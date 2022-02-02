@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32014.148
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IDKEngine", "IDKEngine\IDKEngine.csproj", "{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{702087FC-25B4-48A9-A5A5-DDD8628F75B0}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Debug|x64.ActiveCfg = Debug|x64
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Debug|x64.Build.0 = Debug|x64
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Release|x64.ActiveCfg = Release|x64
+		{A7391BB3-2EAE-49FA-945C-E7237BE6F4DE}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A73FA351-7542-4DD8-84C1-133649F33041}
+	EndGlobalSection
+EndGlobal
