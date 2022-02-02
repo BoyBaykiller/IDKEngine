@@ -23,9 +23,10 @@ Required extensions: `ARB_bindless_texture` and (`EXT_nonuniform_qualifier` or `
 
 Optional extensions: (`ARB_shader_viewport_layer_array` or `AMD_vertex_shader_layer` or `NV_viewport_array` or `NV_viewport_array2`) and (`ARB_seamless_cubemap_per_texture` or `AMD_seamless_cubemap_per_texture`)
 
+# Render Samples
 
 ![PathTracedDiffuse](Screenshots/PathTracedDiffuse.png?raw=true)
 
 ![PathTracedShiny](Screenshots/PathTracedShiny.png?raw=true)
 
-![Rasterized](Screenshots/Rasterized.png?raw=true)
+![Rasterized](Screenshots/Rasterized.PNG?raw=true)
