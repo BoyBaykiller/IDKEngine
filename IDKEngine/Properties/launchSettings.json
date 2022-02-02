@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Renderer": {
+      "commandName": "Project",
+      "workingDirectory": "$(ProjectDir)"
+    }
+  }
+}
