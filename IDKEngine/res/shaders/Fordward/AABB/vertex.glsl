@@ -74,6 +74,9 @@ layout(std140, binding = 0) uniform BasicDataUBO
     vec3 ViewPos;
     mat4 Projection;
     mat4 InvProjection;
+    mat4 InvProjView;
+    float NearPlane;
+    float FarPlane;
 } basicDataUBO;
 
 void main()

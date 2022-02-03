@@ -16,12 +16,12 @@ namespace IDKEngine.Render
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f);
         }
 
-        public void Compute(Texture samplerSrc, Texture normalTexture, Texture depthTexture)
+        public unsafe void Compute(Texture samplerSrc, Texture normalTexture, Texture depthTexture, Texture cubemap)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
-            samplerSrc.BindToUnit(0);
-            normalTexture.BindToUnit(1);
-            depthTexture.BindToUnit(2);
+            
+            int* textures = stackalloc int[] { samplerSrc.ID, normalTexture.ID, depthTexture.ID, cubemap.ID };
+            Texture.MultiBindToUnit(0, 4, textures);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);

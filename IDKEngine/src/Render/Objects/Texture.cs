@@ -135,6 +135,11 @@ namespace IDKEngine.Render.Objects
             GL.BindTextures(first, textures.Length, textures);
         }
 
+        public static unsafe void MultiBindToUnit(int first, int length, int* textures)
+        {
+            GL.BindTextures(first, length, textures);
+        }
+
         public void SubTexture3D<T>(int width, int heigth, int depth, PixelFormat pixelFormat, PixelType pixelType, T[] pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : struct
         {
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, heigth, depth, pixelFormat, pixelType, pixels);

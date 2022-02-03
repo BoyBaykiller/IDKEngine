@@ -47,7 +47,7 @@ namespace IDKEngine.Render
                 {
                     ImGui.Checkbox("FrustumCulling", ref window.IsFrustumCulling);
                     ImGui.Checkbox("ZPrePass", ref window.ForwardRenderer.IsZPrePass);
-                    ImGui.Checkbox("IsDrawAABB", ref window.IsDrawAABB);
+                    ImGui.Checkbox("DrawAABB", ref window.IsDrawAABB);
 
 
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
@@ -69,6 +69,12 @@ namespace IDKEngine.Render
                             if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
                             {
                                 window.VolumetricLighter.Scattering = tempFloat;
+                            }
+
+                            tempFloat = window.VolumetricLighter.MaxDist;
+                            if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1.0f, 500.0f))
+                            {
+                                window.VolumetricLighter.MaxDist = tempFloat;
                             }
                         }
                     }

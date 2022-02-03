@@ -29,15 +29,15 @@ namespace IDKEngine.Render
             }
         }
 
-        private int _renderedFrame;
-        private int RenderedFrame
+        private float _maxDist;
+        public float MaxDist
         {
-            get => _renderedFrame;
+            get => _maxDist;
 
             set
             {
-                _renderedFrame = value;
-                shaderProgram.Upload("RendererdFrame", _renderedFrame);
+                _maxDist = value;
+                shaderProgram.Upload("MaxDist", _maxDist);
             }
         }
 
@@ -45,7 +45,7 @@ namespace IDKEngine.Render
         public readonly Texture Result;
         private static readonly ShaderProgram shaderProgram =
             new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
-        public VolumetricLighter(int width, int height, int samples, float scattering)
+        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -53,6 +53,7 @@ namespace IDKEngine.Render
 
             Samples = samples;
             Scattering = scattering;
+            MaxDist = maxDist;
         }
 
         public void Compute(Texture depth)
@@ -63,7 +64,6 @@ namespace IDKEngine.Render
             
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-            RenderedFrame = (RenderedFrame + 1) % 2;
         }
 
         public void SetSize(int width, int height)
