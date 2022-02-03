@@ -48,6 +48,9 @@ layout(std140, binding = 0) uniform BasicDataUBO
     vec3 ViewPos;
     mat4 Projection;
     mat4 InvProjection;
+    mat4 InvProjView;
+    float NearPlane;
+    float FarPlane;
 } basicDataUBO;
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);
@@ -65,25 +68,32 @@ const float ditherPattern[4][4] =
 };
 
 uniform float Scattering;
+uniform float MaxDist;
 uniform int Samples;
 uniform int RendererdFrame;
 
 void main()
 {
+
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 imgResultSize = imageSize(ImgResult);
-    vec2 samplerDepthUV = vec2(imgCoord) / textureSize(SamplerDepth, 0);
-    float depth = texture(SamplerDepth, samplerDepthUV).r;
-    
-    if (depth > 1.0 - EPSILON || (shadowDataUBO.PointCount == 0))
+    if (shadowDataUBO.PointCount == 0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
     }
+
+    vec2 imgResultSize = imageSize(ImgResult);
+    vec2 samplerDepthUV = vec2(imgCoord) / textureSize(SamplerDepth, 0);
+    float depth = texture(SamplerDepth, samplerDepthUV).r;
+
     vec3 viewToFrag = NDCToWorldSpace(vec3(samplerDepthUV, depth) * 2.0 - 1.0) - basicDataUBO.ViewPos;
-    vec3 deltaStep = viewToFrag / Samples;
-    vec3 viewDir = normalize(viewToFrag);
+    float viewToFragLen = length(viewToFrag);
+    vec3 viewDir = viewToFrag / viewToFragLen;
     
+    if (viewToFragLen > MaxDist)
+        viewToFrag = viewDir * MaxDist;
+
+    vec3 deltaStep = viewToFrag / Samples;
     vec3 origin = basicDataUBO.ViewPos + deltaStep * ditherPattern[imgCoord.x % 4][imgCoord.y % 4];
 
     vec3 scattered = vec3(0.0);
@@ -144,10 +154,9 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample)
 
 vec3 NDCToWorldSpace(vec3 ndc)
 {
-    vec4 worldPos = basicDataUBO.InvProjection * vec4(ndc, 1.0);
-    worldPos /= worldPos.w;
+    vec4 worldPos = basicDataUBO.InvProjView * vec4(ndc, 1.0);
 
-    return (basicDataUBO.InvView * worldPos).xyz;
+    return worldPos.xyz / worldPos.w;
 }
 
 // Mie scaterring approximated with Henyey-Greenstein phase function from http://www.alexandre-pestana.com/volumetric-lights/

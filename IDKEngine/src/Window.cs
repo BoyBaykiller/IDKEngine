@@ -14,6 +14,7 @@ namespace IDKEngine
     class Window : GameWindow
     {
         public const float EPSILON = 0.001f;
+        public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
         public Window()
 #if DEBUG
@@ -29,7 +30,7 @@ namespace IDKEngine
 
 
         private int fps;
-        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = true, IsDrawAABB = false;
+        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = false, IsDrawAABB = true;
         public int FPS;
         protected override void OnRenderFrame(FrameEventArgs e)
         {
@@ -45,15 +46,16 @@ namespace IDKEngine
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
 
                 ForwardRenderer.Render(AtmosphericScatterer.Result, ModelSystem);
-                if (IsDrawAABB)
-                    ModelSystem.DrawAABB();
                 lightRenderer.Draw();
 
                 if (IsVolumetricLighting)
                     VolumetricLighter.Compute(ForwardRenderer.Depth);
 
                 if (IsSSR)
-                    SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth);
+                    SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
+
+                if (IsDrawAABB)
+                    ModelSystem.DrawAABB();
 
                 if (IsSSR) SSR.Result.BindToUnit(2);
                 else Texture.UnbindFromUnit(2);
@@ -92,7 +94,7 @@ namespace IDKEngine
         }
 
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        protected override void OnUpdateFrame(FrameEventArgs e)
+        protected override unsafe void OnUpdateFrame(FrameEventArgs e)
         {
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
@@ -149,9 +151,13 @@ namespace IDKEngine
                     Gui.Update(this);
                 }
 
-                Matrix4 projView = camera.View * projection;
-                basicDataUBO.SubData(0, Unsafe.SizeOf<Matrix4>() * 3, new Matrix4[] { projView, camera.View, camera.View.Inverted() });
-                basicDataUBO.SubData(Unsafe.SizeOf<Matrix4>() * 3, Vector4.SizeInBytes, camera.Position);
+                glslBasicData.ProjView = camera.View * glslBasicData.Projection;
+                glslBasicData.View = camera.View;
+                glslBasicData.InvView = camera.View.Inverted();
+                glslBasicData.CameraPos = camera.Position;
+                glslBasicData.InvProjView = (glslBasicData.View * glslBasicData.Projection).Inverted();
+
+                basicDataUBO.SubData(0, sizeof(GLSLBasicData), glslBasicData);
 
                 //ModelSystem.Upload(0, ModelSystem.MeshCount, (ref Model.GLSLMesh curMesh) =>
                 //{
@@ -173,7 +179,8 @@ namespace IDKEngine
         public VolumetricLighter VolumetricLighter;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
-        protected override void OnLoad(EventArgs e)
+        private GLSLBasicData glslBasicData;
+        protected override unsafe void OnLoad(EventArgs e)
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
@@ -215,7 +222,7 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse });
 
             ForwardRenderer = new Forward(Width, Height);
-            VolumetricLighter = new VolumetricLighter(Width, Height, 17, 0.758f);
+            VolumetricLighter = new VolumetricLighter(Width, Height, 20, 0.758f, 100.0f);
             SSR = new SSR(Width, Height);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Render();
@@ -242,7 +249,7 @@ namespace IDKEngine
             shadows[1].CreateDepthMap(ModelSystem);
 
             basicDataUBO = new BufferObject();
-            basicDataUBO.ImmutableAllocate(5 * Unsafe.SizeOf<Matrix4>() + Vector4.SizeInBytes, IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             basicDataUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 0, 0, basicDataUBO.Size);
 
             finalProgram = new ShaderProgram(
@@ -252,18 +259,17 @@ namespace IDKEngine
             base.OnLoad(e);
         }
 
-        private Matrix4 projection;
         private int lastWidth, lastHeight;
-        protected override void OnResize(EventArgs e)
+        protected override unsafe void OnResize(EventArgs e)
         {
             if ((lastWidth != Width || lastHeight != Height) && Width != 0 && Height != 0)
             {
                 Gui.ImGuiController.WindowResized(Width, Height);
 
-                projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, 0.01f, 500.0f);
-
-                basicDataUBO.SubData(Unsafe.SizeOf<Matrix4>() * 3 + Vector4.SizeInBytes, Unsafe.SizeOf<Matrix4>(), projection);
-                basicDataUBO.SubData(Unsafe.SizeOf<Matrix4>() * 4 + Vector4.SizeInBytes, Unsafe.SizeOf<Matrix4>(), projection.Inverted());
+                glslBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
+                glslBasicData.InvProjection = glslBasicData.Projection.Inverted();
+                glslBasicData.NearPlane = NEAR_PLANE;
+                glslBasicData.FarPlane = FAR_PLANE;
 
                 ForwardRenderer.SetSize(Width, Height);
                 VolumetricLighter.SetSize(Width, Height);

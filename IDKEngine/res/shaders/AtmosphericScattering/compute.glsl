@@ -9,7 +9,7 @@ layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
 
 layout(binding = 0, rgba32f) uniform writeonly restrict imageCube ImgResult;
 
-layout (std140, binding = 4) uniform AtmosphericDataUBO
+layout(std140, binding = 4) uniform AtmosphericDataUBO
 {
     mat4 InvProjection;
     mat4[6] InvView;

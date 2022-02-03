@@ -28,7 +28,7 @@ namespace IDKEngine.Render
         public Forward(int width, int height)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder);
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f);
 
