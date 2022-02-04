@@ -1,6 +1,5 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
-#define EPSILON 0.0001
 #define PI 3.1415926536
 
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
@@ -83,10 +82,10 @@ void main()
     }
 
     vec2 imgResultSize = imageSize(ImgResult);
-    vec2 samplerDepthUV = vec2(imgCoord) / textureSize(SamplerDepth, 0);
-    float depth = texture(SamplerDepth, samplerDepthUV).r;
+    vec2 uv = imgCoord / imgResultSize;
 
-    vec3 viewToFrag = NDCToWorldSpace(vec3(samplerDepthUV, depth) * 2.0 - 1.0) - basicDataUBO.ViewPos;
+    vec3 ndc = vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0;
+    vec3 viewToFrag = NDCToWorldSpace(ndc) - basicDataUBO.ViewPos;
     float viewToFragLen = length(viewToFrag);
     vec3 viewDir = viewToFrag / viewToFragLen;
     

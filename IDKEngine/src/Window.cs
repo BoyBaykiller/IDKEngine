@@ -8,6 +8,7 @@ using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
+using System.Net.Sockets;
 
 namespace IDKEngine
 {
@@ -30,7 +31,7 @@ namespace IDKEngine
 
 
         private int fps;
-        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = false, IsDrawAABB = true;
+        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = false, IsDOF = false, IsDrawAABB = true;
         public int FPS;
         protected override void OnRenderFrame(FrameEventArgs e)
         {
@@ -49,7 +50,7 @@ namespace IDKEngine
                 lightRenderer.Draw();
 
                 if (IsVolumetricLighting)
-                    VolumetricLighter.Compute(ForwardRenderer.Depth);
+                    VolumetricLight.Compute(ForwardRenderer.Depth);
 
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
@@ -57,10 +58,16 @@ namespace IDKEngine
                 if (IsDrawAABB)
                     ModelSystem.DrawAABB();
 
+                if (IsDOF)
+                {
+                    GaussianBlur.Blur(ForwardRenderer.Result);
+                    DOF.Compute(ForwardRenderer.Depth, ForwardRenderer.Result, GaussianBlur.Result, ForwardRenderer.Result);
+                }
+
                 if (IsSSR) SSR.Result.BindToUnit(2);
                 else Texture.UnbindFromUnit(2);
 
-                if (IsVolumetricLighting) VolumetricLighter.Result.BindToUnit(1);
+                if (IsVolumetricLighting) VolumetricLight.Result.BindToUnit(1);
                 else Texture.UnbindFromUnit(1);
 
                 ForwardRenderer.Result.BindToUnit(0);
@@ -170,13 +177,14 @@ namespace IDKEngine
 
         private ShaderProgram finalProgram;
         private BufferObject basicDataUBO;
-
         private ShadowBase[] shadows;
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public SSR SSR;
+        public VolumetricLighter VolumetricLight;
+        public DepthOfField DOF;
+        public GaussianBlur GaussianBlur;
         private Lighter lightRenderer;
-        public VolumetricLighter VolumetricLighter;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         private GLSLBasicData glslBasicData;
@@ -222,8 +230,10 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse });
 
             ForwardRenderer = new Forward(Width, Height);
-            VolumetricLighter = new VolumetricLighter(Width, Height, 20, 0.758f, 100.0f);
             SSR = new SSR(Width, Height);
+            VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f);
+            GaussianBlur = new GaussianBlur(Width, Height);
+            DOF = new DepthOfField(10.0f, 0.07f);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Render();
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
@@ -237,12 +247,13 @@ namespace IDKEngine
 
             GLSLLight[] lights = new GLSLLight[2];
             lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 1000.0f, 0.2f);
+            //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -3.95f), new Vector3(4.585f, 4.725f, 2.56f) * 1000.0f, 0.2f);
             lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.1f);
             lightRenderer = new Lighter(20, 20);
             lightRenderer.Add(lights);
-            
+
             shadows = new ShadowBase[2];
-            shadows[0] = new PointShadow(lightRenderer, 0, 2048, 1.0f, 60.0f);
+            shadows[0] = new PointShadow(lightRenderer, 0, 1536, 1.0f, 60.0f);
             shadows[1] = new PointShadow(lightRenderer, 1, 256, 0.5f, 60.0f);
 
             shadows[0].CreateDepthMap(ModelSystem);
@@ -272,9 +283,10 @@ namespace IDKEngine
                 glslBasicData.FarPlane = FAR_PLANE;
 
                 ForwardRenderer.SetSize(Width, Height);
-                VolumetricLighter.SetSize(Width, Height);
+                VolumetricLight.SetSize(Width, Height);
+                GaussianBlur.SetSize(Width, Height);
                 SSR.SetSize(Width, Height);
-                PathTracer.SetSize(Width / 1, Height / 1);
+                PathTracer.SetSize(Width, Height);
 
                 lastWidth = Width;
                 lastHeight = Height;

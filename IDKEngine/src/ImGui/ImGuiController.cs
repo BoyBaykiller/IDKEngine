@@ -55,7 +55,7 @@ namespace IDKEngine.GUI
             Height = height;
         }
 
-        private void CreateDeviceResources()
+        private unsafe void CreateDeviceResources()
         {
             vbo = new BufferObject();
             vbo.MutableAllocate(10000, IntPtr.Zero, BufferUsageHint.DynamicDraw);
@@ -99,7 +99,7 @@ namespace IDKEngine.GUI
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);
-            vao.AddSourceBuffer(vbo, 0, Unsafe.SizeOf<ImDrawVert>());
+            vao.AddSourceBuffer(vbo, 0, sizeof(ImDrawVert));
             vao.SetAttribFormat(0, 0, 2, VertexAttribType.Float, 0 * sizeof(float));
             vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 2 * sizeof(float));
             vao.SetAttribFormat(0, 2, 4, VertexAttribType.UnsignedByte, 4 * sizeof(float), true);
@@ -289,7 +289,7 @@ namespace IDKEngine.GUI
             style.TabRounding = 0.0f;
             style.WindowRounding = 4.0f;
         }
-        private void RenderImDrawData(ImDrawDataPtr drawData)
+        private unsafe void RenderImDrawData(ImDrawDataPtr drawData)
         {
             if (drawData.CmdListsCount == 0)
                 return;
@@ -297,7 +297,7 @@ namespace IDKEngine.GUI
             for (int i = 0; i < drawData.CmdListsCount; i++)
             {
                 ImDrawListPtr cmdList = drawData.CmdListsRange[i];
-                int vertexSize = cmdList.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>();
+                int vertexSize = cmdList.VtxBuffer.Size * sizeof(ImDrawVert);
                 if (vertexSize > vbo.Size)
                 {
                     int newSize = (int)Math.Max(vbo.Size * 1.5f, vertexSize);
@@ -333,7 +333,7 @@ namespace IDKEngine.GUI
             {
                 ImDrawListPtr cmd_list = drawData.CmdListsRange[i];
 
-                vbo.SubData(0, cmd_list.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>(), cmd_list.VtxBuffer.Data);
+                vbo.SubData(0, cmd_list.VtxBuffer.Size * sizeof(ImDrawVert), cmd_list.VtxBuffer.Data);
                 ebo.SubData(0, cmd_list.IdxBuffer.Size * sizeof(ushort), cmd_list.IdxBuffer.Data);
 
                 int idx_offset = 0;

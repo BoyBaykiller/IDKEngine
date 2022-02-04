@@ -170,15 +170,15 @@ void main()
     {   
         vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01()) - 0.5; // integrating over whole pixel eliminates aliasing
         vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
-        Ray rayEyeToWorld = Ray(basicDataUBO.ViewPos, GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc));
+        Ray camRay = Ray(basicDataUBO.ViewPos, GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc));
 
-        vec3 focalPoint = rayEyeToWorld.Origin + rayEyeToWorld.Direction * FocalLength;
+        vec3 focalPoint = camRay.Origin + camRay.Direction * FocalLength;
         vec2 offset = ApertureDiameter * 0.5 * UniformSampleUnitCircle();
         
-        rayEyeToWorld.Origin = (basicDataUBO.InvView * vec4(offset, 0.0, 1.0)).xyz;
-        rayEyeToWorld.Direction = normalize(focalPoint - rayEyeToWorld.Origin);
+        camRay.Origin = (basicDataUBO.InvView * vec4(offset, 0.0, 1.0)).xyz;
+        camRay.Direction = normalize(focalPoint - camRay.Origin);
 
-        irradiance += Radiance(rayEyeToWorld);
+        irradiance += Radiance(camRay);
     }
     irradiance /= SPP;
     

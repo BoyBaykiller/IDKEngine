@@ -40,15 +40,15 @@ namespace IDKEngine.Render
         private static VAO vao;
         public readonly int IndicisCount;
         private readonly GLSLLight[] lights = new GLSLLight[GLSL_MAX_UBO_LIGHT_COUNT];
-        public Lighter(int latitudes, int longitudes)
+        public unsafe Lighter(int latitudes, int longitudes)
         {
             bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(lights.Length * Unsafe.SizeOf<GLSLLight>() + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            bufferObject.ImmutableAllocate(lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 3, 0, bufferObject.Size);
 
             ObjectFactory.Vertex[] vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
             BufferObject vbo = new BufferObject();
-            vbo.ImmutableAllocate(vertecis.Length * Unsafe.SizeOf<ObjectFactory.Vertex>(), vertecis, BufferStorageFlags.DynamicStorageBit);
+            vbo.ImmutableAllocate(vertecis.Length * sizeof(ObjectFactory.Vertex), vertecis, BufferStorageFlags.DynamicStorageBit);
 
             uint[] indicis = ObjectFactory.GenerateSmoothSphereIndicis((uint)latitudes, (uint)longitudes);
             BufferObject ebo = new BufferObject();
@@ -56,7 +56,7 @@ namespace IDKEngine.Render
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);
-            vao.AddSourceBuffer(vbo, 0, Unsafe.SizeOf<ObjectFactory.Vertex>());
+            vao.AddSourceBuffer(vbo, 0, sizeof(ObjectFactory.Vertex));
             vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0 * sizeof(float)); // Positions
             //vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 3 * sizeof(float)); // TexCoord
             //vao.SetAttribFormat(0, 2, 3, VertexAttribType.Float, 5 * sizeof(float)); // Normals
@@ -71,17 +71,17 @@ namespace IDKEngine.Render
             GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
         }
 
-        public void Add(GLSLLight[] lights)
+        public unsafe void Add(GLSLLight[] lights)
         {
             Debug.Assert(Count + lights.Length <= GLSL_MAX_UBO_LIGHT_COUNT);
 
-            bufferObject.SubData(Count * Unsafe.SizeOf<GLSLLight>(), lights.Length * Unsafe.SizeOf<GLSLLight>(), lights);
+            bufferObject.SubData(Count * sizeof(GLSLLight), lights.Length * sizeof(GLSLLight), lights);
             Array.Copy(lights, 0, this.lights, Count, lights.Length);
             
             Count += lights.Length;
         }
 
-        public void RemoveAt(int index)
+        public unsafe void RemoveAt(int index)
         {
             Debug.Assert(index >= 0 && index < Count);
             Debug.Assert(Count - 1 >= 0);
@@ -93,7 +93,7 @@ namespace IDKEngine.Render
             }
 
             Array.Copy(lights, index + 1, lights, index, Count - index);
-            bufferObject.SubData(index * Unsafe.SizeOf<GLSLLight>(), (Count - index) * Unsafe.SizeOf<GLSLLight>(), lights);
+            bufferObject.SubData(index * sizeof(GLSLLight), (Count - index) * sizeof(GLSLLight), lights);
             Count--;
         }
 

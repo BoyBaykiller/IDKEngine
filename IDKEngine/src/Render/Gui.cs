@@ -58,23 +58,23 @@ namespace IDKEngine.Render
                             int tempInt;
                             float tempFloat;
 
-                            tempInt = window.VolumetricLighter.Samples;
+                            tempInt = window.VolumetricLight.Samples;
                             if (ImGui.SliderInt("Samples", ref tempInt, 1, 100))
                             {
-                                window.VolumetricLighter.Samples = tempInt;
+                                window.VolumetricLight.Samples = tempInt;
                             }
 
 
-                            tempFloat = window.VolumetricLighter.Scattering;
+                            tempFloat = window.VolumetricLight.Scattering;
                             if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
                             {
-                                window.VolumetricLighter.Scattering = tempFloat;
+                                window.VolumetricLight.Scattering = tempFloat;
                             }
 
-                            tempFloat = window.VolumetricLighter.MaxDist;
-                            if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1.0f, 500.0f))
+                            tempFloat = window.VolumetricLight.MaxDist;
+                            if (ImGui.SliderFloat("MaxDist", ref tempFloat, 5.0f, 200.0f))
                             {
-                                window.VolumetricLighter.MaxDist = tempFloat;
+                                window.VolumetricLight.MaxDist = tempFloat;
                             }
                         }
                     }
@@ -88,6 +88,27 @@ namespace IDKEngine.Render
                             float tempFloat;
 
                             // TODO: Do shitty gui
+                        }
+                    }
+
+                    if (ImGui.CollapsingHeader("DOF"))
+                    {
+                        ImGui.Checkbox("IsDOF", ref window.IsDOF);
+                        if (window.IsDOF)
+                        {
+                            float tempFloat;
+
+                            tempFloat = window.DOF.FocalLength;
+                            if (ImGui.SliderFloat("FocalPoint", ref tempFloat, 0.0f, 100.0f))
+                            {
+                                window.DOF.FocalLength = tempFloat;
+                            }
+
+                            tempFloat = window.DOF.ApertureRadius;
+                            if (ImGui.SliderFloat("ApertureRadius", ref tempFloat, 0.0f, 0.5f))
+                            {
+                                window.DOF.ApertureRadius = tempFloat;
+                            }
                         }
                     }
                 }

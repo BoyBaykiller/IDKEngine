@@ -95,6 +95,7 @@ in InOutVars
 {
     vec2 TexCoord;
     vec3 FragPos;
+    vec3 Normal;
     mat3 TBN;
     flat int MeshIndex;
     flat int MaterialIndex;
@@ -127,7 +128,9 @@ void main()
     Roughness  = texture(material.Roughness, inData.TexCoord).r;
     Specular  = texture(material.Specular, inData.TexCoord).r;
 
-    Normal = inData.TBN * (Normal * 2.0 - 1.0);
+    // TODO: Make alpha a gui option
+    Normal = mix(inData.TBN * (Normal * 2.0 - 1.0), inData.Normal, 0.0);
+
     ViewDir = normalize(basicDataUBO.ViewPos - inData.FragPos);
     F0 = mix(vec3(0.04), Albedo.rgb, Metallic);
 
@@ -201,8 +204,8 @@ float Shadow(PointShadow pointShadow)
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
     
     const float DISK_RADIUS = 0.04;
-    float shadowFactor = 0.0;
-    for (int i = 0; i < 20; ++i)
+    float shadowFactor = texture(pointShadow.Sampler, vec4(lightToFrag, mapedDepth));
+    for (int i = 0; i < 20; i++)
     {
         shadowFactor += texture(pointShadow.Sampler, vec4(lightToFrag + sampleOffsetDirections[i] * DISK_RADIUS, mapedDepth));
     }
