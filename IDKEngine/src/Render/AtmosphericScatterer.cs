@@ -101,8 +101,8 @@ namespace IDKEngine.Render
         public void Render()
         {
             Result.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba32f);
-            shaderProgram.Use();
 
+            shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Width + 4 - 1) / 4, 6);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }

@@ -177,7 +177,14 @@ namespace IDKEngine.Render.Objects
 
         public static int GetMaxMipMaplevel(int width, int height, int depth)
         {
-            return (int)(1 + Math.Floor(Math.Log2(Math.Max(width, Math.Max(height, depth)))));
+            return (int)Math.Ceiling(Math.Log2(Math.Max(width, Math.Max(height, depth))));
+        }
+
+        public static void GetMipMapLevelSize(ref int width, ref int height, ref int depth, int level)
+        {
+            width /= (int)MathF.Pow(2, level);
+            height /= (int)MathF.Pow(2, level);
+            depth /= (int)MathF.Pow(2, level);
         }
 
         /// <summary>
@@ -191,8 +198,7 @@ namespace IDKEngine.Render.Objects
 
         public unsafe void SetBorderColor(Vector4 color)
         {
-            float* colors = stackalloc float[] { color.X, color.Y, color.Z, color.W };
-            GL.TextureParameter(ID, TextureParameterName.TextureBorderColor, colors);
+            GL.TextureParameter(ID, TextureParameterName.TextureBorderColor, &color.X);
         }
 
         public void SetMipmapLodBias(float bias)

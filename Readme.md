@@ -10,6 +10,7 @@ Feature list:
  - Physically Based Renderer
  - (Copied) Atmospheric Scattering, ported to Compute Shader and precomputed
  - GLSL Shadow Samplers for hardware filtering + PCF
+ - Depth Of Field (early progress)
  - Naive Screen Space Reflections (needs more tweaking, disabled on default)
  - Single pass Vertex layered rendering for point shadows (updated every frame for all geometry kinda bad)
  - GPU accelerated Frustum Culling (implement for shadows as well?)

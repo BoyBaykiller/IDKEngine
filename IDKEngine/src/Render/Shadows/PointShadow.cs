@@ -31,7 +31,7 @@ namespace IDKEngine.Render
             Instance = CountPointShadows++;
 
             DepthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder);
+            DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             DepthTexture.SetCompareMode(TextureCompareMode.CompareRefToTexture);
             DepthTexture.SetCompareFunc(All.Lequal);
             DepthTexture.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);

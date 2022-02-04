@@ -60,6 +60,8 @@ vec3 SSR(vec3 normal, vec3 fragPos)
     vec3 samplePoint = fragPos;
     for (int i = 0; i < Samples; i++)
     {
+        samplePoint += deltaStep;
+        
         vec3 projectedSample = WorldToNDC(samplePoint) * 0.5 + 0.5;
         
         if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))))
@@ -72,7 +74,6 @@ vec3 SSR(vec3 normal, vec3 fragPos)
         if (projectedSample.z > depth)
             return texture(SamplerSrc, projectedSample.xy).rgb; 
 
-        samplePoint += deltaStep;
     }
 
     return texture(SamplerEnvironment, reflectDir).rgb;
