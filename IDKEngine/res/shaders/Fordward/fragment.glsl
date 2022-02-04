@@ -90,6 +90,13 @@ layout(std140, binding = 3) uniform LightsUBO
     int LightCount;
 } lightsUBO;
 
+vec3 PBR(Light light);
+float Shadow(PointShadow pointShadow);
+float DistributionGGX(float nDotH, float roughness);
+float GeometrySchlickGGX(float nDotV, float roughness);
+float GeometrySmith(float nDotV, float nDotL, float roughness);
+vec3 FresnelSchlick(float cosTheta, vec3 F0);
+float LinearizeDepth(float depth, float nearPlane, float farPlane);
 
 in InOutVars
 {
@@ -101,20 +108,11 @@ in InOutVars
     flat int MaterialIndex;
 } inData;
 
-vec3 PBR(Light light);
-float Shadow(PointShadow pointShadow);
-float DistributionGGX(float nDotH, float roughness);
-float GeometrySchlickGGX(float nDotV, float roughness);
-float GeometrySmith(float nDotV, float nDotL, float roughness);
-vec3 FresnelSchlick(float cosTheta, vec3 F0);
-
 vec4 Albedo;
 vec3 Normal;
 float Metallic;
 float Roughness;
-// TODO: Incorporate Specular into pbr
-float Specular;
-
+float Specular; // TODO: Incorporate Specular into pbr
 vec3 ViewDir;
 vec3 F0;
 void main()
@@ -150,6 +148,8 @@ void main()
     FragColor = vec4(irradiance + Albedo.rgb * 0.05, 1.0);
     NormalColor = vec4(Normal, Specular);
     MeshIndexColor = inData.MeshIndex;
+
+    gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
 }
 
 vec3 PBR(Light light)
@@ -246,4 +246,10 @@ vec3 FresnelSchlick(float cosTheta, vec3 F0)
 {
     float val = 1.0 - cosTheta;
     return F0 + (1.0 - F0) * val * val * val * val * val;
+}
+
+float LinearizeDepth(float depth, float nearPlane, float farPlane)
+{
+    float z = depth * 2.0 - 1.0;
+    return (2.0 * nearPlane * farPlane) / (farPlane + nearPlane - z * (farPlane - nearPlane));
 }

@@ -217,24 +217,24 @@ namespace IDKEngine.Render
             }   
         }
 
-        public static System.Numerics.Vector2 OpenTKToSystem(OpenTK.Vector2 vector2)
+        public static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)
         {
             return new System.Numerics.Vector2(vector2.X, vector2.Y);
         }
 
-        public static OpenTK.Vector2 SystemToOpenTK(System.Numerics.Vector2 vector2)
+        public static Vector2 SystemToOpenTK(System.Numerics.Vector2 vector2)
         {
-            return new OpenTK.Vector2(vector2.X, vector2.Y);
+            return new Vector2(vector2.X, vector2.Y);
         }
 
-        public static System.Numerics.Vector3 OpenTKToSystem(OpenTK.Vector3 vector3)
+        public static System.Numerics.Vector3 OpenTKToSystem(Vector3 vector3)
         {
             return new System.Numerics.Vector3(vector3.X, vector3.Y, vector3.Z);
         }
 
-        public static OpenTK.Vector3 SystemToOpenTK(System.Numerics.Vector3 vector3)
+        public static Vector3 SystemToOpenTK(System.Numerics.Vector3 vector3)
         {
-            return new OpenTK.Vector3(vector3.X, vector3.Y, vector3.Z);
+            return new Vector3(vector3.X, vector3.Y, vector3.Z);
         }
     }
 }

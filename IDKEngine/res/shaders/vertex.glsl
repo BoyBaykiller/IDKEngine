@@ -13,7 +13,6 @@ out InOutVars
     vec2 TexCoord;
 } outData;
 
-
 void main()
 {
     vec4 vertex = data[gl_VertexID];
