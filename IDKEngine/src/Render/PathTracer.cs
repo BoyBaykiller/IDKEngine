@@ -1,9 +1,6 @@
-﻿using System;
-using System.IO;
-using IDKEngine.Render.Objects;
-using System.Collections.Generic;
-using OpenTK;
+﻿using System.IO;
 using OpenTK.Graphics.OpenGL4;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {

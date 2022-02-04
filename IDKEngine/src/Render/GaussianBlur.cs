@@ -28,7 +28,7 @@ namespace IDKEngine.Render
             pong.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, 1);
         }
 
-        public void Blur(Texture src)
+        public void Compute(Texture src)
         {
             // FIX: Pseudo random deterministic black pixels on result texture...
             src.BindToUnit(0);

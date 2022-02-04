@@ -5,7 +5,7 @@
 #extension GL_NV_viewport_array : enable
 #extension GL_NV_viewport_array2 : enable
 
-#define IS_VERTEX_LAYERED_RENDERING defined(GL_ARB_shader_viewport_layer_array) || defined(GL_AMD_vertex_shader_layer) || defined(GL_NV_viewport_array) || defined(GL_NV_viewport_array2)
+#define IS_VERTEX_LAYERED_RENDERING (defined(GL_ARB_shader_viewport_layer_array) || defined(GL_AMD_vertex_shader_layer) || defined(GL_NV_viewport_array) || defined(GL_NV_viewport_array2))
 
 layout(location = 0) in vec3 Position;
 

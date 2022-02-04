@@ -57,7 +57,7 @@ namespace IDKEngine.Render.Objects
             public Matrix4 Model;
             public int MaterialIndex;
             public int BaseNode;
-            private readonly float _pad0; // MeshIndex
+            private readonly float _pad0;
             private readonly float _pad1;
         }
         public struct GLSLVertex

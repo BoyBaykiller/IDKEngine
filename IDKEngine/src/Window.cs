@@ -37,8 +37,17 @@ namespace IDKEngine
         {
             if (!IsPathTracing)
             {
+                // 1. If user deactived frustum culling upload unculled command buffer to take effect
+                // 2. If frustum culling is on and IS_VERTEX_LAYERED_RENDERING is not supported
+                //    upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
+                if (IsFrustumCulling && !PointShadow.IS_VERTEX_LAYERED_RENDERING)
+                {
+                    ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
+                }
+
                 shadows[0].CreateDepthMap(ModelSystem);
                 shadows[1].CreateDepthMap(ModelSystem);
+
                 GL.Viewport(0, 0, Width, Height);
 
                 if (IsFrustumCulling)
@@ -60,7 +69,7 @@ namespace IDKEngine
 
                 if (IsDOF)
                 {
-                    GaussianBlur.Blur(ForwardRenderer.Result);
+                    GaussianBlur.Compute(ForwardRenderer.Result);
                     DOF.Compute(ForwardRenderer.Depth, ForwardRenderer.Result, GaussianBlur.Result, ForwardRenderer.Result);
                 }
 
