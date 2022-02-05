@@ -90,13 +90,6 @@ layout(std140, binding = 3) uniform LightsUBO
     int LightCount;
 } lightsUBO;
 
-vec3 PBR(Light light);
-float Shadow(PointShadow pointShadow);
-float DistributionGGX(float nDotH, float roughness);
-float GeometrySchlickGGX(float nDotV, float roughness);
-float GeometrySmith(float nDotV, float nDotL, float roughness);
-vec3 FresnelSchlick(float cosTheta, vec3 F0);
-float LinearizeDepth(float depth, float nearPlane, float farPlane);
 
 in InOutVars
 {
@@ -107,6 +100,14 @@ in InOutVars
     flat int MeshIndex;
     flat int MaterialIndex;
 } inData;
+
+vec3 PBR(Light light);
+float Shadow(PointShadow pointShadow);
+float DistributionGGX(float nDotH, float roughness);
+float GeometrySchlickGGX(float nDotV, float roughness);
+float GeometrySmith(float nDotV, float nDotL, float roughness);
+vec3 FresnelSchlick(float cosTheta, vec3 F0);
+float LinearizeDepth(float depth, float nearPlane, float farPlane);
 
 vec4 Albedo;
 vec3 Normal;
