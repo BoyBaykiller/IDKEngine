@@ -33,7 +33,7 @@ namespace IDKEngine.Render
             DepthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             DepthTexture.SetCompareMode(TextureCompareMode.CompareRefToTexture);
-            DepthTexture.SetCompareFunc(All.Lequal);
+            DepthTexture.SetCompareFunc(All.Less);
             DepthTexture.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
             
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture);

@@ -31,7 +31,7 @@ namespace IDKEngine
 
 
         private int fps;
-        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = false, IsDOF = false, IsDrawAABB = true;
+        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = true, IsDOF = false, IsDrawAABB = false;
         public int FPS;
         protected override void OnRenderFrame(FrameEventArgs e)
         {
@@ -239,7 +239,7 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse });
 
             ForwardRenderer = new Forward(Width, Height);
-            SSR = new SSR(Width, Height);
+            SSR = new SSR(Width, Height, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f);
             GaussianBlur = new GaussianBlur(Width, Height);
             DOF = new DepthOfField(10.0f, 0.07f);
