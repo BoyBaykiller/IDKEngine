@@ -195,8 +195,8 @@ namespace IDKEngine.Render
                 ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);
                 {
                     bool hadChange = false;
-                    Model.GLSLMesh mesh = window.ModelSystem.Meshes[selectedMeshIndex];
-                    Model.GLSLDrawCommand drawCommand = window.ModelSystem.DrawCommands[selectedMeshIndex];
+                    GLSLMesh mesh = window.ModelSystem.Meshes[selectedMeshIndex];
+                    GLSLDrawCommand drawCommand = window.ModelSystem.DrawCommands[selectedMeshIndex];
 
                     systemVec3 = OpenTKToSystem(mesh.Model.ExtractTranslation());
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
@@ -207,7 +207,7 @@ namespace IDKEngine.Render
 
                     if (hadChange)
                     {
-                        window.ModelSystem.ForEach(selectedMeshIndex, 1, (ref Model.GLSLMesh curMesh) =>
+                        window.ModelSystem.ForEach(selectedMeshIndex, selectedMeshIndex + 1, (ref GLSLMesh curMesh) =>
                         {
                             curMesh = mesh;
                         });

@@ -31,13 +31,13 @@ namespace IDKEngine
 
 
         private int fps;
-        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = true, IsDOF = false, IsDrawAABB = false;
+        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = false, IsDOF = false, IsDrawAABB = false;
         public int FPS;
         protected override void OnRenderFrame(FrameEventArgs e)
         {
             if (!IsPathTracing)
             {
-                // 1. If user deactived frustum culling upload unculled command buffer to take effect
+                // 1. If user deactived frustum culling upload unculled command buffer to render everyting again
                 // 2. If frustum culling is on and IS_VERTEX_LAYERED_RENDERING is not supported
                 //    upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
                 if (IsFrustumCulling && !PointShadow.IS_VERTEX_LAYERED_RENDERING)
@@ -56,7 +56,7 @@ namespace IDKEngine
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
 
                 ForwardRenderer.Render(AtmosphericScatterer.Result, ModelSystem);
-                lightRenderer.Draw();
+                lighterContext.Draw();
 
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
@@ -174,11 +174,6 @@ namespace IDKEngine
                 glslBasicData.InvProjView = (glslBasicData.View * glslBasicData.Projection).Inverted();
 
                 basicDataUBO.SubData(0, sizeof(GLSLBasicData), glslBasicData);
-
-                //ModelSystem.Upload(0, ModelSystem.MeshCount, (ref Model.GLSLMesh curMesh) =>
-                //{
-                //    curMesh.Model *= Matrix4.CreateTranslation(0.001f, 0.0f, 0.0f);
-                //});
             }
 
             base.OnUpdateFrame(e);
@@ -186,14 +181,14 @@ namespace IDKEngine
 
         private ShaderProgram finalProgram;
         private BufferObject basicDataUBO;
-        private ShadowBase[] shadows;
+        private PointShadow[] shadows;
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public SSR SSR;
         public VolumetricLighter VolumetricLight;
         public DepthOfField DOF;
         public GaussianBlur GaussianBlur;
-        private Lighter lightRenderer;
+        private Lighter lighterContext;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         private GLSLBasicData glslBasicData;
@@ -258,12 +253,12 @@ namespace IDKEngine
             lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 1000.0f, 0.2f);
             //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -3.95f), new Vector3(4.585f, 4.725f, 2.56f) * 1000.0f, 0.2f);
             lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.1f);
-            lightRenderer = new Lighter(20, 20);
-            lightRenderer.Add(lights);
+            lighterContext = new Lighter(20, 20);
+            lighterContext.Add(lights);
 
-            shadows = new ShadowBase[2];
-            shadows[0] = new PointShadow(lightRenderer, 0, 1536, 1.0f, 60.0f);
-            shadows[1] = new PointShadow(lightRenderer, 1, 256, 0.5f, 60.0f);
+            shadows = new PointShadow[2];
+            shadows[0] = new PointShadow(lighterContext, 0, 1536, 1.0f, 60.0f);
+            shadows[1] = new PointShadow(lighterContext, 1, 256, 0.5f, 60.0f);
 
             shadows[0].CreateDepthMap(ModelSystem);
             shadows[1].CreateDepthMap(ModelSystem);

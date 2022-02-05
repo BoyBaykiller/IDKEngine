@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -14,6 +13,7 @@ namespace IDKEngine.Render
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/Light/vertex.glsl")),
             new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/Light/fragment.glsl")));
+
         private readonly BufferObject bufferObject;
 
         private int _count;
@@ -28,22 +28,13 @@ namespace IDKEngine.Render
             get => _count;
         }
 
-        public GLSLLight this[int index]
-        {
-            get
-            {
-                Debug.Assert(index >= 0 && index < Count);
-                return lights[index];
-            }
-        }
-
-        private static VAO vao;
         public readonly int IndicisCount;
-        private readonly GLSLLight[] lights = new GLSLLight[GLSL_MAX_UBO_LIGHT_COUNT];
+        public readonly GLSLLight[] Lights = new GLSLLight[GLSL_MAX_UBO_LIGHT_COUNT];
+        private static VAO vao;
         public unsafe Lighter(int latitudes, int longitudes)
         {
             bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 3, 0, bufferObject.Size);
 
             ObjectFactory.Vertex[] vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
@@ -76,7 +67,7 @@ namespace IDKEngine.Render
             Debug.Assert(Count + lights.Length <= GLSL_MAX_UBO_LIGHT_COUNT);
 
             bufferObject.SubData(Count * sizeof(GLSLLight), lights.Length * sizeof(GLSLLight), lights);
-            Array.Copy(lights, 0, this.lights, Count, lights.Length);
+            Array.Copy(lights, 0, this.Lights, Count, lights.Length);
             
             Count += lights.Length;
         }
@@ -92,8 +83,8 @@ namespace IDKEngine.Render
                 return;
             }
 
-            Array.Copy(lights, index + 1, lights, index, Count - index);
-            bufferObject.SubData(index * sizeof(GLSLLight), (Count - index) * sizeof(GLSLLight), lights);
+            Array.Copy(Lights, index + 1, Lights, index, Count - index);
+            bufferObject.SubData(index * sizeof(GLSLLight), (Count - index) * sizeof(GLSLLight), Lights);
             Count--;
         }
 
@@ -102,18 +93,18 @@ namespace IDKEngine.Render
         /// Applies a function over the specefied range on <see cref="Lights"/>
         /// </summary>
         /// <param name="start"></param>
-        /// <param name="count"></param>
+        /// <param name="end"></param>
         /// <param name="func"></param>
-        public unsafe void Upload(int start, int count, FuncUploadLight func)
+        public unsafe void ForEach(int start, int end, FuncUploadLight func)
         {
-            Debug.Assert(start >= 0 && (start + count) <= Count);
+            Debug.Assert(start >= 0 && end <= Count);
 
-            for (int i = start; i < start + count; i++)
-                func(ref lights[i]);
+            for (int i = start; i < end; i++)
+                func(ref Lights[i]);
 
-            fixed (void* ptr = &lights[start])
+            fixed (void* ptr = &Lights[start])
             {
-                bufferObject.SubData(start * sizeof(GLSLLight), count * sizeof(GLSLLight), (IntPtr)ptr);
+                bufferObject.SubData(start * sizeof(GLSLLight), (end - start) * sizeof(GLSLLight), (IntPtr)ptr);
             }
         }
 
