@@ -20,7 +20,7 @@ namespace IDKEngine
         public ModelSystem ModelSystem;
         public BufferObject BVHBuffer;
         public BufferObject VertexBuffer;
-        private readonly List<Model.GLSLVertex> bvhVertices;
+        private readonly List<GLSLVertex> bvhVertices;
         public unsafe BVH(ModelSystem modelSystem)
         {
             const uint TREE_DEPTH = 1;
@@ -28,9 +28,9 @@ namespace IDKEngine
 			ModelSystem = modelSystem;
 
             /// Expand elementBuffer + vertexBuffer to single vertexBuffer
-            List<Model.GLSLVertex> expandedVertices = new List<Model.GLSLVertex>(modelSystem.Vertices.Length);
+            List<GLSLVertex> expandedVertices = new List<GLSLVertex>(modelSystem.Vertices.Length);
             List<GLSLNode> nodes = new List<GLSLNode>();
-            bvhVertices = new List<Model.GLSLVertex>(expandedVertices.Count);
+            bvhVertices = new List<GLSLVertex>(expandedVertices.Count);
             
 			for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
@@ -39,7 +39,7 @@ namespace IDKEngine
 				int start = expandedVertices.Count;
 				for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++) // j is index into indices buffer which we use to index the vertices
                 {
-					Model.GLSLVertex vertex = modelSystem.Vertices[modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j]];
+					GLSLVertex vertex = modelSystem.Vertices[modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j]];
 					min.X = MathF.Min(min.X, vertex.Position.X);
 					min.Y = MathF.Min(min.Y, vertex.Position.Y);
 					min.Z = MathF.Min(min.Z, vertex.Position.Z);
@@ -70,11 +70,11 @@ namespace IDKEngine
                 }
 				nodes.Add(root);
 			}
-            modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(Model.GLSLMesh), modelSystem.Meshes);
+            modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
 
 
 			VertexBuffer = new BufferObject();
-            VertexBuffer.ImmutableAllocate(bvhVertices.Count * sizeof(Model.GLSLVertex), bvhVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
+            VertexBuffer.ImmutableAllocate(bvhVertices.Count * sizeof(GLSLVertex), bvhVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
 
             BVHBuffer = new BufferObject();
             BVHBuffer.ImmutableAllocate(nodes.Count * sizeof(GLSLNode), nodes.ToArray(), BufferStorageFlags.DynamicStorageBit);

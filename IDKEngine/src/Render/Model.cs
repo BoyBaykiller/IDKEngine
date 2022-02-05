@@ -27,53 +27,6 @@ namespace IDKEngine.Render.Objects
             TextureType.Specular,
         };
 
-        public struct GLSLDrawCommand
-        {
-            public int Count;
-            public int InstanceCount;
-            public int FirstIndex;
-            public int BaseVertex;
-            public int BaseInstance;
-        }
-        public unsafe struct GLSLMaterial
-        {
-            public readonly long Albedo;
-            private readonly long _pad0;
-
-            public readonly long Normal;
-            private readonly long _pad1;
-
-            public readonly long Metallic;
-            private readonly long _pad2;
-
-            public readonly long Roughness;
-            private readonly long _pad3;
-
-            public readonly long Specular;
-            private readonly long _pad4;
-        }
-        public struct GLSLMesh
-        {
-            public Matrix4 Model;
-            public int MaterialIndex;
-            public int BaseNode;
-            private readonly float _pad0;
-            private readonly float _pad1;
-        }
-        public struct GLSLVertex
-        {
-            public Vector3 Position;
-            private readonly float _pad0;
-            public Vector2 TexCoord;
-            private readonly Vector2 _pad1;
-            public Vector3 Normal;
-            private readonly float _pad2;
-            public Vector3 Tangent;
-            private readonly float _pad3;
-            public Vector3 BiTangent;
-            private readonly float _pad4;
-        }
-
         public readonly GLSLDrawCommand[] DrawCommands;
         public readonly GLSLMesh[] Meshes;
         public readonly GLSLMaterial[] Materials;

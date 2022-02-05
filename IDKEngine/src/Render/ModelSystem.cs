@@ -11,16 +11,16 @@ namespace IDKEngine.Render
     {
         public const int GLSL_UBO_MAX_MATERIALS = 384;
 
-        public Model.GLSLDrawCommand[] DrawCommands;
+        public GLSLDrawCommand[] DrawCommands;
         public BufferObject DrawCommandBuffer;
 
-        public Model.GLSLMesh[] Meshes;
+        public GLSLMesh[] Meshes;
         public BufferObject MeshBuffer;
 
-        public Model.GLSLMaterial[] Materials;
+        public GLSLMaterial[] Materials;
         public BufferObject MaterialBuffer;
 
-        public Model.GLSLVertex[] Vertices;
+        public GLSLVertex[] Vertices;
         public BufferObject VertexBuffer;
 
         public uint[] Indices;
@@ -29,16 +29,16 @@ namespace IDKEngine.Render
         public readonly VAO VAO;
         public unsafe ModelSystem()
         {
-            DrawCommands = new Model.GLSLDrawCommand[0];
+            DrawCommands = new GLSLDrawCommand[0];
             DrawCommandBuffer = new BufferObject();
 
-            Meshes = new Model.GLSLMesh[0];
+            Meshes = new GLSLMesh[0];
             MeshBuffer = new BufferObject();
 
-            Materials = new Model.GLSLMaterial[0];
+            Materials = new GLSLMaterial[0];
             MaterialBuffer = new BufferObject();
 
-            Vertices = new Model.GLSLVertex[0];
+            Vertices = new GLSLVertex[0];
             VertexBuffer = new BufferObject();
 
             Indices = new uint[0];
@@ -46,14 +46,13 @@ namespace IDKEngine.Render
 
             VAO = new VAO();
             VAO.SetElementBuffer(ElementBuffer);
-            VAO.AddSourceBuffer(VertexBuffer, 0, sizeof(Model.GLSLVertex));
+            VAO.AddSourceBuffer(VertexBuffer, 0, sizeof(GLSLVertex));
             VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0 * sizeof(float)); // Position
             VAO.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 4 * sizeof(float)); // TexCoord
             VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, 8 * sizeof(float)); // Normals
             VAO.SetAttribFormat(0, 3, 3, VertexAttribType.Float, 12 * sizeof(float)); // Tangent
             VAO.SetAttribFormat(0, 4, 3, VertexAttribType.Float, 16 * sizeof(float)); // BiTangent
         }
-        public int MaterialCount => Materials.Length;
         public unsafe void Add(Model[] models)
         {
             int oldDrawCommandsLength = DrawCommands.Length;
@@ -102,10 +101,10 @@ namespace IDKEngine.Render
                 loadedIndices += model.Indices.Length;
             }
 
-            DrawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(Model.GLSLDrawCommand), DrawCommands, BufferUsageHint.StaticDraw);
-            MeshBuffer.MutableAllocate(Meshes.Length * sizeof(Model.GLSLMesh), Meshes, BufferUsageHint.StaticDraw);
-            MaterialBuffer.MutableAllocate(Materials.Length * sizeof(Model.GLSLMaterial), Materials, BufferUsageHint.StaticDraw);
-            VertexBuffer.MutableAllocate(Vertices.Length * sizeof(Model.GLSLVertex), Vertices, BufferUsageHint.StaticDraw);
+            DrawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands, BufferUsageHint.StaticDraw);
+            MeshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes, BufferUsageHint.StaticDraw);
+            MaterialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials, BufferUsageHint.StaticDraw);
+            VertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices, BufferUsageHint.StaticDraw);
             ElementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices, BufferUsageHint.StaticDraw);
         }
 
@@ -150,44 +149,44 @@ namespace IDKEngine.Render
             GL.Enable(EnableCap.CullFace);
         }
 
-        public delegate void FuncUploadMesh(ref Model.GLSLMesh glslMesh);
+        public delegate void FuncUploadMesh(ref GLSLMesh glslMesh);
         /// <summary>
         /// Applies a function over the specified range of <see cref="Meshes"/>
         /// </summary>
         /// <param name="start"></param>
-        /// <param name="count"></param>
+        /// <param name="end"></param>
         /// <param name="func"></param>
-        public unsafe void ForEach(int start, int count, FuncUploadMesh func)
+        public unsafe void ForEach(int start, int end, FuncUploadMesh func)
         {
-            Debug.Assert(start >= 0 && (start + count) <= Meshes.Length);
+            Debug.Assert(start >= 0 && end <= Meshes.Length);
 
-            for (int i = start; i < start + count; i++)
+            for (int i = start; i < end; i++)
                 func(ref Meshes[i]);
 
             fixed (void* ptr = &Meshes[start].Model)
             {
-                MeshBuffer.SubData(start * sizeof(Model.GLSLMesh), count * sizeof(Model.GLSLMesh), (IntPtr)ptr);
+                MeshBuffer.SubData(start * sizeof(GLSLMesh), (end - start) * sizeof(GLSLMesh), (IntPtr)ptr);
             }
         }
 
 
-        public delegate void FuncUploadDrawCommand(ref Model.GLSLDrawCommand drawCommand);
+        public delegate void FuncUploadDrawCommand(ref GLSLDrawCommand drawCommand);
         /// <summary>
         /// Applies a function over the specefied range of <see cref="DrawCommands"/>
         /// </summary>
         /// <param name="start"></param>
-        /// <param name="count"></param>
+        /// <param name="end"></param>
         /// <param name="func"></param>
-        public unsafe void ForEach(int start, int count, FuncUploadDrawCommand func)
+        public unsafe void ForEach(int start, int end, FuncUploadDrawCommand func)
         {
-            Debug.Assert(start >= 0 && (start + count) <= DrawCommands.Length);
+            Debug.Assert(start >= 0 && end <= DrawCommands.Length);
 
-            for (int i = start; i < start + count; i++)
+            for (int i = start; i < end; i++)
                 func(ref DrawCommands[i]);
 
             fixed (void* ptr = &DrawCommands[start])
             {
-                DrawCommandBuffer.SubData(start * sizeof(Model.GLSLDrawCommand), count * sizeof(Model.GLSLDrawCommand), (IntPtr)ptr);
+                DrawCommandBuffer.SubData(start * sizeof(GLSLDrawCommand), (end - start) * sizeof(GLSLDrawCommand), (IntPtr)ptr);
             }
         }
     }

@@ -15,7 +15,5 @@ namespace IDKEngine
             Radius = radius;
             _pad0 = 0;
         }
-
-        public Matrix4 Translation => Matrix4.CreateScale(Radius) * Matrix4.CreateTranslation(Position);
     }
 }
