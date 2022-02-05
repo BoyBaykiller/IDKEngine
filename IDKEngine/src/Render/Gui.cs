@@ -87,7 +87,23 @@ namespace IDKEngine.Render
                             int tempInt;
                             float tempFloat;
 
-                            // TODO: Do shitty gui
+                            tempInt = window.SSR.Samples;
+                            if (ImGui.SliderInt("Samples ", ref tempInt, 1, 100))
+                            {
+                                window.SSR.Samples = tempInt;
+                            }
+
+                            tempInt = window.SSR.BinarySearchSamples;
+                            if (ImGui.SliderInt("BinarySearchSamples", ref tempInt, 1, 40))
+                            {
+                                window.SSR.BinarySearchSamples = tempInt;
+                            }
+
+                            tempFloat = window.SSR.MaxDist;
+                            if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1, 100))
+                            {
+                                window.SSR.MaxDist = tempFloat;
+                            }
                         }
                     }
 
