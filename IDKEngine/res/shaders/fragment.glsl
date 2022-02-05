@@ -5,15 +5,15 @@ layout(binding = 0) uniform sampler2D Sampler0;
 layout(binding = 1) uniform sampler2D Sampler1;
 layout(binding = 2) uniform sampler2D Sampler2;
 
-vec3 LinearToInverseGamma(vec3 rgb, float gamma);
-vec3 Uncharted2Tonemap(vec3 x);
-vec3 TonemapUncharted2(vec3 color);
-vec3 ACESFilm(vec3 x);
-
 in InOutVars
 {
     vec2 TexCoord;
 } inData;
+
+vec3 LinearToInverseGamma(vec3 rgb, float gamma);
+vec3 Uncharted2Tonemap(vec3 x);
+vec3 TonemapUncharted2(vec3 color);
+vec3 ACESFilm(vec3 x);
 
 void main()
 {
