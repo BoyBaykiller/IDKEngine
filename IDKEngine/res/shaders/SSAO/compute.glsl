@@ -4,7 +4,7 @@
 
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
 
-layout(binding = 0, rgba16f) restrict writeonly uniform image2D ImgResult;
+layout(binding = 0, r8) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerDepth;
 layout(binding = 1) uniform sampler2D SamplerNormalSpec;
 
@@ -23,7 +23,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 vec3 ViewToNDC(vec3 ndc);
 vec3 NDCToViewSpace(vec3 ndc);
-vec3 CosineSampleHemisphere(vec3 normal);
+vec3 CosineSampleHemisphere(float u, float v, vec3 normal);
 float GetRandomFloat01();
 uint GetPCGHash(inout uint seed);
 
@@ -45,22 +45,16 @@ void main()
     vec3 fragPos = NDCToViewSpace(vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0);
 
     float occlusion = 0.0;
-    // for (int i = 0; i < Samples; i++)
-    // {
-    //     vec3 samplePos = fragPos + CosineSampleHemisphere(normal) * GetRandomFloat01() * Radius;
-    //     vec3 projectedSample = ViewToNDC(samplePos) * 0.5 + 0.5;
-    //     float depth = NDCToViewSpace(vec3(projectedSample.xy, texture(SamplerDepth, projectedSample.xy).r) * 2.0 - 1.0).z;
-        
-    //     occlusion += (samplePos.z >= depth + EPSILON ? 1.0 : 0.0);
-    // }
-
     for (int i = 0; i < Samples; i++)
     {
-        vec3 samplePos = fragPos + CosineSampleHemisphere(normal) * GetRandomFloat01() * Radius;
-        vec3 projectedSample = ViewToNDC(vec3(samplePos.xy, samplePos.z + EPSILON)) * 0.5 + 0.5;
+        float progress = i / float(Samples);
+        vec3 samplePos = fragPos + CosineSampleHemisphere(GetRandomFloat01(), progress, normal) * Radius * mix(0.1, 1.0, progress * progress);
+        
+        vec3 projectedSample = ViewToNDC(samplePos) * 0.5 + 0.5;
         float depth = texture(SamplerDepth, projectedSample.xy).r;
         
-        occlusion += int(projectedSample.z >= depth);
+        float weight = length(fragPos - samplePos) / Radius;
+        occlusion += int(projectedSample.z >= depth) * weight;
     }
     occlusion /= Samples;
 
@@ -79,12 +73,12 @@ vec3 NDCToViewSpace(vec3 ndc)
     return viewPos.xyz / viewPos.w;
 }
 
-vec3 CosineSampleHemisphere(vec3 normal)
+vec3 CosineSampleHemisphere(float u, float v, vec3 normal)
 {
     // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
 
-    float z = GetRandomFloat01() * 2.0 - 1.0;
-    float a = GetRandomFloat01() * 2.0 * PI;
+    float z = u * 2.0 - 1.0;
+    float a = v * 2.0 * PI;
     float r = sqrt(1.0 - z * z);
     float x = r * cos(a);
     float y = r * sin(a);

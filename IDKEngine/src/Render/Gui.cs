@@ -52,6 +52,7 @@ namespace IDKEngine.Render
                         {
                             int tempInt;
                             float tempFloat;
+                            System.Numerics.Vector3 tempVec;
 
                             tempInt = window.VolumetricLight.Samples;
                             if (ImGui.SliderInt("Samples", ref tempInt, 1, 100))
@@ -66,10 +67,10 @@ namespace IDKEngine.Render
                                 window.VolumetricLight.Scattering = tempFloat;
                             }
 
-                            tempFloat = window.VolumetricLight.MaxDist;
-                            if (ImGui.SliderFloat("MaxDist", ref tempFloat, 5.0f, 200.0f))
+                            tempVec = OpenTKToSystem(window.VolumetricLight.Absorbance);
+                            if (ImGui.SliderFloat3("Absorbance", ref tempVec, 0.0f, 0.2f))
                             {
-                                window.VolumetricLight.MaxDist = tempFloat;
+                                window.VolumetricLight.Absorbance = SystemToOpenTK(tempVec);
                             }
                         }
                     }
@@ -81,6 +82,7 @@ namespace IDKEngine.Render
                         {
                             int tempInt;
                             float tempFloat;
+                            bool tempBool;
 
                             tempInt = window.SSAO.Samples;
                             if (ImGui.SliderInt("Samples  ", ref tempInt, 1, 50))
@@ -89,11 +91,10 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = window.SSAO.Radius;
-                            if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 15.0f))
+                            if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 2.0f))
                             {
                                 window.SSAO.Radius = tempFloat;
                             }
-
                         }
                     }
 

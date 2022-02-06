@@ -70,6 +70,7 @@ uniform float Scattering;
 uniform float MaxDist;
 uniform int Samples;
 uniform int RendererdFrame;
+uniform vec3 Absorbance;
 
 void main()
 {
@@ -110,7 +111,6 @@ void main()
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep)
 {
-    const vec3 MEDIUM_ABSORBANCE = vec3(0.025);
     vec3 scattered = vec3(0.0);
     vec3 samplePoint = origin;
     for (int i = 0; i < Samples; i++)
@@ -123,14 +123,14 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
             vec3 power = light.Color / dot(lightToSample, lightToSample);
             
             // Apply Beers's law
-            vec3 absorbed = exp(-MEDIUM_ABSORBANCE * lengthToLight);
+            vec3 absorbed = exp(-Absorbance * lengthToLight);
             scattered += ComputeScattering(dot(lightDir, -viewDir)) * power * absorbed;
         }
 
         samplePoint += deltaStep;
     }
     // Apply Beers's law, Absorbance is constant so we can have it outside the loop
-    vec3 absorbed = exp(-MEDIUM_ABSORBANCE * distance(origin, samplePoint));
+    vec3 absorbed = exp(-Absorbance * distance(origin, samplePoint));
     scattered *= absorbed;
     
     return scattered / Samples;

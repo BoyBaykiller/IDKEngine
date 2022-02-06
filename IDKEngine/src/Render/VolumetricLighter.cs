@@ -1,4 +1,5 @@
-﻿using OpenTK.Graphics.OpenGL4;
+﻿using OpenTK;
+using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
@@ -41,11 +42,23 @@ namespace IDKEngine.Render
             }
         }
 
+        private Vector3 _absorbance;
+        public Vector3 Absorbance
+        {
+            get => _absorbance;
+
+            set
+            {
+                _absorbance = value;
+                shaderProgram.Upload("Absorbance", _absorbance);
+            }
+        }
+
 
         public readonly Texture Result;
         private static readonly ShaderProgram shaderProgram =
             new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
-        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist)
+        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, Vector3 absorbance)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -55,6 +68,7 @@ namespace IDKEngine.Render
             Samples = samples;
             Scattering = scattering;
             MaxDist = maxDist;
+            Absorbance = absorbance;
         }
 
         public void Compute(Texture depth)

@@ -30,9 +30,9 @@ namespace IDKEngine
         private readonly Camera camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
 
 
-        private int fps;
         public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsDOF = false, IsDrawAABB = false;
         public int FPS;
+        private int fps;
         protected override void OnRenderFrame(FrameEventArgs e)
         {
             if (!IsPathTracing)
@@ -56,11 +56,9 @@ namespace IDKEngine
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
 
                 if (IsSSAO)
-                {
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
-                    GaussianBlur.Compute(SSAO.Result);
-                }
-                ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? GaussianBlur.Result : null);
+
+                ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
                 lighterContext.Draw();
 
                 if (IsVolumetricLighting)
@@ -74,7 +72,7 @@ namespace IDKEngine
 
                 if (IsDOF)
                 {
-                    GaussianBlur.Compute(ForwardRenderer.Result);
+                    GaussianBlur.Compute(ForwardRenderer.Result, 3);
                     DOF.Compute(ForwardRenderer.Depth, ForwardRenderer.Result, GaussianBlur.Result, ForwardRenderer.Result);
                 }
 
@@ -241,10 +239,10 @@ namespace IDKEngine
 
             ForwardRenderer = new Forward(Width, Height);
             SSR = new SSR(Width, Height, 30, 8, 50.0f);
-            SSAO = new SSAO(Width, Height, 10, 1.3f);
-            VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f);
+            VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f, new Vector3(0.025f));
             GaussianBlur = new GaussianBlur(Width, Height);
             DOF = new DepthOfField(10.0f, 0.07f);
+            SSAO = new SSAO(Width, Height, 10, 0.3f);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Render();
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
