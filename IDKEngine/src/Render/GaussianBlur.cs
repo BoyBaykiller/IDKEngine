@@ -10,8 +10,6 @@ namespace IDKEngine.Render
         private Texture ping;
         private Texture pong;
 
-        public uint Strength = 4;
-
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/Blur/compute.glsl")));
         public unsafe GaussianBlur(int width, int height)
@@ -28,14 +26,14 @@ namespace IDKEngine.Render
             pong.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, 1);
         }
 
-        public void Compute(Texture src)
+        public void Compute(Texture src, int strength)
         {
             // FIX: Pseudo random deterministic black pixels on result texture...
             src.BindToUnit(0);
             ping.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
             shaderProgram.Use();
-            for (int i = 0; i < 2 * Strength; i++)
+            for (int i = 0; i < 2 * strength; i++)
             {
                 shaderProgram.Upload(0, i % 2 == 0);
 

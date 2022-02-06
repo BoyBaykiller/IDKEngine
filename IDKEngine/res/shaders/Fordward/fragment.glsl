@@ -130,7 +130,7 @@ void main()
     Roughness = texture(material.Roughness, inData.TexCoord).r;
     Specular = texture(material.Specular, inData.TexCoord).r;
 
-    // FIX: Correct UV calculation 
+    // FIX: Divide by render target size
     vec2 screenUV = gl_FragCoord.xy / vec2(textureSize(SamplerAO, 0));
     AO = texture(SamplerAO, screenUV).r;
 
