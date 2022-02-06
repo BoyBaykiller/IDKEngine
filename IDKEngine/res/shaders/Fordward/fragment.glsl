@@ -1,12 +1,14 @@
 #version 460 core
 #define PI 3.14159265
-#define EPSILON 0.0001
+#define EPSILON 0.001
 #extension GL_ARB_bindless_texture : require
 layout(early_fragment_tests) in;
 
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 NormalColor;
 layout(location = 2) out int MeshIndexColor;
+
+layout(binding = 0) uniform sampler2D SamplerAO;
 
 struct Material
 {
@@ -114,18 +116,23 @@ vec3 Normal;
 float Metallic;
 float Roughness;
 float Specular; // TODO: Incorporate Specular into pbr
+float AO;
 vec3 ViewDir;
 vec3 F0;
 void main()
 {
     Material material = materialUBO.Materials[inData.MaterialIndex];
     
-    // Albedo     = textureLod(material.Albedo, inData.TexCoord, textureQueryLod(material.Albedo, inData.TexCoord).y - 0.5);
-    Albedo     = texture(material.Albedo, inData.TexCoord);
-    Normal     = texture(material.Normal, inData.TexCoord).rgb;
-    Metallic   = texture(material.Metallic, inData.TexCoord).r;
-    Roughness  = texture(material.Roughness, inData.TexCoord).r;
-    Specular  = texture(material.Specular, inData.TexCoord).r;
+    // Albedo = textureLod(material.Albedo, inData.TexCoord, textureQueryLod(material.Albedo, inData.TexCoord).y - 0.5);
+    Albedo = texture(material.Albedo, inData.TexCoord);
+    Normal = texture(material.Normal, inData.TexCoord).rgb;
+    Metallic = texture(material.Metallic, inData.TexCoord).r;
+    Roughness = texture(material.Roughness, inData.TexCoord).r;
+    Specular = texture(material.Specular, inData.TexCoord).r;
+
+    // FIX: Correct UV calculation 
+    vec2 screenUV = gl_FragCoord.xy / vec2(textureSize(SamplerAO, 0));
+    AO = texture(SamplerAO, screenUV).r;
 
     // TODO: Make alpha a gui option
     Normal = mix(inData.TBN * (Normal * 2.0 - 1.0), inData.Normal, 0.0);
@@ -146,7 +153,7 @@ void main()
     }
     irradiance /= lightsUBO.LightCount;
 
-    FragColor = vec4(irradiance + Albedo.rgb * 0.05, 1.0);
+    FragColor = vec4(irradiance + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
     NormalColor = vec4(Normal, Specular);
     MeshIndexColor = inData.MeshIndex;
 

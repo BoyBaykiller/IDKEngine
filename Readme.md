@@ -1,7 +1,7 @@
 # IDKEngine
 
 This is some OpenGL stuff I've been experimenting with lately.
-I am using a lot of modern OpenGL features like Direct State Access or the whole "Approaching Zero Driver Overhead" thing to create a efficient renderer.
+I am using a lot of modern OpenGL features like Direct State Access, Indirect Multi Drawing or Bindless Textures to create a efficient renderer.
 
 Feature list:
  - ImGui
@@ -11,6 +11,7 @@ Feature list:
  - (Copied) Atmospheric Scattering, ported to Compute Shader and precomputed
  - GLSL Shadow Samplers for hardware filtering + PCF
  - Depth Of Field (early progress)
+ - SSAO
  - Screen Space Reflections
  - Single pass Vertex layered rendering for point shadows (updated every frame for all geometry kinda bad)
  - GPU accelerated Frustum Culling (implement for shadows as well?)

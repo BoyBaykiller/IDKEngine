@@ -31,7 +31,7 @@ namespace IDKEngine
 
 
         private int fps;
-        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSR = false, IsDOF = false, IsDrawAABB = false;
+        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsDOF = false, IsDrawAABB = false;
         public int FPS;
         protected override void OnRenderFrame(FrameEventArgs e)
         {
@@ -55,7 +55,12 @@ namespace IDKEngine
                 else
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
 
-                ForwardRenderer.Render(AtmosphericScatterer.Result, ModelSystem);
+                if (IsSSAO)
+                {
+                    SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
+                    GaussianBlur.Compute(SSAO.Result);
+                }
+                ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? GaussianBlur.Result : null);
                 lighterContext.Draw();
 
                 if (IsVolumetricLighting)
@@ -185,6 +190,7 @@ namespace IDKEngine
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public SSR SSR;
+        public SSAO SSAO;
         public VolumetricLighter VolumetricLight;
         public DepthOfField DOF;
         public GaussianBlur GaussianBlur;
@@ -235,6 +241,7 @@ namespace IDKEngine
 
             ForwardRenderer = new Forward(Width, Height);
             SSR = new SSR(Width, Height, 30, 8, 50.0f);
+            SSAO = new SSAO(Width, Height, 10, 1.3f);
             VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f);
             GaussianBlur = new GaussianBlur(Width, Height);
             DOF = new DepthOfField(10.0f, 0.07f);
@@ -250,7 +257,7 @@ namespace IDKEngine
             PathTracer = new PathTracer(bvh, ModelSystem, AtmosphericScatterer.Result, Width, Height);
 
             GLSLLight[] lights = new GLSLLight[2];
-            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 1000.0f, 0.2f);
+            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
             //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -3.95f), new Vector3(4.585f, 4.725f, 2.56f) * 1000.0f, 0.2f);
             lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.1f);
             lighterContext = new Lighter(20, 20);
@@ -290,6 +297,7 @@ namespace IDKEngine
                 VolumetricLight.SetSize(Width, Height);
                 GaussianBlur.SetSize(Width, Height);
                 SSR.SetSize(Width, Height);
+                SSAO.SetSize(Width, Height);
                 PathTracer.SetSize(Width, Height);
 
                 lastWidth = Width;
