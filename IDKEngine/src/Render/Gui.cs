@@ -3,17 +3,13 @@ using OpenTK;
 using OpenTK.Input;
 using OpenTK.Graphics.OpenGL4;
 using ImGuiNET;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using IDKEngine.GUI;
-using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
     static class Gui
     {
         public static ImGuiController ImGuiController = new ImGuiController(832, 832);
-        private static System.Numerics.Vector4 imgUVS = new System.Numerics.Vector4(0.0f, 1.0f, 1.0f, 0.0f); // ImGui.Image((IntPtr)mainWindow.volumetricLighter.Result.ID, new Vector2(mainWindow.volumetricLighter.Result.Width / 2, mainWindow.volumetricLighter.Result.Height / 2), imgUVS);
 
         private static int selectedMeshIndex = -1;
         public static void Render(Window window, float frameTime)
@@ -49,7 +45,6 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("ZPrePass", ref window.ForwardRenderer.IsZPrePass);
                     ImGui.Checkbox("DrawAABB", ref window.IsDrawAABB);
 
-
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
                     {
                         ImGui.Checkbox("IsVolumetricLighting", ref window.IsVolumetricLighting);
@@ -78,6 +73,29 @@ namespace IDKEngine.Render
                             }
                         }
                     }
+                    
+                    if (ImGui.CollapsingHeader("SSAO"))
+                    {
+                        ImGui.Checkbox("IsSSAO", ref window.IsSSAO);
+                        if (window.IsSSAO)
+                        {
+                            int tempInt;
+                            float tempFloat;
+
+                            tempInt = window.SSAO.Samples;
+                            if (ImGui.SliderInt("Samples  ", ref tempInt, 1, 50))
+                            {
+                                window.SSAO.Samples = tempInt;
+                            }
+
+                            tempFloat = window.SSAO.Radius;
+                            if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 15.0f))
+                            {
+                                window.SSAO.Radius = tempFloat;
+                            }
+
+                        }
+                    }
 
                     if (ImGui.CollapsingHeader("SSR"))
                     {
@@ -94,7 +112,7 @@ namespace IDKEngine.Render
                             }
 
                             tempInt = window.SSR.BinarySearchSamples;
-                            if (ImGui.SliderInt("BinarySearchSamples", ref tempInt, 1, 40))
+                            if (ImGui.SliderInt("BinarySearchSamples", ref tempInt, 0, 40))
                             {
                                 window.SSR.BinarySearchSamples = tempInt;
                             }

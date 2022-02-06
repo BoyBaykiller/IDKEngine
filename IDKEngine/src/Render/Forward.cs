@@ -54,7 +54,7 @@ namespace IDKEngine.Render
             Framebuffer.SetDrawBuffers(new DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2 });
         }
 
-        public void Render(Texture skyBox, ModelSystem modelSystem)
+        public void Render(ModelSystem modelSystem, Texture skyBox = null, Texture ambientOcclusion = null)
         {
             // TODO: Find better way to clear. Maybe just render to mesh buffer when necassary
             Framebuffer.Bind();
@@ -62,6 +62,11 @@ namespace IDKEngine.Render
             Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 2, -1);
             Framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
+
+            if (ambientOcclusion != null)
+                ambientOcclusion.BindToUnit(0);
+            else
+                Texture.UnbindFromUnit(0);
 
             if (modelSystem.Meshes.Length > 0)
             {

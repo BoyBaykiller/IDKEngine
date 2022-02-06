@@ -154,7 +154,7 @@ uniform float FocalLength = 10.0;
 uniform float ApertureDiameter = 0.07; // 0.07
 layout(location = 0) uniform int ThisRendererFrame;
 
-uint rndSeed;
+uint rngSeed;
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);
@@ -162,8 +162,8 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rndSeed = ThisRendererFrame;
-    // rndSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + ThisRendererFrame;
+    rngSeed = ThisRendererFrame;
+    // rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + ThisRendererFrame;
 
     vec3 irradiance = vec3(0.0);
     for (int i = 0; i < SPP; i++)
@@ -462,7 +462,7 @@ uint GetPCGHash(inout uint seed)
  
 float GetRandomFloat01()
 {
-    return float(GetPCGHash(rndSeed)) / 4294967296.0;
+    return float(GetPCGHash(rngSeed)) / 4294967296.0;
 }
 
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)

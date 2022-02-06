@@ -188,7 +188,7 @@ namespace IDKEngine.Render.Objects
         }
 
         /// <summary>
-        /// GL_ARB_seamless_cubemap_per_texture must be available
+        /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture must be available
         /// </summary>
         /// <param name="state"></param>
         public void SetSeamlessCubeMapPerTexture(bool state)
