@@ -41,7 +41,7 @@ const vec3 positions[24] = vec3[]
 
 struct Mesh
 {
-    mat4 Model[1];
+    mat4 Model;
     int MaterialIndex;
     int BaseNode;
     int _pad0;
@@ -75,6 +75,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
+    mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
 } basicDataUBO;
@@ -87,5 +88,5 @@ void main()
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;
 
-    gl_Position = basicDataUBO.ProjView * mesh.Model[0] * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0); 
+    gl_Position = basicDataUBO.ProjView * mesh.Model * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0); 
 }

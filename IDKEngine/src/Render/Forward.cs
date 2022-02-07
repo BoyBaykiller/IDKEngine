@@ -43,7 +43,7 @@ namespace IDKEngine.Render
 
             Velocity = new Texture(TextureTarget2d.Texture2D);
             Velocity.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg8, (System.IntPtr)0, PixelFormat.Rg, PixelType.Float);
+            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg32f, (System.IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
             Depth = new Texture(TextureTarget2d.Texture2D);
             Depth.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);

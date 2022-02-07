@@ -32,7 +32,7 @@ struct AABB
 
 struct Mesh
 {
-    mat4 Model[1];
+    mat4 Model;
     int MaterialIndex;
     int BVHEntry;
     int _pad0;
@@ -64,13 +64,13 @@ void main()
 
     gl_Layer = gl_InstanceID;
     
-    mat4 model = meshSSBO.Meshes[gl_DrawID].Model[0];
+    mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[Index].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
 
 #else
 
-    mat4 model = meshSSBO.Meshes[gl_DrawID].Model[0];
+    mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[Index].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
 

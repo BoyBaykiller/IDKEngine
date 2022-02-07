@@ -26,7 +26,7 @@ struct Node
 
 struct Mesh
 {
-    mat4 Model[1];
+    mat4 Model;
     int MaterialIndex;
     int BaseNode;
     int _pad0;
@@ -57,6 +57,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
+    mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
 } basicDataUBO;
@@ -75,7 +76,7 @@ void main()
     Mesh mesh = meshSSBO.Meshes[gl_GlobalInvocationID.x];
     Node node = bvhSSBO.Nodes[mesh.BaseNode];
     
-    Frustum frustum = ExtractFrustum(basicDataUBO.ProjView * mesh.Model[0]);
+    Frustum frustum = ExtractFrustum(basicDataUBO.ProjView * mesh.Model);
     drawCommandsSSBO.DrawCommands[gl_GlobalInvocationID.x].InstanceCount = int(AABBVsFrustum(frustum, node));
 }
 

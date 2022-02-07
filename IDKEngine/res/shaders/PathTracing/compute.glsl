@@ -42,7 +42,7 @@ struct Material
 
 struct Mesh
 {
-    mat4 Model[1];
+    mat4 Model;
     int MaterialIndex;
     int BaseNode;
     int _pad0;
@@ -118,6 +118,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
+    mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
 } basicDataUBO;
@@ -152,7 +153,7 @@ uniform int RayDepth = 6;
 uniform int SPP = 1;
 uniform float FocalLength = 10.0;
 uniform float ApertureDiameter = 0.07; // 0.07
-layout(location = 0) uniform int ThisRendererFrame;
+layout(location = 0) uniform int RenderedFrames;
 
 uint rngSeed;
 void main()
@@ -162,8 +163,8 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rngSeed = ThisRendererFrame;
-    // rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + ThisRendererFrame;
+    rngSeed = RenderedFrames;
+    // rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + RenderedFrames * 2699 | 1;
 
     vec3 irradiance = vec3(0.0);
     for (int i = 0; i < SPP; i++)
@@ -183,7 +184,7 @@ void main()
     irradiance /= SPP;
     
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameColor, irradiance, 1.0 / (ThisRendererFrame + 1.0));
+    irradiance = mix(lastFrameColor, irradiance, 1.0 / (RenderedFrames + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 
@@ -204,7 +205,7 @@ vec3 Radiance(Ray ray)
             Vertex v1 = vertecisSSBO.Vertecis[hitInfo.VerticesStart + 1];
             Vertex v2 = vertecisSSBO.Vertecis[hitInfo.VerticesStart + 2];
             
-            mat4 model = meshSSBO.Meshes[hitInfo.MeshID].Model[0];
+            mat4 model = meshSSBO.Meshes[hitInfo.MeshID].Model;
 
             vec3 tangent = Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary);
             vec3 normal = Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary);
@@ -309,7 +310,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     {
         Mesh mesh = meshSSBO.Meshes[i];
         Node root = bvhSSBO.Nodes[mesh.BaseNode];
-        Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model[0]));
+        Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
 
         if (RayCuboidIntersect(localRay, root, t2) && t2 > 0.0)
         {

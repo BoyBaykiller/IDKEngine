@@ -4,7 +4,7 @@ layout(location = 0) in vec3 Position;
 
 struct Mesh
 {
-    mat4 Model[1];
+    mat4 Model;
     int MaterialIndex;
     int BVHEntry;
     int _pad0;
@@ -25,13 +25,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
+    mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
 } basicDataUBO;
 
 void main()
 {
-    mat4 model = meshSSBO.Meshes[gl_DrawID].Model[0];
+    mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
     gl_Position = basicDataUBO.ProjView * vec4(fragPos, 1.0);
 }

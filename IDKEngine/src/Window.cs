@@ -170,6 +170,7 @@ namespace IDKEngine
                     Gui.Update(this);
                 }
 
+                glslBasicData.PrevProjView = glslBasicData.View * glslBasicData.Projection;
                 glslBasicData.ProjView = camera.View * glslBasicData.Projection;
                 glslBasicData.View = camera.View;
                 glslBasicData.InvView = camera.View.Inverted();
