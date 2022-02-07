@@ -17,7 +17,7 @@ namespace IDKEngine.Render
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba32f);
+            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba32f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             EnvironmentMap = environmentMap;
             ModelSystem = modelSystem;
@@ -49,7 +49,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat);
+            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             ResetRenderer();
         }
     }

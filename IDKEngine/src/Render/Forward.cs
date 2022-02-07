@@ -10,6 +10,7 @@ namespace IDKEngine.Render
         public readonly Texture NormalSpec;
         public readonly Texture MeshIndex;
         public readonly Texture Depth;
+        public readonly Texture Velocity;
 
         private static readonly ShaderProgram shadingProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/vertex.glsl")),
@@ -30,37 +31,43 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f);
+            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             NormalSpec = new Texture(TextureTarget2d.Texture2D);
             NormalSpec.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            NormalSpec.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8);
+            NormalSpec.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             MeshIndex = new Texture(TextureTarget2d.Texture2D);
             MeshIndex.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            MeshIndex.MutableAllocate(width, height, 1, PixelInternalFormat.R32i, System.IntPtr.Zero, PixelFormat.RedInteger, PixelType.Int);
+            MeshIndex.MutableAllocate(width, height, 1, PixelInternalFormat.R32i, (System.IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+
+            Velocity = new Texture(TextureTarget2d.Texture2D);
+            Velocity.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg8, (System.IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
             Depth = new Texture(TextureTarget2d.Texture2D);
             Depth.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Depth.MutableAllocate(width, height, 1, PixelInternalFormat.DepthComponent24, System.IntPtr.Zero, PixelFormat.DepthComponent, PixelType.Float);
+            Depth.MutableAllocate(width, height, 1, PixelInternalFormat.DepthComponent24, (System.IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
 
             Framebuffer = new Framebuffer();
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, NormalSpec);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, MeshIndex);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment3, Velocity);
             Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Depth);
 
             Framebuffer.SetReadBuffer(ReadBufferMode.ColorAttachment2);
-            Framebuffer.SetDrawBuffers(new DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2 });
+            Framebuffer.SetDrawBuffers(new DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3 });
         }
 
         public void Render(ModelSystem modelSystem, Texture skyBox = null, Texture ambientOcclusion = null)
         {
-            // TODO: Find better way to clear. Maybe just render to mesh buffer when necassary
+            // TODO: Find better way to clear. Maybe just render to mesh buffer when necassary so you can call regular GL.Clear
             Framebuffer.Bind();
             Framebuffer.ClearBuffer(ClearBuffer.Color, 0, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 2, -1);
+            Framebuffer.ClearBuffer(ClearBuffer.Color, 3, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
             if (ambientOcclusion != null)
@@ -106,10 +113,11 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat);
-            Depth.MutableAllocate(width, height, 1, Depth.PixelInternalFormat, System.IntPtr.Zero, PixelFormat.DepthComponent, PixelType.Float);
-            NormalSpec.MutableAllocate(width, height, 1, NormalSpec.PixelInternalFormat, System.IntPtr.Zero, PixelFormat.Rgb, PixelType.Float);
-            MeshIndex.MutableAllocate(width, height, 1, MeshIndex.PixelInternalFormat, System.IntPtr.Zero, PixelFormat.RedInteger, PixelType.Int);
+            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            Depth.MutableAllocate(width, height, 1, Depth.PixelInternalFormat, (System.IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
+            NormalSpec.MutableAllocate(width, height, 1, NormalSpec.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgb, PixelType.Float);
+            MeshIndex.MutableAllocate(width, height, 1, MeshIndex.PixelInternalFormat, (System.IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg8, (System.IntPtr)0, PixelFormat.Rg, PixelType.Float);
         }
     }
 }

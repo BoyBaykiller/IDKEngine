@@ -68,6 +68,8 @@ namespace IDKEngine.Render
             glslPointShadow.FarPlane = farPlane;
             glslPointShadow.LightIndex = lightIndex;
 
+            Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
+
             this.lightContext = lightContext;
         }
 
@@ -146,7 +148,7 @@ namespace IDKEngine.Render
         private static unsafe BufferObject InitShadowBuffer()
         {
             BufferObject bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), System.IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            bufferObject.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), (System.IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 2, 0, bufferObject.Size);
 
             return bufferObject;
