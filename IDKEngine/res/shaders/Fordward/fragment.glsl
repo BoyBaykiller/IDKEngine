@@ -31,7 +31,7 @@ struct Material
 
 struct Mesh
 {
-    mat4 Model[1];
+    mat4 Model;
     int MaterialIndex;
     int BVHEntry;
     int _pad0;
@@ -72,6 +72,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
+    mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
 } basicDataUBO;
@@ -99,6 +100,7 @@ in InOutVars
     vec2 TexCoord;
     vec3 FragPos;
     vec4 ClipPos;
+    vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
     flat int MeshIndex;
@@ -158,7 +160,8 @@ void main()
     NormalColor = vec4(Normal, Specular);
     MeshIndexColor = inData.MeshIndex;
 
-    VelocityColor = vec2(uv);
+    vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
+    VelocityColor = uv - prevUV;
 
     gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane) + 2.0;
 }

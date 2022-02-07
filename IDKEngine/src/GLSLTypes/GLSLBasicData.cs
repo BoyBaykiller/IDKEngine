@@ -12,6 +12,7 @@ namespace IDKEngine
         public Matrix4 Projection;
         public Matrix4 InvProjection;
         public Matrix4 InvProjView;
+        public Matrix4 PrevProjView;
         public float NearPlane;
         public float FarPlane;
     }
