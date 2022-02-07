@@ -206,46 +206,6 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureLodBias, bias);
         }
 
-        /// <summary>
-        /// This is an attempt to separate allocation and uploading of mutable texture storage,
-        /// similiar to what GL_ARB_buffer_storage does with its GL.TexStorageXD functions which is
-        /// especially useful if you want to allocate data but not fill it.
-        /// However it does not work for all values of <paramref name="pixelInternalFormat"/> so use this with caution
-        /// </summary>
-        /// <param name="width"></param>
-        /// <param name="height"></param>
-        /// <param name="depth"></param>
-        /// <param name="pixelInternalFormat"></param>
-        public void MutableAllocate(int width, int height, int depth, PixelInternalFormat pixelInternalFormat)
-        {
-            Bind();
-            switch (Dimension)
-            {
-                case TextureDimension.One:
-                    GL.TexImage1D(Target, 0, pixelInternalFormat, width, 0, PixelFormat.Rgba, PixelType.Float, IntPtr.Zero);
-                    Width = width;
-                    break;
-
-                case TextureDimension.Two:
-                    if (Target == TextureTarget.TextureCubeMap)
-                        for (int i = 0; i < 6; i++)
-                            GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, pixelInternalFormat, width, height, 0, PixelFormat.Rgba, PixelType.Float, IntPtr.Zero);
-                    else
-                        GL.TexImage2D(Target, 0, pixelInternalFormat, width, height, 0, PixelFormat.Rgba, PixelType.Float, IntPtr.Zero);
-                    Width = width; Height = height;
-                    break;
-
-                case TextureDimension.Three:
-                    GL.TexImage3D(Target, 0, pixelInternalFormat, width, height, depth, 0, PixelFormat.Rgba, PixelType.Float, IntPtr.Zero);
-                    Width = width; Height = height; Depth = depth;
-                    break;
-
-                default:
-                    return;
-            }
-            PixelInternalFormat = pixelInternalFormat;
-        }
-
         public void MutableAllocate(int width, int height, int depth, PixelInternalFormat pixelInternalFormat, IntPtr intPtr, PixelFormat pixelFormat, PixelType pixelType)
         {
             Bind();

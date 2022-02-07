@@ -82,7 +82,6 @@ namespace IDKEngine.Render
                         {
                             int tempInt;
                             float tempFloat;
-                            bool tempBool;
 
                             tempInt = window.SSAO.Samples;
                             if (ImGui.SliderInt("Samples  ", ref tempInt, 1, 50))

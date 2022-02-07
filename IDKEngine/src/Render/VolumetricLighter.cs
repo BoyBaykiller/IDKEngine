@@ -63,7 +63,7 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f);
+            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             Samples = samples;
             Scattering = scattering;
@@ -73,8 +73,9 @@ namespace IDKEngine.Render
 
         public void Compute(Texture depth)
         {
-            depth.BindToUnit(0);
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+            // Can't use unit 0 because it gets unbound in forward pass when SSAO is disabled (?)
+            depth.BindToUnit(1);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);
@@ -83,7 +84,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat);
+            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
         }
     }
 }

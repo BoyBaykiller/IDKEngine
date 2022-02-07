@@ -37,6 +37,7 @@ out InOutVars
 {
     vec2 TexCoord;
     vec3 FragPos;
+    vec4 ClipPos;
     vec3 Normal;
     mat3 TBN;
     flat int MeshIndex;
@@ -55,10 +56,11 @@ void main()
     outData.TBN = mat3(T, B, N);
     outData.TexCoord = TexCoord;
     outData.FragPos = (mesh.Model[0] * vec4(Position, 1.0)).xyz;
+    outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
     outData.Normal = Normal;
 
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
 
-    gl_Position = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
+    gl_Position = outData.ClipPos;
 }

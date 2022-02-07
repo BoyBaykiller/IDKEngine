@@ -7,6 +7,7 @@ layout(early_fragment_tests) in;
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 NormalColor;
 layout(location = 2) out int MeshIndexColor;
+layout(location = 3) out vec2 VelocityColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
 
@@ -97,6 +98,7 @@ in InOutVars
 {
     vec2 TexCoord;
     vec3 FragPos;
+    vec4 ClipPos;
     vec3 Normal;
     mat3 TBN;
     flat int MeshIndex;
@@ -121,6 +123,8 @@ vec3 ViewDir;
 vec3 F0;
 void main()
 {
+    vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
+
     Material material = materialUBO.Materials[inData.MaterialIndex];
     
     // Albedo = textureLod(material.Albedo, inData.TexCoord, textureQueryLod(material.Albedo, inData.TexCoord).y - 0.5);
@@ -129,10 +133,7 @@ void main()
     Metallic = texture(material.Metallic, inData.TexCoord).r;
     Roughness = texture(material.Roughness, inData.TexCoord).r;
     Specular = texture(material.Specular, inData.TexCoord).r;
-
-    // FIX: Divide by render target size
-    vec2 screenUV = gl_FragCoord.xy / vec2(textureSize(SamplerAO, 0));
-    AO = texture(SamplerAO, screenUV).r;
+    AO = texture(SamplerAO, uv).r;
 
     // TODO: Make alpha a gui option
     Normal = mix(inData.TBN * (Normal * 2.0 - 1.0), inData.Normal, 0.0);
@@ -157,7 +158,9 @@ void main()
     NormalColor = vec4(Normal, Specular);
     MeshIndexColor = inData.MeshIndex;
 
-    gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
+    VelocityColor = vec2(uv);
+
+    gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane) + 2.0;
 }
 
 vec3 PBR(Light light)

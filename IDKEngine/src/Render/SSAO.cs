@@ -39,7 +39,7 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.R8, System.IntPtr.Zero, PixelFormat.Red, PixelType.Float);
+            Result.MutableAllocate(width, height, 1, PixelInternalFormat.R8, (System.IntPtr)0, PixelFormat.Red, PixelType.Float);
 
             Samples = samples;
             Radius = radius;
@@ -58,7 +58,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, System.IntPtr.Zero, PixelFormat.Red, PixelType.Float);
+            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Red, PixelType.Float);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using OpenTK.Graphics.OpenGL4;
+﻿using System;
+using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
@@ -49,7 +50,7 @@ namespace IDKEngine.Render
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f);
+            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             Samples = samples;
             BinarySearchSamples = binarySearchSamples;
@@ -70,7 +71,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat);
+            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
         }
     }
 }

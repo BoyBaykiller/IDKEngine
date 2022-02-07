@@ -62,7 +62,7 @@ namespace IDKEngine.Render
         public AtmosphericScatterer(int size)
         {
             Result = new Texture(TextureTarget2d.TextureCubeMap);
-            Result.MutableAllocate(size, size, 1, PixelInternalFormat.Rgba32f);
+            Result.MutableAllocate(size, size, 1, PixelInternalFormat.Rgba32f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
 
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/AtmosphericScattering/compute.glsl")));
@@ -109,7 +109,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int size)
         {
-            Result.MutableAllocate(size, size, 1, Result.PixelInternalFormat);
+            Result.MutableAllocate(size, size, 1, Result.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
         }
     }
 }
