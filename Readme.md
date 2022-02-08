@@ -10,7 +10,6 @@ Feature list:
  - Physically Based Renderer
  - (Copied) Atmospheric Scattering, ported to Compute Shader and precomputed
  - GLSL Shadow Samplers for hardware filtering + PCF
- - Depth Of Field (early progress)
  - SSAO
  - Screen Space Reflections
  - Single pass Vertex layered rendering for point shadows (updated every frame for all geometry kinda bad)

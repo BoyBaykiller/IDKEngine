@@ -30,7 +30,7 @@ namespace IDKEngine
         private readonly Camera camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
 
 
-        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsDOF = false, IsDrawAABB = false;
+        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsDrawAABB = false;
         public int FPS;
         private int fps;
         protected override void OnRenderFrame(FrameEventArgs e)
@@ -69,12 +69,6 @@ namespace IDKEngine
 
                 if (IsDrawAABB)
                     ModelSystem.DrawAABB();
-
-                if (IsDOF)
-                {
-                    GaussianBlur.Compute(ForwardRenderer.Result, 3);
-                    DOF.Compute(ForwardRenderer.Depth, ForwardRenderer.Result, GaussianBlur.Result, ForwardRenderer.Result);
-                }
 
                 if (IsSSR) SSR.Result.BindToUnit(2);
                 else Texture.UnbindFromUnit(2);
@@ -191,7 +185,6 @@ namespace IDKEngine
         public SSR SSR;
         public SSAO SSAO;
         public VolumetricLighter VolumetricLight;
-        public DepthOfField DOF;
         public GaussianBlur GaussianBlur;
         private Lighter lighterContext;
         public AtmosphericScatterer AtmosphericScatterer;
@@ -242,7 +235,6 @@ namespace IDKEngine
             SSR = new SSR(Width, Height, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f, new Vector3(0.025f));
             GaussianBlur = new GaussianBlur(Width, Height);
-            DOF = new DepthOfField(10.0f, 0.07f);
             SSAO = new SSAO(Width, Height, 10, 0.3f);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Render();

@@ -124,27 +124,6 @@ namespace IDKEngine.Render
                             }
                         }
                     }
-
-                    if (ImGui.CollapsingHeader("DOF"))
-                    {
-                        ImGui.Checkbox("IsDOF", ref window.IsDOF);
-                        if (window.IsDOF)
-                        {
-                            float tempFloat;
-
-                            tempFloat = window.DOF.FocalLength;
-                            if (ImGui.SliderFloat("FocalPoint", ref tempFloat, 0.0f, 100.0f))
-                            {
-                                window.DOF.FocalLength = tempFloat;
-                            }
-
-                            tempFloat = window.DOF.ApertureRadius;
-                            if (ImGui.SliderFloat("ApertureRadius", ref tempFloat, 0.0f, 0.5f))
-                            {
-                                window.DOF.ApertureRadius = tempFloat;
-                            }
-                        }
-                    }
                 }
                
 
