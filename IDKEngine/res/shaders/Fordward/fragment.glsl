@@ -32,6 +32,7 @@ struct Material
 struct Mesh
 {
     mat4 Model;
+    mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
     int _pad0;

@@ -31,18 +31,25 @@ namespace IDKEngine.Render
         {
             DrawCommands = new GLSLDrawCommand[0];
             DrawCommandBuffer = new BufferObject();
+            DrawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
+
 
             Meshes = new GLSLMesh[0];
             MeshBuffer = new BufferObject();
+            MeshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
 
             Materials = new GLSLMaterial[0];
             MaterialBuffer = new BufferObject();
+            MaterialBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
             Vertices = new GLSLVertex[0];
             VertexBuffer = new BufferObject();
+            VertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
 
             Indices = new uint[0];
             ElementBuffer = new BufferObject();
+            ElementBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
+
 
             VAO = new VAO();
             VAO.SetElementBuffer(ElementBuffer);
@@ -113,21 +120,14 @@ namespace IDKEngine.Render
             VAO.Bind();
             DrawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
 
-            DrawCommandBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 0, 0, DrawCommandBuffer.Size);
-            MeshBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 2, 0, MeshBuffer.Size);
-            VertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, VertexBuffer.Size);
-            ElementBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 4, 0, ElementBuffer.Size);
-            MaterialBuffer.BindBufferRange(BufferRangeTarget.UniformBuffer, 1, 0, MaterialBuffer.Size);
-
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
         }
 
         private static readonly ShaderProgram cullingProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/compute.glsl")));
-        public void Cull()
+        public void ViewCull()
         {
             cullingProgram.Use();
-            cullingProgram.Upload(0, Meshes.Length);
 
             GL.DispatchCompute((Meshes.Length + 32 - 1) / 32, 1, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);

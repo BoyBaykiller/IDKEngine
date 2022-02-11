@@ -15,9 +15,14 @@ namespace IDKEngine.Render.Objects
             GL.CreateBuffers(1, out ID);
         }
 
-        public void BindBufferRange(BufferRangeTarget bufferRangeTarget, int index, int offset, int size)
+        public void BindBufferRange(BufferRangeTarget target, int index, int offset, int size)
         {
-            GL.BindBufferRange(bufferRangeTarget, index, ID, (IntPtr)offset, size);
+            GL.BindBufferRange(target, index, ID, (IntPtr)offset, size);
+        }
+
+        public void BindBufferBase(BufferRangeTarget target, int index)
+        {
+            GL.BindBufferBase(target, index, ID);
         }
 
         public void Bind(BufferTarget bufferTarget)
@@ -30,9 +35,9 @@ namespace IDKEngine.Render.Objects
         /// </summary>
         public void Reset()
         {
-            IntPtr intPtr = Marshal.AllocHGlobal(Size);
-            GL.NamedBufferSubData(ID, IntPtr.Zero, Size, intPtr);
-            Marshal.FreeHGlobal(intPtr);
+            IntPtr data = Marshal.AllocHGlobal(Size);
+            GL.NamedBufferSubData(ID, IntPtr.Zero, Size, data);
+            Marshal.FreeHGlobal(data);
         }
 
         public void SubData<T>(int offset, int size, T data) where T : struct

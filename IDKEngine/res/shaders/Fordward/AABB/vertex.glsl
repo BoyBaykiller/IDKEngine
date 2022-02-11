@@ -42,6 +42,7 @@ const vec3 positions[24] = vec3[]
 struct Mesh
 {
     mat4 Model;
+    mat4 PrevModel;
     int MaterialIndex;
     int BaseNode;
     int _pad0;

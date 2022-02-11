@@ -33,6 +33,7 @@ struct AABB
 struct Mesh
 {
     mat4 Model;
+    mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
     int _pad0;
@@ -55,24 +56,32 @@ out InOutVars
     vec3 FragPos;
 } outData;
 
-layout(location = 0) uniform int Index;
+int Unpack6x3Index(int packed, int index);
+
+layout(location = 0) uniform int ShadowIndex;
 layout(location = 1) uniform int Layer;
 
 void main()
 {
 #if IS_VERTEX_LAYERED_RENDERING
 
-    gl_Layer = gl_InstanceID;
+    gl_Layer = Unpack6x3Index(gl_BaseInstance, gl_InstanceID);
     
     mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
-    gl_Position = shadowDataUBO.PointShadows[Index].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
+    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
 
 #else
 
     mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
-    gl_Position = shadowDataUBO.PointShadows[Index].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
+    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
 
 #endif
+}
+
+int Unpack6x3Index(int packed, int index)
+{
+    const int MAX = 2 * 2 * 2 - 1;
+    return packed >> (3 * index) & MAX;
 }

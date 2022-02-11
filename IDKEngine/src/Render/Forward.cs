@@ -25,7 +25,6 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/SkyBox/fragment.glsl")));
 
         public readonly Framebuffer Framebuffer;
-        public bool IsZPrePass = true;
         public Forward(int width, int height)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
@@ -60,9 +59,9 @@ namespace IDKEngine.Render
             Framebuffer.SetDrawBuffers(new DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3 });
         }
 
+        public const int MESH_INDEX_CLEAR_COLOR = -1;
         public void Render(ModelSystem modelSystem, Texture skyBox = null, Texture ambientOcclusion = null)
         {
-            // TODO: Find better way to clear. Maybe just render to mesh buffer when necassary so you can call regular GL.Clear
             Framebuffer.Bind();
             Framebuffer.ClearBuffer(ClearBuffer.Color, 0, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
@@ -77,18 +76,15 @@ namespace IDKEngine.Render
 
             if (modelSystem.Meshes.Length > 0)
             {
-                if (IsZPrePass)
-                {
-                    GL.ColorMask(false, false, false, false);
+                GL.ColorMask(false, false, false, false);
 
-                    depthOnlyProgram.Use();
-                    modelSystem.Draw();
+                depthOnlyProgram.Use();
+                modelSystem.Draw();
 
-                    GL.DepthFunc(DepthFunction.Equal);
-                    GL.ColorMask(true, true, true, true);
-                    GL.DepthMask(false);
-                }
-                
+                GL.DepthFunc(DepthFunction.Equal);
+                GL.ColorMask(true, true, true, true);
+                GL.DepthMask(false);
+
                 shadingProgram.Use();
                 modelSystem.Draw();
             }
@@ -106,7 +102,7 @@ namespace IDKEngine.Render
 
                 GL.Enable(EnableCap.CullFace);
             }
-            
+
             GL.DepthMask(true);
             GL.DepthFunc(DepthFunction.Less);
         }

@@ -1,14 +1,12 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using OpenTK;
 using OpenTK.Input;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
-using System.Net.Sockets;
 
 namespace IDKEngine
 {
@@ -30,17 +28,16 @@ namespace IDKEngine
         private readonly Camera camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
 
 
-        public bool IsPathTracing = false, IsFrustumCulling = true, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsDrawAABB = false;
+        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsDrawAABB = false;
         public int FPS;
         private int fps;
         protected override void OnRenderFrame(FrameEventArgs e)
         {
             if (!IsPathTracing)
             {
-                // 1. If user deactived frustum culling upload unculled command buffer to render everyting again
-                // 2. If frustum culling is on and IS_VERTEX_LAYERED_RENDERING is not supported
-                //    upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
-                if (IsFrustumCulling && !PointShadow.IS_VERTEX_LAYERED_RENDERING)
+                // 1. If IS_VERTEX_LAYERED_RENDERING is false
+                // upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
+                if (!PointShadow.IS_VERTEX_LAYERED_RENDERING)
                 {
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
                 }
@@ -48,16 +45,12 @@ namespace IDKEngine
                 shadows[0].CreateDepthMap(ModelSystem);
                 shadows[1].CreateDepthMap(ModelSystem);
 
-                GL.Viewport(0, 0, Width, Height);
-
-                if (IsFrustumCulling)
-                    ModelSystem.Cull();
-                else
-                    ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
-
                 if (IsSSAO)
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
 
+                ModelSystem.ViewCull();
+
+                GL.Viewport(0, 0, Width, Height);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
                 lighterContext.Draw();
 

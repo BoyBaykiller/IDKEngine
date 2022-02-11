@@ -22,7 +22,7 @@ namespace IDKEngine.Render
 
                 string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
                 string current = window.IsPathTracing ? renderModes[1] : renderModes[0];
-                if (ImGui.BeginCombo("Render mode", current))
+                if (ImGui.BeginCombo("Render Path", current))
                 {
                     for (int i = 0; i < renderModes.Length; i++)
                     {
@@ -41,8 +41,6 @@ namespace IDKEngine.Render
 
                 if (!window.IsPathTracing)
                 {
-                    ImGui.Checkbox("FrustumCulling", ref window.IsFrustumCulling);
-                    ImGui.Checkbox("ZPrePass", ref window.ForwardRenderer.IsZPrePass);
                     ImGui.Checkbox("DrawAABB", ref window.IsDrawAABB);
 
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
@@ -125,7 +123,6 @@ namespace IDKEngine.Render
                         }
                     }
                 }
-               
 
                 if (ImGui.CollapsingHeader("EnvironmentMap"))
                 {
@@ -186,7 +183,7 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
-            if (selectedMeshIndex != -1)
+            if (selectedMeshIndex != Forward.MESH_INDEX_CLEAR_COLOR)
             {   
                 System.Numerics.Vector3 systemVec3;
                 ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);

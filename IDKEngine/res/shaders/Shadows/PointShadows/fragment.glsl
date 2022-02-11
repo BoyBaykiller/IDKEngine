@@ -38,11 +38,11 @@ in InOutVars
     vec3 FragPos;
 } inData;
 
-layout(location = 0) uniform int Index;
+layout(location = 0) uniform int ShadowIndex;
 
 void main()
 {
-    PointShadow pointShadow = shadowDataUBO.PointShadows[Index];
+    PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
     vec3 position = lightsUBO.Lights[pointShadow.LightIndex].Position;
 
     float twoDist = dot(inData.FragPos - position, inData.FragPos - position);

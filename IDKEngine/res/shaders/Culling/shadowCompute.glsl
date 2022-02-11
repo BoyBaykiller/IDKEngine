@@ -1,4 +1,5 @@
 #version 460 core
+#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
@@ -34,6 +35,18 @@ struct Mesh
     int _pad1;
 };
 
+struct PointShadow
+{
+    samplerCubeShadow Sampler;
+    float NearPlane;
+    float FarPlane;
+
+    mat4 ProjViewMatrices[6];
+
+    vec3 _pad0;
+    int LightIndex;
+};
+
 layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
@@ -49,34 +62,42 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std140, binding = 0) uniform BasicDataUBO
+layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    vec3 ViewPos;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-} basicDataUBO;
+    PointShadow PointShadows[8];
+    int PointCount;
+} shadowDataUBO;
 
-vec3 NegativeVertex(Node node, vec3 normal);
-bool AABBVsFrustum(Frustum frustum, Node node);
 Frustum ExtractFrustum(mat4 projViewModel);
+bool AABBVsFrustum(Frustum frustum, Node node);
+vec3 NegativeVertex(Node node, vec3 normal);
+void Insert3BitsIntoInt(int threeBitValue, int index, inout int dest);
+
+layout(location = 0) uniform int ShadowIndex;
 
 void main()
 {
-    if (gl_GlobalInvocationID.x >= meshSSBO.Meshes.length())
+    const uint meshIndex = gl_GlobalInvocationID.x;
+    if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    Mesh mesh = meshSSBO.Meshes[gl_GlobalInvocationID.x];
+    Mesh mesh = meshSSBO.Meshes[meshIndex];
     Node node = bvhSSBO.Nodes[mesh.BaseNode];
-    
-    Frustum frustum = ExtractFrustum(basicDataUBO.ProjView * mesh.Model);
-    drawCommandsSSBO.DrawCommands[gl_GlobalInvocationID.x].InstanceCount = int(AABBVsFrustum(frustum, node));
+    PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
+
+    int instances = 0;
+    int packed = 0;
+    // TODO: Parallelize this for loop over 6 threads
+    for (int i = 0; i < 6; i++)
+    {
+        Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * mesh.Model);
+        if (AABBVsFrustum(frustum, node))
+        {
+            Insert3BitsIntoInt(i, instances++, packed);
+        }
+    }
+    drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = instances;
+    drawCommandsSSBO.DrawCommands[meshIndex].BaseInstance = packed;
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)
@@ -112,4 +133,9 @@ bool AABBVsFrustum(Frustum frustum, Node node)
 vec3 NegativeVertex(Node node, vec3 normal)
 {
 	return mix(node.Min, node.Max, greaterThan(normal, vec3(0.0)));
+}
+
+void Insert3BitsIntoInt(int threeBitValue, int index, inout int dest)
+{
+    dest |= threeBitValue << 3 * index;
 }

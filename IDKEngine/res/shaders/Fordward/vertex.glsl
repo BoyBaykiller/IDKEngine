@@ -9,6 +9,7 @@ layout(location = 4) in vec3 BiTangent;
 struct Mesh
 {
     mat4 Model;
+    mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
     int _pad0;

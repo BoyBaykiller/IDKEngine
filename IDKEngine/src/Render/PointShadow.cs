@@ -31,10 +31,13 @@ namespace IDKEngine.Render
             Helper.IsExtensionsAvailable("GL_NV_viewport_array") ||
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2"));
 
-        private static readonly ShaderProgram shaderProgram = new ShaderProgram(
+        private static readonly ShaderProgram renderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl"))
                 );
+
+        private static readonly ShaderProgram cullingProgram = new ShaderProgram(
+            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/shadowCompute.glsl")));
 
         private static readonly BufferObject shadowsBuffer = InitShadowBuffer();
         public readonly Texture Result;
@@ -103,8 +106,7 @@ namespace IDKEngine.Render
             GL.CullFace(CullFaceMode.Front);
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
-            shaderProgram.Use();
-            shaderProgram.Upload(0, Instance);
+            renderProgram.Upload(0, Instance);
 
             modelSystem.VAO.DisableVertexAttribute(1);
             modelSystem.VAO.DisableVertexAttribute(2);
@@ -112,26 +114,26 @@ namespace IDKEngine.Render
             modelSystem.VAO.DisableVertexAttribute(4);
             if (IS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array or GL_NV_viewport_array2
             {
-                modelSystem.ForEach(0, modelSystem.Meshes.Length, (ref GLSLDrawCommand drawCommand) =>
-                {
-                    drawCommand.InstanceCount *= 6;
-                });
+                cullingProgram.Use();
+                cullingProgram.Upload(0, Instance);
 
+                GL.DispatchCompute((modelSystem.Meshes.Length + 32 - 1) / 32, 1, 1);
+                GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
+
+                renderProgram.Use();
                 modelSystem.Draw();
-
-                modelSystem.ForEach(0, modelSystem.Meshes.Length, (ref GLSLDrawCommand drawCommand) =>
-                {
-                    drawCommand.InstanceCount /= 6;
-                });
             }
             else
             {
+                renderProgram.Use();
+
                 // Using geometry shader would be slower
                 for (int i = 0; i < 6; i++)
                 {
                     framebuffer.SetTextureLayer(FramebufferAttachment.DepthAttachment, Result, i);
-                    shaderProgram.Upload(1, i);
 
+                    renderProgram.Upload(1, i);
+                    
                     modelSystem.Draw();
                 }
                 framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
@@ -144,7 +146,6 @@ namespace IDKEngine.Render
             GL.CullFace(CullFaceMode.Back);
             GL.ColorMask(true, true, true, true);
         }
-
         private static unsafe BufferObject InitShadowBuffer()
         {
             BufferObject bufferObject = new BufferObject();
