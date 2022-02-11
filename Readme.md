@@ -9,13 +9,13 @@ Feature list:
  - Multithreaded model loader
  - Physically Based Renderer
  - (Copied) Atmospheric Scattering, ported to Compute Shader and precomputed
- - GLSL Shadow Samplers for hardware filtering + PCF
- - SSAO
+ - Shadow Samplers for hardware filtering + PCF
  - Screen Space Reflections
- - Single pass Vertex layered rendering for point shadows (updated every frame for all geometry kinda bad)
- - GPU accelerated Frustum Culling (implement for shadows as well?)
+ - Screen Space Ambient Occlusion
+ - Single pass Vertex Layered Rendering for point shadows (updated every frame for all geometry kinda bad)
+ - GPU accelerated Frustum Culling for shadows and player
  - Ray marched Volumetric Lighting
- - Multi draw indirect + bindless texture system that draws every loaded model in one draw call
+ - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
  - Path Tracer (early progress and no bvh yet so really really slow)
  
 Required OpenGL: 4.6

@@ -79,6 +79,7 @@ namespace IDKEngine
             BVHBuffer = new BufferObject();
             BVHBuffer.ImmutableAllocate(nodes.Count * sizeof(GLSLNode), nodes.ToArray(), BufferStorageFlags.DynamicStorageBit);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
+			VertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 5, 0, VertexBuffer.Size);
 
 			void PopulateLeaf(int start, int end, ref GLSLNode node)
             {

@@ -5,6 +5,7 @@ layout(location = 0) in vec3 Position;
 struct Mesh
 {
     mat4 Model;
+    mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
     int _pad0;

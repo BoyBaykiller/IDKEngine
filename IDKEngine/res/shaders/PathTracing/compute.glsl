@@ -43,6 +43,7 @@ struct Material
 struct Mesh
 {
     mat4 Model;
+    mat4 PrevModel;
     int MaterialIndex;
     int BaseNode;
     int _pad0;
@@ -99,15 +100,16 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 3) restrict readonly buffer VertecisSSBO
-{
-    Vertex Vertecis[];
-} vertecisSSBO;
 
 layout(std430, binding = 4) restrict readonly buffer IndicisSSBO
 {
     uint Indicis[];
 } indicisSSBO;
+
+layout(std430, binding = 5) restrict readonly buffer VertecisSSBO
+{
+    Vertex Vertecis[];
+} vertecisSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {

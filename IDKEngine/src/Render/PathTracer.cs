@@ -30,12 +30,6 @@ namespace IDKEngine.Render
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             EnvironmentMap.BindToUnit(0);
 
-            BVH.BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVH.BVHBuffer.Size);
-            ModelSystem.MeshBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 2, 0, ModelSystem.MeshBuffer.Size);
-            BVH.VertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, BVH.VertexBuffer.Size);
-            ModelSystem.ElementBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 4, 0, ModelSystem.ElementBuffer.Size);
-            ModelSystem.MaterialBuffer.BindBufferRange(BufferRangeTarget.UniformBuffer, 1, 0, ModelSystem.MaterialBuffer.Size);
-
             shaderProgram.Use();
             shaderProgram.Upload(0, thisRenderNumFrame++);
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);
