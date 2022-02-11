@@ -71,7 +71,7 @@ layout(std140, binding = 2) uniform ShadowDataUBO
 Frustum ExtractFrustum(mat4 projViewModel);
 bool AABBVsFrustum(Frustum frustum, Node node);
 vec3 NegativeVertex(Node node, vec3 normal);
-void Insert3BitsIntoInt(int threeBitValue, int index, inout int dest);
+void Pack3BitValue(int threeBitValue, int index, inout int dest);
 
 layout(location = 0) uniform int ShadowIndex;
 
@@ -86,18 +86,18 @@ void main()
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
     int instances = 0;
-    int packed = 0;
+    int packedValue = 0;
     // TODO: Parallelize this for loop over 6 threads
     for (int i = 0; i < 6; i++)
     {
         Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * mesh.Model);
         if (AABBVsFrustum(frustum, node))
         {
-            Insert3BitsIntoInt(i, instances++, packed);
+            Pack3BitValue(i, instances++, packedValue);
         }
     }
     drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = instances;
-    drawCommandsSSBO.DrawCommands[meshIndex].BaseInstance = packed;
+    drawCommandsSSBO.DrawCommands[meshIndex].BaseInstance = packedValue;
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)
@@ -135,7 +135,7 @@ vec3 NegativeVertex(Node node, vec3 normal)
 	return mix(node.Min, node.Max, greaterThan(normal, vec3(0.0)));
 }
 
-void Insert3BitsIntoInt(int threeBitValue, int index, inout int dest)
+void Pack3BitValue(int threeBitValue, int index, inout int dest)
 {
     dest |= threeBitValue << 3 * index;
 }
