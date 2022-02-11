@@ -56,7 +56,7 @@ out InOutVars
     vec3 FragPos;
 } outData;
 
-int Unpack6x3Index(int packed, int index);
+int Unpack3Bits(int packedValue, int index);
 
 layout(location = 0) uniform int ShadowIndex;
 layout(location = 1) uniform int Layer;
@@ -65,7 +65,7 @@ void main()
 {
 #if IS_VERTEX_LAYERED_RENDERING
 
-    gl_Layer = Unpack6x3Index(gl_BaseInstance, gl_InstanceID);
+    gl_Layer = Unpack3Bits(gl_BaseInstance, gl_InstanceID);
     
     mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
@@ -80,8 +80,8 @@ void main()
 #endif
 }
 
-int Unpack6x3Index(int packed, int index)
+int Unpack3Bits(int packedValue, int index)
 {
     const int MAX = 2 * 2 * 2 - 1;
-    return packed >> (3 * index) & MAX;
+    return packedValue >> (3 * index) & MAX;
 }
