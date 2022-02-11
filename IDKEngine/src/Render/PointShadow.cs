@@ -96,7 +96,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public void CreateDepthMap(ModelSystem modelSystem)
+        public unsafe void CreateDepthMap(ModelSystem modelSystem)
         {
             if (Position != lightContext.Lights[glslPointShadow.LightIndex].Position)
                 Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
@@ -125,18 +125,24 @@ namespace IDKEngine.Render
             }
             else
             {
-                renderProgram.Use();
-
                 // Using geometry shader would be slower
-                for (int i = 0; i < 6; i++)
+                fixed (Matrix4* ptr = &glslPointShadow.PosX)
                 {
-                    framebuffer.SetTextureLayer(FramebufferAttachment.DepthAttachment, Result, i);
+                    for (int i = 0; i < 6; i++)
+                    {
+                        Matrix4 projView = *(ptr + i);
+                        modelSystem.ViewCull(ref projView);
 
-                    renderProgram.Upload(1, i);
-                    
-                    modelSystem.Draw();
+                        framebuffer.SetTextureLayer(FramebufferAttachment.DepthAttachment, Result, i);
+
+                        renderProgram.Use();
+                        renderProgram.Upload(1, i);
+
+                        modelSystem.Draw();
+                    }
                 }
                 framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
+                
             }
             modelSystem.VAO.EnableVertexAttribute(1);
             modelSystem.VAO.EnableVertexAttribute(2);

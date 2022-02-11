@@ -49,23 +49,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    vec3 ViewPos;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-} basicDataUBO;
-
 vec3 NegativeVertex(Node node, vec3 normal);
 bool AABBVsFrustum(Frustum frustum, Node node);
 Frustum ExtractFrustum(mat4 projViewModel);
+
+layout(location = 0) uniform mat4 ProjView;
 
 void main()
 {
@@ -75,7 +63,7 @@ void main()
     Mesh mesh = meshSSBO.Meshes[gl_GlobalInvocationID.x];
     Node node = bvhSSBO.Nodes[mesh.BaseNode];
     
-    Frustum frustum = ExtractFrustum(basicDataUBO.ProjView * mesh.Model);
+    Frustum frustum = ExtractFrustum(ProjView * mesh.Model);
     drawCommandsSSBO.DrawCommands[gl_GlobalInvocationID.x].InstanceCount = int(AABBVsFrustum(frustum, node));
 }
 

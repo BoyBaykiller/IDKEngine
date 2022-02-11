@@ -36,7 +36,7 @@ namespace IDKEngine
             if (!IsPathTracing)
             {
                 // 1. If IS_VERTEX_LAYERED_RENDERING is false
-                // upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
+                //    upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
                 if (!PointShadow.IS_VERTEX_LAYERED_RENDERING)
                 {
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
@@ -48,7 +48,7 @@ namespace IDKEngine
                 if (IsSSAO)
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
 
-                ModelSystem.ViewCull();
+                ModelSystem.ViewCull(ref glslBasicData.ProjView);
 
                 GL.Viewport(0, 0, Width, Height);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
