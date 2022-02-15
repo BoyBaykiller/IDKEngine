@@ -47,24 +47,20 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsVolumetricLighting", ref window.IsVolumetricLighting);
                         if (window.IsVolumetricLighting)
                         {
-                            int tempInt;
-                            float tempFloat;
-                            System.Numerics.Vector3 tempVec;
-
-                            tempInt = window.VolumetricLight.Samples;
+                            int tempInt = window.VolumetricLight.Samples;
                             if (ImGui.SliderInt("Samples", ref tempInt, 1, 100))
                             {
                                 window.VolumetricLight.Samples = tempInt;
                             }
 
 
-                            tempFloat = window.VolumetricLight.Scattering;
+                            float tempFloat = window.VolumetricLight.Scattering;
                             if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
                             {
                                 window.VolumetricLight.Scattering = tempFloat;
                             }
 
-                            tempVec = OpenTKToSystem(window.VolumetricLight.Absorbance);
+                            System.Numerics.Vector3 tempVec = OpenTKToSystem(window.VolumetricLight.Absorbance);
                             if (ImGui.SliderFloat3("Absorbance", ref tempVec, 0.0f, 0.2f))
                             {
                                 window.VolumetricLight.Absorbance = SystemToOpenTK(tempVec);
@@ -77,16 +73,13 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsSSAO", ref window.IsSSAO);
                         if (window.IsSSAO)
                         {
-                            int tempInt;
-                            float tempFloat;
-
-                            tempInt = window.SSAO.Samples;
+                            int tempInt = window.SSAO.Samples;
                             if (ImGui.SliderInt("Samples  ", ref tempInt, 1, 50))
                             {
                                 window.SSAO.Samples = tempInt;
                             }
 
-                            tempFloat = window.SSAO.Radius;
+                            float tempFloat = window.SSAO.Radius;
                             if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 2.0f))
                             {
                                 window.SSAO.Radius = tempFloat;
@@ -99,10 +92,7 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsSSR", ref window.IsSSR);
                         if (window.IsSSR)
                         {
-                            int tempInt;
-                            float tempFloat;
-
-                            tempInt = window.SSR.Samples;
+                            int tempInt = window.SSR.Samples;
                             if (ImGui.SliderInt("Samples ", ref tempInt, 1, 100))
                             {
                                 window.SSR.Samples = tempInt;
@@ -114,11 +104,37 @@ namespace IDKEngine.Render
                                 window.SSR.BinarySearchSamples = tempInt;
                             }
 
-                            tempFloat = window.SSR.MaxDist;
+                            float tempFloat = window.SSR.MaxDist;
                             if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1, 100))
                             {
                                 window.SSR.MaxDist = tempFloat;
                             }
+                        }
+                    }
+                }
+                else
+                {
+                    if (ImGui.CollapsingHeader("PathTracing"))
+                    {
+                        int tempInt = window.PathTracer.RayDepth;
+                        if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
+                        {
+                            window.PathTracer.ResetRenderer();
+                            window.PathTracer.RayDepth = tempInt;
+                        }
+
+                        float floatTemp = window.PathTracer.FocalLength;
+                        if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
+                        {
+                            window.PathTracer.ResetRenderer();
+                            window.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
+                        }
+
+                        floatTemp = window.PathTracer.ApertureDiameter;
+                        if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
+                        {
+                            window.PathTracer.ResetRenderer();
+                            window.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
                         }
                     }
                 }

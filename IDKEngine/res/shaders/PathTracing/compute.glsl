@@ -6,7 +6,7 @@
 #extension GL_ARB_bindless_texture : require
 #extension GL_NV_gpu_shader5 : enable
 #ifndef GL_NV_gpu_shader5
-    #extension GL_EXT_nonuniform_qualifier : require
+#extension GL_ARB_shader_ballot : require
 #endif
 
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
@@ -60,9 +60,6 @@ struct BVHVertex
 
     vec3 Tangent;
     float _pad2;
-
-    vec3 BiTangent;
-    float _pad3;
 };
 
 struct TraverseVertex
@@ -76,7 +73,7 @@ struct HitInfo
     vec3 Bary;
     float T;
     uvec3 BVHVertexIndices;
-    int MeshID;
+    int HitIndex;
 };
 
 struct Ray
@@ -95,6 +92,8 @@ struct Node
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
+    vec3 _pad0;
+    uint TreeDepth;
     Node Nodes[];
 } bvhSSBO;
 
@@ -108,7 +107,7 @@ layout(std430, binding = 3) restrict readonly buffer BVHVertices
     BVHVertex Vertices[];
 } verticesSSBO;
 
-layout(std430, binding = 5) restrict readonly buffer BVHTraverseVerticesSSBO
+layout(std430, binding = 4) restrict readonly buffer BVHTraverseVerticesSSBO
 {
     TraverseVertex Vertices[];
 } traverseVerticesSSBO;
@@ -129,12 +128,12 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 1) uniform MaterialUBO
 {
-    Material Materials[384];
+    Material Materials[256];
 } materialUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    Light Lights[128];
+    Light Lights[64];
     int LightCount;
 } lightsUBO;
 
@@ -144,6 +143,7 @@ float FresnelSchlick(float cosTheta, float n1, float n2);
 bool RayTrace(Ray ray, out HitInfo hitInfo);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
 bool RayCuboidIntersect(Ray ray, Node node, out float t2);
+bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary);
 vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
@@ -152,14 +152,14 @@ vec2 UniformSampleUnitCircle();
 uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
+uint EmulateNonUniform(uint index);
 
 uint TREE_DEPTH;
 const uint BITS_FOR_MISS_LINK = 10u;
 
-uniform int RayDepth = 6;
-uniform int SPP = 1;
-uniform float FocalLength = 10.0;
-uniform float ApertureDiameter = 0.07; // 0.07
+uniform int RayDepth;
+uniform float FocalLength;
+uniform float ApertureDiameter;
 layout(location = 0) uniform int RenderedFrames;
 
 uint rngSeed;
@@ -170,28 +170,23 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    TREE_DEPTH = 3u;
+    TREE_DEPTH = bvhSSBO.TreeDepth;
 
     rngSeed = RenderedFrames;
-    // rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + RenderedFrames * 2699 | 1;
+    //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + RenderedFrames * 2699 | 1;
 
-    vec3 irradiance = vec3(0.0);
-    for (int i = 0; i < SPP; i++)
-    {   
-        vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01()) - 0.5; // integrating over whole pixel eliminates aliasing
-        vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
-        Ray camRay = Ray(basicDataUBO.ViewPos, GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc));
+    vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01()) - 0.5; // integrating over whole pixel eliminates aliasing
+    vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
+    Ray camRay = Ray(basicDataUBO.ViewPos, GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc));
 
-        vec3 focalPoint = camRay.Origin + camRay.Direction * FocalLength;
-        vec2 offset = ApertureDiameter * 0.5 * UniformSampleUnitCircle();
-        
-        camRay.Origin = (basicDataUBO.InvView * vec4(offset, 0.0, 1.0)).xyz;
-        camRay.Direction = normalize(focalPoint - camRay.Origin);
-
-        irradiance += Radiance(camRay);
-    }
-    irradiance /= SPP;
+    vec3 focalPoint = camRay.Origin + camRay.Direction * FocalLength;
+    vec2 offset = ApertureDiameter * 0.5 * UniformSampleUnitCircle();
     
+    camRay.Origin = (basicDataUBO.InvView * vec4(offset, 0.0, 1.0)).xyz;
+    camRay.Direction = normalize(focalPoint - camRay.Origin);
+    vec3 irradiance = Radiance(camRay);
+    
+
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
     irradiance = mix(lastFrameColor, irradiance, 1.0 / (RenderedFrames + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
@@ -199,9 +194,6 @@ void main()
 
 vec3 Radiance(Ray ray)
 {
-    uvec2 handle;
-    sampler2D tex = sampler2D(handle);
-
     vec3 throughput = vec3(1.0);
     vec3 radiance = vec3(0.0);
 
@@ -210,47 +202,59 @@ vec3 Radiance(Ray ray)
     {
         if (RayTrace(ray, hitInfo))
         {
-            BVHVertex v0 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.x];
-            BVHVertex v1 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.y];
-            BVHVertex v2 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.z];
-            
-            mat4 model = meshSSBO.Meshes[hitInfo.MeshID].Model;
-
-            vec3 tangent = Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary);
-            vec3 normal = Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary);
-            vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
-
-            vec3 T = normalize(vec3(model * vec4(tangent, 0.0)));
-            vec3 N = normalize(vec3(model * vec4(normal, 0.0)));
-            T = normalize(T - dot(T, N) * N);
-            vec3 B = cross(N, T); // interpolating BiTangent would also work
-            mat3 TBN = mat3(T, B, N);
-
-            float specularChance, roughness;
+            vec3 hitpos = ray.Origin + ray.Direction * hitInfo.T;
+            float specularChance = 0.0;
+            float roughness = 1.0;
+            float alpha = 1.0;
             vec3 albedo;
-            Material material = materialUBO.Materials[meshSSBO.Meshes[hitInfo.MeshID].MaterialIndex]; // MaterialIndex is same for v0, v1, v2
+            vec3 normal;
+            vec3 emissive;
+            if (hitInfo.HitIndex >= 0)
+            {
+                BVHVertex v0 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.x];
+                BVHVertex v1 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.y];
+                BVHVertex v2 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.z];
+                
+                Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
+                mat4 model = mesh.Model;
+
+                vec3 tangent = Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary);
+                normal = Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary);
+                vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
+
+                vec3 T = normalize(vec3(model * vec4(tangent, 0.0)));
+                vec3 N = normalize(vec3(model * vec4(normal, 0.0)));
+                T = normalize(T - dot(T, N) * N);
+                vec3 B = cross(N, T);
+                mat3 TBN = mat3(T, B, N);
+                
             #ifdef GL_NV_gpu_shader5
+                Material material = materialUBO.Materials[mesh.MaterialIndex];
+            #else
+                Material material = materialUBO.Materials[EmulateNonUniform(mesh.MaterialIndex)];
+            #endif
+
                 specularChance = texture(material.Specular, texCoord).r;
                 roughness = texture(material.Roughness, texCoord).r;
                 normal = texture(material.Normal, texCoord).rgb;
                 vec4 temp = texture(material.Albedo, texCoord);
                 albedo = temp.rgb;
-            #else
-                specularChance = texture(nonuniformEXT(material.Specular), texCoord).r;
-                roughness = texture(nonuniformEXT(material.Roughness), texCoord).r;
-                normal = texture(nonuniformEXT(material.Normal), texCoord).rgb;
-                vec4 temp = texture(nonuniformEXT(material.Albedo), texCoord);
-                albedo = temp.rgb;
-            #endif
-            normal = TBN * (normal * 2.0 - 1.0);
 
-            vec3 hitpos = ray.Origin + ray.Direction * hitInfo.T;
+                normal = TBN * (normal * 2.0 - 1.0);
+            }
+            else
+            {
+                Light light = lightsUBO.Lights[-hitInfo.HitIndex - 1];
+                emissive = light.Color;
+                albedo = light.Color;
+            }
+
+            // TOOD: Implement BSDF
             float rayProbability;
+            ray.Direction = BRDF(ray.Direction, specularChance, roughness, normal, rayProbability);
+            ray.Origin = hitpos + ray.Direction * EPSILON;
 
-            ray.Direction = BRDF(ray.Direction, specularChance, roughness, normal, rayProbability); // CosineSampleHemisphere(normal)
-            ray.Origin = hitpos + ray.Direction * EPSILON; // offset ray a bit to avoid numerical errors
-
-            radiance += ((hitInfo.MeshID > 1 && hitInfo.MeshID < 26) ? vec3(albedo * 16) : vec3(0.0)) * throughput;
+            radiance += emissive * throughput;
             throughput *= albedo;
             throughput /= rayProbability;
 
@@ -346,7 +350,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                             hitInfo.Bary = baryT.xyz;
                             hitInfo.T = baryT.w;
                             hitInfo.BVHVertexIndices = uvec3(v0.BVHVertexIndex, v1.BVHVertexIndex, v2.BVHVertexIndex);
-                            hitInfo.MeshID = i;
+                            hitInfo.HitIndex = i;
                         }
                     }
                 }
@@ -357,6 +361,17 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                 const uint MAX_MISS_LINK = (1u << BITS_FOR_MISS_LINK) - 1u;
                 localNodeIndex = (node.MissLinkAndVerticesCount >> (32u - BITS_FOR_MISS_LINK)) & MAX_MISS_LINK;
             }
+        }
+    }
+
+    float t1;
+    for (int i = 0; i < lightsUBO.LightCount; i++)
+    {
+        Light light = lightsUBO.Lights[i];
+        if (RaySphereIntersect(ray, light, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
+        {
+            hitInfo.T = t1;
+            hitInfo.HitIndex = -i - 1;
         }
     }
 
@@ -395,6 +410,25 @@ bool RayCuboidIntersect(Ray ray, Node node, out float t2)
 
     t1 = max(t1, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
     t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
+    return t1 <= t2;
+}
+
+bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2)
+{
+    // Source: https://antongerdelan.net/opengl/raycasting.html
+    t1 = t2 = FLOAT_MAX;
+
+    vec3 sphereToRay = ray.Origin - light.Position;
+    float b = dot(ray.Direction, sphereToRay);
+    float c = dot(sphereToRay, sphereToRay) - light.Radius * light.Radius;
+    float discriminant = b * b - c;
+    if (discriminant < 0.0)
+        return false;
+
+    float squareRoot = sqrt(discriminant);
+    t1 = -b - squareRoot;
+    t2 = -b + squareRoot;
+
     return t1 <= t2;
 }
 
@@ -453,4 +487,12 @@ vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedD
     vec4 rayEye = inverseProj * vec4(normalizedDeviceCoords, -1.0, 0.0);
     rayEye.zw = vec2(-1.0, 0.0);
     return normalize((inverseView * rayEye).xyz);
+}
+
+// Source: https://discord.com/channels/318590007881236480/318590007881236480/856523979383373835
+uint EmulateNonUniform(uint index)
+{
+    uint currentIndex;
+    while ((currentIndex = readFirstInvocationARB(index)) != index) ;
+    return currentIndex;
 }

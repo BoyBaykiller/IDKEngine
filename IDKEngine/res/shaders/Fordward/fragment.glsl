@@ -80,7 +80,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 1) uniform MaterialUBO
 {
-    Material Materials[384];
+    Material Materials[256];
 } materialUBO;
 
 layout(std140, binding = 2) uniform ShadowDataUBO
@@ -91,7 +91,7 @@ layout(std140, binding = 2) uniform ShadowDataUBO
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    Light Lights[128];
+    Light Lights[64];
     int LightCount;
 } lightsUBO;
 

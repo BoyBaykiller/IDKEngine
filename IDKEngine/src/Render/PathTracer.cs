@@ -7,13 +7,49 @@ namespace IDKEngine.Render
     class PathTracer
     {
         public readonly Texture Result;
-        private static readonly ShaderProgram shaderProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
 
-        public Texture EnvironmentMap;
+		private int _rayDepth;
+		public int RayDepth
+		{
+			get => _rayDepth;
+
+			set
+			{
+				_rayDepth = value;
+				shaderProgram.Upload("RayDepth", value);
+			}
+		}
+
+		private float _focalLength;
+		public float FocalLength
+		{
+			get => _focalLength;
+
+			set
+			{
+				_focalLength = value;
+				shaderProgram.Upload("FocalLength", value);
+			}
+		}
+
+		private float _apertureDiameter;
+		public float ApertureDiameter
+		{
+			get => _apertureDiameter;
+
+			set
+			{
+				_apertureDiameter = value;
+				shaderProgram.Upload("ApertureDiameter", value);
+			}
+		}
+
+		public Texture EnvironmentMap;
         public ModelSystem ModelSystem;
         public readonly BVH BVH;
-        public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, Texture environmentMap, int width, int height)
+		private static readonly ShaderProgram shaderProgram = new ShaderProgram(
+			new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
+		public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, Texture environmentMap, int width, int height)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -22,6 +58,10 @@ namespace IDKEngine.Render
             EnvironmentMap = environmentMap;
             ModelSystem = modelSystem;
             BVH = bvh;
+
+			RayDepth = 6;
+			FocalLength = 10.0f;
+			ApertureDiameter = 0.03f;
         }
 
         private int thisRenderNumFrame = 0;

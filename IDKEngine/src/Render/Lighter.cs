@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class Lighter
     {
-        public const int GLSL_MAX_UBO_LIGHT_COUNT = 128; // also change UBO size in shaders
+        public const int GLSL_MAX_UBO_LIGHT_COUNT = 64; // also change UBO size in shaders
 
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/Light/vertex.glsl")),
@@ -67,7 +67,7 @@ namespace IDKEngine.Render
             Debug.Assert(Count + lights.Length <= GLSL_MAX_UBO_LIGHT_COUNT);
 
             bufferObject.SubData(Count * sizeof(GLSLLight), lights.Length * sizeof(GLSLLight), lights);
-            Array.Copy(lights, 0, this.Lights, Count, lights.Length);
+            Array.Copy(lights, 0, Lights, Count, lights.Length);
             
             Count += lights.Length;
         }
@@ -107,6 +107,5 @@ namespace IDKEngine.Render
                 bufferObject.SubData(start * sizeof(GLSLLight), (end - start) * sizeof(GLSLLight), (IntPtr)ptr);
             }
         }
-
     }
 }

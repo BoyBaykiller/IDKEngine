@@ -20,7 +20,7 @@ Feature list:
  
 Required OpenGL: 4.6
 
-Required extensions: `ARB_bindless_texture` and (`EXT_nonuniform_qualifier` or `NV_gpu_shader5`)
+Required extensions: `ARB_bindless_texture` and (`NV_gpu_shader5` or `GL_ARB_shader_ballot`)
 
 Optional extensions: (`ARB_shader_viewport_layer_array` or `AMD_vertex_shader_layer` or `NV_viewport_array` or `NV_viewport_array2`) and (`ARB_seamless_cubemap_per_texture` or `AMD_seamless_cubemap_per_texture`)
 

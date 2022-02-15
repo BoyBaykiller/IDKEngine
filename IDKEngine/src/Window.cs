@@ -42,8 +42,10 @@ namespace IDKEngine
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
                 }
 
-                shadows[0].CreateDepthMap(ModelSystem);
-                shadows[1].CreateDepthMap(ModelSystem);
+                for (int i = 0; i < pointShadows.Length; i++)
+                {
+                    pointShadows[i].CreateDepthMap(ModelSystem);
+                }
 
                 if (IsSSAO)
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
@@ -172,7 +174,7 @@ namespace IDKEngine
 
         private ShaderProgram finalProgram;
         private BufferObject basicDataUBO;
-        private PointShadow[] shadows;
+        private PointShadow[] pointShadows;
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public SSR SSR;
@@ -242,21 +244,22 @@ namespace IDKEngine
             PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Width, Height);
 
             GLSLLight[] lights = new GLSLLight[2];
-            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
+            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 1.0f);
             //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -0.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
-            lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.1f);
+            lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.5f);
+
             lighterContext = new Lighter(20, 20);
             lighterContext.Add(lights);
 
-            shadows = new PointShadow[2];
-            shadows[0] = new PointShadow(lighterContext, 0, 1536, 1.0f, 60.0f);
-            shadows[1] = new PointShadow(lighterContext, 1, 256, 0.5f, 60.0f);
+            pointShadows = new PointShadow[2];
+            pointShadows[0] = new PointShadow(lighterContext, 0, 1536, 1.0f, 60.0f);
+            pointShadows[1] = new PointShadow(lighterContext, 1, 256, 0.5f, 60.0f);
 
-            shadows[0].CreateDepthMap(ModelSystem);
-            shadows[1].CreateDepthMap(ModelSystem);
+            pointShadows[0].CreateDepthMap(ModelSystem);
+            pointShadows[1].CreateDepthMap(ModelSystem);
 
             basicDataUBO = new BufferObject();
-            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             basicDataUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 0, 0, basicDataUBO.Size);
 
             finalProgram = new ShaderProgram(
