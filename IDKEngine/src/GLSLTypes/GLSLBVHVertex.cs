@@ -10,7 +10,5 @@ namespace IDKEngine
         private readonly float _pad1;
         public Vector3 Tangent;
         private readonly float _pad2;
-        public Vector3 BiTangent;
-        private readonly float _pad3;
     }
 }

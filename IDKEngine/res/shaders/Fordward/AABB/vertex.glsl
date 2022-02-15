@@ -59,6 +59,8 @@ struct Node
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
+    vec3 _pad0;
+    uint TreeDepth;
     Node Nodes[];
 } bvhSSBO;
 
@@ -83,8 +85,9 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 void main()
 {
-    Mesh mesh = meshSSBO.Meshes[gl_InstanceID];
-    Node node = bvhSSBO.Nodes[mesh.BaseNode + 0];
+    int nodesPerMesh = (1 << bvhSSBO.TreeDepth) - 1;
+    Mesh mesh = meshSSBO.Meshes[gl_InstanceID / nodesPerMesh];
+    Node node = bvhSSBO.Nodes[mesh.BaseNode + (gl_InstanceID % nodesPerMesh)];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;

@@ -14,7 +14,7 @@ namespace IDKEngine
 		public const uint BITS_FOR_MISS_LINK = 10u; // also adjust in PathTracing/compute.glsl
 		public const uint TREE_DEPTH = 3; // also adjust in PathTracing/compute.glsl
 
-        public readonly BufferObject BVHBuffer;
+		public readonly BufferObject BVHBuffer;
         public readonly BufferObject BVHVertexBuffer;
         public readonly BufferObject TraverseVertexBuffer;
 		public ModelSystem ModelSystem;
@@ -33,7 +33,6 @@ namespace IDKEngine
 				bvhVertecis[i].TexCoord = modelSystem.Vertices[i].TexCoord;
 				bvhVertecis[i].Normal = modelSystem.Vertices[i].Normal;
 				bvhVertecis[i].Tangent = modelSystem.Vertices[i].Tangent;
-				bvhVertecis[i].BiTangent = modelSystem.Vertices[i].BiTangent;
 			}
 
 			for (int i = 0; i < modelSystem.Meshes.Length; i++)
@@ -93,7 +92,9 @@ namespace IDKEngine
 			modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
 
             BVHBuffer = new BufferObject();
-            BVHBuffer.ImmutableAllocate(nodes.Length * sizeof(GLSLNode), nodes, BufferStorageFlags.DynamicStorageBit);
+            BVHBuffer.ImmutableAllocate(Vector4.SizeInBytes + nodes.Length * sizeof(GLSLNode), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+			BVHBuffer.SubData(Vector3.SizeInBytes, sizeof(uint), TREE_DEPTH);
+			BVHBuffer.SubData(Vector4.SizeInBytes, nodes.Length * sizeof(GLSLNode), nodes);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
             BVHVertexBuffer = new BufferObject();
@@ -102,7 +103,7 @@ namespace IDKEngine
 
             TraverseVertexBuffer = new BufferObject();
             TraverseVertexBuffer.ImmutableAllocate(alignedTraverseVertices.Count * sizeof(GLSLTraverseVertex), alignedTraverseVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
-            TraverseVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 5, 0, TraverseVertexBuffer.Size);
+            TraverseVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 4, 0, TraverseVertexBuffer.Size);
 
             ModelSystem = modelSystem;
 			
@@ -347,7 +348,8 @@ namespace IDKEngine
 
 			aabbProgram.Use();
 
-			GL.DrawArraysInstanced(PrimitiveType.Quads, 0, 24, ModelSystem.Meshes.Length);
+			int nodesPerMesh = (int)MathF.Pow(2, TREE_DEPTH) - 1;
+			GL.DrawArraysInstanced(PrimitiveType.Quads, 0, 24, ModelSystem.Meshes.Length * nodesPerMesh);
 
 			GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
 			GL.Enable(EnableCap.CullFace);

@@ -9,7 +9,7 @@ namespace IDKEngine.Render
 {
     class ModelSystem
     {
-        public const int GLSL_MAX_UBO_MATERIAL_COUNT = 384; // also change UBO size in shaders
+        public const int GLSL_MAX_UBO_MATERIAL_COUNT = 256; // also change UBO size in shaders
 
         public GLSLDrawCommand[] DrawCommands;
         public BufferObject DrawCommandBuffer;

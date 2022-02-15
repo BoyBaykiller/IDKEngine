@@ -41,6 +41,8 @@ layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
+    vec3 _pad0;
+    uint TreeDepth;
     Node Nodes[];
 } bvhSSBO;
 

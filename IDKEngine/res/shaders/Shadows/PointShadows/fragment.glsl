@@ -29,7 +29,7 @@ layout(std140, binding = 2) uniform ShadowDataUBO
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    Light Lights[128];
+    Light Lights[64];
     int LightCount;
 } lightsUBO;
 
