@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+using System.Diagnostics;
 using System.Collections.Generic;
 using OpenTK;
 using OpenTK.Graphics.OpenGL4;
@@ -7,39 +9,45 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
-    struct GLSLNode
+	class BVH
     {
-        public Vector3 Min;
-        public int VerticesStart;
-        public Vector3 Max;
-        public int VerticesEnd;
-	}
+		public const uint BITS_FOR_MISS_LINK = 10u; // also adjust in PathTracing/compute.glsl
+		public const uint TREE_DEPTH = 3; // also adjust in PathTracing/compute.glsl
 
-    class BVH
-    {
-        public ModelSystem ModelSystem;
-        public BufferObject BVHBuffer;
-        public BufferObject VertexBuffer;
-        private readonly List<GLSLVertex> bvhVertices;
+        public readonly BufferObject BVHBuffer;
+        public readonly BufferObject BVHVertexBuffer;
+        public readonly BufferObject TraverseVertexBuffer;
+		public ModelSystem ModelSystem;
         public unsafe BVH(ModelSystem modelSystem)
         {
-            const uint TREE_DEPTH = 1;
 			if (TREE_DEPTH == 0) return;
-			ModelSystem = modelSystem;
 
-            /// Expand elementBuffer + vertexBuffer to single vertexBuffer
-            List<GLSLVertex> expandedVertices = new List<GLSLVertex>(modelSystem.Vertices.Length);
-            List<GLSLNode> nodes = new List<GLSLNode>();
-            bvhVertices = new List<GLSLVertex>(expandedVertices.Count);
+			uint nodesPerMesh = (uint)MathF.Pow(2, TREE_DEPTH) - 1;
+            List<GLSLTraverseVertex> expandedTraverseVertices = new List<GLSLTraverseVertex>(modelSystem.Vertices.Length);
+			List<GLSLTraverseVertex> alignedTraverseVertices = new List<GLSLTraverseVertex>(expandedTraverseVertices.Count);
+			GLSLBVHVertex[] bvhVertecis = new GLSLBVHVertex[modelSystem.Vertices.Length];
+			GLSLNode[] nodes = new GLSLNode[nodesPerMesh * modelSystem.Meshes.Length];
             
+			for (int i = 0; i < modelSystem.Vertices.Length; i++)
+            {
+				bvhVertecis[i].TexCoord = modelSystem.Vertices[i].TexCoord;
+				bvhVertecis[i].Normal = modelSystem.Vertices[i].Normal;
+				bvhVertecis[i].Tangent = modelSystem.Vertices[i].Tangent;
+				bvhVertecis[i].BiTangent = modelSystem.Vertices[i].BiTangent;
+			}
+
 			for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
 				Vector3 min = new Vector3(float.MaxValue);
 				Vector3 max = new Vector3(float.MinValue);
-				int start = expandedVertices.Count;
-				for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++) // j is index into indices buffer which we use to index the vertices
+				int start = expandedTraverseVertices.Count;
+				for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
                 {
-					GLSLVertex vertex = modelSystem.Vertices[modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j]];
+					GLSLTraverseVertex vertex = new GLSLTraverseVertex();
+					uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
+					vertex.Position = modelSystem.Vertices[indici].Position;
+					vertex.BVHVertexIndex = indici;
+
 					min.X = MathF.Min(min.X, vertex.Position.X);
 					min.Y = MathF.Min(min.Y, vertex.Position.Y);
 					min.Z = MathF.Min(min.Z, vertex.Position.Z);
@@ -48,73 +56,85 @@ namespace IDKEngine
 					max.Y = MathF.Max(max.Y, vertex.Position.Y);
 					max.Z = MathF.Max(max.Z, vertex.Position.Z);
 
-					expandedVertices.Add(vertex);
+					expandedTraverseVertices.Add(vertex);
                 }
-				int end = expandedVertices.Count;
+				int end = expandedTraverseVertices.Count;
 
-
-				modelSystem.Meshes[i].BaseNode = nodes.Count;
+				modelSystem.Meshes[i].BaseNode = (int)(nodesPerMesh * i);
 
 				GLSLNode root = new GLSLNode();
 				root.Min = min;
 				root.Max = max;
-				bool isLeaf = TREE_DEPTH == 1;
-				// TODO: Implement stackless bvh
-				if (isLeaf)
-                {
-					PopulateLeaf(start, end, ref root);
-                }
-				else
-                {
-					root.VerticesEnd = -1;
-                }
-				nodes.Add(root);
+				nodes[modelSystem.Meshes[i].BaseNode + 0] = root;
+				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
+
+				Tuple<GLSLNode, GLSLNode> childs = ConstructChildNodesBounds(root);
+                nodes[modelSystem.Meshes[i].BaseNode + 1] = childs.Item1;
+                nodes[modelSystem.Meshes[i].BaseNode + 4] = childs.Item2;
+				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 1], 4u);
+				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 4], nodesPerMesh);
+
+				childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 1]);
+                nodes[modelSystem.Meshes[i].BaseNode + 2] = childs.Item1;
+                nodes[modelSystem.Meshes[i].BaseNode + 3] = childs.Item2;
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 2], start, end);
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 3], start, end);
+				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 2], 3u);
+				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 3], 4u);
+
+				childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 4]);
+                nodes[modelSystem.Meshes[i].BaseNode + 5] = childs.Item1;
+                nodes[modelSystem.Meshes[i].BaseNode + 6] = childs.Item2;
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 5], start, end);
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 6], start, end);
+				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 5], 6u);
+				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 6], nodesPerMesh);
 			}
-            modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
-
-
-			VertexBuffer = new BufferObject();
-            VertexBuffer.ImmutableAllocate(bvhVertices.Count * sizeof(GLSLVertex), bvhVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
+			modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
 
             BVHBuffer = new BufferObject();
-            BVHBuffer.ImmutableAllocate(nodes.Count * sizeof(GLSLNode), nodes.ToArray(), BufferStorageFlags.DynamicStorageBit);
+            BVHBuffer.ImmutableAllocate(nodes.Length * sizeof(GLSLNode), nodes, BufferStorageFlags.DynamicStorageBit);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
-			VertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 5, 0, VertexBuffer.Size);
 
-			void PopulateLeaf(int start, int end, ref GLSLNode node)
+            BVHVertexBuffer = new BufferObject();
+            BVHVertexBuffer.ImmutableAllocate(bvhVertecis.Length * sizeof(GLSLBVHVertex), bvhVertecis, BufferStorageFlags.DynamicStorageBit);
+            BVHVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, BVHVertexBuffer.Size);
+
+            TraverseVertexBuffer = new BufferObject();
+            TraverseVertexBuffer.ImmutableAllocate(alignedTraverseVertices.Count * sizeof(GLSLTraverseVertex), alignedTraverseVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
+            TraverseVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 5, 0, TraverseVertexBuffer.Size);
+
+            ModelSystem = modelSystem;
+			
+			void MakeLeaf(ref GLSLNode node, int start, int end)
             {
-				node.VerticesStart = bvhVertices.Count;
+				Debug.Assert(alignedTraverseVertices.Count < MathF.Pow(2, 31)); // only 31 bits because one is used as a marker for isLeaf
+				node.IsLeafAndVerticesStart = (uint)alignedTraverseVertices.Count;
 
 				Vector3 center = (node.Min + node.Max) * 0.5f;
 				Vector3 size = node.Max - node.Min;
 				for (int i = start; i < end; i += 3)
 				{
-					if (TriangleVSBox(expandedVertices[i + 0].Position, expandedVertices[i + 1].Position, expandedVertices[i + 2].Position, center, size))
+					if (TriangleVSBox(expandedTraverseVertices[i + 0].Position, expandedTraverseVertices[i + 1].Position, expandedTraverseVertices[i + 2].Position, center, size))
 					{
-						bvhVertices.Add(expandedVertices[i + 0]);
-						bvhVertices.Add(expandedVertices[i + 1]);
-						bvhVertices.Add(expandedVertices[i + 2]);
+						alignedTraverseVertices.Add(expandedTraverseVertices[i + 0]);
+						alignedTraverseVertices.Add(expandedTraverseVertices[i + 1]);
+						alignedTraverseVertices.Add(expandedTraverseVertices[i + 2]);
 					}
 				}
-				node.VerticesEnd = bvhVertices.Count;
+				uint count = (uint)alignedTraverseVertices.Count - node.IsLeafAndVerticesStart;
+				Debug.Assert(count < MathF.Pow(2, 32 - (int)BITS_FOR_MISS_LINK));
+				
+				node.MissLinkAndVerticesCount = count;
+				node.IsLeafAndVerticesStart |= 1u << 31;
 			}
 		}
 
-		private static float fmin(float a, float b, float c)
+		private static void SetMissLink(ref GLSLNode node, uint missLink)
 		{
-			return MathF.Min(a, MathF.Min(b, c));
+			Debug.Assert(missLink < MathF.Pow(2, BITS_FOR_MISS_LINK));
+			node.MissLinkAndVerticesCount |= missLink << (32 - (int)BITS_FOR_MISS_LINK);
 		}
-
-		private static float fmax(float a, float b, float c)
-		{
-			return MathF.Max(a, MathF.Max(b, c));
-		}
-
-		public static int GetNumNodesOnLevel(int level) => (int)MathF.Pow(2, level);
-		public static int GetIndex(int level, int node) => GetNumNodesOnLevel(level) + node - 1;
-		public static int GetLevel(int index) => (int)MathF.Log2(index + 1);
-		public static int GetIndexChild0(int index) => 2 * index + 1;
-		public static int GetIndexParent(int index) => (index - 1) / 2;
 
 		private static Tuple<GLSLNode, GLSLNode> ConstructChildNodesBounds(in GLSLNode parent)
 		{
@@ -127,20 +147,23 @@ namespace IDKEngine
 			child1.Max = parent.Max;
 
 			Vector3 parentNodeSize = parent.Max - parent.Min;
-			if (parentNodeSize.X >= parentNodeSize.Y)
+			if (parentNodeSize.X > parentNodeSize.Y)
 			{
-				child0.Max.X -= parentNodeSize.X / 2.0f;
-				child1.Min.X += parentNodeSize.X / 2.0f;
-			}
-			else if (parentNodeSize.Y >= parentNodeSize.Z)
-			{
-				child0.Max.Y -= parentNodeSize.Y / 2.0f;
-				child1.Min.Y += parentNodeSize.Y / 2.0f;
+				if (parentNodeSize.X > parentNodeSize.Z)
+                {
+					child0.Max.X -= parentNodeSize.X / 2.0f;
+					child1.Min.X += parentNodeSize.X / 2.0f;
+                }
+				else
+                {
+					child0.Max.Z -= parentNodeSize.Z / 2.0f;
+					child1.Min.Z += parentNodeSize.Z / 2.0f;
+				}
 			}
 			else
 			{
-				child0.Max.Z -= parentNodeSize.Z / 2.0f;
-				child1.Min.Z += parentNodeSize.Z / 2.0f;
+				child0.Max.Y -= parentNodeSize.Y / 2.0f;
+				child1.Min.Y += parentNodeSize.Y / 2.0f;
 			}
 
 			return new Tuple<GLSLNode, GLSLNode>(child0, child1);
@@ -168,7 +191,7 @@ namespace IDKEngine
 			var p1 = Vector3.Dot(v1, a00);
 			var p2 = Vector3.Dot(v2, a00);
 			var r = boxExtents.Y * Math.Abs(f0.Z) + boxExtents.Z * Math.Abs(f0.Y);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -179,7 +202,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a01);
 			p2 = Vector3.Dot(v2, a01);
 			r = boxExtents.Y * Math.Abs(f1.Z) + boxExtents.Z * Math.Abs(f1.Y);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -190,7 +213,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a02);
 			p2 = Vector3.Dot(v2, a02);
 			r = boxExtents.Y * Math.Abs(f2.Z) + boxExtents.Z * Math.Abs(f2.Y);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -201,7 +224,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a10);
 			p2 = Vector3.Dot(v2, a10);
 			r = boxExtents.X * Math.Abs(f0.Z) + boxExtents.Z * Math.Abs(f0.X);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -212,7 +235,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a11);
 			p2 = Vector3.Dot(v2, a11);
 			r = boxExtents.X * Math.Abs(f1.Z) + boxExtents.Z * Math.Abs(f1.X);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -223,7 +246,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a12);
 			p2 = Vector3.Dot(v2, a12);
 			r = boxExtents.X * Math.Abs(f2.Z) + boxExtents.Z * Math.Abs(f2.X);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -234,7 +257,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a20);
 			p2 = Vector3.Dot(v2, a20);
 			r = boxExtents.X * Math.Abs(f0.Y) + boxExtents.Y * Math.Abs(f0.X);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -245,7 +268,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a21);
 			p2 = Vector3.Dot(v2, a21);
 			r = boxExtents.X * Math.Abs(f1.Y) + boxExtents.Y * Math.Abs(f1.X);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -256,7 +279,7 @@ namespace IDKEngine
 			p1 = Vector3.Dot(v1, a22);
 			p2 = Vector3.Dot(v2, a22);
 			r = boxExtents.X * Math.Abs(f2.Y) + boxExtents.Y * Math.Abs(f2.X);
-			if (Math.Max(-fmax(p0, p1, p2), fmin(p0, p1, p2)) > r)
+			if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
 			{
 				return false;
 			}
@@ -267,19 +290,19 @@ namespace IDKEngine
 
 			// Exit if...
 			// ... [-extents.x, extents.x] and [min(v0.x,v1.x,v2.x), max(v0.x,v1.x,v2.x)] do not overlap
-			if (fmax(v0.X, v1.X, v2.X) < -boxExtents.X || fmin(v0.X, v1.X, v2.X) > boxExtents.X)
+			if (Fmax(v0.X, v1.X, v2.X) < -boxExtents.X || Fmin(v0.X, v1.X, v2.X) > boxExtents.X)
 			{
 				return false;
 			}
 
 			// ... [-extents.y, extents.y] and [min(v0.y,v1.y,v2.y), max(v0.y,v1.y,v2.y)] do not overlap
-			if (fmax(v0.Y, v1.Y, v2.Y) < -boxExtents.Y || fmin(v0.Y, v1.Y, v2.Y) > boxExtents.Y)
+			if (Fmax(v0.Y, v1.Y, v2.Y) < -boxExtents.Y || Fmin(v0.Y, v1.Y, v2.Y) > boxExtents.Y)
 			{
 				return false;
 			}
 
 			// ... [-extents.z, extents.z] and [min(v0.z,v1.z,v2.z), max(v0.z,v1.z,v2.z)] do not overlap
-			if (fmax(v0.Z, v1.Z, v2.Z) < -boxExtents.Z || fmin(v0.Z, v1.Z, v2.Z) > boxExtents.Z)
+			if (Fmax(v0.Z, v1.Z, v2.Z) < -boxExtents.Z || Fmin(v0.Z, v1.Z, v2.Z) > boxExtents.Z)
 			{
 				return false;
 			}
@@ -303,6 +326,31 @@ namespace IDKEngine
 			#endregion
 
 			return true;
+
+			static float Fmin(float a, float b, float c)
+			{
+				return MathF.Min(a, MathF.Min(b, c));
+			}
+			static float Fmax(float a, float b, float c)
+			{
+				return MathF.Max(a, MathF.Max(b, c));
+			}
+		}
+
+		private static readonly ShaderProgram aabbProgram = new ShaderProgram(
+			new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
+			new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
+		public void DrawNodes()
+		{
+			GL.Disable(EnableCap.CullFace);
+			GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
+
+			aabbProgram.Use();
+
+			GL.DrawArraysInstanced(PrimitiveType.Quads, 0, 24, ModelSystem.Meshes.Length);
+
+			GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
+			GL.Enable(EnableCap.CullFace);
 		}
 	}
 }

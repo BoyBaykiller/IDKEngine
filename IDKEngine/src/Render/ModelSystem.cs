@@ -9,7 +9,7 @@ namespace IDKEngine.Render
 {
     class ModelSystem
     {
-        public const int GLSL_UBO_MAX_MATERIALS = 384;
+        public const int GLSL_MAX_UBO_MATERIAL_COUNT = 384; // also change UBO size in shaders
 
         public GLSLDrawCommand[] DrawCommands;
         public BufferObject DrawCommandBuffer;
@@ -44,12 +44,9 @@ namespace IDKEngine.Render
 
             Vertices = new GLSLVertex[0];
             VertexBuffer = new BufferObject();
-            VertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
 
             Indices = new uint[0];
             ElementBuffer = new BufferObject();
-            ElementBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
-
 
             VAO = new VAO();
             VAO.SetElementBuffer(ElementBuffer);
@@ -132,22 +129,6 @@ namespace IDKEngine.Render
 
             GL.DispatchCompute((Meshes.Length + 32 - 1) / 32, 1, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
-        }
-
-        private static readonly ShaderProgram aabbProgram = new ShaderProgram(
-            new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
-            new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
-        public void DrawAABB()
-        {
-            GL.Disable(EnableCap.CullFace);
-            GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
-
-            aabbProgram.Use();
-
-            GL.DrawArraysInstanced(PrimitiveType.Quads, 0, 24, Meshes.Length);
-
-            GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
-            GL.Enable(EnableCap.CullFace);
         }
 
         public delegate void FuncUploadMesh(ref GLSLMesh glslMesh);

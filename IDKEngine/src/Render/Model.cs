@@ -14,7 +14,6 @@ namespace IDKEngine.Render.Objects
 {
     class Model
     {
-        public const int GLSL_INSTANCE_COUNT = 1;
         public const int GLSL_TEXTURE_SIZE = sizeof(long) * 2;
         private static readonly AssimpContext assimpContext = new AssimpContext();
 
@@ -152,7 +151,7 @@ namespace IDKEngine.Render.Objects
                     }
                     long textureHandle = texture.MakeHandleResident();
 
-                    /// Yes I preferre this pointer trickery over a long switch statement
+                    /// Yes I prefer this pointer trickery over a long switch statement
                     fixed (void* ptr = &Materials[i].Albedo)
                     {
                         *(long*)((byte*)ptr + GLSL_TEXTURE_SIZE * j) = textureHandle;

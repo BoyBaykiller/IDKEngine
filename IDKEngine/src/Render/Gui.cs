@@ -15,7 +15,6 @@ namespace IDKEngine.Render
         public static void Render(Window window, float frameTime)
         {
             ImGuiController.Update(window, frameTime);
-
             ImGui.Begin("Graphics");
             {
                 ImGui.Text($"FPS: {window.FPS}");
@@ -72,7 +71,7 @@ namespace IDKEngine.Render
                             }
                         }
                     }
-                    
+
                     if (ImGui.CollapsingHeader("SSAO"))
                     {
                         ImGui.Checkbox("IsSSAO", ref window.IsSSAO);
@@ -184,7 +183,7 @@ namespace IDKEngine.Render
             }
 
             if (selectedMeshIndex != Forward.MESH_INDEX_CLEAR_COLOR)
-            {   
+            {
                 System.Numerics.Vector3 systemVec3;
                 ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);
                 {

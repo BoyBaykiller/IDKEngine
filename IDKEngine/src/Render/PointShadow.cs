@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class PointShadow
     {
-        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 8;
+        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 8; // also change UBO size in shaders
 
         private static int _countPointShadows;
         public static int CountPointShadows

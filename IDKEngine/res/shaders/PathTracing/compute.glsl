@@ -50,29 +50,32 @@ struct Mesh
     int _pad1;
 };
 
-struct Vertex
+struct BVHVertex
 {
-    vec3 Position;
-    float _pad0;
-
     vec2 TexCoord;
-    vec2 _pad1;
+    vec2 _pad0;
 
     vec3 Normal;
-    float _pad2;
+    float _pad1;
 
     vec3 Tangent;
-    float _pad3;
+    float _pad2;
 
     vec3 BiTangent;
-    float _pad4;
+    float _pad3;
+};
+
+struct TraverseVertex
+{
+    vec3 Position;
+    uint BVHVertexIndex;
 };
 
 struct HitInfo
 {
-    float T;
     vec3 Bary;
-    int VerticesStart;
+    float T;
+    uvec3 BVHVertexIndices;
     int MeshID;
 };
 
@@ -85,9 +88,9 @@ struct Ray
 struct Node
 {
     vec3 Min;
-    int VerticesStart;
+    uint IsLeafAndVerticesStart;
     vec3 Max;
-    int VerticesEnd;
+    uint MissLinkAndVerticesCount;
 };
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
@@ -100,16 +103,15 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-
-layout(std430, binding = 4) restrict readonly buffer IndicisSSBO
+layout(std430, binding = 3) restrict readonly buffer BVHVertices
 {
-    uint Indicis[];
-} indicisSSBO;
+    BVHVertex Vertices[];
+} verticesSSBO;
 
-layout(std430, binding = 5) restrict readonly buffer VertecisSSBO
+layout(std430, binding = 5) restrict readonly buffer BVHTraverseVerticesSSBO
 {
-    Vertex Vertecis[];
-} vertecisSSBO;
+    TraverseVertex Vertices[];
+} traverseVerticesSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -151,6 +153,9 @@ uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 
+uint TREE_DEPTH;
+const uint BITS_FOR_MISS_LINK = 10u;
+
 uniform int RayDepth = 6;
 uniform int SPP = 1;
 uniform float FocalLength = 10.0;
@@ -164,6 +169,8 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
+
+    TREE_DEPTH = 3u;
 
     rngSeed = RenderedFrames;
     // rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + RenderedFrames * 2699 | 1;
@@ -203,9 +210,9 @@ vec3 Radiance(Ray ray)
     {
         if (RayTrace(ray, hitInfo))
         {
-            Vertex v0 = vertecisSSBO.Vertecis[hitInfo.VerticesStart + 0];
-            Vertex v1 = vertecisSSBO.Vertecis[hitInfo.VerticesStart + 1];
-            Vertex v2 = vertecisSSBO.Vertecis[hitInfo.VerticesStart + 2];
+            BVHVertex v0 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.x];
+            BVHVertex v1 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.y];
+            BVHVertex v2 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.z];
             
             mat4 model = meshSSBO.Meshes[hitInfo.MeshID].Model;
 
@@ -306,77 +313,50 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
 {
     hitInfo.T = FLOAT_MAX;
     float t2;
+    float nodeTMin = FLOAT_MAX;
     vec4 baryT;
 
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         Mesh mesh = meshSSBO.Meshes[i];
-        Node root = bvhSSBO.Nodes[mesh.BaseNode];
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
-
-        if (RayCuboidIntersect(localRay, root, t2) && t2 > 0.0)
+        
+        uint localNodeIndex = 0u;
+        while (localNodeIndex < (1u << TREE_DEPTH) - 1u)
         {
-            for (int j = root.VerticesStart; j < root.VerticesEnd; j += 3)
+            Node node = bvhSSBO.Nodes[mesh.BaseNode + localNodeIndex];
+            bool hit = RayCuboidIntersect(localRay, node, t2) && t2 > 0.0;
+            if (hit)
             {
-                vec3 v0 = vertecisSSBO.Vertecis[j + 0].Position;
-                vec3 v1 = vertecisSSBO.Vertecis[j + 1].Position;
-                vec3 v2 = vertecisSSBO.Vertecis[j + 2].Position;
-                if (RayTriangleIntersect(localRay, v0, v1, v2, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
+                if (bool(node.IsLeafAndVerticesStart))
                 {
-                    hitInfo.Bary = baryT.xyz;
-                    hitInfo.T = baryT.w;
-                    hitInfo.VerticesStart = j;
-                    hitInfo.MeshID = i;
+                    const uint MAX_COUNT = (1u << (32u - BITS_FOR_MISS_LINK)) - 1u;
+                    const uint count = node.MissLinkAndVerticesCount & MAX_COUNT;
+                    
+                    const uint MAX_START = (1u << 31u) - 1u;
+                    const uint start = node.IsLeafAndVerticesStart & MAX_START;
+                    
+                    for (uint j = start; j < start + count; j += 3u)
+                    {
+                        TraverseVertex v0 = traverseVerticesSSBO.Vertices[j + 0u];
+                        TraverseVertex v1 = traverseVerticesSSBO.Vertices[j + 1u];
+                        TraverseVertex v2 = traverseVerticesSSBO.Vertices[j + 2u];
+                        if (RayTriangleIntersect(localRay, v0.Position, v1.Position, v2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
+                        {
+                            hitInfo.Bary = baryT.xyz;
+                            hitInfo.T = baryT.w;
+                            hitInfo.BVHVertexIndices = uvec3(v0.BVHVertexIndex, v1.BVHVertexIndex, v2.BVHVertexIndex);
+                            hitInfo.MeshID = i;
+                        }
+                    }
                 }
+                localNodeIndex++;
             }
-
-            // int box_index_next = mesh.BaseNode;
-            // for (int box_index = 0; box_index < boxes_count; box_index++) {
-            //     if (box_index != box_index_next) {
-            //         continue;
-            //     }
-
-            //     Node node = bvhSSBO.Nodes[box_index];
-
-            //     bool hit = RayCuboidIntersect(node, localRay);
-            //     bool leaf = node.VerticesEnd != -1;
-
-            //     if (hit) {
-            //         box_index_next = node.links.x; // hit link
-            //     } else {
-            //         box_index_next = node.links.y; // miss link
-            //     }
-
-            //     if (hit && leaf) {
-            //         for (int j = node.VerticesStart; j < node.VerticesEnd; j++) {
-                        
-            //         }
-            //     }
-            // }
-
-
-            // int nodeIndex = mesh.BaseNode;
-            // while (nodeIndex != -1)
-            // {
-            //     node = bvhSSBO.Nodes[nodeIndex];
-            //     if (intersect(node.bonding, ray))
-            //     {
-            //         const isLeaf = node.VerticesStart != -1;
-            //         if (isLeaf)
-            //         {
-            //             // Triangles
-            //             for (int j = node.VerticesStart; j < node.VerticesEnd; j++)
-            //             {
-                            
-            //             }
-            //         }
-            //         node = node.HitLink;
-            //     } 
-            //     else
-            //     {
-            //         node = node.MissLink;
-            //     }
-            // }
+            else
+            {
+                const uint MAX_MISS_LINK = (1u << BITS_FOR_MISS_LINK) - 1u;
+                localNodeIndex = (node.MissLinkAndVerticesCount >> (32u - BITS_FOR_MISS_LINK)) & MAX_MISS_LINK;
+            }
         }
     }
 
