@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using OpenTK;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Input;
@@ -31,7 +30,7 @@ namespace IDKEngine.GUI
         {
             Width = width;
             Height = height;
-
+            
             IntPtr context = ImGui.CreateContext();
             ImGui.SetCurrentContext(context);
             ImGuiIOPtr io = ImGui.GetIO();
@@ -42,7 +41,7 @@ namespace IDKEngine.GUI
             SetKeyMappings();
             SetStyle();
 
-            SetPerFrameImGuiData(1f / 60f);
+            SetPerFrameImGuiData(1.0f / 60.0f);
 
             ImGui.NewFrame();
             

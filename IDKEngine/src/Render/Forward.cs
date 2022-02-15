@@ -34,7 +34,7 @@ namespace IDKEngine.Render
 
             NormalSpec = new Texture(TextureTarget2d.Texture2D);
             NormalSpec.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            NormalSpec.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            NormalSpec.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8Snorm, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             MeshIndex = new Texture(TextureTarget2d.Texture2D);
             MeshIndex.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
@@ -65,7 +65,7 @@ namespace IDKEngine.Render
             Framebuffer.Bind();
             Framebuffer.ClearBuffer(ClearBuffer.Color, 0, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
-            Framebuffer.ClearBuffer(ClearBuffer.Color, 2, -1);
+            Framebuffer.ClearBuffer(ClearBuffer.Color, 2, MESH_INDEX_CLEAR_COLOR);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 3, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 

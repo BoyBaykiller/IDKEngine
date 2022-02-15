@@ -61,7 +61,7 @@ namespace IDKEngine
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
 
                 if (IsDrawAABB)
-                    ModelSystem.DrawAABB();
+                    Bvh.DrawNodes();
 
                 if (IsSSR) SSR.Result.BindToUnit(2);
                 else Texture.UnbindFromUnit(2);
@@ -177,6 +177,7 @@ namespace IDKEngine
         public Forward ForwardRenderer;
         public SSR SSR;
         public SSAO SSAO;
+        public BVH Bvh;
         public VolumetricLighter VolumetricLight;
         public GaussianBlur GaussianBlur;
         private Lighter lighterContext;
@@ -237,12 +238,12 @@ namespace IDKEngine
             if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTexture(true);
 
-            BVH bvh = new BVH(ModelSystem);
-            PathTracer = new PathTracer(bvh, ModelSystem, AtmosphericScatterer.Result, Width, Height);
+            Bvh = new BVH(ModelSystem);
+            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Width, Height);
 
             GLSLLight[] lights = new GLSLLight[2];
             lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
-            //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -3.95f), new Vector3(4.585f, 4.725f, 2.56f) * 1000.0f, 0.2f);
+            //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -0.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
             lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.1f);
             lighterContext = new Lighter(20, 20);
             lighterContext.Add(lights);

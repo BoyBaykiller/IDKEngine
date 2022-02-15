@@ -20,9 +20,9 @@ struct DrawCommand
 struct Node
 {
     vec3 Min;
-    int VerticesStart;
+    uint IsLeafAndVerticesStart;
     vec3 Max;
-    int VerticesEnd;
+    uint MissLinkAndVerticesCount;
 };
 
 struct Mesh
@@ -103,9 +103,9 @@ void main()
 Frustum ExtractFrustum(mat4 projViewModel)
 {
     Frustum frustum;
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < 3; i++)
     {
-        for (int j = 0; j < 2; ++j)
+        for (int j = 0; j < 2; j++)
         {
             frustum.Planes[i * 2 + j].x = projViewModel[0][3] + (j == 0 ? projViewModel[0][i] : -projViewModel[0][i]);
             frustum.Planes[i * 2 + j].y = projViewModel[1][3] + (j == 0 ? projViewModel[1][i] : -projViewModel[1][i]);
@@ -121,7 +121,7 @@ bool AABBVsFrustum(Frustum frustum, Node node)
 {
 	float a = 1.0;
 
-	for (int i = 0; i < 6 && a >= 0.0; ++i) {
+	for (int i = 0; i < 6 && a >= 0.0; i++) {
 		vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
 
 		a = dot(vec4(negative, 1.0), frustum.Planes[i]);
@@ -137,5 +137,5 @@ vec3 NegativeVertex(Node node, vec3 normal)
 
 void Pack3BitValue(int threeBitValue, int index, inout int dest)
 {
-    dest |= threeBitValue << 3 * index;
+    dest |= threeBitValue << (3 * index);
 }

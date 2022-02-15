@@ -113,7 +113,7 @@ float Shadow(PointShadow pointShadow);
 float DistributionGGX(float nDotH, float roughness);
 float GeometrySchlickGGX(float nDotV, float roughness);
 float GeometrySmith(float nDotV, float nDotL, float roughness);
-vec3 FresnelSchlick(float cosTheta, vec3 F0);
+vec3 FresnelSchlick(float cosTheta, vec3 SpecularColor);
 float LinearizeDepth(float depth, float nearPlane, float farPlane);
 
 vec4 Albedo;
@@ -121,9 +121,9 @@ vec3 Normal;
 float Metallic;
 float Roughness;
 float Specular; // TODO: Incorporate Specular into pbr
+vec3 SpecularColor;
 float AO;
 vec3 ViewDir;
-vec3 F0;
 void main()
 {
     vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
@@ -140,9 +140,9 @@ void main()
 
     // TODO: Make alpha a gui option
     Normal = mix(inData.TBN * (Normal * 2.0 - 1.0), inData.Normal, 0.0);
+    SpecularColor = mix(vec3(0.04), Albedo.rgb, Metallic);
 
     ViewDir = normalize(basicDataUBO.ViewPos - inData.FragPos);
-    F0 = mix(vec3(0.04), Albedo.rgb, Metallic);
 
     vec3 irradiance = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
@@ -181,7 +181,7 @@ vec3 PBR(Light light)
 
     float NDF = DistributionGGX(nDotH, Roughness);
     float G = GeometrySmith(nDotV, nDotL, Roughness);
-    vec3 F = FresnelSchlick(max(dot(halfway, ViewDir), 0.0), F0);
+    vec3 F = FresnelSchlick(max(dot(halfway, ViewDir), 0.0), SpecularColor);
 
     vec3 kD = vec3(1.0) - F;
     kD *= 1.0 - Metallic;
@@ -257,10 +257,10 @@ float GeometrySmith(float nDotV, float nDotL, float roughness)
     return GeometrySchlickGGX(nDotV, roughness) * GeometrySchlickGGX(nDotL, roughness);
 }
 
-vec3 FresnelSchlick(float cosTheta, vec3 F0)
+vec3 FresnelSchlick(float cosTheta, vec3 SpecularColor)
 {
     float val = 1.0 - cosTheta;
-    return F0 + (1.0 - F0) * val * val * val * val * val;
+    return SpecularColor + (1.0 - SpecularColor) * val * val * val * val * val;
 }
 
 float LinearizeDepth(float depth, float nearPlane, float farPlane)

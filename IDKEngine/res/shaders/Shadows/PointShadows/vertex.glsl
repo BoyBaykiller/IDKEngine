@@ -21,15 +21,6 @@ struct PointShadow
     int LightIndex;
 };
 
-struct AABB
-{
-    vec3 Min;
-    int PTVerticesStart;
-
-    vec3 Max;
-    int PTVerticesEnd;
-};
-
 struct Mesh
 {
     mat4 Model;
@@ -83,5 +74,5 @@ void main()
 int Unpack3Bits(int packedValue, int index)
 {
     const int MAX = 2 * 2 * 2 - 1;
-    return packedValue >> (3 * index) & MAX;
+    return (packedValue >> (3 * index)) & MAX;
 }
