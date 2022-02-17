@@ -67,6 +67,7 @@ namespace IDKEngine
 				nodes[modelSystem.Meshes[i].BaseNode + 0] = root;
 				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
 
+
 				Tuple<GLSLNode, GLSLNode> childs = ConstructChildNodesBounds(root);
                 nodes[modelSystem.Meshes[i].BaseNode + 1] = childs.Item1;
                 nodes[modelSystem.Meshes[i].BaseNode + 4] = childs.Item2;
@@ -341,12 +342,12 @@ namespace IDKEngine
 		private static readonly ShaderProgram aabbProgram = new ShaderProgram(
 			new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
 			new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
-		public void DrawNodes()
+		public void Draw()
 		{
 			GL.Disable(EnableCap.CullFace);
 			GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
 
-			aabbProgram.Use();
+            aabbProgram.Use();
 
 			int nodesPerMesh = (int)MathF.Pow(2, TREE_DEPTH) - 1;
 			GL.DrawArraysInstanced(PrimitiveType.Quads, 0, 24, ModelSystem.Meshes.Length * nodesPerMesh);

@@ -98,7 +98,7 @@ namespace IDKEngine.Render
         /// This method computes a whole cubemap rather than just whats visible. It is meant for precomputation and should not be called frequently for performance reasons
         /// </summary>
         /// <param name="renderParams"></param>
-        public void Render()
+        public void Compute()
         {
             Result.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba32f);
 

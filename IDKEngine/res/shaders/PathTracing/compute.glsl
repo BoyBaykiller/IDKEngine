@@ -154,7 +154,7 @@ float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 uint EmulateNonUniform(uint index);
 
-uint TREE_DEPTH;
+uint TreeDepth;
 const uint BITS_FOR_MISS_LINK = 10u;
 
 uniform int RayDepth;
@@ -170,8 +170,7 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    TREE_DEPTH = bvhSSBO.TreeDepth;
-
+    TreeDepth = bvhSSBO.TreeDepth;
     rngSeed = RenderedFrames;
     //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + RenderedFrames * 2699 | 1;
 
@@ -185,7 +184,6 @@ void main()
     camRay.Origin = (basicDataUBO.InvView * vec4(offset, 0.0, 1.0)).xyz;
     camRay.Direction = normalize(focalPoint - camRay.Origin);
     vec3 irradiance = Radiance(camRay);
-    
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
     irradiance = mix(lastFrameColor, irradiance, 1.0 / (RenderedFrames + 1.0));
@@ -326,7 +324,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
         
         uint localNodeIndex = 0u;
-        while (localNodeIndex < (1u << TREE_DEPTH) - 1u)
+        while (localNodeIndex < (1u << TreeDepth) - 1u)
         {
             Node node = bvhSSBO.Nodes[mesh.BaseNode + localNodeIndex];
             bool hit = RayCuboidIntersect(localRay, node, t2) && t2 > 0.0;

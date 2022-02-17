@@ -2,8 +2,6 @@
 layout(location = 0) out vec4 FragColor;
 
 layout(binding = 0) uniform sampler2D Sampler0;
-layout(binding = 1) uniform sampler2D Sampler1;
-layout(binding = 2) uniform sampler2D Sampler2;
 
 in InOutVars
 {
@@ -18,8 +16,6 @@ vec3 ACESFilm(vec3 x);
 void main()
 {
     vec3 color = texture(Sampler0, inData.TexCoord).rgb;
-    color += texture(Sampler1, inData.TexCoord).rgb;
-    color += texture(Sampler2, inData.TexCoord).rgb;
     
     color = ACESFilm(color);
     color = LinearToInverseGamma(color, 2.2);
