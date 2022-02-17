@@ -35,6 +35,10 @@ namespace IDKEngine
         {
             if (!IsPathTracing)
             {
+                // Compute last frames SSAO
+                if (IsSSAO)
+                    SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
+
                 // 1. If IS_VERTEX_LAYERED_RENDERING is false
                 //    upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
                 if (!PointShadow.IS_VERTEX_LAYERED_RENDERING)
@@ -47,14 +51,14 @@ namespace IDKEngine
                     pointShadows[i].CreateDepthMap(ModelSystem);
                 }
 
-                if (IsSSAO)
-                    SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
-
                 ModelSystem.ViewCull(ref glslBasicData.ProjView);
 
                 GL.Viewport(0, 0, Width, Height);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
                 lighterContext.Draw();
+
+                if (IsDrawAABB)
+                    Bvh.Draw();
 
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
@@ -62,16 +66,8 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
 
-                if (IsDrawAABB)
-                    Bvh.DrawNodes();
-
-                if (IsSSR) SSR.Result.BindToUnit(2);
-                else Texture.UnbindFromUnit(2);
-
-                if (IsVolumetricLighting) VolumetricLight.Result.BindToUnit(1);
-                else Texture.UnbindFromUnit(1);
-
-                ForwardRenderer.Result.BindToUnit(0);
+                PostCombine.Compute(ForwardRenderer.Result, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
+                PostCombine.Result.BindToUnit(0);
             }
             else
             {
@@ -89,7 +85,6 @@ namespace IDKEngine
             finalProgram.Use();
 
             GL.DrawArrays(PrimitiveType.Quads, 0, 4);
-
             Gui.Render(this, (float)e.Time);
             
             GL.Enable(EnableCap.CullFace);
@@ -179,6 +174,7 @@ namespace IDKEngine
         public Forward ForwardRenderer;
         public SSR SSR;
         public SSAO SSAO;
+        public PostCombine PostCombine;
         public BVH Bvh;
         public VolumetricLighter VolumetricLight;
         public GaussianBlur GaussianBlur;
@@ -232,8 +228,9 @@ namespace IDKEngine
             VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f, new Vector3(0.025f));
             GaussianBlur = new GaussianBlur(Width, Height);
             SSAO = new SSAO(Width, Height, 10, 0.3f);
+            PostCombine = new PostCombine(Width, Height);
             AtmosphericScatterer = new AtmosphericScatterer(256);
-            AtmosphericScatterer.Render();
+            AtmosphericScatterer.Compute();
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
@@ -286,6 +283,7 @@ namespace IDKEngine
                 GaussianBlur.SetSize(Width, Height);
                 SSR.SetSize(Width, Height);
                 SSAO.SetSize(Width, Height);
+                PostCombine.SetSize(Width, Height);
                 PathTracer.SetSize(Width, Height);
 
                 lastWidth = Width;

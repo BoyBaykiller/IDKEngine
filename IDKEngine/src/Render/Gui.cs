@@ -152,7 +152,7 @@ namespace IDKEngine.Render
                             {
                                 current = resolutions[i];
                                 window.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
-                                window.AtmosphericScatterer.Render();
+                                window.AtmosphericScatterer.Compute();
                                 window.PathTracer.ResetRenderer();
                             }
 
@@ -166,7 +166,7 @@ namespace IDKEngine.Render
                     if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                     {
                         window.AtmosphericScatterer.ISteps = tempInt;
-                        window.AtmosphericScatterer.Render();
+                        window.AtmosphericScatterer.Compute();
                         window.PathTracer.ResetRenderer();
                     }
 
@@ -174,7 +174,7 @@ namespace IDKEngine.Render
                     if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
                     {
                         window.AtmosphericScatterer.JSteps = tempInt;
-                        window.AtmosphericScatterer.Render();
+                        window.AtmosphericScatterer.Compute();
                         window.PathTracer.ResetRenderer();
                     }
 
@@ -182,7 +182,7 @@ namespace IDKEngine.Render
                     if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
                     {
                         window.AtmosphericScatterer.Time = tempFloat;
-                        window.AtmosphericScatterer.Render();
+                        window.AtmosphericScatterer.Compute();
                         window.PathTracer.ResetRenderer();
                     }
 
@@ -190,7 +190,7 @@ namespace IDKEngine.Render
                     if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
                     {
                         window.AtmosphericScatterer.LightIntensity = tempFloat;
-                        window.AtmosphericScatterer.Render();
+                        window.AtmosphericScatterer.Compute();
                         window.PathTracer.ResetRenderer();
                     }
                 }

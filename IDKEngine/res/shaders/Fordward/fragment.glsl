@@ -5,7 +5,7 @@
 layout(early_fragment_tests) in;
 
 layout(location = 0) out vec4 FragColor;
-layout(location = 1) out vec4 NormalColor;
+layout(location = 1) out vec4 NormalSpecColor;
 layout(location = 2) out int MeshIndexColor;
 layout(location = 3) out vec2 VelocityColor;
 
@@ -158,7 +158,7 @@ void main()
     irradiance /= lightsUBO.LightCount;
 
     FragColor = vec4(irradiance + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
-    NormalColor = vec4(Normal, Specular);
+    NormalSpecColor = vec4(Normal, Specular);
     MeshIndexColor = inData.MeshIndex;
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
