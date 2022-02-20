@@ -30,6 +30,10 @@ namespace IDKEngine.Render
                         {
                             current = renderModes[i];
                             window.IsPathTracing = current == renderModes[1];
+                            if (current == "PathTracer")
+                            {
+                                window.GLSLBasicData.FrameCount = 0;
+                            }
                         }
 
                         if (isSelected)
@@ -40,7 +44,7 @@ namespace IDKEngine.Render
 
                 if (!window.IsPathTracing)
                 {
-                    ImGui.Checkbox("DrawAABB", ref window.IsDrawAABB);
+                    ImGui.Checkbox("DrawFirstLevelBVH", ref window.ForwardRenderer.IsDrawAABB);
 
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
                     {
@@ -119,21 +123,21 @@ namespace IDKEngine.Render
                         int tempInt = window.PathTracer.RayDepth;
                         if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                         {
-                            window.PathTracer.ResetRenderer();
+                            window.GLSLBasicData.FrameCount = 0;
                             window.PathTracer.RayDepth = tempInt;
                         }
 
                         float floatTemp = window.PathTracer.FocalLength;
                         if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                         {
-                            window.PathTracer.ResetRenderer();
+                            window.GLSLBasicData.FrameCount = 0;
                             window.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
                         }
 
                         floatTemp = window.PathTracer.ApertureDiameter;
                         if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
                         {
-                            window.PathTracer.ResetRenderer();
+                            window.GLSLBasicData.FrameCount = 0;
                             window.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
                         }
                     }
@@ -153,7 +157,7 @@ namespace IDKEngine.Render
                                 current = resolutions[i];
                                 window.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
                                 window.AtmosphericScatterer.Compute();
-                                window.PathTracer.ResetRenderer();
+                                window.GLSLBasicData.FrameCount = 0;
                             }
 
                             if (isSelected)
@@ -167,7 +171,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.ISteps = tempInt;
                         window.AtmosphericScatterer.Compute();
-                        window.PathTracer.ResetRenderer();
+                        window.GLSLBasicData.FrameCount = 0;
                     }
 
                     tempInt = window.AtmosphericScatterer.JSteps;
@@ -175,7 +179,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.JSteps = tempInt;
                         window.AtmosphericScatterer.Compute();
-                        window.PathTracer.ResetRenderer();
+                        window.GLSLBasicData.FrameCount = 0;
                     }
 
                     float tempFloat = window.AtmosphericScatterer.Time;
@@ -183,7 +187,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.Time = tempFloat;
                         window.AtmosphericScatterer.Compute();
-                        window.PathTracer.ResetRenderer();
+                        window.GLSLBasicData.FrameCount = 0;
                     }
 
                     tempFloat = window.AtmosphericScatterer.LightIntensity;
@@ -191,7 +195,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.LightIntensity = tempFloat;
                         window.AtmosphericScatterer.Compute();
-                        window.PathTracer.ResetRenderer();
+                        window.GLSLBasicData.FrameCount = 0;
                     }
                 }
 
@@ -220,7 +224,7 @@ namespace IDKEngine.Render
                         {
                             curMesh = mesh;
                         });
-                        window.PathTracer.ResetRenderer();
+                        window.GLSLBasicData.FrameCount = 0;
                     }
 
                     ImGui.End();

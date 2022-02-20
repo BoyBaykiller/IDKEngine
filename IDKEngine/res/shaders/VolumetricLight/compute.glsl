@@ -1,4 +1,4 @@
-#version 460 core
+#version 450 core
 #extension GL_ARB_bindless_texture : require
 #define PI 3.1415926536
 
@@ -45,6 +45,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
+    int FrameCount;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -153,7 +154,6 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample)
 vec3 NDCToWorldSpace(vec3 ndc)
 {
     vec4 worldPos = basicDataUBO.InvProjView * vec4(ndc, 1.0);
-
     return worldPos.xyz / worldPos.w;
 }
 

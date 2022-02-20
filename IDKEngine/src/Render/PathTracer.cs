@@ -64,27 +64,19 @@ namespace IDKEngine.Render
 			ApertureDiameter = 0.03f;
         }
 
-        private int thisRenderNumFrame = 0;
         public void Render()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             EnvironmentMap.BindToUnit(0);
 
             shaderProgram.Use();
-            shaderProgram.Upload(0, thisRenderNumFrame++);
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-        }
-
-        public void ResetRenderer()
-        {
-            thisRenderNumFrame = 0;
         }
 
         public void SetSize(int width, int height)
         {
             Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
-            ResetRenderer();
-        }
+		}
     }
 }

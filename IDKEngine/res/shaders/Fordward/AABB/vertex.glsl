@@ -75,6 +75,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
+    int FrameCount;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -85,9 +86,8 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 void main()
 {
-    int nodesPerMesh = (1 << bvhSSBO.TreeDepth) - 1;
-    Mesh mesh = meshSSBO.Meshes[gl_InstanceID / nodesPerMesh];
-    Node node = bvhSSBO.Nodes[mesh.BaseNode + (gl_InstanceID % nodesPerMesh)];
+    Mesh mesh = meshSSBO.Meshes[gl_InstanceID];
+    Node node = bvhSSBO.Nodes[mesh.BaseNode];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;

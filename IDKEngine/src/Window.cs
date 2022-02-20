@@ -28,11 +28,13 @@ namespace IDKEngine
         private readonly Camera camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
 
 
-        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsDrawAABB = false;
+        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false;
         public int FPS;
         private int fps;
-        protected override void OnRenderFrame(FrameEventArgs e)
+        protected override unsafe void OnRenderFrame(FrameEventArgs e)
         {
+            basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
+
             if (!IsPathTracing)
             {
                 // Compute last frames SSAO
@@ -45,20 +47,16 @@ namespace IDKEngine
                 {
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
                 }
-
+                
                 for (int i = 0; i < pointShadows.Length; i++)
                 {
                     pointShadows[i].CreateDepthMap(ModelSystem);
                 }
 
-                ModelSystem.ViewCull(ref glslBasicData.ProjView);
+                ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 
                 GL.Viewport(0, 0, Width, Height);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
-                lighterContext.Draw();
-
-                if (IsDrawAABB)
-                    Bvh.Draw();
 
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
@@ -90,14 +88,15 @@ namespace IDKEngine
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
 
-            SwapBuffers();
             fps++;
+            GLSLBasicData.FrameCount++;
+            SwapBuffers();
             
             base.OnRenderFrame(e);
         }
 
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        protected override unsafe void OnUpdateFrame(FrameEventArgs e)
+        protected override void OnUpdateFrame(FrameEventArgs e)
         {
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
@@ -145,8 +144,8 @@ namespace IDKEngine
                 if (!CursorVisible)
                 {
                     camera.ProcessInputs((float)e.Time, out bool hadCameraInputs);
-                    if (hadCameraInputs)
-                        PathTracer.ResetRenderer();
+                    if (hadCameraInputs && IsPathTracing)
+                        GLSLBasicData.FrameCount = 0;
                 }
 
                 if (CursorVisible)
@@ -154,14 +153,12 @@ namespace IDKEngine
                     Gui.Update(this);
                 }
 
-                glslBasicData.PrevProjView = glslBasicData.View * glslBasicData.Projection;
-                glslBasicData.ProjView = camera.View * glslBasicData.Projection;
-                glslBasicData.View = camera.View;
-                glslBasicData.InvView = camera.View.Inverted();
-                glslBasicData.CameraPos = camera.Position;
-                glslBasicData.InvProjView = (glslBasicData.View * glslBasicData.Projection).Inverted();
-
-                basicDataUBO.SubData(0, sizeof(GLSLBasicData), glslBasicData);
+                GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
+                GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
+                GLSLBasicData.View = camera.View;
+                GLSLBasicData.InvView = camera.View.Inverted();
+                GLSLBasicData.CameraPos = camera.Position;
+                GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
             }
 
             base.OnUpdateFrame(e);
@@ -178,10 +175,9 @@ namespace IDKEngine
         public BVH Bvh;
         public VolumetricLighter VolumetricLight;
         public GaussianBlur GaussianBlur;
-        private Lighter lighterContext;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
-        private GLSLBasicData glslBasicData;
+        public GLSLBasicData GLSLBasicData;
         protected override unsafe void OnLoad(EventArgs e)
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
@@ -223,7 +219,13 @@ namespace IDKEngine
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse });
 
-            ForwardRenderer = new Forward(Width, Height);
+            GLSLLight[] lights = new GLSLLight[2];
+            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 1.0f);
+            //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -0.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
+            lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.5f);
+
+            ForwardRenderer = new Forward(new Lighter(20, 20), Width, Height);
+            ForwardRenderer.LightingContext.Add(lights);
             SSR = new SSR(Width, Height, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f, new Vector3(0.025f));
             GaussianBlur = new GaussianBlur(Width, Height);
@@ -237,23 +239,15 @@ namespace IDKEngine
             if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTexture(true);
 
-            Bvh = new BVH(ModelSystem);
-            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Width, Height);
-
-            GLSLLight[] lights = new GLSLLight[2];
-            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 1.0f);
-            //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -0.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
-            lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.5f);
-
-            lighterContext = new Lighter(20, 20);
-            lighterContext.Add(lights);
-
             pointShadows = new PointShadow[2];
-            pointShadows[0] = new PointShadow(lighterContext, 0, 1536, 1.0f, 60.0f);
-            pointShadows[1] = new PointShadow(lighterContext, 1, 256, 0.5f, 60.0f);
+            pointShadows[0] = new PointShadow(ForwardRenderer.LightingContext, 0, 1536, 1.0f, 60.0f);
+            pointShadows[1] = new PointShadow(ForwardRenderer.LightingContext, 1, 256, 0.5f, 60.0f);
 
             pointShadows[0].CreateDepthMap(ModelSystem);
             pointShadows[1].CreateDepthMap(ModelSystem);
+
+            Bvh = new BVH(ModelSystem);
+            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Width, Height);
 
             basicDataUBO = new BufferObject();
             basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
@@ -273,10 +267,10 @@ namespace IDKEngine
             {
                 Gui.ImGuiController.WindowResized(Width, Height);
 
-                glslBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
-                glslBasicData.InvProjection = glslBasicData.Projection.Inverted();
-                glslBasicData.NearPlane = NEAR_PLANE;
-                glslBasicData.FarPlane = FAR_PLANE;
+                GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
+                GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
+                GLSLBasicData.NearPlane = NEAR_PLANE;
+                GLSLBasicData.FarPlane = FAR_PLANE;
 
                 ForwardRenderer.SetSize(Width, Height);
                 VolumetricLight.SetSize(Width, Height);
@@ -284,7 +278,11 @@ namespace IDKEngine
                 SSR.SetSize(Width, Height);
                 SSAO.SetSize(Width, Height);
                 PostCombine.SetSize(Width, Height);
-                PathTracer.SetSize(Width, Height);
+                if (IsPathTracing)
+                {
+                    PathTracer.SetSize(Width, Height);
+                    GLSLBasicData.FrameCount = 0;
+                }
 
                 lastWidth = Width;
                 lastHeight = Height;

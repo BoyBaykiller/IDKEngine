@@ -118,6 +118,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
+    int FrameCount;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -160,7 +161,6 @@ const uint BITS_FOR_MISS_LINK = 10u;
 uniform int RayDepth;
 uniform float FocalLength;
 uniform float ApertureDiameter;
-layout(location = 0) uniform int RenderedFrames;
 
 uint rngSeed;
 void main()
@@ -171,8 +171,8 @@ void main()
         return;
 
     TreeDepth = bvhSSBO.TreeDepth;
-    rngSeed = RenderedFrames;
-    //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + RenderedFrames * 2699 | 1;
+    rngSeed = basicDataUBO.FrameCount;
+    //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FrameCount * 2699 | 1;
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01()) - 0.5; // integrating over whole pixel eliminates aliasing
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -186,7 +186,7 @@ void main()
     vec3 irradiance = Radiance(camRay);
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameColor, irradiance, 1.0 / (RenderedFrames + 1.0));
+    irradiance = mix(lastFrameColor, irradiance, 1.0 / (basicDataUBO.FrameCount + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 
