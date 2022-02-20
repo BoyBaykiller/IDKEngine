@@ -15,6 +15,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
+    int FrameCount;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -38,13 +39,14 @@ void main()
     vec2 uv = vec2(imgCoord + 0.5) / imageSize(ImgResult);
 
     vec4 normalSpec = texture(SamplerNormalSpec, uv);
-    if (normalSpec.a < EPSILON)
+    float depth = texture(SamplerDepth, uv).r;
+    if (normalSpec.a < EPSILON || depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
     }
 
-    vec3 fragPos = NDCToViewSpace(vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0);
+    vec3 fragPos = NDCToViewSpace(vec3(uv, depth) * 2.0 - 1.0);
     vec3 color = SSR(normalize((vec4(normalSpec.rgb, 1.0) * basicDataUBO.InvView).xyz), fragPos);
 
     imageStore(ImgResult, imgCoord, vec4(color * normalSpec.a, 1.0));

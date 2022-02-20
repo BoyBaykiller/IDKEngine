@@ -12,17 +12,17 @@ namespace IDKEngine
 	class BVH
     {
 		public const uint BITS_FOR_MISS_LINK = 10u; // also adjust in PathTracing/compute.glsl
-		public const uint TREE_DEPTH = 3; // also adjust in PathTracing/compute.glsl
 
+		public int TreeDepth = 3;
 		public readonly BufferObject BVHBuffer;
         public readonly BufferObject BVHVertexBuffer;
         public readonly BufferObject TraverseVertexBuffer;
 		public ModelSystem ModelSystem;
         public unsafe BVH(ModelSystem modelSystem)
         {
-			if (TREE_DEPTH == 0) return;
+			if (TreeDepth == 0) return;
 
-			uint nodesPerMesh = (uint)MathF.Pow(2, TREE_DEPTH) - 1;
+			uint nodesPerMesh = (uint)MathF.Pow(2, TreeDepth) - 1;
             List<GLSLTraverseVertex> expandedTraverseVertices = new List<GLSLTraverseVertex>(modelSystem.Vertices.Length);
 			List<GLSLTraverseVertex> alignedTraverseVertices = new List<GLSLTraverseVertex>(expandedTraverseVertices.Count);
 			GLSLBVHVertex[] bvhVertecis = new GLSLBVHVertex[modelSystem.Vertices.Length];
@@ -65,36 +65,37 @@ namespace IDKEngine
 				root.Min = min;
 				root.Max = max;
 				nodes[modelSystem.Meshes[i].BaseNode + 0] = root;
-				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
+				//MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 0], start, end);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
 
 
-				Tuple<GLSLNode, GLSLNode> childs = ConstructChildNodesBounds(root);
+                Tuple<GLSLNode, GLSLNode> childs = ConstructChildNodesBounds(root);
                 nodes[modelSystem.Meshes[i].BaseNode + 1] = childs.Item1;
                 nodes[modelSystem.Meshes[i].BaseNode + 4] = childs.Item2;
-				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 1], 4u);
-				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 4], nodesPerMesh);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 1], 4u);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 4], nodesPerMesh);
 
-				childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 1]);
+                childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 1]);
                 nodes[modelSystem.Meshes[i].BaseNode + 2] = childs.Item1;
                 nodes[modelSystem.Meshes[i].BaseNode + 3] = childs.Item2;
                 MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 2], start, end);
                 MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 3], start, end);
-				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 2], 3u);
-				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 3], 4u);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 2], 3u);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 3], 4u);
 
-				childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 4]);
+                childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 4]);
                 nodes[modelSystem.Meshes[i].BaseNode + 5] = childs.Item1;
                 nodes[modelSystem.Meshes[i].BaseNode + 6] = childs.Item2;
                 MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 5], start, end);
                 MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 6], start, end);
-				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 5], 6u);
-				SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 6], nodesPerMesh);
-			}
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 5], 6u);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 6], nodesPerMesh);
+            }
 			modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
 
             BVHBuffer = new BufferObject();
             BVHBuffer.ImmutableAllocate(Vector4.SizeInBytes + nodes.Length * sizeof(GLSLNode), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-			BVHBuffer.SubData(Vector3.SizeInBytes, sizeof(uint), TREE_DEPTH);
+			BVHBuffer.SubData(Vector3.SizeInBytes, sizeof(uint), TreeDepth);
 			BVHBuffer.SubData(Vector4.SizeInBytes, nodes.Length * sizeof(GLSLNode), nodes);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
@@ -337,23 +338,6 @@ namespace IDKEngine
 			{
 				return MathF.Max(a, MathF.Max(b, c));
 			}
-		}
-
-		private static readonly ShaderProgram aabbProgram = new ShaderProgram(
-			new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
-			new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
-		public void Draw()
-		{
-			GL.Disable(EnableCap.CullFace);
-			GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
-
-            aabbProgram.Use();
-
-			int nodesPerMesh = (int)MathF.Pow(2, TREE_DEPTH) - 1;
-			GL.DrawArraysInstanced(PrimitiveType.Quads, 0, 24, ModelSystem.Meshes.Length * nodesPerMesh);
-
-			GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
-			GL.Enable(EnableCap.CullFace);
 		}
 	}
 }

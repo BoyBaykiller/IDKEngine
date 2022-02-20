@@ -70,6 +70,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
+    int FrameCount;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -113,7 +114,7 @@ float Shadow(PointShadow pointShadow);
 float DistributionGGX(float nDotH, float roughness);
 float GeometrySchlickGGX(float nDotV, float roughness);
 float GeometrySmith(float nDotV, float nDotL, float roughness);
-vec3 FresnelSchlick(float cosTheta, vec3 SpecularColor);
+vec3 FresnelSchlick(float cosTheta, vec3 specularColor);
 float LinearizeDepth(float depth, float nearPlane, float farPlane);
 
 vec4 Albedo;
@@ -257,10 +258,10 @@ float GeometrySmith(float nDotV, float nDotL, float roughness)
     return GeometrySchlickGGX(nDotV, roughness) * GeometrySchlickGGX(nDotL, roughness);
 }
 
-vec3 FresnelSchlick(float cosTheta, vec3 SpecularColor)
+vec3 FresnelSchlick(float cosTheta, vec3 specularColor)
 {
     float val = 1.0 - cosTheta;
-    return SpecularColor + (1.0 - SpecularColor) * val * val * val * val * val;
+    return specularColor + (1.0 - specularColor) * val * val * val * val * val;
 }
 
 float LinearizeDepth(float depth, float nearPlane, float farPlane)

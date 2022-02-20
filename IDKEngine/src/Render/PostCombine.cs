@@ -7,7 +7,7 @@ namespace IDKEngine.Render
 {
     class PostCombine
     {
-        public Texture Result;
+        public readonly Texture Result;
         
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PostCombine/compute.glsl")));
@@ -18,17 +18,17 @@ namespace IDKEngine.Render
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
         }
 
-        public unsafe void Compute(Texture forward, Texture volumetricLighting, Texture ssr)
+        public unsafe void Compute(Texture v0, Texture v1, Texture v2)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
 
-            if (forward != null) forward.BindToUnit(0);
+            if (v0 != null) v0.BindToUnit(0);
             else Texture.UnbindFromUnit(0);
 
-            if (volumetricLighting != null) volumetricLighting.BindToUnit(1);
+            if (v1 != null) v1.BindToUnit(1);
             else Texture.UnbindFromUnit(1);
 
-            if (ssr != null) ssr.BindToUnit(2);
+            if (v2 != null) v2.BindToUnit(2);
             else Texture.UnbindFromUnit(2);
 
             shaderProgram.Use();

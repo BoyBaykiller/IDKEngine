@@ -14,7 +14,7 @@ namespace IDKEngine.Render
             set
             {
                 _iSteps = value;
-                shaderProgram.Upload("iSteps", _iSteps);
+                shaderProgram.Upload("ISteps", _iSteps);
             }
 
             get => _iSteps;
@@ -26,7 +26,7 @@ namespace IDKEngine.Render
             set
             {
                 _jSteps = value;
-                shaderProgram.Upload("jSteps", _jSteps);
+                shaderProgram.Upload("JSteps", _jSteps);
             }
 
             get => _jSteps;
@@ -38,7 +38,7 @@ namespace IDKEngine.Render
             set
             {
                 _time = value;
-                shaderProgram.Upload("lightPos", new Vector3(0.0f, MathF.Sin(MathHelper.DegreesToRadians(_time * 360.0f)), MathF.Cos(MathHelper.DegreesToRadians(_time * 360.0f))) * 149600000e3f);
+                shaderProgram.Upload("LightPos", new Vector3(0.0f, MathF.Sin(MathHelper.DegreesToRadians(_time * 360.0f)), MathF.Cos(MathHelper.DegreesToRadians(_time * 360.0f))) * 149600000e3f);
             }
 
             get => _time;
@@ -50,7 +50,7 @@ namespace IDKEngine.Render
             set
             {
                 _lightIntensity = Math.Max(value, 0.0f);
-                shaderProgram.Upload("lightIntensity", _lightIntensity);
+                shaderProgram.Upload("LightIntensity", _lightIntensity);
             }
 
             get => _lightIntensity;
@@ -58,8 +58,7 @@ namespace IDKEngine.Render
 
         public readonly Texture Result;
         private readonly ShaderProgram shaderProgram;
-        private readonly BufferObject bufferObject;
-        public AtmosphericScatterer(int size)
+        public unsafe AtmosphericScatterer(int size)
         {
             Result = new Texture(TextureTarget2d.TextureCubeMap);
             Result.MutableAllocate(size, size, 1, PixelInternalFormat.Rgba32f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
@@ -67,10 +66,6 @@ namespace IDKEngine.Render
 
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/AtmosphericScattering/compute.glsl")));
             
-            bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(Vector4.SizeInBytes * 4 * 7 + Vector4.SizeInBytes, IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 4, 0, bufferObject.Size);
-
             Matrix4 invProjection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 0.1f, 10f).Inverted();
             Matrix4[] invViews = new Matrix4[]
             {
@@ -84,8 +79,11 @@ namespace IDKEngine.Render
                 Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeZ
             };
 
-            bufferObject.SubData(0, Vector4.SizeInBytes * 4, invProjection);
-            bufferObject.SubData(Vector4.SizeInBytes * 4, Vector4.SizeInBytes * 4 * invViews.Length, invViews);
+            fixed (void* matrices = &invViews[0])
+            {
+                shaderProgram.Upload("InvViews[0]", 6, (Matrix4*)matrices);
+            }
+            shaderProgram.Upload("InvProjection", ref invProjection);
 
             Time = 0.05f;
             ISteps = 40;

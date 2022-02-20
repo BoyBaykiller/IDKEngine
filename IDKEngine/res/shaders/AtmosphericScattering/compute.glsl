@@ -7,25 +7,19 @@
 
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
 
-layout(binding = 0, rgba32f) uniform writeonly restrict imageCube ImgResult;
-
-layout(std140, binding = 4) uniform AtmosphericDataUBO
-{
-    mat4 InvProjection;
-    mat4[6] InvView;
-} atmoDataUBO;
+layout(binding = 0, rgba32f) restrict writeonly uniform imageCube ImgResult;
 
 vec2 Rsi(vec3 r0, vec3 rd, float sr);
 vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAtmos, vec3 kRlh, float kMie, float shRlh, float shMie, float g);
 bool IsInside(vec2 pos, vec2 size);
 vec3 GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 
-uniform vec3 lightPos;
-
-uniform float lightIntensity;
-
-uniform int iSteps;
-uniform int jSteps;
+uniform vec3 LightPos;
+uniform float LightIntensity;
+uniform int ISteps;
+uniform int JSteps;
+uniform mat4 InvViews[6];
+uniform mat4 InvProjection;
 
 void main()
 {
@@ -36,13 +30,13 @@ void main()
     
     vec2 ndc = vec2(imgCoord.xy) / imgResultSize * 2.0 - 1.0;
     
-    vec3 eyeToWorld = GetWorldSpaceRay(atmoDataUBO.InvProjection, atmoDataUBO.InvView[imgCoord.z], ndc);
+    vec3 eyeToWorld = GetWorldSpaceRay(InvProjection, InvViews[imgCoord.z], ndc);
     
     vec3 color = Atmosphere(
         eyeToWorld,                     // normalized ray direction
         vec3(0, 6376e3, 0),             // ray origin
-        lightPos,                       // position of the sun
-        lightIntensity,                 // intensity of the sun
+        LightPos,                       // position of the sun
+        LightIntensity,                 // intensity of the sun
         6371e3,                         // radius of the planet in meters
         6471e3,                         // radius of the atmosphere in meters
         vec3(5.5e-6, 13.0e-6, 22.4e-6), // Rayleigh scattering coefficient
@@ -81,7 +75,7 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
     vec2 p = Rsi(r0, r, rAtmos);
     if (p.x > p.y) return vec3(0,0,0);
     p.y = min(p.y, Rsi(r0, r, rPlanet).x);
-    float iStepSize = (p.y - p.x) / float(iSteps);
+    float IStepsize = (p.y - p.x) / float(ISteps);
 
     // Initialize the primary ray time.
     float iTime = 0.0;
@@ -102,24 +96,24 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
     float pMie = 3.0 / (8.0 * PI) * ((1.0 - gg) * (mumu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * g, 1.5) * (2.0 + gg));
 
     // Sample the primary ray.
-    for (int i = 0; i < iSteps; i++) {
+    for (int i = 0; i < ISteps; i++) {
 
         // Calculate the primary ray sample position.
-        vec3 iPos = r0 + r * (iTime + iStepSize * 0.5);
+        vec3 iPos = r0 + r * (iTime + IStepsize * 0.5);
 
         // Calculate the height of the sample.
         float iHeight = length(iPos) - rPlanet;
 
         // Calculate the optical depth of the Rayleigh and Mie scattering for this step.
-        float odStepRlh = exp(-iHeight / shRlh) * iStepSize;
-        float odStepMie = exp(-iHeight / shMie) * iStepSize;
+        float odStepRlh = exp(-iHeight / shRlh) * IStepsize;
+        float odStepMie = exp(-iHeight / shMie) * IStepsize;
 
         // Accumulate optical depth.
         iOdRlh += odStepRlh;
         iOdMie += odStepMie;
 
         // Calculate the step size of the secondary ray.
-        float jStepSize = Rsi(iPos, pSun, rAtmos).y / float(jSteps);
+        float JStepsize = Rsi(iPos, pSun, rAtmos).y / float(JSteps);
 
         // Initialize the secondary ray time.
         float jTime = 0.0;
@@ -129,20 +123,20 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
         float jOdMie = 0.0;
 
         // Sample the secondary ray.
-        for (int j = 0; j < jSteps; j++) {
+        for (int j = 0; j < JSteps; j++) {
 
             // Calculate the secondary ray sample position.
-            vec3 jPos = iPos + pSun * (jTime + jStepSize * 0.5);
+            vec3 jPos = iPos + pSun * (jTime + JStepsize * 0.5);
 
             // Calculate the height of the sample.
             float jHeight = length(jPos) - rPlanet;
 
             // Accumulate the optical depth.
-            jOdRlh += exp(-jHeight / shRlh) * jStepSize;
-            jOdMie += exp(-jHeight / shMie) * jStepSize;
+            jOdRlh += exp(-jHeight / shRlh) * JStepsize;
+            jOdMie += exp(-jHeight / shMie) * JStepsize;
 
             // Increment the secondary ray time.
-            jTime += jStepSize;
+            jTime += JStepsize;
         }
 
         // Calculate attenuation.
@@ -153,7 +147,7 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
         totalMie += odStepMie * attn;
 
         // Increment the primary ray time.
-        iTime += iStepSize;
+        iTime += IStepsize;
     }
 
     // Calculate and return the final color.

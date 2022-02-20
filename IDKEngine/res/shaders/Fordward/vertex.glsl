@@ -27,6 +27,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
+    int FrameCount;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -34,6 +35,11 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float NearPlane;
     float FarPlane;
 } basicDataUBO;
+
+layout(std140, binding = 4) uniform TAASettingsUBO
+{
+    vec4 HaltonSequence[256];
+} taaSettingsUBO;
 
 out InOutVars
 {
@@ -60,12 +66,17 @@ void main()
     outData.TexCoord = TexCoord;
     outData.FragPos = (mesh.Model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
+
     // FIX: Also use prevModel and prevPosition
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
+    
     outData.Normal = Normal;
-
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
 
-    gl_Position = outData.ClipPos;
+    int rawIndex = basicDataUBO.FrameCount % taaSettingsUBO.HaltonSequence.length();
+    int mapedIndex = rawIndex / 2; 
+    int componentIndex = rawIndex % 2;
+    vec2 jitter = vec2(taaSettingsUBO.HaltonSequence[mapedIndex][componentIndex + 0], taaSettingsUBO.HaltonSequence[mapedIndex][componentIndex + 1]);
+    gl_Position = vec4(outData.ClipPos.xy + outData.ClipPos.w * jitter, outData.ClipPos.zw);
 }
