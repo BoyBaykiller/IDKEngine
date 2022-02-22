@@ -66,7 +66,7 @@ namespace IDKEngine.Render
 
             projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, nearPlane, farPlane);
 
-            glslPointShadow.Sampler = Result.MakeHandleResident();
+            glslPointShadow.Sampler = Result.MakeHandleResidentARB();
             glslPointShadow.NearPlane = nearPlane;
             glslPointShadow.FarPlane = farPlane;
             glslPointShadow.LightIndex = lightIndex;
