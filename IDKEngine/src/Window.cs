@@ -183,6 +183,8 @@ namespace IDKEngine
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
 
+            // Necessary extensions without fallback
+            // I don't think I have to test for <4.4 extensions if the system already has bindless and all
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
                 throw new NotSupportedException("Your system does not support GL_ARB_bindless_texture");
 
@@ -237,7 +239,7 @@ namespace IDKEngine
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
             if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
-                AtmosphericScatterer.Result.SetSeamlessCubeMapPerTexture(true);
+                AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             pointShadows = new PointShadow[2];
             pointShadows[0] = new PointShadow(ForwardRenderer.LightingContext, 0, 1536, 1.0f, 60.0f);

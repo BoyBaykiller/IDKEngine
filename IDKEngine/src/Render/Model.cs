@@ -141,7 +141,9 @@ namespace IDKEngine.Render.Objects
                         }
                         texture.GenerateMipmap();
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
-                        texture.SetAnisotropy(4.0f);
+                        if (Helper.IsCoreExtensionAvailable("GL_ARB_texture_filter_anisotropic", 4.6) || Helper.IsExtensionsAvailable("GL_EXT_texture_filter_anisotropic"))
+                            texture.SetAnisotropy(4.0f);
+
                         img.Dispose();
                     }
                     else
@@ -149,7 +151,7 @@ namespace IDKEngine.Render.Objects
                         // Create dummy texture
                         texture.ImmutableAllocate(1, 1, 1, (SizedInternalFormat)format);
                     }
-                    long textureHandle = texture.MakeHandleResident();
+                    long textureHandle = texture.MakeHandleResidentARB();
 
                     /// Yes I prefer this pointer trickery over a long switch statement
                     fixed (void* ptr = &Materials[i].Albedo)

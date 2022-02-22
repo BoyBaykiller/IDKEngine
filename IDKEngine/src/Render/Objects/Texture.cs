@@ -191,7 +191,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture must be available
         /// </summary>
         /// <param name="state"></param>
-        public void SetSeamlessCubeMapPerTexture(bool state)
+        public void SetSeamlessCubeMapPerTextureARB_AMD(bool state)
         {
             GL.TextureParameter(ID, (TextureParameterName)All.TextureCubeMapSeamless, state ? 1 : 0);
         }
@@ -265,7 +265,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long MakeHandleResident()
+        public long MakeHandleResidentARB()
         {
             long textureHandle = GL.Arb.GetTextureHandle(ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
@@ -276,7 +276,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long MakeSamplerHandleResident(SamplerObject samplerObject)
+        public long MakeSamplerHandleResidentARB(SamplerObject samplerObject)
         {
             long textureHandle = GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
@@ -287,7 +287,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public static bool UnmakeHandleResident(long textureHandle)
+        public static bool UnmakeHandleResidentARB(long textureHandle)
         {
             if (GL.Arb.IsTextureHandleResident(textureHandle))
             {
@@ -301,7 +301,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long MakeImageHandleResident(int level, bool layered, int layer, PixelFormat pixelFormat, TextureAccess textureAccess)
+        public long MakeImageHandleResidentARB(int level, bool layered, int layer, PixelFormat pixelFormat, TextureAccess textureAccess)
         {
             long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, pixelFormat);
             GL.Arb.MakeImageHandleResident(imageHandle, (All)textureAccess);
@@ -312,7 +312,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public static bool UnmakeImageHandleResident(long imageHandle)
+        public static bool UnmakeImageHandleResidentARB(long imageHandle)
         {
             if (GL.Arb.IsImageHandleResident(imageHandle))
             {
