@@ -487,6 +487,7 @@ vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedD
     return normalize((inverseView * rayEye).xyz);
 }
 
+#ifndef GL_NV_gpu_shader5
 // Source: https://discord.com/channels/318590007881236480/318590007881236480/856523979383373835
 uint EmulateNonUniform(uint index)
 {
@@ -494,3 +495,4 @@ uint EmulateNonUniform(uint index)
     while ((currentIndex = readFirstInvocationARB(index)) != index) ;
     return currentIndex;
 }
+#endif
