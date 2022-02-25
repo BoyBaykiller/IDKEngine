@@ -110,7 +110,7 @@ in InOutVars
 } inData;
 
 vec3 PBR(Light light);
-float Shadow(PointShadow pointShadow);
+float Visibility(PointShadow pointShadow);
 float DistributionGGX(float nDotH, float roughness);
 float GeometrySchlickGGX(float nDotV, float roughness);
 float GeometrySmith(float nDotV, float nDotL, float roughness);
@@ -149,7 +149,7 @@ void main()
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
     {
         PointShadow pointShadow = shadowDataUBO.PointShadows[i];
-        irradiance += PBR(lightsUBO.Lights[pointShadow.LightIndex]) * Shadow(pointShadow);
+        irradiance += PBR(lightsUBO.Lights[pointShadow.LightIndex]) * Visibility(pointShadow);
     }
 
     for (int i = shadowDataUBO.PointCount; i < lightsUBO.LightCount; i++)
@@ -165,7 +165,7 @@ void main()
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
     VelocityColor = uv - prevUV;
 
-    gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
+    gl_FragDepth = 100-LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
 }
 
 vec3 PBR(Light light)
@@ -204,7 +204,7 @@ const vec3 sampleOffsetDirections[20] =
    vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
 };  
 
-float Shadow(PointShadow pointShadow)
+float Visibility(PointShadow pointShadow)
 {
     vec3 lightToFrag = vec3(inData.FragPos - lightsUBO.Lights[pointShadow.LightIndex].Position);
 

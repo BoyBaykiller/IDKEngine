@@ -36,7 +36,7 @@ uniform float MaxDist;
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = vec2(imgCoord + 0.5) / imageSize(ImgResult);
+    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
     vec4 normalSpec = texture(SamplerNormalSpec, uv);
     float depth = texture(SamplerDepth, uv).r;

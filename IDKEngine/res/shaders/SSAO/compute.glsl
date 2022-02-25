@@ -42,7 +42,7 @@ void main()
 
     rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277;
     
-    vec2 uv = vec2(imgCoord + 0.5) / imgResultSize;
+    vec2 uv = (imgCoord + 0.5) / imgResultSize;
     vec3 normal = normalize((vec4(texture(SamplerNormalSpec, uv).rgb, 1.0) * basicDataUBO.InvView).xyz);
     vec3 fragPos = NDCToViewSpace(vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0);
 

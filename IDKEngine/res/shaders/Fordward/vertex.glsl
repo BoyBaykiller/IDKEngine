@@ -36,11 +36,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float FarPlane;
 } basicDataUBO;
 
-layout(std140, binding = 4) uniform TAASettingsUBO
-{
-    vec4 HaltonSequence[256];
-} taaSettingsUBO;
-
 out InOutVars
 {
     vec2 TexCoord;
@@ -74,9 +69,5 @@ void main()
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
 
-    int rawIndex = basicDataUBO.FrameCount % taaSettingsUBO.HaltonSequence.length();
-    int mapedIndex = rawIndex / 2; 
-    int componentIndex = rawIndex % 2;
-    vec2 jitter = vec2(taaSettingsUBO.HaltonSequence[mapedIndex][componentIndex + 0], taaSettingsUBO.HaltonSequence[mapedIndex][componentIndex + 1]);
-    gl_Position = vec4(outData.ClipPos.xy + outData.ClipPos.w * jitter, outData.ClipPos.zw);
+    gl_Position = outData.ClipPos;
 }

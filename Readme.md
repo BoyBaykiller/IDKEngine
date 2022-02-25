@@ -4,6 +4,7 @@ This is some OpenGL stuff I've been experimenting with lately.
 I am using a lot of modern OpenGL features like Direct State Access, Indirect Multi Drawing or Bindless Textures to create a efficient renderer.
 
 Feature list:
+ - HDR + Gamma correction
  - ImGui
  - Depth Pre Pass
  - Multithreaded model loader

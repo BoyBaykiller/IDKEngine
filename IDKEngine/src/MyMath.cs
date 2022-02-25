@@ -13,29 +13,25 @@ namespace IDKEngine
 
             for (int i = 0; i < haltonSequence.Length; i++)
             {
-                float f = 1;
-                float haltonNum = 0;
-                int paramCurrent = i + 1;
-                int paramBase = i % 2 == 0 ? 2 : 3;
-                do
-                {
-                    f /= paramBase;
-                    haltonNum += f * (paramCurrent % paramBase);
-                    paramCurrent = (int)MathF.Floor((float)paramCurrent / paramBase);
-                } while (paramCurrent > 0);
-                if (i % 2 == 0)
-                {
-                    // Map from [0; 1] to [-0.5; 0.5] * xScale
-                    haltonSequence[i][i % 4] = (haltonNum - 0.5f) * xScale;
-                }
-                else
-                {
-                    // Map from [0; 1] to [-0.5; 0.5] * yScale
-                    haltonSequence[i][i % 4] = (haltonNum - 0.5f) * yScale;
-                }
+                float haltonValue = GetHalton(i + 1, i % 2 == 0 ? 2 : 3);
+                haltonSequence[i][i % 4] = (haltonValue - 0.5f) * (i % 2 == 0 ? xScale : yScale);
             }
 
             return haltonSequence;
+        }
+        public static float GetHalton(int index, int haltonBase)
+        {
+            float f = 1.0f;
+            float haltonValue = 0.0f;
+
+            while (index > 0)
+            {
+                f /= haltonBase;
+                haltonValue += f * (index % haltonBase);
+                index = (int)MathF.Floor(index / (float)haltonBase);
+            }
+
+            return haltonValue;
         }
     }
 }

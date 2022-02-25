@@ -83,7 +83,7 @@ void main()
         return;
     }
 
-    vec2 uv = vec2(imgCoord + 0.5) / imageSize(ImgResult);
+    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
     vec3 ndc = vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0;
     vec3 viewToFrag = NDCToWorldSpace(ndc) - basicDataUBO.ViewPos;
