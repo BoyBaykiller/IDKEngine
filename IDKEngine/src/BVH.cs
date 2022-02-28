@@ -1,8 +1,7 @@
 ﻿using System;
-using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
-using OpenTK;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;

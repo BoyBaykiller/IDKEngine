@@ -4,9 +4,9 @@ using System.Linq;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using Assimp;
-using OpenTK;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
+using Assimp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 

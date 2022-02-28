@@ -30,11 +30,23 @@ namespace IDKEngine.Render
             }
         }
 
+        private float _strength;
+        public float Strength
+        {
+            get => _strength;
+
+            set
+            {
+                _strength = value;
+                shaderProgram.Upload("Strength", _strength);
+            }
+        }
+
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/SSAO/compute.glsl")));
 
         public readonly Texture Result;
-        public SSAO(int width, int height, int samples, float radius)
+        public SSAO(int width, int height, int samples, float radius, float strength)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -43,6 +55,7 @@ namespace IDKEngine.Render
 
             Samples = samples;
             Radius = radius;
+            Strength = strength;
         }
 
         public void Compute(Texture depth, Texture normal)

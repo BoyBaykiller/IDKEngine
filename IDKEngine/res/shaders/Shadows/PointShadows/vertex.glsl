@@ -56,6 +56,8 @@ void main()
 {
 #if IS_VERTEX_LAYERED_RENDERING
 
+    // gl_BaseInstance is a specific manipulated value from the culling shadowCompute shader
+    // It contains 3 bit values, six at maximum, which represent the faces each instance of a mesh is visible on
     gl_Layer = Unpack3Bits(gl_BaseInstance, gl_InstanceID);
     
     mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
@@ -63,6 +65,8 @@ void main()
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
 
 #else
+
+    // In multi pass shadows the layer is simply passed as a uniform before each pass
 
     mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     outData.FragPos = vec3(model * vec4(Position, 1.0));

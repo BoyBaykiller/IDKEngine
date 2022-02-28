@@ -1,7 +1,7 @@
 ﻿using System;
-using OpenTK;
-using OpenTK.Input;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
 
@@ -12,7 +12,7 @@ namespace IDKEngine.Render
         public static ImGuiController ImGuiController = new ImGuiController(832, 832);
 
         private static int selectedMeshIndex = -1;
-        public static void Render(Window window, float frameTime)
+        public static void Render(Application window, float frameTime)
         {
             ImGuiController.Update(window, frameTime);
             ImGui.Begin("Graphics");
@@ -87,6 +87,12 @@ namespace IDKEngine.Render
                             if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 2.0f))
                             {
                                 window.SSAO.Radius = tempFloat;
+                            }
+
+                            tempFloat = window.SSAO.Strength;
+                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 20.0f))
+                            {
+                                window.SSAO.Strength = tempFloat;
                             }
                         }
                     }
@@ -234,16 +240,16 @@ namespace IDKEngine.Render
             ImGuiController.Render();
         }
 
-        public static void Update(Window window)
+        public static void Update(WindowOld window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
             if (MouseManager.IsButtonTouched(MouseButton.Left) && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
             {
-                System.Drawing.Point point = window.PointToClient(new System.Drawing.Point(MouseManager.WindowPositionX, MouseManager.WindowPositionY));
-                point.Y = window.Height - point.Y;
-                
+                Vector2i point = window.PointToClient(new Vector2i(MouseManager.WindowPositionX, MouseManager.WindowPositionY));
+                point.Y = window.Size.Y - point.Y;
+
                 window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
-            }   
+            }
         }
 
         public static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)

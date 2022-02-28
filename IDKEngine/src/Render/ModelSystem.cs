@@ -123,7 +123,7 @@ namespace IDKEngine.Render
 
         private static readonly ShaderProgram cullingProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/compute.glsl")));
-        public void ViewCull(ref OpenTK.Matrix4 projView)
+        public void ViewCull(ref OpenTK.Mathematics.Matrix4 projView)
         {
             cullingProgram.Use();
             cullingProgram.Upload(0, ref projView);
