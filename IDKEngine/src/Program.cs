@@ -1,21 +1,12 @@
-﻿using OpenTK.Windowing.Desktop;
-using OpenTK.Windowing;
-using OpenTK;
-using OpenTK.Graphics;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Core;
-using OpenTK.Core.Platform;
-using OpenTK.Platform;
-using OpenTK.Platform.Windows;
-
-namespace IDKEngine
+﻿namespace IDKEngine
 {
     class Program
     {
-        private static void Main(string[] args)
+        private static void Main()
         {
             Application application = new Application(832, 832, "IDKEngine");
 
+            // TODO: Take monitors refresh rate
             application.Start(144, 0);
         }
     }

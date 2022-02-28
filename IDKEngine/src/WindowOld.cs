@@ -106,49 +106,47 @@ namespace IDKEngine
 
             if (IsFocused)
             {
+                WindowState = WindowState.Normal;
                 ThreadManager.InvokeQueuedActions();
+
+                //if (KeyboardManager.IsKeyDown(Keys.Escape))
+                //    Close();
+
+                //if (KeyboardManager.IsKeyTouched(Keys.V))
+                //    VSync = VSync == VSyncMode.Off ? VSyncMode.On : VSyncMode.Off;
+
+                //if (KeyboardManager.IsKeyTouched(Keys.F11))
+                //    WindowState = WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
                 
-                KeyboardManager.Update(KeyboardState);
-                MouseManager.Update(MouseState);
+                //if (ImGuiNET.ImGui.GetIO().WantCaptureMouse && !CursorVisible)
+                //{
+                //    MousePosition = PointToScreen(Size / 2);
+                //}
 
-                if (KeyboardManager.IsKeyDown(Keys.Escape))
-                    Close();
+                //if (KeyboardManager.IsKeyTouched(Keys.E) && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+                //{
+                //    CursorVisible = !CursorVisible;
+                //    CursorGrabbed = !CursorGrabbed;
 
-                if (KeyboardManager.IsKeyTouched(Keys.V))
-                    VSync = VSync == VSyncMode.Off ? VSyncMode.On : VSyncMode.Off;
-
-                if (KeyboardManager.IsKeyTouched(Keys.F11))
-                    WindowState = WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
-                
-                if (ImGuiNET.ImGui.GetIO().WantCaptureMouse && !CursorVisible)
-                {
-                    MousePosition = PointToScreen(Size / 2);
-                }
-
-                if (KeyboardManager.IsKeyTouched(Keys.E) && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
-                {
-                    CursorVisible = !CursorVisible;
-                    CursorGrabbed = !CursorGrabbed;
-
-                    if (!CursorGrabbed)
-                    {
-                        CursorVisible = true;
-                        MouseManager.Update(MouseState);
-                        camera.Velocity = Vector3.Zero;
-                    }
-                }
+                //    if (!CursorGrabbed)
+                //    {
+                //        CursorVisible = true;
+                //        MouseManager.Update(MouseState);
+                //        camera.Velocity = Vector3.Zero;
+                //    }
+                //}
 
                 if (!CursorVisible)
                 {
-                    camera.ProcessInputs((float)e.Time, out bool hadCameraInputs);
-                    if (hadCameraInputs && IsPathTracing)
-                        GLSLBasicData.FrameCount = 0;
+                    //camera.ProcessInputs(KeyboardState, (float)e.Time, out bool hadCameraInputs);
+                    //if (hadCameraInputs && IsPathTracing)
+                    //    GLSLBasicData.FrameCount = 0;
                 }
 
-                if (CursorVisible)
-                {
-                    Gui.Update(this);
-                }
+                //if (CursorVisible)
+                //{
+                //    Gui.Update(this);
+                //}
 
                 GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
                 GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
@@ -292,8 +290,8 @@ namespace IDKEngine
 
         protected override void OnFocusedChanged(FocusedChangedEventArgs e)
         {
-            if (IsFocused)
-                MouseManager.Update(MouseState);
+            //if (IsFocused)
+            //    MouseManager.Update(MouseState);
             base.OnFocusedChanged(e);
         }
     }

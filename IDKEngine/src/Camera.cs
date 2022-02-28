@@ -1,5 +1,4 @@
 ﻿using System;
-using OpenTK;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
@@ -33,16 +32,16 @@ namespace IDKEngine
 
         public float LookX { get; private set; }
         public float LookY { get; private set; }
-        public void ProcessInputs(float dT, out bool frameChanged)
+        public void ProcessInputs(Keyboard keyboard, float dT, out bool frameChanged)
         {
             frameChanged = false;
 
-            Vector2 mouseDelta = MouseManager.DeltaPosition;
+            //Vector2 mouseDelta = MouseManager.DeltaPosition;
 
-            LookX += mouseDelta.X * Sensitivity;
-            LookY -= mouseDelta.Y * Sensitivity;
-            if (mouseDelta.X != 0 || mouseDelta.Y != 0)
-                frameChanged = true;
+            //LookX += mouseDelta.X * Sensitivity;
+            //LookY -= mouseDelta.Y * Sensitivity;
+            //if (mouseDelta.X != 0 || mouseDelta.Y != 0)
+            //    frameChanged = true;
 
             if (LookY >= 90) LookY = 89.999f;
             if (LookY <= -90) LookY = -89.999f;
@@ -52,19 +51,19 @@ namespace IDKEngine
             ViewDir.Z = MathF.Sin(MathHelper.DegreesToRadians(LookX)) * MathF.Cos(MathHelper.DegreesToRadians(LookY));
 
             Vector3 acceleration = Vector3.Zero;
-            if (KeyboardManager.IsKeyDown(Keys.W))
+            if (keyboard[Keys.W] == InputState.Pressed)
                 acceleration += ViewDir;
-            
-            if (KeyboardManager.IsKeyDown(Keys.S))
+
+            if (keyboard[Keys.S] == InputState.Pressed)
                 acceleration -= ViewDir;
-            
-            if (KeyboardManager.IsKeyDown(Keys.D))
+
+            if (keyboard[Keys.D] == InputState.Pressed)
                 acceleration += Vector3.Cross(ViewDir, Up).Normalized();
 
-            if (KeyboardManager.IsKeyDown(Keys.A))
+            if (keyboard[Keys.A] == InputState.Pressed)
                 acceleration -= Vector3.Cross(ViewDir, Up).Normalized();
 
-            Velocity += KeyboardManager.IsKeyDown(Keys.LeftShift) ? acceleration * 5.0f : (KeyboardManager.IsKeyDown(Keys.LeftControl) ? acceleration * 0.35f : acceleration);
+            Velocity += keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.35f : acceleration);
             if (acceleration != Vector3.Zero || Velocity != Vector3.Zero)
                 frameChanged = true;
             if (Vector3.Dot(Velocity, Velocity) < 0.01f)
