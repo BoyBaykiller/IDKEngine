@@ -168,28 +168,28 @@ namespace IDKEngine.GUI
         {
             ImGuiIOPtr io = ImGui.GetIO();
 
-            io.MouseDown[0] = MouseManager.IsButtonDown(MouseButton.Left);
-            io.MouseDown[1] = MouseManager.IsButtonDown(MouseButton.Right);
-            io.MouseDown[2] = MouseManager.IsButtonDown(MouseButton.Middle);
+            //io.MouseDown[0] = MouseManager.IsButtonDown(MouseButton.Left);
+            //io.MouseDown[1] = MouseManager.IsButtonDown(MouseButton.Right);
+            //io.MouseDown[2] = MouseManager.IsButtonDown(MouseButton.Middle);
 
             //Vector2 point = wnd.PointToClient(new Vector2i(MouseManager.WindowPositionX, MouseManager.WindowPositionY));
             //io.MousePos = new System.Numerics.Vector2(point.X, point.Y);
 
-            io.MouseWheel = MouseManager.DeltaScrollY;
-            io.MouseWheelH = MouseManager.DeltaScrollX;
+            //io.MouseWheel = MouseManager.DeltaScrollY;
+            //io.MouseWheelH = MouseManager.DeltaScrollX;
 
-            foreach (Keys key in Enum.GetValues(typeof(Keys)))
-                io.KeysDown[(int)key] = KeyboardManager.IsKeyDown(key);
+            //foreach (Keys key in Enum.GetValues(typeof(Keys)))
+            //    io.KeysDown[(int)key] = KeyboardManager.IsKeyDown(key);
 
             for (int i = 0; i < pressedChars.Count; i++)
                 io.AddInputCharacter(pressedChars[i]);
 
             pressedChars.Clear();
 
-            io.KeyCtrl = KeyboardManager.IsKeyDown(Keys.LeftControl) || KeyboardManager.IsKeyDown(Keys.RightControl);
-            io.KeyAlt = KeyboardManager.IsKeyDown(Keys.LeftAlt) || KeyboardManager.IsKeyDown(Keys.RightAlt);
-            io.KeyShift = KeyboardManager.IsKeyDown(Keys.LeftShift) || KeyboardManager.IsKeyDown(Keys.RightShift);
-            io.KeySuper = KeyboardManager.IsKeyDown(Keys.LeftSuper) || KeyboardManager.IsKeyDown(Keys.RightSuper);
+            //io.KeyCtrl = KeyboardManager.IsKeyDown(Keys.LeftControl) || KeyboardManager.IsKeyDown(Keys.RightControl);
+            //io.KeyAlt = KeyboardManager.IsKeyDown(Keys.LeftAlt) || KeyboardManager.IsKeyDown(Keys.RightAlt);
+            //io.KeyShift = KeyboardManager.IsKeyDown(Keys.LeftShift) || KeyboardManager.IsKeyDown(Keys.RightShift);
+            //io.KeySuper = KeyboardManager.IsKeyDown(Keys.LeftSuper) || KeyboardManager.IsKeyDown(Keys.RightSuper);
         }
 
         public void PressChar(char keyChar)

@@ -240,16 +240,16 @@ namespace IDKEngine.Render
             ImGuiController.Render();
         }
 
-        public static void Update(WindowOld window)
+        public static void Update(Application window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
-            if (MouseManager.IsButtonTouched(MouseButton.Left) && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
-            {
-                Vector2i point = window.PointToClient(new Vector2i(MouseManager.WindowPositionX, MouseManager.WindowPositionY));
-                point.Y = window.Size.Y - point.Y;
+            //if (MouseManager.IsButtonTouched(MouseButton.Left) && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
+            //{
+            //    Vector2i point = window.PointToClient(new Vector2i(MouseManager.WindowPositionX, MouseManager.WindowPositionY));
+            //    point.Y = window.Size.Y - point.Y;
 
-                window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
-            }
+            //    window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
+            //}
         }
 
         public static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)

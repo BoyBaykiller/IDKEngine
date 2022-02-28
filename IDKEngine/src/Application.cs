@@ -5,6 +5,7 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine
 {
@@ -101,45 +102,45 @@ namespace IDKEngine
             {
                 ThreadManager.InvokeQueuedActions();
 
+                if (KeyboardState[Keys.Escape] == InputState.Pressed)
+                    ShouldClose();
+                
+                if (KeyboardState[Keys.V] == InputState.Touched)
+                    IsVSync = !IsVSync;
 
-                //if (KeyboardManager.IsKeyDown(Keys.Escape))
-                //    Close();
-
-                //if (KeyboardManager.IsKeyTouched(Keys.V))
-                //    VSync = VSync == VSyncMode.Off ? VSyncMode.On : VSyncMode.Off;
-
-                //if (KeyboardManager.IsKeyTouched(Keys.F11))
-                //    WindowState = WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
+                if (KeyboardState[Keys.F11] == InputState.Touched)
+                {
+                    WindowState = WindowState == OpenTK.Windowing.Common.WindowState.Fullscreen ? OpenTK.Windowing.Common.WindowState.Normal : OpenTK.Windowing.Common.WindowState.Fullscreen;
+                }
 
                 //if (ImGuiNET.ImGui.GetIO().WantCaptureMouse && !CursorVisible)
                 //{
                 //    MousePosition = PointToScreen(Size / 2);
                 //}
 
-                //if (KeyboardManager.IsKeyTouched(Keys.E) && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
-                //{
-                //    CursorVisible = !CursorVisible;
-                //    CursorGrabbed = !CursorGrabbed;
+                if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+                {
+                    if (CursorMode == CursorModeValue.CursorDisabled)
+                    {
+                        // MouseState.Update();
+                        // 
+                        CursorMode = CursorModeValue.CursorNormal;
+                    }
+                    else
+                    {
+                        CursorMode = CursorModeValue.CursorDisabled;
+                    }
+                }
 
-                //    if (!CursorGrabbed)
-                //    {
-                //        CursorVisible = true;
-                //        MouseManager.Update(MouseState);
-                //        camera.Velocity = Vector3.Zero;
-                //    }
-                //}
+                if (CursorMode == CursorModeValue.CursorDisabled)
+                {
+                    camera.ProcessInputs(KeyboardState, dT, out bool hadCameraInputs);
+                    if (hadCameraInputs && IsPathTracing)
+                        GLSLBasicData.FrameCount = 0;
+                }
 
-                //if (!CursorVisible)
-                //{
-                //    camera.ProcessInputs((float)e.Time, out bool hadCameraInputs);
-                //    if (hadCameraInputs && IsPathTracing)
-                //        GLSLBasicData.FrameCount = 0;
-                //}
 
-                //if (CursorVisible)
-                //{
-                //    Gui.Update(this);
-                //}
+                Gui.Update(this);
 
                 GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
                 GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
@@ -194,8 +195,7 @@ namespace IDKEngine
             GL.DebugMessageCallback(Helper.DebugCallback, IntPtr.Zero);
 #endif
             IsVSync = true;
-            //CursorGrabbed = true;
-            //CursorVisible = false;
+            CursorMode = CursorModeValue.CursorDisabled;
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.Meshes.Length; i++)
@@ -252,12 +252,6 @@ namespace IDKEngine
             GLSLBasicData.FarPlane = FAR_PLANE;
         }
 
-        protected override void OnEnd()
-        {
-            
-        }
-
-
         protected override void OnResize(int width, int height)
         {
             Gui.ImGuiController.WindowResized(Width, Height);
@@ -266,7 +260,6 @@ namespace IDKEngine
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
-
             ForwardRenderer.SetSize(Width, Height);
             VolumetricLight.SetSize(Width, Height);
             GaussianBlur.SetSize(Width, Height);
@@ -281,6 +274,10 @@ namespace IDKEngine
         }
 
         protected override void OnFocusChanged()
+        {
+
+        }
+        protected override void OnEnd()
         {
 
         }
