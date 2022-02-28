@@ -1,5 +1,5 @@
 ﻿using System;
-using OpenTK;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using PixelFormat = OpenTK.Graphics.OpenGL4.PixelFormat;
 

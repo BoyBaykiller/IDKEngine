@@ -15,12 +15,12 @@ namespace IDKEngine.Render
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
         }
 
         public unsafe void Compute(Texture v0, Texture v1, Texture v2)
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
 
             if (v0 != null) v0.BindToUnit(0);
             else Texture.UnbindFromUnit(0);

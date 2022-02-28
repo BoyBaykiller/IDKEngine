@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK;
-using OpenTK.Input;
+using OpenTK.Mathematics;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine
 {
@@ -51,19 +52,19 @@ namespace IDKEngine
             ViewDir.Z = MathF.Sin(MathHelper.DegreesToRadians(LookX)) * MathF.Cos(MathHelper.DegreesToRadians(LookY));
 
             Vector3 acceleration = Vector3.Zero;
-            if (KeyboardManager.IsKeyDown(Key.W))
+            if (KeyboardManager.IsKeyDown(Keys.W))
                 acceleration += ViewDir;
             
-            if (KeyboardManager.IsKeyDown(Key.S))
+            if (KeyboardManager.IsKeyDown(Keys.S))
                 acceleration -= ViewDir;
             
-            if (KeyboardManager.IsKeyDown(Key.D))
+            if (KeyboardManager.IsKeyDown(Keys.D))
                 acceleration += Vector3.Cross(ViewDir, Up).Normalized();
 
-            if (KeyboardManager.IsKeyDown(Key.A))
+            if (KeyboardManager.IsKeyDown(Keys.A))
                 acceleration -= Vector3.Cross(ViewDir, Up).Normalized();
 
-            Velocity += KeyboardManager.IsKeyDown(Key.LShift) ? acceleration * 5.0f : (KeyboardManager.IsKeyDown(Key.LControl) ? acceleration * 0.35f : acceleration);
+            Velocity += KeyboardManager.IsKeyDown(Keys.LeftShift) ? acceleration * 5.0f : (KeyboardManager.IsKeyDown(Keys.LeftControl) ? acceleration * 0.35f : acceleration);
             if (acceleration != Vector3.Zero || Velocity != Vector3.Zero)
                 frameChanged = true;
             if (Vector3.Dot(Velocity, Velocity) < 0.01f)

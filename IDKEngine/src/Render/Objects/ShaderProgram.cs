@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Diagnostics;
-using OpenTK;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 
 namespace IDKEngine.Render.Objects

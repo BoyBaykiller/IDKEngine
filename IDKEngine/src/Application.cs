@@ -1,37 +1,30 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using OpenTK;
-using OpenTK.Input;
-using OpenTK.Graphics;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
-    class Window : GameWindow
+    /// <summary>
+    /// This class represents the engine which can be run inside of an OpenGL context
+    /// </summary>
+    class Application : GameWindowBase
     {
-        public const float EPSILON = 0.001f;
-        public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
-
-        public Window()
-#if DEBUG
-            : base(832, 832, new GraphicsMode(0, 0, 0, 0), string.Empty, GameWindowFlags.Default, DisplayDevice.Default, 4, 6, GraphicsContextFlags.Debug)
-#else
-            : base(832, 832, new GraphicsMode(0, 0, 0, 0))
-#endif
+        public Application(int width, int height, string title)
+            : base(width, height, title)
         {
 
         }
-
-        private readonly Camera camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
-
+        public const float EPSILON = 0.001f;
+        public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
         public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false;
         public int FPS;
         private int fps;
-        protected override unsafe void OnRenderFrame(FrameEventArgs e)
+        protected override unsafe void OnRender(float dT)
         {
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
 
@@ -42,12 +35,12 @@ namespace IDKEngine
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
 
                 // 1. If IS_VERTEX_LAYERED_RENDERING is false
-                //    upload unculled command buffer for shadows to avoid supplying player-culled command buffer for shadows
+                //    upload unculled command buffer to avoid supplying player-culled command buffer for shadows
                 if (!PointShadow.IS_VERTEX_LAYERED_RENDERING)
                 {
                     ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
                 }
-                
+
                 for (int i = 0; i < pointShadows.Length; i++)
                 {
                     pointShadows[i].CreateDepthMap(ModelSystem);
@@ -65,15 +58,16 @@ namespace IDKEngine
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
 
                 PostCombine.Compute(ForwardRenderer.Result, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
-                PostCombine.Result.BindToUnit(0);
             }
             else
             {
                 PathTracer.Render();
                 Texture.UnbindFromUnit(1);
                 Texture.UnbindFromUnit(2);
-                PathTracer.Result.BindToUnit(0);
+
+                PostCombine.Compute(PathTracer.Result, null, null);
             }
+            PostCombine.Result.BindToUnit(0);
 
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
@@ -83,20 +77,17 @@ namespace IDKEngine
             finalProgram.Use();
 
             GL.DrawArrays(PrimitiveType.Quads, 0, 4);
-            Gui.Render(this, (float)e.Time);
-            
+            Gui.Render(this, (float)dT);
+
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
 
             fps++;
             GLSLBasicData.FrameCount++;
-            SwapBuffers();
-            
-            base.OnRenderFrame(e);
         }
 
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        protected override void OnUpdateFrame(FrameEventArgs e)
+        protected override void OnUpdate(float dT)
         {
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
@@ -106,52 +97,49 @@ namespace IDKEngine
                 fpsTimer.Restart();
             }
 
-            if (Focused)
+            if (IsFocused)
             {
                 ThreadManager.InvokeQueuedActions();
-                
-                KeyboardManager.Update();
-                MouseManager.Update();
 
-                if (KeyboardManager.IsKeyDown(Key.Escape))
-                    Close();
 
-                if (KeyboardManager.IsKeyTouched(Key.V))
-                    VSync = VSync == VSyncMode.Off ? VSyncMode.On : VSyncMode.Off;
+                //if (KeyboardManager.IsKeyDown(Keys.Escape))
+                //    Close();
 
-                if (KeyboardManager.IsKeyTouched(Key.F11))
-                    WindowState = WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
+                //if (KeyboardManager.IsKeyTouched(Keys.V))
+                //    VSync = VSync == VSyncMode.Off ? VSyncMode.On : VSyncMode.Off;
 
-                if (ImGuiNET.ImGui.GetIO().WantCaptureMouse && !CursorVisible)
-                {
-                    System.Drawing.Point point = PointToScreen(new System.Drawing.Point(Width / 2, Height / 2));
-                    Mouse.SetPosition(point.X, point.Y);
-                }
+                //if (KeyboardManager.IsKeyTouched(Keys.F11))
+                //    WindowState = WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen;
 
-                if (KeyboardManager.IsKeyTouched(Key.E) && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
-                {
-                    CursorVisible = !CursorVisible;
-                    CursorGrabbed = !CursorGrabbed;
+                //if (ImGuiNET.ImGui.GetIO().WantCaptureMouse && !CursorVisible)
+                //{
+                //    MousePosition = PointToScreen(Size / 2);
+                //}
 
-                    if (!CursorGrabbed)
-                    {
-                        CursorVisible = true;
-                        MouseManager.Update();
-                        camera.Velocity = Vector3.Zero;
-                    }
-                }
+                //if (KeyboardManager.IsKeyTouched(Keys.E) && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+                //{
+                //    CursorVisible = !CursorVisible;
+                //    CursorGrabbed = !CursorGrabbed;
 
-                if (!CursorVisible)
-                {
-                    camera.ProcessInputs((float)e.Time, out bool hadCameraInputs);
-                    if (hadCameraInputs && IsPathTracing)
-                        GLSLBasicData.FrameCount = 0;
-                }
+                //    if (!CursorGrabbed)
+                //    {
+                //        CursorVisible = true;
+                //        MouseManager.Update(MouseState);
+                //        camera.Velocity = Vector3.Zero;
+                //    }
+                //}
 
-                if (CursorVisible)
-                {
-                    Gui.Update(this);
-                }
+                //if (!CursorVisible)
+                //{
+                //    camera.ProcessInputs((float)e.Time, out bool hadCameraInputs);
+                //    if (hadCameraInputs && IsPathTracing)
+                //        GLSLBasicData.FrameCount = 0;
+                //}
+
+                //if (CursorVisible)
+                //{
+                //    Gui.Update(this);
+                //}
 
                 GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
                 GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
@@ -160,10 +148,9 @@ namespace IDKEngine
                 GLSLBasicData.CameraPos = camera.Position;
                 GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
             }
-
-            base.OnUpdateFrame(e);
         }
 
+        private readonly Camera camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
         private ShaderProgram finalProgram;
         private BufferObject basicDataUBO;
         private PointShadow[] pointShadows;
@@ -178,7 +165,7 @@ namespace IDKEngine
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         public GLSLBasicData GLSLBasicData;
-        protected override unsafe void OnLoad(EventArgs e)
+        protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
@@ -206,9 +193,9 @@ namespace IDKEngine
             GL.Enable(EnableCap.DebugOutput);
             GL.DebugMessageCallback(Helper.DebugCallback, IntPtr.Zero);
 #endif
-            VSync = VSyncMode.On;
-            CursorGrabbed = true;
-            CursorVisible = false;
+            IsVSync = true;
+            //CursorGrabbed = true;
+            //CursorVisible = false;
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.Meshes.Length; i++)
@@ -231,7 +218,7 @@ namespace IDKEngine
             SSR = new SSR(Width, Height, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f, new Vector3(0.025f));
             GaussianBlur = new GaussianBlur(Width, Height);
-            SSAO = new SSAO(Width, Height, 10, 0.3f);
+            SSAO = new SSAO(Width, Height, 20, 0.35f, 2.0f);
             PostCombine = new PostCombine(Width, Height);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
@@ -259,45 +246,43 @@ namespace IDKEngine
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
 
-            base.OnLoad(e);
+            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
+            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
+            GLSLBasicData.NearPlane = NEAR_PLANE;
+            GLSLBasicData.FarPlane = FAR_PLANE;
         }
 
-        private int lastWidth, lastHeight;
-        protected override unsafe void OnResize(EventArgs e)
+        protected override void OnEnd()
         {
-            if ((lastWidth != Width || lastHeight != Height) && Width != 0 && Height != 0)
-            {
-                Gui.ImGuiController.WindowResized(Width, Height);
-
-                GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
-                GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
-                GLSLBasicData.NearPlane = NEAR_PLANE;
-                GLSLBasicData.FarPlane = FAR_PLANE;
-
-                ForwardRenderer.SetSize(Width, Height);
-                VolumetricLight.SetSize(Width, Height);
-                GaussianBlur.SetSize(Width, Height);
-                SSR.SetSize(Width, Height);
-                SSAO.SetSize(Width, Height);
-                PostCombine.SetSize(Width, Height);
-                if (IsPathTracing)
-                {
-                    PathTracer.SetSize(Width, Height);
-                    GLSLBasicData.FrameCount = 0;
-                }
-
-                lastWidth = Width;
-                lastHeight = Height;
-            }
             
-            base.OnResize(e);
         }
 
-        protected override void OnFocusedChanged(EventArgs e)
+
+        protected override void OnResize(int width, int height)
         {
-            if (Focused)
-                MouseManager.Update();
-            base.OnFocusedChanged(e);
+            Gui.ImGuiController.WindowResized(Width, Height);
+
+            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
+            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
+            GLSLBasicData.NearPlane = NEAR_PLANE;
+            GLSLBasicData.FarPlane = FAR_PLANE;
+
+            ForwardRenderer.SetSize(Width, Height);
+            VolumetricLight.SetSize(Width, Height);
+            GaussianBlur.SetSize(Width, Height);
+            SSR.SetSize(Width, Height);
+            SSAO.SetSize(Width, Height);
+            PostCombine.SetSize(Width, Height);
+            if (IsPathTracing)
+            {
+                PathTracer.SetSize(Width, Height);
+                GLSLBasicData.FrameCount = 0;
+            }
+        }
+
+        protected override void OnFocusChanged()
+        {
+
         }
     }
 }

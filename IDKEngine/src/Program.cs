@@ -1,13 +1,22 @@
-﻿using OpenTK;
+﻿using OpenTK.Windowing.Desktop;
+using OpenTK.Windowing;
+using OpenTK;
+using OpenTK.Graphics;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Core;
+using OpenTK.Core.Platform;
+using OpenTK.Platform;
+using OpenTK.Platform.Windows;
 
 namespace IDKEngine
 {
     class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
-            using Window window = new Window();
-            window.Run(DisplayDevice.Default.RefreshRate);
+            Application application = new Application(832, 832, "IDKEngine");
+
+            application.Start(144, 0);
         }
     }
 }
