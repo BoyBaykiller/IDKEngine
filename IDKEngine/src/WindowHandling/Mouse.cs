@@ -3,9 +3,10 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine
 {
-    class Mouse
+    unsafe class Mouse
     {
-        public Vector2 RawPosition { get; private set; }
+        public Vector2 Position { get; private set; }
+        public Vector2 LastPosition { get; private set; }
 
         public InputState this[MouseButton button]
         {
@@ -14,18 +15,18 @@ namespace IDKEngine
 
         private readonly InputState[] buttonStates;
 
-        public Mouse()
+        private readonly Window* window;
+        public Mouse(Window* window)
         {
+            this.window = window;
             buttonStates = new InputState[8];
         }
 
-        public unsafe void Update(Window* window)
+        public unsafe void Update()
         {
             for (int i = 0; i < buttonStates.Length; i++)
             {
                 InputAction action = GLFW.GetMouseButton(window, (MouseButton)i);
-                buttonStates[i] = (InputState)action;
-
                 if (action == InputAction.Press && buttonStates[i] == InputState.Released)
                 {
                     buttonStates[i] = InputState.Touched;
@@ -35,10 +36,10 @@ namespace IDKEngine
                     buttonStates[i] = (InputState)action;
                 }
             }
-            double x, y;
-            GLFW.GetCursorPosRaw(window, &x, &y);
-
-            RawPosition = new Vector2((float)x, (float)y);
+            GLFW.GetCursorPos(window, out double x, out double y);
+            
+            LastPosition = Position;
+            Position = new Vector2((float)x, (float)y);
         }
     }
 }

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render.Objects;
 using ImGuiNET;
@@ -15,6 +14,8 @@ namespace IDKEngine.GUI
     /// </summary>
     class ImGuiController : IDisposable
     {
+        public bool IsIgnoreMouseInput = false;
+
         private bool frameBegun;
 
         private VAO vao;
@@ -55,6 +56,39 @@ namespace IDKEngine.GUI
             Height = height;
         }
 
+        public void Render()
+        {
+            if (frameBegun)
+            {
+                frameBegun = false;
+                ImGui.Render();
+                RenderImDrawData(ImGui.GetDrawData());
+            }
+        }
+        public void Update(GameWindowBase wnd, float dT)
+        {
+            if (frameBegun)
+                ImGui.Render();
+
+            SetPerFrameImGuiData(dT);
+            UpdateImGuiInput(wnd);
+
+            frameBegun = true;
+            ImGui.NewFrame();
+        }
+
+        public void PressChar(char keyChar)
+        {
+            pressedChars.Add(keyChar);
+        }
+
+        public void Dispose()
+        {
+            fontTexture.Dispose();
+            shaderProgram.Dispose();
+            vao.Dispose();
+        }
+
         private unsafe void CreateDeviceResources()
         {
             vbo = new BufferObject();
@@ -62,37 +96,53 @@ namespace IDKEngine.GUI
             ebo = new BufferObject();
             ebo.MutableAllocate(2000, IntPtr.Zero, BufferUsageHint.DynamicDraw);
 
-            CreateFontDeviceTexture();
+            ImGuiIOPtr io = ImGui.GetIO();
+            io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int width, out int height, out _);
 
-            string vertexSource = @"#version 330 core
+            fontTexture = new Texture(TextureTarget2d.Texture2D);
+            fontTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
+            fontTexture.SubTexture2D(width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
+            fontTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
 
-                uniform mat4 projection_matrix;
+            io.Fonts.SetTexID((IntPtr)fontTexture.ID);
+            io.Fonts.ClearTexData();
 
-                layout(location = 0) in vec2 in_position;
-                layout(location = 1) in vec2 in_texCoord;
-                layout(location = 2) in vec4 in_color;
+            string vertexSource = @"#version 460 core
 
-                out vec4 color;
-                out vec2 texCoord;
+                layout(location = 0) in vec2 Position;
+                layout(location = 1) in vec2 TexCoord;
+                layout(location = 2) in vec4 Color;
+
+                layout(location = 0) uniform mat4 projection;
+
+                out InOutVars
+                {
+                    vec4 Color;
+                    vec2 TexCoord;
+                } outData;
 
                 void main()
                 {
-                    gl_Position = projection_matrix * vec4(in_position, 0, 1);
-                    color = in_color;
-                    texCoord = in_texCoord;
+                    outData.Color = Color;
+                    outData.TexCoord = TexCoord;
+                    gl_Position = projection * vec4(Position, 0.0, 1.0);
                 }";
-            string fragmentSource = @"#version 330 core
 
-                uniform sampler2D in_fontTexture;
+            string fragmentSource = @"#version 460 core
 
-                in vec4 color;
-                in vec2 texCoord;
+                layout(location = 0) out vec4 FragColor;
 
-                out vec4 outputColor;
+                layout(binding = 0) uniform sampler2D SamplerFontTexture;
+
+                in InOutVars
+                {
+                    vec4 Color;
+                    vec2 TexCoord;
+                } inData;
 
                 void main()
                 {
-                    outputColor = color * texture(in_fontTexture, texCoord);
+                    FragColor = inData.Color * texture(SamplerFontTexture, inData.TexCoord);
                 }";
 
             shaderProgram = new ShaderProgram(new Shader(ShaderType.VertexShader, vertexSource), new Shader(ShaderType.FragmentShader, fragmentSource));
@@ -105,62 +155,12 @@ namespace IDKEngine.GUI
             vao.SetAttribFormat(0, 2, 4, VertexAttribType.UnsignedByte, 4 * sizeof(float), true);
         }
 
-        private void CreateFontDeviceTexture()
-        {
-            ImGuiIOPtr io = ImGui.GetIO();
-            io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int width, out int height, out _);
-
-            fontTexture = new Texture(TextureTarget2d.Texture2D);
-            fontTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
-            fontTexture.SubTexture2D(width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
-            fontTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-
-
-            io.Fonts.SetTexID((IntPtr)fontTexture.ID);
-            io.Fonts.ClearTexData();
-        }
-
-        /// <summary>
-        /// Renders the ImGui draw list data.
-        /// This method requires a <see cref="GraphicsDevice"/> because it may create new DeviceBuffers if the size of vertex
-        /// or index data has increased beyond the capacity of the existing buffers.
-        /// A <see cref="CommandList"/> is needed to submit drawing and resource update commands.
-        /// </summary>
-        public void Render()
-        {
-            if (frameBegun)
-            {
-                frameBegun = false;
-                ImGui.Render();
-                RenderImDrawData(ImGui.GetDrawData());
-            }
-        }
-
-        /// <summary>
-        /// Updates ImGui input and IO configuration state.
-        /// </summary>
-        public void Update(GameWindowBase wnd, float deltaSeconds)
-        {
-            if (frameBegun)
-                ImGui.Render();
-
-            SetPerFrameImGuiData(deltaSeconds);
-            UpdateImGuiInput(wnd);
-
-            frameBegun = true;
-            ImGui.NewFrame();
-        }
-
-        /// <summary>
-        /// Sets per-frame data based on the associated window.
-        /// This is called by Update(float).
-        /// </summary>
-        private void SetPerFrameImGuiData(float deltaSeconds)
+        private void SetPerFrameImGuiData(float dT)
         {
             ImGuiIOPtr io = ImGui.GetIO();
             io.DisplaySize = new System.Numerics.Vector2(Width / scaleFactor.X, Height / scaleFactor.Y);
             io.DisplayFramebufferScale = scaleFactor;
-            io.DeltaTime = deltaSeconds;
+            io.DeltaTime = dT;
         }
 
         private readonly List<char> pressedChars = new List<char>();
@@ -168,33 +168,35 @@ namespace IDKEngine.GUI
         {
             ImGuiIOPtr io = ImGui.GetIO();
 
-            //io.MouseDown[0] = MouseManager.IsButtonDown(MouseButton.Left);
-            //io.MouseDown[1] = MouseManager.IsButtonDown(MouseButton.Right);
-            //io.MouseDown[2] = MouseManager.IsButtonDown(MouseButton.Middle);
+            io.MouseDown[0] = wnd.MouseState[MouseButton.Left] == InputState.Pressed;
+            io.MouseDown[1] = wnd.MouseState[MouseButton.Right] == InputState.Pressed;
+            io.MouseDown[2] = wnd.MouseState[MouseButton.Middle] == InputState.Pressed;
 
-            //Vector2 point = wnd.PointToClient(new Vector2i(MouseManager.WindowPositionX, MouseManager.WindowPositionY));
-            //io.MousePos = new System.Numerics.Vector2(point.X, point.Y);
+            if (IsIgnoreMouseInput)
+                io.MousePos = new System.Numerics.Vector2(-1.0f);
+            else
+                io.MousePos = new System.Numerics.Vector2(wnd.MouseState.Position.X, wnd.MouseState.Position.Y);
 
             //io.MouseWheel = MouseManager.DeltaScrollY;
             //io.MouseWheelH = MouseManager.DeltaScrollX;
 
-            //foreach (Keys key in Enum.GetValues(typeof(Keys)))
-            //    io.KeysDown[(int)key] = KeyboardManager.IsKeyDown(key);
+            for (int i = 0; i < Keyboard.KeyValues.Length; i++)
+            {
+                if (Keyboard.KeyValues[i] == Keys.Unknown)
+                    continue;
+
+                io.KeysDown[(int)Keyboard.KeyValues[i]] = wnd.KeyboardState[Keyboard.KeyValues[i]] == InputState.Pressed;
+            }
 
             for (int i = 0; i < pressedChars.Count; i++)
                 io.AddInputCharacter(pressedChars[i]);
 
             pressedChars.Clear();
 
-            //io.KeyCtrl = KeyboardManager.IsKeyDown(Keys.LeftControl) || KeyboardManager.IsKeyDown(Keys.RightControl);
-            //io.KeyAlt = KeyboardManager.IsKeyDown(Keys.LeftAlt) || KeyboardManager.IsKeyDown(Keys.RightAlt);
-            //io.KeyShift = KeyboardManager.IsKeyDown(Keys.LeftShift) || KeyboardManager.IsKeyDown(Keys.RightShift);
-            //io.KeySuper = KeyboardManager.IsKeyDown(Keys.LeftSuper) || KeyboardManager.IsKeyDown(Keys.RightSuper);
-        }
-
-        public void PressChar(char keyChar)
-        {
-            pressedChars.Add(keyChar);
+            io.KeyCtrl = wnd.KeyboardState[Keys.LeftControl] == InputState.Pressed || wnd.KeyboardState[Keys.RightControl] == InputState.Pressed;
+            io.KeyAlt = wnd.KeyboardState[Keys.LeftAlt] == InputState.Pressed || wnd.KeyboardState[Keys.RightAlt] == InputState.Pressed;
+            io.KeyShift = wnd.KeyboardState[Keys.LeftShift] == InputState.Pressed || wnd.KeyboardState[Keys.RightShift] == InputState.Pressed;
+            io.KeySuper = wnd.KeyboardState[Keys.LeftSuper] == InputState.Pressed || wnd.KeyboardState[Keys.RightSuper] == InputState.Pressed;
         }
 
         private static void SetKeyMappings()
@@ -245,11 +247,10 @@ namespace IDKEngine.GUI
             }
 
             ImGuiIOPtr io = ImGui.GetIO();
-            Matrix4 mvp = Matrix4.CreateOrthographicOffCenter(0.0f, io.DisplaySize.X, io.DisplaySize.Y, 0.0f, -1.0f, 1.0f);
+            Matrix4 projection = Matrix4.CreateOrthographicOffCenter(0.0f, io.DisplaySize.X, io.DisplaySize.Y, 0.0f, -1.0f, 1.0f);
 
             shaderProgram.Use();
-            shaderProgram.Upload("projection_matrix", ref mvp);
-            shaderProgram.Upload("in_fontTexture", 0);
+            shaderProgram.Upload(0, ref projection);
 
             vao.Bind();
 
@@ -295,13 +296,6 @@ namespace IDKEngine.GUI
             }
             GL.Disable(EnableCap.Blend);
             GL.Disable(EnableCap.ScissorTest);
-        }
-
-        public void Dispose()
-        {
-            fontTexture.Dispose();
-            shaderProgram.Dispose();
-            vao.Dispose();
         }
 
         private unsafe void SetStyle()
