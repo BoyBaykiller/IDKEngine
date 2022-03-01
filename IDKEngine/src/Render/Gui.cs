@@ -2,14 +2,14 @@
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using ImGuiNET;
 using IDKEngine.GUI;
+using ImGuiNET;
 
 namespace IDKEngine.Render
 {
     static class Gui
     {
-        public static ImGuiController ImGuiController = new ImGuiController(832, 832);
+        public static ImGuiController ImGuiController = new ImGuiController(1, 1);
 
         private static int selectedMeshIndex = -1;
         public static void Render(Application window, float frameTime)
@@ -243,31 +243,31 @@ namespace IDKEngine.Render
         public static void Update(Application window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
-            //if (MouseManager.IsButtonTouched(MouseButton.Left) && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
-            //{
-            //    Vector2i point = window.PointToClient(new Vector2i(MouseManager.WindowPositionX, MouseManager.WindowPositionY));
-            //    point.Y = window.Size.Y - point.Y;
+            if (window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
+            {
+                Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
+                point.Y = window.Width - point.Y;
 
-            //    window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
-            //}
+                window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
+            }
         }
 
-        public static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)
+        private static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)
         {
             return new System.Numerics.Vector2(vector2.X, vector2.Y);
         }
 
-        public static Vector2 SystemToOpenTK(System.Numerics.Vector2 vector2)
+        private static Vector2 SystemToOpenTK(System.Numerics.Vector2 vector2)
         {
             return new Vector2(vector2.X, vector2.Y);
         }
 
-        public static System.Numerics.Vector3 OpenTKToSystem(Vector3 vector3)
+        private static System.Numerics.Vector3 OpenTKToSystem(Vector3 vector3)
         {
             return new System.Numerics.Vector3(vector3.X, vector3.Y, vector3.Z);
         }
 
-        public static Vector3 SystemToOpenTK(System.Numerics.Vector3 vector3)
+        private static Vector3 SystemToOpenTK(System.Numerics.Vector3 vector3)
         {
             return new Vector3(vector3.X, vector3.Y, vector3.Z);
         }

@@ -113,8 +113,8 @@ namespace IDKEngine
             }
         }
 
-        protected readonly Keyboard KeyboardState;
-        protected readonly Mouse MouseState;
+        public readonly Keyboard KeyboardState;
+        public readonly Mouse MouseState;
 
         private bool glfwInitialized = false;
         private readonly Window* window;
@@ -148,8 +148,8 @@ namespace IDKEngine
             windowFocusDelegate = WindowFocusCallback;
             GLFW.SetWindowFocusCallback(window, windowFocusDelegate);
 
-            KeyboardState = new Keyboard();
-            MouseState = new Mouse();
+            KeyboardState = new Keyboard(window);
+            MouseState = new Mouse(window);
         }
 
         private readonly Stopwatch renderTimer = new Stopwatch();
@@ -168,14 +168,15 @@ namespace IDKEngine
 
             renderTimer.Start();
             updateTimer.Start();
+            // TODO: Simply running timers and checking for threshold doesn't work that well. Investigate into proper update and render loop system
             while (!GLFW.WindowShouldClose(window))
             {
                 GLFW.PollEvents();
 
                 if (updateTimer.Elapsed.TotalMilliseconds / 1000.0f >= updateThreshold)
                 {
-                    KeyboardState.Update(window);
-                    MouseState.Update(window);
+                    KeyboardState.Update();
+                    MouseState.Update();
                     OnUpdate((float)updateTimer.Elapsed.TotalMilliseconds / 1000.0f);
                     updateTimer.Restart();
                 }

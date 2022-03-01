@@ -32,16 +32,16 @@ namespace IDKEngine
 
         public float LookX { get; private set; }
         public float LookY { get; private set; }
-        public void ProcessInputs(Keyboard keyboard, float dT, out bool frameChanged)
+        public void ProcessInputs(Keyboard keyboard, Mouse mouse, float dT, out bool didMove)
         {
-            frameChanged = false;
+            didMove = false;
 
-            //Vector2 mouseDelta = MouseManager.DeltaPosition;
+            Vector2 mouseDelta = mouse.Position - mouse.LastPosition;
 
-            //LookX += mouseDelta.X * Sensitivity;
-            //LookY -= mouseDelta.Y * Sensitivity;
-            //if (mouseDelta.X != 0 || mouseDelta.Y != 0)
-            //    frameChanged = true;
+            LookX += mouseDelta.X * Sensitivity;
+            LookY -= mouseDelta.Y * Sensitivity;
+            if (mouseDelta.X != 0 || mouseDelta.Y != 0)
+                didMove = true;
 
             if (LookY >= 90) LookY = 89.999f;
             if (LookY <= -90) LookY = -89.999f;
@@ -65,7 +65,7 @@ namespace IDKEngine
 
             Velocity += keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.35f : acceleration);
             if (acceleration != Vector3.Zero || Velocity != Vector3.Zero)
-                frameChanged = true;
+                didMove = true;
             if (Vector3.Dot(Velocity, Velocity) < 0.01f)
                 Velocity = Vector3.Zero;
             

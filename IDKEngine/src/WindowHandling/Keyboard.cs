@@ -4,7 +4,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine
 {
-    class Keyboard
+    unsafe class Keyboard
     {
         public InputState this[Keys key]
         {
@@ -12,33 +12,37 @@ namespace IDKEngine
         }
 
         
-        private static readonly Keys[] keyValues = Enum.GetValues<Keys>();
+        public static readonly Keys[] KeyValues = Enum.GetValues<Keys>();
 
         // Keys aren't layed out sequentialy so I decided to use a dictionary instead of InputState[]
         private readonly Dictionary<Keys, InputState> keyStates;
 
-        public Keyboard()
+        private readonly Window* window;
+        public Keyboard(Window* window)
         {
-            keyStates = new Dictionary<Keys, InputState>(keyValues.Length);
+            this.window = window;
 
-            for (int i = 0; i < keyValues.Length - 2; i++)
+            keyStates = new Dictionary<Keys, InputState>();
+
+            for (int i = 0; i < KeyValues.Length; i++)
             {
-                keyStates.Add(keyValues[i], InputState.Released);
+                if (!keyStates.ContainsKey(KeyValues[i]))
+                    keyStates.Add(KeyValues[i], InputState.Released);
             }
         }
 
-        public unsafe void Update(Window* window)
+        public unsafe void Update()
         {
-            for (int i = 0; i < keyValues.Length; i++)
+            for (int i = 0; i < KeyValues.Length; i++)
             {
-                InputAction action = GLFW.GetKey(window, keyValues[i]);
-                if (action == InputAction.Press && keyStates[keyValues[i]] == InputState.Released)
+                InputAction action = GLFW.GetKey(window, KeyValues[i]);
+                if (action == InputAction.Press && keyStates[KeyValues[i]] == InputState.Released)
                 {
-                    keyStates[keyValues[i]] = InputState.Touched;
+                    keyStates[KeyValues[i]] = InputState.Touched;
                 }
                 else
                 {
-                    keyStates[keyValues[i]] = (InputState)action;
+                    keyStates[KeyValues[i]] = (InputState)action;
                 }
             }
         }
