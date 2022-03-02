@@ -2,12 +2,12 @@
 {
     class Program
     {
-        private static void Main()
+        private static unsafe void Main()
         {
             Application application = new Application(832, 832, "IDKEngine");
 
-            // TODO: Take monitors refresh rate
-            application.Start(0, 0);
+            application.UpdatePeriod = 1.0 / application.VideoMode->RefreshRate;
+            application.Start();
         }
     }
 }

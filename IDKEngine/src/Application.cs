@@ -24,6 +24,7 @@ namespace IDKEngine
 
         public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false;
         public int FPS;
+
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
@@ -49,7 +50,7 @@ namespace IDKEngine
 
                 ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 
-                GL.Viewport(0, 0, Width, Height);
+                GL.Viewport(0, 0, Size.X, Size.Y);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
 
                 if (IsVolumetricLighting)
@@ -73,7 +74,7 @@ namespace IDKEngine
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
 
-            GL.Viewport(0, 0, Width, Height);
+            GL.Viewport(0, 0, Size.X, Size.Y);
             Framebuffer.Bind(0);
             finalProgram.Use();
 
@@ -88,32 +89,28 @@ namespace IDKEngine
         }
 
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        private int ups = 0;
         protected override void OnUpdate(float dT)
         {
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
                 FPS = fps;
-                Title = $"FPS: {FPS}; {ups}; Position {camera.Position};";
+                Title = $"FPS: {FPS}; Position {camera.Position};";
                 fps = 0;
-                ups = 0;
                 fpsTimer.Restart();
             }
 
             if (IsFocused)
             {
-                ThreadManager.InvokeQueuedActions();
-
                 if (KeyboardState[Keys.Escape] == InputState.Pressed)
                     ShouldClose();
                 
                 if (KeyboardState[Keys.V] == InputState.Touched)
                     IsVSync = !IsVSync;
 
-                if (KeyboardState[Keys.F11] == InputState.Touched)
-                {
-                    WindowState = WindowState == OpenTK.Windowing.Common.WindowState.Fullscreen ? OpenTK.Windowing.Common.WindowState.Normal : OpenTK.Windowing.Common.WindowState.Fullscreen;
-                }
+                //if (KeyboardState[Keys.F11] == InputState.Touched)
+                //{
+                //    WindowState = WindowState == OpenTK.Windowing.Common.WindowState.Fullscreen ? OpenTK.Windowing.Common.WindowState.Normal : OpenTK.Windowing.Common.WindowState.Fullscreen;
+                //}
 
                 if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
                 {
@@ -121,6 +118,7 @@ namespace IDKEngine
                     {
                         CursorMode = CursorModeValue.CursorNormal;
                         Gui.ImGuiController.IsIgnoreMouseInput = false;
+                        camera.Velocity = Vector3.Zero;
                     }
                     else
                     {
@@ -128,14 +126,13 @@ namespace IDKEngine
                         Gui.ImGuiController.IsIgnoreMouseInput = true;
                     }
                 }
-
+                
                 if (CursorMode == CursorModeValue.CursorDisabled)
                 {
                     camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
                     if (hadCameraInputs && IsPathTracing)
                         GLSLBasicData.FrameCount = 0;
                 }
-
 
                 Gui.Update(this);
 
@@ -145,11 +142,10 @@ namespace IDKEngine
                 GLSLBasicData.InvView = camera.View.Inverted();
                 GLSLBasicData.CameraPos = camera.Position;
                 GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
-                ups++;
             }
         }
 
-        private readonly Camera camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
+        private Camera camera;
         private ShaderProgram finalProgram;
         private BufferObject basicDataUBO;
         private PointShadow[] pointShadows;
@@ -196,6 +192,8 @@ namespace IDKEngine
             CursorMode = CursorModeValue.CursorDisabled;
             Gui.ImGuiController.IsIgnoreMouseInput = true;
 
+            camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
+
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.Meshes.Length; i++)
                 sponza.Meshes[i].Model = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
@@ -212,15 +210,19 @@ namespace IDKEngine
             //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -0.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
             lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.5f);
 
-            ForwardRenderer = new Forward(new Lighter(20, 20), Width, Height);
+            
+            ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
             ForwardRenderer.LightingContext.Add(lights);
-            SSR = new SSR(Width, Height, 30, 8, 50.0f);
-            VolumetricLight = new VolumetricLighter(Width, Height, 20, 0.758f, 50.0f, new Vector3(0.025f));
-            GaussianBlur = new GaussianBlur(Width, Height);
-            SSAO = new SSAO(Width, Height, 20, 0.35f, 2.0f);
-            PostCombine = new PostCombine(Width, Height);
+            SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
+            VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, new Vector3(0.025f));
+            GaussianBlur = new GaussianBlur(Size.X, Size.Y);
+            SSAO = new SSAO(Size.X, Size.Y, 20, 0.35f, 2.0f);
+            PostCombine = new PostCombine(Size.X, Size.Y);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
+
+            Bvh = new BVH(ModelSystem);
+            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
@@ -231,11 +233,9 @@ namespace IDKEngine
             pointShadows[0] = new PointShadow(ForwardRenderer.LightingContext, 0, 1536, 1.0f, 60.0f);
             pointShadows[1] = new PointShadow(ForwardRenderer.LightingContext, 1, 256, 0.5f, 60.0f);
 
+            
             pointShadows[0].CreateDepthMap(ModelSystem);
             pointShadows[1].CreateDepthMap(ModelSystem);
-
-            Bvh = new BVH(ModelSystem);
-            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Width, Height);
 
             basicDataUBO = new BufferObject();
             basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
@@ -245,30 +245,33 @@ namespace IDKEngine
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
 
-            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
+            Gui.ImGuiController.WindowResized(Size.X, Size.Y);
+
+            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Size.X / (float)Size.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
-            Gui.ImGuiController.WindowResized(832, 832);
+
+
         }
 
-        protected override void OnResize(int width, int height)
+        protected override void OnResize()
         {
-            Gui.ImGuiController.WindowResized(Width, Height);
+            Gui.ImGuiController.WindowResized(Size.X, Size.Y);
 
-            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Width / (float)Height, NEAR_PLANE, FAR_PLANE);
+            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Size.X / (float)Size.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
-            ForwardRenderer.SetSize(Width, Height);
-            VolumetricLight.SetSize(Width, Height);
-            GaussianBlur.SetSize(Width, Height);
-            SSR.SetSize(Width, Height);
-            SSAO.SetSize(Width, Height);
-            PostCombine.SetSize(Width, Height);
+            ForwardRenderer.SetSize(Size.X, Size.Y);
+            VolumetricLight.SetSize(Size.X, Size.Y);
+            GaussianBlur.SetSize(Size.X, Size.Y);
+            SSR.SetSize(Size.X, Size.Y);
+            SSAO.SetSize(Size.X, Size.Y);
+            PostCombine.SetSize(Size.X, Size.Y);
             if (IsPathTracing)
             {
-                PathTracer.SetSize(Width, Height);
+                PathTracer.SetSize(Size.X, Size.Y);
                 GLSLBasicData.FrameCount = 0;
             }
         }

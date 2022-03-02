@@ -5,7 +5,17 @@ namespace IDKEngine
 {
     unsafe class Mouse
     {
-        public Vector2 Position { get; private set; }
+        private Vector2 _position;
+        public Vector2 Position
+        {
+            get => _position;
+
+            set
+            {
+                _position = value;
+                GLFW.SetCursorPos(window, _position.X, _position.Y);
+            }
+        }
         public Vector2 LastPosition { get; private set; }
 
         public InputState this[MouseButton button]
@@ -20,6 +30,9 @@ namespace IDKEngine
         {
             this.window = window;
             buttonStates = new InputState[8];
+
+            GLFW.GetCursorPos(window, out double x, out double y);
+            Position = new Vector2((float)x, (float)y);
         }
 
         public unsafe void Update()
@@ -37,7 +50,7 @@ namespace IDKEngine
                 }
             }
             GLFW.GetCursorPos(window, out double x, out double y);
-            
+
             LastPosition = Position;
             Position = new Vector2((float)x, (float)y);
         }
