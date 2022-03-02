@@ -1,5 +1,6 @@
-﻿using System.Diagnostics;
-using OpenTK.Windowing.Common;
+﻿using System;
+using System.Diagnostics;
+using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine
@@ -34,27 +35,27 @@ namespace IDKEngine
             }
         }
 
-        private int _width;
-        public int Width
+        private Vector2i _size;
+        public Vector2i Size
         {
-            get => _width;
+            get => _size;
 
             set
             {
-                _width = value;
-                GLFW.SetWindowSize(window, Width, Height);
+                _size = value;
+                GLFW.SetWindowSize(window, _size.X, _size.Y);
             }
         }
 
-        private int _height;
-        public int Height
+        private Vector2i _position;
+        public Vector2i Position
         {
-            get => _height;
+            get => _position;
 
             set
             {
-                _height = value;
-                GLFW.SetWindowSize(window, Width, Height);
+                _position = value;
+                GLFW.SetWindowPos(window, _position.X, _position.Y);
             }
         }
 
@@ -69,50 +70,14 @@ namespace IDKEngine
             set
             {
                 _cursorMode = value;
+
                 GLFW.SetInputMode(window, CursorStateAttribute.Cursor, _cursorMode);
             }
         }
 
-        private WindowState _windowState;
-        public WindowState WindowState
-        {
-            get => _windowState;
-
-            set
-            {  
-                // TODO: Investigate more into wtf is happining here
-
-                bool num = _windowState != WindowState.Fullscreen && _windowState != WindowState.Minimized && (value == WindowState.Fullscreen || value == WindowState.Minimized);
-                if (_windowState == WindowState.Fullscreen && value != WindowState.Fullscreen)
-                {
-                    GLFW.SetWindowMonitor(window, null, 1920 / 2, 1080 / 2, 832, 832, 0);
-                }
-
-                _windowState = value;
-                switch (_windowState)
-                {
-                    case WindowState.Normal:
-                        GLFW.RestoreWindow(window);
-                        break;
-
-                    case WindowState.Minimized:
-                        GLFW.IconifyWindow(window);
-                        break;
-
-                    case WindowState.Maximized:
-                        GLFW.MaximizeWindow(window);
-                        break;
-                    case WindowState.Fullscreen:
-                        {
-                            Monitor* monitor = GLFW.GetMonitors()[0];
-                            VideoMode* videoMode = GLFW.GetVideoMode(monitor);
-                            GLFW.SetWindowMonitor(window, monitor, 0, 0, videoMode->Width, videoMode->Height, videoMode->RefreshRate);
-                            break;
-                        }
-                }
-            }
-        }
-
+        public readonly VideoMode* VideoMode;
+        public readonly Monitor* Monitor;
+        public double UpdatePeriod = 1.0 / 60.0;
         public readonly Keyboard KeyboardState;
         public readonly Mouse MouseState;
 
@@ -127,71 +92,96 @@ namespace IDKEngine
             if (!glfwInitialized)
             {
                 GLFW.Init();
-
+#if DEBUG
+                GLFW.WindowHint(WindowHintBool.OpenGLDebugContext, true);
+#else
+                GLFW.WindowHint(WindowHintBool.ContextNoError, true);
+#endif
                 GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Compat);
                 GLFW.WindowHint(WindowHintInt.ContextVersionMajor, 4);
                 GLFW.WindowHint(WindowHintInt.ContextVersionMinor, 6);
                 glfwInitialized = true;
             }
-
             _title = title;
-            _width = width;
-            _height = heigth;
-            
-            window = GLFW.CreateWindow(width, heigth, _title, null, null);
-            GLFW.MakeContextCurrent(window);
-            InitializeGLBindings();
+            _size.X = width;
+            _size.Y = heigth;
 
-            windowSizeDelegate = WindowSizeCallback;
-            GLFW.SetWindowSizeCallback(window, windowSizeDelegate);
+            window = GLFW.CreateWindow(_size.X, _size.Y, _title, null, null);
+
+            framebufferSizeDelegate = FramebufferSizeCallback;
+            GLFW.SetFramebufferSizeCallback(window, framebufferSizeDelegate);
 
             windowFocusDelegate = WindowFocusCallback;
             GLFW.SetWindowFocusCallback(window, windowFocusDelegate);
 
+            windowPosDelegate = WindowPosCallback;
+            GLFW.SetWindowPosCallback(window, windowPosDelegate);
+
+            Monitor = GLFW.GetMonitors()[0];
+            VideoMode = GLFW.GetVideoMode(Monitor);
             KeyboardState = new Keyboard(window);
             MouseState = new Mouse(window);
+            Position = new Vector2i(VideoMode->Width / 2 - _size.X / 2, VideoMode->Height / 2 - _size.Y / 2);
+
+            GLFW.MakeContextCurrent(window);
+            InitializeGLBindings();
         }
 
-        private readonly Stopwatch renderTimer = new Stopwatch();
-        private readonly Stopwatch updateTimer = new Stopwatch();
         /// <summary>
         /// Starts the applications game loop
         /// </summary>
         /// <param name="ups">Limits the number of times <see cref="OnUpdate(float)"/> is dispatched per second. Unlimited if 0</param>
         /// <param name="fps">Limits the number of times <see cref="OnRender(float)"/> is dispatched per second. Unlimited if 0</param>
-        public void Start(int ups, int fps)
+        public void Start()
         {
-            float renderThreshold = fps == 0 ? 0 : (1.0f / fps);
-            float updateThreshold = ups == 0 ? 0 : (1.0f / ups);
-
             OnStart();
 
-            renderTimer.Start();
             updateTimer.Start();
-            // TODO: Simply running timers and checking for threshold doesn't work that well. Investigate into proper update and render loop system
+            double lastTime = 0.0;
             while (!GLFW.WindowShouldClose(window))
             {
+                double currentTime = GLFW.GetTime();
+                double runTime = currentTime - lastTime;
+                
                 GLFW.PollEvents();
 
-                if (updateTimer.Elapsed.TotalMilliseconds / 1000.0f >= updateThreshold)
-                {
-                    KeyboardState.Update();
-                    MouseState.Update();
-                    OnUpdate((float)updateTimer.Elapsed.TotalMilliseconds / 1000.0f);
-                    updateTimer.Restart();
-                }
-
-                if (renderTimer.Elapsed.TotalMilliseconds / 1000.0f >= renderThreshold)
-                {
-                    OnRender((float)renderTimer.Elapsed.TotalMilliseconds / 1000.0f);
-                    renderTimer.Restart();
-                }
+                DispatchUpdateFrame();
+                OnRender((float)runTime);
 
                 GLFW.SwapBuffers(window);
+                
+                lastTime = currentTime;
             }
 
             OnEnd();
             GLFW.DestroyWindow(window);
+        }
+
+        // Source: https://github.com/opentk/opentk/blob/558132bd2cc41eed704f6e6acd1e3fe5830df5ad/src/OpenTK.Windowing.Desktop/GameWindow.cs
+        private readonly Stopwatch updateTimer = new Stopwatch();
+        private double updateEpsilon = 0.0;
+        private bool isRunningSlowly = false;
+        private void DispatchUpdateFrame()
+        {
+            double isRunningSlowlyRetries = 4;
+            double elapsed = updateTimer.Elapsed.TotalSeconds;
+
+            while (elapsed > 0.0 && elapsed + updateEpsilon >= UpdatePeriod)
+            {
+                updateTimer.Restart();
+                KeyboardState.Update();
+                MouseState.Update();
+                OnUpdate((float)elapsed);
+
+                updateEpsilon += elapsed - UpdatePeriod;
+
+                isRunningSlowly = updateEpsilon >= UpdatePeriod;
+
+                if (isRunningSlowly && --isRunningSlowlyRetries == 0)
+                    break;
+
+                elapsed = updateTimer.Elapsed.TotalSeconds;
+            }
         }
 
         /// <summary>
@@ -206,16 +196,16 @@ namespace IDKEngine
         protected abstract void OnUpdate(float dT);
         protected abstract void OnStart();
         protected abstract void OnEnd();
-        protected abstract void OnResize(int width, int height);
+        protected abstract void OnResize();
         protected abstract void OnFocusChanged();
 
 
-        private readonly GLFWCallbacks.WindowSizeCallback windowSizeDelegate;
-        private void WindowSizeCallback(Window* window, int width, int height)
+        private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeDelegate;
+        private void FramebufferSizeCallback(Window* window, int width, int height)
         {
-            _width = width;
-            _height = height;
-            OnResize(width, height);
+            _size.X = width;
+            _size.Y = height;
+            OnResize();
         }
 
         private readonly GLFWCallbacks.WindowFocusCallback windowFocusDelegate;
@@ -223,6 +213,14 @@ namespace IDKEngine
         {
             _isFocused = focused;
             OnFocusChanged();
+        }
+
+        private readonly GLFWCallbacks.WindowPosCallback windowPosDelegate;
+        private void WindowPosCallback(Window* window, int x, int y)
+        {
+            _position.X = x;
+            _position.Y = y;
+            MouseState.Update();
         }
 
         private static void InitializeGLBindings()

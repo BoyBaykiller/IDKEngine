@@ -8,10 +8,6 @@ using ImGuiNET;
 
 namespace IDKEngine.GUI
 {
-    /// <summary>
-    /// This ImGui wrapper is from <see href="https://github.com/mellinoe/ImGui.NET">here</see>.
-    /// I modified it to make it work tighter with my project
-    /// </summary>
     class ImGuiController : IDisposable
     {
         public bool IsIgnoreMouseInput = false;
@@ -177,8 +173,9 @@ namespace IDKEngine.GUI
             else
                 io.MousePos = new System.Numerics.Vector2(wnd.MouseState.Position.X, wnd.MouseState.Position.Y);
 
-            //io.MouseWheel = MouseManager.DeltaScrollY;
-            //io.MouseWheelH = MouseManager.DeltaScrollX;
+            // TODO: Implement
+            //io.MouseWheel = wnd.MouseState.Scroll.X;
+            //io.MouseWheelH = wnd.MouseState.Scroll.Y;
 
             for (int i = 0; i < Keyboard.KeyValues.Length; i++)
             {
