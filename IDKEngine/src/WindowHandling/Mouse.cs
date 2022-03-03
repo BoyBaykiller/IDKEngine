@@ -12,6 +12,7 @@ namespace IDKEngine
 
             set
             {
+                LastPosition = _position;
                 _position = value;
                 GLFW.SetCursorPos(window, _position.X, _position.Y);
             }
@@ -51,7 +52,6 @@ namespace IDKEngine
             }
             GLFW.GetCursorPos(window, out double x, out double y);
 
-            LastPosition = Position;
             Position = new Vector2((float)x, (float)y);
         }
     }

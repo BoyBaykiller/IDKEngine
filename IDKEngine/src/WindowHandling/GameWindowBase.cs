@@ -6,7 +6,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 namespace IDKEngine
 {
     /// <summary>
-    /// Represents window with OpenGL context and extra helpul functionality
+    /// Represents window with OpenGL context and helpul game functionality
     /// </summary>
     abstract unsafe class GameWindowBase
     {
@@ -23,15 +23,15 @@ namespace IDKEngine
 
         }
 
-        private bool _vSync;
+        private bool _isVSync;
         public bool IsVSync
         {
-            get => _vSync;
+            get => _isVSync;
 
             set
             {
-                _vSync = value;
-                GLFW.SwapInterval(_vSync ? 1 : 0);
+                _isVSync = value;
+                GLFW.SwapInterval(_isVSync ? 1 : 0);
             }
         }
 
@@ -59,6 +59,28 @@ namespace IDKEngine
             }
         }
 
+        private bool _isFullscreen;
+        public bool IsFullscreen
+        {
+            get => _isFullscreen;
+
+            set
+            {
+                _isFullscreen = value;
+                if (_isFullscreen)
+                {
+                    GLFW.GetWindowPos(window, out cachedWindowPos.X, out cachedWindowPos.Y);
+                    GLFW.GetWindowSize(window, out cachedWindowSize.X, out cachedWindowSize.Y);
+                    GLFW.SetWindowMonitor(window, Monitor, 0, 0, VideoMode->Width, VideoMode->Height, VideoMode->RefreshRate);
+                }
+                else
+                {
+                    GLFW.SetWindowMonitor(window, null, cachedWindowPos.X, cachedWindowPos.Y, cachedWindowSize.X, cachedWindowSize.Y, 0);
+                }
+                IsVSync = _isVSync;
+            }
+        }
+
         private bool _isFocused = true;
         public bool IsFocused => _isFocused;
 
@@ -75,11 +97,15 @@ namespace IDKEngine
             }
         }
 
+
         public readonly VideoMode* VideoMode;
         public readonly Monitor* Monitor;
         public double UpdatePeriod = 1.0 / 60.0;
         public readonly Keyboard KeyboardState;
         public readonly Mouse MouseState;
+
+        private Vector2i cachedWindowPos;
+        private Vector2i cachedWindowSize;
 
         private bool glfwInitialized = false;
         private readonly Window* window;
@@ -117,7 +143,7 @@ namespace IDKEngine
             windowPosDelegate = WindowPosCallback;
             GLFW.SetWindowPosCallback(window, windowPosDelegate);
 
-            Monitor = GLFW.GetMonitors()[0];
+            Monitor = GLFW.GetPrimaryMonitor();
             VideoMode = GLFW.GetVideoMode(Monitor);
             KeyboardState = new Keyboard(window);
             MouseState = new Mouse(window);
@@ -152,7 +178,7 @@ namespace IDKEngine
                 
                 lastTime = currentTime;
             }
-
+            
             OnEnd();
             GLFW.DestroyWindow(window);
         }

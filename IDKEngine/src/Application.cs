@@ -107,10 +107,8 @@ namespace IDKEngine
                 if (KeyboardState[Keys.V] == InputState.Touched)
                     IsVSync = !IsVSync;
 
-                //if (KeyboardState[Keys.F11] == InputState.Touched)
-                //{
-                //    WindowState = WindowState == OpenTK.Windowing.Common.WindowState.Fullscreen ? OpenTK.Windowing.Common.WindowState.Normal : OpenTK.Windowing.Common.WindowState.Fullscreen;
-                //}
+                if (KeyboardState[Keys.F11] == InputState.Touched)
+                    IsFullscreen = !IsFullscreen;
 
                 if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
                 {
@@ -216,7 +214,7 @@ namespace IDKEngine
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, new Vector3(0.025f));
             GaussianBlur = new GaussianBlur(Size.X, Size.Y);
-            SSAO = new SSAO(Size.X, Size.Y, 20, 0.35f, 2.0f);
+            SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
             PostCombine = new PostCombine(Size.X, Size.Y);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
@@ -257,6 +255,7 @@ namespace IDKEngine
 
         protected override void OnResize()
         {
+            
             Gui.ImGuiController.WindowResized(Size.X, Size.Y);
 
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Size.X / (float)Size.Y, NEAR_PLANE, FAR_PLANE);
