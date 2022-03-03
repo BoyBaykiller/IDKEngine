@@ -1,6 +1,6 @@
 ﻿using System.IO;
 using System.Diagnostics;
-using OpenTK;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -63,6 +63,7 @@ namespace IDKEngine.Render
             framebuffer = new Framebuffer();
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
             framebuffer.SetDrawBuffers(new DrawBuffersEnum[] { DrawBuffersEnum.None });
+            framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
             projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, nearPlane, farPlane);
 
@@ -104,7 +105,9 @@ namespace IDKEngine.Render
             GL.Viewport(0, 0, Result.Width, Result.Height);
             GL.ColorMask(false, false, false, false);
             GL.CullFace(CullFaceMode.Front);
-            framebuffer.Clear(ClearBufferMask.DepthBufferBit);
+            
+            framebuffer.Bind();
+            framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
             renderProgram.Upload(0, Instance);
 

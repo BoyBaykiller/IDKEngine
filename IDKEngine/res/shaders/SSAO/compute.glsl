@@ -31,6 +31,7 @@ uint GetPCGHash(inout uint seed);
 
 uniform int Samples;
 uniform float Radius;
+uniform float Strength;
 
 uint rngSeed;
 void main()
@@ -45,20 +46,30 @@ void main()
     vec2 uv = (imgCoord + 0.5) / imgResultSize;
     vec3 normal = normalize((vec4(texture(SamplerNormalSpec, uv).rgb, 1.0) * basicDataUBO.InvView).xyz);
     vec3 fragPos = NDCToViewSpace(vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0);
+    
 
     float occlusion = 0.0;
+    float samples = Samples;
     for (int i = 0; i < Samples; i++)
     {
         float progress = i / float(Samples);
         vec3 samplePos = fragPos + CosineSampleHemisphere(GetRandomFloat01(), progress, normal) * Radius * mix(0.1, 1.0, progress * progress);
         
         vec3 projectedSample = ViewToNDC(samplePos) * 0.5 + 0.5;
-        float depth = texture(SamplerDepth, projectedSample.xy).r;
+        if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))))
+        {
+            samples--;
+        }
+        else
+        {
+            float depth = texture(SamplerDepth, projectedSample.xy).r;
         
-        float weight = length(fragPos - samplePos) / Radius;
-        occlusion += int(projectedSample.z >= depth) * weight;
+            float weight = length(fragPos - samplePos) / Radius;
+            occlusion += int(projectedSample.z >= depth) * weight;
+        }
     }
-    occlusion /= Samples;
+    occlusion /= samples;
+    occlusion *= Strength;
 
     imageStore(ImgResult, imgCoord, vec4(occlusion.xxx, 1.0));
 }

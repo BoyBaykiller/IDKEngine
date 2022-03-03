@@ -1,4 +1,4 @@
-﻿using OpenTK;
+﻿using OpenTK.Mathematics;
 
 namespace IDKEngine
 {

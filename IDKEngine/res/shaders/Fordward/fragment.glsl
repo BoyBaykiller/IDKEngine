@@ -165,7 +165,7 @@ void main()
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
     VelocityColor = uv - prevUV;
 
-    gl_FragDepth = 100-LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
+    gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
 }
 
 vec3 PBR(Light light)
