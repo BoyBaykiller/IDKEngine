@@ -77,6 +77,11 @@ void Pack3BitValue(int threeBitValue, int index, inout int dest);
 
 layout(location = 0) uniform int ShadowIndex;
 
+// 1. Count number of shadow-cubemap-faces the mesh is visible from the shadow source
+// 2. Pack each visible face into a single int - in order. Would be six at maximum and single face is only 3 bits so works
+// 3. Write the packed int into the BaseInstance draw command paramter. The shadow vertex shader will access this variable
+// 4. Also write the InstanceCount into the draw command buffer - one instance for each mesh
+
 void main()
 {
     const uint meshIndex = gl_GlobalInvocationID.x;
@@ -95,6 +100,8 @@ void main()
         Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * mesh.Model);
         if (AABBVsFrustum(frustum, node))
         {
+            // Pack the 3 bit face value this instace is visible on into packedValue
+            // Later this will be unpacked in the shadow pass
             Pack3BitValue(i, instances++, packedValue);
         }
     }

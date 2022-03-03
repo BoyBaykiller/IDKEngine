@@ -1,13 +1,13 @@
-﻿using OpenTK;
-
-namespace IDKEngine
+﻿namespace IDKEngine
 {
     class Program
     {
-        static void Main(string[] args)
+        private static unsafe void Main()
         {
-            using Window window = new Window();
-            window.Run(DisplayDevice.Default.RefreshRate);
+            Application application = new Application(832, 832, "IDKEngine");
+
+            application.UpdatePeriod = 1.0 / application.VideoMode->RefreshRate;
+            application.Start();
         }
     }
 }
