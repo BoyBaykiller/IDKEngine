@@ -27,6 +27,11 @@ struct PointShadow
     int LightIndex;
 };
 
+layout(std140, binding = 4) uniform BlueNoiseUBO
+{
+    sampler2D SamplerBueNoise;
+} blueNoiseUBO;
+
 layout(std140, binding = 3) uniform LightsUBO
 {
     Light Lights[64];
@@ -58,15 +63,6 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample);
 vec3 NDCToWorldSpace(vec3 ndc);
 float ComputeScattering(float lightDotView);
 
-// From: http://www.alexandre-pestana.com/volumetric-lights/
-const float ditherPattern[4][4] = 
-{
-    { 0.0, 0.5, 0.125, 0.625 },
-    { 0.75, 0.22, 0.875, 0.375 },
-    { 0.1875, 0.6875, 0.0625, 0.5625 },
-    { 0.9375, 0.4375, 0.8125, 0.3125 }
-};
-
 uniform float Scattering;
 uniform float MaxDist;
 uniform int Samples;
@@ -75,7 +71,6 @@ uniform vec3 Absorbance;
 
 void main()
 {
-
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     if (shadowDataUBO.PointCount == 0)
     {
@@ -94,7 +89,8 @@ void main()
         viewToFrag = viewDir * MaxDist;
 
     vec3 deltaStep = viewToFrag / Samples;
-    vec3 origin = basicDataUBO.ViewPos + deltaStep * ditherPattern[imgCoord.x % 4][imgCoord.y % 4];
+    ivec2 texel = imgCoord % textureSize(blueNoiseUBO.SamplerBueNoise, 0);
+    vec3 origin = basicDataUBO.ViewPos + deltaStep * texelFetch(blueNoiseUBO.SamplerBueNoise, texel, 0).r;
 
     vec3 scattered = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
@@ -162,4 +158,3 @@ float ComputeScattering(float lightDotView)
 {
     return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * lightDotView, 1.5));
 }
-
