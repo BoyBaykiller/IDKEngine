@@ -94,14 +94,12 @@ void main()
 
     int instances = 0;
     int packedValue = 0;
-    // TODO: Parallelize this for loop over 6 threads
+    // TODO: Parallelize this for loop over 6 threads maybe?
     for (int i = 0; i < 6; i++)
     {
         Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * mesh.Model);
         if (AABBVsFrustum(frustum, node))
         {
-            // Pack the 3 bit face value this instace is visible on into packedValue
-            // Later this will be unpacked in the shadow pass
             Pack3BitValue(i, instances++, packedValue);
         }
     }

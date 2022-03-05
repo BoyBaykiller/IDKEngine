@@ -33,8 +33,7 @@ namespace IDKEngine.Render
 
         private static readonly ShaderProgram renderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl"))
-                );
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
 
         private static readonly ShaderProgram cullingProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/shadowCompute.glsl")));

@@ -38,13 +38,6 @@ namespace IDKEngine
                 if (IsSSAO)
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
 
-                // 1. If IS_VERTEX_LAYERED_RENDERING is false
-                //    upload unculled command buffer to avoid supplying player-culled command buffer for shadows
-                if (!PointShadow.IS_VERTEX_LAYERED_RENDERING)
-                {
-                    ModelSystem.DrawCommandBuffer.SubData(0, ModelSystem.DrawCommandBuffer.Size, ModelSystem.DrawCommands);
-                }
-
                 for (int i = 0; i < pointShadows.Length; i++)
                 {
                     pointShadows[i].CreateDepthMap(ModelSystem);
@@ -160,6 +153,7 @@ namespace IDKEngine
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         public GLSLBasicData GLSLBasicData;
+
         protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
@@ -195,7 +189,7 @@ namespace IDKEngine
             camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
-            for (int i = 0; i < sponza.Meshes.Length; i++)
+            for (int i = 0; i < sponza.Meshes.Length; i++) // 0.0145f
                 sponza.Meshes[i].Model = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
 
             Model horse = new Model("res/models/Horse/horse.gltf");
