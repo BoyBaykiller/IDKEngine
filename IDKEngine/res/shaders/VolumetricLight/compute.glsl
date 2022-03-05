@@ -29,7 +29,7 @@ struct PointShadow
 
 layout(std140, binding = 4) uniform BlueNoiseUBO
 {
-    sampler2D SamplerBueNoise;
+    sampler2D SamplerBlueNoise;
 } blueNoiseUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
@@ -89,8 +89,8 @@ void main()
         viewToFrag = viewDir * MaxDist;
 
     vec3 deltaStep = viewToFrag / Samples;
-    ivec2 texel = imgCoord % textureSize(blueNoiseUBO.SamplerBueNoise, 0);
-    vec3 origin = basicDataUBO.ViewPos + deltaStep * texelFetch(blueNoiseUBO.SamplerBueNoise, texel, 0).r;
+    ivec2 texel = imgCoord % textureSize(blueNoiseUBO.SamplerBlueNoise, 0);
+    vec3 origin = basicDataUBO.ViewPos + deltaStep * texelFetch(blueNoiseUBO.SamplerBlueNoise, texel, 0).r;
 
     vec3 scattered = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
