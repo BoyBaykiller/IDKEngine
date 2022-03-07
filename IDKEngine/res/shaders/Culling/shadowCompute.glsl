@@ -1,7 +1,7 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
-
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+#define LOCAL_SIZE_X 8
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = 6, local_size_z = 1) in;
 
 struct Frustum
 {
@@ -73,38 +73,48 @@ layout(std140, binding = 2) uniform ShadowDataUBO
 Frustum ExtractFrustum(mat4 projViewModel);
 bool AABBVsFrustum(Frustum frustum, Node node);
 vec3 NegativeVertex(Node node, vec3 normal);
-void Pack3BitValue(int threeBitValue, int index, inout int dest);
 
 layout(location = 0) uniform int ShadowIndex;
 
 // 1. Count number of shadow-cubemap-faces the mesh is visible from the shadow source
-// 2. Pack each visible face into a single int - in order. Would be six at maximum and single face is only 3 bits so works
+// 2. Pack each visible face into a single int
 // 3. Write the packed int into the BaseInstance draw command paramter. The shadow vertex shader will access this variable
 // 4. Also write the InstanceCount into the draw command buffer - one instance for each mesh
 
+// Note: Meshes are processed in batches of LOCAL_SIZE_X Threads. Additionaly each mesh gets processed by 6 Threads one for each face.
+
+shared int SharedPackedValues[LOCAL_SIZE_X];
+shared int SharedInstanceCounts[LOCAL_SIZE_X];
 void main()
 {
-    const uint meshIndex = gl_GlobalInvocationID.x;
-    if (meshIndex >= meshSSBO.Meshes.length())
+    const uint globalMeshIndex = gl_GlobalInvocationID.x;
+    if (globalMeshIndex >= meshSSBO.Meshes.length())
         return;
 
-    Mesh mesh = meshSSBO.Meshes[meshIndex];
-    Node node = bvhSSBO.Nodes[mesh.BaseNode];
-    PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
+    const int cubemapFace = int(gl_LocalInvocationID.y);
+    const int localMeshIndex = int(gl_LocalInvocationID.x);
 
-    int instances = 0;
-    int packedValue = 0;
-    // TODO: Parallelize this for loop over 6 threads maybe?
-    for (int i = 0; i < 6; i++)
+    SharedPackedValues[localMeshIndex] = 0;
+    SharedInstanceCounts[localMeshIndex] = 0;
+
+    Mesh mesh = meshSSBO.Meshes[globalMeshIndex];
+    Node node = bvhSSBO.Nodes[mesh.BaseNode];
+    Frustum frustum = ExtractFrustum(shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[cubemapFace] * mesh.Model);
+
+    memoryBarrierShared();
+
+    if (AABBVsFrustum(frustum, node))
     {
-        Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * mesh.Model);
-        if (AABBVsFrustum(frustum, node))
-        {
-            Pack3BitValue(i, instances++, packedValue);
-        }
+        // Basically a atomic bitfieldInsert()
+        atomicOr(SharedPackedValues[localMeshIndex], cubemapFace << (3 * atomicAdd(SharedInstanceCounts[localMeshIndex], 1)));
     }
-    drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = instances;
-    drawCommandsSSBO.DrawCommands[meshIndex].BaseInstance = packedValue;
+
+    if (cubemapFace == 0)
+    {
+        memoryBarrierShared();
+        drawCommandsSSBO.DrawCommands[globalMeshIndex].InstanceCount = SharedInstanceCounts[localMeshIndex];
+        drawCommandsSSBO.DrawCommands[globalMeshIndex].BaseInstance = SharedPackedValues[localMeshIndex];
+    }
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)
@@ -140,9 +150,4 @@ bool AABBVsFrustum(Frustum frustum, Node node)
 vec3 NegativeVertex(Node node, vec3 normal)
 {
 	return mix(node.Min, node.Max, greaterThan(normal, vec3(0.0)));
-}
-
-void Pack3BitValue(int threeBitValue, int index, inout int dest)
-{
-    dest |= threeBitValue << (3 * index);
 }
