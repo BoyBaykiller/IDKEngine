@@ -8,9 +8,6 @@
         public readonly long Normal;
         private readonly long _pad1;
 
-        public readonly long Metallic;
-        private readonly long _pad2;
-
         public readonly long Roughness;
         private readonly long _pad3;
 

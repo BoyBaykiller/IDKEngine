@@ -30,9 +30,6 @@ struct Material
     sampler2D Normal;
     float _pad1;
 
-    sampler2D Metallic;
-    float _pad2;
-
     sampler2D Roughness;
     float _pad3;
 
@@ -327,8 +324,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
         while (localNodeIndex < (1u << TreeDepth) - 1u)
         {
             Node node = bvhSSBO.Nodes[mesh.BaseNode + localNodeIndex];
-            bool hit = RayCuboidIntersect(localRay, node, t2) && t2 > 0.0;
-            if (hit)
+            if (RayCuboidIntersect(localRay, node, t2) && t2 > 0.0)
             {
                 if (bool(node.IsLeafAndVerticesStart))
                 {
@@ -491,8 +487,8 @@ vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedD
 // Source: https://discord.com/channels/318590007881236480/318590007881236480/856523979383373835
 uint EmulateNonUniform(uint index)
 {
-    uint currentIndex;
-    while ((currentIndex = readFirstInvocationARB(index)) != index) ;
-    return currentIndex;
+    // uint currentIndex;
+    // while ((currentIndex = readFirstInvocationARB(index)) != index) ;
+    return index;
 }
 #endif

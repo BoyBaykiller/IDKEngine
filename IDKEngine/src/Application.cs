@@ -47,6 +47,10 @@ namespace IDKEngine
 
                 GL.Viewport(0, 0, Size.X, Size.Y);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
+                
+                GL.BlendEquation(BlendEquationMode.FuncAdd);
+                GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                ParticleSimulator.Render(dT);
 
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
@@ -107,20 +111,21 @@ namespace IDKEngine
 
                 if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
                 {
-                    if (CursorMode == CursorModeValue.CursorDisabled)
+                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                     {
-                        CursorMode = CursorModeValue.CursorNormal;
+                        MouseState.CursorMode = CursorModeValue.CursorNormal;
                         Gui.ImGuiController.IsIgnoreMouseInput = false;
                         camera.Velocity = Vector3.Zero;
                     }
                     else
                     {
-                        CursorMode = CursorModeValue.CursorDisabled;
+                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
                         Gui.ImGuiController.IsIgnoreMouseInput = true;
                     }
                 }
-                
-                if (CursorMode == CursorModeValue.CursorDisabled)
+
+                ParticleSimulator.ProcessInputs(this, camera, GLSLBasicData);
+                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
                     camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
                     if (hadCameraInputs && IsPathTracing)
@@ -143,6 +148,7 @@ namespace IDKEngine
         private BufferObject basicDataUBO;
         private PointShadow[] pointShadows;
         public ModelSystem ModelSystem;
+        public ParticleSimulator ParticleSimulator;
         public Forward ForwardRenderer;
         public SSR SSR;
         public SSAO SSAO;
@@ -153,12 +159,10 @@ namespace IDKEngine
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         public GLSLBasicData GLSLBasicData;
-
         protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
-
             // Necessary extensions without fallback
             // I don't think I have to test for <4.4 extensions if the system already has bindless and all
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
@@ -173,8 +177,7 @@ namespace IDKEngine
             if (!Helper.IsCoreExtensionAvailable("GL_ARB_buffer_storage", 4.4))
                 throw new NotSupportedException("Your system does not support GL_ARB_buffer_storage");
 
-
-            GL.LineWidth(1.1f);
+            GL.PointSize(1.3f);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.CullFace);
@@ -183,7 +186,7 @@ namespace IDKEngine
             GL.DebugMessageCallback(Helper.DebugCallback, IntPtr.Zero);
 #endif
             IsVSync = true;
-            CursorMode = CursorModeValue.CursorDisabled;
+            MouseState.CursorMode = CursorModeValue.CursorDisabled;
             Gui.ImGuiController.IsIgnoreMouseInput = true;
 
             camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
@@ -200,11 +203,16 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse });
 
             GLSLLight[] lights = new GLSLLight[2];
-            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 1.0f);
+            lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f);
             //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -0.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
-            lights[1] = new GLSLLight(new Vector3(-14.0f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 40.0f, 0.5f);
+            lights[1] = new GLSLLight(new Vector3(-13.5f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 3.0f, 0.5f);
 
-            
+
+            Random rng = new Random();
+            GLSLParticle[] particles = new GLSLParticle[1000];
+            for (int i = 0; i < particles.Length; i++)
+                particles[i].Position = new Vector3((float)rng.NextDouble() * 40 - 20, (float)rng.NextDouble() * 40 - 20, (float)rng.NextDouble() * 40 - 20);
+            ParticleSimulator = new ParticleSimulator(particles);
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
             ForwardRenderer.LightingContext.Add(lights);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);

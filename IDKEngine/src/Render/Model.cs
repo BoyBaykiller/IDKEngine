@@ -21,7 +21,6 @@ namespace IDKEngine.Render.Objects
         {
             TextureType.Diffuse /* Albedo */,
             TextureType.Normals,
-            TextureType.Ambient /* Metallic */,
             TextureType.Shininess /* Roughness */,
             TextureType.Specular,
         };
