@@ -64,9 +64,15 @@ namespace IDKEngine
 				root.Min = min;
 				root.Max = max;
 				nodes[modelSystem.Meshes[i].BaseNode + 0] = root;
-				//MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 0], start, end);
-                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
-
+				if (TreeDepth == 1)
+                {
+					MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 0], start, end);
+					SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
+                }
+				else
+                {
+					SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
+                }
 
                 Tuple<GLSLNode, GLSLNode> childs = ConstructChildNodesBounds(root);
                 nodes[modelSystem.Meshes[i].BaseNode + 1] = childs.Item1;

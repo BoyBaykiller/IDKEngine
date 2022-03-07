@@ -98,16 +98,22 @@ namespace IDKEngine.Render
 
         public unsafe void CreateDepthMap(ModelSystem modelSystem)
         {
+            if (IS_VERTEX_LAYERED_RENDERING)
+            {
+                cullingProgram.Use();
+                cullingProgram.Upload(0, Instance);
+                GL.DispatchCompute((modelSystem.Meshes.Length + 32 - 1) / 32, 1, 1);
+            }
+
             if (Position != lightContext.Lights[glslPointShadow.LightIndex].Position)
                 Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
 
             GL.Viewport(0, 0, Result.Width, Result.Height);
             GL.ColorMask(false, false, false, false);
-            GL.CullFace(CullFaceMode.Front);
-            
-            framebuffer.Bind();
-            framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
+            framebuffer.Clear(ClearBufferMask.DepthBufferBit);
+
+            renderProgram.Use();
             renderProgram.Upload(0, Instance);
 
             modelSystem.VAO.DisableVertexAttribute(1);
@@ -116,13 +122,7 @@ namespace IDKEngine.Render
             modelSystem.VAO.DisableVertexAttribute(4);
             if (IS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array or GL_NV_viewport_array2
             {
-                cullingProgram.Use();
-                cullingProgram.Upload(0, Instance);
-
-                GL.DispatchCompute((modelSystem.Meshes.Length + 32 - 1) / 32, 1, 1);
                 GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
-
-                renderProgram.Use();
                 modelSystem.Draw();
             }
             else
@@ -137,7 +137,6 @@ namespace IDKEngine.Render
 
                         framebuffer.SetTextureLayer(FramebufferAttachment.DepthAttachment, Result, i);
 
-                        renderProgram.Use();
                         renderProgram.Upload(1, i);
 
                         modelSystem.Draw();
@@ -151,7 +150,6 @@ namespace IDKEngine.Render
             modelSystem.VAO.EnableVertexAttribute(3);
             modelSystem.VAO.EnableVertexAttribute(4);
 
-            GL.CullFace(CullFaceMode.Back);
             GL.ColorMask(true, true, true, true);
         }
         private static unsafe BufferObject InitShadowBuffer()

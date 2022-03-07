@@ -33,6 +33,7 @@ namespace IDKEngine.Render
                             if (current == "PathTracer")
                             {
                                 window.GLSLBasicData.FrameCount = 0;
+                                window.PathTracer.SetSize(window.Size.X, window.Size.Y);
                             }
                         }
 

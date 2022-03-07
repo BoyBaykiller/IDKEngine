@@ -5,6 +5,19 @@ namespace IDKEngine
 {
     unsafe class Mouse
     {
+        private CursorModeValue _cursorMode;
+        public CursorModeValue CursorMode
+        {
+            get => _cursorMode;
+
+            set
+            {
+                _cursorMode = value;
+
+                GLFW.SetInputMode(window, CursorStateAttribute.Cursor, _cursorMode);
+            }
+        }
+
         private Vector2 _position;
         public Vector2 Position
         {

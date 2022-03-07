@@ -84,19 +84,6 @@ namespace IDKEngine
         private bool _isFocused = true;
         public bool IsFocused => _isFocused;
 
-        private CursorModeValue _cursorMode;
-        public CursorModeValue CursorMode
-        {
-            get => _cursorMode;
-
-            set
-            {
-                _cursorMode = value;
-
-                GLFW.SetInputMode(window, CursorStateAttribute.Cursor, _cursorMode);
-            }
-        }
-
 
         public readonly VideoMode* VideoMode;
         public readonly Monitor* Monitor;
