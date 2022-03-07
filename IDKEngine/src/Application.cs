@@ -38,10 +38,12 @@ namespace IDKEngine
                 if (IsSSAO)
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
 
+                GL.ColorMask(false, false, false, false);
                 for (int i = 0; i < pointShadows.Length; i++)
                 {
                     pointShadows[i].CreateDepthMap(ModelSystem);
                 }
+                GL.ColorMask(true, true, true, true);
 
                 ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 

@@ -102,15 +102,13 @@ namespace IDKEngine.Render
             {
                 cullingProgram.Use();
                 cullingProgram.Upload(0, Instance);
-                GL.DispatchCompute((modelSystem.Meshes.Length + 32 - 1) / 32, 1, 1);
+                GL.DispatchCompute((modelSystem.Meshes.Length + 8 - 1) / 8, 1, 1);
             }
 
             if (Position != lightContext.Lights[glslPointShadow.LightIndex].Position)
                 Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
 
             GL.Viewport(0, 0, Result.Width, Result.Height);
-            GL.ColorMask(false, false, false, false);
-
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
             renderProgram.Use();
@@ -149,9 +147,8 @@ namespace IDKEngine.Render
             modelSystem.VAO.EnableVertexAttribute(2);
             modelSystem.VAO.EnableVertexAttribute(3);
             modelSystem.VAO.EnableVertexAttribute(4);
-
-            GL.ColorMask(true, true, true, true);
         }
+
         private static unsafe BufferObject InitShadowBuffer()
         {
             BufferObject bufferObject = new BufferObject();

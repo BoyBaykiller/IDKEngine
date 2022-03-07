@@ -47,8 +47,6 @@ out InOutVars
     vec3 FragPos;
 } outData;
 
-int Unpack3Bits(int packedValue, int index);
-
 layout(location = 0) uniform int ShadowIndex;
 layout(location = 1) uniform int Layer;
 
@@ -58,7 +56,8 @@ void main()
 
     // gl_BaseInstance is a specific manipulated value from the culling shadowCompute shader
     // It contains 3 bit values, six at maximum, which represent the faces each instance of a mesh is visible on
-    gl_Layer = Unpack3Bits(gl_BaseInstance, gl_InstanceID);
+    const int MAX = 2 * 2 * 2 - 1;
+    gl_Layer = bitfieldExtract(gl_BaseInstance, 3 * gl_InstanceID, 3) & MAX;
     
     mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
@@ -73,10 +72,4 @@ void main()
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
 
 #endif
-}
-
-int Unpack3Bits(int packedValue, int index)
-{
-    const int MAX = 2 * 2 * 2 - 1;
-    return (packedValue >> (3 * index)) & MAX;
 }
