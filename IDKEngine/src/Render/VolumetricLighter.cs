@@ -54,11 +54,23 @@ namespace IDKEngine.Render
             }
         }
 
+        private float _strength;
+        public float Strength
+        {
+            get => _strength;
+
+            set
+            {
+                _strength = value;
+                shaderProgram.Upload("Strength", _strength);
+            }
+        }
+
 
         public readonly Texture Result;
         private static readonly ShaderProgram shaderProgram =
             new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
-        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, Vector3 absorbance)
+        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -68,6 +80,7 @@ namespace IDKEngine.Render
             Samples = samples;
             Scattering = scattering;
             MaxDist = maxDist;
+            Strength = strength;
             Absorbance = absorbance;
         }
 

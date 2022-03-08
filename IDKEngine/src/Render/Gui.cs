@@ -65,6 +65,12 @@ namespace IDKEngine.Render
                                 window.VolumetricLight.Scattering = tempFloat;
                             }
 
+                            tempFloat = window.VolumetricLight.Strength;
+                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 30.0f))
+                            {
+                                window.VolumetricLight.Strength = tempFloat;
+                            }
+
                             System.Numerics.Vector3 tempVec = OpenTKToSystem(window.VolumetricLight.Absorbance);
                             if (ImGui.SliderFloat3("Absorbance", ref tempVec, 0.0f, 0.2f))
                             {
