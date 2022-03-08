@@ -101,17 +101,16 @@ void main()
     Node node = bvhSSBO.Nodes[mesh.BaseNode];
     Frustum frustum = ExtractFrustum(shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[cubemapFace] * mesh.Model);
 
-    memoryBarrierShared();
-
+    barrier();
     if (AABBVsFrustum(frustum, node))
     {
         // Basically a atomic bitfieldInsert()
         atomicOr(SharedPackedValues[localMeshIndex], cubemapFace << (3 * atomicAdd(SharedInstanceCounts[localMeshIndex], 1)));
     }
 
+    barrier();
     if (cubemapFace == 0)
     {
-        memoryBarrierShared();
         drawCommandsSSBO.DrawCommands[globalMeshIndex].InstanceCount = SharedInstanceCounts[localMeshIndex];
         drawCommandsSSBO.DrawCommands[globalMeshIndex].BaseInstance = SharedPackedValues[localMeshIndex];
     }
