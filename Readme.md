@@ -8,13 +8,12 @@ Feature list:
  - ImGui
  - Depth Pre Pass
  - Multithreaded model loader
- - Physically Based Renderer
  - (Copied) Atmospheric Scattering, ported to Compute Shader and precomputed
  - Shadow Samplers for hardware filtering + PCF
  - Screen Space Reflections
  - Screen Space Ambient Occlusion
- - Single pass Vertex Layered Rendering for point shadows (updated every frame for all geometry kinda bad)
- - GPU accelerated Frustum Culling for shadows and player
+ - Single pass Vertex Layered Rendering for point shadows
+ - GPU accelerated Frustum Culling for shadows and camera
  - Ray marched Volumetric Lighting
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
  - Path Tracer (early progress and no bvh yet so really really slow)

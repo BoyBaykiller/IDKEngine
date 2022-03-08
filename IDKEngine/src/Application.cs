@@ -218,7 +218,7 @@ namespace IDKEngine
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
             ForwardRenderer.LightingContext.Add(lights);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
-            VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, new Vector3(0.025f));
+            VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 12.0f, new Vector3(0.025f));
             GaussianBlur = new GaussianBlur(Size.X, Size.Y);
             SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
             PostCombine = new PostCombine(Size.X, Size.Y);

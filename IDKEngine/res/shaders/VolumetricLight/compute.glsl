@@ -63,10 +63,10 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample);
 vec3 NDCToWorldSpace(vec3 ndc);
 float ComputeScattering(float lightDotView);
 
+uniform int Samples;
 uniform float Scattering;
 uniform float MaxDist;
-uniform int Samples;
-uniform int RendererdFrame;
+uniform float Strength;
 uniform vec3 Absorbance;
 
 void main()
@@ -102,7 +102,7 @@ void main()
     }
     scattered /= shadowDataUBO.PointCount;
 
-    imageStore(ImgResult, imgCoord, vec4(scattered, 1.0));
+    imageStore(ImgResult, imgCoord, vec4(scattered * Strength, 1.0));
 }
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep)
