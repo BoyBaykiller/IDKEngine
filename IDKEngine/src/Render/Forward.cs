@@ -87,12 +87,14 @@ namespace IDKEngine.Render
 
             if (modelSystem.Meshes.Length > 0)
             {
+                GL.Disable(EnableCap.CullFace);
                 GL.ColorMask(false, false, false, false);
 
                 depthOnlyProgram.Use();
                 modelSystem.Draw();
 
                 GL.DepthFunc(DepthFunction.Equal);
+                GL.Enable(EnableCap.CullFace);
                 GL.ColorMask(true, true, true, true);
                 GL.DepthMask(false);
 
