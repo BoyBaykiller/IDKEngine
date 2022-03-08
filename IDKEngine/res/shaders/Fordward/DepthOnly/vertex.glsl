@@ -1,6 +1,7 @@
 #version 460 core
 
 layout(location = 0) in vec3 Position;
+layout(location = 1) in vec2 TexCoord;
 
 struct Mesh
 {
@@ -32,10 +33,19 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float FarPlane;
 } basicDataUBO;
 
+out InOutVars
+{
+    vec2 TexCoord;
+    flat int MaterialIndex;
+} outData;
+
 void main()
 {
-    mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
+    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
+    mat4 model = mesh.Model;
     vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
+    outData.MaterialIndex = mesh.MaterialIndex;
+    outData.TexCoord = TexCoord;
 
     gl_Position = basicDataUBO.ProjView * vec4(fragPos, 1.0);
 }

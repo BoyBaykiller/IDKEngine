@@ -68,6 +68,7 @@ namespace IDKEngine
                 {
 					MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 0], start, end);
 					SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
+					continue;
                 }
 				else
                 {

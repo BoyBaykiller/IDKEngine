@@ -114,10 +114,6 @@ namespace IDKEngine.Render
             renderProgram.Use();
             renderProgram.Upload(0, Instance);
 
-            modelSystem.VAO.DisableVertexAttribute(1);
-            modelSystem.VAO.DisableVertexAttribute(2);
-            modelSystem.VAO.DisableVertexAttribute(3);
-            modelSystem.VAO.DisableVertexAttribute(4);
             if (IS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array or GL_NV_viewport_array2
             {
                 GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
@@ -143,10 +139,6 @@ namespace IDKEngine.Render
                 framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
                 
             }
-            modelSystem.VAO.EnableVertexAttribute(1);
-            modelSystem.VAO.EnableVertexAttribute(2);
-            modelSystem.VAO.EnableVertexAttribute(3);
-            modelSystem.VAO.EnableVertexAttribute(4);
         }
 
         private static unsafe BufferObject InitShadowBuffer()
