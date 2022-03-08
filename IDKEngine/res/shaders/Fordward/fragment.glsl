@@ -93,7 +93,6 @@ layout(std140, binding = 3) uniform LightsUBO
     int LightCount;
 } lightsUBO;
 
-
 in InOutVars
 {
     vec2 TexCoord;

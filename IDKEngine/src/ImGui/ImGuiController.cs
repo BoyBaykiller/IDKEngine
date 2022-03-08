@@ -253,12 +253,6 @@ namespace IDKEngine.GUI
 
             drawData.ScaleClipRects(io.DisplayFramebufferScale);
 
-            GL.Enable(EnableCap.Blend);
-            GL.Enable(EnableCap.ScissorTest);
-            GL.BlendEquation(BlendEquationMode.FuncAdd);
-            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-            //GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.One);
-
             for (int i = 0; i < drawData.CmdListsCount; i++)
             {
                 ImDrawListPtr cmd_list = drawData.CmdListsRange[i];
@@ -291,7 +285,6 @@ namespace IDKEngine.GUI
                     idx_offset += (int)pcmd.ElemCount;
                 }
             }
-            GL.Disable(EnableCap.Blend);
             GL.Disable(EnableCap.ScissorTest);
         }
 

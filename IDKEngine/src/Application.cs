@@ -50,8 +50,6 @@ namespace IDKEngine
                 GL.Viewport(0, 0, Size.X, Size.Y);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
                 
-                GL.BlendEquation(BlendEquationMode.FuncAdd);
-                GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
                 ParticleSimulator.Render(dT);
 
                 if (IsVolumetricLighting)
@@ -180,9 +178,11 @@ namespace IDKEngine
                 throw new NotSupportedException("Your system does not support GL_ARB_buffer_storage");
 
             GL.PointSize(1.3f);
+            GL.Enable(EnableCap.Blend);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.CullFace);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 #if DEBUG
             GL.Enable(EnableCap.DebugOutput);
             GL.DebugMessageCallback(Helper.DebugCallback, IntPtr.Zero);
