@@ -84,7 +84,6 @@ namespace IDKEngine
         private bool _isFocused = true;
         public bool IsFocused => _isFocused;
 
-
         public readonly VideoMode* VideoMode;
         public readonly Monitor* Monitor;
         public double UpdatePeriod = 1.0 / 60.0;
@@ -137,7 +136,7 @@ namespace IDKEngine
             Position = new Vector2i(VideoMode->Width / 2 - _size.X / 2, VideoMode->Height / 2 - _size.Y / 2);
 
             GLFW.MakeContextCurrent(window);
-            InitializeGLBindings();
+            OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
         }
 
         /// <summary>
@@ -157,15 +156,17 @@ namespace IDKEngine
                 double runTime = currentTime - lastTime;
                 
                 GLFW.PollEvents();
+                if (IsFocused)
+                {
+                    DispatchUpdateFrame();
+                    OnRender((float)runTime);
 
-                DispatchUpdateFrame();
-                OnRender((float)runTime);
+                    GLFW.SwapBuffers(window);
 
-                GLFW.SwapBuffers(window);
-                
-                lastTime = currentTime;
+                    lastTime = currentTime;
+                }
             }
-            
+
             OnEnd();
             GLFW.DestroyWindow(window);
         }
@@ -218,7 +219,8 @@ namespace IDKEngine
         {
             _size.X = width;
             _size.Y = height;
-            OnResize();
+            if (_size.X > 0 && _size.Y > 0) // don't trigger resize when minimzed or fullscreen
+                OnResize();
         }
 
         private readonly GLFWCallbacks.WindowFocusCallback windowFocusDelegate;
@@ -234,11 +236,6 @@ namespace IDKEngine
             _position.X = x;
             _position.Y = y;
             MouseState.Update();
-        }
-
-        private static void InitializeGLBindings()
-        {
-            OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
         }
     }
 }

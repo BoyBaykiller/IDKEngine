@@ -49,8 +49,10 @@ namespace IDKEngine
 
                 GL.Viewport(0, 0, Size.X, Size.Y);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
-                
+
+                GL.Enable(EnableCap.Blend);
                 ParticleSimulator.Render(dT);
+                GL.Disable(EnableCap.Blend);
 
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
@@ -72,6 +74,7 @@ namespace IDKEngine
 
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
+            GL.Enable(EnableCap.Blend);
 
             GL.Viewport(0, 0, Size.X, Size.Y);
             Framebuffer.Bind(0);
@@ -82,6 +85,7 @@ namespace IDKEngine
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
+            GL.Disable(EnableCap.Blend);
 
             fps++;
             GLSLBasicData.FrameCount++;
@@ -98,49 +102,46 @@ namespace IDKEngine
                 fpsTimer.Restart();
             }
 
-            if (IsFocused)
-            {
-                if (KeyboardState[Keys.Escape] == InputState.Pressed)
-                    ShouldClose();
+            if (KeyboardState[Keys.Escape] == InputState.Pressed)
+                ShouldClose();
                 
-                if (KeyboardState[Keys.V] == InputState.Touched)
-                    IsVSync = !IsVSync;
+            if (KeyboardState[Keys.V] == InputState.Touched)
+                IsVSync = !IsVSync;
 
-                if (KeyboardState[Keys.F11] == InputState.Touched)
-                    IsFullscreen = !IsFullscreen;
+            if (KeyboardState[Keys.F11] == InputState.Touched)
+                IsFullscreen = !IsFullscreen;
 
-                if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
-                {
-                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorNormal;
-                        Gui.ImGuiController.IsIgnoreMouseInput = false;
-                        camera.Velocity = Vector3.Zero;
-                    }
-                    else
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
-                        Gui.ImGuiController.IsIgnoreMouseInput = true;
-                    }
-                }
-
-                ParticleSimulator.ProcessInputs(this, camera, GLSLBasicData);
+            if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+            {
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
-                    camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
-                    if (hadCameraInputs && IsPathTracing)
-                        GLSLBasicData.FrameCount = 0;
+                    MouseState.CursorMode = CursorModeValue.CursorNormal;
+                    Gui.ImGuiController.IsIgnoreMouseInput = false;
+                    camera.Velocity = Vector3.Zero;
                 }
-
-                Gui.Update(this);
-
-                GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
-                GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
-                GLSLBasicData.View = camera.View;
-                GLSLBasicData.InvView = camera.View.Inverted();
-                GLSLBasicData.CameraPos = camera.Position;
-                GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
+                else
+                {
+                    MouseState.CursorMode = CursorModeValue.CursorDisabled;
+                    Gui.ImGuiController.IsIgnoreMouseInput = true;
+                }
             }
+
+            ParticleSimulator.ProcessInputs(this, camera, GLSLBasicData);
+            if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+            {
+                camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
+                if (hadCameraInputs && IsPathTracing)
+                    GLSLBasicData.FrameCount = 0;
+            }
+
+            Gui.Update(this);
+
+            GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
+            GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
+            GLSLBasicData.View = camera.View;
+            GLSLBasicData.InvView = camera.View.Inverted();
+            GLSLBasicData.CameraPos = camera.Position;
+            GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
         }
 
         private Camera camera;
@@ -178,7 +179,6 @@ namespace IDKEngine
                 throw new NotSupportedException("Your system does not support GL_ARB_buffer_storage");
 
             GL.PointSize(1.3f);
-            GL.Enable(EnableCap.Blend);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.CullFace);
