@@ -252,7 +252,7 @@ namespace IDKEngine.GUI
             vao.Bind();
 
             drawData.ScaleClipRects(io.DisplayFramebufferScale);
-
+            GL.Enable(EnableCap.ScissorTest);
             for (int i = 0; i < drawData.CmdListsCount; i++)
             {
                 ImDrawListPtr cmd_list = drawData.CmdListsRange[i];

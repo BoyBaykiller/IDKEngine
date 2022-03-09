@@ -7,7 +7,6 @@ namespace IDKEngine.Render.Objects
     public class BufferObject : IDisposable
     {
         public readonly int ID;
-        public int BufferOffset;
         public int Size { get; private set; }
 
         public BufferObject()

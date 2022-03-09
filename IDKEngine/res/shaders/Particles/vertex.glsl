@@ -1,4 +1,4 @@
-#version 430 core
+#version 460 core
 #define EPSILON 0.001
 const float DRAG_COEF = log(0.998) * 176.0; // log(0.70303228048)
 
@@ -36,7 +36,7 @@ layout(location = 4) uniform mat4 projViewMatrix;
 
 out InOutVars
 {
-    vec4 Color;
+    vec3 Color;
 } outData;
 
 void main()
@@ -52,6 +52,6 @@ void main()
     particle.Velocity += acceleration * dT;
     particlesSSBO.Particles[gl_VertexID] = particle;
 
-    outData.Color = vec4(vec3(0.1), 0.25);
+    outData.Color = vec3(0.1);
     gl_Position = basicDataUBO.ProjView * vec4(particle.Position, 1.0);
 }
