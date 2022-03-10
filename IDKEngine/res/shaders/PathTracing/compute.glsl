@@ -4,9 +4,14 @@
 #define EPSILON 0.001
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
+#extension GL_NV_compute_shader_derivatives : enable
 #extension GL_NV_gpu_shader5 : enable
 #ifndef GL_NV_gpu_shader5
 #extension GL_ARB_shader_ballot : require
+#endif
+
+#ifdef GL_NV_compute_shader_derivatives
+layout(derivative_group_quadsNV) in;
 #endif
 
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
