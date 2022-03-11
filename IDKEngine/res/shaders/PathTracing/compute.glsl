@@ -4,6 +4,7 @@
 #define EPSILON 0.001
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
+#extension GL_AMD_shader_trinary_minmax : enable
 #extension GL_NV_compute_shader_derivatives : enable
 #extension GL_NV_gpu_shader5 : enable
 #ifndef GL_NV_gpu_shader5
@@ -262,7 +263,11 @@ vec3 Radiance(Ray ray)
             // return float(any(lessThan(hitInfo.Bary, vec3(0.01)))).xxx;
 
             // Russian Roulette - unbiased method to terminate rays and therefore lower render times (also reduces fireflies)
+        #if GL_AMD_shader_trinary_minmax
+            float p = max3(throughput.x, throughput.y, throughput.z);
+        #else
             float p = max(throughput.x, max(throughput.y, throughput.z));
+        #endif
             if (GetRandomFloat01() > p)
                 break;
 
@@ -407,8 +412,13 @@ bool RayCuboidIntersect(Ray ray, Node node, out float t2)
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
 
+#if GL_AMD_shader_trinary_minmax
+    t1 = max(t1, max3(tsmaller.x, tsmaller.y, tsmaller.z));
+    t2 = min(t2, min3(tbigger.x, tbigger.y, tbigger.z));
+#else
     t1 = max(t1, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
     t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
+#endif
     return t1 <= t2;
 }
 
