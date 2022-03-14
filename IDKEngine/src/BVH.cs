@@ -12,7 +12,7 @@ namespace IDKEngine
     {
 		public const uint BITS_FOR_MISS_LINK = 10u; // also adjust in PathTracing/compute.glsl
 
-		public int TreeDepth = 3;
+		public uint TreeDepth = 3;
 		public readonly BufferObject BVHBuffer;
         public readonly BufferObject BVHVertexBuffer;
         public readonly BufferObject TraverseVertexBuffer;
@@ -21,7 +21,7 @@ namespace IDKEngine
         {
 			if (TreeDepth == 0) return;
 
-			uint nodesPerMesh = (uint)MathF.Pow(2, TreeDepth) - 1;
+			uint nodesPerMesh = (uint)MathF.Pow(2u, TreeDepth) - 1;
             List<GLSLTraverseVertex> expandedTraverseVertices = new List<GLSLTraverseVertex>(modelSystem.Vertices.Length);
 			List<GLSLTraverseVertex> alignedTraverseVertices = new List<GLSLTraverseVertex>(expandedTraverseVertices.Count);
 			GLSLBVHVertex[] bvhVertecis = new GLSLBVHVertex[modelSystem.Vertices.Length];
@@ -101,7 +101,7 @@ namespace IDKEngine
 
             BVHBuffer = new BufferObject();
             BVHBuffer.ImmutableAllocate(Vector4.SizeInBytes + nodes.Length * sizeof(GLSLNode), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-			BVHBuffer.SubData(Vector3.SizeInBytes, sizeof(uint), TreeDepth);
+			BVHBuffer.SubData(Vector2.SizeInBytes, 2 * sizeof(uint), new uint[] { TreeDepth, BITS_FOR_MISS_LINK });
 			BVHBuffer.SubData(Vector4.SizeInBytes, nodes.Length * sizeof(GLSLNode), nodes);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
@@ -135,14 +135,14 @@ namespace IDKEngine
 				Debug.Assert(count < MathF.Pow(2, 32 - (int)BITS_FOR_MISS_LINK));
 				
 				node.MissLinkAndVerticesCount = count;
-				node.IsLeafAndVerticesStart |= 1u << 31;
+				MyMath.BitsInsert(ref node.IsLeafAndVerticesStart, 1, 31, 1);
 			}
 		}
 
 		private static void SetMissLink(ref GLSLNode node, uint missLink)
 		{
 			Debug.Assert(missLink < MathF.Pow(2, BITS_FOR_MISS_LINK));
-			node.MissLinkAndVerticesCount |= missLink << (32 - (int)BITS_FOR_MISS_LINK);
+			MyMath.BitsInsert(ref node.MissLinkAndVerticesCount, missLink, 32 - (int)BITS_FOR_MISS_LINK, (int)BITS_FOR_MISS_LINK);
 		}
 
 		private static Tuple<GLSLNode, GLSLNode> ConstructChildNodesBounds(in GLSLNode parent)

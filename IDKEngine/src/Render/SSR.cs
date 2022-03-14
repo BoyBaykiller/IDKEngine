@@ -42,7 +42,7 @@ namespace IDKEngine.Render
             }
         }
 
-        private static ShaderProgram shaderProgram = new ShaderProgram(
+        private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/SSR/compute.glsl")));
 
         public readonly Texture Result;

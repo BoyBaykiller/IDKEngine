@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
@@ -32,6 +33,16 @@ namespace IDKEngine
             }
 
             return haltonValue;
+        }
+
+        public static void BitsInsert(ref uint mem, uint data, int offset, int bits)
+        {
+            mem |= GetBits(data, 0, bits) << offset;
+        }
+
+        public static uint GetBits(uint data, int offset, int bits)
+        {
+            return data & (((1u << bits) - 1u) << offset);
         }
     }
 }

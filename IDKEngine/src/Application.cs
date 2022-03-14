@@ -31,7 +31,7 @@ namespace IDKEngine
         protected override unsafe void OnRender(float dT)
         {
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
-
+            
             if (!IsPathTracing)
             {
                 // Compute last frames SSAO
@@ -44,22 +44,18 @@ namespace IDKEngine
                     pointShadows[i].CreateDepthMap(ModelSystem);
                 }
                 GL.ColorMask(true, true, true, true);
-
+                
                 ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 
                 GL.Viewport(0, 0, Size.X, Size.Y);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
-
-                GL.Enable(EnableCap.Blend);
-                ParticleSimulator.Render(dT);
-                GL.Disable(EnableCap.Blend);
 
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
 
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
-
+                
                 PostCombine.Compute(ForwardRenderer.Result, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
             else
@@ -126,7 +122,6 @@ namespace IDKEngine
                 }
             }
 
-            ParticleSimulator.ProcessInputs(this, camera, GLSLBasicData);
             if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
             {
                 camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
@@ -149,7 +144,6 @@ namespace IDKEngine
         private BufferObject basicDataUBO;
         private PointShadow[] pointShadows;
         public ModelSystem ModelSystem;
-        public ParticleSimulator ParticleSimulator;
         public Forward ForwardRenderer;
         public SSR SSR;
         public SSAO SSAO;
@@ -181,7 +175,6 @@ namespace IDKEngine
             GL.PointSize(1.3f);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
-            GL.Enable(EnableCap.CullFace);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 #if DEBUG
             GL.Enable(EnableCap.DebugOutput);
@@ -209,12 +202,10 @@ namespace IDKEngine
             //lights[0] = new GLSLLight(new Vector3(-6.0f, 21.0f, -0.95f), new Vector3(4.585f, 4.725f, 2.56f) * 900.0f, 0.2f);
             lights[1] = new GLSLLight(new Vector3(-13.5f, 4.7f, 1.0f), new Vector3(0.5f, 0.8f, 0.9f) * 3.0f, 0.5f);
 
-
             Random rng = new Random();
             GLSLParticle[] particles = new GLSLParticle[1000];
             for (int i = 0; i < particles.Length; i++)
                 particles[i].Position = new Vector3((float)rng.NextDouble() * 40 - 20, (float)rng.NextDouble() * 40 - 20, (float)rng.NextDouble() * 40 - 20);
-            ParticleSimulator = new ParticleSimulator(particles);
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
             ForwardRenderer.LightingContext.Add(lights);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);

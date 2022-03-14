@@ -52,19 +52,19 @@ namespace IDKEngine.Render.Objects
             GL.NamedBufferSubData(ID, (IntPtr)offset, size, data);
         }
 
-        public void MutableAllocate<T>(int size, T data, BufferUsageHint bufferUsageHint) where T : struct
+        public void MutableAllocate<T>(int size, T data) where T : struct
         {
-            GL.NamedBufferData(ID, size, ref data, bufferUsageHint);
+            GL.NamedBufferData(ID, size, ref data, BufferUsageHint.StaticDraw);
             Size = size;
         }
-        public void MutableAllocate<T>(int size, T[] data, BufferUsageHint bufferUsageHint) where T : struct
+        public void MutableAllocate<T>(int size, T[] data) where T : struct
         {
-            GL.NamedBufferData(ID, size, data, bufferUsageHint);
+            GL.NamedBufferData(ID, size, data, BufferUsageHint.StaticDraw);
             Size = size;
         }
-        public void MutableAllocate(int size, IntPtr data, BufferUsageHint bufferUsageHint)
+        public void MutableAllocate(int size, IntPtr data)
         {
-            GL.NamedBufferData(ID, size, data, bufferUsageHint);
+            GL.NamedBufferData(ID, size, data, BufferUsageHint.StaticDraw);
             Size = size;
         }
 

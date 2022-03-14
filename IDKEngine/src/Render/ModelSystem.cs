@@ -106,11 +106,11 @@ namespace IDKEngine.Render
                 loadedIndices += model.Indices.Length;
             }
 
-            DrawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands, BufferUsageHint.StaticDraw);
-            MeshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes, BufferUsageHint.StaticDraw);
-            MaterialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials, BufferUsageHint.StaticDraw);
-            VertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices, BufferUsageHint.StaticDraw);
-            ElementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices, BufferUsageHint.StaticDraw);
+            DrawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands);
+            MeshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes);
+            MaterialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
+            VertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices);
+            ElementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
         }
 
         public void Draw()

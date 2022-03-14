@@ -171,10 +171,10 @@ namespace IDKEngine
             GLFW.DestroyWindow(window);
         }
 
-        // Source: https://github.com/opentk/opentk/blob/558132bd2cc41eed704f6e6acd1e3fe5830df5ad/src/OpenTK.Windowing.Desktop/GameWindow.cs
         private readonly Stopwatch updateTimer = new Stopwatch();
         private double updateEpsilon = 0.0;
         private bool isRunningSlowly = false;
+        // Source: https://github.com/opentk/opentk/blob/558132bd2cc41eed704f6e6acd1e3fe5830df5ad/src/OpenTK.Windowing.Desktop/GameWindow.cs
         private void DispatchUpdateFrame()
         {
             double isRunningSlowlyRetries = 4;

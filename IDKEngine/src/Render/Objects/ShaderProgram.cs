@@ -88,9 +88,9 @@ namespace IDKEngine.Render.Objects
         {
             GL.ProgramUniformMatrix4(ID, GetUniformLocation(name), transpose, ref matrix4);
         }
-        public unsafe void Upload(string name, int count, Matrix4* matrices, bool transpose = false)
+        public void Upload(string name, int count, ref Matrix4 matrices, bool transpose = false)
         {
-            GL.ProgramUniformMatrix4(ID, GetUniformLocation(name), count, transpose, &matrices[0].Row0.X);
+            GL.ProgramUniformMatrix4(ID, GetUniformLocation(name), count, transpose, ref matrices.Row0.X);
         }
 
         public static void UploadToProgram(int id, int location, Vector4 vector4)
