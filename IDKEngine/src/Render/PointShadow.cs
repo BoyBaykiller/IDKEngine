@@ -137,7 +137,6 @@ namespace IDKEngine.Render
                     }
                 }
                 framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
-                
             }
         }
 

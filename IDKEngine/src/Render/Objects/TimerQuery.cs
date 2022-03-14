@@ -1,12 +1,9 @@
-﻿using System;
-using OpenTK.Graphics.OpenGL4;
+﻿using OpenTK.Graphics.OpenGL4;
 
 namespace IDKEngine.Render.Objects
 {
     class TimerQuery
     {
-        public const int GL_MAX_TIMER_QUERY_COUNT = 10;
-
         public float MeasuredMilliseconds { get; private set; }
         public int ID;
         private int readyForNext;

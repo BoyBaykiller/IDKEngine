@@ -79,10 +79,7 @@ namespace IDKEngine.Render
                 Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeZ
             };
 
-            fixed (void* matrices = &invViews[0])
-            {
-                shaderProgram.Upload("InvViews[0]", 6, (Matrix4*)matrices);
-            }
+            shaderProgram.Upload("InvViews[0]", 6, ref invViews[0]);
             shaderProgram.Upload("InvProjection", ref invProjection);
 
             Time = 0.05f;

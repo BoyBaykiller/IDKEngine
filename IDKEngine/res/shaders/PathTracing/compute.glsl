@@ -95,8 +95,9 @@ struct Node
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
-    vec3 _pad0;
+    vec2 _pad0;
     uint TreeDepth;
+    uint BitsForMissLink;
     Node Nodes[];
 } bvhSSBO;
 
@@ -158,9 +159,6 @@ float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 uint EmulateNonUniform(uint index);
 
-uint TreeDepth;
-const uint BITS_FOR_MISS_LINK = 10u;
-
 uniform int RayDepth;
 uniform float FocalLength;
 uniform float ApertureDiameter;
@@ -173,7 +171,6 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    TreeDepth = bvhSSBO.TreeDepth;
     rngSeed = basicDataUBO.FrameCount;
     //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FrameCount * 2699 | 1;
 
@@ -320,6 +317,9 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
 
 bool RayTrace(Ray ray, out HitInfo hitInfo)
 {
+    const uint bitsForMissLink = bvhSSBO.BitsForMissLink; 
+    const uint treeDepth = bvhSSBO.TreeDepth;
+
     hitInfo.T = FLOAT_MAX;
     float t2;
     float nodeTMin = FLOAT_MAX;
@@ -331,14 +331,14 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
         
         uint localNodeIndex = 0u;
-        while (localNodeIndex < (1u << TreeDepth) - 1u)
+        while (localNodeIndex < (1u << treeDepth) - 1u)
         {
             Node node = bvhSSBO.Nodes[mesh.BaseNode + localNodeIndex];
             if (RayCuboidIntersect(localRay, node, t2) && t2 > 0.0)
             {
                 if (bool(node.IsLeafAndVerticesStart))
                 {
-                    const uint MAX_COUNT = (1u << (32u - BITS_FOR_MISS_LINK)) - 1u;
+                    const uint MAX_COUNT = (1u << (32u - bitsForMissLink)) - 1u;
                     const uint count = node.MissLinkAndVerticesCount & MAX_COUNT;
                     
                     const uint MAX_START = (1u << 31u) - 1u;
@@ -362,8 +362,8 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
             }
             else
             {
-                const uint MAX_MISS_LINK = (1u << BITS_FOR_MISS_LINK) - 1u;
-                localNodeIndex = (node.MissLinkAndVerticesCount >> (32u - BITS_FOR_MISS_LINK)) & MAX_MISS_LINK;
+                const uint MAX_MISS_LINK = (1u << bitsForMissLink) - 1u;
+                localNodeIndex = (node.MissLinkAndVerticesCount >> (32u - bitsForMissLink)) & MAX_MISS_LINK;
             }
         }
     }
@@ -502,8 +502,8 @@ vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedD
 // Source: https://discord.com/channels/318590007881236480/318590007881236480/856523979383373835
 uint EmulateNonUniform(uint index)
 {
-    // uint currentIndex;
-    // while ((currentIndex = readFirstInvocationARB(index)) != index) ;
+    uint currentIndex;
+    while ((currentIndex = readFirstInvocationARB(index)) != index) ;
     return index;
 }
 #endif
