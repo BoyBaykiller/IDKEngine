@@ -93,7 +93,7 @@ namespace IDKEngine
         private Vector2i cachedWindowPos;
         private Vector2i cachedWindowSize;
 
-        private bool glfwInitialized = false;
+        private readonly bool glfwInitialized = false;
         private readonly Window* window;
 
         /// <summary>
@@ -134,6 +134,8 @@ namespace IDKEngine
             KeyboardState = new Keyboard(window);
             MouseState = new Mouse(window);
             Position = new Vector2i(VideoMode->Width / 2 - _size.X / 2, VideoMode->Height / 2 - _size.Y / 2);
+            updateTimer = new Stopwatch();
+
 
             GLFW.MakeContextCurrent(window);
             OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
@@ -162,6 +164,7 @@ namespace IDKEngine
                     OnRender((float)runTime);
 
                     GLFW.SwapBuffers(window);
+                    _fps++;
 
                     lastTime = currentTime;
                 }
@@ -171,10 +174,10 @@ namespace IDKEngine
             GLFW.DestroyWindow(window);
         }
 
-        private readonly Stopwatch updateTimer = new Stopwatch();
-        private double updateEpsilon = 0.0;
-        private bool isRunningSlowly = false;
-        // Source: https://github.com/opentk/opentk/blob/558132bd2cc41eed704f6e6acd1e3fe5830df5ad/src/OpenTK.Windowing.Desktop/GameWindow.cs
+        private readonly Stopwatch updateTimer;
+        private double updateEpsilon;
+        private bool isRunningSlowly;
+        // Source: https://github.com/opentk/opentk/blob/558132bd2cc41eed704f6e6acd1e3fe5830df5ad/src/OpenTK.Windowing.Desktop/GameWindow.cs#L258
         private void DispatchUpdateFrame()
         {
             double isRunningSlowlyRetries = 4;

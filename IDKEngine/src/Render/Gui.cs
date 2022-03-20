@@ -7,12 +7,16 @@ using ImGuiNET;
 
 namespace IDKEngine.Render
 {
-    static class Gui
+    class Gui
     {
-        public static ImGuiController ImGuiController = new ImGuiController(1, 1);
+        private int selectedMeshIndex = -1;
+        public ImGuiController ImGuiController;
+        public Gui(int width, int height)
+        {
+            ImGuiController = new ImGuiController(width, height);
+        }
 
-        private static int selectedMeshIndex = -1;
-        public static void Render(Application window, float frameTime)
+        public void Render(Application window, float frameTime)
         {
             ImGuiController.Update(window, frameTime);
             ImGui.Begin("Graphics");
@@ -247,10 +251,10 @@ namespace IDKEngine.Render
             ImGuiController.Render();
         }
 
-        public static void Update(Application window)
+        public void Update(Application window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
-            if (window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
+            if (!window.IsPathTracing && window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 point.Y = window.Size.X - point.Y;

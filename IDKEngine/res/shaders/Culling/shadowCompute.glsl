@@ -1,7 +1,6 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
-#define LOCAL_SIZE_X 8
-layout(local_size_x = LOCAL_SIZE_X, local_size_y = 6, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 6, local_size_z = 1) in;
 
 struct Frustum
 {
@@ -83,8 +82,8 @@ layout(location = 0) uniform int ShadowIndex;
 
 // Note: Meshes are processed in batches of LOCAL_SIZE_X Threads. Additionaly each mesh gets processed by 6 Threads one for each face.
 
-shared int SharedPackedValues[LOCAL_SIZE_X];
-shared int SharedInstanceCounts[LOCAL_SIZE_X];
+shared int SharedPackedValues[gl_WorkGroupSize.x];
+shared int SharedInstanceCounts[gl_WorkGroupSize.x];
 void main()
 {
     const uint globalMeshIndex = gl_GlobalInvocationID.x;
