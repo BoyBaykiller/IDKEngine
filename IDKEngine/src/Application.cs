@@ -1,11 +1,11 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -77,7 +77,7 @@ namespace IDKEngine
             finalProgram.Use();
 
             GL.DrawArrays(PrimitiveType.Quads, 0, 4);
-            Gui.Render(this, (float)dT);
+            gui.Render(this, (float)dT);
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
@@ -112,13 +112,13 @@ namespace IDKEngine
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
                     MouseState.CursorMode = CursorModeValue.CursorNormal;
-                    Gui.ImGuiController.IsIgnoreMouseInput = false;
+                    gui.ImGuiController.IsIgnoreMouseInput = false;
                     camera.Velocity = Vector3.Zero;
                 }
                 else
                 {
                     MouseState.CursorMode = CursorModeValue.CursorDisabled;
-                    Gui.ImGuiController.IsIgnoreMouseInput = true;
+                    gui.ImGuiController.IsIgnoreMouseInput = true;
                 }
             }
 
@@ -129,7 +129,7 @@ namespace IDKEngine
                     GLSLBasicData.FrameCount = 0;
             }
 
-            Gui.Update(this);
+            gui.Update(this);
 
             GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
             GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
@@ -153,6 +153,7 @@ namespace IDKEngine
         public GaussianBlur GaussianBlur;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
+        public Gui gui;
         public GLSLBasicData GLSLBasicData;
         protected override unsafe void OnStart()
         {
@@ -178,11 +179,13 @@ namespace IDKEngine
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 #if DEBUG
             GL.Enable(EnableCap.DebugOutput);
+            GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.DebugCallback, IntPtr.Zero);
 #endif
             IsVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorDisabled;
-            Gui.ImGuiController.IsIgnoreMouseInput = true;
+            gui = new Gui(Size.X, Size.Y);
+            gui.ImGuiController.IsIgnoreMouseInput = true;
 
             camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
 
@@ -251,8 +254,7 @@ namespace IDKEngine
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
 
-            Gui.ImGuiController.WindowResized(Size.X, Size.Y);
-
+            gui.ImGuiController.WindowResized(Size.X, Size.Y);
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Size.X / (float)Size.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
@@ -261,7 +263,7 @@ namespace IDKEngine
 
         protected override void OnResize()
         {
-            Gui.ImGuiController.WindowResized(Size.X, Size.Y);
+            gui.ImGuiController.WindowResized(Size.X, Size.Y);
 
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Size.X / (float)Size.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();

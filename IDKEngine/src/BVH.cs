@@ -114,7 +114,7 @@ namespace IDKEngine
             TraverseVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 4, 0, TraverseVertexBuffer.Size);
 
             ModelSystem = modelSystem;
-			
+
 			void MakeLeaf(ref GLSLNode node, int start, int end)
             {
 				Debug.Assert(alignedTraverseVertices.Count < MathF.Pow(2, 31)); // only 31 bits because one is used as a marker for isLeaf
@@ -139,12 +139,20 @@ namespace IDKEngine
 			}
 		}
 
+		private static uint GetRightChildIndex(uint parent, uint treeDepth, uint level)
+        {
+			return parent + (uint)MathF.Pow(2u, treeDepth - level);
+        }
+		private static uint GetLeftChildIndex(uint index)
+        {
+			return ++index;
+        }
+
 		private static void SetMissLink(ref GLSLNode node, uint missLink)
 		{
 			Debug.Assert(missLink < MathF.Pow(2, BITS_FOR_MISS_LINK));
 			MyMath.BitsInsert(ref node.MissLinkAndVerticesCount, missLink, 32 - (int)BITS_FOR_MISS_LINK, (int)BITS_FOR_MISS_LINK);
 		}
-
 		private static Tuple<GLSLNode, GLSLNode> ConstructChildNodesBounds(in GLSLNode parent)
 		{
 			GLSLNode child0 = new GLSLNode();

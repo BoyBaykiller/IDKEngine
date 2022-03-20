@@ -165,9 +165,9 @@ vec3 BlinnPhong(Light light)
     {
         vec3 diffuse = light.Color * cosTerm * Albedo.rgb;  
     
-        vec3 reflectDir = reflect(-lightDir, Normal);  
+        vec3 reflectDir = reflect(-lightDir, Normal);
         float spec = pow(max(dot(ViewDir, reflectDir), 0.0), 256.0 * (1.0 - Roughness));
-        vec3 specular = light.Color * spec * Specular;  
+        vec3 specular = light.Color * spec * Specular;
         
         vec3 attenuation = light.Color / (fragToLightLength * fragToLightLength);
 
