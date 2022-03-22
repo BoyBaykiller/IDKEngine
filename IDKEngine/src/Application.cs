@@ -49,7 +49,7 @@ namespace IDKEngine
 
                 GL.Viewport(0, 0, Size.X, Size.Y);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
-
+                bloom.Compute(ForwardRenderer.Result);
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
 
@@ -57,6 +57,7 @@ namespace IDKEngine
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
                 
                 PostCombine.Compute(ForwardRenderer.Result, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
+                //PostCombine.Compute(bloom.Result, null, null);
             }
             else
             {
@@ -145,12 +146,12 @@ namespace IDKEngine
         private PointShadow[] pointShadows;
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
+        public Bloom bloom;
         public SSR SSR;
         public SSAO SSAO;
         public PostCombine PostCombine;
         public BVH Bvh;
         public VolumetricLighter VolumetricLight;
-        public GaussianBlur GaussianBlur;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         public Gui gui;
@@ -210,10 +211,10 @@ namespace IDKEngine
             for (int i = 0; i < particles.Length; i++)
                 particles[i].Position = new Vector3((float)rng.NextDouble() * 40 - 20, (float)rng.NextDouble() * 40 - 20, (float)rng.NextDouble() * 40 - 20);
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
+            bloom = new Bloom(Size.X, Size.Y);
             ForwardRenderer.LightingContext.Add(lights);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 12.0f, new Vector3(0.025f));
-            GaussianBlur = new GaussianBlur(Size.X, Size.Y);
             SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
             PostCombine = new PostCombine(Size.X, Size.Y);
             AtmosphericScatterer = new AtmosphericScatterer(256);
@@ -270,8 +271,8 @@ namespace IDKEngine
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
             ForwardRenderer.SetSize(Size.X, Size.Y);
+            bloom.SetSize(Size.X, Size.Y);
             VolumetricLight.SetSize(Size.X, Size.Y);
-            GaussianBlur.SetSize(Size.X, Size.Y);
             SSR.SetSize(Size.X, Size.Y);
             SSAO.SetSize(Size.X, Size.Y);
             PostCombine.SetSize(Size.X, Size.Y);
