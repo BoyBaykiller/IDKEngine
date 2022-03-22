@@ -164,7 +164,6 @@ namespace IDKEngine
                     OnRender((float)runTime);
 
                     GLFW.SwapBuffers(window);
-                    _fps++;
 
                     lastTime = currentTime;
                 }

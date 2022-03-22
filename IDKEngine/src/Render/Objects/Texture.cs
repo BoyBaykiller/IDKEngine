@@ -180,11 +180,9 @@ namespace IDKEngine.Render.Objects
             return (int)Math.Ceiling(Math.Log2(Math.Max(width, Math.Max(height, depth))));
         }
 
-        public static void GetMipMapLevelSize(ref int width, ref int height, ref int depth, int level)
+        public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)
         {
-            width /= (int)MathF.Pow(2, level);
-            height /= (int)MathF.Pow(2, level);
-            depth /= (int)MathF.Pow(2, level);
+            return new Vector3i(width / (1 << level), height / (1 << level), depth / (1 << level));
         }
 
         /// <summary>
