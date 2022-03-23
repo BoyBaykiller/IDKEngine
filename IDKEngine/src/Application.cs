@@ -56,8 +56,7 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
                 
-                PostCombine.Compute(ForwardRenderer.Result, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
-                //PostCombine.Compute(bloom.Result, null, null);
+                PostCombine.Compute(ForwardRenderer.Result, bloom.Result, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
             else
             {
@@ -65,7 +64,7 @@ namespace IDKEngine
                 Texture.UnbindFromUnit(1);
                 Texture.UnbindFromUnit(2);
 
-                PostCombine.Compute(PathTracer.Result, null, null);
+                PostCombine.Compute(PathTracer.Result, null, null, null);
             }
             PostCombine.Result.BindToUnit(0);
 
@@ -248,6 +247,7 @@ namespace IDKEngine
                 blueNoise.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
             }
             BufferObject blueNoiseUBO = new BufferObject();
+            
             blueNoiseUBO.ImmutableAllocate(sizeof(long), blueNoise.MakeHandleResidentARB(), BufferStorageFlags.DynamicStorageBit);
             blueNoiseUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 4, 0, blueNoiseUBO.Size);
 

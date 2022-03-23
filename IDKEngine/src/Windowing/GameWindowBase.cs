@@ -219,10 +219,13 @@ namespace IDKEngine
         private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeDelegate;
         private void FramebufferSizeCallback(Window* window, int width, int height)
         {
-            _size.X = width;
-            _size.Y = height;
-            if (_size.X > 0 && _size.Y > 0) // don't trigger resize when minimzed or fullscreen
+            // Don't trigger resize when window toggled or minimized
+            if ((width > 0 && height > 0) && (_size.X != width || _size.Y != height))
+            {
+                _size.X = width;
+                _size.Y = height;
                 OnResize();
+            }
         }
 
         private readonly GLFWCallbacks.WindowFocusCallback windowFocusDelegate;

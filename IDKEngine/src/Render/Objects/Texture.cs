@@ -7,7 +7,7 @@ namespace IDKEngine.Render.Objects
 {
     class Texture : IDisposable
     {
-        public enum PixelTypeSize
+        public enum PixelTypeSize : int
         {
             TextureRedSize = 32860,
             TextureGreenSize = 32861,
@@ -15,7 +15,7 @@ namespace IDKEngine.Render.Objects
             TextureAlphaSize = 32863,
         }
 
-        public enum TextureDimension
+        public enum TextureDimension : byte
         {
             Undefined = 0,
             One = 1,
