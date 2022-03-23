@@ -18,7 +18,7 @@ namespace IDKEngine.Render
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
         }
 
-        public unsafe void Compute(Texture v0, Texture v1, Texture v2)
+        public void Compute(Texture v0, Texture v1, Texture v2, Texture v3)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
 
@@ -30,6 +30,9 @@ namespace IDKEngine.Render
 
             if (v2 != null) v2.BindToUnit(2);
             else Texture.UnbindFromUnit(2);
+
+            if (v3 != null) v3.BindToUnit(3);
+            else Texture.UnbindFromUnit(3);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);
