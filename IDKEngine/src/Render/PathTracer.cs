@@ -47,11 +47,12 @@ namespace IDKEngine.Render
 		public Texture EnvironmentMap;
         public ModelSystem ModelSystem;
         public readonly BVH BVH;
-		private static readonly ShaderProgram shaderProgram = new ShaderProgram(
-			new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
+		private readonly ShaderProgram shaderProgram;
 		public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, Texture environmentMap, int width, int height)
         {
-            Result = new Texture(TextureTarget2d.Texture2D);
+			shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
+
+			Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba32f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 

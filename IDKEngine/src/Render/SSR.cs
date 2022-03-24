@@ -42,12 +42,12 @@ namespace IDKEngine.Render
             }
         }
 
-        private static readonly ShaderProgram shaderProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/SSR/compute.glsl")));
-
         public readonly Texture Result;
+        private readonly ShaderProgram shaderProgram;
         public SSR(int width, int height, int samples, int binarySearchSamples, float maxDist)
         {
+            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/SSR/compute.glsl")));
+
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);

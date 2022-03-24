@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using IDKEngine.Render.Objects;
-using OpenTK;
 using OpenTK.Graphics.OpenGL4;
 
 namespace IDKEngine.Render

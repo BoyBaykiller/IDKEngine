@@ -132,6 +132,31 @@ namespace IDKEngine.Render
                             }
                         }
                     }
+
+                    if (ImGui.CollapsingHeader("Bloom"))
+                    {
+                        ImGui.Checkbox("IsBloom", ref window.IsBloom);
+                        if (window.IsBloom)
+                        {
+                            float temp = window.Bloom.Threshold;
+                            if (ImGui.SliderFloat("Threshold", ref temp, 0.0f, 10.0f))
+                            {
+                                window.Bloom.Threshold = temp;
+                            }
+
+                            temp = window.Bloom.Clamp;
+                            if (ImGui.SliderFloat("Clamp", ref temp, 0.0f, 50.0f))
+                            {
+                                window.Bloom.Clamp = temp;
+                            }
+
+                            temp = window.Bloom.Radius;
+                            if (ImGui.SliderFloat("Radius", ref temp, 1.0f, 5.0f))
+                            {
+                                window.Bloom.Radius = temp;
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -228,6 +253,9 @@ namespace IDKEngine.Render
                     GLSLMesh mesh = window.ModelSystem.Meshes[selectedMeshIndex];
                     GLSLDrawCommand drawCommand = window.ModelSystem.DrawCommands[selectedMeshIndex];
 
+                    ImGui.Text($"MeshID: {selectedMeshIndex}");
+                    ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
+
                     systemVec3 = OpenTKToSystem(mesh.Model.ExtractTranslation());
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
@@ -241,7 +269,6 @@ namespace IDKEngine.Render
                         {
                             curMesh = mesh;
                         });
-                        window.GLSLBasicData.FrameCount = 0;
                     }
 
                     ImGui.End();
@@ -257,8 +284,7 @@ namespace IDKEngine.Render
             if (!window.IsPathTracing && window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
-                point.Y = window.Size.X - point.Y;
-
+                point.Y = window.Size.Y - point.Y;
                 window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
             }
         }
