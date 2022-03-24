@@ -42,12 +42,13 @@ namespace IDKEngine.Render
             }
         }
 
-        private static readonly ShaderProgram shaderProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/SSAO/compute.glsl")));
+        private readonly ShaderProgram shaderProgram;
 
         public readonly Texture Result;
         public SSAO(int width, int height, int samples, float radius, float strength)
         {
+            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/SSAO/compute.glsl")));
+
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);

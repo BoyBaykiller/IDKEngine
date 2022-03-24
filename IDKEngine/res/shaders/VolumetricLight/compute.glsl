@@ -40,7 +40,7 @@ layout(std140, binding = 3) uniform LightsUBO
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[8];
+    PointShadow PointShadows[64];
     int PointCount;
 } shadowDataUBO;
 

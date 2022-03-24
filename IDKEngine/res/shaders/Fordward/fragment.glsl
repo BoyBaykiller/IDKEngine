@@ -83,7 +83,7 @@ layout(std140, binding = 1) uniform MaterialUBO
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[8];
+    PointShadow PointShadows[64];
     int PointCount;
 } shadowDataUBO;
 
@@ -142,7 +142,6 @@ void main()
     {
         irradiance += BlinnPhong(lightsUBO.Lights[i]);
     }
-    irradiance /= lightsUBO.LightCount;
 
     FragColor = vec4(irradiance + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
     NormalSpecColor = vec4(Normal, Specular);
@@ -165,9 +164,14 @@ vec3 BlinnPhong(Light light)
     {
         vec3 diffuse = light.Color * cosTerm * Albedo.rgb;  
     
-        vec3 reflectDir = reflect(-lightDir, Normal);
-        float spec = pow(max(dot(ViewDir, reflectDir), 0.0), 256.0 * (1.0 - Roughness));
-        vec3 specular = light.Color * spec * Specular;
+        vec3 halfwayDir = normalize(lightDir + ViewDir);\
+        vec3 specular = vec3(0.0);
+        float temp = dot(Normal, halfwayDir);
+        if (temp > 0.0)
+        {
+            float spec = pow(temp, 256.0 * (1.0 - Roughness));
+            specular = light.Color * spec * Specular;
+        }
         
         vec3 attenuation = light.Color / (fragToLightLength * fragToLightLength);
 
@@ -195,8 +199,8 @@ float Visibility(PointShadow pointShadow)
     float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
     float twoFarPlane = pointShadow.FarPlane * pointShadow.FarPlane;
     
-    const float MIN_BIAS = 0.01;
-    const float MAX_BIAS = 1.2;
+    const float MIN_BIAS = 0.1;
+    const float MAX_BIAS = 3.0;
     float twoBias = mix(MAX_BIAS * MAX_BIAS, MIN_BIAS * MIN_BIAS, max(dot(Normal, lightToFrag / lightToFragLength), 0.0));
 
     // Map from [nearPlane; farPlane] to [0.0; 1.0]
