@@ -131,7 +131,7 @@ namespace IDKEngine
             if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
             {
                 camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
-                if (hadCameraInputs && IsPathTracing)
+                if (hadCameraInputs)
                     GLSLBasicData.FrameCount = 0;
             }
 
@@ -166,7 +166,7 @@ namespace IDKEngine
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
             // Necessary extensions without fallback
-            // I don't think I have to test for <4.4 extensions if the system already has bindless and all
+            // I don't think I have to test for <4.4 extensions if the system already has bindless and stuff
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
                 throw new NotSupportedException("Your system does not support GL_ARB_bindless_texture");
 
@@ -279,8 +279,8 @@ namespace IDKEngine
             if (IsPathTracing)
             {
                 PathTracer.SetSize(Size.X, Size.Y);
-                GLSLBasicData.FrameCount = 0;
             }
+            GLSLBasicData.FrameCount = 0;
         }
 
         protected override void OnFocusChanged()

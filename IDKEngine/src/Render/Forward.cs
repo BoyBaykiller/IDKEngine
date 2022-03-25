@@ -8,8 +8,26 @@ namespace IDKEngine.Render
     class Forward
     {
         public const int MESH_INDEX_CLEAR_COLOR = -1;
-        
-        public bool IsDrawAABB = false;
+
+        private int _renderMeshAABBIndex = -1;
+        public int RenderMeshAABBIndex
+        {
+            get => _renderMeshAABBIndex;
+
+            set
+            {
+                if (_renderMeshAABBIndex != value)
+                {
+                    _renderMeshAABBIndex = value;
+                    aabbProgram.Upload(0, _renderMeshAABBIndex);
+                }
+                else
+                {
+                    _renderMeshAABBIndex = -1;
+                }
+            }
+        }
+
         public readonly Framebuffer Framebuffer;
         public readonly Texture NormalSpec;
         public readonly Texture MeshIndex;
@@ -28,8 +46,8 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/fragment.glsl")));
 
         private static readonly ShaderProgram skyBoxProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/SkyBox/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/SkyBox/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/SkyBox/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/SkyBox/fragment.glsl")));
 
         private static readonly ShaderProgram aabbProgram = new ShaderProgram(
             new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
@@ -120,16 +138,18 @@ namespace IDKEngine.Render
 
             LightingContext.Draw();
 
-            if (IsDrawAABB)
+            if (RenderMeshAABBIndex >= 0)
             {
+                GL.Disable(EnableCap.DepthTest);
                 GL.Disable(EnableCap.CullFace);
                 GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
 
                 aabbProgram.Use();
-                GL.DrawArraysInstanced(PrimitiveType.Quads, 0, 24, modelSystem.Meshes.Length);
+                GL.DrawArrays(PrimitiveType.Quads, 0, 24);
 
                 GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
                 GL.Enable(EnableCap.CullFace);
+                GL.Enable(EnableCap.DepthTest);
             }
         }
 
