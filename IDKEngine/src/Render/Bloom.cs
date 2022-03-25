@@ -43,18 +43,6 @@ namespace IDKEngine.Render
             }
         }
 
-        private float _radius;
-        public float Radius
-        {
-            get => _radius;
-
-            set
-            {
-                _radius = value;
-                shaderProgram.Upload("Radius", _radius);
-            }
-        }
-
         private enum Stage : int
         {
             Downsample = 0,
@@ -66,13 +54,13 @@ namespace IDKEngine.Render
         private Texture downscaleTexture;
         private Texture upsampleTexture;
         private readonly ShaderProgram shaderProgram;
-        public Bloom(int width, int height, float threshold, float clamp, float upsampleRadius)
+        public Bloom(int width, int height, float threshold, float clamp)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Bloom/compute.glsl")));
 
             width = (int)(width / 2.0f);
             height = (int)(height / 2.0f);
-            _lod = System.Math.Max(Texture.GetMaxMipMaplevel(width, height, 1) - 2, 1);
+            _lod = System.Math.Max(Texture.GetMaxMipMaplevel(width, height, 1) - 3, 1);
 
             downscaleTexture = new Texture(TextureTarget2d.Texture2D);
             downscaleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
@@ -86,7 +74,6 @@ namespace IDKEngine.Render
 
             Threshold = threshold;
             Clamp = clamp;
-            Radius = upsampleRadius;
         }
 
         public void Compute(Texture src)
@@ -99,19 +86,18 @@ namespace IDKEngine.Render
 
             Vector3i size = Texture.GetMipMapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, 0);
             shaderProgram.Upload(3, 0);
-            downscaleTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+            downscaleTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
             GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
 
             downscaleTexture.BindToUnit(0);
-            shaderProgram.Upload(4, (int)Stage.Downsample);
             for (int i = 1; i < Lod; i++)
             {
                 size = Texture.GetMipMapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, i);
 
                 shaderProgram.Upload(3, i - 1);
-                downscaleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+                downscaleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
-                GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
                 GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
             }
             #endregion
@@ -122,8 +108,8 @@ namespace IDKEngine.Render
 
             size = Texture.GetMipMapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, Lod - 2);
             shaderProgram.Upload(3, Lod - 1);
-            upsampleTexture.BindToImageUnit(0, Lod - 2, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
-            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+            upsampleTexture.BindToImageUnit(0, Lod - 2, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
 
             upsampleTexture.BindToUnit(1);
@@ -132,9 +118,9 @@ namespace IDKEngine.Render
                 size = Texture.GetMipMapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, i);
 
                 shaderProgram.Upload(3, i + 1);
-                upsampleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+                upsampleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
-                GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
                 GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
             }
             #endregion
@@ -142,7 +128,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            _lod = System.Math.Max(Texture.GetMaxMipMaplevel(width, height, 1) - 2, 1);
+            _lod = System.Math.Max(Texture.GetMaxMipMaplevel(width, height, 1) - 3, 1);
 
             downscaleTexture.Dispose();
             

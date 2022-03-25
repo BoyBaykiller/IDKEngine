@@ -32,7 +32,7 @@ struct Mesh
     mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
-    int _pad0;
+    float Emissive;
     int _pad1;
 };
 
@@ -103,6 +103,7 @@ in InOutVars
     mat3 TBN;
     flat int MeshIndex;
     flat int MaterialIndex;
+    flat float Emissive;
 } inData;
 
 vec3 BlinnPhong(Light light);
@@ -143,7 +144,8 @@ void main()
         irradiance += BlinnPhong(lightsUBO.Lights[i]);
     }
 
-    FragColor = vec4(irradiance + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
+    vec3 emissive = inData.Emissive * Albedo.rgb;
+    FragColor = vec4(irradiance + emissive + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
     NormalSpecColor = vec4(Normal, Specular);
     MeshIndexColor = inData.MeshIndex;
 
@@ -199,8 +201,8 @@ float Visibility(PointShadow pointShadow)
     float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
     float twoFarPlane = pointShadow.FarPlane * pointShadow.FarPlane;
     
-    const float MIN_BIAS = 0.1;
-    const float MAX_BIAS = 3.0;
+    const float MIN_BIAS = 0.3;
+    const float MAX_BIAS = 2.0;
     float twoBias = mix(MAX_BIAS * MAX_BIAS, MIN_BIAS * MIN_BIAS, max(dot(Normal, lightToFrag / lightToFragLength), 0.0));
 
     // Map from [nearPlane; farPlane] to [0.0; 1.0]

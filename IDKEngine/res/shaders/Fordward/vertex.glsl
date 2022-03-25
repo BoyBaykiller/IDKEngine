@@ -12,7 +12,7 @@ struct Mesh
     mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
-    int _pad0;
+    float Emissive;
     int _pad1;
 };
 
@@ -46,6 +46,7 @@ out InOutVars
     mat3 TBN;
     flat int MeshIndex;
     flat int MaterialIndex;
+    flat float Emissive;
 } outData;
 
 void main()
@@ -68,6 +69,7 @@ void main()
     outData.Normal = Normal;
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
+    outData.Emissive = mesh.Emissive;
 
     gl_Position = outData.ClipPos;
 }

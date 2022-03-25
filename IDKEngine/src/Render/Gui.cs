@@ -19,7 +19,7 @@ namespace IDKEngine.Render
         public void Render(Application window, float frameTime)
         {
             ImGuiController.Update(window, frameTime);
-            ImGui.Begin("Graphics");
+            ImGui.Begin("Render");
             {
                 ImGui.Text($"FPS: {window.FPS}");
 
@@ -46,11 +46,32 @@ namespace IDKEngine.Render
                     }
                     ImGui.EndCombo();
                 }
-
                 if (!window.IsPathTracing)
                 {
                     ImGui.Checkbox("DrawFirstLevelBVH", ref window.ForwardRenderer.IsDrawAABB);
+                }
 
+                if (ImGui.CollapsingHeader("Bloom"))
+                {
+                    ImGui.Checkbox("IsBloom", ref window.IsBloom);
+                    if (window.IsBloom)
+                    {
+                        float temp = window.Bloom.Threshold;
+                        if (ImGui.SliderFloat("Threshold", ref temp, 0.0f, 10.0f))
+                        {
+                            window.Bloom.Threshold = temp;
+                        }
+
+                        temp = window.Bloom.Clamp;
+                        if (ImGui.SliderFloat("Clamp", ref temp, 0.0f, 50.0f))
+                        {
+                            window.Bloom.Clamp = temp;
+                        }
+                    }
+                }
+
+                if (!window.IsPathTracing)
+                {
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
                     {
                         ImGui.Checkbox("IsVolumetricLighting", ref window.IsVolumetricLighting);
@@ -129,31 +150,6 @@ namespace IDKEngine.Render
                             if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1, 100))
                             {
                                 window.SSR.MaxDist = tempFloat;
-                            }
-                        }
-                    }
-
-                    if (ImGui.CollapsingHeader("Bloom"))
-                    {
-                        ImGui.Checkbox("IsBloom", ref window.IsBloom);
-                        if (window.IsBloom)
-                        {
-                            float temp = window.Bloom.Threshold;
-                            if (ImGui.SliderFloat("Threshold", ref temp, 0.0f, 10.0f))
-                            {
-                                window.Bloom.Threshold = temp;
-                            }
-
-                            temp = window.Bloom.Clamp;
-                            if (ImGui.SliderFloat("Clamp", ref temp, 0.0f, 50.0f))
-                            {
-                                window.Bloom.Clamp = temp;
-                            }
-
-                            temp = window.Bloom.Radius;
-                            if (ImGui.SliderFloat("Radius", ref temp, 1.0f, 5.0f))
-                            {
-                                window.Bloom.Radius = temp;
                             }
                         }
                     }
@@ -261,6 +257,13 @@ namespace IDKEngine.Render
                     {
                         hadChange = true;
                         mesh.Model = mesh.Model.ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
+                    }
+
+                    float temp = mesh.Emissive;
+                    if (ImGui.SliderFloat("Emissive", ref temp, 0.0f, 100.0f))
+                    {
+                        hadChange = true;
+                        mesh.Emissive = temp;
                     }
 
                     if (hadChange)

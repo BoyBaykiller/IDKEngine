@@ -30,7 +30,7 @@ struct Mesh
     mat4 PrevModel;
     int MaterialIndex;
     int BaseNode;
-    int _pad0;
+    float Emissive;
     int _pad1;
 };
 

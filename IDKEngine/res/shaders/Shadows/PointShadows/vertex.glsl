@@ -27,7 +27,7 @@ struct Mesh
     mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
-    int _pad0;
+    float Emissive;
     int _pad1;
 };
 
