@@ -49,7 +49,7 @@ struct Mesh
     mat4 PrevModel;
     int MaterialIndex;
     int BaseNode;
-    int _pad0;
+    float Emissive;
     int _pad1;
 };
 
@@ -237,6 +237,7 @@ vec3 Radiance(Ray ray)
                 normal = texture(material.Normal, texCoord).rgb;
                 vec4 temp = texture(material.Albedo, texCoord);
                 albedo = temp.rgb;
+                emissive = mesh.Emissive * albedo;
 
                 normal = TBN * (normal * 2.0 - 1.0);
             }

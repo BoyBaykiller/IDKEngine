@@ -58,7 +58,7 @@ namespace IDKEngine
 
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
-                
+
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
             else
@@ -67,7 +67,10 @@ namespace IDKEngine
                 Texture.UnbindFromUnit(1);
                 Texture.UnbindFromUnit(2);
 
-                PostCombine.Compute(PathTracer.Result, null, null, null);
+                if (IsBloom)
+                    Bloom.Compute(PathTracer.Result);
+
+                PostCombine.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
             }
             PostCombine.Result.BindToUnit(0);
 
@@ -190,7 +193,7 @@ namespace IDKEngine
             gui = new Gui(Size.X, Size.Y);
             gui.ImGuiController.IsIgnoreMouseInput = true;
 
-            camera = new Camera(new Vector3(0.0f, 5.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 0.1f, 0.25f);
+            camera = new Camera(new Vector3(3.68f, 7.7f, 2.53f), new Vector3(0.0f, 1.0f, 0.0f), -128.3f, -1.6f, 0.1f, 0.25f);
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.Meshes.Length; i++) // 0.0145f
@@ -201,11 +204,11 @@ namespace IDKEngine
                 horse.Meshes[i].Model = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, 0.5f);
 
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza});
+            ModelSystem.Add(new Model[] { sponza, horse });
 
 
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
-            Bloom = new Bloom(Size.X, Size.Y, 1.0f, 3.0f, 1.0f);
+            Bloom = new Bloom(Size.X, Size.Y, 1.0f, 3.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 12.0f, new Vector3(0.025f));
             SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
@@ -222,9 +225,9 @@ namespace IDKEngine
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             GLSLLight[] lights = new GLSLLight[3];
-            lights[0] = new GLSLLight(new Vector3(-4.5f, 4.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.0f, 0.3f);
-            lights[1] = new GLSLLight(new Vector3(-0.5f, 4.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.0f, 0.3f);
-            lights[2] = new GLSLLight(new Vector3( 4.5f, 4.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.0f, 0.3f);
+            lights[0] = new GLSLLight(new Vector3(-4.5f, 4.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 1.3f, 0.3f);
+            lights[1] = new GLSLLight(new Vector3(-0.5f, 4.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 1.3f, 0.3f);
+            lights[2] = new GLSLLight(new Vector3( 4.5f, 4.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 1.3f, 0.3f);
             ForwardRenderer.LightingContext.Add(lights);
             
             pointShadows = new PointShadow[3];

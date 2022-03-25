@@ -8,7 +8,7 @@ namespace IDKEngine
         public Matrix4 PrevModel;
         public int MaterialIndex;
         public int BaseNode;
-        private readonly float _pad0;
+        public float Emissive;
         private readonly float _pad1;
     }
 }
