@@ -34,9 +34,9 @@ namespace IDKEngine.Render
                         {
                             current = renderModes[i];
                             window.IsPathTracing = current == renderModes[1];
+                            window.GLSLBasicData.FrameCount = 0;
                             if (current == "PathTracer")
                             {
-                                window.GLSLBasicData.FrameCount = 0;
                                 window.PathTracer.SetSize(window.Size.X, window.Size.Y);
                             }
                         }
@@ -45,10 +45,6 @@ namespace IDKEngine.Render
                             ImGui.SetItemDefaultFocus();
                     }
                     ImGui.EndCombo();
-                }
-                if (!window.IsPathTracing)
-                {
-                    ImGui.Checkbox("DrawFirstLevelBVH", ref window.ForwardRenderer.IsDrawAABB);
                 }
 
                 if (ImGui.CollapsingHeader("Bloom"))
@@ -289,6 +285,7 @@ namespace IDKEngine.Render
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 point.Y = window.Size.Y - point.Y;
                 window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
+                window.ForwardRenderer.RenderMeshAABBIndex = selectedMeshIndex;
             }
         }
 

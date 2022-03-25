@@ -84,9 +84,11 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float FarPlane;
 } basicDataUBO;
 
+layout(location = 0) uniform int MeshIndex;
+
 void main()
 {
-    Mesh mesh = meshSSBO.Meshes[gl_InstanceID];
+    Mesh mesh = meshSSBO.Meshes[MeshIndex];
     Node node = bvhSSBO.Nodes[mesh.BaseNode];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
