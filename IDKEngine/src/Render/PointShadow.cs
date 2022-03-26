@@ -10,6 +10,12 @@ namespace IDKEngine.Render
     {
         public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 64; // also change UBO size in shaders
 
+        public static readonly bool IS_VERTEX_LAYERED_RENDERING =
+            (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
+            Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer") ||
+            Helper.IsExtensionsAvailable("GL_NV_viewport_array") ||
+            Helper.IsExtensionsAvailable("GL_NV_viewport_array2"));
+
         private static int _countPointShadows;
         public static int CountPointShadows
         {
@@ -25,11 +31,25 @@ namespace IDKEngine.Render
             }
         }
 
-        public static readonly bool IS_VERTEX_LAYERED_RENDERING =
-            (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
-            Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer") ||
-            Helper.IsExtensionsAvailable("GL_NV_viewport_array") ||
-            Helper.IsExtensionsAvailable("GL_NV_viewport_array2"));
+        private Vector3 _position;
+        public unsafe Vector3 Position
+        {
+            get => _position;
+
+            set
+            {
+                _position = value;
+
+                glslPointShadow.PosX = Camera.GenerateMatrix(_position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.NegX = Camera.GenerateMatrix(_position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.PosY = Camera.GenerateMatrix(_position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
+                glslPointShadow.NegY = Camera.GenerateMatrix(_position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
+                glslPointShadow.PosZ = Camera.GenerateMatrix(_position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.NegZ = Camera.GenerateMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+
+                shadowsBuffer.SubData(Instance * sizeof(GLSLPointShadow), sizeof(GLSLPointShadow), glslPointShadow);
+            }
+        }
 
         private static readonly ShaderProgram renderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
@@ -74,26 +94,6 @@ namespace IDKEngine.Render
             Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
 
             this.lightContext = lightContext;
-        }
-
-        private Vector3 _position;
-        public unsafe Vector3 Position
-        {
-            get => _position;
-
-            set
-            {
-                _position = value;
-
-                glslPointShadow.PosX = Camera.GenerateMatrix(_position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.NegX = Camera.GenerateMatrix(_position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.PosY = Camera.GenerateMatrix(_position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
-                glslPointShadow.NegY = Camera.GenerateMatrix(_position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
-                glslPointShadow.PosZ = Camera.GenerateMatrix(_position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.NegZ = Camera.GenerateMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-
-                shadowsBuffer.SubData(Instance * sizeof(GLSLPointShadow), sizeof(GLSLPointShadow), glslPointShadow);
-            }
         }
 
         public unsafe void CreateDepthMap(ModelSystem modelSystem)

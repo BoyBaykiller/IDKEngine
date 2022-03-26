@@ -149,6 +149,11 @@ namespace IDKEngine.Render
                             }
                         }
                     }
+
+                    if (ImGui.CollapsingHeader("Shadows"))
+                    {
+                        ImGui.Checkbox("IsShadows", ref window.IsShadows);
+                    }
                 }
                 else
                 {
@@ -285,6 +290,9 @@ namespace IDKEngine.Render
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 point.Y = window.Size.Y - point.Y;
                 window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
+                if (window.ForwardRenderer.RenderMeshAABBIndex == selectedMeshIndex)
+                    selectedMeshIndex = -1;
+                
                 window.ForwardRenderer.RenderMeshAABBIndex = selectedMeshIndex;
             }
         }

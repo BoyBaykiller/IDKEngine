@@ -6,7 +6,6 @@ layout(location = 1) in vec2 TexCoord;
 struct Mesh
 {
     mat4 Model;
-    mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
     float Emissive;

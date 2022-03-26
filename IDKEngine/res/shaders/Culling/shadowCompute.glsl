@@ -27,7 +27,6 @@ struct Node
 struct Mesh
 {
     mat4 Model;
-    mat4 PrevModel;
     int MaterialIndex;
     int BaseNode;
     float Emissive;
@@ -66,7 +65,7 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
     PointShadow PointShadows[64];
-    int PointCount;
+    int Count;
 } shadowDataUBO;
 
 Frustum ExtractFrustum(mat4 projViewModel);

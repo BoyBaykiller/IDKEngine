@@ -35,13 +35,13 @@ layout(std140, binding = 4) uniform BlueNoiseUBO
 layout(std140, binding = 3) uniform LightsUBO
 {
     Light Lights[64];
-    int LightCount;
+    int Count;
 } lightsUBO;
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
     PointShadow PointShadows[64];
-    int PointCount;
+    int Count;
 } shadowDataUBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -72,7 +72,7 @@ uniform vec3 Absorbance;
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    if (shadowDataUBO.PointCount == 0)
+    if (shadowDataUBO.Count == 0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
@@ -93,14 +93,13 @@ void main()
     vec3 origin = basicDataUBO.ViewPos + deltaStep * texelFetch(blueNoiseUBO.SamplerBlueNoise, texel, 0).r;
 
     vec3 scattered = vec3(0.0);
-    for (int i = 0; i < shadowDataUBO.PointCount; i++)
+    for (int i = 0; i < shadowDataUBO.Count; i++)
     {
         PointShadow pointShadow = shadowDataUBO.PointShadows[i];
         Light light = lightsUBO.Lights[pointShadow.LightIndex];
 
         scattered += UniformScatter(light, pointShadow, origin, viewDir, deltaStep);
     }
-    scattered /= shadowDataUBO.PointCount;
 
     imageStore(ImgResult, imgCoord, vec4(scattered * Strength, 1.0));
 }

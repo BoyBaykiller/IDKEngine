@@ -12,7 +12,7 @@ struct Light
 layout(std140, binding = 3) uniform LightsUBO
 {
     Light Lights[64];
-    int LightCount;
+    int Count;
 } lightsUBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
