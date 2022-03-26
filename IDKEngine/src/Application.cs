@@ -24,7 +24,7 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true;
+        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true;
         public int FPS;
 
         private int fps;
@@ -38,12 +38,15 @@ namespace IDKEngine
                 if (IsSSAO)
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
 
-                GL.ColorMask(false, false, false, false);
-                for (int i = 0; i < pointShadows.Length; i++)
+                if (IsShadows)
                 {
-                    pointShadows[i].CreateDepthMap(ModelSystem);
+                    GL.ColorMask(false, false, false, false);
+                    for (int i = 0; i < pointShadows.Length; i++)
+                    {
+                        pointShadows[i].CreateDepthMap(ModelSystem);
+                    }
+                    GL.ColorMask(true, true, true, true);
                 }
-                GL.ColorMask(true, true, true, true);
                 
                 ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 
@@ -210,12 +213,12 @@ namespace IDKEngine
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 3.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
-            VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 12.0f, new Vector3(0.025f));
+            VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 2.0f, new Vector3(0.025f));
             SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
             PostCombine = new PostCombine(Size.X, Size.Y);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
-
+            
             Bvh = new BVH(ModelSystem);
             PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube

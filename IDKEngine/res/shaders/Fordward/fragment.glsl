@@ -29,7 +29,6 @@ struct Material
 struct Mesh
 {
     mat4 Model;
-    mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
     float Emissive;
@@ -90,7 +89,7 @@ layout(std140, binding = 2) uniform ShadowDataUBO
 layout(std140, binding = 3) uniform LightsUBO
 {
     Light Lights[64];
-    int LightCount;
+    int Count;
 } lightsUBO;
 
 in InOutVars
@@ -139,7 +138,7 @@ void main()
         irradiance += BlinnPhong(lightsUBO.Lights[i]) * Visibility(pointShadow);
     }
 
-    for (int i = shadowDataUBO.PointCount; i < lightsUBO.LightCount; i++)
+    for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
     {
         irradiance += BlinnPhong(lightsUBO.Lights[i]);
     }
@@ -201,14 +200,14 @@ float Visibility(PointShadow pointShadow)
     float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
     float twoFarPlane = pointShadow.FarPlane * pointShadow.FarPlane;
     
-    const float MIN_BIAS = 0.3;
-    const float MAX_BIAS = 2.0;
+    const float MIN_BIAS = EPSILON;
+    const float MAX_BIAS = 1.5;
     float twoBias = mix(MAX_BIAS * MAX_BIAS, MIN_BIAS * MIN_BIAS, max(dot(Normal, lightToFrag / lightToFragLength), 0.0));
 
     // Map from [nearPlane; farPlane] to [0.0; 1.0]
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
     
-    const float DISK_RADIUS = 0.04;
+    const float DISK_RADIUS = 0.08;
     float shadowFactor = texture(pointShadow.Sampler, vec4(lightToFrag, mapedDepth));
     for (int i = 0; i < 20; i++)
     {

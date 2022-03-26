@@ -2,8 +2,9 @@
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
-using IDKEngine.Render.Objects;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
@@ -26,13 +27,14 @@ namespace IDKEngine.Render
         public uint[] Indices;
         public BufferObject ElementBuffer;
 
+        public BufferObject ClipPosBuffer;
+
         public readonly VAO VAO;
         public unsafe ModelSystem()
         {
             DrawCommands = new GLSLDrawCommand[0];
             DrawCommandBuffer = new BufferObject();
             DrawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
-
 
             Meshes = new GLSLMesh[0];
             MeshBuffer = new BufferObject();
@@ -47,6 +49,9 @@ namespace IDKEngine.Render
 
             Indices = new uint[0];
             ElementBuffer = new BufferObject();
+
+            ClipPosBuffer = new BufferObject();
+            ClipPosBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
 
             VAO = new VAO();
             VAO.SetElementBuffer(ElementBuffer);
@@ -111,6 +116,7 @@ namespace IDKEngine.Render
             MaterialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
             VertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices);
             ElementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
+            ClipPosBuffer.MutableAllocate(Vertices.Length * sizeof(Vector4), (IntPtr)0);
         }
 
         public void Draw()

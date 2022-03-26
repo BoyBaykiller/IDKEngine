@@ -9,7 +9,6 @@ layout(location = 4) in vec3 BiTangent;
 struct Mesh
 {
     mat4 Model;
-    mat4 PrevModel;
     int MaterialIndex;
     int BVHEntry;
     float Emissive;
@@ -20,6 +19,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
+
+layout(std430, binding = 5) restrict buffer ClipPosSSBO
+{
+    vec4 ClipPos[];
+} clipPosSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -63,13 +67,13 @@ void main()
     outData.FragPos = (mesh.Model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
 
-    // FIX: Also use prevModel and prevPosition
-    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
+    outData.PrevClipPos = clipPosSSBO.ClipPos[gl_VertexID];
     
     outData.Normal = Normal;
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.Emissive = mesh.Emissive;
 
+    clipPosSSBO.ClipPos[gl_VertexID] = outData.ClipPos;
     gl_Position = outData.ClipPos;
 }

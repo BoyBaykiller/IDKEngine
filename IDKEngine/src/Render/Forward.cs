@@ -16,15 +16,8 @@ namespace IDKEngine.Render
 
             set
             {
-                if (_renderMeshAABBIndex != value)
-                {
-                    _renderMeshAABBIndex = value;
-                    aabbProgram.Upload(0, _renderMeshAABBIndex);
-                }
-                else
-                {
-                    _renderMeshAABBIndex = -1;
-                }
+                _renderMeshAABBIndex = value;
+                aabbProgram.Upload(0, _renderMeshAABBIndex);
             }
         }
 

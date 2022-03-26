@@ -27,7 +27,6 @@ struct Node
 struct Mesh
 {
     mat4 Model;
-    mat4 PrevModel;
     int MaterialIndex;
     int BaseNode;
     float Emissive;

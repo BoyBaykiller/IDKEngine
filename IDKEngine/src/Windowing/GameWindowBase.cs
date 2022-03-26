@@ -81,6 +81,9 @@ namespace IDKEngine
             }
         }
 
+        private float _time;
+        public float Time => _time;
+
         private bool _isFocused = true;
         public bool IsFocused => _isFocused;
 
@@ -152,6 +155,7 @@ namespace IDKEngine
 
             updateTimer.Start();
             double lastTime = 0.0;
+            GLFW.SetTime(0.0);
             while (!GLFW.WindowShouldClose(window))
             {
                 double currentTime = GLFW.GetTime();
@@ -166,6 +170,7 @@ namespace IDKEngine
                     GLFW.SwapBuffers(window);
 
                     lastTime = currentTime;
+                    _time += (float)runTime;
                 }
             }
 

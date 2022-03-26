@@ -24,13 +24,13 @@ struct PointShadow
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
     PointShadow PointShadows[64];
-    int PointCount;
+    int Count;
 } shadowDataUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
 {
     Light Lights[64];
-    int LightCount;
+    int Count;
 } lightsUBO;
 
 in InOutVars

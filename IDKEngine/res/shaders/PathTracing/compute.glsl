@@ -46,7 +46,6 @@ struct Material
 struct Mesh
 {
     mat4 Model;
-    mat4 PrevModel;
     int MaterialIndex;
     int BaseNode;
     float Emissive;
@@ -139,7 +138,7 @@ layout(std140, binding = 1) uniform MaterialUBO
 layout(std140, binding = 3) uniform LightsUBO
 {
     Light Lights[64];
-    int LightCount;
+    int Count;
 } lightsUBO;
 
 vec3 Radiance(Ray ray);
@@ -370,7 +369,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     }
 
     float t1;
-    for (int i = 0; i < lightsUBO.LightCount; i++)
+    for (int i = 0; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
         if (RaySphereIntersect(ray, light, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
