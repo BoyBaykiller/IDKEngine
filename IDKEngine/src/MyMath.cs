@@ -1,21 +1,20 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
 {
     static class MyMath
     {
-        public static Vector4[] GetMapedHaltonSequence_2_3(int length, int width, int height)
+        public static float[] GetMapedHaltonSequence_2_3(int length, int width, int height)
         {
-            Vector4[] haltonSequence = new Vector4[length];
+            float[] haltonSequence = new float[length];
             float xScale = 1.0f / width;
             float yScale = 1.0f / height;
 
             for (int i = 0; i < haltonSequence.Length; i++)
             {
                 float haltonValue = GetHalton(i + 1, i % 2 == 0 ? 2 : 3);
-                haltonSequence[i][i % 4] = (haltonValue - 0.5f) * (i % 2 == 0 ? xScale : yScale);
+                haltonSequence[i] = (haltonValue - 0.5f) * (i % 2 == 0 ? xScale : yScale);
             }
 
             return haltonSequence;

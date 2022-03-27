@@ -127,7 +127,7 @@ void main()
     float AO = texture(SamplerAO, uv).r;
 
     // TODO: Make alpha a gui option
-    Normal = mix(inData.TBN * (Normal * 2.0 - 1.0), inData.Normal, 0.0);
+    Normal = normalize(mix(inData.TBN * (Normal * 2.0 - 1.0), inData.Normal, 0.0));
     ViewDir = normalize(basicDataUBO.ViewPos - inData.FragPos);
 
 
@@ -165,8 +165,8 @@ vec3 BlinnPhong(Light light)
     {
         vec3 diffuse = light.Color * cosTerm * Albedo.rgb;  
     
-        vec3 halfwayDir = normalize(lightDir + ViewDir);\
         vec3 specular = vec3(0.0);
+        vec3 halfwayDir = normalize(lightDir + ViewDir);
         float temp = dot(Normal, halfwayDir);
         if (temp > 0.0)
         {
