@@ -45,7 +45,7 @@ struct Mesh
     int MaterialIndex;
     int BaseNode;
     float Emissive;
-    int _pad1;
+    float NormalMapStrength;
 };
 
 struct Node

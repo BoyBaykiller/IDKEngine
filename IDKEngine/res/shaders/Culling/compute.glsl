@@ -30,7 +30,7 @@ struct Mesh
     int MaterialIndex;
     int BaseNode;
     float Emissive;
-    int _pad1;
+    float NormalMapStrength;
 };
 
 layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO

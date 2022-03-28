@@ -32,7 +32,7 @@ struct Mesh
     int MaterialIndex;
     int BVHEntry;
     float Emissive;
-    int _pad1;
+    float NormalMapStrength;
 };
 
 struct Light
@@ -103,6 +103,7 @@ in InOutVars
     flat int MeshIndex;
     flat int MaterialIndex;
     flat float Emissive;
+    flat float NormalMapStrength;
 } inData;
 
 vec3 BlinnPhong(Light light);
@@ -126,10 +127,10 @@ void main()
     Specular = texture(material.Specular, inData.TexCoord).r;
     float AO = texture(SamplerAO, uv).r;
 
-    // TODO: Make alpha a gui option
-    Normal = normalize(mix(inData.TBN * (Normal * 2.0 - 1.0), inData.Normal, 0.0));
-    ViewDir = normalize(basicDataUBO.ViewPos - inData.FragPos);
+    Normal = inData.TBN * normalize(Normal * 2.0 - 1.0);
+    Normal = normalize(mix(normalize(inData.Normal), Normal, inData.NormalMapStrength));
 
+    ViewDir = normalize(basicDataUBO.ViewPos - inData.FragPos);
 
     vec3 irradiance = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
@@ -149,7 +150,7 @@ void main()
     MeshIndexColor = inData.MeshIndex;
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
-    VelocityColor = uv - prevUV;
+    VelocityColor = (uv - prevUV);
 
     gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
 }

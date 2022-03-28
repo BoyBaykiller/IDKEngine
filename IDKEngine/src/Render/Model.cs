@@ -80,6 +80,7 @@ namespace IDKEngine.Render.Objects
 
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
                 Meshes[i].Model = Matrix4.Identity;
+                Meshes[i].NormalMapStrength = 1.0f;
 
                 DrawCommands[i].InstanceCount = 1;
                 DrawCommands[i].BaseInstance = 0;

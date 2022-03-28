@@ -8,6 +8,6 @@ namespace IDKEngine
         public int MaterialIndex;
         public int BaseNode;
         public float Emissive;
-        private readonly float _pad1;
+        public float NormalMapStrength;
     }
 }

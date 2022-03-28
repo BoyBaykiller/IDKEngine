@@ -49,7 +49,7 @@ struct Mesh
     int MaterialIndex;
     int BaseNode;
     float Emissive;
-    int _pad1;
+    float NormalMapStrength;
 };
 
 struct BVHVertex
@@ -216,11 +216,11 @@ vec3 Radiance(Ray ray)
                 mat4 model = mesh.Model;
 
                 vec3 tangent = Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary);
-                normal = Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary);
+                vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
                 vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
 
                 vec3 T = normalize(vec3(model * vec4(tangent, 0.0)));
-                vec3 N = normalize(vec3(model * vec4(normal, 0.0)));
+                vec3 N = normalize(vec3(model * vec4(geoNormal, 0.0)));
                 T = normalize(T - dot(T, N) * N);
                 vec3 B = cross(N, T);
                 mat3 TBN = mat3(T, B, N);
@@ -238,7 +238,8 @@ vec3 Radiance(Ray ray)
                 albedo = temp.rgb;
                 emissive = mesh.Emissive * albedo;
 
-                normal = TBN * (normal * 2.0 - 1.0);
+                normal = TBN * normalize(normal * 2.0 - 1.0);
+                normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength));
             }
             else
             {

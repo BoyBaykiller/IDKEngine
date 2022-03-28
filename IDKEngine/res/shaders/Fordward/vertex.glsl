@@ -12,7 +12,7 @@ struct Mesh
     int MaterialIndex;
     int BVHEntry;
     float Emissive;
-    int _pad1;
+    float NormalMapStrength;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -51,6 +51,7 @@ out InOutVars
     flat int MeshIndex;
     flat int MaterialIndex;
     flat float Emissive;
+    flat float NormalMapStrength;
 } outData;
 
 void main()
@@ -73,6 +74,7 @@ void main()
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.Emissive = mesh.Emissive;
+    outData.NormalMapStrength = mesh.NormalMapStrength;
 
     clipPosSSBO.ClipPos[gl_VertexID] = outData.ClipPos;
     gl_Position = outData.ClipPos;
