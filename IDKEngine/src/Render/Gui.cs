@@ -241,14 +241,13 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
-            if (selectedMeshIndex != Forward.MESH_INDEX_CLEAR_COLOR)
+            if (selectedMeshIndex != Forward.MESH_INDEX_CLEAR_COLOR && !window.IsPathTracing)
             {
                 System.Numerics.Vector3 systemVec3;
                 ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);
                 {
                     bool hadChange = false;
                     GLSLMesh mesh = window.ModelSystem.Meshes[selectedMeshIndex];
-                    GLSLDrawCommand drawCommand = window.ModelSystem.DrawCommands[selectedMeshIndex];
 
                     ImGui.Text($"MeshID: {selectedMeshIndex}");
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
@@ -265,6 +264,13 @@ namespace IDKEngine.Render
                     {
                         hadChange = true;
                         mesh.Emissive = temp;
+                    }
+
+                    temp = mesh.NormalMapStrength;
+                    if (ImGui.SliderFloat("NormalMapStrength", ref temp, 0.0f, 4.0f))
+                    {
+                        hadChange = true;
+                        mesh.NormalMapStrength = temp;
                     }
 
                     if (hadChange)

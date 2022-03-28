@@ -75,7 +75,6 @@ namespace IDKEngine
 
                 PostCombine.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
             }
-            PostCombine.Result.BindToUnit(0);
 
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
@@ -83,6 +82,9 @@ namespace IDKEngine
 
             GL.Viewport(0, 0, Size.X, Size.Y);
             Framebuffer.Bind(0);
+
+            PostCombine.Result.BindToUnit(0);
+
             finalProgram.Use();
 
             GL.DrawArrays(PrimitiveType.Quads, 0, 4);

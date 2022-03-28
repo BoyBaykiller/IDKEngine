@@ -27,7 +27,7 @@ struct Mesh
     int MaterialIndex;
     int BVHEntry;
     float Emissive;
-    int _pad1;
+    float NormalMapStrength;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
