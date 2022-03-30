@@ -52,8 +52,11 @@ struct Mesh
     float NormalMapStrength;
 };
 
-struct BVHVertex
+struct Vertex
 {
+    vec3 Position;
+    float _pad3;
+
     vec2 TexCoord;
     vec2 _pad0;
 
@@ -64,17 +67,11 @@ struct BVHVertex
     float _pad2;
 };
 
-struct TraverseVertex
-{
-    vec3 Position;
-    uint BVHVertexIndex;
-};
-
 struct HitInfo
 {
     vec3 Bary;
     float T;
-    uvec3 BVHVertexIndices;
+    uint VertexIndex;
     int HitIndex;
 };
 
@@ -107,13 +104,8 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 
 layout(std430, binding = 3) restrict readonly buffer BVHVertices
 {
-    BVHVertex Vertices[];
+    Vertex Vertices[];
 } verticesSSBO;
-
-layout(std430, binding = 4) restrict readonly buffer BVHTraverseVerticesSSBO
-{
-    TraverseVertex Vertices[];
-} traverseVerticesSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -208,9 +200,9 @@ vec3 Radiance(Ray ray)
             vec3 emissive;
             if (hitInfo.HitIndex >= 0)
             {
-                BVHVertex v0 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.x];
-                BVHVertex v1 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.y];
-                BVHVertex v2 = verticesSSBO.Vertices[hitInfo.BVHVertexIndices.z];
+                Vertex v0 = verticesSSBO.Vertices[hitInfo.VertexIndex + 0u];
+                Vertex v1 = verticesSSBO.Vertices[hitInfo.VertexIndex + 1u];
+                Vertex v2 = verticesSSBO.Vertices[hitInfo.VertexIndex + 2u];
                 
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
                 mat4 model = mesh.Model;
@@ -347,14 +339,14 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                     
                     for (uint j = start; j < start + count; j += 3u)
                     {
-                        TraverseVertex v0 = traverseVerticesSSBO.Vertices[j + 0u];
-                        TraverseVertex v1 = traverseVerticesSSBO.Vertices[j + 1u];
-                        TraverseVertex v2 = traverseVerticesSSBO.Vertices[j + 2u];
+                        Vertex v0 = verticesSSBO.Vertices[j + 0u];
+                        Vertex v1 = verticesSSBO.Vertices[j + 1u];
+                        Vertex v2 = verticesSSBO.Vertices[j + 2u];
                         if (RayTriangleIntersect(localRay, v0.Position, v1.Position, v2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
                         {
                             hitInfo.Bary = baryT.xyz;
                             hitInfo.T = baryT.w;
-                            hitInfo.BVHVertexIndices = uvec3(v0.BVHVertexIndex, v1.BVHVertexIndex, v2.BVHVertexIndex);
+                            hitInfo.VertexIndex = j;
                             hitInfo.HitIndex = i;
                         }
                     }

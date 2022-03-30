@@ -15,36 +15,29 @@ namespace IDKEngine
         public uint TreeDepth = 3;
         public readonly BufferObject BVHBuffer;
         public readonly BufferObject BVHVertexBuffer;
-        public readonly BufferObject TraverseVertexBuffer;
         public ModelSystem ModelSystem;
         public unsafe BVH(ModelSystem modelSystem)
         {
             if (TreeDepth == 0) return;
 
             uint nodesPerMesh = (1u << (int)TreeDepth) - 1u;
-            List<GLSLTraverseVertex> expandedTraverseVertices = new List<GLSLTraverseVertex>(modelSystem.Vertices.Length);
-            List<GLSLTraverseVertex> alignedTraverseVertices = new List<GLSLTraverseVertex>(expandedTraverseVertices.Count);
-            GLSLBVHVertex[] bvhVertecis = new GLSLBVHVertex[modelSystem.Vertices.Length];
+            List<GLSLBVHVertex> bvhVertices = new List<GLSLBVHVertex>(modelSystem.Vertices.Length);
+            List<GLSLBVHVertex> expandedVertices = new List<GLSLBVHVertex>(modelSystem.Vertices.Length);
             GLSLNode[] nodes = new GLSLNode[nodesPerMesh * modelSystem.Meshes.Length];
-
-            for (int i = 0; i < modelSystem.Vertices.Length; i++)
-            {
-                bvhVertecis[i].TexCoord = modelSystem.Vertices[i].TexCoord;
-                bvhVertecis[i].Normal = modelSystem.Vertices[i].Normal;
-                bvhVertecis[i].Tangent = modelSystem.Vertices[i].Tangent;
-            }
 
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
                 Vector3 min = new Vector3(float.MaxValue);
                 Vector3 max = new Vector3(float.MinValue);
-                int start = expandedTraverseVertices.Count;
+                int start = expandedVertices.Count;
                 for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
                 {
-                    GLSLTraverseVertex vertex = new GLSLTraverseVertex();
                     uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
+                    GLSLBVHVertex vertex = new GLSLBVHVertex();
                     vertex.Position = modelSystem.Vertices[indici].Position;
-                    vertex.BVHVertexIndex = indici;
+                    vertex.TexCoord = modelSystem.Vertices[indici].TexCoord;
+                    vertex.Normal = modelSystem.Vertices[indici].Normal;
+                    vertex.Tangent = modelSystem.Vertices[indici].Tangent;
 
                     min.X = MathF.Min(min.X, vertex.Position.X);
                     min.Y = MathF.Min(min.Y, vertex.Position.Y);
@@ -54,9 +47,9 @@ namespace IDKEngine
                     max.Y = MathF.Max(max.Y, vertex.Position.Y);
                     max.Z = MathF.Max(max.Z, vertex.Position.Z);
 
-                    expandedTraverseVertices.Add(vertex);
+                    expandedVertices.Add(vertex);
                 }
-                int end = expandedTraverseVertices.Count;
+                int end = expandedVertices.Count;
 
                 modelSystem.Meshes[i].BaseNode = (int)(nodesPerMesh * i);
 
@@ -106,32 +99,28 @@ namespace IDKEngine
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
             BVHVertexBuffer = new BufferObject();
-            BVHVertexBuffer.ImmutableAllocate(bvhVertecis.Length * sizeof(GLSLBVHVertex), bvhVertecis, BufferStorageFlags.DynamicStorageBit);
+            BVHVertexBuffer.ImmutableAllocate(bvhVertices.Count * sizeof(GLSLBVHVertex), bvhVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
             BVHVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, BVHVertexBuffer.Size);
-
-            TraverseVertexBuffer = new BufferObject();
-            TraverseVertexBuffer.ImmutableAllocate(alignedTraverseVertices.Count * sizeof(GLSLTraverseVertex), alignedTraverseVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
-            TraverseVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 4, 0, TraverseVertexBuffer.Size);
 
             ModelSystem = modelSystem;
 
             void MakeLeaf(ref GLSLNode node, int start, int end)
             {
-                Debug.Assert(alignedTraverseVertices.Count < MathF.Pow(2, 31)); // only 31 bits because one is used as a marker for isLeaf
-                node.IsLeafAndVerticesStart = (uint)alignedTraverseVertices.Count;
+                Debug.Assert(bvhVertices.Count < MathF.Pow(2, 31)); // only 31 bits because one is used as a marker for isLeaf
+                node.IsLeafAndVerticesStart = (uint)bvhVertices.Count;
 
                 Vector3 center = (node.Min + node.Max) * 0.5f;
                 Vector3 size = node.Max - node.Min;
                 for (int i = start; i < end; i += 3)
                 {
-                    if (MyMath.TriangleVSBox(expandedTraverseVertices[i + 0].Position, expandedTraverseVertices[i + 1].Position, expandedTraverseVertices[i + 2].Position, center, size))
+                    if (MyMath.TriangleVSBox(expandedVertices[i + 0].Position, expandedVertices[i + 1].Position, expandedVertices[i + 2].Position, center, size))
                     {
-                        alignedTraverseVertices.Add(expandedTraverseVertices[i + 0]);
-                        alignedTraverseVertices.Add(expandedTraverseVertices[i + 1]);
-                        alignedTraverseVertices.Add(expandedTraverseVertices[i + 2]);
+                        bvhVertices.Add(expandedVertices[i + 0]);
+                        bvhVertices.Add(expandedVertices[i + 1]);
+                        bvhVertices.Add(expandedVertices[i + 2]);
                     }
                 }
-                uint count = (uint)alignedTraverseVertices.Count - node.IsLeafAndVerticesStart;
+                uint count = (uint)bvhVertices.Count - node.IsLeafAndVerticesStart;
                 Debug.Assert(count < (1u << (32 - (int)BITS_FOR_MISS_LINK)));
 
                 node.MissLinkAndVerticesCount = count;
