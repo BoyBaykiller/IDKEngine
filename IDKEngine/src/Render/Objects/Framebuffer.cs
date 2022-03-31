@@ -13,7 +13,6 @@ namespace IDKEngine.Render.Objects
 
         public void Clear(ClearBufferMask clearBufferMask)
         {
-            Bind();
             GL.Clear(clearBufferMask);
         }
 
@@ -25,12 +24,6 @@ namespace IDKEngine.Render.Objects
         public void ClearBuffer(ClearBuffer clearBuffer, int drawBuffer, int clearValue)
         {
             GL.ClearNamedFramebuffer(ID, clearBuffer, drawBuffer, ref clearValue);
-        }
-
-        public static void Clear(int id, ClearBufferMask clearBufferMask)
-        {
-            Bind(id);
-            GL.Clear(clearBufferMask);
         }
 
         public void SetRenderTarget(FramebufferAttachment framebufferAttachment, Texture texture, int level = 0)
@@ -74,14 +67,14 @@ namespace IDKEngine.Render.Objects
 
         public void GetPixels(int x, int y, int width, int height, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels)
         {
-            Bind();
+            Bind(FramebufferTarget.ReadFramebuffer);
             GL.ReadPixels(x, y, width, height, pixelFormat, pixelType, pixels);
             GL.Finish();
         }
 
         public void GetPixels<T>(int x, int y, int width, int height, PixelFormat pixelFormat, PixelType pixelType, T[] pixels) where T : struct
         {
-            Bind();
+            Bind(FramebufferTarget.ReadFramebuffer);
             GL.ReadPixels(x, y, width, height, pixelFormat, pixelType, pixels);
             GL.Finish();
         }

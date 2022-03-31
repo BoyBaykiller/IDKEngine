@@ -42,7 +42,6 @@ namespace IDKEngine.Render
                 shaderProgram.Upload("Clamp", _clamp);
             }
         }
-
         private enum Stage : int
         {
             Downsample = 0,

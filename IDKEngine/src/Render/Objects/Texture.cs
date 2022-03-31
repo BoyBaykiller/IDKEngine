@@ -31,6 +31,13 @@ namespace IDKEngine.Render.Objects
         public int Depth { get; private set; } = 1;
         public PixelInternalFormat PixelInternalFormat { get; private set; }
 
+        private static int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
+        private static int GetDummyTexture(TextureTarget textureTarget)
+        {
+            GL.CreateTextures(textureTarget, 1, out int id);
+            return id;
+        }
+
         public Texture(TextureTarget3d textureTarget3D)
         {
             Target = (TextureTarget)textureTarget3D;
@@ -125,9 +132,7 @@ namespace IDKEngine.Render.Objects
 
         public static void UnbindFromUnit(int unit)
         {
-            // NO dsa way to unbind from texture unit? GL.BindTextureUnit(unit, 0) doesnt work
-            GL.ActiveTexture(TextureUnit.Texture0 + unit);
-            GL.BindTexture(TextureTarget.Texture2D, 0);
+            GL.BindTextureUnit(unit, dummyTexture);
         }
 
         public static void MultiBindToUnit(int first, int[] textures)

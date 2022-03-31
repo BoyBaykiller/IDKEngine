@@ -10,7 +10,7 @@ namespace IDKEngine
 {
     class BVH
     {
-        public const uint BITS_FOR_MISS_LINK = 10u; // also adjust in PathTracing/compute.glsl
+        public const uint BITS_FOR_MISS_LINK = 10u; // also adjust in shader
 
         public uint TreeDepth = 3;
         public readonly BufferObject BVHBuffer;

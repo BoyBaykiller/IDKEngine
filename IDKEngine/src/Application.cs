@@ -31,7 +31,6 @@ namespace IDKEngine
         protected override unsafe void OnRender(float dT)
         {
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
-            
             if (!IsPathTracing)
             {
                 // Compute last frames SSAO
@@ -47,15 +46,15 @@ namespace IDKEngine
                     }
                     GL.ColorMask(true, true, true, true);
                 }
-                
+
                 ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 
                 GL.Viewport(0, 0, Size.X, Size.Y);
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
-                
+
                 if (IsBloom)
                     Bloom.Compute(ForwardRenderer.Result);
-                
+
                 if (IsVolumetricLighting)
                     VolumetricLight.Compute(ForwardRenderer.Depth);
 
@@ -66,7 +65,7 @@ namespace IDKEngine
             }
             else
             {
-                PathTracer.Render();
+                PathTracer.Compute();
                 Texture.UnbindFromUnit(1);
                 Texture.UnbindFromUnit(2);
 
@@ -211,8 +210,7 @@ namespace IDKEngine
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse });
 
-
-            ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y);
+            ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 3.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 2.0f, new Vector3(0.025f));
@@ -247,12 +245,11 @@ namespace IDKEngine
             Image<Rgba32> img = SixLabors.ImageSharp.Image.Load<Rgba32>("res/textures/blueNoise/LDR_RGBA_1024.png");
             Texture blueNoise = new Texture(TextureTarget2d.Texture2D);
             blueNoise.ImmutableAllocate(img.Width, img.Height, 1, SizedInternalFormat.Rgba8);
-            fixed (void* ptr = img.GetPixelRowSpan(0))
-            {
-                blueNoise.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
-            }
-            BufferObject blueNoiseUBO = new BufferObject();
+            blueNoise.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            blueNoise.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            blueNoise.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, img.GetPixelRowSpan(0).ToPtr());
             
+            BufferObject blueNoiseUBO = new BufferObject();
             blueNoiseUBO.ImmutableAllocate(sizeof(long), blueNoise.MakeHandleResidentARB(), BufferStorageFlags.DynamicStorageBit);
             blueNoiseUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 4, 0, blueNoiseUBO.Size);
 

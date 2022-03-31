@@ -109,6 +109,7 @@ namespace IDKEngine.Render
                 Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
 
             GL.Viewport(0, 0, Result.Width, Result.Height);
+            framebuffer.Bind();
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
             renderProgram.Use();

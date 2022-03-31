@@ -96,9 +96,10 @@ namespace IDKEngine.GUI
             io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int width, out int height, out _);
 
             fontTexture = new Texture(TextureTarget2d.Texture2D);
+            fontTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            fontTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             fontTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
             fontTexture.SubTexture2D(width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
-            fontTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
 
             io.Fonts.SetTexID((IntPtr)fontTexture.ID);
             io.Fonts.ClearTexData();

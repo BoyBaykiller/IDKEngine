@@ -27,8 +27,6 @@ namespace IDKEngine.Render
         public uint[] Indices;
         public BufferObject ElementBuffer;
 
-        public BufferObject ClipPosBuffer;
-
         public readonly VAO VAO;
         public unsafe ModelSystem()
         {
@@ -50,17 +48,14 @@ namespace IDKEngine.Render
             Indices = new uint[0];
             ElementBuffer = new BufferObject();
 
-            ClipPosBuffer = new BufferObject();
-            ClipPosBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
-
             VAO = new VAO();
             VAO.SetElementBuffer(ElementBuffer);
             VAO.AddSourceBuffer(VertexBuffer, 0, sizeof(GLSLVertex));
-            VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0 * sizeof(float)); // Position
-            VAO.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 4 * sizeof(float)); // TexCoord
-            VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, 8 * sizeof(float)); // Normals
-            VAO.SetAttribFormat(0, 3, 3, VertexAttribType.Float, 12 * sizeof(float)); // Tangent
-            VAO.SetAttribFormat(0, 4, 3, VertexAttribType.Float, 16 * sizeof(float)); // BiTangent
+            VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
+            VAO.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
+            VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 8); // Normals
+            VAO.SetAttribFormat(0, 3, 3, VertexAttribType.Float, sizeof(float) * 12); // Tangent
+            VAO.SetAttribFormat(0, 4, 3, VertexAttribType.Float, sizeof(float) * 16); // BiTangent
         }
         public unsafe void Add(Model[] models)
         {
@@ -116,7 +111,6 @@ namespace IDKEngine.Render
             MaterialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
             VertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices);
             ElementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
-            ClipPosBuffer.MutableAllocate(Vertices.Length * sizeof(Vector4), (IntPtr)0);
         }
 
         public void Draw()
@@ -152,7 +146,7 @@ namespace IDKEngine.Render
             for (int i = start; i < end; i++)
                 func(ref Meshes[i]);
 
-            fixed (void* ptr = &Meshes[start].Model)
+            fixed (void* ptr = &Meshes[start])
             {
                 MeshBuffer.SubData(start * sizeof(GLSLMesh), (end - start) * sizeof(GLSLMesh), (IntPtr)ptr);
             }

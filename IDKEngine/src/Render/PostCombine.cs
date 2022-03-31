@@ -8,13 +8,14 @@ namespace IDKEngine.Render
     class PostCombine
     {
         public readonly Texture Result;
-        
+
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PostCombine/compute.glsl")));
         public PostCombine(int width, int height)
         {
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
         }
 
@@ -33,6 +34,7 @@ namespace IDKEngine.Render
 
             if (v3 != null) v3.BindToUnit(3);
             else Texture.UnbindFromUnit(3);
+
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);

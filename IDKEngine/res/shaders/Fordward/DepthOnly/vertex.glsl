@@ -32,6 +32,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float FarPlane;
 } basicDataUBO;
 
+layout(std140, binding = 5) uniform TaaDataUBO
+{
+    vec4 Jitters[32 / 2];
+    int Samples;
+    int Enabled;
+    int Frame;
+} taaDataUBO;
+
 out InOutVars
 {
     vec2 TexCoord;
@@ -41,10 +49,19 @@ out InOutVars
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    mat4 model = mesh.Model;
-    vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.TexCoord = TexCoord;
 
-    gl_Position = basicDataUBO.ProjView * vec4(fragPos, 1.0);
+    vec3 fragPos = (mesh.Model * vec4(Position, 1.0)).xyz;
+    
+    int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
+    vec2 offset = vec2(
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 0],
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 1]
+    );
+
+    vec4 jitteredClipPos = basicDataUBO.ProjView * vec4(fragPos, 1.0);
+    jitteredClipPos.xy += offset * jitteredClipPos.w * taaDataUBO.Enabled;
+
+    gl_Position = jitteredClipPos;
 }

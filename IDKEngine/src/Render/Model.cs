@@ -134,13 +134,11 @@ namespace IDKEngine.Render.Objects
                     Image<Rgba32> img = images[perMaterialTextures.Length * i + j];
                     if (img != null)
                     {
-                        texture.ImmutableAllocate(img.Width, img.Height, 1, (SizedInternalFormat)format, Texture.GetMaxMipMaplevel(img.Width, img.Height, 1));
-                        fixed (void* ptr = img.GetPixelRowSpan(0))
-                        {
-                            texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
-                        }
-                        texture.GenerateMipmap();
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
+                        texture.SetWrapMode(OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat, OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
+                        texture.ImmutableAllocate(img.Width, img.Height, 1, (SizedInternalFormat)format, Texture.GetMaxMipMaplevel(img.Width, img.Height, 1));
+                        texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, img.GetPixelRowSpan(0).ToPtr());
+                        texture.GenerateMipmap();
                         if (Helper.IsCoreExtensionAvailable("GL_ARB_texture_filter_anisotropic", 4.6) || Helper.IsExtensionsAvailable("GL_EXT_texture_filter_anisotropic"))
                             texture.SetAnisotropy(4.0f);
 

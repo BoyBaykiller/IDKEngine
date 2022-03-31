@@ -42,6 +42,7 @@ namespace IDKEngine.Render
             }
         }
 
+
         private readonly ShaderProgram shaderProgram;
 
         public readonly Texture Result;
