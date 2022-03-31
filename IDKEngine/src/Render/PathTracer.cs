@@ -65,7 +65,7 @@ namespace IDKEngine.Render
 			ApertureDiameter = 0.03f;
         }
 
-        public void Render()
+        public void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             EnvironmentMap.BindToUnit(0);

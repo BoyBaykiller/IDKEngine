@@ -93,9 +93,8 @@ namespace IDKEngine.Render.Objects
         {
             GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, data);
         }
-        public void GetSubData(int offset, int size, out IntPtr data)
+        public void GetSubData(int offset, int size, IntPtr data)
         {
-            data = Marshal.AllocHGlobal(size);
             GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, data);
         }
 

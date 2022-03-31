@@ -34,7 +34,7 @@ namespace IDKEngine.Render
         public unsafe Lighter(int latitudes, int longitudes)
         {
             bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 3, 0, bufferObject.Size);
 
             ObjectFactory.Vertex[] vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);

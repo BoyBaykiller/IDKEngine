@@ -154,6 +154,24 @@ namespace IDKEngine.Render
                     {
                         ImGui.Checkbox("IsShadows", ref window.IsShadows);
                     }
+
+                    if (ImGui.CollapsingHeader("TAA"))
+                    {
+                        bool tempBool = window.ForwardRenderer.TaaEnabled;
+                        if (ImGui.Checkbox("IsTAA", ref tempBool))
+                        {
+                            window.ForwardRenderer.TaaEnabled = tempBool;
+                        }
+
+                        if (window.ForwardRenderer.TaaEnabled)
+                        {
+                            int tempInt = window.ForwardRenderer.TaaSamples;
+                            if (ImGui.SliderInt("Samples", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
+                            {
+                                window.ForwardRenderer.TaaSamples = tempInt;
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -298,7 +316,7 @@ namespace IDKEngine.Render
                 window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
                 if (window.ForwardRenderer.RenderMeshAABBIndex == selectedMeshIndex)
                     selectedMeshIndex = -1;
-                
+
                 window.ForwardRenderer.RenderMeshAABBIndex = selectedMeshIndex;
             }
         }

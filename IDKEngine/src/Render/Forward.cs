@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
-using IDKEngine.Render.Objects;
+using System.Diagnostics;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class Forward
+    unsafe class Forward
     {
         public const int MESH_INDEX_CLEAR_COLOR = -1;
 
@@ -21,18 +23,43 @@ namespace IDKEngine.Render
             }
         }
 
+        public bool TaaEnabled
+        {
+            get => taaData->IsEnabled == 1 ? true : false;
+
+            set
+            {
+                taaData->IsEnabled = value ? 1 : 0;
+                TaaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + sizeof(int), sizeof(int), taaData->IsEnabled);
+            }
+        }
+        public int TaaSamples
+        {
+            get => taaData->Samples;
+
+            set
+            {
+                taaData->Samples = value;
+                TaaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT, sizeof(int), taaData->Samples);
+            }
+        }
+
+        public Texture Result => isPing ? taaPing : taaPong;
+
         public readonly Framebuffer Framebuffer;
         public readonly Texture NormalSpec;
-        public readonly Texture MeshIndex;
-        public readonly Texture Depth;
+        public readonly Texture MeshIndexes;
         public readonly Texture Velocity;
+        public readonly Texture Depth;
+        public readonly BufferObject TaaBuffer;
         public readonly Lighter LightingContext;
-        
-        public readonly Texture Result;
 
         private static readonly ShaderProgram shadingProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/fragment.glsl")));
+
+        private static readonly ShaderProgram taaResolveProgram = new ShaderProgram(
+            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Fordward/TAAResolve/compute.glsl")));
 
         private static readonly ShaderProgram depthOnlyProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/vertex.glsl")),
@@ -46,33 +73,72 @@ namespace IDKEngine.Render
             new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
             new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
 
-        public Forward(Lighter lighter, int width, int height)
+        private int taaFrame
         {
-            Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            get => taaData->Frame;
+
+            set
+            {
+                taaData->Frame = value;
+                TaaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + 2 * sizeof(int), sizeof(int), taaData->Frame);
+            }
+        }
+
+        private readonly GLSLTaaData* taaData;
+
+        private readonly Texture taaPing;
+        private readonly Texture taaPong;
+        private bool isPing = true;
+
+        public Forward(Lighter lighter, int width, int height, int taaSamples)
+        {
+            Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
+
+            taaPing = new Texture(TextureTarget2d.Texture2D);
+            taaPing.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            taaPing.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            taaPing.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+
+            taaPong = new Texture(TextureTarget2d.Texture2D);
+            taaPong.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            taaPong.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            taaPong.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             NormalSpec = new Texture(TextureTarget2d.Texture2D);
             NormalSpec.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            NormalSpec.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             NormalSpec.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8Snorm, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
-            MeshIndex = new Texture(TextureTarget2d.Texture2D);
-            MeshIndex.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            MeshIndex.MutableAllocate(width, height, 1, PixelInternalFormat.R32i, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+            MeshIndexes = new Texture(TextureTarget2d.Texture2D);
+            MeshIndexes.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            MeshIndexes.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            MeshIndexes.MutableAllocate(width, height, 1, PixelInternalFormat.R32i, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
 
             Velocity = new Texture(TextureTarget2d.Texture2D);
             Velocity.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.R16Snorm, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
+            Velocity.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg16Snorm, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
             Depth = new Texture(TextureTarget2d.Texture2D);
             Depth.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Depth.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Depth.MutableAllocate(width, height, 1, PixelInternalFormat.DepthComponent24, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
 
+            taaData = Helper.Malloc<GLSLTaaData>();
+            taaData->Samples = taaSamples;
+            taaData->IsEnabled = 1;
+            Span<float> jitterData = new Span<float>(taaData->Jitter, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);
+            MyMath.GetHaltonSequence_2_3(jitterData);
+            MyMath.MapHaltonSequence(jitterData, width, height);
+
+            TaaBuffer = new BufferObject();
+            TaaBuffer.ImmutableAllocate(sizeof(GLSLTaaData), (IntPtr)taaData, BufferStorageFlags.DynamicStorageBit);
+            TaaBuffer.BindBufferRange(BufferRangeTarget.UniformBuffer, 5, 0, TaaBuffer.Size);
+
             Framebuffer = new Framebuffer();
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, taaPing);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, NormalSpec);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, MeshIndex);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, MeshIndexes);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment3, Velocity);
             Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Depth);
 
@@ -85,6 +151,7 @@ namespace IDKEngine.Render
         public void Render(ModelSystem modelSystem, Texture skyBox = null, Texture ambientOcclusion = null)
         {
             Framebuffer.Bind();
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, isPing ? taaPing : taaPong);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 0, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 2, MESH_INDEX_CLEAR_COLOR);
@@ -125,11 +192,20 @@ namespace IDKEngine.Render
                 GL.Enable(EnableCap.CullFace);
             }
 
-
             GL.DepthMask(true);
             GL.DepthFunc(DepthFunction.Less);
 
             LightingContext.Draw();
+
+            if (taaData->IsEnabled == 1)
+            {
+                taaResolveProgram.Use();
+                (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+                (isPing ? taaPong : taaPing).BindToUnit(0);
+                Velocity.BindToUnit(1);
+                GL.DispatchCompute((taaPing.Width + 8 - 1) / 8, (taaPing.Height + 4 - 1) / 4, 1);
+                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+            }
 
             if (RenderMeshAABBIndex >= 0)
             {
@@ -144,15 +220,24 @@ namespace IDKEngine.Render
                 GL.Enable(EnableCap.CullFace);
                 GL.Enable(EnableCap.DepthTest);
             }
+
+            isPing = !isPing;
+            taaFrame++;
         }
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            taaPing.MutableAllocate(width, height, 1, taaPing.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            taaPong.MutableAllocate(width, height, 1, taaPong.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             Depth.MutableAllocate(width, height, 1, Depth.PixelInternalFormat, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
             NormalSpec.MutableAllocate(width, height, 1, NormalSpec.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgb, PixelType.Float);
-            MeshIndex.MutableAllocate(width, height, 1, MeshIndex.PixelInternalFormat, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+            MeshIndexes.MutableAllocate(width, height, 1, MeshIndexes.PixelInternalFormat, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
             Velocity.MutableAllocate(width, height, 1, Velocity.PixelInternalFormat, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
+
+            Span<float> jitterData = new Span<float>(taaData->Jitter, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);
+            MyMath.GetHaltonSequence_2_3(jitterData);
+            MyMath.MapHaltonSequence(jitterData, width, height);
+            TaaBuffer.SubData(0, sizeof(float) * jitterData.Length, jitterData.ToPtr());
         }
     }
 }

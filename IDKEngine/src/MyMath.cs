@@ -5,33 +5,48 @@ namespace IDKEngine
 {
     static class MyMath
     {
-        public static float[] GetMapedHaltonSequence_2_3(int length, int width, int height)
+        // Source: https://github.com/leesg213/TemporalAA/blob/main/Renderer/AAPLRenderer.mm#L152
+        public static void GetHaltonSequence_2_3(Span<float> buffer)
         {
-            float[] haltonSequence = new float[length];
-            float xScale = 1.0f / width;
-            float yScale = 1.0f / height;
-
-            for (int i = 0; i < haltonSequence.Length; i++)
+            int n2 = 0, d2 = 1, n3 = 0, d3 = 1;
+            for (int i = 0; i < buffer.Length; i += 2)
             {
-                float haltonValue = GetHalton(i + 1, i % 2 == 0 ? 2 : 3);
-                haltonSequence[i] = (haltonValue - 0.5f) * (i % 2 == 0 ? xScale : yScale);
+                buffer[i + 0] = GetHalton(2, ref n2, ref d2);
+                buffer[i + 1] = GetHalton(3, ref n3, ref d3);
             }
-
-            return haltonSequence;
         }
-        public static float GetHalton(int index, int haltonBase)
-        {
-            float f = 1.0f;
-            float haltonValue = 0.0f;
 
-            while (index > 0)
+        // Source: https://github.com/leesg213/TemporalAA/blob/main/Renderer/AAPLRenderer.mm#L124
+        public static float GetHalton(int baseHalton, ref int n, ref int d)
+        {
+            int x = d - n;
+            if (x == 1)
             {
-                f /= haltonBase;
-                haltonValue += f * (index % haltonBase);
-                index = (int)MathF.Floor(index / (float)haltonBase);
+                n = 1;
+                d *= baseHalton;
+            }
+            else
+            {
+                int y = d / baseHalton;
+                while(x <= y)
+                {
+                    y /= baseHalton;
+                }
+
+                n = (baseHalton + 1) * y - x;
             }
 
-            return haltonValue;
+            float result = n / (float)d;
+            return result;
+        }
+        
+        public static void MapHaltonSequence(Span<float> halton, float width, float height)
+        {
+            for (int i = 0; i < halton.Length; i += 2)
+            {
+                halton[i + 0] = (halton[i + 0] * 2.0f - 1.0f) / width;
+                halton[i + 1] = (halton[i + 1] * 2.0f - 1.0f) / height;
+            }
         }
 
         public static void BitsInsert(ref uint mem, uint data, int offset, int bits)

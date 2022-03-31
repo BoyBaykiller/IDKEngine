@@ -30,6 +30,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float FarPlane;
 } basicDataUBO;
 
+layout(std140, binding = 5) uniform TaaDataUBO
+{
+    vec4 Jitters[32 / 2];
+    int Samples;
+    int Enabled;
+    int Frame;
+} taaDataUBO;
+
 out InOutVars
 {
     vec3 FragColor;
@@ -47,5 +55,14 @@ void main()
         vec4(light.Position, 1.0)
     );
 
-    gl_Position = basicDataUBO.ProjView * model * vec4(Position, 1.0);
+    int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
+    vec2 offset = vec2(
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 0],
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 1]
+    );
+
+    vec4 jitteredClipPos = basicDataUBO.ProjView * model * vec4(Position, 1.0);
+    jitteredClipPos.xy += offset * jitteredClipPos.w * taaDataUBO.Enabled;
+
+    gl_Position = jitteredClipPos;
 }

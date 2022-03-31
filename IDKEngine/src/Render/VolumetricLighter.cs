@@ -75,7 +75,7 @@ namespace IDKEngine.Render
 
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             Samples = samples;
@@ -88,7 +88,6 @@ namespace IDKEngine.Render
         public void Compute(Texture depth)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
-            // Can't use unit 0 because it gets unbound in forward pass when SSAO is disabled (?)
             depth.BindToUnit(1);
 
             shaderProgram.Use();

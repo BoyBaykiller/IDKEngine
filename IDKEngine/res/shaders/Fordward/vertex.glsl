@@ -20,11 +20,6 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 5) restrict buffer ClipPosSSBO
-{
-    vec4 ClipPos[];
-} clipPosSSBO;
-
 layout(std140, binding = 0) uniform BasicDataUBO
 {
     mat4 ProjView;
@@ -39,6 +34,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float NearPlane;
     float FarPlane;
 } basicDataUBO;
+
+layout(std140, binding = 5) uniform TaaDataUBO
+{
+    vec4 Jitters[32 / 2];
+    int Samples;
+    int Enabled;
+    int Frame;
+} taaDataUBO;
 
 out InOutVars
 {
@@ -67,15 +70,23 @@ void main()
     outData.TexCoord = TexCoord;
     outData.FragPos = (mesh.Model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
-
-    outData.PrevClipPos = clipPosSSBO.ClipPos[gl_VertexID];
+    
+    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
     
     outData.Normal = Normal;
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.Emissive = mesh.Emissive;
     outData.NormalMapStrength = mesh.NormalMapStrength;
+    
+    int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
+    vec2 offset = vec2(
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 0],
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 1]
+    );
 
-    clipPosSSBO.ClipPos[gl_VertexID] = outData.ClipPos;
-    gl_Position = outData.ClipPos;
+    vec4 jitteredClipPos = outData.ClipPos;
+    jitteredClipPos.xy += offset * outData.ClipPos.w * taaDataUBO.Enabled;
+    
+    gl_Position = jitteredClipPos;
 }
