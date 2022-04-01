@@ -203,13 +203,14 @@ namespace IDKEngine.Render
                 (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
                 (isPing ? taaPong : taaPing).BindToUnit(0);
                 Velocity.BindToUnit(1);
+                Depth.BindToUnit(2);
                 GL.DispatchCompute((taaPing.Width + 8 - 1) / 8, (taaPing.Height + 4 - 1) / 4, 1);
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             }
 
             if (RenderMeshAABBIndex >= 0)
             {
-                GL.Disable(EnableCap.DepthTest);
+                GL.DepthFunc(DepthFunction.Always);
                 GL.Disable(EnableCap.CullFace);
                 GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
 
@@ -218,7 +219,7 @@ namespace IDKEngine.Render
 
                 GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
                 GL.Enable(EnableCap.CullFace);
-                GL.Enable(EnableCap.DepthTest);
+                GL.DepthFunc(DepthFunction.Less);
             }
 
             isPing = !isPing;
