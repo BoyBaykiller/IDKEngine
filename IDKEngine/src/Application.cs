@@ -197,7 +197,7 @@ namespace IDKEngine
             gui = new Gui(Size.X, Size.Y);
             gui.ImGuiController.IsIgnoreMouseInput = true;
 
-            camera = new Camera(new Vector3(3.68f, 7.7f, 2.53f), new Vector3(0.0f, 1.0f, 0.0f), -128.3f, -1.6f, 0.1f, 0.25f);
+            camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.Meshes.Length; i++) // 0.0145f

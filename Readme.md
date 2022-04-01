@@ -15,6 +15,7 @@ Feature list:
  - Single pass Vertex Layered Rendering for point shadows
  - GPU accelerated Frustum Culling for shadows and camera
  - Ray marched Volumetric Lighting
+ - Temporal Anti Aliasing
  - Fast CoD-Modern-Warfare Bloom implementation
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
  - Path Tracer (early progress and no bvh yet so really really slow)

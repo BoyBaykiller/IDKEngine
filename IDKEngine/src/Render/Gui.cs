@@ -309,7 +309,7 @@ namespace IDKEngine.Render
         public void Update(Application window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
-            if (!window.IsPathTracing && window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
+            if (!window.IsPathTracing && window.MouseState.CursorMode == CursorModeValue.CursorNormal && window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 point.Y = window.Size.Y - point.Y;
