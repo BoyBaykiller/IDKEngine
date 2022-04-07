@@ -80,7 +80,7 @@ namespace IDKEngine.Render.Objects
 
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
                 Meshes[i].Model = Matrix4.Identity;
-                Meshes[i].NormalMapStrength = 1.0f;
+                Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
 
                 DrawCommands[i].InstanceCount = 1;
                 DrawCommands[i].BaseInstance = 0;
@@ -96,19 +96,33 @@ namespace IDKEngine.Render.Objects
                     images[i] = Image.Load<Rgba32>(Path.Combine(dirPath, textureSlot.FilePath));
             });
 
-            while (!vertecisLoadResult.IsCompleted && !texturesLoadResult.IsCompleted) ;
-
             List<uint> indices = new List<uint>();
             for (int i = 0; i < scene.MeshCount; i++)
             {
                 DrawCommands[i].FirstIndex = indices.Count;
-                    
+
                 uint[] thisIndices = scene.Meshes[i].GetUnsignedIndices();
                 indices.AddRange(thisIndices);
-                    
+
                 DrawCommands[i].Count = thisIndices.Length;
             }
             Indices = indices.ToArray();
+
+            for (int i = 0; i < scene.RootNode.MeshCount; i++)
+            {
+                Console.WriteLine(scene.RootNode.MeshIndices[i]);
+                Meshes[scene.RootNode.MeshIndices[i]].Model = AssimpToOpenTKMat4(scene.RootNode.Transform);
+            }
+
+            for (int i = 0; i < scene.RootNode.ChildCount; i++)
+            {
+                for (int j = 0; j < scene.RootNode.Children[i].MeshCount; j++)
+                {
+                    Meshes[scene.RootNode.Children[i].MeshIndices[j]].Model *= AssimpToOpenTKMat4(scene.RootNode.Children[i].Transform);
+                }
+            }
+
+            while (!vertecisLoadResult.IsCompleted && !texturesLoadResult.IsCompleted) ;
 
             for (int i = 0; i < Materials.Length; i++)
             {
@@ -158,6 +172,13 @@ namespace IDKEngine.Render.Objects
                     }
                 }
             }
+        }
+
+        private static unsafe Matrix4 AssimpToOpenTKMat4(Matrix4x4 matrix)
+        {
+            Matrix4 result = *(Matrix4*)&matrix;
+            result.Transpose();
+            return result;
         }
     }
 }
