@@ -52,9 +52,9 @@ namespace IDKEngine
             Console.WriteLine();
         }
 
-        public static unsafe T* Malloc<T>() where T : unmanaged
+        public static unsafe T* Malloc<T>(int count = 1) where T : unmanaged
         {
-            return (T*)Marshal.AllocHGlobal(sizeof(T));
+            return (T*)Marshal.AllocHGlobal(sizeof(T) * count);
         }
 
         public static unsafe IntPtr ToPtr<T>(this Span<T> span) where T : unmanaged
@@ -64,7 +64,6 @@ namespace IDKEngine
                 return (IntPtr)ptr;
             }
         }
-
         public static unsafe IntPtr ToPtr<T>(this T[] arr) where T : unmanaged
         {
             fixed (void* ptr = arr)

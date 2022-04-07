@@ -287,7 +287,7 @@ vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, ou
     if (specularChance > raySelectRoll)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);
-        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRay, roughness)); 
+        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRay, roughness * roughness)); 
         outgoing = reflectionRayDir;
         rayProbability = specularChance;
     }

@@ -68,9 +68,9 @@ void NeighborhoodClamping(ivec2 imgCoord, out ivec2 bestPixel, out vec3 current,
             neighborhoodMax = max(neighborhoodMax, neighbor);
             
             if (x == 0 && y == 0)
-			{
-				current = neighbor;
-			}
+            {
+                current = neighbor;
+            }
     
             float currentDepth = texelFetch(SamplerDepth, curPixel, 0).r;
             if (currentDepth < bestDepth)

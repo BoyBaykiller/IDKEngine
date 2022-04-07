@@ -321,16 +321,6 @@ namespace IDKEngine.Render
             }
         }
 
-        private static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)
-        {
-            return new System.Numerics.Vector2(vector2.X, vector2.Y);
-        }
-
-        private static Vector2 SystemToOpenTK(System.Numerics.Vector2 vector2)
-        {
-            return new Vector2(vector2.X, vector2.Y);
-        }
-
         private static System.Numerics.Vector3 OpenTKToSystem(Vector3 vector3)
         {
             return new System.Numerics.Vector3(vector3.X, vector3.Y, vector3.Z);

@@ -87,6 +87,8 @@ namespace IDKEngine
             finalProgram.Use();
 
             GL.DrawArrays(PrimitiveType.Quads, 0, 4);
+            
+            GLSLBasicData.FrameCount++;
             gui.Render(this, (float)dT);
 
             GL.Enable(EnableCap.CullFace);
@@ -94,7 +96,6 @@ namespace IDKEngine
             GL.Disable(EnableCap.Blend);
 
             fps++;
-            GLSLBasicData.FrameCount++;
         }
 
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
@@ -207,8 +208,12 @@ namespace IDKEngine
             for (int i = 0; i < horse.Meshes.Length; i++)
                 horse.Meshes[i].Model = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, 0.5f);
 
+            Model deccer = new Model("res/models/deccer/SM_Deccer_Cubes_Textured.gltf");
+            for (int i = 0; i < deccer.Meshes.Length; i++)
+                deccer.Meshes[i].Model = deccer.Meshes[i].Model * Matrix4.CreateScale(0.4f);
+
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza, horse });
+            ModelSystem.Add(new Model[] { sponza, horse, deccer });
 
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 3.0f);

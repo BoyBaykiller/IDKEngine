@@ -74,9 +74,10 @@ namespace IDKEngine.Render
             Array.Resize(ref DrawCommands, DrawCommands.Length + models.Sum(m => m.DrawCommands.Length));
             Array.Resize(ref Meshes, Meshes.Length + models.Sum(m => m.Meshes.Length));
             Array.Resize(ref Materials, Materials.Length + models.Sum(m => m.Materials.Length));
-            Debug.Assert(Materials.Length <= GLSL_MAX_UBO_MATERIAL_COUNT);
             Array.Resize(ref Vertices, Vertices.Length + models.Sum(m => m.Vertices.Length));
             Array.Resize(ref Indices, Indices.Length + models.Sum(m => m.Indices.Length));
+            
+            Debug.Assert(Materials.Length <= GLSL_MAX_UBO_MATERIAL_COUNT);
 
             for (int i = 0; i < models.Length; i++)
             {

@@ -1,10 +1,10 @@
-﻿using IDKEngine.Render;
-using IDKEngine.Render.Objects;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Mathematics;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
+using IDKEngine.Render;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
@@ -126,67 +126,17 @@ namespace IDKEngine
                 node.MissLinkAndVerticesCount = count;
                 MyMath.BitsInsert(ref node.IsLeafAndVerticesStart, 1, 31, 1);
             }
-
-            Console.WriteLine(GetNearSiblingRight(1, 1, 31)); // 1 -> 16
-            //Console.WriteLine(GetAdjacentSibling(1, 1, 5)); // 1 -> 16
-            
-            Console.WriteLine("=========");
-
-            Console.WriteLine(GetNearSiblingRight(2, 2, 31)); // 2 -> 9
-            Console.WriteLine(GetAdjacentSibling(9, 2, 5)); // 9 -> 17
-            Console.WriteLine(GetNearSiblingRight(17, 2, 31)); // 17 -> 24
-
-            Console.WriteLine("=========");
-
-            Console.WriteLine(GetNearSiblingRight(3, 3, 31)); // 3 -> 6
-            Console.WriteLine(GetAdjacentSibling(6, 2, 4)); // 6 -> 10
-            Console.WriteLine(GetNearSiblingRight(10, 3, 31)); // 10 -> 13
-            Console.WriteLine(GetAdjacentSibling(13, 3, 5)); // 13 -> 18
-            Console.WriteLine(GetNearSiblingRight(18, 3, 31)); // 18 -> 21
-            Console.WriteLine(GetAdjacentSibling(21, 2, 4)); // 21 -> 25
-            Console.WriteLine(GetNearSiblingRight(25, 3, 31)); // 25 -> 28
-
-            Console.WriteLine("=========");
-            for (int i = 0; i < TreeDepth; i++)
-            {
-                uint index = (uint)i;
-                for (int j = 1; j < NodesOnLevel(i); j++)
-                {
-                    if (j % 2 == 0)
-                    {
-                        // FIX: Find correct arguments lol
-                        uint newIndex = GetAdjacentSibling(index, 1, 4);
-                    }
-                    else
-                    {
-                        uint newIndex = GetNearSiblingRight(index, i, nodesPerMesh);
-                    }
-                }
-            }
         }
 
-        private static uint GetRightChildIndex(uint parent, int treeDepth, int level)
+        private static uint GetDistanceSibling(int level, uint allNodesCount)
         {
-            return parent + (1u << (treeDepth - level));
-        }
-        private static uint GetNearSiblingRight(uint index, int level, uint allNodesCount)
-        {
-            return index + (allNodesCount / (1u << level));
-        }
-        private static uint GetAdjacentSibling(uint index, uint level, uint treeDepth)
-        {
-            uint result = treeDepth - 1u;
-            for (uint i = treeDepth - 2; i >= level; i--)
-            {
-                result = result * 2u - i;
-            }
-            return index + result;
+            return allNodesCount / (1u << level);
         }
         private static uint NodesOnLevel(int level)
         {
             return 1u << level;
         }
-
+        
         private static void SetMissLink(ref GLSLNode node, uint missLink)
         {
             Debug.Assert(missLink < (1u << (int)BITS_FOR_MISS_LINK));
