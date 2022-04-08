@@ -210,7 +210,7 @@ namespace IDKEngine
 
             Model deccer = new Model("res/models/deccer/SM_Deccer_Cubes_Textured.gltf");
             for (int i = 0; i < deccer.Meshes.Length; i++)
-                deccer.Meshes[i].Model = deccer.Meshes[i].Model * Matrix4.CreateScale(0.4f);
+                deccer.Meshes[i].Model = deccer.Meshes[i].Model * Matrix4.CreateTranslation(0.0f, 4.0f, 0.0f) * Matrix4.CreateScale(0.4f);
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse, deccer });
