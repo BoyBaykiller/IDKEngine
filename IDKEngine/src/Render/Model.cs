@@ -108,21 +108,20 @@ namespace IDKEngine.Render.Objects
             }
             Indices = indices.ToArray();
 
-            for (int i = 0; i < scene.RootNode.MeshCount; i++)
-            {
-                Console.WriteLine(scene.RootNode.MeshIndices[i]);
-                Meshes[scene.RootNode.MeshIndices[i]].Model = AssimpToOpenTKMat4(scene.RootNode.Transform);
-            }
+            while (!vertecisLoadResult.IsCompleted && !texturesLoadResult.IsCompleted) ;
 
-            for (int i = 0; i < scene.RootNode.ChildCount; i++)
+            PreTransformMeshes(scene.RootNode);
+            void PreTransformMeshes(Node node)
             {
-                for (int j = 0; j < scene.RootNode.Children[i].MeshCount; j++)
+                for (int i = 0; i < node.ChildCount; i++)
                 {
-                    Meshes[scene.RootNode.Children[i].MeshIndices[j]].Model *= AssimpToOpenTKMat4(scene.RootNode.Children[i].Transform);
+                    for (int j = 0; j < node.Children[i].MeshCount; j++)
+                    {
+                        Meshes[node.Children[i].MeshIndices[j]].Model *= AssimpToOpenTKMat4(node.Children[i].Transform);
+                    }
+                    PreTransformMeshes(node.Children[i]);
                 }
             }
-
-            while (!vertecisLoadResult.IsCompleted && !texturesLoadResult.IsCompleted) ;
 
             for (int i = 0; i < Materials.Length; i++)
             {
