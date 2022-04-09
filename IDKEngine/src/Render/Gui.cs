@@ -87,7 +87,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = window.VolumetricLight.Strength;
-                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 30.0f))
+                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 50.0f))
                             {
                                 window.VolumetricLight.Strength = tempFloat;
                             }
