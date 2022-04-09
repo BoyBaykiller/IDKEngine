@@ -114,7 +114,7 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
         if (!Shadow(pointShadow, lightToSample))
         {
             float lengthToLight = length(lightToSample);
-            vec3 power = light.Color / dot(lightToSample, lightToSample);
+            vec3 power = light.Color / (4.0 * PI * dot(lightToSample, lightToSample));
             
             // Apply Beers's law
             vec3 lightDir = lightToSample / lengthToLight;

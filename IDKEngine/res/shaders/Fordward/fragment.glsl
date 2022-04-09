@@ -175,7 +175,7 @@ vec3 BlinnPhong(Light light)
             specular = light.Color * spec * Specular;
         }
         
-        vec3 attenuation = light.Color / (fragToLightLength * fragToLightLength);
+        vec3 attenuation = light.Color / (4.0 * PI * fragToLightLength * fragToLightLength);
 
         return (diffuse + specular) * attenuation;
     }
