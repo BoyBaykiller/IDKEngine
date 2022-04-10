@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -36,7 +35,7 @@ namespace IDKEngine.Render.Objects
         {
             string dirPath = Path.GetDirectoryName(path);
             scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.CalculateTangentSpace | PostProcessSteps.JoinIdenticalVertices |
-                                                   PostProcessSteps.ImproveCacheLocality | PostProcessSteps.JoinIdenticalVertices |  PostProcessSteps.RemoveRedundantMaterials | // PostProcessSteps.OptimizeMeshes | PostProcessSteps.OptimizeGraph | 
+                                                   PostProcessSteps.ImproveCacheLocality | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.RemoveRedundantMaterials | // PostProcessSteps.OptimizeMeshes | PostProcessSteps.OptimizeGraph | 
                                                    PostProcessSteps.FlipUVs);
             Debug.Assert(scene != null);
 

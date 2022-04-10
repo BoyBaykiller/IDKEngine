@@ -59,7 +59,7 @@ namespace IDKEngine
             return data & (((1u << bits) - 1u) << offset);
         }
 
-        public static bool TriangleVSBox(Vector3 a, Vector3 b, Vector3 c, Vector3 boxCenter, Vector3 boxExtents)
+        public static bool TriangleVSBox(Vector3 a, Vector3 b, Vector3 c, Vector3 boxCenter, Vector3 halfSize)
         {
             // From the book "Real-Time Collision Detection" by Christer Ericson, page 169
             // See also the published Errata at http://realtimecollisiondetection.net/books/rtcd/errata/
@@ -81,8 +81,8 @@ namespace IDKEngine
             var p0 = Vector3.Dot(v0, a00);
             var p1 = Vector3.Dot(v1, a00);
             var p2 = Vector3.Dot(v2, a00);
-            var r = boxExtents.Y * Math.Abs(f0.Z) + boxExtents.Z * Math.Abs(f0.Y);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            var r = halfSize.Y * Math.Abs(f0.Z) + halfSize.Z * Math.Abs(f0.Y);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -92,8 +92,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a01);
             p1 = Vector3.Dot(v1, a01);
             p2 = Vector3.Dot(v2, a01);
-            r = boxExtents.Y * Math.Abs(f1.Z) + boxExtents.Z * Math.Abs(f1.Y);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.Y * Math.Abs(f1.Z) + halfSize.Z * Math.Abs(f1.Y);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -103,8 +103,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a02);
             p1 = Vector3.Dot(v1, a02);
             p2 = Vector3.Dot(v2, a02);
-            r = boxExtents.Y * Math.Abs(f2.Z) + boxExtents.Z * Math.Abs(f2.Y);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.Y * Math.Abs(f2.Z) + halfSize.Z * Math.Abs(f2.Y);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -114,8 +114,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a10);
             p1 = Vector3.Dot(v1, a10);
             p2 = Vector3.Dot(v2, a10);
-            r = boxExtents.X * Math.Abs(f0.Z) + boxExtents.Z * Math.Abs(f0.X);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.X * Math.Abs(f0.Z) + halfSize.Z * Math.Abs(f0.X);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -125,8 +125,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a11);
             p1 = Vector3.Dot(v1, a11);
             p2 = Vector3.Dot(v2, a11);
-            r = boxExtents.X * Math.Abs(f1.Z) + boxExtents.Z * Math.Abs(f1.X);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.X * Math.Abs(f1.Z) + halfSize.Z * Math.Abs(f1.X);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -136,8 +136,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a12);
             p1 = Vector3.Dot(v1, a12);
             p2 = Vector3.Dot(v2, a12);
-            r = boxExtents.X * Math.Abs(f2.Z) + boxExtents.Z * Math.Abs(f2.X);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.X * Math.Abs(f2.Z) + halfSize.Z * Math.Abs(f2.X);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -147,8 +147,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a20);
             p1 = Vector3.Dot(v1, a20);
             p2 = Vector3.Dot(v2, a20);
-            r = boxExtents.X * Math.Abs(f0.Y) + boxExtents.Y * Math.Abs(f0.X);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.X * Math.Abs(f0.Y) + halfSize.Y * Math.Abs(f0.X);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -158,8 +158,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a21);
             p1 = Vector3.Dot(v1, a21);
             p2 = Vector3.Dot(v2, a21);
-            r = boxExtents.X * Math.Abs(f1.Y) + boxExtents.Y * Math.Abs(f1.X);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.X * Math.Abs(f1.Y) + halfSize.Y * Math.Abs(f1.X);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -169,8 +169,8 @@ namespace IDKEngine
             p0 = Vector3.Dot(v0, a22);
             p1 = Vector3.Dot(v1, a22);
             p2 = Vector3.Dot(v2, a22);
-            r = boxExtents.X * Math.Abs(f2.Y) + boxExtents.Y * Math.Abs(f2.X);
-            if (Math.Max(-Fmax(p0, p1, p2), Fmin(p0, p1, p2)) > r)
+            r = halfSize.X * Math.Abs(f2.Y) + halfSize.Y * Math.Abs(f2.X);
+            if (Math.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
                 return false;
             }
@@ -181,19 +181,19 @@ namespace IDKEngine
 
             // Exit if...
             // ... [-extents.x, extents.x] and [min(v0.x,v1.x,v2.x), max(v0.x,v1.x,v2.x)] do not overlap
-            if (Fmax(v0.X, v1.X, v2.X) < -boxExtents.X || Fmin(v0.X, v1.X, v2.X) > boxExtents.X)
+            if (Max3(v0.X, v1.X, v2.X) < -halfSize.X || Min3(v0.X, v1.X, v2.X) > halfSize.X)
             {
                 return false;
             }
 
             // ... [-extents.y, extents.y] and [min(v0.y,v1.y,v2.y), max(v0.y,v1.y,v2.y)] do not overlap
-            if (Fmax(v0.Y, v1.Y, v2.Y) < -boxExtents.Y || Fmin(v0.Y, v1.Y, v2.Y) > boxExtents.Y)
+            if (Max3(v0.Y, v1.Y, v2.Y) < -halfSize.Y || Min3(v0.Y, v1.Y, v2.Y) > halfSize.Y)
             {
                 return false;
             }
 
             // ... [-extents.z, extents.z] and [min(v0.z,v1.z,v2.z), max(v0.z,v1.z,v2.z)] do not overlap
-            if (Fmax(v0.Z, v1.Z, v2.Z) < -boxExtents.Z || Fmin(v0.Z, v1.Z, v2.Z) > boxExtents.Z)
+            if (Max3(v0.Z, v1.Z, v2.Z) < -halfSize.Z || Min3(v0.Z, v1.Z, v2.Z) > halfSize.Z)
             {
                 return false;
             }
@@ -206,7 +206,7 @@ namespace IDKEngine
             var planeDistance = Vector3.Dot(planeNormal, v0);
 
             // Compute the projection interval radius of b onto L(t) = b.c + t * p.n
-            r = boxExtents.X * Math.Abs(planeNormal.X) + boxExtents.Y * Math.Abs(planeNormal.Y) + boxExtents.Z * Math.Abs(planeNormal.Z);
+            r = halfSize.X * Math.Abs(planeNormal.X) + halfSize.Y * Math.Abs(planeNormal.Y) + halfSize.Z * Math.Abs(planeNormal.Z);
 
             // Intersection occurs when plane distance falls within [-r,+r] interval
             if (planeDistance > r)
@@ -218,11 +218,11 @@ namespace IDKEngine
 
             return true;
 
-            static float Fmin(float a, float b, float c)
+            static float Min3(float a, float b, float c)
             {
                 return MathF.Min(a, MathF.Min(b, c));
             }
-            static float Fmax(float a, float b, float c)
+            static float Max3(float a, float b, float c)
             {
                 return MathF.Max(a, MathF.Max(b, c));
             }

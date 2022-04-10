@@ -31,6 +31,10 @@ struct Mesh
     int BaseNode;
     float Emissive;
     float NormalMapStrength;
+    float pad;
+    float alsoPad;
+    float _pad0;
+    float _pad1;
 };
 
 struct PointShadow

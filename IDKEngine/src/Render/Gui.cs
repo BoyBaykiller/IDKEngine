@@ -259,7 +259,7 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
-            if (selectedMeshIndex != Forward.MESH_INDEX_CLEAR_COLOR && !window.IsPathTracing)
+            if (selectedMeshIndex != Forward.MESH_INDEX_CLEAR_COLOR/* && !window.IsPathTracing*/)
             {
                 System.Numerics.Vector3 systemVec3;
                 ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);
@@ -277,28 +277,24 @@ namespace IDKEngine.Render
                         mesh.Model = mesh.Model.ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
                     }
 
-                    float temp = mesh.Emissive;
-                    if (ImGui.SliderFloat("Emissive", ref temp, 0.0f, 100.0f))
+                    if (ImGui.SliderFloat("Emissive", ref mesh.Emissive, 0.0f, 100.0f))
                     {
                         hadChange = true;
-                        mesh.Emissive = temp;
                     }
 
-                    temp = mesh.NormalMapStrength;
-                    if (ImGui.SliderFloat("NormalMapStrength", ref temp, 0.0f, 4.0f))
+                    if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
                     {
                         hadChange = true;
-                        mesh.NormalMapStrength = temp;
                     }
 
                     if (hadChange)
                     {
+                        window.GLSLBasicData.FrameCount = 0;
                         window.ModelSystem.ForEach(selectedMeshIndex, selectedMeshIndex + 1, (ref GLSLMesh curMesh) =>
                         {
                             curMesh = mesh;
                         });
                     }
-
                     ImGui.End();
                 }
             }
@@ -309,7 +305,7 @@ namespace IDKEngine.Render
         public void Update(Application window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
-            if (!window.IsPathTracing && window.MouseState.CursorMode == CursorModeValue.CursorNormal && window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
+            if (/*!window.IsPathTracing && */window.MouseState.CursorMode == CursorModeValue.CursorNormal && window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 point.Y = window.Size.Y - point.Y;

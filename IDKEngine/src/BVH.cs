@@ -21,9 +21,11 @@ namespace IDKEngine
             if (TreeDepth == 0) return;
 
             uint nodesPerMesh = (1u << (int)TreeDepth) - 1u;
-            List<GLSLBVHVertex> bvhVertices = new List<GLSLBVHVertex>(modelSystem.Vertices.Length);
-            List<GLSLBVHVertex> expandedVertices = new List<GLSLBVHVertex>(modelSystem.Vertices.Length);
+            List<GLSLBLASVertex> bvhVertices = new List<GLSLBLASVertex>(modelSystem.Vertices.Length);
+            List<GLSLBLASVertex> expandedVertices = new List<GLSLBLASVertex>(modelSystem.Vertices.Length);
             GLSLNode[] nodes = new GLSLNode[nodesPerMesh * modelSystem.Meshes.Length];
+
+            
 
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
@@ -33,63 +35,54 @@ namespace IDKEngine
                 for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
                 {
                     uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
-                    GLSLBVHVertex vertex = new GLSLBVHVertex();
-                    vertex.Position = modelSystem.Vertices[indici].Position;
-                    vertex.TexCoord = modelSystem.Vertices[indici].TexCoord;
-                    vertex.Normal = modelSystem.Vertices[indici].Normal;
-                    vertex.Tangent = modelSystem.Vertices[indici].Tangent;
-
-                    min.X = MathF.Min(min.X, vertex.Position.X);
-                    min.Y = MathF.Min(min.Y, vertex.Position.Y);
-                    min.Z = MathF.Min(min.Z, vertex.Position.Z);
-
-                    max.X = MathF.Max(max.X, vertex.Position.X);
-                    max.Y = MathF.Max(max.Y, vertex.Position.Y);
-                    max.Z = MathF.Max(max.Z, vertex.Position.Z);
+                    GLSLBLASVertex vertex = *(GLSLBLASVertex*)((GLSLVertex*)modelSystem.Vertices.ToPtr() + indici);
+                    min = Vector3.ComponentMin(min, vertex.Position);
+                    max = Vector3.ComponentMax(max, vertex.Position);
 
                     expandedVertices.Add(vertex);
                 }
                 int end = expandedVertices.Count;
 
-                modelSystem.Meshes[i].BaseNode = (int)(nodesPerMesh * i);
+                modelSystem.Meshes[i].BaseIndex = (int)(nodesPerMesh * i);
 
                 GLSLNode root = new GLSLNode();
                 root.Min = min;
                 root.Max = max;
-                nodes[modelSystem.Meshes[i].BaseNode + 0] = root;
+                nodes[modelSystem.Meshes[i].BaseIndex + 0] = root;
                 if (TreeDepth == 1)
                 {
-                    MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 0], start, end);
-                    SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
+                    MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseIndex + 0], start, end);
+                    SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 0], nodesPerMesh);
                     continue;
                 }
                 else
                 {
-                    SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 0], nodesPerMesh);
+                    SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 0], nodesPerMesh);
                 }
 
                 Tuple<GLSLNode, GLSLNode> childs = ConstructChildNodesBounds(root);
-                nodes[modelSystem.Meshes[i].BaseNode + 1] = childs.Item1;
-                nodes[modelSystem.Meshes[i].BaseNode + 4] = childs.Item2;
-                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 1], 4u);
-                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 4], nodesPerMesh);
+                nodes[modelSystem.Meshes[i].BaseIndex + 1] = childs.Item1;
+                nodes[modelSystem.Meshes[i].BaseIndex + 4] = childs.Item2;
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 1], 4u);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 4], nodesPerMesh);
 
-                childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 1]);
-                nodes[modelSystem.Meshes[i].BaseNode + 2] = childs.Item1;
-                nodes[modelSystem.Meshes[i].BaseNode + 3] = childs.Item2;
-                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 2], start, end);
-                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 3], start, end);
-                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 2], 3u);
-                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 3], 4u);
+                childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseIndex + 1]);
+                nodes[modelSystem.Meshes[i].BaseIndex + 2] = childs.Item1;
+                nodes[modelSystem.Meshes[i].BaseIndex + 3] = childs.Item2;
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseIndex + 2], start, end);
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseIndex + 3], start, end);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 2], 3u);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 3], 4u);
 
-                childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseNode + 4]);
-                nodes[modelSystem.Meshes[i].BaseNode + 5] = childs.Item1;
-                nodes[modelSystem.Meshes[i].BaseNode + 6] = childs.Item2;
-                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 5], start, end);
-                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseNode + 6], start, end);
-                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 5], 6u);
-                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseNode + 6], nodesPerMesh);
+                childs = ConstructChildNodesBounds(nodes[modelSystem.Meshes[i].BaseIndex + 4]);
+                nodes[modelSystem.Meshes[i].BaseIndex + 5] = childs.Item1;
+                nodes[modelSystem.Meshes[i].BaseIndex + 6] = childs.Item2;
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseIndex + 5], start, end);
+                MakeLeaf(ref nodes[modelSystem.Meshes[i].BaseIndex + 6], start, end);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 5], 6u);
+                SetMissLink(ref nodes[modelSystem.Meshes[i].BaseIndex + 6], nodesPerMesh);
             }
+
             modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
 
             BVHBuffer = new BufferObject();
@@ -99,7 +92,7 @@ namespace IDKEngine
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
             BVHVertexBuffer = new BufferObject();
-            BVHVertexBuffer.ImmutableAllocate(bvhVertices.Count * sizeof(GLSLBVHVertex), bvhVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
+            BVHVertexBuffer.ImmutableAllocate(bvhVertices.Count * sizeof(GLSLBLASVertex), bvhVertices.ToArray(), BufferStorageFlags.DynamicStorageBit);
             BVHVertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, BVHVertexBuffer.Size);
 
             ModelSystem = modelSystem;
@@ -110,7 +103,7 @@ namespace IDKEngine
                 node.IsLeafAndVerticesStart = (uint)bvhVertices.Count;
 
                 Vector3 center = (node.Min + node.Max) * 0.5f;
-                Vector3 size = node.Max - node.Min;
+                Vector3 size = (node.Max - node.Min) * 0.5f;
                 for (int i = start; i < end; i += 3)
                 {
                     if (MyMath.TriangleVSBox(expandedVertices[i + 0].Position, expandedVertices[i + 1].Position, expandedVertices[i + 2].Position, center, size))

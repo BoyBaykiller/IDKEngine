@@ -50,21 +50,25 @@ struct Mesh
     int BaseNode;
     float Emissive;
     float NormalMapStrength;
+    float pad;
+    float alsoPad;
+    float _pad0;
+    float _pad1;
 };
 
 struct Vertex
 {
     vec3 Position;
-    float _pad3;
+    float _pad0;
 
     vec2 TexCoord;
-    vec2 _pad0;
+    vec2 _pad1;
 
     vec3 Normal;
-    float _pad1;
+    float _pad2;
 
     vec3 Tangent;
-    float _pad2;
+    float _pad3;
 };
 
 struct HitInfo
@@ -191,6 +195,9 @@ vec3 Radiance(Ray ray)
     {
         if (RayTrace(ray, hitInfo))
         {
+            // Render wireframe
+            // return float(any(lessThan(hitInfo.Bary, vec3(0.01)))).xxx;
+
             vec3 hitpos = ray.Origin + ray.Direction * hitInfo.T;
             float specularChance = 0.0;
             float roughness = 1.0;
@@ -207,7 +214,7 @@ vec3 Radiance(Ray ray)
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
                 mat4 model = mesh.Model;
 
-                vec3 tangent = Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary);
+                vec3 tangent = normalize(Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary));
                 vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
                 vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
 
@@ -223,11 +230,10 @@ vec3 Radiance(Ray ray)
                 Material material = materialUBO.Materials[EmulateNonUniform(mesh.MaterialIndex)];
             #endif
 
+                albedo = texture(material.Albedo, texCoord).rgb;
+                normal = texture(material.Normal, texCoord).rgb;
                 specularChance = texture(material.Specular, texCoord).r;
                 roughness = texture(material.Roughness, texCoord).r;
-                normal = texture(material.Normal, texCoord).rgb;
-                vec4 temp = texture(material.Albedo, texCoord);
-                albedo = temp.rgb;
                 emissive = mesh.Emissive * albedo;
 
                 normal = TBN * normalize(normal * 2.0 - 1.0);
@@ -248,9 +254,6 @@ vec3 Radiance(Ray ray)
             radiance += emissive * throughput;
             throughput *= albedo;
             throughput /= rayProbability;
-
-            // DEBUG: Render wireframe
-            // return float(any(lessThan(hitInfo.Bary, vec3(0.01)))).xxx;
 
             // Russian Roulette - unbiased method to terminate rays and therefore lower render times (also reduces fireflies)
         #if GL_AMD_shader_trinary_minmax
@@ -283,7 +286,7 @@ vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, ou
     vec3 diffuseRay = CosineSampleHemisphere(normal);
     
     float raySelectRoll = GetRandomFloat01();
-    vec3 outgoing = vec3(0.0);
+    vec3 outgoing;
     if (specularChance > raySelectRoll)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);

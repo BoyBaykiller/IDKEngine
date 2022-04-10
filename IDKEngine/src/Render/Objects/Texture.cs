@@ -31,7 +31,7 @@ namespace IDKEngine.Render.Objects
         public int Depth { get; private set; } = 1;
         public PixelInternalFormat PixelInternalFormat { get; private set; }
 
-        private static int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
+        private static readonly int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
         private static int GetDummyTexture(TextureTarget textureTarget)
         {
             GL.CreateTextures(textureTarget, 1, out int id);
