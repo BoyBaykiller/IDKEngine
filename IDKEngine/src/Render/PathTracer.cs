@@ -46,9 +46,9 @@ namespace IDKEngine.Render
 
 		public Texture EnvironmentMap;
         public ModelSystem ModelSystem;
-        public readonly BVH BVH;
+        public readonly bvh.BVH BVH;
 		private readonly ShaderProgram shaderProgram;
-		public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, Texture environmentMap, int width, int height)
+		public unsafe PathTracer(ModelSystem modelSystem, Texture environmentMap, int width, int height)
         {
 			shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
 
@@ -59,7 +59,7 @@ namespace IDKEngine.Render
 
             EnvironmentMap = environmentMap;
             ModelSystem = modelSystem;
-            BVH = bvh;
+            //BVH = bvh;
 
 			RayDepth = 6;
 			FocalLength = 10.0f;

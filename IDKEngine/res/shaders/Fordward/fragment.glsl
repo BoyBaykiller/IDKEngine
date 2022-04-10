@@ -33,6 +33,10 @@ struct Mesh
     int BVHEntry;
     float Emissive;
     float NormalMapStrength;
+    float pad;
+    float alsoPad;
+    float _pad0;
+    float _pad1;
 };
 
 struct Light

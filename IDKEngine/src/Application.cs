@@ -216,16 +216,20 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse, deccer });
 
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
-            Bloom = new Bloom(Size.X, Size.Y, 1.0f, 3.0f);
+            Bloom = new Bloom(Size.X, Size.Y, 1.0f, 20.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 3.5f, new Vector3(0.025f));
             SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
             PostCombine = new PostCombine(Size.X, Size.Y);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
-            
+
             Bvh = new BVH(ModelSystem);
-            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
+            Console.WriteLine("================");
+            var blas = new bvh.BLAS(3, ModelSystem);
+            //var plsBVH = new bvh.BVH(blas);
+            
+            PathTracer = new PathTracer(ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
@@ -235,7 +239,7 @@ namespace IDKEngine
             GLSLLight[] lights = new GLSLLight[3];
             lights[0] = new GLSLLight(new Vector3(-4.5f, 4.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f);
             lights[1] = new GLSLLight(new Vector3(-0.5f, 4.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f);
-            lights[2] = new GLSLLight(new Vector3( 4.5f, 4.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f);
+            lights[2] = new GLSLLight(new Vector3(4.5f, 4.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f);
             ForwardRenderer.LightingContext.Add(lights);
             
             pointShadows = new PointShadow[3];
