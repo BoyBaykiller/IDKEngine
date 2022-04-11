@@ -3,7 +3,7 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
-namespace IDKEngine.bvh
+namespace IDKEngine
 {
     class BVH
     {
@@ -18,7 +18,7 @@ namespace IDKEngine.bvh
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
             VertexBuffer = new BufferObject();
-            VertexBuffer.ImmutableAllocate(sizeof(GLSLBLASVertex) * blas.Vertices.Length, (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            VertexBuffer.ImmutableAllocate(sizeof(GLSLBLASVertex) * blas.Vertices.Length, blas.Vertices, BufferStorageFlags.DynamicStorageBit);
             VertexBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, VertexBuffer.Size);
         }
 
