@@ -224,12 +224,9 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            Bvh = new BVH(ModelSystem);
-            Console.WriteLine("================");
-            var blas = new bvh.BLAS(3, ModelSystem);
-            //var plsBVH = new bvh.BVH(blas);
+            Bvh = new BVH(new BLAS(3, ModelSystem));
             
-            PathTracer = new PathTracer(ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
+            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless

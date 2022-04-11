@@ -1,10 +1,10 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using OpenTK.Mathematics;
 using IDKEngine.Render;
-using System.Diagnostics;
 
-namespace IDKEngine.bvh
+namespace IDKEngine
 {
     class BLAS
     {
