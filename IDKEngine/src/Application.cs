@@ -8,6 +8,7 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Collections.Generic;
 
 namespace IDKEngine
 {
@@ -21,6 +22,7 @@ namespace IDKEngine
         {
 
         }
+
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
@@ -40,7 +42,7 @@ namespace IDKEngine
                 if (IsShadows)
                 {
                     GL.ColorMask(false, false, false, false);
-                    for (int i = 0; i < pointShadows.Length; i++)
+                    for (int i = 0; i < pointShadows.Count; i++)
                     {
                         pointShadows[i].CreateDepthMap(ModelSystem);
                     }
@@ -153,7 +155,7 @@ namespace IDKEngine
         private Camera camera;
         private ShaderProgram finalProgram;
         private BufferObject basicDataUBO;
-        private PointShadow[] pointShadows;
+        private List<PointShadow> pointShadows;
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public Bloom Bloom;
@@ -208,15 +210,11 @@ namespace IDKEngine
             for (int i = 0; i < horse.Meshes.Length; i++)
                 horse.Meshes[i].Model = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, 0.5f);
 
-            Model deccer = new Model("res/models/deccer/SM_Deccer_Cubes_Textured.gltf");
-            for (int i = 0; i < deccer.Meshes.Length; i++)
-                deccer.Meshes[i].Model = deccer.Meshes[i].Model * Matrix4.CreateTranslation(0.0f, 4.0f, 0.0f) * Matrix4.CreateScale(0.4f);
-
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza, horse, deccer });
+            ModelSystem.Add(new Model[] { sponza, horse });
 
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
-            Bloom = new Bloom(Size.X, Size.Y, 1.0f, 20.0f);
+            Bloom = new Bloom(Size.X, Size.Y, 1.0f, 8.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 3.5f, new Vector3(0.025f));
             SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
@@ -224,7 +222,7 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            Bvh = new BVH(new BLAS(3, ModelSystem));
+            Bvh = new BVH(new BLAS(ModelSystem));
             
             PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
@@ -233,16 +231,16 @@ namespace IDKEngine
             if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
-            GLSLLight[] lights = new GLSLLight[3];
-            lights[0] = new GLSLLight(new Vector3(-4.5f, 4.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f);
-            lights[1] = new GLSLLight(new Vector3(-0.5f, 4.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f);
-            lights[2] = new GLSLLight(new Vector3(4.5f, 4.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f);
-            ForwardRenderer.LightingContext.Add(lights);
+            List<GLSLLight> lights = new List<GLSLLight>();
+            lights.Add(new GLSLLight(new Vector3(-4.5f, 4.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-0.5f, 4.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(4.5f, 4.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f));
+            ForwardRenderer.LightingContext.Add(lights.ToArray());
             
-            pointShadows = new PointShadow[3];
-            pointShadows[0] = new PointShadow(ForwardRenderer.LightingContext, 0, 512, 0.5f, 60.0f);
-            pointShadows[1] = new PointShadow(ForwardRenderer.LightingContext, 1, 512, 0.5f, 60.0f);
-            pointShadows[2] = new PointShadow(ForwardRenderer.LightingContext, 2, 512, 0.5f, 60.0f);
+            pointShadows = new List<PointShadow>();
+            pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, 0, 512, 0.5f, 60.0f));
+            pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, 1, 512, 0.5f, 60.0f));
+            pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, 2, 512, 0.5f, 60.0f));
 
             basicDataUBO = new BufferObject();
             basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
@@ -291,13 +289,14 @@ namespace IDKEngine
             GLSLBasicData.FrameCount = 0;
         }
 
-        protected override void OnFocusChanged()
-        {
-            
-        }
         protected override void OnEnd()
         {
 
+        }
+
+        protected override void OnKeyPress(char key)
+        {
+            gui.ImGuiController.PressChar(key);
         }
     }
 }
