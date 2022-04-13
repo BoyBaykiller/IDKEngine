@@ -130,6 +130,9 @@ namespace IDKEngine
             windowPosDelegate = WindowPosCallback;
             GLFW.SetWindowPosCallback(window, windowPosDelegate);
 
+            windowCharDelegate = WindowCharCallback;
+            GLFW.SetCharCallback(window, windowCharDelegate);
+
             Monitor = GLFW.GetPrimaryMonitor();
             VideoMode = GLFW.GetVideoMode(Monitor);
             KeyboardState = new Keyboard(window);
@@ -216,8 +219,7 @@ namespace IDKEngine
         protected abstract void OnStart();
         protected abstract void OnEnd();
         protected abstract void OnResize();
-        protected abstract void OnFocusChanged();
-
+        protected abstract void OnKeyPress(char key);
 
         private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeDelegate;
         private void FramebufferSizeCallback(Window* window, int width, int height)
@@ -235,7 +237,6 @@ namespace IDKEngine
         private void WindowFocusCallback(Window* window, bool focused)
         {
             _isFocused = focused;
-            OnFocusChanged();
         }
 
         private readonly GLFWCallbacks.WindowPosCallback windowPosDelegate;
@@ -244,6 +245,12 @@ namespace IDKEngine
             _position.X = x;
             _position.Y = y;
             MouseState.Update();
+        }
+
+        private readonly GLFWCallbacks.CharCallback windowCharDelegate;
+        private void WindowCharCallback(Window* window, uint codepoint)
+        {
+            OnKeyPress((char)codepoint);
         }
     }
 }

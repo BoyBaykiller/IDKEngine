@@ -73,18 +73,6 @@ namespace IDKEngine.GUI
             ImGui.NewFrame();
         }
 
-        public void PressChar(char keyChar)
-        {
-            pressedChars.Add(keyChar);
-        }
-
-        public void Dispose()
-        {
-            fontTexture.Dispose();
-            shaderProgram.Dispose();
-            vao.Dispose();
-        }
-
         private unsafe void CreateDeviceResources()
         {
             vbo = new BufferObject();
@@ -195,6 +183,11 @@ namespace IDKEngine.GUI
             io.KeyAlt = wnd.KeyboardState[Keys.LeftAlt] == InputState.Pressed || wnd.KeyboardState[Keys.RightAlt] == InputState.Pressed;
             io.KeyShift = wnd.KeyboardState[Keys.LeftShift] == InputState.Pressed || wnd.KeyboardState[Keys.RightShift] == InputState.Pressed;
             io.KeySuper = wnd.KeyboardState[Keys.LeftSuper] == InputState.Pressed || wnd.KeyboardState[Keys.RightSuper] == InputState.Pressed;
+        }
+
+        public void PressChar(char keyChar)
+        {
+            pressedChars.Add(keyChar);
         }
 
         private static void SetKeyMappings()
@@ -355,6 +348,13 @@ namespace IDKEngine.GUI
             style.TabBorderSize = 1.0f;
             style.TabRounding = 0.0f;
             style.WindowRounding = 4.0f;
+        }
+
+        public void Dispose()
+        {
+            fontTexture.Dispose();
+            shaderProgram.Dispose();
+            vao.Dispose();
         }
     }
 }

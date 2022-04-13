@@ -244,6 +244,7 @@ vec3 Radiance(Ray ray)
                 Light light = lightsUBO.Lights[-hitInfo.HitIndex - 1];
                 emissive = light.Color;
                 albedo = light.Color;
+                normal = (hitpos - light.Position) / light.Radius;
             }
 
             // TOOD: Implement BSDF
@@ -342,10 +343,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                     
                     for (uint j = start; j < start + count; j += 3u)
                     {
-                        Vertex v0 = verticesSSBO.Vertices[j + 0u];
-                        Vertex v1 = verticesSSBO.Vertices[j + 1u];
-                        Vertex v2 = verticesSSBO.Vertices[j + 2u];
-                        if (RayTriangleIntersect(localRay, v0.Position, v1.Position, v2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
+                        if (RayTriangleIntersect(localRay, verticesSSBO.Vertices[j + 0u].Position, verticesSSBO.Vertices[j + 1u].Position, verticesSSBO.Vertices[j + 2u].Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
                         {
                             hitInfo.Bary = baryT.xyz;
                             hitInfo.T = baryT.w;
@@ -358,8 +356,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
             }
             else
             {
-                const uint MAX_MISS_LINK = (1u << bitsForMissLink) - 1u;
-                localNodeIndex = (node.MissLinkAndVerticesCount >> (32u - bitsForMissLink)) & MAX_MISS_LINK;
+                localNodeIndex = node.MissLinkAndVerticesCount >> (32u - bitsForMissLink);
             }
         }
     }

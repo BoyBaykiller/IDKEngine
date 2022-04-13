@@ -14,8 +14,9 @@ namespace IDKEngine
         public readonly GLSLNode[] Nodes;
         public readonly GLSLBLASVertex[] Vertices;
         public readonly int TreeDepth;
-        public unsafe BLAS(int treeDepth, in ModelSystem modelSystem)
+        public unsafe BLAS(ModelSystem modelSystem)
         {
+            const int treeDepth = 5;
             if (treeDepth <= 1)
             {
                 throw new ArgumentOutOfRangeException("Tree Depth must be at least 2");
@@ -57,12 +58,36 @@ namespace IDKEngine
                 Build(root, baseIndex, start, end);
 
                 // TODO: Set the misslinks programmatically so that it works for every tree depth
-                SetMissLink(ref nodes[baseIndex + 1], 4u);
-                SetMissLink(ref nodes[baseIndex + 2], 3u);
-                SetMissLink(ref nodes[baseIndex + 3], 4u);
-                SetMissLink(ref nodes[baseIndex + 4], nodesPerMesh);
+                SetMissLink(ref nodes[baseIndex + 1], 16u);
+                SetMissLink(ref nodes[baseIndex + 2], 9u);
+                SetMissLink(ref nodes[baseIndex + 3], 6u);
+                SetMissLink(ref nodes[baseIndex + 4], 5u);
                 SetMissLink(ref nodes[baseIndex + 5], 6u);
-                SetMissLink(ref nodes[baseIndex + 6], nodesPerMesh);
+                SetMissLink(ref nodes[baseIndex + 6], 9u);
+                SetMissLink(ref nodes[baseIndex + 7], 8u);
+                SetMissLink(ref nodes[baseIndex + 8], 9u);
+                SetMissLink(ref nodes[baseIndex + 9], 16u);
+                SetMissLink(ref nodes[baseIndex + 10], 13u);
+                SetMissLink(ref nodes[baseIndex + 11], 12u);
+                SetMissLink(ref nodes[baseIndex + 12], 13u);
+                SetMissLink(ref nodes[baseIndex + 13], 17u);
+                SetMissLink(ref nodes[baseIndex + 14], 15u);
+                SetMissLink(ref nodes[baseIndex + 15], 16u);
+                SetMissLink(ref nodes[baseIndex + 16], nodesPerMesh);
+                SetMissLink(ref nodes[baseIndex + 17], 24u);
+                SetMissLink(ref nodes[baseIndex + 18], 21u);
+                SetMissLink(ref nodes[baseIndex + 19], 20u);
+                SetMissLink(ref nodes[baseIndex + 20], 21u);
+                SetMissLink(ref nodes[baseIndex + 21], 24u);
+                SetMissLink(ref nodes[baseIndex + 22], 23u);
+                SetMissLink(ref nodes[baseIndex + 23], 24u);
+                SetMissLink(ref nodes[baseIndex + 24], nodesPerMesh);
+                SetMissLink(ref nodes[baseIndex + 25], 28u);
+                SetMissLink(ref nodes[baseIndex + 26], 27u);
+                SetMissLink(ref nodes[baseIndex + 27], 28u);
+                SetMissLink(ref nodes[baseIndex + 28], nodesPerMesh);
+                SetMissLink(ref nodes[baseIndex + 29], 30u);
+                SetMissLink(ref nodes[baseIndex + 30], nodesPerMesh);
             }
             modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
 
@@ -75,15 +100,8 @@ namespace IDKEngine
 
                 void BuildTree(in GLSLNode node, int index = 0, int level = 0)
                 {
-                    //Console.WriteLine(index);
-                    //Console.WriteLine($"VerticesStart: {node.IsLeafAndVerticesStart & ((1u << BITS_FOR_VERTICES_START) - 1u)}");
-                    //Console.WriteLine($"IsLeaf: {node.IsLeafAndVerticesStart >> (BITS_FOR_VERTICES_START)}");
-                    //Console.WriteLine($"VerticesCount: {node.MissLinkAndVerticesCount & ((1u << (32 - BITS_FOR_MISS_LINK)) - 1u)}");
-
-                    //Console.WriteLine("================================");
                     if (level == (treeDepth - 1))
                         return;
-
                     ConstructChildBounds(node, out GLSLNode child0, out GLSLNode child1);
 
                     int newIndex = index + 1;
@@ -171,6 +189,11 @@ namespace IDKEngine
         private static int GetRightChildIndex(int parent, int treeDepth, int level)
         {
             return parent + (1 << (treeDepth - (level + 1)));
+        }
+
+        private static uint GetDistanceSibling(int level, uint allNodesCount)
+        {
+            return allNodesCount / (1u << level);
         }
     }
 }
