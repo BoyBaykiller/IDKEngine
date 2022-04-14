@@ -1,11 +1,10 @@
 #version 460 core
 
-const vec4 data[4] =
+const vec2 vertex[3] =
 {
-    vec4( -1.0, -1.0,  0.0, 0.0),
-    vec4(  1.0, -1.0,  1.0, 0.0),
-    vec4(  1.0,  1.0,  1.0, 1.0),
-    vec4( -1.0,  1.0,  0.0, 1.0)
+    vec2( -1.0, -1.0 ),
+    vec2(  3.0, -1.0 ),
+    vec2( -1.0,  3.0 )
 };
 
 out InOutVars
@@ -15,7 +14,6 @@ out InOutVars
 
 void main()
 {
-    vec4 vertex = data[gl_VertexID];
-    outData.TexCoord = vertex.zw;
-    gl_Position = vec4(vertex.xy, 0.0, 1.0);
+    gl_Position = vec4(vertex[gl_VertexID], 0.0, 1.0);
+    outData.TexCoord = gl_Position.xy * 0.5 + 0.5;
 }
