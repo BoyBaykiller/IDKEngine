@@ -88,7 +88,7 @@ namespace IDKEngine
 
             finalProgram.Use();
 
-            GL.DrawArrays(PrimitiveType.Quads, 0, 4);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             
             GLSLBasicData.FrameCount++;
             gui.Render(this, (float)dT);

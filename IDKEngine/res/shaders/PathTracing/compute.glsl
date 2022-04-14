@@ -238,6 +238,9 @@ vec3 Radiance(Ray ray)
 
                 normal = TBN * normalize(normal * 2.0 - 1.0);
                 normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength));
+
+                if (dot(-ray.Direction, normal) < 0.0)
+                    normal *= -1.0;
             }
             else
             {
