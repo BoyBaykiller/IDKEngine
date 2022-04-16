@@ -112,7 +112,6 @@ in InOutVars
 
 vec3 BlinnPhong(Light light);
 float Visibility(PointShadow pointShadow);
-float LinearizeDepth(float depth, float nearPlane, float farPlane);
 
 vec4 Albedo;
 vec3 Normal;
@@ -155,8 +154,6 @@ void main()
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
     VelocityColor = (uv - prevUV);
-
-    gl_FragDepth = LinearizeDepth(gl_FragCoord.z, basicDataUBO.NearPlane, basicDataUBO.FarPlane);
 }
 
 vec3 BlinnPhong(Light light)
@@ -220,10 +217,4 @@ float Visibility(PointShadow pointShadow)
     }
 
     return shadowFactor / 20.0;
-}
-
-float LinearizeDepth(float depth, float nearPlane, float farPlane)
-{
-    float z = depth * 2.0 - 1.0;
-    return (2.0 * nearPlane * farPlane) / (farPlane + nearPlane - z * (farPlane - nearPlane));
 }

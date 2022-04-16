@@ -13,7 +13,7 @@ namespace IDKEngine
         {
             BVHBuffer = new BufferObject();
             BVHBuffer.ImmutableAllocate(Vector4.SizeInBytes + blas.Nodes.Length * sizeof(GLSLNode), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            BVHBuffer.SubData(Vector2.SizeInBytes, 2 * sizeof(uint), new uint[] { (uint)blas.TreeDepth, BLAS.BITS_FOR_MISS_LINK });
+            BVHBuffer.SubData(Vector2.SizeInBytes, 2 * sizeof(uint), new uint[] { BLAS.TREE_DEPTH, BLAS.BITS_FOR_MISS_LINK });
             BVHBuffer.SubData(Vector4.SizeInBytes, blas.Nodes.Length * sizeof(GLSLNode), blas.Nodes);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
