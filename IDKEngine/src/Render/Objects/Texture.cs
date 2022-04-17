@@ -116,6 +116,25 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureCompareFunc, (int)textureCompareFunc);
         }
 
+        /// <summary>
+        /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture must be available
+        /// </summary>
+        /// <param name="state"></param>
+        public void SetSeamlessCubeMapPerTextureARB_AMD(bool state)
+        {
+            GL.TextureParameter(ID, (TextureParameterName)All.TextureCubeMapSeamless, state ? 1 : 0);
+        }
+
+        public unsafe void SetBorderColor(Vector4 color)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureBorderColor, &color.X);
+        }
+
+        public void SetMipmapLodBias(float bias)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureLodBias, bias);
+        }
+
         public void Bind()
         {
             GL.BindTexture(Target, ID);
@@ -188,25 +207,6 @@ namespace IDKEngine.Render.Objects
         public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)
         {
             return new Vector3i(width / (1 << level), height / (1 << level), depth / (1 << level));
-        }
-
-        /// <summary>
-        /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture must be available
-        /// </summary>
-        /// <param name="state"></param>
-        public void SetSeamlessCubeMapPerTextureARB_AMD(bool state)
-        {
-            GL.TextureParameter(ID, (TextureParameterName)All.TextureCubeMapSeamless, state ? 1 : 0);
-        }
-
-        public unsafe void SetBorderColor(Vector4 color)
-        {
-            GL.TextureParameter(ID, TextureParameterName.TextureBorderColor, &color.X);
-        }
-
-        public void SetMipmapLodBias(float bias)
-        {
-            GL.TextureParameter(ID, TextureParameterName.TextureLodBias, bias);
         }
 
         public void MutableAllocate(int width, int height, int depth, PixelInternalFormat pixelInternalFormat, IntPtr intPtr, PixelFormat pixelFormat, PixelType pixelType)

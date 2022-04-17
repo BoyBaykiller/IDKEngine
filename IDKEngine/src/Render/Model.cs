@@ -80,6 +80,8 @@ namespace IDKEngine.Render.Objects
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
                 Meshes[i].Model = Matrix4.Identity;
                 Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
+                Meshes[i].SpecularChance = 0.5f;
+                Meshes[i].Roughness = 0.5f;
 
                 DrawCommands[i].InstanceCount = 1;
                 DrawCommands[i].BaseInstance = 0;
@@ -151,9 +153,9 @@ namespace IDKEngine.Render.Objects
                         texture.ImmutableAllocate(img.Width, img.Height, 1, (SizedInternalFormat)format, Texture.GetMaxMipMaplevel(img.Width, img.Height, 1));
                         texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, img.GetPixelRowSpan(0).ToPtr());
                         texture.GenerateMipmap();
-                        if (Helper.IsCoreExtensionAvailable("GL_ARB_texture_filter_anisotropic", 4.6) || Helper.IsExtensionsAvailable("GL_EXT_texture_filter_anisotropic"))
+                        if (Helper.IsCoreExtensionAvailable("GL_ARB_texture_filter_anisotropic", 4.6) || Helper.IsExtensionsAvailable("GL_ARB_texture_filter_anisotropic") || Helper.IsExtensionsAvailable("GL_EXT_texture_filter_anisotropic"))
                             texture.SetAnisotropy(4.0f);
-
+                        
                         img.Dispose();
                     }
                     else

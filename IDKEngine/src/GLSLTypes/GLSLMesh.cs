@@ -9,9 +9,9 @@ namespace IDKEngine
         public int BaseIndex;
         public float Emissive;
         public float NormalMapStrength;
-        private readonly float pad;
-        private readonly float alsoPad;
-        private readonly float _pad0;
+        public float SpecularChance;
+        public float Roughness;
+        public int BLASDepth;
         private readonly float _pad1;
     }
 }

@@ -59,7 +59,7 @@ namespace IDKEngine
             return data & (((1u << bits) - 1u) << offset);
         }
 
-        public static bool TriangleVSBox(Vector3 a, Vector3 b, Vector3 c, Vector3 boxCenter, Vector3 halfSize)
+        public static bool TriangleVSBox(in Vector3 a, in Vector3 b, in Vector3 c, in Vector3 boxCenter, in Vector3 halfSize)
         {
             // From the book "Real-Time Collision Detection" by Christer Ericson, page 169
             // See also the published Errata at http://realtimecollisiondetection.net/books/rtcd/errata/
