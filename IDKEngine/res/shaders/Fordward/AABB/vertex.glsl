@@ -46,8 +46,8 @@ struct Mesh
     int BaseNode;
     float Emissive;
     float NormalMapStrength;
-    float pad;
-    float alsoPad;
+    float SpecularChance;
+    float Roughness;
     float _pad0;
     float _pad1;
 };

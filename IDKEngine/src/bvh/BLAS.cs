@@ -18,7 +18,7 @@ namespace IDKEngine
         public unsafe BLAS(ModelSystem modelSystem)
         {
             GLSLNode[] nodes = new GLSLNode[NODES_PER_MESH * modelSystem.Meshes.Length];
-
+            
             List<GLSLBLASVertex> vertices = new List<GLSLBLASVertex>(modelSystem.Vertices.Length);
             List<GLSLBLASVertex> bvhVertices = new List<GLSLBLASVertex>(modelSystem.Vertices.Length);
 
@@ -26,7 +26,7 @@ namespace IDKEngine
             {
                 Vector3 min = new Vector3(float.MaxValue);
                 Vector3 max = new Vector3(float.MinValue);
-                int start = vertices.Count;
+                int verticesStart = vertices.Count;
                 for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
                 {
                     uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
@@ -36,24 +36,26 @@ namespace IDKEngine
                     min = Vector3.ComponentMin(min, vertex.Position);
                     max = Vector3.ComponentMax(max, vertex.Position);
                 }
-                int end = vertices.Count;
+                int verticesEnd = vertices.Count;
 
                 int baseIndex = (int)(NODES_PER_MESH * i);
                 modelSystem.Meshes[i].BaseIndex = baseIndex;
+                modelSystem.Meshes[i].BLASDepth = TREE_DEPTH;
 
                 GLSLNode root = new GLSLNode();
                 root.Min = min;
                 root.Max = max;
                 nodes[baseIndex] = root;
+
                 for (int level = 0; level < TREE_DEPTH; level++)
                 {
                     int n = 0;
                     uint localIndex = (uint)level;
                     uint distance = GetDistanceSibling(level, NODES_PER_MESH);
 
+
                     for (int horNode = 0; horNode < GetNodesOnLevel(level); horNode++)
                     {
-                        // Set miss link of this parent
                         if (horNode == GetNodesOnLevel(level) - 1)
                             SetMissLink(ref nodes[baseIndex + localIndex], NODES_PER_MESH);
                         else if (horNode % 2 == 0)
@@ -67,14 +69,15 @@ namespace IDKEngine
 
                             if (level == TREE_DEPTH - 2)
                             {
-                                MakeLeaf(ref child0, start, end);
-                                MakeLeaf(ref child1, start, end);
+                                MakeLeaf(ref child0, verticesStart, verticesEnd);
+                                MakeLeaf(ref child1, verticesStart, verticesEnd);
                             }
 
                             nodes[baseIndex + localIndex + 1] = child0;
                             nodes[baseIndex + GetRightChildIndex((int)localIndex, TREE_DEPTH, level)] = child1;
+
                         }
-                        localIndex += horNode % 2 != 0 ? GetDistanceInterNode(distance, n++) : distance;
+                        localIndex += horNode % 2 == 0 ? distance : GetDistanceInterNode(distance, n++);
                     }
                 }
             }
@@ -103,7 +106,6 @@ namespace IDKEngine
                 
                 Debug.Assert(count < (1u << (32 - BITS_FOR_MISS_LINK)));
                 MyMath.BitsInsert(ref node.MissLinkAndVerticesCount, count, 0, 32 - BITS_FOR_MISS_LINK);
-
                 MyMath.BitsInsert(ref node.IsLeafAndVerticesStart, 1, BITS_FOR_VERTICES_START, 1);
             }
         }

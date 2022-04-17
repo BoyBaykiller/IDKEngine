@@ -50,9 +50,9 @@ struct Mesh
     int BaseNode;
     float Emissive;
     float NormalMapStrength;
-    float pad;
-    float alsoPad;
-    float _pad0;
+    float SpecularChance;
+    float Roughness;
+    int BLASDepth;
     float _pad1;
 };
 
@@ -95,9 +95,6 @@ struct Node
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
-    vec2 _pad0;
-    uint TreeDepth;
-    uint BitsForMissLink;
     Node Nodes[];
 } bvhSSBO;
 
@@ -166,8 +163,8 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    //rngSeed = basicDataUBO.FrameCount;
-    rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FrameCount * 2699 | 1;
+    rngSeed = basicDataUBO.FrameCount;
+    //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FrameCount * 2699 | 1;
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -232,8 +229,8 @@ vec3 Radiance(Ray ray)
 
                 albedo = texture(material.Albedo, texCoord).rgb;
                 normal = texture(material.Normal, texCoord).rgb;
-                specularChance = texture(material.Specular, texCoord).r;
-                roughness = texture(material.Roughness, texCoord).r;
+                specularChance = clamp(texture(material.Specular, texCoord).r + (mesh.SpecularChance * 2.0 - 1.0), 0.0, 1.0);
+                roughness = clamp(texture(material.Roughness, texCoord).r + (mesh.Roughness * 2.0 - 1.0), 0.0, 1.0);
                 emissive = mesh.Emissive * albedo;
 
                 normal = TBN * normalize(normal * 2.0 - 1.0);
@@ -317,8 +314,6 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
 
 bool RayTrace(Ray ray, out HitInfo hitInfo)
 {
-    const uint bitsForMissLink = bvhSSBO.BitsForMissLink; 
-    const uint treeDepth = bvhSSBO.TreeDepth;
 
     hitInfo.T = FLOAT_MAX;
     float t2;
@@ -330,8 +325,10 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
         Mesh mesh = meshSSBO.Meshes[i];
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
         
+        const uint bitsForMissLink = mesh.BLASDepth; 
+        
         uint localNodeIndex = 0u;
-        while (localNodeIndex < (1u << treeDepth) - 1u)
+        while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
         {
             Node node = bvhSSBO.Nodes[mesh.BaseNode + localNodeIndex];
             if (RayCuboidIntersect(localRay, node, t2) && t2 > 0.0)
