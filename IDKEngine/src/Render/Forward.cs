@@ -204,7 +204,7 @@ namespace IDKEngine.Render
                 (isPing ? taaPong : taaPing).BindToUnit(0);
                 Velocity.BindToUnit(1);
                 Depth.BindToUnit(2);
-                GL.DispatchCompute((taaPing.Width + 8 - 1) / 8, (taaPing.Height + 4 - 1) / 4, 1);
+                GL.DispatchCompute((taaPing.Width + 8 - 1) / 8, (taaPing.Height + 8 - 1) / 8, 1);
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             }
 

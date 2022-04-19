@@ -129,7 +129,7 @@ namespace IDKEngine.Render
             cullingProgram.Use();
             cullingProgram.Upload(0, ref projView);
 
-            GL.DispatchCompute((Meshes.Length + 32 - 1) / 32, 1, 1);
+            GL.DispatchCompute((Meshes.Length + 64 - 1) / 64, 1, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
         }
 

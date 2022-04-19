@@ -86,7 +86,7 @@ namespace IDKEngine.Render
             Vector3i size = Texture.GetMipMapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, 0);
             shaderProgram.Upload(3, 0);
             downscaleTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
-            GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
+            GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
 
             downscaleTexture.BindToUnit(0);
             for (int i = 1; i < Lod; i++)
@@ -97,7 +97,7 @@ namespace IDKEngine.Render
                 downscaleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-                GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
+                GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
             }
             #endregion
 
@@ -109,7 +109,7 @@ namespace IDKEngine.Render
             shaderProgram.Upload(3, Lod - 1);
             upsampleTexture.BindToImageUnit(0, Lod - 2, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-            GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
+            GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
 
             upsampleTexture.BindToUnit(1);
             for (int i = Lod - 3; i >= 0; i--)
@@ -120,7 +120,7 @@ namespace IDKEngine.Render
                 upsampleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-                GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 4 - 1) / 4, 1);
+                GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
             }
             #endregion
         }
