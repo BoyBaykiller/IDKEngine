@@ -37,7 +37,7 @@ namespace IDKEngine.Render
 
 
             shaderProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 4 - 1) / 4, 1);
+            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 

@@ -102,7 +102,7 @@ namespace IDKEngine.Render
             {
                 cullingProgram.Use();
                 cullingProgram.Upload(0, Instance);
-                GL.DispatchCompute((modelSystem.Meshes.Length + 8 - 1) / 8, 1, 1);
+                GL.DispatchCompute((modelSystem.Meshes.Length + 12 - 1) / 12, 1, 1);
             }
 
             if (Position != lightContext.Lights[glslPointShadow.LightIndex].Position)

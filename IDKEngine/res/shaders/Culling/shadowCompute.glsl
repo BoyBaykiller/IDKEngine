@@ -1,6 +1,6 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
-layout(local_size_x = 8, local_size_y = 6, local_size_z = 1) in;
+layout(local_size_x = 12, local_size_y = 6, local_size_z = 1) in;
 
 struct Frustum
 {

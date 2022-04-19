@@ -7,7 +7,7 @@
 #define UPSAMPLE_STAGE 1
 #extension GL_AMD_shader_trinary_minmax : enable
 
-layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerDownsample;

@@ -2,7 +2,7 @@
 #define PI 3.14159265
 #define EPSILON 0.001
 
-layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, r8) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerDepth;
