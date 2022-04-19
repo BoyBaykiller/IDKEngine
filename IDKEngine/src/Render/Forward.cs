@@ -7,7 +7,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    unsafe class Forward
+    unsafe class Forward : IDisposable
     {
         public const int MESH_INDEX_CLEAR_COLOR = -1;
 
@@ -239,6 +239,11 @@ namespace IDKEngine.Render
             MyMath.GetHaltonSequence_2_3(jitterData);
             MyMath.MapHaltonSequence(jitterData, width, height);
             TaaBuffer.SubData(0, sizeof(float) * jitterData.Length, jitterData.ToPtr());
+        }
+
+        public void Dispose()
+        {
+            System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)taaData);
         }
     }
 }

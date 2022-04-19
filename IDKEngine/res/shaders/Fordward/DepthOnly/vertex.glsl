@@ -60,8 +60,8 @@ void main()
     
     int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(
-        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 0],
-        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 1]
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 0],
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 1]
     );
 
     vec4 jitteredClipPos = basicDataUBO.ProjView * vec4(fragPos, 1.0);

@@ -139,7 +139,7 @@ vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, ou
 float FresnelSchlick(float cosTheta, float n1, float n2);
 bool RayTrace(Ray ray, out HitInfo hitInfo);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
-bool RayCuboidIntersect(Ray ray, Node node, out float t2);
+bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
 bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary);
 vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
@@ -252,6 +252,11 @@ vec3 Radiance(Ray ray)
             ray.Direction = BRDF(ray.Direction, specularChance, roughness, normal, rayProbability);
             ray.Origin = hitpos + ray.Direction * EPSILON;
 
+            if (dot(ray.Direction, normal) <= 0.0)
+			{
+				ray.Origin += normal * EPSILON;
+			}
+
             radiance += emissive * throughput;
             throughput *= albedo;
             throughput /= rayProbability;
@@ -314,28 +319,24 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
 
 bool RayTrace(Ray ray, out HitInfo hitInfo)
 {
-
     hitInfo.T = FLOAT_MAX;
-    float t2;
-    float nodeTMin = FLOAT_MAX;
+    float t1, t2;
     vec4 baryT;
 
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
-        Mesh mesh = meshSSBO.Meshes[i];
-        Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
-        
-        const uint bitsForMissLink = mesh.BLASDepth; 
-        
+        const Mesh mesh = meshSSBO.Meshes[i];
+        const Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
+                
         uint localNodeIndex = 0u;
         while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
         {
             Node node = bvhSSBO.Nodes[mesh.BaseNode + localNodeIndex];
-            if (RayCuboidIntersect(localRay, node, t2) && t2 > 0.0)
+            if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
             {
                 if (bool(node.IsLeafAndVerticesStart))
                 {
-                    const uint MAX_COUNT = (1u << (32u - bitsForMissLink)) - 1u;
+                    const uint MAX_COUNT = (1u << (32u - mesh.BLASDepth)) - 1u;
                     const uint count = node.MissLinkAndVerticesCount & MAX_COUNT;
                     
                     const uint MAX_START = (1u << 31u) - 1u;
@@ -356,12 +357,11 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
             }
             else
             {
-                localNodeIndex = node.MissLinkAndVerticesCount >> (32u - bitsForMissLink);
+                localNodeIndex = node.MissLinkAndVerticesCount >> (32u - mesh.BLASDepth);
             }
         }
     }
 
-    float t1;
     for (int i = 0; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
@@ -393,10 +393,10 @@ bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT)
     return all(greaterThanEqual(baryT.xyz, vec3(0.0)));
 }
 
-bool RayCuboidIntersect(Ray ray, Node node, out float t2)
+bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2)
 {
     // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
-    float t1 = FLOAT_MIN;
+    t1 = FLOAT_MIN;
     t2 = FLOAT_MAX;
 
     vec3 t0s = (node.Min - ray.Origin) / ray.Direction;
