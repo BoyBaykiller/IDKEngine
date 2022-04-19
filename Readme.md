@@ -18,7 +18,7 @@ Feature list:
  - Temporal Anti Aliasing
  - Fast CoD-Modern-Warfare Bloom implementation
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
- - Path Tracer (early progress and no bvh yet so really really slow)
+ - Path Tracer with parallel BVH construction and stackless traversal
  
 Required OpenGL: 4.6
 

@@ -6,7 +6,7 @@ namespace IDKEngine
     {
         public Matrix4 Model;
         public int MaterialIndex;
-        public int BaseIndex;
+        public int BaseNode;
         public float Emissive;
         public float NormalMapStrength;
         public float SpecularChance;

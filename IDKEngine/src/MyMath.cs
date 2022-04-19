@@ -49,14 +49,15 @@ namespace IDKEngine
             }
         }
 
-        public static void BitsInsert(ref uint mem, uint data, int offset, int bits)
+        public static void BitsInsert(ref uint mem, uint data, int offset)
         {
-            mem |= GetBits(data, 0, bits) << offset;
+            mem |= data << offset;
         }
 
         public static uint GetBits(uint data, int offset, int bits)
         {
-            return data & (((1u << bits) - 1u) << offset);
+            uint mask = (1u << bits) - 1u;
+            return (data >> offset) & mask;
         }
 
         public static bool TriangleVSBox(in Vector3 a, in Vector3 b, in Vector3 c, in Vector3 boxCenter, in Vector3 halfSize)

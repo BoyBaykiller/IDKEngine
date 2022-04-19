@@ -108,6 +108,8 @@ in InOutVars
     flat int MaterialIndex;
     flat float Emissive;
     flat float NormalMapStrength;
+    flat float SpecularBias;
+    flat float RoughnessBias;
 } inData;
 
 vec3 BlinnPhong(Light light);
@@ -126,8 +128,8 @@ void main()
     
     Albedo = texture(material.Albedo, inData.TexCoord);
     Normal = texture(material.Normal, inData.TexCoord).rgb;
-    Roughness = texture(material.Roughness, inData.TexCoord).r;
-    Specular = texture(material.Specular, inData.TexCoord).r;
+    Roughness = clamp(texture(material.Roughness, inData.TexCoord).r + (inData.RoughnessBias * 2.0 - 1.0), 0.0, 1.0);
+    Specular = clamp(texture(material.Specular, inData.TexCoord).r + (inData.SpecularBias * 2.0 - 1.0), 0.0, 1.0);
     float AO = texture(SamplerAO, uv).r;
 
     Normal = inData.TBN * normalize(Normal * 2.0 - 1.0);

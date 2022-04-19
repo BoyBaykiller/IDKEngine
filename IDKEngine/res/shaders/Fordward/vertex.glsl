@@ -59,6 +59,8 @@ out InOutVars
     flat int MaterialIndex;
     flat float Emissive;
     flat float NormalMapStrength;
+    flat float SpecularBias;
+    flat float RoughnessBias;
 } outData;
 
 void main()
@@ -82,11 +84,13 @@ void main()
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.Emissive = mesh.Emissive;
     outData.NormalMapStrength = mesh.NormalMapStrength;
+    outData.SpecularBias = mesh.SpecularChance;
+    outData.RoughnessBias = mesh.Roughness;
     
     int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(
-        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 0],
-        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) + 1]
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 0],
+        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 1]
     );
 
     vec4 jitteredClipPos = outData.ClipPos;
