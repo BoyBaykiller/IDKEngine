@@ -30,13 +30,13 @@ struct Mesh
 {
     mat4 Model;
     int MaterialIndex;
-    int BVHEntry;
+    int NodeStart;
+    int BLASDepth;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
     float Roughness;
-    float _pad0;
-    float _pad1;
+    float RefractionChance;
 };
 
 struct Light
@@ -186,7 +186,7 @@ vec3 BlinnPhong(Light light)
 }
 
 // From: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
-const vec3 sampleOffsetDirections[20] =
+const vec3 SampleOffsetDirections[20] =
 {
    vec3( 1.0,  1.0,  1.0 ), vec3(  1.0, -1.0,  1.0 ), vec3( -1.0, -1.0,  1.0 ), vec3( -1.0,  1.0,  1.0 ), 
    vec3( 1.0,  1.0, -1.0 ), vec3(  1.0, -1.0, -1.0 ), vec3( -1.0, -1.0, -1.0 ), vec3( -1.0,  1.0, -1.0 ),
@@ -215,7 +215,7 @@ float Visibility(PointShadow pointShadow)
     float shadowFactor = texture(pointShadow.Sampler, vec4(lightToFrag, mapedDepth));
     for (int i = 0; i < 20; i++)
     {
-        shadowFactor += texture(pointShadow.Sampler, vec4(lightToFrag + sampleOffsetDirections[i] * DISK_RADIUS, mapedDepth));
+        shadowFactor += texture(pointShadow.Sampler, vec4(lightToFrag + SampleOffsetDirections[i] * DISK_RADIUS, mapedDepth));
     }
 
     return shadowFactor / 20.0;

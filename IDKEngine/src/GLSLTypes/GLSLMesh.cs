@@ -5,13 +5,15 @@ namespace IDKEngine
     public struct GLSLMesh
     {
         public Matrix4 Model;
+        //public int BaseMatrix;
+        //public int InstanceCount;
         public int MaterialIndex;
-        public int BaseNode;
+        public int NodeStart;
+        public int BLASDepth;
         public float Emissive;
         public float NormalMapStrength;
         public float SpecularChance;
         public float Roughness;
-        public int BLASDepth;
-        private readonly float _pad1;
+        public float RefractionChance;
     }
 }

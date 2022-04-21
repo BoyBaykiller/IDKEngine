@@ -238,7 +238,10 @@ namespace IDKEngine.Render
             Span<float> jitterData = new Span<float>(taaData->Jitter, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);
             MyMath.GetHaltonSequence_2_3(jitterData);
             MyMath.MapHaltonSequence(jitterData, width, height);
-            TaaBuffer.SubData(0, sizeof(float) * jitterData.Length, jitterData.ToPtr());
+            fixed (void* ptr = jitterData)
+            {
+                TaaBuffer.SubData(0, sizeof(float) * jitterData.Length, (IntPtr)ptr);
+            }
         }
 
         public void Dispose()

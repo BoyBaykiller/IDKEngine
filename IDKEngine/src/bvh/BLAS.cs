@@ -10,13 +10,15 @@ namespace IDKEngine
 {
     class BLAS
     {
-        public const int MAX_TREE_DEPTH = 9;
         public const int BITS_FOR_VERTICES_START = 31;
 
-        public readonly GLSLNode[] Nodes;
-        public readonly GLSLBLASVertex[] Vertices;
-        public unsafe BLAS(ModelSystem modelSystem)
+        public readonly int MaxTreeDepth;
+        public readonly GLSLNode[][] Nodes;
+        public readonly GLSLBLASVertex[][] Vertices;
+        public unsafe BLAS(ModelSystem modelSystem, int maxTreeDepth, uint trianglesPerLevelHint = 45u)
         {
+            MaxTreeDepth = maxTreeDepth;
+
             List<GLSLBLASVertex> vertices = new List<GLSLBLASVertex>(modelSystem.Vertices.Length);
             GLSLNode[] rootNodes = new GLSLNode[modelSystem.Meshes.Length];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
@@ -27,7 +29,11 @@ namespace IDKEngine
                 for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
                 {
                     uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
-                    GLSLBLASVertex vertex = *(GLSLBLASVertex*)((GLSLVertex*)modelSystem.Vertices.ToPtr() + indici);
+                    GLSLBLASVertex vertex = new GLSLBLASVertex();
+                    vertex.Position = modelSystem.Vertices[indici].Position;
+                    vertex.TexCoord = modelSystem.Vertices[indici].TexCoord;
+                    vertex.Normal = modelSystem.Vertices[indici].Normal;
+                    vertex.Tangent = modelSystem.Vertices[indici].Tangent;
                     vertices.Add(vertex);
 
                     rootNodes[i].Min = Vector3.ComponentMin(rootNodes[i].Min, vertex.Position);
@@ -37,13 +43,13 @@ namespace IDKEngine
             }
 
 
-            GLSLNode[][] nodes = new GLSLNode[modelSystem.Meshes.Length][];
-            GLSLBLASVertex[][] bvhVertices = new GLSLBLASVertex[modelSystem.Meshes.Length][];
+            Nodes = new GLSLNode[modelSystem.Meshes.Length][];
+            Vertices = new GLSLBLASVertex[modelSystem.Meshes.Length][];
             ParallelLoopResult parallelLoopResult = Parallel.For(0, modelSystem.Meshes.Length, i =>
             {
                 GLSLNode root = rootNodes[i];
 
-                int treeDepth = (int)Math.Max(Math.Min(root.MissLinkAndVerticesCount / 45u, MAX_TREE_DEPTH), 2u);
+                int treeDepth = (int)Math.Max(Math.Min(root.MissLinkAndVerticesCount / trianglesPerLevelHint, MaxTreeDepth), 2u);
                 uint nodesForMesh = (1u << treeDepth) - 1u;
                 modelSystem.Meshes[i].BLASDepth = treeDepth;
                 int bitsForMissLink = treeDepth; // ceil(log2(NODES_PER_MESH))
@@ -52,11 +58,10 @@ namespace IDKEngine
 
                 List<GLSLBLASVertex> localBVHVertices = new List<GLSLBLASVertex>((int)(root.MissLinkAndVerticesCount * 1.5f));
                 GLSLNode[] localNodes = new GLSLNode[nodesForMesh];
-                root.IsLeafAndVerticesStart = 0;
                 localNodes[0] = root;
+                
                 for (int level = 0; level < treeDepth; level++)
                 {
-                    int n = 0;
                     uint localIndex = (uint)level;
                     uint distance = GetDistanceSibling(level, nodesForMesh);
 
@@ -67,7 +72,7 @@ namespace IDKEngine
                         else if (horNode % 2 == 0)
                             SetMissLink(ref localNodes[localIndex], localIndex + distance, bitsForMissLink);
                         else
-                            SetMissLink(ref localNodes[localIndex], localIndex + GetDistanceInterNode(distance, n) - 1u, bitsForMissLink);
+                            SetMissLink(ref localNodes[localIndex], localIndex + GetDistanceInterNode(distance, horNode / 2) - 1u, bitsForMissLink);
 
                         if (level < treeDepth - 1)
                         {
@@ -82,11 +87,11 @@ namespace IDKEngine
                             localNodes[GetRightChildIndex((int)localIndex, treeDepth, level)] = child1;
 
                         }
-                        localIndex += horNode % 2 == 0 ? distance : GetDistanceInterNode(distance, n++);
+                        localIndex += horNode % 2 == 0 ? distance : GetDistanceInterNode(distance, horNode / 2);
                     }
                 }
-                nodes[i] = localNodes;
-                bvhVertices[i] = localBVHVertices.ToArray();
+                Nodes[i] = localNodes;
+                Vertices[i] = localBVHVertices.ToArray();
 
                 void MakeLeaf(ref GLSLNode node)
                 {
@@ -114,26 +119,21 @@ namespace IDKEngine
             while (!parallelLoopResult.IsCompleted) ;
 
             int nodesOffset = 0, verticesOffset = 0;
-            Nodes = new GLSLNode[nodes.Sum(arr => arr.Length)];
-            Vertices = new GLSLBLASVertex[bvhVertices.Sum(arr => arr.Length)];
-            
-            for (int i = 0; i < nodes.Length; i++)
+            for (int i = 0; i < Nodes.Length; i++)
             {
-                for (int j = 0; j < nodes[i].Length; j++)
+                for (int j = 0; j < Nodes[i].Length; j++)
                 {
-                    if (MyMath.GetBits(nodes[i][j].IsLeafAndVerticesStart, BITS_FOR_VERTICES_START, 1) == 1)
+                    if (MyMath.GetBits(Nodes[i][j].IsLeafAndVerticesStart, BITS_FOR_VERTICES_START, 1) == 1)
                     {
-                        uint globalStart = (uint)verticesOffset + nodes[i][j].IsLeafAndVerticesStart;
-                        nodes[i][j].IsLeafAndVerticesStart = globalStart;
-                        MyMath.BitsInsert(ref nodes[i][j].IsLeafAndVerticesStart, 1, BITS_FOR_VERTICES_START);
+                        uint globalStart = (uint)verticesOffset + Nodes[i][j].IsLeafAndVerticesStart;
+                        Nodes[i][j].IsLeafAndVerticesStart = globalStart;
+                        MyMath.BitsInsert(ref Nodes[i][j].IsLeafAndVerticesStart, 1, BITS_FOR_VERTICES_START);
                     }
                 }
-                Array.Copy(nodes[i], 0, Nodes, nodesOffset, nodes[i].Length);
-                Array.Copy(bvhVertices[i], 0, Vertices, verticesOffset, bvhVertices[i].Length);
-                modelSystem.Meshes[i].BaseNode = nodesOffset;
+                modelSystem.Meshes[i].NodeStart = nodesOffset;
 
-                nodesOffset += nodes[i].Length;
-                verticesOffset += bvhVertices[i].Length;
+                nodesOffset += Nodes[i].Length;
+                verticesOffset += Vertices[i].Length;
             }
 
             modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);

@@ -47,13 +47,13 @@ struct Mesh
 {
     mat4 Model;
     int MaterialIndex;
-    int BaseNode;
+    int NodeStart;
+    int BLASDepth;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
     float Roughness;
-    int BLASDepth;
-    float _pad1;
+    float RefractionChance;
 };
 
 struct Vertex
@@ -182,6 +182,7 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 
+bool debug = false;
 vec3 Radiance(Ray ray)
 {
     vec3 throughput = vec3(1.0);
@@ -197,6 +198,7 @@ vec3 Radiance(Ray ray)
 
             vec3 hitpos = ray.Origin + ray.Direction * hitInfo.T;
             float specularChance = 0.0;
+            float refractionChance = 0.0;
             float roughness = 1.0;
             float alpha = 1.0;
             vec3 albedo;
@@ -251,14 +253,12 @@ vec3 Radiance(Ray ray)
             float rayProbability;
             ray.Direction = BRDF(ray.Direction, specularChance, roughness, normal, rayProbability);
             ray.Origin = hitpos + ray.Direction * EPSILON;
-
             if (dot(ray.Direction, normal) <= 0.0)
-			{
 				ray.Origin += normal * EPSILON;
-			}
 
             radiance += emissive * throughput;
-            throughput *= albedo;
+            if (!debug)
+                throughput *= albedo;
             throughput /= rayProbability;
 
             // Russian Roulette - unbiased method to terminate rays and therefore lower render times (also reduces fireflies)
@@ -284,15 +284,19 @@ vec3 Radiance(Ray ray)
 
 vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, out float rayProbability)
 {
+    float refractionChance = 0.0;
+    // specularChance = 1.0;
     if (specularChance > 0.0)
     {
         specularChance = mix(specularChance, 1.0, FresnelSchlick(dot(-incomming, normal), 1.0, 1.0));
+        float diffuseChance = 1.0 - specularChance - refractionChance;
+        refractionChance = 1.0 - specularChance - diffuseChance;
     }
 
     vec3 diffuseRay = CosineSampleHemisphere(normal);
-    
     float raySelectRoll = GetRandomFloat01();
     vec3 outgoing;
+    debug = false;
     if (specularChance > raySelectRoll)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);
@@ -300,10 +304,18 @@ vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, ou
         outgoing = reflectionRayDir;
         rayProbability = specularChance;
     }
+    else if (specularChance + refractionChance > raySelectRoll)
+    {
+        vec3 refractionRayDir = refract(incomming, normal, 1.0);
+        refractionRayDir = normalize(mix(refractionRayDir, CosineSampleHemisphere(-normal), 0.0));
+        outgoing = refractionRayDir;
+        rayProbability = refractionChance;
+        debug = true;
+    }
     else
     {
         outgoing = diffuseRay;
-        rayProbability = 1.0 - specularChance;
+        rayProbability = 1.0 - specularChance - refractionChance;
     }
     rayProbability = max(rayProbability, EPSILON);
 
@@ -331,10 +343,10 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
         uint localNodeIndex = 0u;
         while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
         {
-            Node node = bvhSSBO.Nodes[mesh.BaseNode + localNodeIndex];
+            Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
             if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
             {
-                if (bool(node.IsLeafAndVerticesStart))
+                if ((node.IsLeafAndVerticesStart >> 31) == 1)
                 {
                     const uint MAX_COUNT = (1u << (32u - mesh.BLASDepth)) - 1u;
                     const uint count = node.MissLinkAndVerticesCount & MAX_COUNT;

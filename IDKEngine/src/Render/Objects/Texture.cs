@@ -199,9 +199,9 @@ namespace IDKEngine.Render.Objects
             GL.GenerateTextureMipmap(ID);
         }
 
-        public static int GetMaxMipMaplevel(int width, int height, int depth)
+        public static int GetMaxMipmapLevel(int width, int height, int depth)
         {
-            return (int)Math.Ceiling(Math.Log2(Math.Max(width, Math.Max(height, depth))));
+            return (int)MathF.Ceiling(MathF.Log2(Math.Max(width, Math.Max(height, depth))));
         }
 
         public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)

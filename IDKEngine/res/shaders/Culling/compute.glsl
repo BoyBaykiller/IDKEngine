@@ -28,13 +28,13 @@ struct Mesh
 {
     mat4 Model;
     int MaterialIndex;
-    int BaseNode;
+    int NodeStart;
+    int BLASDepth;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
     float Roughness;
-    float _pad0;
-    float _pad1;
+    float RefractionChance;
 };
 
 layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO
@@ -64,7 +64,7 @@ void main()
         return;
 
     Mesh mesh = meshSSBO.Meshes[gl_GlobalInvocationID.x];
-    Node node = bvhSSBO.Nodes[mesh.BaseNode];
+    Node node = bvhSSBO.Nodes[mesh.NodeStart];
     
     Frustum frustum = ExtractFrustum(ProjView * mesh.Model);
     drawCommandsSSBO.DrawCommands[gl_GlobalInvocationID.x].InstanceCount = int(AABBVsFrustum(frustum, node));

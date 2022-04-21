@@ -59,7 +59,7 @@ namespace IDKEngine.Render
 
             width = (int)(width / 2.0f);
             height = (int)(height / 2.0f);
-            _lod = System.Math.Max(Texture.GetMaxMipMaplevel(width, height, 1) - 3, 1);
+            _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - 3, 1);
 
             downscaleTexture = new Texture(TextureTarget2d.Texture2D);
             downscaleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
@@ -127,7 +127,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            _lod = System.Math.Max(Texture.GetMaxMipMaplevel(width, height, 1) - 3, 1);
+            _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - 3, 1);
 
             downscaleTexture.Dispose();
             

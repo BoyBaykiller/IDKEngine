@@ -28,13 +28,13 @@ struct Mesh
 {
     mat4 Model;
     int MaterialIndex;
-    int BaseNode;
+    int NodeStart;
+    int BLASDepth;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
     float Roughness;
-    float _pad0;
-    float _pad1;
+    float RefractionChance;
 };
 
 struct PointShadow
@@ -98,7 +98,7 @@ void main()
     SharedInstanceCounts[localMeshIndex] = 0;
 
     Mesh mesh = meshSSBO.Meshes[globalMeshIndex];
-    Node node = bvhSSBO.Nodes[mesh.BaseNode];
+    Node node = bvhSSBO.Nodes[mesh.NodeStart];
     Frustum frustum = ExtractFrustum(shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[cubemapFace] * mesh.Model);
 
     barrier();
