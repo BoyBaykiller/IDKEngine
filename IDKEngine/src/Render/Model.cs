@@ -111,16 +111,18 @@ namespace IDKEngine.Render.Objects
 
             while (!vertecisLoadResult.IsCompleted && !texturesLoadResult.IsCompleted) ;
 
-            PreTransformMeshes(scene.RootNode);
-            void PreTransformMeshes(Node node)
+            PreTransformMeshes(scene.RootNode, AssimpToOpenTKMat4(scene.RootNode.Transform));
+            void PreTransformMeshes(Node node, Matrix4 model)
             {
+                Matrix4 parent = model;
                 for (int i = 0; i < node.ChildCount; i++)
                 {
+                    Matrix4 child = parent * AssimpToOpenTKMat4(node.Children[i].Transform);
                     for (int j = 0; j < node.Children[i].MeshCount; j++)
                     {
-                        Meshes[node.Children[i].MeshIndices[j]].Model *= AssimpToOpenTKMat4(node.Children[i].Transform);
+                        Meshes[node.Children[i].MeshIndices[j]].Model *= child;
                     }
-                    PreTransformMeshes(node.Children[i]);
+                    PreTransformMeshes(node.Children[i], child);
                 }
             }
 
@@ -150,8 +152,11 @@ namespace IDKEngine.Render.Objects
                     {
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
                         texture.SetWrapMode(OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat, OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
-                        texture.ImmutableAllocate(img.Width, img.Height, 1, (SizedInternalFormat)format, Texture.GetMaxMipMaplevel(img.Width, img.Height, 1));
-                        texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, img.GetPixelRowSpan(0).ToPtr());
+                        texture.ImmutableAllocate(img.Width, img.Height, 1, (SizedInternalFormat)format, Texture.GetMaxMipmapLevel(img.Width, img.Height, 1));
+                        fixed (void* ptr = img.GetPixelRowSpan(0))
+                        {
+                            texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (System.IntPtr)ptr);
+                        }
                         texture.GenerateMipmap();
                         if (Helper.IsCoreExtensionAvailable("GL_ARB_texture_filter_anisotropic", 4.6) || Helper.IsExtensionsAvailable("GL_ARB_texture_filter_anisotropic") || Helper.IsExtensionsAvailable("GL_EXT_texture_filter_anisotropic"))
                             texture.SetAnisotropy(4.0f);

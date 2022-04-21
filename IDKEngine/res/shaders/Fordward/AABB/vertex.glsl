@@ -43,13 +43,13 @@ struct Mesh
 {
     mat4 Model;
     int MaterialIndex;
-    int BaseNode;
+    int NodeStart;
+    int BLASDepth;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
     float Roughness;
-    float _pad0;
-    float _pad1;
+    float RefractionChance;
 };
 
 struct Node
@@ -92,7 +92,7 @@ layout(location = 0) uniform int MeshIndex;
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[MeshIndex];
-    Node node = bvhSSBO.Nodes[mesh.BaseNode];
+    Node node = bvhSSBO.Nodes[mesh.NodeStart];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;

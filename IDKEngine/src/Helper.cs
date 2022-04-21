@@ -56,20 +56,5 @@ namespace IDKEngine
         {
             return (T*)Marshal.AllocHGlobal(sizeof(T) * count);
         }
-
-        public static unsafe IntPtr ToPtr<T>(this Span<T> span) where T : unmanaged
-        {
-            fixed (void* ptr = span)
-            {
-                return (IntPtr)ptr;
-            }
-        }
-        public static unsafe IntPtr ToPtr<T>(this T[] arr) where T : unmanaged
-        {
-            fixed (void* ptr = arr)
-            {
-                return (IntPtr)ptr;
-            }
-        }
     }
 }

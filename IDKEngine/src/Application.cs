@@ -26,7 +26,7 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true;
+        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsDithering = true, IsShadows = true;
         public int FPS;
 
         private int fps;
@@ -86,7 +86,7 @@ namespace IDKEngine
 
             PostCombine.Result.BindToUnit(0);
 
-            finalProgram.Use();
+            FinalProgram.Use();
 
             GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             
@@ -153,9 +153,9 @@ namespace IDKEngine
         }
 
         private Camera camera;
-        private ShaderProgram finalProgram;
         private BufferObject basicDataUBO;
         private List<PointShadow> pointShadows;
+        public ShaderProgram FinalProgram;
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public Bloom Bloom;
@@ -222,7 +222,7 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            Bvh = new BVH(new BLAS(ModelSystem));
+            Bvh = new BVH(new BLAS(ModelSystem, 9));
             
             PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
@@ -251,21 +251,30 @@ namespace IDKEngine
             blueNoise.ImmutableAllocate(img.Width, img.Height, 1, SizedInternalFormat.Rgba8);
             blueNoise.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             blueNoise.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            blueNoise.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, img.GetPixelRowSpan(0).ToPtr());
+            fixed (void* ptr = img.GetPixelRowSpan(0))
+            {
+                blueNoise.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
+            }
             
             BufferObject blueNoiseUBO = new BufferObject();
             blueNoiseUBO.ImmutableAllocate(sizeof(long), blueNoise.MakeHandleResidentARB(), BufferStorageFlags.DynamicStorageBit);
             blueNoiseUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 4, 0, blueNoiseUBO.Size);
 
-            finalProgram = new ShaderProgram(
+            FinalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
+
+            FinalProgram.Upload("IsDithering", IsDithering);
 
             gui.ImGuiController.WindowResized(Size.X, Size.Y);
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Size.X / (float)Size.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
+
+            // I know this is bad practice but BVH polutes memory
+            // and it doesn't seem to get cleaned up anytime soon without this
+            GC.Collect();
         }
 
         protected override void OnResize()

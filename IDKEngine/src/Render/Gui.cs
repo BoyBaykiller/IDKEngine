@@ -22,6 +22,10 @@ namespace IDKEngine.Render
             ImGui.Begin("Render");
             {
                 ImGui.Text($"FPS: {window.FPS}");
+                if (ImGui.Checkbox("IsDithering", ref window.IsDithering))
+                {
+                    window.FinalProgram.Upload("IsDithering", window.IsDithering);
+                }
 
                 string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
                 string current = window.IsPathTracing ? renderModes[1] : renderModes[0];
@@ -293,6 +297,11 @@ namespace IDKEngine.Render
                     }
 
                     if (ImGui.SliderFloat("Roughness", ref mesh.Roughness, 0.0f, 1.0f))
+                    {
+                        hadChange = true;
+                    }
+
+                    if (ImGui.SliderFloat("RefractionChance", ref mesh.RefractionChance, 0.0f, 1.0f))
                     {
                         hadChange = true;
                     }
