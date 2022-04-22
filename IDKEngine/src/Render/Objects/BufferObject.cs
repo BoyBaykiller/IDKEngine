@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL4;
 
@@ -39,11 +40,11 @@ namespace IDKEngine.Render.Objects
             Marshal.FreeHGlobal(data);
         }
 
-        public void SubData<T>(int offset, int size, T data) where T : struct
+        public void SubData<T>(int offset, int size, T data) where T : unmanaged
         {
             GL.NamedBufferSubData(ID, (IntPtr)offset, size, ref data);
         }
-        public void SubData<T>(int offset, int size, T[] data) where T : struct
+        public void SubData<T>(int offset, int size, T[] data) where T : unmanaged
         {
             GL.NamedBufferSubData(ID, (IntPtr)offset, size, data);
         }
@@ -52,12 +53,12 @@ namespace IDKEngine.Render.Objects
             GL.NamedBufferSubData(ID, (IntPtr)offset, size, data);
         }
 
-        public void MutableAllocate<T>(int size, T data) where T : struct
+        public void MutableAllocate<T>(int size, T data) where T : unmanaged
         {
             GL.NamedBufferData(ID, size, ref data, BufferUsageHint.StaticDraw);
             Size = size;
         }
-        public void MutableAllocate<T>(int size, T[] data) where T : struct
+        public void MutableAllocate<T>(int size, T[] data) where T : unmanaged
         {
             GL.NamedBufferData(ID, size, data, BufferUsageHint.StaticDraw);
             Size = size;

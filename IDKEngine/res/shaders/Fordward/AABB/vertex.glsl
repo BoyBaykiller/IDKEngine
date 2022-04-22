@@ -41,10 +41,11 @@ const vec3 positions[24] = vec3[]
 
 struct Mesh
 {
-    mat4 Model;
-    int MaterialIndex;
+    int InstanceCount;
+    int MatrixStart;
     int NodeStart;
     int BLASDepth;
+    int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
@@ -62,8 +63,6 @@ struct Node
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
-    vec3 _pad0;
-    uint TreeDepth;
     Node Nodes[];
 } bvhSSBO;
 
@@ -71,6 +70,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+{
+    mat4 Models[];
+} matrixSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -93,9 +97,10 @@ void main()
 {
     Mesh mesh = meshSSBO.Meshes[MeshIndex];
     Node node = bvhSSBO.Nodes[mesh.NodeStart];
+    mat4 model = matrixSSBO.Models[mesh.MatrixStart + gl_InstanceID];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;
 
-    gl_Position = basicDataUBO.ProjView * mesh.Model * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0);
+    gl_Position = basicDataUBO.ProjView * model * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0);
 }

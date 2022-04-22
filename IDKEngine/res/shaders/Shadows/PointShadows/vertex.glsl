@@ -5,7 +5,7 @@
 #extension GL_NV_viewport_array : enable
 #extension GL_NV_viewport_array2 : enable
 
-#define IS_VERTEX_LAYERED_RENDERING GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array || GL_NV_viewport_array2
+#define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array || GL_NV_viewport_array2)
 
 layout(location = 0) in vec3 Position;
 
@@ -23,10 +23,11 @@ struct PointShadow
 
 struct Mesh
 {
-    mat4 Model;
-    int MaterialIndex;
+    int InstanceCount;
+    int MatrixStart;
     int NodeStart;
     int BLASDepth;
+    int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
@@ -38,6 +39,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+{
+    mat4 Models[];
+} matrixSSBO;
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
@@ -62,7 +68,7 @@ void main()
     const int MAX = 2 * 2 * 2 - 1;
     gl_Layer = bitfieldExtract(gl_BaseInstance, 3 * gl_InstanceID, 3) & MAX;
     
-    mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
+    mat4 model = matrixSSBO.Models[meshSSBO.Meshes[gl_DrawID].MatrixStart + gl_InstanceID];
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
 
@@ -70,7 +76,7 @@ void main()
 
     // In multi pass shadows the layer is simply passed as a uniform before each pass
 
-    mat4 model = meshSSBO.Meshes[gl_DrawID].Model;
+    mat4 model = matrixSSBO.Models[meshSSBO.Meshes[gl_DrawID].MatrixStart + gl_InstanceID];
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
 

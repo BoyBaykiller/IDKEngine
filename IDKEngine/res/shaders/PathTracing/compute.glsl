@@ -45,10 +45,11 @@ struct Material
 
 struct Mesh
 {
-    mat4 Model;
-    int MaterialIndex;
+    int InstanceCount;
+    int MatrixStart;
     int NodeStart;
     int BLASDepth;
+    int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
@@ -77,6 +78,7 @@ struct HitInfo
     float T;
     uint VertexIndex;
     int HitIndex;
+    int InstanceID;
 };
 
 struct Ray
@@ -107,6 +109,11 @@ layout(std430, binding = 3) restrict readonly buffer BVHVertices
 {
     Vertex Vertices[];
 } verticesSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+{
+    mat4 Models[];
+} matrixSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -211,7 +218,7 @@ vec3 Radiance(Ray ray)
                 Vertex v2 = verticesSSBO.Vertices[hitInfo.VertexIndex + 2u];
                 
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
-                mat4 model = mesh.Model;
+                mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
 
                 vec3 tangent = normalize(Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary));
                 vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
@@ -338,38 +345,42 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         const Mesh mesh = meshSSBO.Meshes[i];
-        const Ray localRay = WorldSpaceRayToLocal(ray, inverse(mesh.Model));
-                
-        uint localNodeIndex = 0u;
-        while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
+        for (int j = mesh.MatrixStart; j < mesh.MatrixStart + mesh.InstanceCount; j++)
         {
-            Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
-            if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
+            const Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[j]));
+                    
+            uint localNodeIndex = 0u;
+            while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
             {
-                if ((node.IsLeafAndVerticesStart >> 31) == 1)
+                Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
+                if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
                 {
-                    const uint MAX_COUNT = (1u << (32u - mesh.BLASDepth)) - 1u;
-                    const uint count = node.MissLinkAndVerticesCount & MAX_COUNT;
-                    
-                    const uint MAX_START = (1u << 31u) - 1u;
-                    const uint start = node.IsLeafAndVerticesStart & MAX_START;
-                    
-                    for (uint j = start; j < start + count; j += 3u)
+                    if ((node.IsLeafAndVerticesStart >> 31) == 1)
                     {
-                        if (RayTriangleIntersect(localRay, verticesSSBO.Vertices[j + 0u].Position, verticesSSBO.Vertices[j + 1u].Position, verticesSSBO.Vertices[j + 2u].Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
+                        const uint MAX_COUNT = (1u << (32u - mesh.BLASDepth)) - 1u;
+                        const uint count = node.MissLinkAndVerticesCount & MAX_COUNT;
+                        
+                        const uint MAX_START = (1u << 31u) - 1u;
+                        const uint start = node.IsLeafAndVerticesStart & MAX_START;
+                        
+                        for (uint k = start; k < start + count; k += 3u)
                         {
-                            hitInfo.Bary = baryT.xyz;
-                            hitInfo.T = baryT.w;
-                            hitInfo.VertexIndex = j;
-                            hitInfo.HitIndex = i;
+                            if (RayTriangleIntersect(localRay, verticesSSBO.Vertices[k + 0u].Position, verticesSSBO.Vertices[k + 1u].Position, verticesSSBO.Vertices[k + 2u].Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
+                            {
+                                hitInfo.Bary = baryT.xyz;
+                                hitInfo.T = baryT.w;
+                                hitInfo.HitIndex = i;
+                                hitInfo.InstanceID = j;
+                                hitInfo.VertexIndex = k;
+                            }
                         }
                     }
+                    localNodeIndex++;
                 }
-                localNodeIndex++;
-            }
-            else
-            {
-                localNodeIndex = node.MissLinkAndVerticesCount >> (32u - mesh.BLASDepth);
+                else
+                {
+                    localNodeIndex = node.MissLinkAndVerticesCount >> (32u - mesh.BLASDepth);
+                }
             }
         }
     }

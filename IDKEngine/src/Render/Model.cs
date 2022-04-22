@@ -30,6 +30,8 @@ namespace IDKEngine.Render.Objects
         public readonly GLSLVertex[] Vertices;
         public readonly uint[] Indices;
 
+        public readonly Matrix4[][] Models;
+
         private readonly Scene scene;
         public unsafe Model(string path)
         {
@@ -43,6 +45,7 @@ namespace IDKEngine.Render.Objects
             Meshes = new GLSLMesh[scene.MeshCount];
             Materials = new GLSLMaterial[scene.MaterialCount];
             Vertices = new GLSLVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
+            Models = new Matrix4[scene.MeshCount][];
             Image<Rgba32>[] images = new Image<Rgba32>[scene.MaterialCount * perMaterialTextures.Length];
 
             ParallelLoopResult vertecisLoadResult = Parallel.For(0, scene.MeshCount, i =>
@@ -77,13 +80,17 @@ namespace IDKEngine.Render.Objects
                     Vertices[baseVertex + j].BiTangent.Z = mesh.BiTangents[j].Z;
                 }
 
+                Models[i] = new Matrix4[1] { Matrix4.Identity };
+
+                Meshes[i].InstanceCount = Models[i].Length;
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
-                Meshes[i].Model = Matrix4.Identity;
+                Meshes[i].MatrixStart = i;
                 Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
                 Meshes[i].SpecularChance = 0.5f;
                 Meshes[i].Roughness = 0.5f;
 
-                DrawCommands[i].InstanceCount = 1;
+                // Drawcommand instance count may differ depending on culling. Mesh instance count doesn't
+                DrawCommands[i].InstanceCount = Meshes[i].InstanceCount;
                 DrawCommands[i].BaseInstance = 0;
             });
 
@@ -120,7 +127,7 @@ namespace IDKEngine.Render.Objects
                     Matrix4 child = parent * AssimpToOpenTKMat4(node.Children[i].Transform);
                     for (int j = 0; j < node.Children[i].MeshCount; j++)
                     {
-                        Meshes[node.Children[i].MeshIndices[j]].Model *= child;
+                        Models[node.Children[i].MeshIndices[j]][0] *= child;
                     }
                     PreTransformMeshes(node.Children[i], child);
                 }
