@@ -203,12 +203,12 @@ namespace IDKEngine
             camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
-            for (int i = 0; i < sponza.Meshes.Length; i++) // 0.0145f
-                sponza.Meshes[i].Model = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
+            for (int i = 0; i < sponza.Models.Length; i++) // 0.0145f
+                sponza.Models[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
 
             Model horse = new Model("res/models/Horse/horse.gltf");
-            for (int i = 0; i < horse.Meshes.Length; i++)
-                horse.Meshes[i].Model = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, 0.5f);
+            for (int i = 0; i < horse.Models.Length; i++)
+                horse.Models[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, 0.5f);
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse });
@@ -276,6 +276,7 @@ namespace IDKEngine
             // and it doesn't seem to get cleaned up anytime soon without this
             GC.Collect();
         }
+
 
         protected override void OnResize()
         {

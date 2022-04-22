@@ -26,10 +26,11 @@ struct Node
 
 struct Mesh
 {
-    mat4 Model;
-    int MaterialIndex;
+    int InstanceCount;
+    int MatrixStart;
     int NodeStart;
     int BLASDepth;
+    int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
@@ -52,6 +53,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
+layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+{
+    mat4 Models[];
+} matrixSSBO;
+
 vec3 NegativeVertex(Node node, vec3 normal);
 bool AABBVsFrustum(Frustum frustum, Node node);
 Frustum ExtractFrustum(mat4 projViewModel);
@@ -65,8 +71,10 @@ void main()
 
     Mesh mesh = meshSSBO.Meshes[gl_GlobalInvocationID.x];
     Node node = bvhSSBO.Nodes[mesh.NodeStart];
+    const int glInstanceID = 0; // TODO: Derive from built in variables
+    mat4 model = matrixSSBO.Models[mesh.MatrixStart + glInstanceID];
     
-    Frustum frustum = ExtractFrustum(ProjView * mesh.Model);
+    Frustum frustum = ExtractFrustum(ProjView * model);
     drawCommandsSSBO.DrawCommands[gl_GlobalInvocationID.x].InstanceCount = int(AABBVsFrustum(frustum, node));
 }
 

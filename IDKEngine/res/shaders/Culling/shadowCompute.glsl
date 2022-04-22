@@ -26,10 +26,11 @@ struct Node
 
 struct Mesh
 {
-    mat4 Model;
-    int MaterialIndex;
+    int InstanceCount;
+    int MatrixStart;
     int NodeStart;
     int BLASDepth;
+    int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
@@ -63,6 +64,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+{
+    mat4 Models[];
+} matrixSSBO;
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
@@ -99,7 +105,9 @@ void main()
 
     Mesh mesh = meshSSBO.Meshes[globalMeshIndex];
     Node node = bvhSSBO.Nodes[mesh.NodeStart];
-    Frustum frustum = ExtractFrustum(shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[cubemapFace] * mesh.Model);
+    const int glInstanceID = 0; // TODO: Derive from built in variables
+    mat4 model = matrixSSBO.Models[mesh.MatrixStart + glInstanceID];
+    Frustum frustum = ExtractFrustum(shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[cubemapFace] * model);
 
     barrier();
     if (AABBVsFrustum(frustum, node))

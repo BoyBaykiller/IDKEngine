@@ -59,8 +59,9 @@ namespace IDKEngine.Render
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/shadowCompute.glsl")));
 
         private static readonly BufferObject shadowsBuffer = InitShadowBuffer();
-        public readonly Texture Result;
+        
         public readonly int Instance;
+        public readonly Texture Result;
         private readonly Matrix4 projection;
 
         private readonly Framebuffer framebuffer;

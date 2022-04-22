@@ -274,12 +274,13 @@ namespace IDKEngine.Render
                     ImGui.Text($"MeshID: {selectedMeshIndex}");
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
 
-                    systemVec3 = OpenTKToSystem(mesh.Model.ExtractTranslation());
-                    if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
-                    {
-                        hadChange = true;
-                        mesh.Model = mesh.Model.ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
-                    }
+                    // TODO: Implement again with new system
+                    //systemVec3 = OpenTKToSystem(mesh.Model.ExtractTranslation());
+                    //if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
+                    //{
+                    //    hadChange = true;
+                    //    mesh.Model = mesh.Model.ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
+                    //}
 
                     if (ImGui.SliderFloat("Emissive", ref mesh.Emissive, 0.0f, 100.0f))
                     {

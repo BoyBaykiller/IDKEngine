@@ -5,10 +5,11 @@ layout(location = 1) in vec2 TexCoord;
 
 struct Mesh
 {
-    mat4 Model;
-    int MaterialIndex;
+    int InstanceCount;
+    int MatrixStart;
     int NodeStart;
     int BLASDepth;
+    int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
@@ -20,6 +21,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+{
+    mat4 Models[];
+} matrixSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -53,10 +59,12 @@ out InOutVars
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
+    mat4 model = matrixSSBO.Models[mesh.MatrixStart + gl_InstanceID];
+
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.TexCoord = TexCoord;
 
-    vec3 fragPos = (mesh.Model * vec4(Position, 1.0)).xyz;
+    vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
     
     int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(

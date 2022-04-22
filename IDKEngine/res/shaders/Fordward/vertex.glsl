@@ -8,10 +8,11 @@ layout(location = 4) in vec3 BiTangent;
 
 struct Mesh
 {
-    mat4 Model;
-    int MaterialIndex;
+    int InstanceCount;
+    int MatrixStart;
     int NodeStart;
     int BLASDepth;
+    int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
     float SpecularChance;
@@ -23,6 +24,11 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+{
+    mat4 Models[];
+} matrixSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -66,15 +72,16 @@ out InOutVars
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
+    mat4 model = matrixSSBO.Models[mesh.MatrixStart + gl_InstanceID];
 
-    vec3 T = normalize(vec3(mesh.Model * vec4(Tangent, 0.0)));
-    vec3 N = normalize(vec3(mesh.Model * vec4(Normal, 0.0)));
+    vec3 T = normalize(vec3(model * vec4(Tangent, 0.0)));
+    vec3 N = normalize(vec3(model * vec4(Normal, 0.0)));
     T = normalize(T - dot(T, N) * N);
     vec3 B = BiTangent;
 
     outData.TBN = mat3(T, B, N);
     outData.TexCoord = TexCoord;
-    outData.FragPos = (mesh.Model * vec4(Position, 1.0)).xyz;
+    outData.FragPos = (model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
     
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
