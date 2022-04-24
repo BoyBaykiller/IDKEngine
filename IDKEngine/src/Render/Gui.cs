@@ -72,6 +72,21 @@ namespace IDKEngine.Render
 
                 if (!window.IsPathTracing)
                 {
+                    if (ImGui.CollapsingHeader("Variable Rate Shading"))
+                    {
+                        bool tempBool = window.ShadingRateClassifier.IsDebug;
+                        if (ImGui.Checkbox("Debug", ref tempBool))
+                        {
+                            window.ShadingRateClassifier.IsDebug = tempBool;
+                        }
+
+                        float tempFloat = window.ShadingRateClassifier.Aggressiveness;
+                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 20.0f))
+                        {
+                            window.ShadingRateClassifier.Aggressiveness = tempFloat;
+                        }
+                    }
+
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
                     {
                         ImGui.Checkbox("IsVolumetricLighting", ref window.IsVolumetricLighting);

@@ -97,6 +97,15 @@ layout(std140, binding = 3) uniform LightsUBO
     int Count;
 } lightsUBO;
 
+layout(std140, binding = 5) uniform TaaDataUBO
+{
+    vec4 Jitters[18 / 2];
+    int Samples;
+    int Enabled;
+    int Frame;
+    float VelScale;
+} taaDataUBO;
+
 in InOutVars
 {
     vec2 TexCoord;
@@ -156,7 +165,7 @@ void main()
     MeshIndexColor = inData.MeshIndex;
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
-    VelocityColor = (uv - prevUV);
+    VelocityColor = (uv - prevUV) * taaDataUBO.VelScale;
 }
 
 vec3 BlinnPhong(Light light)
