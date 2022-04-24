@@ -41,9 +41,12 @@ namespace IDKEngine.Render.Objects
             GL.NamedFramebufferRenderbuffer(ID, framebufferAttachment, RenderbufferTarget.Renderbuffer, renderbuffer.ID);
         }
 
-        public void SetDrawBuffers(DrawBuffersEnum[] drawBuffersEnums)
+        public unsafe void SetDrawBuffers(Span<DrawBuffersEnum> drawBuffersEnums)
         {
-            GL.NamedFramebufferDrawBuffers(ID, drawBuffersEnums.Length, drawBuffersEnums);
+            fixed (DrawBuffersEnum* ptr = drawBuffersEnums)
+            {
+                GL.NamedFramebufferDrawBuffers(ID, drawBuffersEnums.Length, ptr);
+            }
         }
         public void SetReadBuffer(ReadBufferMode readBufferMode)
         {
