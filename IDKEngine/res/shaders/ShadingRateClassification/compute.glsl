@@ -21,7 +21,7 @@ layout(std140, binding = 5) uniform TaaDataUBO
     float VelScale;
 } taaDataUBO;
 
-uniform int IsDebug;
+uniform bool IsDebug;
 uniform float Aggressiveness;
 
 shared uint DebugShadingRate;

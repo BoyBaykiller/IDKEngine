@@ -82,7 +82,7 @@ namespace IDKEngine.Render
 
             framebuffer = new Framebuffer();
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
-            framebuffer.SetDrawBuffers(new DrawBuffersEnum[] { DrawBuffersEnum.None });
+            framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.None });
             framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
             projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, nearPlane, farPlane);
