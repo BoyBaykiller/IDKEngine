@@ -32,20 +32,12 @@ namespace IDKEngine
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
-            if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-            {
-                camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
-                if (hadCameraInputs)
-                    GLSLBasicData.FrameCount = 0;
-            }
-
             GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
             GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
             GLSLBasicData.View = camera.View;
             GLSLBasicData.InvView = camera.View.Inverted();
             GLSLBasicData.CameraPos = camera.Position;
             GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
-
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
             if (!IsPathTracing)
             {
@@ -148,6 +140,13 @@ namespace IDKEngine
                     MouseState.CursorMode = CursorModeValue.CursorDisabled;
                     gui.ImGuiController.IsIgnoreMouseInput = true;
                 }
+            }
+
+            if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+            {
+                camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
+                if (hadCameraInputs)
+                    GLSLBasicData.FrameCount = 0;
             }
 
             gui.Update(this);
