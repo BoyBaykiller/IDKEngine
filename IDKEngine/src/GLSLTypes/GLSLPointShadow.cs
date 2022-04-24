@@ -17,7 +17,7 @@ namespace IDKEngine
         public Matrix4 PosZ;
         public Matrix4 NegZ;
 
-        public readonly Vector3 _pad0;
+        private readonly Vector3 _pad0;
         public int LightIndex;
     }
 }

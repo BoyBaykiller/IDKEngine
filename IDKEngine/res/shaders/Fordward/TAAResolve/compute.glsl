@@ -15,6 +15,7 @@ layout(std140, binding = 5) uniform TaaDataUBO
     int Samples;
     int Enabled;
     int Frame;
+    float VelScale;
 } taaDataUBO;
 
 void NeighborhoodClamping(ivec2 imgCoord, out ivec2 bestPixel, out vec3 current, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
@@ -29,7 +30,7 @@ void main()
     vec3 current;
     NeighborhoodClamping(imgCoord, bestPixel, current, neighborhoodMin, neighborhoodMax);
 
-    vec2 velocity = texelFetch(SamplerVelocity, bestPixel, 0).rg;
+    vec2 velocity = texelFetch(SamplerVelocity, bestPixel, 0).rg / taaDataUBO.VelScale;
     vec2 oldUV = uv - velocity;
     if (any(greaterThan(oldUV, vec2(1.0))) || any(lessThan(oldUV, vec2(0.0))))
     {

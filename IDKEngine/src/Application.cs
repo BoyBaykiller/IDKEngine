@@ -32,6 +32,20 @@ namespace IDKEngine
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
+            if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+            {
+                camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
+                if (hadCameraInputs)
+                    GLSLBasicData.FrameCount = 0;
+            }
+
+            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
+            GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
+            GLSLBasicData.View = camera.View;
+            GLSLBasicData.InvView = camera.View.Inverted();
+            GLSLBasicData.CameraPos = camera.Position;
+            GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
+
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
             if (!IsPathTracing)
             {
@@ -63,6 +77,7 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
 
+                ShadingRateClassifier.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
             else
@@ -135,21 +150,7 @@ namespace IDKEngine
                 }
             }
 
-            if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-            {
-                camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
-                if (hadCameraInputs)
-                    GLSLBasicData.FrameCount = 0;
-            }
-
             gui.Update(this);
-
-            GLSLBasicData.PrevProjView = GLSLBasicData.View * GLSLBasicData.Projection;
-            GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
-            GLSLBasicData.View = camera.View;
-            GLSLBasicData.InvView = camera.View.Inverted();
-            GLSLBasicData.CameraPos = camera.Position;
-            GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
         }
 
         private Camera camera;
@@ -159,6 +160,7 @@ namespace IDKEngine
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public Bloom Bloom;
+        public ShadingRateClassifier ShadingRateClassifier;
         public SSR SSR;
         public SSAO SSAO;
         public PostCombine PostCombine;
@@ -214,6 +216,7 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse });
 
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
+            ShadingRateClassifier = new ShadingRateClassifier(Size.X, Size.Y);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 8.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 3.5f, new Vector3(0.025f));
@@ -287,6 +290,7 @@ namespace IDKEngine
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
             ForwardRenderer.SetSize(Size.X, Size.Y);
+            ShadingRateClassifier.SetSize(Size.X, Size.Y);
             Bloom.SetSize(Size.X, Size.Y);
             VolumetricLight.SetSize(Size.X, Size.Y);
             SSR.SetSize(Size.X, Size.Y);

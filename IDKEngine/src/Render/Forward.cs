@@ -117,7 +117,7 @@ namespace IDKEngine.Render
             Velocity = new Texture(TextureTarget2d.Texture2D);
             Velocity.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             Velocity.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg16Snorm, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
+            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg16f, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
             Depth = new Texture(TextureTarget2d.Texture2D);
             Depth.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -127,6 +127,7 @@ namespace IDKEngine.Render
             taaData = Helper.Malloc<GLSLTaaData>();
             taaData->Samples = taaSamples;
             taaData->IsEnabled = 1;
+            taaData->Scale = 5.0f;
             Span<float> jitterData = new Span<float>(taaData->Jitter, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);
             MyMath.GetHaltonSequence_2_3(jitterData);
             MyMath.MapHaltonSequence(jitterData, width, height);

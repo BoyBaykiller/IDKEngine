@@ -9,5 +9,6 @@
         public int Samples;
         public int IsEnabled;
         public int Frame;
+        public float Scale;
     }
 }

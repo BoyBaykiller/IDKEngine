@@ -51,6 +51,7 @@ layout(std140, binding = 5) uniform TaaDataUBO
     int Samples;
     int Enabled;
     int Frame;
+    float VelScale;
 } taaDataUBO;
 
 out InOutVars
