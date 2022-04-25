@@ -8,7 +8,7 @@
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
-layout(binding = 0, r32ui) restrict writeonly uniform uimage2D ImgResult;
+layout(binding = 0, r8ui) restrict writeonly uniform uimage2D ImgResult;
 layout(binding = 1, rgba16f) restrict uniform image2D ImgShaded;
 layout(binding = 0) uniform sampler2D SamplerVelocity;
 

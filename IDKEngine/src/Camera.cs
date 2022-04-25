@@ -63,14 +63,18 @@ namespace IDKEngine
             if (keyboard[Keys.A] == InputState.Pressed)
                 acceleration -= Vector3.Cross(ViewDir, Up).Normalized();
 
-            Velocity += keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.35f : acceleration);
             if (acceleration != Vector3.Zero || Velocity != Vector3.Zero)
                 didMove = true;
+
+            acceleration *= 144.0f;
+
+            Velocity *= MathF.Exp(MathF.Log10(0.95f) * 144.0f * dT);
+            Position += (dT * Velocity * Speed + 0.5f * acceleration * dT * dT);
+            Velocity += (keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.35f : acceleration)) * dT;
+
             if (Vector3.Dot(Velocity, Velocity) < 0.01f)
                 Velocity = Vector3.Zero;
-            
-            Position += Velocity * Speed * dT;
-            Velocity *= 0.95f;
+
             View = GenerateMatrix(Position, ViewDir, Up);
         }
 
