@@ -45,7 +45,7 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             // Shading rate texture must be imuutable by spec
-            Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R32ui);
+            Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R8ui);
 
             this.width = width;
             this.height = height;
@@ -54,7 +54,7 @@ namespace IDKEngine.Render
 
         public void Compute(Texture shaded, Texture velocity)
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32ui);
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R8ui);
             shaded.BindToImageUnit(1, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
             velocity.BindToUnit(0);
             shaded.BindToUnit(1);
@@ -71,7 +71,7 @@ namespace IDKEngine.Render
             Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R32ui);
+            Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R8ui);
 
             this.width = width;
             this.height = height;
