@@ -259,7 +259,7 @@ namespace IDKEngine
             }
             
             BufferObject blueNoiseUBO = new BufferObject();
-            blueNoiseUBO.ImmutableAllocate(sizeof(long), blueNoise.MakeHandleResidentARB(), BufferStorageFlags.DynamicStorageBit);
+            blueNoiseUBO.ImmutableAllocate(sizeof(long), blueNoise.MakeImageHandleResidentARB(0, false, 0, SizedInternalFormat.Rgba8, TextureAccess.ReadOnly), BufferStorageFlags.DynamicStorageBit);
             blueNoiseUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 4, 0, blueNoiseUBO.Size);
 
             FinalProgram = new ShaderProgram(
