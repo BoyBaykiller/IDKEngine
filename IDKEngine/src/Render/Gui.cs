@@ -290,11 +290,11 @@ namespace IDKEngine.Render
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
 
                     // TODO: Implement again with new system
-                    //systemVec3 = OpenTKToSystem(mesh.Model.ExtractTranslation());
+                    //systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[mesh.MatrixStart][0].ExtractTranslation());
                     //if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     //{
                     //    hadChange = true;
-                    //    mesh.Model = mesh.Model.ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
+                    //    window.ModelSystem.ModelMatrices[mesh.MatrixStart][0] = window.ModelSystem.ModelMatrices[mesh.MatrixStart][0].ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
                     //}
 
                     if (ImGui.SliderFloat("Emissive", ref mesh.Emissive, 0.0f, 100.0f))

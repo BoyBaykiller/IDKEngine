@@ -133,6 +133,7 @@ namespace IDKEngine.Render
 
                         framebuffer.SetTextureLayer(FramebufferAttachment.DepthAttachment, Result, i);
 
+                        renderProgram.Use();
                         renderProgram.Upload(1, i);
 
                         modelSystem.Draw();

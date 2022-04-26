@@ -304,9 +304,9 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long MakeImageHandleResidentARB(int level, bool layered, int layer, PixelFormat pixelFormat, TextureAccess textureAccess)
+        public long MakeImageHandleResidentARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
         {
-            long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, pixelFormat);
+            long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
             GL.Arb.MakeImageHandleResident(imageHandle, (All)textureAccess);
             return imageHandle;
         }

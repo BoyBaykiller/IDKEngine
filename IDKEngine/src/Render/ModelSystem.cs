@@ -27,8 +27,8 @@ namespace IDKEngine.Render
         public uint[] Indices;
         public BufferObject ElementBuffer;
 
-        public Matrix4[][] Models;
-        public BufferObject ModelsBuffer;
+        public Matrix4[][] ModelMatrices;
+        public BufferObject ModelMatricesBuffer;
 
         public readonly VAO VAO;
         public unsafe ModelSystem()
@@ -51,9 +51,9 @@ namespace IDKEngine.Render
             Indices = new uint[0];
             ElementBuffer = new BufferObject();
 
-            Models = new Matrix4[0][];
-            ModelsBuffer = new BufferObject();
-            ModelsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
+            ModelMatrices = new Matrix4[0][];
+            ModelMatricesBuffer = new BufferObject();
+            ModelMatricesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
             VAO = new VAO();
             VAO.SetElementBuffer(ElementBuffer);
@@ -71,7 +71,7 @@ namespace IDKEngine.Render
             int oldMaterialsLength = Materials.Length;
             int oldVerticesLength = Vertices.Length;
             int oldIndicesLength = Indices.Length;
-            int oldModelsLength = Models.Length;
+            int oldModelsLength = ModelMatrices.Length;
 
             int loadedDrawCommands = 0;
             int loadedMeshes = 0;
@@ -85,7 +85,7 @@ namespace IDKEngine.Render
             Array.Resize(ref Materials, Materials.Length + models.Sum(m => m.Materials.Length));
             Array.Resize(ref Vertices, Vertices.Length + models.Sum(m => m.Vertices.Length));
             Array.Resize(ref Indices, Indices.Length + models.Sum(m => m.Indices.Length));
-            Array.Resize(ref Models, Models.Length + models.Sum(m => m.Models.Length));
+            Array.Resize(ref ModelMatrices, ModelMatrices.Length + models.Sum(m => m.Models.Length));
 
             Debug.Assert(Materials.Length <= GLSL_MAX_UBO_MATERIAL_COUNT);
 
@@ -98,7 +98,7 @@ namespace IDKEngine.Render
                 Array.Copy(model.Materials, 0, Materials, oldMaterialsLength + loadedMaterials, model.Materials.Length);
                 Array.Copy(model.Vertices, 0, Vertices, oldVerticesLength + loadedVertices, model.Vertices.Length);
                 Array.Copy(model.Indices, 0, Indices, oldIndicesLength + loadedIndices, model.Indices.Length);
-                Array.Copy(model.Models, 0, Models, oldModelsLength + loadedModels, model.Models.Length);
+                Array.Copy(model.Models, 0, ModelMatrices, oldModelsLength + loadedModels, model.Models.Length);
 
                 for (int j = oldDrawCommandsLength + loadedDrawCommands; j < oldDrawCommandsLength + loadedDrawCommands + model.DrawCommands.Length; j++)
                 {
@@ -127,14 +127,14 @@ namespace IDKEngine.Render
             ElementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
 
             loadedModels = 0;
-            ModelsBuffer.MutableAllocate(Models.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
-            for (int i = 0; i < Models.Length; i++)
+            ModelMatricesBuffer.MutableAllocate(ModelMatrices.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
+            for (int i = 0; i < ModelMatrices.Length; i++)
             {
-                fixed (void* model = Models[i])
+                fixed (void* model = ModelMatrices[i])
                 {
-                    ModelsBuffer.SubData(loadedModels * sizeof(Matrix4), Models[i].Length * sizeof(Matrix4), (IntPtr)model);
+                    ModelMatricesBuffer.SubData(loadedModels * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), (IntPtr)model);
                 }
-                loadedModels += Models[i].Length;
+                loadedModels += ModelMatrices[i].Length;
             }
         }
 
