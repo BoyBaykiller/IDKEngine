@@ -13,51 +13,51 @@ namespace IDKEngine.Render
         public const int GLSL_MAX_UBO_MATERIAL_COUNT = 256; // also change UBO size in shaders
 
         public GLSLDrawCommand[] DrawCommands;
-        public BufferObject DrawCommandBuffer;
+        private readonly BufferObject drawCommandBuffer;
 
         public GLSLMesh[] Meshes;
-        public BufferObject MeshBuffer;
+        private readonly BufferObject meshBuffer;
 
         public GLSLMaterial[] Materials;
-        public BufferObject MaterialBuffer;
+        private readonly BufferObject materialBuffer;
 
         public GLSLVertex[] Vertices;
-        public BufferObject VertexBuffer;
+        private readonly BufferObject vertexBuffer;
 
         public uint[] Indices;
-        public BufferObject ElementBuffer;
+        private readonly BufferObject elementBuffer;
 
         public Matrix4[][] ModelMatrices;
-        public BufferObject ModelMatricesBuffer;
+        private readonly BufferObject modelMatricesBuffer;
 
         public readonly VAO VAO;
         public unsafe ModelSystem()
         {
             DrawCommands = new GLSLDrawCommand[0];
-            DrawCommandBuffer = new BufferObject();
-            DrawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
+            drawCommandBuffer = new BufferObject();
+            drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
 
             Meshes = new GLSLMesh[0];
-            MeshBuffer = new BufferObject();
-            MeshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
+            meshBuffer = new BufferObject();
+            meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
 
             Materials = new GLSLMaterial[0];
-            MaterialBuffer = new BufferObject();
-            MaterialBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
+            materialBuffer = new BufferObject();
+            materialBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
             Vertices = new GLSLVertex[0];
-            VertexBuffer = new BufferObject();
+            vertexBuffer = new BufferObject();
 
             Indices = new uint[0];
-            ElementBuffer = new BufferObject();
+            elementBuffer = new BufferObject();
 
             ModelMatrices = new Matrix4[0][];
-            ModelMatricesBuffer = new BufferObject();
-            ModelMatricesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
+            modelMatricesBuffer = new BufferObject();
+            modelMatricesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
             VAO = new VAO();
-            VAO.SetElementBuffer(ElementBuffer);
-            VAO.AddSourceBuffer(VertexBuffer, 0, sizeof(GLSLVertex));
+            VAO.SetElementBuffer(elementBuffer);
+            VAO.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLVertex));
             VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
             VAO.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
             VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 8); // Normals
@@ -120,19 +120,19 @@ namespace IDKEngine.Render
                 loadedIndices += model.Indices.Length;
             }
 
-            DrawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands);
-            MeshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes);
-            MaterialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
-            VertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices);
-            ElementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
+            drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands);
+            meshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes);
+            materialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
+            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices);
+            elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
 
             loadedModels = 0;
-            ModelMatricesBuffer.MutableAllocate(ModelMatrices.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
+            modelMatricesBuffer.MutableAllocate(ModelMatrices.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
             for (int i = 0; i < ModelMatrices.Length; i++)
             {
                 fixed (void* model = ModelMatrices[i])
                 {
-                    ModelMatricesBuffer.SubData(loadedModels * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), (IntPtr)model);
+                    modelMatricesBuffer.SubData(loadedModels * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), (IntPtr)model);
                 }
                 loadedModels += ModelMatrices[i].Length;
             }
@@ -141,7 +141,7 @@ namespace IDKEngine.Render
         public void Draw()
         {
             VAO.Bind();
-            DrawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
+            drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
 
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
         }
@@ -164,16 +164,19 @@ namespace IDKEngine.Render
         /// <param name="start"></param>
         /// <param name="end"></param>
         /// <param name="func"></param>
-        public unsafe void ForEach(int start, int end, FuncUploadMesh func)
+        public unsafe void UpdateMeshBuffer(int start, int end, FuncUploadMesh func = null)
         {
             Debug.Assert(start >= 0 && end <= Meshes.Length);
 
-            for (int i = start; i < end; i++)
-                func(ref Meshes[i]);
+            if (func != null)
+            {
+                for (int i = start; i < end; i++)
+                    func(ref Meshes[i]);
+            }
 
             fixed (void* ptr = &Meshes[start])
             {
-                MeshBuffer.SubData(start * sizeof(GLSLMesh), (end - start) * sizeof(GLSLMesh), (IntPtr)ptr);
+                meshBuffer.SubData(start * sizeof(GLSLMesh), (end - start) * sizeof(GLSLMesh), (IntPtr)ptr);
             }
         }
 
@@ -185,16 +188,19 @@ namespace IDKEngine.Render
         /// <param name="start"></param>
         /// <param name="end"></param>
         /// <param name="func"></param>
-        public unsafe void ForEach(int start, int end, FuncUploadDrawCommand func)
+        public unsafe void UpdateDrawCommandBuffer(int start, int end, FuncUploadDrawCommand func = null)
         {
             Debug.Assert(start >= 0 && end <= DrawCommands.Length);
 
-            for (int i = start; i < end; i++)
-                func(ref DrawCommands[i]);
+            if (func != null)
+            {
+                for (int i = start; i < end; i++)
+                    func(ref DrawCommands[i]);
+            }
 
             fixed (void* ptr = &DrawCommands[start])
             {
-                DrawCommandBuffer.SubData(start * sizeof(GLSLDrawCommand), (end - start) * sizeof(GLSLDrawCommand), (IntPtr)ptr);
+                drawCommandBuffer.SubData(start * sizeof(GLSLDrawCommand), (end - start) * sizeof(GLSLDrawCommand), (IntPtr)ptr);
             }
         }
     }

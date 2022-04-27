@@ -95,7 +95,7 @@ namespace IDKEngine.Render
         /// <param name="start"></param>
         /// <param name="end"></param>
         /// <param name="func"></param>
-        public unsafe void ForEach(int start, int end, FuncUploadLight func)
+        public unsafe void UpdateLightBuffer(int start, int end, FuncUploadLight func)
         {
             Debug.Assert(start >= 0 && end <= Count);
 

@@ -68,7 +68,8 @@ void main()
     const int MAX = 2 * 2 * 2 - 1;
     gl_Layer = bitfieldExtract(gl_BaseInstance, 3 * gl_InstanceID, 3) & MAX;
     
-    mat4 model = matrixSSBO.Models[meshSSBO.Meshes[gl_DrawID].MatrixStart + gl_InstanceID];
+    const int glInstanceID = 0; // TODO: Work out actual instanceID value
+    mat4 model = matrixSSBO.Models[meshSSBO.Meshes[gl_DrawID].MatrixStart + glInstanceID];
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
 

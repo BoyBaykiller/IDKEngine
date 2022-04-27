@@ -325,7 +325,7 @@ namespace IDKEngine.Render
                     if (hadChange)
                     {
                         window.GLSLBasicData.FrameCount = 0;
-                        window.ModelSystem.ForEach(selectedMeshIndex, selectedMeshIndex + 1, (ref GLSLMesh curMesh) =>
+                        window.ModelSystem.UpdateMeshBuffer(selectedMeshIndex, selectedMeshIndex + 1, (ref GLSLMesh curMesh) =>
                         {
                             curMesh = mesh;
                         });
