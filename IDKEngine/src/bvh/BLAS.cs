@@ -136,7 +136,7 @@ namespace IDKEngine
                 verticesOffset += Vertices[i].Length;
             }
 
-            modelSystem.MeshBuffer.SubData(0, modelSystem.Meshes.Length * sizeof(GLSLMesh), modelSystem.Meshes);
+            modelSystem.UpdateMeshBuffer(0, modelSystem.Meshes.Length);
         }
 
         private static void ConstructChildBounds(in GLSLNode parent, out GLSLNode child0, out GLSLNode child1)
