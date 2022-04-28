@@ -44,9 +44,10 @@ void main()
     rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277;
     
     vec2 uv = (imgCoord + 0.5) / imgResultSize;
-    vec3 normal = normalize((basicDataUBO.View * vec4(texture(SamplerNormalSpec, uv).rgb, 0.0)).xyz);
+
+    mat3 worldToViewNormal = mat3(transpose(inverse(basicDataUBO.View)));
+    vec3 normal = worldToViewNormal * texture(SamplerNormalSpec, uv).rgb;
     vec3 fragPos = NDCToViewSpace(vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0);
-    
 
     float occlusion = 0.0;
     float samples = Samples;
