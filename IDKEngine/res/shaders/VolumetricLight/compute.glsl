@@ -29,7 +29,7 @@ struct PointShadow
 
 layout(std140, binding = 4) uniform BlueNoiseUBO
 {
-    restrict readonly image2D ImgBlueNoise;
+    layout(rgba8) restrict readonly image2D ImgBlueNoise;
 } blueNoiseUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
