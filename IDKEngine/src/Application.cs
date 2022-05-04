@@ -74,8 +74,17 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
 
-                if (IsVRSForwardRender)
+                // Small "hack" to enable VRS debug image even on systems that don't support the extension
+                if (VariableRateShading.NV_SHADING_RATE_IMAGE)
+                {
+                    if (IsVRSForwardRender)
+                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+                }
+                else if (ForwardPassVRS.IsDebug)
+                {
                     ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+                }
+
 
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
@@ -256,9 +265,9 @@ namespace IDKEngine
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             List<GLSLLight> lights = new List<GLSLLight>();
-            lights.Add(new GLSLLight(new Vector3(-4.5f, 7.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(-0.5f, 7.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(4.5f, 7.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f));
             ForwardRenderer.LightingContext.Add(lights.ToArray());
             
             pointShadows = new List<PointShadow>();

@@ -123,7 +123,10 @@ namespace IDKEngine.Render
         public void SetSize(int width, int height)
         {
             // Shading rate texture must be immutable by spec so recreate the whole texture
-            GL.NV.BindShadingRateImage(0);
+            if (NV_SHADING_RATE_IMAGE)
+            {
+                GL.NV.BindShadingRateImage(0);
+            }
             Result.Dispose();
             
             Result = new Texture(TextureTarget2d.Texture2D);
