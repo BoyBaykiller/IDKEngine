@@ -15,13 +15,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FrameCount;
+    int FreezeFramesCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
     mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
+    float DeltaUpdate;
 } basicDataUBO;
 
 vec3 SSR(vec3 normal, vec3 fragPos);
@@ -70,7 +71,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
         if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))))
         {
             // TODO: Parallax corrected cubemap reflections as fallback? 
-            return vec3(0.0);
+            return texture(SamplerEnvironment, reflectDir).rgb;
         }
 
         float depth = texture(SamplerDepth, projectedSample.xy).r;

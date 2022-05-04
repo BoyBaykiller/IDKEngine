@@ -121,13 +121,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FrameCount;
+    int FreezeFramesCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
     mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
+    float DeltaUpdate;
 } basicDataUBO;
 
 layout(std140, binding = 1) uniform MaterialUBO
@@ -170,8 +171,8 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rngSeed = basicDataUBO.FrameCount;
-    //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FrameCount * 2699 | 1;
+    rngSeed = basicDataUBO.FreezeFramesCounter;
+    //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FreezeFramesCounter * 2699 | 1;
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -185,7 +186,7 @@ void main()
     vec3 irradiance = Radiance(camRay);
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameColor, irradiance, 1.0 / (basicDataUBO.FrameCount + 1.0));
+    irradiance = mix(lastFrameColor, irradiance, 1.0 / (basicDataUBO.FreezeFramesCounter + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 

@@ -138,19 +138,19 @@ namespace IDKEngine.Render.Objects
                 for (int j = 0; j < perMaterialTextures.Length; j++)
                 {
                     Texture texture = new Texture(TextureTarget2d.Texture2D);
-                    PixelInternalFormat format;
+                    SizedInternalFormat format;
                     switch (perMaterialTextures[j])
                     {
                         case TextureType.Diffuse:
-                            format = PixelInternalFormat.Srgb8Alpha8;
+                            format = SizedInternalFormat.Srgb8Alpha8;
                             break;
 
                         case TextureType.Shininess or TextureType.Specular or TextureType.Metalness or TextureType.Ambient or TextureType.Roughness:
-                            format = PixelInternalFormat.R8;
+                            format = SizedInternalFormat.R8;
                             break;
 
                         default:
-                            format = PixelInternalFormat.Rgba8;
+                            format = SizedInternalFormat.Rgba8;
                             break;
                     }
 
@@ -159,7 +159,7 @@ namespace IDKEngine.Render.Objects
                     {
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
                         texture.SetWrapMode(OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat, OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
-                        texture.ImmutableAllocate(img.Width, img.Height, 1, (SizedInternalFormat)format, Texture.GetMaxMipmapLevel(img.Width, img.Height, 1));
+                        texture.ImmutableAllocate(img.Width, img.Height, 1, format, Texture.GetMaxMipmapLevel(img.Width, img.Height, 1));
                         fixed (void* ptr = img.GetPixelRowSpan(0))
                         {
                             texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (System.IntPtr)ptr);

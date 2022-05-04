@@ -12,6 +12,22 @@ layout(binding = 0, r8ui) restrict writeonly uniform uimage2D ImgResult;
 layout(binding = 1, rgba16f) restrict uniform image2D ImgShaded;
 layout(binding = 0) uniform sampler2D SamplerVelocity;
 
+layout(std140, binding = 0) uniform BasicDataUBO
+{
+    mat4 ProjView;
+    mat4 View;
+    mat4 InvView;
+    vec3 ViewPos;
+    int FreezeFramesCounter;
+    mat4 Projection;
+    mat4 InvProjection;
+    mat4 InvProjView;
+    mat4 PrevProjView;
+    float NearPlane;
+    float FarPlane;
+    float DeltaUpdate;
+} basicDataUBO;
+
 layout(std140, binding = 5) uniform TaaDataUBO
 {
     vec4 Jitters[18 / 2];
@@ -46,22 +62,23 @@ void main()
                 avgVelocity += SharedVelocity[i][j];
             }
         }
+        avgVelocity /= basicDataUBO.DeltaUpdate;
 
         float shadingRateFactor = max(avgVelocity.x, avgVelocity.y);
         uint rate = SHADING_RATE_1_INVOCATION_PER_PIXEL_NV;
-        if (shadingRateFactor > 0.1)
+        if (shadingRateFactor > 1.0)
 		{
 			rate = SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV;
 		}
-		else if (shadingRateFactor > 0.01)
+		else if (shadingRateFactor > 0.1)
 		{
 			rate = SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV;
 		}
-		else if (shadingRateFactor > 0.005)
+		else if (shadingRateFactor > 0.05)
 		{
 			rate = SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV;
 		}
-		else if (shadingRateFactor > 0.001)
+		else if (shadingRateFactor > 0.01)
 		{
 			rate = SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV;
 		}
@@ -72,7 +89,7 @@ void main()
         imageStore(ImgResult, ivec2(gl_WorkGroupID.xy), uvec4(rate));
     }
 
-    if (IsDebug)
+    if (IsDebug && imgCoord.x < imageSize(ImgShaded).x / 2)
     {
         barrier();
         

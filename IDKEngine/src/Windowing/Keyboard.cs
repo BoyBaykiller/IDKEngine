@@ -31,7 +31,7 @@ namespace IDKEngine
             }
         }
 
-        public unsafe void Update()
+        public void Update()
         {
             for (int i = 0; i < KeyValues.Length; i++)
             {

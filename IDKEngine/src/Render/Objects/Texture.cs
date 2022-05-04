@@ -90,7 +90,7 @@ namespace IDKEngine.Render.Objects
         /// <param name="value">Range of [1.0; MaxTextureMaxAnisotropy]</param>
         public void SetAnisotropy(float value)
         {
-            GL.TextureParameter(ID, (TextureParameterName)All.TextureMaxAnisotropy, value);
+            GL.TextureParameter(ID, TextureParameterName.TextureMaxAnisotropy, value);
         }
 
         public void SetWrapMode(TextureWrapMode wrapS, TextureWrapMode wrapT)
@@ -122,7 +122,7 @@ namespace IDKEngine.Render.Objects
         /// <param name="state"></param>
         public void SetSeamlessCubeMapPerTextureARB_AMD(bool state)
         {
-            GL.TextureParameter(ID, (TextureParameterName)All.TextureCubeMapSeamless, state ? 1 : 0);
+            GL.TextureParameter(ID, TextureParameterName.TextureCubeMapSeamless, state ? 1 : 0);
         }
 
         public unsafe void SetBorderColor(Vector4 color)

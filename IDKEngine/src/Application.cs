@@ -26,7 +26,7 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsDithering = true, IsShadows = true;
+        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsDithering = true, IsShadows = true, IsVRSForwardRender = false;
         public int FPS;
 
         private int fps;
@@ -58,7 +58,12 @@ namespace IDKEngine
                 ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 
                 GL.Viewport(0, 0, Size.X, Size.Y);
+
+                if (IsVRSForwardRender)
+                    VariableRateShading.IsEnabled = true;
+
                 ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
+                VariableRateShading.IsEnabled = false;
 
                 if (IsBloom)
                     Bloom.Compute(ForwardRenderer.Result);
@@ -69,7 +74,9 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
 
-                ShadingRateClassifier.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+                if (IsVRSForwardRender)
+                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
             else
@@ -81,6 +88,7 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
+                ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
                 PostCombine.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
             }
 
@@ -97,7 +105,7 @@ namespace IDKEngine
 
             GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             
-            GLSLBasicData.FrameCount++;
+            GLSLBasicData.FreezeFramesCounter++;
             gui.Render(this, (float)dT);
 
             GL.Enable(EnableCap.CullFace);
@@ -146,8 +154,9 @@ namespace IDKEngine
             {
                 camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
                 if (hadCameraInputs)
-                    GLSLBasicData.FrameCount = 0;
+                    GLSLBasicData.FreezeFramesCounter = 0;
             }
+            GLSLBasicData.DeltaUpdate = dT;
 
             gui.Update(this);
         }
@@ -159,7 +168,7 @@ namespace IDKEngine
         public ModelSystem ModelSystem;
         public Forward ForwardRenderer;
         public Bloom Bloom;
-        public ShadingRateClassifier ShadingRateClassifier;
+        public VariableRateShading ForwardPassVRS;
         public SSR SSR;
         public SSAO SSAO;
         public PostCombine PostCombine;
@@ -209,13 +218,26 @@ namespace IDKEngine
 
             Model horse = new Model("res/models/Horse/horse.gltf");
             for (int i = 0; i < horse.Models.Length; i++)
-                horse.Models[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, 0.5f);
+                horse.Models[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse });
 
+
+            Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
+            {
+                NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
+                NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
+                NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
+                NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
+                NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
+            };
+            ForwardPassVRS = new VariableRateShading(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")), Size.X, Size.Y);
+            ForwardPassVRS.BindShadingRateImageNV();
+            VariableRateShading.SetShadingRatePaletteNV(shadingRates);
+            IsVRSForwardRender = VariableRateShading.NV_SHADING_RATE_IMAGE;
+
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
-            ShadingRateClassifier = new ShadingRateClassifier(Size.X, Size.Y);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 8.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 3.5f, new Vector3(0.025f));
@@ -234,9 +256,9 @@ namespace IDKEngine
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             List<GLSLLight> lights = new List<GLSLLight>();
-            lights.Add(new GLSLLight(new Vector3(-4.5f, 4.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(-0.5f, 4.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(4.5f, 4.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-4.5f, 7.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-0.5f, 7.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(4.5f, 7.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f));
             ForwardRenderer.LightingContext.Add(lights.ToArray());
             
             pointShadows = new List<PointShadow>();
@@ -289,7 +311,7 @@ namespace IDKEngine
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
             ForwardRenderer.SetSize(Size.X, Size.Y);
-            ShadingRateClassifier.SetSize(Size.X, Size.Y);
+            ForwardPassVRS.SetSize(Size.X, Size.Y);
             Bloom.SetSize(Size.X, Size.Y);
             VolumetricLight.SetSize(Size.X, Size.Y);
             SSR.SetSize(Size.X, Size.Y);
@@ -299,7 +321,7 @@ namespace IDKEngine
             {
                 PathTracer.SetSize(Size.X, Size.Y);
             }
-            GLSLBasicData.FrameCount = 0;
+            GLSLBasicData.FreezeFramesCounter = 0;
         }
 
         protected override void OnEnd()
