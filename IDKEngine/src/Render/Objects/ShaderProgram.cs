@@ -76,10 +76,6 @@ namespace IDKEngine.Render.Objects
             }
         }
 
-        public static void UploadToProgram(int id, int location, ref Matrix4 matrix4, bool transpose = false)
-        {
-            GL.ProgramUniformMatrix4(id, location, transpose, ref matrix4);
-        }
         public void Upload(int location, ref Matrix4 matrix4, bool transpose = false)
         {
             GL.ProgramUniformMatrix4(ID, location, transpose, ref matrix4);
@@ -93,10 +89,6 @@ namespace IDKEngine.Render.Objects
             GL.ProgramUniformMatrix4(ID, GetUniformLocation(name), count, transpose, ref matrices.Row0.X);
         }
 
-        public static void UploadToProgram(int id, int location, Vector4 vector4)
-        {
-            GL.ProgramUniform4(id, location, vector4);
-        }
         public void Upload(int location, Vector4 vector4)
         {
             GL.ProgramUniform4(ID, location, vector4);
@@ -106,10 +98,6 @@ namespace IDKEngine.Render.Objects
             GL.ProgramUniform4(ID, GetUniformLocation(name), vector4);
         }
 
-        public static void UploadToProgram(int id, int location, Vector3 vector3)
-        {
-            GL.ProgramUniform3(id, location, vector3);
-        }
         public void Upload(int location, Vector3 vector3)
         {
             GL.ProgramUniform3(ID, location, vector3);
@@ -119,10 +107,6 @@ namespace IDKEngine.Render.Objects
             GL.ProgramUniform3(ID, GetUniformLocation(name), vector3);
         }
 
-        public static void UploadToProgram(int id, int location, Vector2 vector2)
-        {
-            GL.ProgramUniform2(id, location, vector2);
-        }
         public void Upload(int location, Vector2 vector2)
         {
             GL.ProgramUniform2(ID, location, vector2);
@@ -132,10 +116,6 @@ namespace IDKEngine.Render.Objects
             GL.ProgramUniform2(ID, GetUniformLocation(name), vector2);
         }
 
-        public static void UploadToProgram(int id, int location, float x)
-        {
-            GL.ProgramUniform1(id, location, x);
-        }
         public void Upload(int location, float x)
         {
             GL.ProgramUniform1(ID, location, x);
@@ -145,10 +125,6 @@ namespace IDKEngine.Render.Objects
             GL.ProgramUniform1(ID, GetUniformLocation(name), x);
         }
 
-        public static void UploadToProgram(int id, int location, int x)
-        {
-            GL.ProgramUniform1(id, location, x);
-        }
         public void Upload(int location, int x)
         {
             GL.ProgramUniform1(ID, location, x);
@@ -158,10 +134,6 @@ namespace IDKEngine.Render.Objects
             GL.ProgramUniform1(ID, GetUniformLocation(name), x);
         }
 
-        public static void UploadToProgram(int id, int location, uint x)
-        {
-            GL.ProgramUniform1((uint)id, location, x);
-        }
         public void Upload(int location, uint x)
         {
             GL.ProgramUniform1((uint)ID, location, x);
@@ -171,10 +143,6 @@ namespace IDKEngine.Render.Objects
             GL.ProgramUniform1((uint)ID, GetUniformLocation(name), x);
         }
 
-        public static void UploadToProgram(int id, int location, bool x)
-        {
-            GL.ProgramUniform1(id, location, x ? 1 : 0);
-        }
         public void Upload(int location, bool x)
         {
             GL.ProgramUniform1(ID, location, x ? 1 : 0);

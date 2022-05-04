@@ -38,7 +38,7 @@ namespace IDKEngine.Render
                         {
                             current = renderModes[i];
                             window.IsPathTracing = current == renderModes[1];
-                            window.GLSLBasicData.FrameCount = 0;
+                            window.GLSLBasicData.FreezeFramesCounter = 0;
                             if (current == "PathTracer")
                             {
                                 window.PathTracer.SetSize(window.Size.X, window.Size.Y);
@@ -74,16 +74,34 @@ namespace IDKEngine.Render
                 {
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
-                        bool tempBool = window.ShadingRateClassifier.IsDebug;
+                        if (!VariableRateShading.NV_SHADING_RATE_IMAGE)
+                        {
+                            ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f);
+                            ImGui.BeginDisabled();
+                        }
+                        ImGui.Checkbox("IsVRS", ref window.IsVRSForwardRender);
+                        if (!VariableRateShading.NV_SHADING_RATE_IMAGE)
+                        {
+                            ImGui.EndDisabled();
+                            ImGui.PopStyleVar();
+                        }
+                        ImGui.SameLine();
+                        HelpMarker(
+                        "Requires support for NV_shading_rate_image. " +
+                        "This feature when enabled allows the engine to choose a unique shading rate " +
+                        "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
+                        "shader invocations in regions where less detail may be required.");
+                        
+                        bool tempBool = window.ForwardPassVRS.IsDebug;
                         if (ImGui.Checkbox("Debug", ref tempBool))
                         {
-                            window.ShadingRateClassifier.IsDebug = tempBool;
+                            window.ForwardPassVRS.IsDebug = tempBool;
                         }
 
-                        float tempFloat = window.ShadingRateClassifier.Aggressiveness;
-                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 20.0f))
+                        float tempFloat = window.ForwardPassVRS.Aggressiveness;
+                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 3.5f))
                         {
-                            window.ShadingRateClassifier.Aggressiveness = tempFloat;
+                            window.ForwardPassVRS.Aggressiveness = tempFloat;
                         }
                     }
 
@@ -185,7 +203,7 @@ namespace IDKEngine.Render
                         if (window.ForwardRenderer.TaaEnabled)
                         {
                             int tempInt = window.ForwardRenderer.TaaSamples;
-                            if (ImGui.SliderInt("Samples", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
+                            if (ImGui.SliderInt("Samples   ", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
                             {
                                 window.ForwardRenderer.TaaSamples = tempInt;
                             }
@@ -199,21 +217,21 @@ namespace IDKEngine.Render
                         int tempInt = window.PathTracer.RayDepth;
                         if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                         {
-                            window.GLSLBasicData.FrameCount = 0;
+                            window.GLSLBasicData.FreezeFramesCounter = 0;
                             window.PathTracer.RayDepth = tempInt;
                         }
 
                         float floatTemp = window.PathTracer.FocalLength;
                         if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                         {
-                            window.GLSLBasicData.FrameCount = 0;
+                            window.GLSLBasicData.FreezeFramesCounter = 0;
                             window.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
                         }
 
                         floatTemp = window.PathTracer.ApertureDiameter;
                         if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
                         {
-                            window.GLSLBasicData.FrameCount = 0;
+                            window.GLSLBasicData.FreezeFramesCounter = 0;
                             window.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
                         }
                     }
@@ -233,7 +251,7 @@ namespace IDKEngine.Render
                                 current = resolutions[i];
                                 window.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
                                 window.AtmosphericScatterer.Compute();
-                                window.GLSLBasicData.FrameCount = 0;
+                                window.GLSLBasicData.FreezeFramesCounter = 0;
                             }
 
                             if (isSelected)
@@ -247,7 +265,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.ISteps = tempInt;
                         window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FrameCount = 0;
+                        window.GLSLBasicData.FreezeFramesCounter = 0;
                     }
 
                     tempInt = window.AtmosphericScatterer.JSteps;
@@ -255,7 +273,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.JSteps = tempInt;
                         window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FrameCount = 0;
+                        window.GLSLBasicData.FreezeFramesCounter = 0;
                     }
 
                     float tempFloat = window.AtmosphericScatterer.Time;
@@ -263,7 +281,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.Time = tempFloat;
                         window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FrameCount = 0;
+                        window.GLSLBasicData.FreezeFramesCounter = 0;
                     }
 
                     tempFloat = window.AtmosphericScatterer.LightIntensity;
@@ -271,7 +289,7 @@ namespace IDKEngine.Render
                     {
                         window.AtmosphericScatterer.LightIntensity = tempFloat;
                         window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FrameCount = 0;
+                        window.GLSLBasicData.FreezeFramesCounter = 0;
                     }
                 }
 
@@ -324,7 +342,7 @@ namespace IDKEngine.Render
 
                     if (hadChange)
                     {
-                        window.GLSLBasicData.FrameCount = 0;
+                        window.GLSLBasicData.FreezeFramesCounter = 0;
                         window.ModelSystem.UpdateMeshBuffer(selectedMeshIndex, selectedMeshIndex + 1, (ref GLSLMesh curMesh) =>
                         {
                             curMesh = mesh;
@@ -335,6 +353,20 @@ namespace IDKEngine.Render
             }
 
             ImGuiController.Render();
+        }
+
+        private static void HelpMarker(string desc)
+        {
+            ImGui.TextDisabled("(?)");
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0f);
+                ImGui.TextUnformatted(desc);
+                ImGui.PopTextWrapPos();
+                ImGui.EndTooltip();
+            }
         }
 
         public void Update(Application window)

@@ -165,7 +165,11 @@ namespace IDKEngine
                 GLFW.PollEvents();
                 if (IsFocused)
                 {
-                    DispatchUpdateFrame();
+                    //DispatchUpdateFrame();
+                    // TODO: Fix seperate update and render again without breaking camera, vrs or taa
+                    KeyboardState.Update();
+                    MouseState.Update();
+                    OnUpdate((float)runTime);
                     OnRender((float)runTime);
 
                     GLFW.SwapBuffers(window);

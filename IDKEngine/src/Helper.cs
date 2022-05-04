@@ -43,13 +43,17 @@ namespace IDKEngine
         public static DebugProc DebugCallback = Debug;
         private static void Debug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
         {
-            Console.WriteLine($"\nType: {type},\nSeverity: {severity},\nMessage: {Marshal.PtrToStringAnsi(message, length - 1)}");
-            if (severity == DebugSeverity.DebugSeverityHigh)
+            // Filter shader compile error
+            if (id != 2000)
             {
-                Console.WriteLine($"Critical error detected, press enter to continue");
-                Console.ReadLine();
+                Console.WriteLine($"\nType: {type},\nSeverity: {severity},\nMessage: {Marshal.PtrToStringAnsi(message, length - 1)}");
+                if (severity == DebugSeverity.DebugSeverityHigh)
+                {
+                    Console.WriteLine($"Critical error detected, press enter to continue");
+                    Console.ReadLine();
+                }
+                Console.WriteLine();
             }
-            Console.WriteLine();
         }
 
         public static unsafe T* Malloc<T>(int count = 1) where T : unmanaged

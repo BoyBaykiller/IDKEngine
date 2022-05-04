@@ -82,13 +82,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FrameCount;
+    int FreezeFramesCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
     mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
+    float DeltaUpdate;
 } basicDataUBO;
 
 layout(location = 0) uniform int MeshIndex;

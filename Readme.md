@@ -15,6 +15,7 @@ Feature list:
  - Single pass Vertex Layered Rendering for point shadows
  - GPU accelerated Frustum Culling for shadows and camera
  - Ray marched Volumetric Lighting
+ - Variable Rate Shading
  - Temporal Anti Aliasing
  - Fast CoD-Modern-Warfare Bloom implementation
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
@@ -24,7 +25,7 @@ Required OpenGL: 4.6
 
 Required extensions: `ARB_bindless_texture` and (`NV_gpu_shader5` or `ARB_shader_ballot`)
 
-Optional extensions: (`ARB_shader_viewport_layer_array` or `AMD_vertex_shader_layer` or `NV_viewport_array` or `NV_viewport_array2`), (`ARB_seamless_cubemap_per_texture` or `AMD_seamless_cubemap_per_texture`), `NV_compute_shader_derivatives`, `AMD_shader_trinary_minmax`
+Optional extensions: (`ARB_shader_viewport_layer_array` or `AMD_vertex_shader_layer` or `NV_viewport_array` or `NV_viewport_array2`), (`ARB_seamless_cubemap_per_texture` or `AMD_seamless_cubemap_per_texture`), `NV_compute_shader_derivatives`, `AMD_shader_trinary_minmax`, `NV_shading_rate_image`
 
 # Render Samples
 

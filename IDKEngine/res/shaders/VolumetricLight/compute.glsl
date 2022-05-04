@@ -50,7 +50,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FrameCount;
+    int FreezeFramesCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -72,11 +72,6 @@ uniform vec3 Absorbance;
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    if (shadowDataUBO.Count == 0)
-    {
-        imageStore(ImgResult, imgCoord, vec4(0.0));
-        return;
-    }
 
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
@@ -125,7 +120,7 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
         samplePoint += deltaStep;
     }
     // Apply Beers's law, Absorbance is constant so we can have it outside the loop
-    vec3 absorbed = exp(-Absorbance * distance(origin, samplePoint));
+    vec3 absorbed = exp(-Absorbance * length(origin - samplePoint));
     scattered *= absorbed;
     
     return scattered / Samples;
