@@ -115,7 +115,7 @@ namespace IDKEngine
             GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             
             GLSLBasicData.FreezeFramesCounter++;
-            gui.Render(this, (float)dT);
+            gui.Draw(this, (float)dT);
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
@@ -233,6 +233,7 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse });
 
 
+            IsVRSForwardRender = VariableRateShading.NV_SHADING_RATE_IMAGE;
             Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
             {
                 NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
@@ -242,9 +243,8 @@ namespace IDKEngine
                 NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
             };
             ForwardPassVRS = new VariableRateShading(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")), Size.X, Size.Y);
-            ForwardPassVRS.BindShadingRateImageNV();
+            VariableRateShading.BindVRSNV(ForwardPassVRS);
             VariableRateShading.SetShadingRatePaletteNV(shadingRates);
-            IsVRSForwardRender = VariableRateShading.NV_SHADING_RATE_IMAGE;
 
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 8.0f);

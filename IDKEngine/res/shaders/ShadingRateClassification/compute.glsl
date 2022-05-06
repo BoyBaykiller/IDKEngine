@@ -40,51 +40,53 @@ layout(std140, binding = 5) uniform TaaDataUBO
 uniform bool IsDebug;
 uniform float Aggressiveness;
 
-shared uint DebugShadingRate;
-shared vec2 SharedVelocity[TILE_SIZE][TILE_SIZE];
+shared uint SharedDebugShadingRate;
+shared vec2 SharedVelocity[TILE_SIZE * TILE_SIZE];
 
 const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / textureSize(SamplerVelocity, 0);
+
     vec2 vel = (texture(SamplerVelocity, uv).rg / taaDataUBO.VelScale) * AVG_MULTIPLIER;
-    SharedVelocity[gl_LocalInvocationID.x][gl_LocalInvocationID.y] = abs(vel * Aggressiveness);
+    SharedVelocity[gl_LocalInvocationIndex] = abs(vel * Aggressiveness);
     barrier();
+
+    // Use parallel reduction to calculate sum (average) of all velocities
+    for (int cutoff = (TILE_SIZE * TILE_SIZE) / 2; cutoff > 0; cutoff /= 2)
+    {
+        if (gl_LocalInvocationIndex < cutoff)
+        {
+            SharedVelocity[gl_LocalInvocationIndex] += SharedVelocity[cutoff + gl_LocalInvocationIndex];
+        }
+        barrier();
+    }
 
     if (gl_LocalInvocationIndex == 0)
     {
-        vec2 avgVelocity = vec2(0.0);
-        for (int i = 0; i < TILE_SIZE; i++)
-        {
-            for (int j = 0; j < TILE_SIZE; j++)
-            {
-                avgVelocity += SharedVelocity[i][j];
-            }
-        }
-        avgVelocity /= basicDataUBO.DeltaUpdate;
-
-        float shadingRateFactor = max(avgVelocity.x, avgVelocity.y);
+        vec2 avgVelocity = SharedVelocity[0] / basicDataUBO.DeltaUpdate;
+        float maxAvgVelocity = max(avgVelocity.x, avgVelocity.y);
         uint rate = SHADING_RATE_1_INVOCATION_PER_PIXEL_NV;
-        if (shadingRateFactor > 1.0)
-		{
-			rate = SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV;
-		}
-		else if (shadingRateFactor > 0.1)
-		{
-			rate = SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV;
-		}
-		else if (shadingRateFactor > 0.05)
-		{
-			rate = SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV;
-		}
-		else if (shadingRateFactor > 0.01)
-		{
-			rate = SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV;
-		}
+        if (maxAvgVelocity > 1.0)
+        {
+            rate = SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV;
+        }
+        else if (maxAvgVelocity > 0.1)
+        {
+            rate = SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV;
+        }
+        else if (maxAvgVelocity > 0.05)
+        {
+            rate = SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV;
+        }
+        else if (maxAvgVelocity > 0.01)
+        {
+            rate = SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV;
+        }
 
         if (IsDebug)
-            DebugShadingRate = rate;
+            SharedDebugShadingRate = rate;
 
         imageStore(ImgResult, ivec2(gl_WorkGroupID.xy), uvec4(rate));
     }
@@ -94,13 +96,13 @@ void main()
         barrier();
         
         vec3 debugcolor = vec3(0.0);
-        if (DebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
+        if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
             debugcolor = vec3(4, 0, 0);
-        else if (DebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
+        else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
             debugcolor = vec3(4, 4, 0);
-        else if (DebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
+        else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
             debugcolor = vec3(0, 4, 0);
-        else if (DebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
+        else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
             debugcolor = vec3(0, 0, 4);
 
         vec3 current = imageLoad(ImgShaded, imgCoord).rgb;

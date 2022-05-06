@@ -16,7 +16,7 @@ namespace IDKEngine.Render
             ImGuiController = new ImGuiController(width, height);
         }
 
-        public void Render(Application window, float frameTime)
+        public void Draw(Application window, float frameTime)
         {
             ImGuiController.Update(window, frameTime);
             ImGui.Begin("Render");
@@ -99,7 +99,7 @@ namespace IDKEngine.Render
                         }
 
                         float tempFloat = window.ForwardPassVRS.Aggressiveness;
-                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 3.5f))
+                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 1.5f))
                         {
                             window.ForwardPassVRS.Aggressiveness = tempFloat;
                         }
