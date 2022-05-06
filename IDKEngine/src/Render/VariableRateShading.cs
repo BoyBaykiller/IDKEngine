@@ -68,7 +68,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram shaderProgram;
         private int width;
         private int height;
-        public unsafe VariableRateShading(Shader classificationComputeShader, int width, int height, float aggressiveness = 0.5f)
+        public VariableRateShading(Shader classificationComputeShader, int width, int height, float aggressiveness = 0.2f)
         {
             shaderProgram = new ShaderProgram(classificationComputeShader);
 
@@ -95,14 +95,16 @@ namespace IDKEngine.Render
             }
         }
 
+        private static int currentlyBound = -1;
         /// <summary>
         /// NV_shading_rate_image must be available for this to take effect
         /// </summary>
-        public void BindShadingRateImageNV()
+        public static void BindVRSNV(VariableRateShading variableRateShading)
         {
             if (NV_SHADING_RATE_IMAGE)
             {
-                GL.NV.BindShadingRateImage(Result.ID);
+                GL.NV.BindShadingRateImage(variableRateShading.Result.ID);
+                currentlyBound = variableRateShading.Result.ID;
             }
         }
 
@@ -127,13 +129,17 @@ namespace IDKEngine.Render
             {
                 GL.NV.BindShadingRateImage(0);
             }
+            bool wasBound = Result.ID == currentlyBound;
+
             Result.Dispose();
-            
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R8ui);
 
-            BindShadingRateImageNV();
+            if (wasBound)
+            {
+                BindVRSNV(this);
+            }
             this.width = width;
             this.height = height;
         }
