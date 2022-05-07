@@ -76,6 +76,7 @@ namespace IDKEngine
                 {
                     GLFW.SetWindowMonitor(window, null, cachedWindowPos.X, cachedWindowPos.Y, cachedWindowSize.X, cachedWindowSize.Y, 0);
                 }
+                IsVSync = _isVSync;
             }
         }
 

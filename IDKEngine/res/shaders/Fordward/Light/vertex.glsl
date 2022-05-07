@@ -33,7 +33,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 5) uniform TaaDataUBO
 {
-    vec4 Jitters[18 / 2];
+    vec4 Jitters[36 / 2];
     int Samples;
     int Enabled;
     int Frame;

@@ -54,23 +54,11 @@ namespace IDKEngine.Render
         public readonly BufferObject TaaBuffer;
         public readonly Lighter LightingContext;
 
-        private static readonly ShaderProgram shadingProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/fragment.glsl")));
-
-        private static readonly ShaderProgram taaResolveProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Fordward/TAAResolve/compute.glsl")));
-
-        private static readonly ShaderProgram depthOnlyProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/fragment.glsl")));
-
-        private static readonly ShaderProgram skyBoxProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Fordward/SkyBox/compute.glsl")));
-
-        private static readonly ShaderProgram aabbProgram = new ShaderProgram(
-            new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
-            new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
+        private readonly ShaderProgram shadingProgram;
+        private readonly ShaderProgram taaResolveProgram;
+        private readonly ShaderProgram depthOnlyProgram;
+        private readonly ShaderProgram skyBoxProgram;
+        private readonly ShaderProgram aabbProgram;
 
         private int taaFrame
         {
@@ -92,6 +80,23 @@ namespace IDKEngine.Render
         public Forward(Lighter lighter, int width, int height, int taaSamples)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
+
+            shadingProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/fragment.glsl")));
+
+            taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Fordward/TAAResolve/compute.glsl")));
+
+            depthOnlyProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/fragment.glsl")));
+
+            skyBoxProgram = new ShaderProgram(
+                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Fordward/SkyBox/compute.glsl")));
+
+            aabbProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
 
             taaPing = new Texture(TextureTarget2d.Texture2D);
             taaPing.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
