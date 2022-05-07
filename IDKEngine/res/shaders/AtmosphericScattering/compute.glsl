@@ -1,6 +1,5 @@
+// Atmospheric scattering code adapted to single pass compute shader
 // Source: https://github.com/wwwtyro/glsl-atmosphere
-// I only adapted his code to a compute shader.
-// The actual atmospheric scattering code is copied from the given source
 
 #version 460 core
 #define PI 3.14159265
