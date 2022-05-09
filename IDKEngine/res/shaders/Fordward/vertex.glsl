@@ -3,8 +3,6 @@
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
 layout(location = 2) in vec3 Normal;
-layout(location = 3) in vec3 Tangent;
-layout(location = 4) in vec3 BiTangent;
 
 struct Mesh
 {
@@ -76,10 +74,14 @@ void main()
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     mat4 model = matrixSSBO.Models[mesh.MatrixStart + gl_InstanceID];
 
-    vec3 T = normalize(vec3(model * vec4(Tangent, 0.0)));
-    vec3 N = normalize(vec3(model * vec4(Normal, 0.0)));
+    vec3 c1 = cross(Normal, vec3(0.0, 0.0, 1.0));
+    vec3 c2 = cross(Normal, vec3(0.0, 1.0, 0.0));
+    vec3 tangent = dot(c1, c1) > dot(c2, c2) ? c1 : c2;
+    
+    vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
+    vec3 N = normalize((model * vec4(Normal, 0.0)).xyz);
     T = normalize(T - dot(T, N) * N);
-    vec3 B = BiTangent;
+    vec3 B = cross(N, T);
 
     outData.TBN = mat3(T, B, N);
     outData.TexCoord = TexCoord;

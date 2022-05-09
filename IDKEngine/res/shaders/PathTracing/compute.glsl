@@ -67,16 +67,13 @@ struct Vertex
 
     vec3 Normal;
     float _pad2;
-
-    vec3 Tangent;
-    float _pad3;
 };
 
 struct HitInfo
 {
     vec3 Bary;
     float T;
-    uint VertexIndex;
+    uint TriangleIndex;
     int HitIndex;
     int InstanceID;
 };
@@ -95,6 +92,13 @@ struct Node
     uint MissLinkAndVerticesCount;
 };
 
+struct Triangle
+{
+    Vertex Vertex0;
+    Vertex Vertex1;
+    Vertex Vertex2;
+};
+
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
     Node Nodes[];
@@ -107,7 +111,7 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 
 layout(std430, binding = 3) restrict readonly buffer BVHVertices
 {
-    Vertex Vertices[];
+    Triangle Triangles[];
 } verticesSSBO;
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
@@ -214,21 +218,25 @@ vec3 Radiance(Ray ray)
             vec3 emissive;
             if (hitInfo.HitIndex >= 0)
             {
-                Vertex v0 = verticesSSBO.Vertices[hitInfo.VertexIndex + 0u];
-                Vertex v1 = verticesSSBO.Vertices[hitInfo.VertexIndex + 1u];
-                Vertex v2 = verticesSSBO.Vertices[hitInfo.VertexIndex + 2u];
+                Triangle triangle = verticesSSBO.Triangles[hitInfo.TriangleIndex];
+                Vertex v0 = triangle.Vertex0;
+                Vertex v1 = triangle.Vertex1;
+                Vertex v2 = triangle.Vertex2;
                 
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
                 mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
 
-                vec3 tangent = normalize(Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary));
-                vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
                 vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
+                vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
+                vec3 c1 = cross(geoNormal, vec3(0.0, 0.0, 1.0));
+                vec3 c2 = cross(geoNormal, vec3(0.0, 1.0, 0.0));
+                vec3 tangent = dot(c1, c1) > dot(c2, c2) ? c1 : c2;
 
                 vec3 T = normalize(vec3(model * vec4(tangent, 0.0)));
                 vec3 N = normalize(vec3(model * vec4(geoNormal, 0.0)));
                 T = normalize(T - dot(T, N) * N);
                 vec3 B = cross(N, T);
+
                 mat3 TBN = mat3(T, B, N);
                 
             #ifdef GL_NV_gpu_shader5
@@ -364,15 +372,16 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                         const uint MAX_START = (1u << 31u) - 1u;
                         const uint start = node.IsLeafAndVerticesStart & MAX_START;
                         
-                        for (uint k = start; k < start + count; k += 3u)
+                        for (uint k = start / 3; k < (start + count) / 3; k++)
                         {
-                            if (RayTriangleIntersect(localRay, verticesSSBO.Vertices[k + 0u].Position, verticesSSBO.Vertices[k + 1u].Position, verticesSSBO.Vertices[k + 2u].Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
+                            Triangle triangle = verticesSSBO.Triangles[k];
+                            if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
                             {
                                 hitInfo.Bary = baryT.xyz;
                                 hitInfo.T = baryT.w;
                                 hitInfo.HitIndex = i;
                                 hitInfo.InstanceID = j;
-                                hitInfo.VertexIndex = k;
+                                hitInfo.TriangleIndex = k;
                             }
                         }
                     }

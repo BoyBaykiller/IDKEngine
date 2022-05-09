@@ -36,7 +36,7 @@ namespace IDKEngine.Render.Objects
         public unsafe Model(string path)
         {
             string dirPath = Path.GetDirectoryName(path);
-            scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.CalculateTangentSpace | PostProcessSteps.JoinIdenticalVertices |
+            scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices |
                                                    PostProcessSteps.ImproveCacheLocality | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.RemoveRedundantMaterials | // PostProcessSteps.OptimizeMeshes | PostProcessSteps.OptimizeGraph | 
                                                    PostProcessSteps.FlipUVs);
             Debug.Assert(scene != null);
@@ -70,14 +70,6 @@ namespace IDKEngine.Render.Objects
                     Vertices[baseVertex + j].Normal.X = mesh.Normals[j].X;
                     Vertices[baseVertex + j].Normal.Y = mesh.Normals[j].Y;
                     Vertices[baseVertex + j].Normal.Z = mesh.Normals[j].Z;
-
-                    Vertices[baseVertex + j].Tangent.X = mesh.Tangents[j].X;
-                    Vertices[baseVertex + j].Tangent.Y = mesh.Tangents[j].Y;
-                    Vertices[baseVertex + j].Tangent.Z = mesh.Tangents[j].Z;
-
-                    Vertices[baseVertex + j].BiTangent.X = mesh.BiTangents[j].X;
-                    Vertices[baseVertex + j].BiTangent.Y = mesh.BiTangents[j].Y;
-                    Vertices[baseVertex + j].BiTangent.Z = mesh.BiTangents[j].Z;
                 }
 
                 Models[i] = new Matrix4[1] { Matrix4.Identity };

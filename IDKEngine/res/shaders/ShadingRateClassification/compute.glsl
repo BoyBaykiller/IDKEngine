@@ -6,6 +6,11 @@
 #define SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV 4u
 #define MESHES_CLEAR_COLOR -1.0
 #define TILE_SIZE 16
+#define DEBUG_NO_DEBUG 0
+#define DEBUG_SHADING_RATES 1
+#define DEBUG_ABS_VELOCITY 2
+#define DEBUG_LUMINANCE 3
+#define DEBUG_LUMINANCE_VARIANCE 4
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
 layout(binding = 0, r8ui) restrict writeonly uniform uimage2D ImgResult;
@@ -40,7 +45,7 @@ layout(std140, binding = 5) uniform TaaDataUBO
 
 float GetLuminance(vec3 color);
 
-uniform bool IsDebug;
+uniform int DebugMode;
 uniform float Aggressiveness;
 
 shared uint SharedDebugShadingRate;
@@ -104,35 +109,50 @@ void main()
         float combinedShadingRate = velocityShadingRate + varianceShadingRate;
         uint finalShadingRate = clamp(uint(round(combinedShadingRate)), SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV);
 
-        if (IsDebug)
+        if (DebugMode != DEBUG_NO_DEBUG)
             SharedDebugShadingRate = finalShadingRate;
 
         imageStore(ImgResult, ivec2(gl_WorkGroupID.xy), uvec4(finalShadingRate));
     }
 
-    if (IsDebug)
+    if (DebugMode != DEBUG_NO_DEBUG)
     {
         barrier();
         
-        vec3 debugcolor = vec3(0.0);
+        vec3 debugcolor = srcColor;
         int meshID = texture(SamplerMeshes, uv).r;
         // Don't show shading rate for non meshes like a skybox
         // since those get rendered differently and are not effected
         if (meshID != MESHES_CLEAR_COLOR)
         {
-            if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
-                debugcolor = vec3(4, 0, 0);
-            else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
-                debugcolor = vec3(4, 4, 0);
-            else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
-                debugcolor = vec3(0, 4, 0);
-            else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
-                debugcolor = vec3(0, 0, 4);
+            if (DebugMode == DEBUG_SHADING_RATES)
+            {
+                if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
+                    debugcolor += vec3(4, 0, 0);
+                else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
+                    debugcolor += vec3(4, 4, 0);
+                else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
+                    debugcolor += vec3(0, 4, 0);
+                else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
+                    debugcolor += vec3(0, 0, 4);
+
+            }
+            else if (DebugMode == DEBUG_LUMINANCE)
+            {
+                debugcolor = vec3(SharedMeanLum[0]);
+            }
+            else if (DebugMode == DEBUG_LUMINANCE_VARIANCE)
+            {
+                debugcolor = vec3(SharedMeanLumVariance[0]);
+            }
+            else if (DebugMode == DEBUG_ABS_VELOCITY)
+            {
+                debugcolor = vec3(SharedMeanVelocity[0] / basicDataUBO.DeltaUpdate, 0.0);
+            }
         }
 
-        debugcolor += srcColor;
 
-        if (gl_LocalInvocationID.x == 0 || gl_LocalInvocationID.y == 0)
+        if (gl_LocalInvocationID.x * gl_LocalInvocationID.y == 0)
         {
             debugcolor = vec3(0.0);
         }

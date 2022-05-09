@@ -61,8 +61,6 @@ namespace IDKEngine.Render
             VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
             VAO.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
             VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 8); // Normals
-            VAO.SetAttribFormat(0, 3, 3, VertexAttribType.Float, sizeof(float) * 12); // Tangent
-            VAO.SetAttribFormat(0, 4, 3, VertexAttribType.Float, sizeof(float) * 16); // BiTangent
         }
         public unsafe void Add(Model[] models)
         {

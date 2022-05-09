@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -14,12 +13,12 @@ namespace IDKEngine
 
         public readonly int MaxTreeDepth;
         public readonly GLSLNode[][] Nodes;
-        public readonly GLSLBLASVertex[][] Vertices;
+        public readonly GLSLVertex[][] Vertices;
         public unsafe BLAS(ModelSystem modelSystem, int maxTreeDepth, uint trianglesPerLevelHint = 45u)
         {
             MaxTreeDepth = maxTreeDepth;
 
-            List<GLSLBLASVertex> vertices = new List<GLSLBLASVertex>(modelSystem.Vertices.Length);
+            List<GLSLVertex> vertices = new List<GLSLVertex>(modelSystem.Vertices.Length);
             GLSLNode[] rootNodes = new GLSLNode[modelSystem.Meshes.Length];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
@@ -29,11 +28,7 @@ namespace IDKEngine
                 for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
                 {
                     uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
-                    GLSLBLASVertex vertex = new GLSLBLASVertex();
-                    vertex.Position = modelSystem.Vertices[indici].Position;
-                    vertex.TexCoord = modelSystem.Vertices[indici].TexCoord;
-                    vertex.Normal = modelSystem.Vertices[indici].Normal;
-                    vertex.Tangent = modelSystem.Vertices[indici].Tangent;
+                    GLSLVertex vertex = modelSystem.Vertices[indici];
                     vertices.Add(vertex);
 
                     rootNodes[i].Min = Vector3.ComponentMin(rootNodes[i].Min, vertex.Position);
@@ -44,7 +39,7 @@ namespace IDKEngine
 
 
             Nodes = new GLSLNode[modelSystem.Meshes.Length][];
-            Vertices = new GLSLBLASVertex[modelSystem.Meshes.Length][];
+            Vertices = new GLSLVertex[modelSystem.Meshes.Length][];
             ParallelLoopResult parallelLoopResult = Parallel.For(0, modelSystem.Meshes.Length, i =>
             {
                 GLSLNode root = rootNodes[i];
@@ -56,7 +51,7 @@ namespace IDKEngine
                 int verticesStart = (int)root.IsLeafAndVerticesStart;
                 int verticesEnd = (int)(root.IsLeafAndVerticesStart + root.MissLinkAndVerticesCount);
 
-                List<GLSLBLASVertex> localBVHVertices = new List<GLSLBLASVertex>((int)(root.MissLinkAndVerticesCount * 1.5f));
+                List<GLSLVertex> localBVHVertices = new List<GLSLVertex>((int)(root.MissLinkAndVerticesCount * 1.5f));
                 GLSLNode[] localNodes = new GLSLNode[nodesForMesh];
                 localNodes[0] = root;
                 
