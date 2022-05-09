@@ -78,13 +78,12 @@ namespace IDKEngine
                 if (VariableRateShading.NV_SHADING_RATE_IMAGE)
                 {
                     if (IsVRSForwardRender)
-                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity, ForwardRenderer.Meshes);
                 }
                 else if (ForwardPassVRS.IsDebug)
                 {
-                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity, ForwardRenderer.Meshes);
                 }
-
 
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
@@ -97,7 +96,6 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
-                ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
                 PostCombine.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
             }
 
@@ -191,26 +189,15 @@ namespace IDKEngine
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
-            // Necessary extensions without fallback
-            // I don't think I have to test for <4.4 extensions if the system already has bindless and stuff
+
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
                 throw new NotSupportedException("Your system does not support GL_ARB_bindless_texture");
-
-            if (!Helper.IsCoreExtensionAvailable("GL_ARB_shader_draw_parameters", 4.6))
-                throw new NotSupportedException("Your system does not support GL_ARB_shader_draw_parameters");
-
-            if (!Helper.IsCoreExtensionAvailable("GL_ARB_direct_state_access", 4.5))
-                throw new NotSupportedException("Your system does not support GL_ARB_direct_state_access");
-
-            if (!Helper.IsCoreExtensionAvailable("GL_ARB_buffer_storage", 4.4))
-                throw new NotSupportedException("Your system does not support GL_ARB_buffer_storage");
 
             GL.PointSize(1.3f);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 #if DEBUG
-            GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.DebugCallback, IntPtr.Zero);
 #endif
@@ -265,9 +252,9 @@ namespace IDKEngine
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             List<GLSLLight> lights = new List<GLSLLight>();
-            lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 5.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 5.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 5.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             ForwardRenderer.LightingContext.Add(lights.ToArray());
             
             pointShadows = new List<PointShadow>();

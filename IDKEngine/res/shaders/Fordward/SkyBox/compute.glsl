@@ -29,6 +29,8 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
+    // TODO: Properly mix with existing geometry if
+    // transparent objects ever become a thing
     if (texture(SamplerDepth, uv).r != DEPTH_CLEAR_COLOR)
         return;
 

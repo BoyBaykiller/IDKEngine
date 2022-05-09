@@ -63,7 +63,7 @@ namespace IDKEngine.Render
                         }
 
                         temp = window.Bloom.Clamp;
-                        if (ImGui.SliderFloat("Clamp", ref temp, 0.0f, 50.0f))
+                        if (ImGui.SliderFloat("Clamp", ref temp, 0.0f, 100.0f))
                         {
                             window.Bloom.Clamp = temp;
                         }
@@ -99,7 +99,7 @@ namespace IDKEngine.Render
                         }
 
                         float tempFloat = window.ForwardPassVRS.Aggressiveness;
-                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 1.5f))
+                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 4.0f))
                         {
                             window.ForwardPassVRS.Aggressiveness = tempFloat;
                         }
@@ -296,7 +296,7 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
-            if (selectedMeshIndex != Forward.MESH_INDEX_CLEAR_COLOR/* && !window.IsPathTracing*/)
+            if (selectedMeshIndex != Forward.MESHES_CLEAR_COLOR/* && !window.IsPathTracing*/)
             {
                 System.Numerics.Vector3 systemVec3;
                 ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);
