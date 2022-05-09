@@ -11,6 +11,16 @@ namespace IDKEngine.Render
         public const int TILE_SIZE = 16;
 
         public static readonly bool NV_SHADING_RATE_IMAGE = Helper.IsExtensionsAvailable("GL_NV_shading_rate_image");
+        
+        public enum DebugMode
+        {
+            NoDebug = 0,
+            ShadingRate = 1,
+            ABSVelocity = 2,
+            Luminance = 3,
+            LuminanceVariance = 4,
+        }
+        
 
         private static bool _isEnabled;
         /// <summary>
@@ -40,15 +50,17 @@ namespace IDKEngine.Render
             }
         }
 
-        private bool _isDebug;
-        public bool IsDebug
+
+
+        private DebugMode _debug;
+        public DebugMode DebugValue
         {
-            get => _isDebug;
+            get => _debug;
 
             set
             {
-                _isDebug = value;
-                shaderProgram.Upload("IsDebug", IsDebug);
+                _debug = value;
+                shaderProgram.Upload("DebugMode", (int)DebugValue);
             }
         }
 
@@ -114,7 +126,7 @@ namespace IDKEngine.Render
             shaded.BindToImageUnit(1, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
             
             velocity.BindToUnit(0);
-            if (IsDebug && meshes != null)
+            if (DebugValue != DebugMode.NoDebug && meshes != null)
                 meshes.BindToUnit(1);
 
             shaderProgram.Use();

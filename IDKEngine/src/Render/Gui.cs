@@ -92,10 +92,32 @@ namespace IDKEngine.Render
                         "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
                         "shader invocations in regions where less detail may be required.");
                         
-                        bool tempBool = window.ForwardPassVRS.IsDebug;
-                        if (ImGui.Checkbox("Debug", ref tempBool))
+
+                        string[] debugModes = new string[]
                         {
-                            window.ForwardPassVRS.IsDebug = tempBool;
+                            nameof(VariableRateShading.DebugMode.NoDebug),
+                            nameof(VariableRateShading.DebugMode.ShadingRate),
+                            nameof(VariableRateShading.DebugMode.ABSVelocity),
+                            nameof(VariableRateShading.DebugMode.Luminance),
+                            nameof(VariableRateShading.DebugMode.LuminanceVariance),
+                        };
+
+                        current = nameof(window.ForwardPassVRS.DebugValue);
+                        if (ImGui.BeginCombo("DebugMode", current))
+                        {
+                            for (int i = 0; i < debugModes.Length; i++)
+                            {
+                                bool isSelected = current == debugModes[i];
+                                if (ImGui.Selectable(debugModes[i], isSelected))
+                                {
+                                    current = debugModes[i];
+                                    window.ForwardPassVRS.DebugValue = VariableRateShading.DebugMode.NoDebug + i;
+                                }
+
+                                if (isSelected)
+                                    ImGui.SetItemDefaultFocus();
+                            }
+                            ImGui.EndCombo();
                         }
 
                         float tempFloat = window.ForwardPassVRS.Aggressiveness;

@@ -80,7 +80,7 @@ namespace IDKEngine
                     if (IsVRSForwardRender)
                         ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity, ForwardRenderer.Meshes);
                 }
-                else if (ForwardPassVRS.IsDebug)
+                else if (ForwardPassVRS.DebugValue != VariableRateShading.DebugMode.NoDebug)
                 {
                     ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity, ForwardRenderer.Meshes);
                 }
