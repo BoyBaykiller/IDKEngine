@@ -9,7 +9,7 @@ namespace IDKEngine.Render
 {
     unsafe class Forward : IDisposable
     {
-        public const int MESH_INDEX_CLEAR_COLOR = -1;
+        public const int MESHES_CLEAR_COLOR = -1; // also change in shaders
 
         private int _renderMeshAABBIndex = -1;
         public int RenderMeshAABBIndex
@@ -48,7 +48,7 @@ namespace IDKEngine.Render
 
         public readonly Framebuffer Framebuffer;
         public readonly Texture NormalSpec;
-        public readonly Texture MeshIndexes;
+        public readonly Texture Meshes;
         public readonly Texture Velocity;
         public readonly Texture Depth;
         public readonly BufferObject TaaBuffer;
@@ -113,10 +113,10 @@ namespace IDKEngine.Render
             NormalSpec.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             NormalSpec.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8Snorm, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
-            MeshIndexes = new Texture(TextureTarget2d.Texture2D);
-            MeshIndexes.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            MeshIndexes.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            MeshIndexes.MutableAllocate(width, height, 1, PixelInternalFormat.R32i, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+            Meshes = new Texture(TextureTarget2d.Texture2D);
+            Meshes.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            Meshes.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Meshes.MutableAllocate(width, height, 1, PixelInternalFormat.R16i, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
 
             Velocity = new Texture(TextureTarget2d.Texture2D);
             Velocity.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
@@ -143,7 +143,7 @@ namespace IDKEngine.Render
             Framebuffer = new Framebuffer();
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, taaPing);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, NormalSpec);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, MeshIndexes);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, Meshes);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment3, Velocity);
             Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Depth);
 
@@ -159,7 +159,7 @@ namespace IDKEngine.Render
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, isPing ? taaPing : taaPong);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 0, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
-            Framebuffer.ClearBuffer(ClearBuffer.Color, 2, MESH_INDEX_CLEAR_COLOR);
+            Framebuffer.ClearBuffer(ClearBuffer.Color, 2, MESHES_CLEAR_COLOR);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 3, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
@@ -232,7 +232,7 @@ namespace IDKEngine.Render
             taaPong.MutableAllocate(width, height, 1, taaPong.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             Depth.MutableAllocate(width, height, 1, Depth.PixelInternalFormat, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
             NormalSpec.MutableAllocate(width, height, 1, NormalSpec.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgb, PixelType.Float);
-            MeshIndexes.MutableAllocate(width, height, 1, MeshIndexes.PixelInternalFormat, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+            Meshes.MutableAllocate(width, height, 1, Meshes.PixelInternalFormat, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
             Velocity.MutableAllocate(width, height, 1, Velocity.PixelInternalFormat, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
             Span<float> jitterData = new Span<float>(taaData->Jitter, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);

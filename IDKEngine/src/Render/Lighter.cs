@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class Lighter
     {
-        public const int GLSL_MAX_UBO_LIGHT_COUNT = 64; // also change UBO size in shaders
+        public const int GLSL_MAX_UBO_LIGHT_COUNT = 64; // also change in shaders
 
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
             new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/Light/vertex.glsl")),

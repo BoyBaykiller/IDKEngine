@@ -165,15 +165,14 @@ namespace IDKEngine.Render.Objects
                             texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (System.IntPtr)ptr);
                         }
                         texture.GenerateMipmap();
-                        if (Helper.IsCoreExtensionAvailable("GL_ARB_texture_filter_anisotropic", 4.6) || Helper.IsExtensionsAvailable("GL_ARB_texture_filter_anisotropic") || Helper.IsExtensionsAvailable("GL_EXT_texture_filter_anisotropic"))
-                            texture.SetAnisotropy(4.0f);
-                        
+                        texture.SetAnisotropy(4.0f);
+
                         img.Dispose();
                     }
                     else
                     {
                         // Create dummy texture
-                        texture.ImmutableAllocate(1, 1, 1, (SizedInternalFormat)format);
+                        texture.ImmutableAllocate(1, 1, 1, format);
                     }
                     long textureHandle = texture.MakeHandleResidentARB();
 

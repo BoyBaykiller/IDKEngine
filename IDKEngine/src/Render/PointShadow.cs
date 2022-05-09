@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class PointShadow
     {
-        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 64; // also change UBO size in shaders
+        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 64; // also change in shaders
 
         public static readonly bool IS_VERTEX_LAYERED_RENDERING =
             (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
