@@ -60,5 +60,12 @@ namespace IDKEngine
         {
             return (T*)Marshal.AllocHGlobal(sizeof(T) * count);
         }
+
+        public static void Swap<T>(ref T first, ref T other) where T : struct
+        {
+            T temp = first;
+            first = other;
+            other = temp;
+        }
     }
 }

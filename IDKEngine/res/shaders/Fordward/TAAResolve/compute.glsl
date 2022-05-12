@@ -21,8 +21,6 @@ layout(std140, binding = 5) uniform TaaDataUBO
 void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 currentColor, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
 vec4 SampleTextureCatmullRom(sampler2D srcTexture, vec2 uv);
 
-layout(location = 10) uniform bool isdebug;
-
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
@@ -56,6 +54,9 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 
+// 1. Return best velocity pixel in a 3x3 radius
+// 2. Return min/max colors in a 3x3 radius
+// 3. Return color of the current coords 
 // Source: https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
 void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 currentColor, out vec3 neighborhoodMin, out vec3 neighborhoodMax)
 {
@@ -88,7 +89,7 @@ void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 curren
 }
 
 // This filter is better suited than the standard bilinear procedure
-// as to not introducing too much of a blur when sampling the historyColor texture
+// as to not introducing too much of a blur
 // Source: https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
 vec4 SampleTextureCatmullRom(sampler2D srcTexture, vec2 uv)
 {

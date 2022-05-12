@@ -145,24 +145,12 @@ namespace IDKEngine
             child1.Max = parent.Max;
 
             Vector3 parentNodeSize = parent.Max - parent.Min;
-            if (parentNodeSize.X > parentNodeSize.Y)
-            {
-                if (parentNodeSize.X > parentNodeSize.Z)
-                {
-                    child0.Max.X -= parentNodeSize.X / 2.0f;
-                    child1.Min.X += parentNodeSize.X / 2.0f;
-                }
-                else
-                {
-                    child0.Max.Z -= parentNodeSize.Z / 2.0f;
-                    child1.Min.Z += parentNodeSize.Z / 2.0f;
-                }
-            }
-            else
-            {
-                child0.Max.Y -= parentNodeSize.Y / 2.0f;
-                child1.Min.Y += parentNodeSize.Y / 2.0f;
-            }
+            int axis = 0;
+            if (parentNodeSize.Y > parentNodeSize.X) axis = 1;
+            if (parentNodeSize.Z > parentNodeSize[axis]) axis = 2; 
+
+            child0.Max[axis] -= parentNodeSize[axis] * 0.5f;
+            child1.Min[axis] += parentNodeSize[axis] * 0.5f;
         }
 
         private static int GetRightChildIndex(int parent, int treeDepth, int level)
