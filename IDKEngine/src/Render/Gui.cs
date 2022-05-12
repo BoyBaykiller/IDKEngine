@@ -102,7 +102,7 @@ namespace IDKEngine.Render
                             nameof(VariableRateShading.DebugMode.LuminanceVariance),
                         };
 
-                        current = nameof(window.ForwardPassVRS.DebugValue);
+                        current = window.ForwardPassVRS.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
                             for (int i = 0; i < debugModes.Length; i++)

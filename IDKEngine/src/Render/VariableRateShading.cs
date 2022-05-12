@@ -34,9 +34,6 @@ namespace IDKEngine.Render
             {
                 if (NV_SHADING_RATE_IMAGE)
                 {
-                    if (_isEnabled == value)
-                        return;
-
                     _isEnabled = value;
                     if (_isEnabled)
                     {

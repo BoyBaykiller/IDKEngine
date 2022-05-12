@@ -109,10 +109,10 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 3) restrict readonly buffer BVHVertices
+layout(std430, binding = 3) restrict readonly buffer TriangleSSBO
 {
     Triangle Triangles[];
-} verticesSSBO;
+} triangleSSBO;
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
@@ -218,7 +218,7 @@ vec3 Radiance(Ray ray)
             vec3 emissive;
             if (hitInfo.HitIndex >= 0)
             {
-                Triangle triangle = verticesSSBO.Triangles[hitInfo.TriangleIndex];
+                Triangle triangle = triangleSSBO.Triangles[hitInfo.TriangleIndex];
                 Vertex v0 = triangle.Vertex0;
                 Vertex v1 = triangle.Vertex1;
                 Vertex v2 = triangle.Vertex2;
@@ -374,7 +374,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                         
                         for (uint k = start / 3; k < (start + count) / 3; k++)
                         {
-                            Triangle triangle = verticesSSBO.Triangles[k];
+                            Triangle triangle = triangleSSBO.Triangles[k];
                             if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
                             {
                                 hitInfo.Bary = baryT.xyz;
