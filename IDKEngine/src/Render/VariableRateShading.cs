@@ -16,7 +16,7 @@ namespace IDKEngine.Render
         {
             NoDebug = 0,
             ShadingRate = 1,
-            ABSVelocity = 2,
+            AbsVelocity = 2,
             Luminance = 3,
             LuminanceVariance = 4,
         }

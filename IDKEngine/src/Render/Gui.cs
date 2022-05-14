@@ -97,7 +97,7 @@ namespace IDKEngine.Render
                         {
                             nameof(VariableRateShading.DebugMode.NoDebug),
                             nameof(VariableRateShading.DebugMode.ShadingRate),
-                            nameof(VariableRateShading.DebugMode.ABSVelocity),
+                            nameof(VariableRateShading.DebugMode.AbsVelocity),
                             nameof(VariableRateShading.DebugMode.Luminance),
                             nameof(VariableRateShading.DebugMode.LuminanceVariance),
                         };
