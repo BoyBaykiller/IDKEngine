@@ -14,7 +14,6 @@ namespace IDKEngine.Render
             new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/Light/vertex.glsl")),
             new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/Light/fragment.glsl")));
 
-        private readonly BufferObject bufferObject;
 
         private int _count;
         public int Count
@@ -29,10 +28,13 @@ namespace IDKEngine.Render
         }
 
         public readonly int IndicisCount;
-        public readonly GLSLLight[] Lights = new GLSLLight[GLSL_MAX_UBO_LIGHT_COUNT];
+        public readonly GLSLLight[] Lights;
+        private readonly BufferObject bufferObject;
         private static VAO vao;
         public unsafe Lighter(int latitudes, int longitudes)
         {
+            Lights = new GLSLLight[GLSL_MAX_UBO_LIGHT_COUNT];
+
             bufferObject = new BufferObject();
             bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 3, 0, bufferObject.Size);
@@ -90,17 +92,20 @@ namespace IDKEngine.Render
 
         public delegate void FuncUploadLight(ref GLSLLight light);
         /// <summary>
-        /// Applies a function over the specefied range on <see cref="Lights"/>
+        /// Synchronizes buffer with local <see cref="Lights"/> and conditionally applies function over all elements
         /// </summary>
         /// <param name="start"></param>
         /// <param name="end"></param>
         /// <param name="func"></param>
-        public unsafe void UpdateLightBuffer(int start, int end, FuncUploadLight func)
+        public unsafe void UpdateLightBuffer(int start, int end, FuncUploadLight func = null)
         {
             Debug.Assert(start >= 0 && end <= Count);
 
-            for (int i = start; i < end; i++)
-                func(ref Lights[i]);
+            if (func != null)
+            {
+                for (int i = start; i < end; i++)
+                    func(ref Lights[i]);
+            }
 
             fixed (void* ptr = &Lights[start])
             {

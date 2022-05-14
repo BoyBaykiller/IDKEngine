@@ -101,7 +101,7 @@ void main()
         vec2 avgVelocity = SharedMeanVelocity[0] / basicDataUBO.DeltaUpdate;
         float maxAvgVelocity = max(avgVelocity.x, avgVelocity.y);
         // higher variance -> select higher shading rate (higher res)
-        float scaledMeanLumVariance = SharedMeanLumVariance[0] * 600000.0;
+        float scaledMeanLumVariance = SharedMeanLumVariance[0] * 300000.0;
 
         float velocityShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, maxAvgVelocity * Aggressiveness);
         float varianceShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, Aggressiveness / scaledMeanLumVariance);
@@ -143,7 +143,7 @@ void main()
             }
             else if (DebugMode == DEBUG_LUMINANCE_VARIANCE)
             {
-                debugcolor = vec3(SharedMeanLumVariance[0]);
+                debugcolor = vec3(SharedMeanLumVariance[0] * 20.0);
             }
             else if (DebugMode == DEBUG_ABS_VELOCITY)
             {

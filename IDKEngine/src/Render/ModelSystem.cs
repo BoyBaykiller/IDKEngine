@@ -128,10 +128,7 @@ namespace IDKEngine.Render
             modelMatricesBuffer.MutableAllocate(ModelMatrices.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
             for (int i = 0; i < ModelMatrices.Length; i++)
             {
-                fixed (void* model = ModelMatrices[i])
-                {
-                    modelMatricesBuffer.SubData(loadedModels * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), (IntPtr)model);
-                }
+                modelMatricesBuffer.SubData(loadedModels * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), ModelMatrices[i]);
                 loadedModels += ModelMatrices[i].Length;
             }
         }
@@ -157,7 +154,7 @@ namespace IDKEngine.Render
 
         public delegate void FuncUploadMesh(ref GLSLMesh glslMesh);
         /// <summary>
-        /// Applies a function over the specified range of <see cref="Meshes"/>
+        /// Synchronizes buffer with local <see cref="Meshes"/> and conditionally applies function over all elements
         /// </summary>
         /// <param name="start"></param>
         /// <param name="end"></param>
@@ -181,7 +178,7 @@ namespace IDKEngine.Render
 
         public delegate void FuncUploadDrawCommand(ref GLSLDrawCommand drawCommand);
         /// <summary>
-        /// Applies a function over the specefied range of <see cref="DrawCommands"/>
+        /// Synchronizes buffer with local <see cref="DrawCommands"/> and conditionally applies function over all elements
         /// </summary>
         /// <param name="start"></param>
         /// <param name="end"></param>
@@ -199,6 +196,25 @@ namespace IDKEngine.Render
             fixed (void* ptr = &DrawCommands[start])
             {
                 drawCommandBuffer.SubData(start * sizeof(GLSLDrawCommand), (end - start) * sizeof(GLSLDrawCommand), (IntPtr)ptr);
+            }
+        }
+
+
+        /// <summary>
+        /// Synchronizes buffer with local <see cref="ModelMatrices"/>
+        /// </summary>
+        /// <param name="start"></param>
+        /// <param name="end"></param>
+        /// <param name="func"></param>
+        public unsafe void UpdateModelMatricesBuffer(int start, int end)
+        {
+            Debug.Assert(start >= 0 && end <= ModelMatrices.Length);
+
+            int updatedModelCounter = 0;
+            for (int i = 0; i < ModelMatrices.Length; i++)
+            {
+                modelMatricesBuffer.SubData(updatedModelCounter * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), ModelMatrices[i]);
+                updatedModelCounter += ModelMatrices[i].Length;
             }
         }
     }
