@@ -320,22 +320,22 @@ namespace IDKEngine.Render
 
             if (selectedMeshIndex != Forward.MESHES_CLEAR_COLOR/* && !window.IsPathTracing*/)
             {
-                System.Numerics.Vector3 systemVec3;
                 ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);
                 {
                     bool hadChange = false;
                     GLSLMesh mesh = window.ModelSystem.Meshes[selectedMeshIndex];
+                    GLSLDrawCommand cmd = window.ModelSystem.DrawCommands[selectedMeshIndex];
 
                     ImGui.Text($"MeshID: {selectedMeshIndex}");
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
+                    ImGui.Text($"IndicesCount: {cmd.Count}");
 
-                    // TODO: Implement again with new system
-                    //systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[mesh.MatrixStart][0].ExtractTranslation());
-                    //if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
-                    //{
-                    //    hadChange = true;
-                    //    window.ModelSystem.ModelMatrices[mesh.MatrixStart][0] = window.ModelSystem.ModelMatrices[mesh.MatrixStart][0].ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
-                    //}
+                    System.Numerics.Vector3 systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[mesh.MatrixStart][0].ExtractTranslation());
+                    if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
+                    {
+                        hadChange = true;
+                        window.ModelSystem.ModelMatrices[mesh.MatrixStart][0] = window.ModelSystem.ModelMatrices[mesh.MatrixStart][0].ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
+                    }
 
                     if (ImGui.SliderFloat("Emissive", ref mesh.Emissive, 0.0f, 100.0f))
                     {
@@ -369,6 +369,7 @@ namespace IDKEngine.Render
                         {
                             curMesh = mesh;
                         });
+                        window.ModelSystem.UpdateModelMatricesBuffer(0, window.ModelSystem.ModelMatrices.Length);
                     }
                     ImGui.End();
                 }

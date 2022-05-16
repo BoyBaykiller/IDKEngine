@@ -19,9 +19,11 @@ struct DrawCommand
 struct Node
 {
     vec3 Min;
-    uint IsLeafAndVerticesStart;
+    uint VerticesStart;
     vec3 Max;
-    uint MissLinkAndVerticesCount;
+    uint VertexCount;
+    vec3 _pad0;
+    uint MissLink;
 };
 
 struct Mesh

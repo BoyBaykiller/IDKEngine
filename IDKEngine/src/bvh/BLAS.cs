@@ -24,7 +24,7 @@ namespace IDKEngine
             {
                 rootNodes[i].Min = new Vector3(float.MaxValue);
                 rootNodes[i].Max = new Vector3(float.MinValue);
-                rootNodes[i].IsLeafAndVerticesStart = (uint)vertices.Count;
+                rootNodes[i].VerticesStart = (uint)vertices.Count;
                 for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
                 {
                     uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
@@ -34,7 +34,7 @@ namespace IDKEngine
                     rootNodes[i].Min = Vector3.ComponentMin(rootNodes[i].Min, vertex.Position);
                     rootNodes[i].Max = Vector3.ComponentMax(rootNodes[i].Max, vertex.Position);
                 }
-                rootNodes[i].MissLinkAndVerticesCount = (uint)vertices.Count - rootNodes[i].IsLeafAndVerticesStart;
+                rootNodes[i].VertexCount = (uint)vertices.Count - rootNodes[i].VerticesStart;
             }
 
 
@@ -44,15 +44,15 @@ namespace IDKEngine
             {
                 GLSLNode root = rootNodes[i];
 
-                int treeDepth = (int)Math.Max(Math.Min(root.MissLinkAndVerticesCount / trianglesPerLevelHint, MaxTreeDepth), 2u);
+                int treeDepth = (int)Math.Max(Math.Min(root.VertexCount / trianglesPerLevelHint, MaxTreeDepth), 2u);
                 uint nodesForMesh = (1u << treeDepth) - 1u;
                 modelSystem.Meshes[i].BLASDepth = treeDepth;
-                int bitsForMissLink = treeDepth; // ceil(log2(NODES_PER_MESH))
-                int verticesStart = (int)root.IsLeafAndVerticesStart;
-                int verticesEnd = (int)(root.IsLeafAndVerticesStart + root.MissLinkAndVerticesCount);
+                int verticesStart = (int)root.VerticesStart;
+                int verticesEnd = (int)(root.VerticesStart + root.VertexCount);
 
-                List<GLSLVertex> localBVHVertices = new List<GLSLVertex>((int)(root.MissLinkAndVerticesCount * 1.5f));
+                List<GLSLVertex> localBVHVertices = new List<GLSLVertex>((int)(root.VertexCount * 1.5f));
                 GLSLNode[] localNodes = new GLSLNode[nodesForMesh];
+                root.VertexCount = 0; // only child nodes should have VertexCount > 0
                 localNodes[0] = root;
                 
                 for (int level = 0; level < treeDepth; level++)
@@ -63,11 +63,11 @@ namespace IDKEngine
                     for (int horNode = 0; horNode < GetNodesOnLevel(level); horNode++)
                     {
                         if (horNode == GetNodesOnLevel(level) - 1)
-                            SetMissLink(ref localNodes[localIndex], nodesForMesh, bitsForMissLink);
+                            localNodes[localIndex].MissLink = nodesForMesh;
                         else if (horNode % 2 == 0)
-                            SetMissLink(ref localNodes[localIndex], localIndex + distance, bitsForMissLink);
+                            localNodes[localIndex].MissLink = localIndex + distance;
                         else
-                            SetMissLink(ref localNodes[localIndex], localIndex + GetDistanceInterNode(distance, horNode / 2) - 1u, bitsForMissLink);
+                            localNodes[localIndex].MissLink = localIndex + GetDistanceInterNode(distance, horNode / 2) - 1u;
 
                         if (level < treeDepth - 1)
                         {
@@ -91,7 +91,7 @@ namespace IDKEngine
                 void MakeLeaf(ref GLSLNode node)
                 {
                     Debug.Assert((uint)localBVHVertices.Count < (1u << BITS_FOR_VERTICES_START));
-                    node.IsLeafAndVerticesStart = (uint)localBVHVertices.Count;
+                    node.VerticesStart = (uint)localBVHVertices.Count;
 
                     Vector3 center = (node.Min + node.Max) * 0.5f;
                     Vector3 halfSize = (node.Max - node.Min) * (0.5f + 0.000001f);
@@ -104,11 +104,8 @@ namespace IDKEngine
                             localBVHVertices.Add(vertices[i + 2]);
                         }
                     }
-                    uint count = (uint)localBVHVertices.Count - node.IsLeafAndVerticesStart;
-
-                    Debug.Assert(count < (1u << (32 - bitsForMissLink)));
-                    MyMath.BitsInsert(ref node.MissLinkAndVerticesCount, count, 0);
-                    MyMath.BitsInsert(ref node.IsLeafAndVerticesStart, 1, BITS_FOR_VERTICES_START);
+                    uint count = (uint)localBVHVertices.Count - node.VerticesStart;
+                    node.VertexCount = count;
                 }
             });
             while (!parallelLoopResult.IsCompleted) ;
@@ -118,11 +115,10 @@ namespace IDKEngine
             {
                 for (int j = 0; j < Nodes[i].Length; j++)
                 {
-                    if (MyMath.GetBits(Nodes[i][j].IsLeafAndVerticesStart, BITS_FOR_VERTICES_START, 1) == 1)
+                    if (Nodes[i][j].VertexCount > 0)
                     {
-                        uint globalStart = (uint)verticesOffset + Nodes[i][j].IsLeafAndVerticesStart;
-                        Nodes[i][j].IsLeafAndVerticesStart = globalStart;
-                        MyMath.BitsInsert(ref Nodes[i][j].IsLeafAndVerticesStart, 1, BITS_FOR_VERTICES_START);
+                        uint globalStart = (uint)verticesOffset + Nodes[i][j].VerticesStart;
+                        Nodes[i][j].VerticesStart = globalStart;
                     }
                 }
                 modelSystem.Meshes[i].NodeStart = nodesOffset;
@@ -156,11 +152,6 @@ namespace IDKEngine
         private static int GetRightChildIndex(int parent, int treeDepth, int level)
         {
             return parent + (1 << (treeDepth - (level + 1)));
-        }
-        private static void SetMissLink(ref GLSLNode node, uint missLink, int bitsForMissLink)
-        {
-            Debug.Assert(missLink < (1u << bitsForMissLink));
-            MyMath.BitsInsert(ref node.MissLinkAndVerticesCount, missLink, 32 - bitsForMissLink);
         }
         private static uint GetNodesOnLevel(int level)
         {
