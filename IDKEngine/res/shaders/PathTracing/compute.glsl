@@ -87,9 +87,11 @@ struct Ray
 struct Node
 {
     vec3 Min;
-    uint IsLeafAndVerticesStart;
+    uint VerticesStart;
     vec3 Max;
-    uint MissLinkAndVerticesCount;
+    uint VertexCount;
+    vec3 _pad0;
+    uint MissLink;
 };
 
 struct Triangle
@@ -364,15 +366,9 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                 Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
                 if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
                 {
-                    if ((node.IsLeafAndVerticesStart >> 31) == 1)
+                    if (node.VertexCount > 0)
                     {
-                        const uint MAX_COUNT = (1u << (32u - mesh.BLASDepth)) - 1u;
-                        const uint count = node.MissLinkAndVerticesCount & MAX_COUNT;
-                        
-                        const uint MAX_START = (1u << 31u) - 1u;
-                        const uint start = node.IsLeafAndVerticesStart & MAX_START;
-                        
-                        for (uint k = start / 3; k < (start + count) / 3; k++)
+                        for (uint k = node.VerticesStart / 3; k < (node.VerticesStart + node.VertexCount) / 3; k++)
                         {
                             Triangle triangle = triangleSSBO.Triangles[k];
                             if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
@@ -389,7 +385,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                 }
                 else
                 {
-                    localNodeIndex = node.MissLinkAndVerticesCount >> (32u - mesh.BLASDepth);
+                    localNodeIndex = node.MissLink;
                 }
             }
         }
@@ -408,9 +404,9 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     return hitInfo.T != FLOAT_MAX;
 }
 
+// Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT)
 {
-    // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 
     vec3 v1v0 = v1 - v0;
     vec3 v2v0 = v2 - v0;
@@ -426,9 +422,9 @@ bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT)
     return all(greaterThanEqual(baryT.xyz, vec3(0.0)));
 }
 
+// Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
 bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2)
 {
-    // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
     t1 = FLOAT_MIN;
     t2 = FLOAT_MAX;
 
@@ -482,9 +478,9 @@ Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel)
     return Ray((invModel * vec4(ray.Origin, 1.0)).xyz, (invModel * vec4(ray.Direction, 0.0)).xyz);
 }
 
+// Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
 vec3 CosineSampleHemisphere(vec3 normal)
 {
-    // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
 
     float z = GetRandomFloat01() * 2.0 - 1.0;
     float a = GetRandomFloat01() * 2.0 * PI;
