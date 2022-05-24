@@ -75,7 +75,6 @@ struct HitInfo
     float T;
     uint TriangleIndex;
     int HitIndex;
-    int InstanceID;
 };
 
 struct Ray
@@ -226,7 +225,8 @@ vec3 Radiance(Ray ray)
                 Vertex v2 = triangle.Vertex2;
                 
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
-                mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
+                const int glInstanceID = 0; // TODO: Work out actual instanceID value
+                mat4 model = matrixSSBO.Models[glInstanceID];
 
                 vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
                 vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
@@ -356,37 +356,32 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         const Mesh mesh = meshSSBO.Meshes[i];
-        for (int j = mesh.MatrixStart; j < mesh.MatrixStart + mesh.InstanceCount; j++)
+        const Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[0]));
+        uint localNodeIndex = 0u;
+        while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
         {
-            const Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[j]));
-                    
-            uint localNodeIndex = 0u;
-            while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
+            Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
+            if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
             {
-                Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
-                if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
+                if (node.VertexCount > 0)
                 {
-                    if (node.VertexCount > 0)
+                    for (uint k = node.VerticesStart / 3; k < (node.VerticesStart + node.VertexCount) / 3; k++)
                     {
-                        for (uint k = node.VerticesStart / 3; k < (node.VerticesStart + node.VertexCount) / 3; k++)
+                        Triangle triangle = triangleSSBO.Triangles[k];
+                        if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
                         {
-                            Triangle triangle = triangleSSBO.Triangles[k];
-                            if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
-                            {
-                                hitInfo.Bary = baryT.xyz;
-                                hitInfo.T = baryT.w;
-                                hitInfo.HitIndex = i;
-                                hitInfo.InstanceID = j;
-                                hitInfo.TriangleIndex = k;
-                            }
+                            hitInfo.Bary = baryT.xyz;
+                            hitInfo.T = baryT.w;
+                            hitInfo.HitIndex = i;
+                            hitInfo.TriangleIndex = k;
                         }
                     }
-                    localNodeIndex++;
                 }
-                else
-                {
-                    localNodeIndex = node.MissLink;
-                }
+                localNodeIndex++;
+            }
+            else
+            {
+                localNodeIndex = node.MissLink;
             }
         }
     }
@@ -524,8 +519,11 @@ vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedD
 // Source: https://discord.com/channels/318590007881236480/318590007881236480/856523979383373835
 uint EmulateNonUniform(uint index)
 {
-    uint currentIndex;
-    while ((currentIndex = readFirstInvocationARB(index)) != index) ;
-    return index;
+    for (;;)
+    {
+        uint currentIndex = readFirstInvocationARB(index);
+        if (currentIndex == index)
+            return currentIndex;
+    }
 }
 #endif

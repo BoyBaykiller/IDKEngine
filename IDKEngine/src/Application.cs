@@ -39,10 +39,11 @@ namespace IDKEngine
             GLSLBasicData.CameraPos = camera.Position;
             GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
+            
             if (!IsPathTracing)
             {
                 // Compute last frames SSAO
-                if (IsSSAO)
+                if (IsSSAO) 
                     SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
 
                 if (IsShadows)
@@ -78,11 +79,11 @@ namespace IDKEngine
                 if (VariableRateShading.NV_SHADING_RATE_IMAGE)
                 {
                     if (IsVRSForwardRender)
-                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity, ForwardRenderer.Meshes);
+                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
                 }
                 else if (ForwardPassVRS.DebugValue != VariableRateShading.DebugMode.NoDebug)
                 {
-                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity, ForwardRenderer.Meshes);
+                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
                 }
 
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
@@ -219,19 +220,42 @@ namespace IDKEngine
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse });
 
-
-            IsVRSForwardRender = VariableRateShading.NV_SHADING_RATE_IMAGE;
-            Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
             {
-                NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
-                NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
-            };
-            ForwardPassVRS = new VariableRateShading(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")), Size.X, Size.Y);
-            VariableRateShading.BindVRSNV(ForwardPassVRS);
-            VariableRateShading.SetShadingRatePaletteNV(shadingRates);
+                IsVRSForwardRender = VariableRateShading.NV_SHADING_RATE_IMAGE;
+                Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
+                {
+                    NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
+                    NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
+                    NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
+                    NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
+                    NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
+                };
+
+                string srcCode = File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl");
+                int effectiveSubGroupSize = 1;
+                if (Helper.IsExtensionsAvailable("GL_KHR_shader_subgroup"))
+                {
+                    // "do it yourself" until opentk provides these enums
+                    // https://github.com/opentk/opentk/issues/1450
+                    const int SUBGROUP_SIZE_KHR = 0x9532;
+                    const int SUBGROUP_SUPPORTED_FEATURES_KHR = 0x9534;
+                    const int SUBGROUP_FEATURE_BASIC_BIT_KHR = 0x00000001;
+                    const int SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR = 0x00000004;
+
+                    int bitfield = GL.GetInteger((GetPName)SUBGROUP_SUPPORTED_FEATURES_KHR);
+                    
+                    if ((bitfield & SUBGROUP_FEATURE_BASIC_BIT_KHR) == SUBGROUP_FEATURE_BASIC_BIT_KHR &&
+                        (bitfield & SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR) == SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR)
+                    {
+                        effectiveSubGroupSize = GL.GetInteger((GetPName)SUBGROUP_SIZE_KHR);
+                    }
+                }
+                srcCode = srcCode.Replace("__effectiveSubroupSize__", Convert.ToString(effectiveSubGroupSize));
+                
+                ForwardPassVRS = new VariableRateShading(new Shader(ShaderType.ComputeShader, srcCode), Size.X, Size.Y);
+                VariableRateShading.BindVRSNV(ForwardPassVRS);
+                VariableRateShading.SetShadingRatePaletteNV(shadingRates);
+            }
 
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 8.0f);
