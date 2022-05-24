@@ -16,7 +16,7 @@ namespace IDKEngine.Render
         {
             NoDebug = 0,
             ShadingRate = 1,
-            AbsVelocity = 2,
+            Speed = 2,
             Luminance = 3,
             LuminanceVariance = 4,
         }
@@ -61,15 +61,27 @@ namespace IDKEngine.Render
             }
         }
 
-        private float _aggressiveness;
-        public float Aggressiveness
+        private float _speedFactor;
+        public float SpeedFactor
         {
-            get => _aggressiveness;
+            get => _speedFactor;
 
             set
             {
-                _aggressiveness = value;
-                shaderProgram.Upload("Aggressiveness", Aggressiveness);
+                _speedFactor = value;
+                shaderProgram.Upload("SpeedFactor", SpeedFactor);
+            }
+        }
+
+        private float _lumVarianceFactor;
+        public float LumVarianceFactor
+        {
+            get => _lumVarianceFactor;
+
+            set
+            {
+                _lumVarianceFactor = value;
+                shaderProgram.Upload("LumVarianceFactor", LumVarianceFactor);
             }
         }
 
@@ -77,7 +89,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram shaderProgram;
         private int width;
         private int height;
-        public VariableRateShading(Shader classificationComputeShader, int width, int height, float aggressiveness = 0.3f)
+        public VariableRateShading(Shader classificationComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.3f)
         {
             shaderProgram = new ShaderProgram(classificationComputeShader);
 
@@ -88,7 +100,8 @@ namespace IDKEngine.Render
             
             this.width = width;
             this.height = height;
-            Aggressiveness = aggressiveness;
+            SpeedFactor = speedFactor;
+            LumVarianceFactor = lumVarianceFactor;
         }
 
         /// <summary>
@@ -117,14 +130,12 @@ namespace IDKEngine.Render
             }
         }
 
-        public unsafe void Compute(Texture shaded, Texture velocity, Texture meshes = null)
+        public unsafe void Compute(Texture shaded, Texture velocity)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R8ui);
             shaded.BindToImageUnit(1, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
             
             velocity.BindToUnit(0);
-            if (DebugValue != DebugMode.NoDebug && meshes != null)
-                meshes.BindToUnit(1);
 
             shaderProgram.Use();
             GL.DispatchCompute((width + TILE_SIZE - 1) / TILE_SIZE, (height + TILE_SIZE - 1) / TILE_SIZE, 1);

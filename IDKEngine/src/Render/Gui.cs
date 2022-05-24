@@ -87,17 +87,18 @@ namespace IDKEngine.Render
                         }
                         ImGui.SameLine();
                         HelpMarker(
-                        "Requires support for NV_shading_rate_image. " +
-                        "This feature when enabled allows the engine to choose a unique shading rate " +
-                        "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
-                        "shader invocations in regions where less detail may be required.");
+                            "Requires support for NV_shading_rate_image. " +
+                            "This feature when enabled allows the engine to choose a unique shading rate " +
+                            "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
+                            "shader invocations in regions where less detail may be required."
+                        );
                         
 
                         string[] debugModes = new string[]
                         {
                             nameof(VariableRateShading.DebugMode.NoDebug),
                             nameof(VariableRateShading.DebugMode.ShadingRate),
-                            nameof(VariableRateShading.DebugMode.AbsVelocity),
+                            nameof(VariableRateShading.DebugMode.Speed),
                             nameof(VariableRateShading.DebugMode.Luminance),
                             nameof(VariableRateShading.DebugMode.LuminanceVariance),
                         };
@@ -120,10 +121,16 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        float tempFloat = window.ForwardPassVRS.Aggressiveness;
-                        if (ImGui.SliderFloat("Aggressiveness", ref tempFloat, 0.0f, 4.0f))
+                        float tempFloat = window.ForwardPassVRS.SpeedFactor;
+                        if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
-                            window.ForwardPassVRS.Aggressiveness = tempFloat;
+                            window.ForwardPassVRS.SpeedFactor = tempFloat;
+                        }
+
+                        tempFloat = window.ForwardPassVRS.LumVarianceFactor;
+                        if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
+                        {
+                            window.ForwardPassVRS.LumVarianceFactor = tempFloat;
                         }
                     }
 
@@ -212,6 +219,21 @@ namespace IDKEngine.Render
                     if (ImGui.CollapsingHeader("Shadows"))
                     {
                         ImGui.Checkbox("IsShadows", ref window.IsShadows);
+                        ImGui.SameLine();
+                        if (PointShadow.IS_VERTEX_LAYERED_RENDERING)
+                        {
+                            HelpMarker(
+                                "This system supports vertex layered rendering. " +
+                                "Each pointshadow will be generated in only 1 draw call instead of 6."
+                            );
+                        }
+                        else
+                        {
+                            HelpMarker(
+                                "This system does not support vertex layered rendering. " +
+                                "Each pointshadow will be generated in 6 draw calls instead of 1."
+                            );
+                        }
                     }
 
                     if (ImGui.CollapsingHeader("TAA"))

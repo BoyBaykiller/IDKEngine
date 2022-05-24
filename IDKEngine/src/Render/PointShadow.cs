@@ -113,12 +113,12 @@ namespace IDKEngine.Render
             framebuffer.Bind();
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
-            renderProgram.Use();
             renderProgram.Upload(0, Instance);
 
             if (IS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array or GL_NV_viewport_array2
             {
                 GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
+                renderProgram.Use();
                 modelSystem.Draw();
             }
             else

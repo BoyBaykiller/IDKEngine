@@ -43,8 +43,8 @@ namespace IDKEngine
         public static DebugProc DebugCallback = Debug;
         private static void Debug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
         {
-            // Filter shader compile error
-            if (id != 2000)
+            // Filter shader compile error and "... will use bla bla ..."
+            if (id != 2000 && id != 131185)
             {
                 Console.WriteLine($"\nType: {type},\nSeverity: {severity},\nMessage: {Marshal.PtrToStringAnsi(message, length - 1)}");
                 if (severity == DebugSeverity.DebugSeverityHigh)

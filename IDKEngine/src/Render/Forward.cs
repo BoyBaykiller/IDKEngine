@@ -92,7 +92,9 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/fragment.glsl")));
 
             skyBoxProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Fordward/SkyBox/compute.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/SkyBox/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/SkyBox/fragment.glsl")));
+
 
             aabbProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
@@ -168,23 +170,33 @@ namespace IDKEngine.Render
             else
                 Texture.UnbindFromUnit(0);
 
-            if (modelSystem.Meshes.Length > 0)
+            GL.ColorMask(false, false, false, false);
+            depthOnlyProgram.Use();
+            modelSystem.Draw();
+
+            GL.DepthFunc(DepthFunction.Equal);
+            GL.ColorMask(true, true, true, true);
+            GL.DepthMask(false);
+
+            shadingProgram.Use();
+            modelSystem.Draw();
+
+            if (skyBox != null)
             {
-                GL.ColorMask(false, false, false, false);
+                skyBox.BindToUnit(0);
 
-                depthOnlyProgram.Use();
-                modelSystem.Draw();
-
-                GL.DepthFunc(DepthFunction.Equal);
-                GL.ColorMask(true, true, true, true);
                 GL.DepthMask(false);
+                GL.Disable(EnableCap.CullFace);
+                GL.DepthFunc(DepthFunction.Lequal);
 
-                shadingProgram.Use();
-                modelSystem.Draw();
+                skyBoxProgram.Use();
+                GL.DrawArrays(PrimitiveType.Quads, 0, 24);
 
-                GL.DepthMask(true);
-                GL.DepthFunc(DepthFunction.Less);
+                GL.Enable(EnableCap.CullFace);
             }
+
+            GL.DepthFunc(DepthFunction.Less);
+            GL.DepthMask(true);
 
             LightingContext.Draw();
 
@@ -196,17 +208,8 @@ namespace IDKEngine.Render
                 Depth.BindToUnit(2);
                 taaResolveProgram.Use();
                 GL.DispatchCompute((taaPing.Width + 8 - 1) / 8, (taaPing.Height + 8 - 1) / 8, 1);
+                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             }
-
-            if (skyBox != null)
-            {
-                Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
-                Depth.BindToUnit(0);
-                skyBox.BindToUnit(1);
-                skyBoxProgram.Use();
-                GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            }
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
 
             if (RenderMeshAABBIndex >= 0)
             {

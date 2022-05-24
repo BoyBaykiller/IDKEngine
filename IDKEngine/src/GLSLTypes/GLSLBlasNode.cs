@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-	struct GLSLNode
+	struct GLSLBlasNode
 	{
 		public Vector3 Min;
 		public uint VerticesStart;

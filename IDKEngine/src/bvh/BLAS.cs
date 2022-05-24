@@ -12,14 +12,14 @@ namespace IDKEngine
         public const int BITS_FOR_VERTICES_START = 31;
 
         public readonly int MaxTreeDepth;
-        public readonly GLSLNode[][] Nodes;
+        public readonly GLSLBlasNode[][] Nodes;
         public readonly GLSLVertex[][] Vertices;
         public unsafe BLAS(ModelSystem modelSystem, int maxTreeDepth, uint trianglesPerLevelHint = 45u)
         {
             MaxTreeDepth = maxTreeDepth;
 
             List<GLSLVertex> vertices = new List<GLSLVertex>(modelSystem.Vertices.Length);
-            GLSLNode[] rootNodes = new GLSLNode[modelSystem.Meshes.Length];
+            GLSLBlasNode[] rootNodes = new GLSLBlasNode[modelSystem.Meshes.Length];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
                 rootNodes[i].Min = new Vector3(float.MaxValue);
@@ -38,11 +38,11 @@ namespace IDKEngine
             }
 
 
-            Nodes = new GLSLNode[modelSystem.Meshes.Length][];
+            Nodes = new GLSLBlasNode[modelSystem.Meshes.Length][];
             Vertices = new GLSLVertex[modelSystem.Meshes.Length][];
             ParallelLoopResult parallelLoopResult = Parallel.For(0, modelSystem.Meshes.Length, i =>
             {
-                GLSLNode root = rootNodes[i];
+                GLSLBlasNode root = rootNodes[i];
 
                 int treeDepth = (int)Math.Max(Math.Min(root.VertexCount / trianglesPerLevelHint, MaxTreeDepth), 2u);
                 uint nodesForMesh = (1u << treeDepth) - 1u;
@@ -51,7 +51,7 @@ namespace IDKEngine
                 int verticesEnd = (int)(root.VerticesStart + root.VertexCount);
 
                 List<GLSLVertex> localBVHVertices = new List<GLSLVertex>((int)(root.VertexCount * 1.5f));
-                GLSLNode[] localNodes = new GLSLNode[nodesForMesh];
+                GLSLBlasNode[] localNodes = new GLSLBlasNode[nodesForMesh];
                 root.VertexCount = 0; // only child nodes should have VertexCount > 0
                 localNodes[0] = root;
                 
@@ -71,7 +71,7 @@ namespace IDKEngine
 
                         if (level < treeDepth - 1)
                         {
-                            ConstructChildBounds(localNodes[localIndex], out GLSLNode child0, out GLSLNode child1);
+                            ConstructChildBounds(localNodes[localIndex], out GLSLBlasNode child0, out GLSLBlasNode child1);
                             if (level == treeDepth - 2)
                             {
                                 MakeLeaf(ref child0);
@@ -88,7 +88,7 @@ namespace IDKEngine
                 Nodes[i] = localNodes;
                 Vertices[i] = localBVHVertices.ToArray();
 
-                void MakeLeaf(ref GLSLNode node)
+                void MakeLeaf(ref GLSLBlasNode node)
                 {
                     Debug.Assert((uint)localBVHVertices.Count < (1u << BITS_FOR_VERTICES_START));
                     node.VerticesStart = (uint)localBVHVertices.Count;
@@ -130,10 +130,10 @@ namespace IDKEngine
             modelSystem.UpdateMeshBuffer(0, modelSystem.Meshes.Length);
         }
 
-        private static void ConstructChildBounds(in GLSLNode parent, out GLSLNode child0, out GLSLNode child1)
+        private static void ConstructChildBounds(in GLSLBlasNode parent, out GLSLBlasNode child0, out GLSLBlasNode child1)
         {
-            child0 = new GLSLNode();
-            child1 = new GLSLNode();
+            child0 = new GLSLBlasNode();
+            child1 = new GLSLBlasNode();
 
             child0.Min = parent.Min;
             child0.Max = parent.Max;

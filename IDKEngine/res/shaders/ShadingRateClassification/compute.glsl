@@ -4,19 +4,25 @@
 #define SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV 2u
 #define SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV 3u
 #define SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV 4u
-#define MESHES_CLEAR_COLOR -1.0
 #define TILE_SIZE 16
 #define DEBUG_NO_DEBUG 0
 #define DEBUG_SHADING_RATES 1
-#define DEBUG_ABS_VELOCITY 2
+#define DEBUG_SPEED 2
 #define DEBUG_LUMINANCE 3
 #define DEBUG_LUMINANCE_VARIANCE 4
+
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+// Inserted by application.
+// Will be 1 if no subgroup features are available
+#define EFFECTIVE_SUBGROUP_SIZE __effectiveSubroupSize__
+
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
 layout(binding = 0, r8ui) restrict writeonly uniform uimage2D ImgResult;
 layout(binding = 1, rgba16f) restrict uniform image2D ImgShaded;
 layout(binding = 0) uniform sampler2D SamplerVelocity;
-layout(binding = 1) uniform isampler2D SamplerMeshes;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -46,48 +52,69 @@ layout(std140, binding = 5) uniform TaaDataUBO
 float GetLuminance(vec3 color);
 
 uniform int DebugMode;
-uniform float Aggressiveness;
+uniform float SpeedFactor;
+uniform float LumVarianceFactor;
 
 shared uint SharedDebugShadingRate;
-shared vec2 SharedMeanVelocity[TILE_SIZE * TILE_SIZE];
-shared float SharedMeanLum[TILE_SIZE * TILE_SIZE];
-shared float SharedMeanLumVariance[TILE_SIZE * TILE_SIZE];
 
-const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
-const float VARIANCE_AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE - 1);
+shared float SharedMeanSpeed[TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE];
+shared float SharedMeanLum[TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE];
+shared float SharedMeanLumVariance[TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE];
+
+const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE);
+const float VARIANCE_AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE - 1);
+
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgShaded);
 
-    vec2 vel = (texture(SamplerVelocity, uv).rg / taaDataUBO.VelScale) * AVG_MULTIPLIER;
-    SharedMeanVelocity[gl_LocalInvocationIndex] = abs(vel);
-
+    vec2 vel = texture(SamplerVelocity, uv).rg / taaDataUBO.VelScale;
     vec3 srcColor = imageLoad(ImgShaded, imgCoord).rgb;
     float luminance = GetLuminance(srcColor);
+#if EFFECTIVE_SUBGROUP_SIZE == 1
+    SharedMeanSpeed[gl_LocalInvocationIndex] = dot(vel, vel) * AVG_MULTIPLIER;
     SharedMeanLum[gl_LocalInvocationIndex] = luminance * AVG_MULTIPLIER;
+#else
+    float subgroupAddedSpeed = subgroupInclusiveAdd(dot(vel, vel) * AVG_MULTIPLIER);
+    float subgroupAddedLum = subgroupInclusiveAdd(luminance * AVG_MULTIPLIER);
 
+    if (subgroupElect())
+    {
+        SharedMeanSpeed[gl_SubgroupID] = subgroupAddedSpeed;
+        SharedMeanLum[gl_SubgroupID] = subgroupAddedLum;
+    }
+#endif
     barrier();
 
     // Use parallel reduction to calculate sum (average) of all velocity and luminance values
     // Final results will have been collapsed into the first array element
-    for (int cutoff = (TILE_SIZE * TILE_SIZE) / 2; cutoff > 0; cutoff /= 2)
+    for (int cutoff = (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE) / 2; cutoff > 0; cutoff /= 2)
     {
         if (gl_LocalInvocationIndex < cutoff)
         {
-            SharedMeanVelocity[gl_LocalInvocationIndex] += SharedMeanVelocity[cutoff + gl_LocalInvocationIndex];
+            SharedMeanSpeed[gl_LocalInvocationIndex] += SharedMeanSpeed[cutoff + gl_LocalInvocationIndex];
             SharedMeanLum[gl_LocalInvocationIndex] += SharedMeanLum[cutoff + gl_LocalInvocationIndex];
         }
         barrier();
     }
 
-    float lumDiffToMean = luminance - SharedMeanLum[0];
-    SharedMeanLumVariance[gl_LocalInvocationIndex] = pow(lumDiffToMean, 2.0) * VARIANCE_AVG_MULTIPLIER;
+    float deltaLumMean = luminance - SharedMeanLum[0];
+#if EFFECTIVE_SUBGROUP_SIZE == 1
+    SharedMeanLumVariance[gl_LocalInvocationIndex] = pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER;
+#else
+    float subgroupAddedDeltaLumMean = subgroupInclusiveAdd(pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER);
+
+    if (subgroupElect())
+    {
+        SharedMeanLumVariance[gl_SubgroupID] = subgroupAddedDeltaLumMean;
+    }
+#endif
     barrier();
 
     // Use parallel reduction to calculate sum (average) of squared luminance deltas - variance
     // Final luminance variance will have been collapsed into the first array element
-    for (int cutoff = (TILE_SIZE * TILE_SIZE) / 2; cutoff > 0; cutoff /= 2)
+    for (int cutoff = (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE) / 2; cutoff > 0; cutoff /= 2)
     {
         if (gl_LocalInvocationIndex < cutoff)
         {
@@ -98,18 +125,19 @@ void main()
 
     if (gl_LocalInvocationIndex == 0)
     {
-        vec2 avgVelocity = SharedMeanVelocity[0] / basicDataUBO.DeltaUpdate;
-        float maxAvgVelocity = max(avgVelocity.x, avgVelocity.y);
-        // higher variance -> select higher shading rate (higher res)
-        float scaledMeanLumVariance = SharedMeanLumVariance[0] * 300000.0;
+        float meanSpeed = sqrt(SharedMeanSpeed[0]) / basicDataUBO.DeltaUpdate;
+        
+        // Source: https://www.vosesoftware.com/riskwiki/Normalizedmeasuresofspread-theCofV.php
+        float stdDev = sqrt(SharedMeanLumVariance[0]);
+        float normalizedVariance = stdDev / SharedMeanLum[0];
 
-        float velocityShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, maxAvgVelocity * Aggressiveness);
-        float varianceShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, Aggressiveness / scaledMeanLumVariance);
+        float velocityShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, meanSpeed * SpeedFactor);
+        float varianceShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, LumVarianceFactor / normalizedVariance);
         
         float combinedShadingRate = velocityShadingRate + varianceShadingRate;
         uint finalShadingRate = clamp(uint(round(combinedShadingRate)), SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV);
 
-        if (DebugMode != DEBUG_NO_DEBUG)
+        if (DebugMode == DEBUG_SHADING_RATES)
             SharedDebugShadingRate = finalShadingRate;
 
         imageStore(ImgResult, ivec2(gl_WorkGroupID.xy), uvec4(finalShadingRate));
@@ -120,35 +148,32 @@ void main()
         barrier();
         
         vec3 debugcolor = srcColor;
-        int meshID = texture(SamplerMeshes, uv).r;
-        // Don't show shading rate for non meshes like a skybox
-        // since those get rendered differently and are not effected
-        if (meshID != MESHES_CLEAR_COLOR)
+        if (DebugMode == DEBUG_SHADING_RATES)
         {
-            if (DebugMode == DEBUG_SHADING_RATES)
-            {
-                if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
-                    debugcolor += vec3(4, 0, 0);
-                else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
-                    debugcolor += vec3(4, 4, 0);
-                else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
-                    debugcolor += vec3(0, 4, 0);
-                else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
-                    debugcolor += vec3(0, 0, 4);
+            if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
+                debugcolor += vec3(4, 0, 0);
+            else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
+                debugcolor += vec3(4, 4, 0);
+            else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
+                debugcolor += vec3(0, 4, 0);
+            else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
+                debugcolor += vec3(0, 0, 4);
 
-            }
-            else if (DebugMode == DEBUG_LUMINANCE)
-            {
-                debugcolor = vec3(SharedMeanLum[0]);
-            }
-            else if (DebugMode == DEBUG_LUMINANCE_VARIANCE)
-            {
-                debugcolor = vec3(SharedMeanLumVariance[0] * 20.0);
-            }
-            else if (DebugMode == DEBUG_ABS_VELOCITY)
-            {
-                debugcolor = vec3(SharedMeanVelocity[0] / basicDataUBO.DeltaUpdate, 0.0);
-            }
+        }
+        else if (DebugMode == DEBUG_LUMINANCE)
+        {
+            debugcolor = vec3(SharedMeanLum[0]);
+        }
+        else if (DebugMode == DEBUG_LUMINANCE_VARIANCE)
+        {
+            float stdDev = sqrt(SharedMeanLumVariance[0]);
+            float normalizedVariance = stdDev / SharedMeanLum[0];
+            // darken a bit for debug view
+            debugcolor = vec3(normalizedVariance * 0.2);
+        }
+        else if (DebugMode == DEBUG_SPEED)
+        {
+            debugcolor = vec3(sqrt(SharedMeanSpeed[0]) / basicDataUBO.DeltaUpdate);
         }
 
 
