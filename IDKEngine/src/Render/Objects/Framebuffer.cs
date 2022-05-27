@@ -21,6 +21,11 @@ namespace IDKEngine.Render.Objects
             GL.ClearNamedFramebuffer(ID, clearBuffer, drawBuffer, ref clearValue);
         }
 
+        public void ClearBuffer(ClearBuffer clearBuffer, int drawBuffer, uint clearValue)
+        {
+            GL.ClearNamedFramebuffer((uint)ID, clearBuffer, drawBuffer, ref clearValue);
+        }
+
         public void ClearBuffer(ClearBuffer clearBuffer, int drawBuffer, int clearValue)
         {
             GL.ClearNamedFramebuffer(ID, clearBuffer, drawBuffer, ref clearValue);

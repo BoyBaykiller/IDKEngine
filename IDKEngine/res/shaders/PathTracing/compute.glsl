@@ -138,12 +138,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 1) uniform MaterialUBO
 {
-    Material Materials[256];
+    #define GLSL_MAX_UBO_MATERIAL_COUNT 256 // used in shader and client code - keep in sync!
+    Material Materials[GLSL_MAX_UBO_MATERIAL_COUNT];
 } materialUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    Light Lights[64];
+    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 

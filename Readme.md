@@ -87,13 +87,15 @@ Calculating the variance requires some more work.
 (Normalized) Variance is defined as:
 
 $$V(x) = \frac{\sum_{i = 1}^{n}(x_{i} - \overline{x})^{2}}{n - 1}$$
+<!-- Maybe fix error of second formula not rendering properly -->
+&nbsp;
 $$VN = \frac{\sqrt{V(x)}}{\overline{x}}$$
 
 Like before $\overline{x}$ is the mean of set $x$ and $n$ the number of elements. $V(x)$ tells us the variance of that set.
 However $V(x)$ is dependent on scale which is not what we want. $\{5, 10\}$ should result in the same variance as $\{10, 20\}$.
 The second part solves this by [normalizing the variance](https://www.vosesoftware.com/riskwiki/Normalizedmeasuresofspread-theCofV.php).
 
-Here's a implementation. I put the averaging stuff from above in the function `ParallelReductionAverage`.
+Here's a implementation. I put the parallel adding stuff from above in the function `ParallelSum`.
 ```glsl
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
@@ -103,10 +105,10 @@ const float VARIANCE_AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE - 1);
 
 void main()
 {
-    float lumAvg = ParallelReductionAverage(GetLuminance() * AVG_MULTIPLIER);
+    float lumAvg = ParallelSum(GetLuminance() * AVG_MULTIPLIER);
     
     float deltaLumAvg = pow(luminance - lumAvg, 2.0);
-    float varianceLum = ParallelReductionAverage(deltaLumAvg);
+    float varianceLum = ParallelSum(deltaLumAvg * VARIANCE_AVG_MULTIPLIER);
 
     if (gl_LocalInvocationIndex == 0)
     {
@@ -161,12 +163,14 @@ void main()
         }
         barrier();
     }
+
+    // average is computed and stored in SharedSums[0]
 }
 ```
 Note how the workgroup expands the size of a subgroup so we still have to use shared memory to obtain a workgroup wide result.
-However now it only has to iterate through `log2(gl_NumSubgroups / 2)` values instead of `log2(gl_WorkGroupSize.x / 2)`.
+However in the for loop it now only has to iterate through `log2(gl_NumSubgroups / 2)` values instead of `log2(gl_WorkGroupSize.x / 2)`.
 
-## Point Shadows
+## Single pass Point Shadow rendering
 
 ### 1.0 Rendering
 
@@ -187,7 +191,6 @@ you do:
 RenderScene();
 ```
 ```glsl
-/// pointShadow.geo
 void main()
 {
     for (int face = 0; face < 6; face++)
@@ -197,13 +200,13 @@ void main()
     }
 }
 ```
-Notice how instead of calling `NamedFramebufferTextureLayer` from the CPU we set `gl_Layer` inside the geometry shader saving us 5 draw calls and driver overhead.
+Notice how instead of calling `NamedFramebufferTextureLayer` from the CPU we set `gl_Layer` inside a geometry shader saving us 5 draw calls and driver overhead.
 
 So this should be faster right?
 
 No. At least not on my RX 580 and RX 5700 XT. And I assume its not much different on NVIDIA since geometry shaders are slow except on Intel.
 
-There are multiple extensions which allow you too set `gl_Layer` from a vertex shader.
+There are multiple extensions which allow you to set `gl_Layer` from a vertex shader.
 `ARB_shader_viewport_layer_array` for example reads:
 > In order to use any viewport or attachment layer other than zero, a
 > geometry shader must be present. Geometry shaders introduce processing
@@ -221,8 +224,6 @@ RenderSceneInstanced(count: 6);
 ```
 
 ```glsl
-/// pointShadow.vert
-
 #define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array || GL_NV_viewport_array2)
 #extension GL_ARB_shader_viewport_layer_array : enable
 #extension GL_AMD_vertex_shader_layer : enable

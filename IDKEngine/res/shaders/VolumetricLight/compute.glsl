@@ -34,13 +34,15 @@ layout(std140, binding = 4) uniform BlueNoiseUBO
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    Light Lights[64];
+    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[64];
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 3 // used in shader and client code - keep in sync!
+    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 

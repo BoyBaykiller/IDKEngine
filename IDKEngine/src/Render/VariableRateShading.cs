@@ -11,7 +11,8 @@ namespace IDKEngine.Render
         public const int TILE_SIZE = 16;
 
         public static readonly bool NV_SHADING_RATE_IMAGE = Helper.IsExtensionsAvailable("GL_NV_shading_rate_image");
-        
+
+        // used in shader and client code - keep in sync!
         public enum DebugMode
         {
             NoDebug = 0,

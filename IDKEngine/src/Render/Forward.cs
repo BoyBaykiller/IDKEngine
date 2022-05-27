@@ -9,9 +9,22 @@ namespace IDKEngine.Render
 {
     unsafe class Forward : IDisposable
     {
-        public const int MESHES_CLEAR_COLOR = -1; // also change in shaders
+        public const int ENTITY_BIFIELD_BITS_FOR_TYPE = 3; // used in shader and client code - keep in sync!
+        /// <summary>
+        /// Used to extract the entity type out of the entity indices textures. 16 matches bit depth of texture.
+        /// </summary>
+        public enum EntityType : uint
+        {
+            None  = 0u,
+            Mesh  = 1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
+            Light = 2u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
+        }
+
 
         private int _renderMeshAABBIndex = -1;
+        /// <summary>
+        /// Any negative number will not render any AABB at all
+        /// </summary>
         public int RenderMeshAABBIndex
         {
             get => _renderMeshAABBIndex;
@@ -47,10 +60,10 @@ namespace IDKEngine.Render
         public Texture Result => isPing ? taaPing : taaPong;
 
         public readonly Framebuffer Framebuffer;
-        public readonly Texture NormalSpec;
-        public readonly Texture Meshes;
-        public readonly Texture Velocity;
-        public readonly Texture Depth;
+        public readonly Texture NormalSpecTexture;
+        public readonly Texture EntityIndicesTexture;
+        public readonly Texture VelocityTexture;
+        public readonly Texture DepthTexture;
         public readonly BufferObject TaaBuffer;
         public readonly Lighter LightingContext;
 
@@ -110,25 +123,26 @@ namespace IDKEngine.Render
             taaPong.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             taaPong.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
-            NormalSpec = new Texture(TextureTarget2d.Texture2D);
-            NormalSpec.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            NormalSpec.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            NormalSpec.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8Snorm, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            NormalSpecTexture = new Texture(TextureTarget2d.Texture2D);
+            NormalSpecTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            NormalSpecTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            NormalSpecTexture.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8Snorm, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
-            Meshes = new Texture(TextureTarget2d.Texture2D);
-            Meshes.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Meshes.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Meshes.MutableAllocate(width, height, 1, PixelInternalFormat.R16i, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+            EntityIndicesTexture = new Texture(TextureTarget2d.Texture2D);
+            EntityIndicesTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            EntityIndicesTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            // if bitdepth changes also adjust enum "EntityClearColorMask"
+            EntityIndicesTexture.MutableAllocate(width, height, 1, PixelInternalFormat.R16ui, (IntPtr)0, PixelFormat.RedInteger, PixelType.UnsignedInt);
 
-            Velocity = new Texture(TextureTarget2d.Texture2D);
-            Velocity.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Velocity.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Velocity.MutableAllocate(width, height, 1, PixelInternalFormat.Rg16f, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
+            VelocityTexture = new Texture(TextureTarget2d.Texture2D);
+            VelocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            VelocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            VelocityTexture.MutableAllocate(width, height, 1, PixelInternalFormat.Rg16f, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
-            Depth = new Texture(TextureTarget2d.Texture2D);
-            Depth.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Depth.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Depth.MutableAllocate(width, height, 1, PixelInternalFormat.DepthComponent24, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
+            DepthTexture = new Texture(TextureTarget2d.Texture2D);
+            DepthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            DepthTexture.MutableAllocate(width, height, 1, PixelInternalFormat.DepthComponent24, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
 
             taaData = Helper.Malloc<GLSLTaaData>();
             taaData->Samples = taaSamples;
@@ -144,10 +158,10 @@ namespace IDKEngine.Render
 
             Framebuffer = new Framebuffer();
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, taaPing);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, NormalSpec);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, Meshes);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment3, Velocity);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Depth);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, NormalSpecTexture);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, EntityIndicesTexture);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment3, VelocityTexture);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture);
 
             Framebuffer.SetReadBuffer(ReadBufferMode.ColorAttachment2);
             Framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3 });
@@ -161,7 +175,7 @@ namespace IDKEngine.Render
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, isPing ? taaPing : taaPong);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 0, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
-            Framebuffer.ClearBuffer(ClearBuffer.Color, 2, MESHES_CLEAR_COLOR);
+            Framebuffer.ClearBuffer(ClearBuffer.Color, 2, (uint)EntityType.None);
             Framebuffer.ClearBuffer(ClearBuffer.Color, 3, 0.0f);
             Framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
@@ -204,8 +218,8 @@ namespace IDKEngine.Render
             {
                 (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
                 (isPing ? taaPong : taaPing).BindToUnit(0);
-                Velocity.BindToUnit(1);
-                Depth.BindToUnit(2);
+                VelocityTexture.BindToUnit(1);
+                DepthTexture.BindToUnit(2);
                 taaResolveProgram.Use();
                 GL.DispatchCompute((taaPing.Width + 8 - 1) / 8, (taaPing.Height + 8 - 1) / 8, 1);
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
@@ -229,14 +243,33 @@ namespace IDKEngine.Render
             taaFrame++;
         }
 
+        public EntityType ExtractEntityAndIndex(uint entityIndexBitfield, out uint index)
+        {
+            index = 0;
+
+            if ((entityIndexBitfield & (uint)EntityType.Mesh) == (uint)EntityType.Mesh)
+            {
+                index = entityIndexBitfield & ((1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE)) - 1);
+                return EntityType.Mesh;
+            }
+
+            if ((entityIndexBitfield & (uint)EntityType.Light) == (uint)EntityType.Light)
+            {
+                index = entityIndexBitfield & ((1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE)) - 1);
+                return EntityType.Light;
+            }
+
+            return EntityType.None;
+        }
+
         public void SetSize(int width, int height)
         {
             taaPing.MutableAllocate(width, height, 1, taaPing.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             taaPong.MutableAllocate(width, height, 1, taaPong.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
-            Depth.MutableAllocate(width, height, 1, Depth.PixelInternalFormat, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
-            NormalSpec.MutableAllocate(width, height, 1, NormalSpec.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgb, PixelType.Float);
-            Meshes.MutableAllocate(width, height, 1, Meshes.PixelInternalFormat, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
-            Velocity.MutableAllocate(width, height, 1, Velocity.PixelInternalFormat, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
+            DepthTexture.MutableAllocate(width, height, 1, DepthTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
+            NormalSpecTexture.MutableAllocate(width, height, 1, NormalSpecTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgb, PixelType.Float);
+            EntityIndicesTexture.MutableAllocate(width, height, 1, EntityIndicesTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
+            VelocityTexture.MutableAllocate(width, height, 1, VelocityTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
             Span<float> jitterData = new Span<float>(taaData->Jitter, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);
             MyMath.GetHaltonSequence_2_3(jitterData);

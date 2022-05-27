@@ -44,7 +44,7 @@ namespace IDKEngine
             {
                 // Compute last frames SSAO
                 if (IsSSAO) 
-                    SSAO.Compute(ForwardRenderer.Depth, ForwardRenderer.NormalSpec);
+                    SSAO.Compute(ForwardRenderer.DepthTexture, ForwardRenderer.NormalSpecTexture);
 
                 if (IsShadows)
                 {
@@ -70,20 +70,20 @@ namespace IDKEngine
                     Bloom.Compute(ForwardRenderer.Result);
 
                 if (IsVolumetricLighting)
-                    VolumetricLight.Compute(ForwardRenderer.Depth);
+                    VolumetricLight.Compute(ForwardRenderer.DepthTexture);
 
                 if (IsSSR)
-                    SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpec, ForwardRenderer.Depth, AtmosphericScatterer.Result);
+                    SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpecTexture, ForwardRenderer.DepthTexture, AtmosphericScatterer.Result);
 
                 // Small "hack" to enable VRS debug image even on systems that don't support the extension
                 if (VariableRateShading.NV_SHADING_RATE_IMAGE)
                 {
                     if (IsVRSForwardRender)
-                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
                 }
                 else if (ForwardPassVRS.DebugValue != VariableRateShading.DebugMode.NoDebug)
                 {
-                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.Velocity);
+                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
                 }
 
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
@@ -192,7 +192,11 @@ namespace IDKEngine
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
 
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
-                throw new NotSupportedException("Your system does not support GL_ARB_bindless_texture");
+            {
+                Console.WriteLine("Your system does not support GL_ARB_bindless_texture");
+                Console.ReadLine();
+                throw new NotSupportedException();
+            }
 
             GL.PointSize(1.3f);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
@@ -230,7 +234,7 @@ namespace IDKEngine
                     NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
                     NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
                 };
-
+                
                 string srcCode = File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl");
                 int effectiveSubGroupSize = 1;
                 if (Helper.IsExtensionsAvailable("GL_KHR_shader_subgroup"))
@@ -260,7 +264,7 @@ namespace IDKEngine
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 8.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
-            VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 20, 0.758f, 50.0f, 3.5f, new Vector3(0.025f));
+            VolumetricLight = new VolumetricLighter(Size.X, Size.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             SSAO = new SSAO(Size.X, Size.Y, 16, 0.25f, 2.0f);
             PostCombine = new PostCombine(Size.X, Size.Y);
             AtmosphericScatterer = new AtmosphericScatterer(256);
