@@ -11,7 +11,8 @@ struct Light
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    Light Lights[64];
+    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
@@ -33,7 +34,8 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 5) uniform TaaDataUBO
 {
-    vec4 Jitters[36 / 2];
+    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
+    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
     int Frame;
@@ -43,12 +45,14 @@ layout(std140, binding = 5) uniform TaaDataUBO
 out InOutVars
 {
     vec3 FragColor;
+    flat int LightIndex;
 } outData;
 
 void main()
 {
     Light light = lightsUBO.Lights[gl_InstanceID];
     outData.FragColor = light.Color;
+    outData.LightIndex = gl_InstanceID;
 
     mat4 model = mat4(
         vec4(light.Radius, 0.0, 0.0, 0.0),

@@ -47,7 +47,8 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[64];
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 3 // used in shader and client code - keep in sync!
+    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 

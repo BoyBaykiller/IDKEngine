@@ -46,7 +46,8 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 5) uniform TaaDataUBO
 {
-    vec4 Jitters[36 / 2];
+    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
+    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
     int Frame;

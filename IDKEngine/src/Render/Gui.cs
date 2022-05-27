@@ -9,8 +9,11 @@ namespace IDKEngine.Render
 {
     class Gui
     {
-        private int selectedMeshIndex = -1;
         public ImGuiController ImGuiController;
+        private Forward.EntityType selectedEntityType;
+        private uint selectedEntityIndex;
+
+
         public Gui(int width, int height)
         {
             ImGuiController = new ImGuiController(width, height);
@@ -56,16 +59,16 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("IsBloom", ref window.IsBloom);
                     if (window.IsBloom)
                     {
-                        float temp = window.Bloom.Threshold;
-                        if (ImGui.SliderFloat("Threshold", ref temp, 0.0f, 10.0f))
+                        float tempBool = window.Bloom.Threshold;
+                        if (ImGui.SliderFloat("Threshold", ref tempBool, 0.0f, 10.0f))
                         {
-                            window.Bloom.Threshold = temp;
+                            window.Bloom.Threshold = tempBool;
                         }
 
-                        temp = window.Bloom.Clamp;
-                        if (ImGui.SliderFloat("Clamp", ref temp, 0.0f, 100.0f))
+                        tempBool = window.Bloom.Clamp;
+                        if (ImGui.SliderFloat("Clamp", ref tempBool, 0.0f, 100.0f))
                         {
-                            window.Bloom.Clamp = temp;
+                            window.Bloom.Clamp = tempBool;
                         }
                     }
                 }
@@ -340,15 +343,15 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
-            if (selectedMeshIndex != Forward.MESHES_CLEAR_COLOR/* && !window.IsPathTracing*/)
+            if (selectedEntityType == Forward.EntityType.Mesh /* && !window.IsPathTracing*/)
             {
-                ImGui.Begin("GameObjectProperties", ImGuiWindowFlags.AlwaysAutoResize);
+                ImGui.Begin("Mesh properties", ImGuiWindowFlags.AlwaysAutoResize);
                 {
                     bool hadChange = false;
-                    GLSLMesh mesh = window.ModelSystem.Meshes[selectedMeshIndex];
-                    GLSLDrawCommand cmd = window.ModelSystem.DrawCommands[selectedMeshIndex];
+                    ref GLSLMesh mesh = ref window.ModelSystem.Meshes[selectedEntityIndex];
+                    GLSLDrawCommand cmd = window.ModelSystem.DrawCommands[selectedEntityIndex];
 
-                    ImGui.Text($"MeshID: {selectedMeshIndex}");
+                    ImGui.Text($"MeshID: {selectedEntityIndex}");
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"IndicesCount: {cmd.Count}");
 
@@ -387,12 +390,45 @@ namespace IDKEngine.Render
                     if (hadChange)
                     {
                         window.GLSLBasicData.FreezeFramesCounter = 0;
-                        window.ModelSystem.UpdateMeshBuffer(selectedMeshIndex, selectedMeshIndex + 1, (ref GLSLMesh curMesh) =>
-                        {
-                            curMesh = mesh;
-                        });
+                        window.ModelSystem.UpdateMeshBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
                         window.ModelSystem.UpdateModelMatricesBuffer(0, window.ModelSystem.ModelMatrices.Length);
                     }
+                    ImGui.End();
+                }
+            }
+
+            if (selectedEntityType == Forward.EntityType.Light /* && !window.IsPathTracing*/)
+            {
+                ImGui.Begin("Light properties", ImGuiWindowFlags.AlwaysAutoResize);
+                {
+                    ref GLSLLight light = ref window.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
+
+                    bool hadChange = false;
+                    
+                    System.Numerics.Vector3 systemVec3 = OpenTKToSystem(light.Position);
+                    if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
+                    {
+                        hadChange = true;
+                        light.Position = SystemToOpenTK(systemVec3);
+                    }
+
+                    systemVec3 = OpenTKToSystem(light.Color);
+                    if (ImGui.DragFloat3("Color", ref systemVec3, 0.1f, 0.0f))
+                    {
+                        hadChange = true;
+                        light.Color = SystemToOpenTK(systemVec3);
+                    }
+
+                    if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f, 0.0f))
+                    {
+                        hadChange = true;
+                    }
+
+                    if (hadChange)
+                    {
+                        window.ForwardRenderer.LightingContext.UpdateLightBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
+                    }
+
                     ImGui.End();
                 }
             }
@@ -421,11 +457,41 @@ namespace IDKEngine.Render
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 point.Y = window.Size.Y - point.Y;
-                window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, ref selectedMeshIndex);
-                if (window.ForwardRenderer.RenderMeshAABBIndex == selectedMeshIndex)
-                    selectedMeshIndex = -1;
+                
+                uint entityBitfield = 0u;
+                window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.UnsignedInt, ref entityBitfield);
 
-                window.ForwardRenderer.RenderMeshAABBIndex = selectedMeshIndex;
+                selectedEntityType = window.ForwardRenderer.ExtractEntityAndIndex(entityBitfield, out selectedEntityIndex);
+                switch (selectedEntityType)
+                {
+                    case Forward.EntityType.Mesh:
+                        if (selectedEntityIndex == window.ForwardRenderer.RenderMeshAABBIndex)
+                        {
+                            // artificially set selected type to none and don't render aabb if user clicks on already selected mesh
+
+                            window.ForwardRenderer.RenderMeshAABBIndex = -1;
+                            selectedEntityType = Forward.EntityType.None;
+                        }
+                        else
+                        {
+                            window.ForwardRenderer.RenderMeshAABBIndex = (int)selectedEntityIndex;
+                        }
+                        break;
+
+                    case Forward.EntityType.Light:
+                        window.ForwardRenderer.RenderMeshAABBIndex = -1;
+                        break;
+
+                    case Forward.EntityType.None:
+                        window.ForwardRenderer.RenderMeshAABBIndex = -1;
+                        break;
+
+                    default:
+            #if DEBUG
+                        throw new Exception($"Unknown selected type: {selectedEntityType}, index was: {selectedEntityIndex}");
+            #endif
+                        break;
+                }
             }
         }
 

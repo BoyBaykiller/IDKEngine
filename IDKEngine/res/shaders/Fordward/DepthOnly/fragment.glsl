@@ -21,7 +21,8 @@ struct Material
 
 layout(std140, binding = 1) uniform MaterialUBO
 {
-    Material Materials[256];
+    #define GLSL_MAX_UBO_MATERIAL_COUNT 256 // used in shader and client code - keep in sync!
+    Material Materials[GLSL_MAX_UBO_MATERIAL_COUNT];
 } materialUBO;
 
 in InOutVars

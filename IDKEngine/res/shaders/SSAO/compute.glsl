@@ -73,7 +73,7 @@ void main()
     occlusion /= samples;
     occlusion *= Strength;
 
-    imageStore(ImgResult, imgCoord, vec4(occlusion.xxx, 1.0));
+    imageStore(ImgResult, imgCoord, vec4(vec3(occlusion), 1.0));
 }
 
 vec3 ViewToNDC(vec3 viewPos)

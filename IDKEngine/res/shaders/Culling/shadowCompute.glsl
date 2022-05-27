@@ -74,7 +74,8 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[64];
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 3 // used in shader and client code - keep in sync!
+    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 
@@ -95,12 +96,12 @@ shared int SharedPackedValues[gl_WorkGroupSize.x];
 shared int SharedInstanceCounts[gl_WorkGroupSize.x];
 void main()
 {
-    const uint globalMeshIndex = gl_GlobalInvocationID.x;
+    uint globalMeshIndex = gl_GlobalInvocationID.x;
     if (globalMeshIndex >= meshSSBO.Meshes.length())
         return;
 
-    const int cubemapFace = int(gl_LocalInvocationID.y);
-    const int localMeshIndex = int(gl_LocalInvocationID.x);
+    int cubemapFace = int(gl_LocalInvocationID.y);
+    int localMeshIndex = int(gl_LocalInvocationID.x);
 
     SharedPackedValues[localMeshIndex] = 0;
     SharedInstanceCounts[localMeshIndex] = 0;

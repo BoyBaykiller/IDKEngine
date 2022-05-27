@@ -1,7 +1,7 @@
 #version 460 core
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 NormalSpecColor;
-layout(location = 2) out int MeshIndexColor;
+layout(location = 2) out uint MeshIndexColor;
 layout(location = 3) out vec2 VelocityColor;
 
 void main()

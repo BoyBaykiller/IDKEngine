@@ -1,12 +1,14 @@
 #version 460 core
 #define PI 3.14159265
 #define EPSILON 0.001
+#define ENTITY_BIFIELD_BITS_FOR_TYPE 3 // used in shader and client code - keep in sync!
+#define ENTITY_TYPE_MESH 1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE) // used in shader and client code - keep in sync!
 #extension GL_ARB_bindless_texture : require
 layout(early_fragment_tests) in;
 
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 NormalSpecColor;
-layout(location = 2) out int MeshIndexColor;
+layout(location = 2) out uint MeshIndexColor;
 layout(location = 3) out vec2 VelocityColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
@@ -83,24 +85,28 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 1) uniform MaterialUBO
 {
-    Material Materials[256];
+    #define GLSL_MAX_UBO_MATERIAL_COUNT 256 // used in shader and client code - keep in sync!
+    Material Materials[GLSL_MAX_UBO_MATERIAL_COUNT];
 } materialUBO;
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[64];
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 3 // used in shader and client code - keep in sync!
+    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int PointCount;
 } shadowDataUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    Light Lights[64];
+    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
 layout(std140, binding = 5) uniform TaaDataUBO
 {
-    vec4 Jitters[36 / 2];
+    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
+    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
     int Frame;
@@ -163,7 +169,7 @@ void main()
     vec3 emissive = inData.Emissive * Albedo.rgb;
     FragColor = vec4(irradiance + emissive + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
     NormalSpecColor = vec4(Normal, Specular);
-    MeshIndexColor = inData.MeshIndex;
+    MeshIndexColor = inData.MeshIndex | ENTITY_TYPE_MESH;
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
     VelocityColor = (uv - prevUV) * taaDataUBO.VelScale;

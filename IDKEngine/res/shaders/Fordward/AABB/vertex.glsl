@@ -1,7 +1,7 @@
 #version 460 core
 
-const vec3 positions[24] = vec3[]
-(
+const vec3 positions[24] =
+{
     // Back
     vec3(-0.5,  0.5, -0.5 ),
     vec3(-0.5, -0.5, -0.5 ),
@@ -37,7 +37,7 @@ const vec3 positions[24] = vec3[]
     vec3(-0.5, -0.5,  0.5 ),
     vec3( 0.5, -0.5,  0.5 ),
     vec3( 0.5, -0.5, -0.5 )
-);
+};
 
 struct Mesh
 {
