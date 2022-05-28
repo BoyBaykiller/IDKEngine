@@ -149,7 +149,8 @@ vec3 NDCToWorldSpace(vec3 ndc)
     return worldPos.xyz / worldPos.w;
 }
 
-// Mie scaterring approximated with Henyey-Greenstein phase function from http://www.alexandre-pestana.com/volumetric-lights/
+// Mie scaterring approximated with Henyey-Greenstein phase function
+// Source: http://www.alexandre-pestana.com/volumetric-lights/
 float ComputeScattering(float lightDotView)
 {
     return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * lightDotView, 1.5));

@@ -45,14 +45,17 @@ layout(std140, binding = 5) uniform TaaDataUBO
 out InOutVars
 {
     vec3 FragColor;
+    vec3 FragPos;
+    vec4 ClipPos;
+    vec4 PrevClipPos;
     flat int LightIndex;
+    flat vec3 Position;
+    flat float Radius;
 } outData;
 
 void main()
 {
     Light light = lightsUBO.Lights[gl_InstanceID];
-    outData.FragColor = light.Color;
-    outData.LightIndex = gl_InstanceID;
 
     mat4 model = mat4(
         vec4(light.Radius, 0.0, 0.0, 0.0),
@@ -60,6 +63,15 @@ void main()
         vec4(0.0, 0.0, light.Radius, 0.0),
         vec4(light.Position, 1.0)
     );
+
+
+    outData.FragColor = light.Color;
+    outData.LightIndex = gl_InstanceID;
+    outData.FragPos = (model * vec4(Position, 1.0)).xyz;
+    outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
+    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
+    outData.Position = light.Position;
+    outData.Radius = light.Radius;
 
     int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(

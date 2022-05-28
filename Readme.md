@@ -86,8 +86,8 @@ Calculating the variance requires some more work.
 
 (Normalized) Variance is defined as:
 
-$$V(x) = \frac{\sum_{i = 1}^{n}(x_{i} - \overline{x})^{2}}{n - 1}$$
-<!-- Maybe fix error of second formula not rendering properly -->
+$$V(x) = \sum_{i = 1}^{n}(x_{i} - \overline{x})^{2} \times \frac{1}{n - 1}$$
+<!-- fix error of second formula not rendering properly -->
 &nbsp;
 $$VN = \frac{\sqrt{V(x)}}{\overline{x}}$$
 

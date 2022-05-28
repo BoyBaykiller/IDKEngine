@@ -52,8 +52,8 @@ struct Mesh
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
-    float SpecularChance;
-    float Roughness;
+    float SpecularBias;
+    float RoughnessBias;
     float RefractionChance;
 };
 
@@ -251,8 +251,8 @@ vec3 Radiance(Ray ray)
 
                 albedo = texture(material.Albedo, texCoord).rgb;
                 normal = texture(material.Normal, texCoord).rgb;
-                specularChance = clamp(texture(material.Specular, texCoord).r + (mesh.SpecularChance * 2.0 - 1.0), 0.0, 1.0);
-                roughness = clamp(texture(material.Roughness, texCoord).r + (mesh.Roughness * 2.0 - 1.0), 0.0, 1.0);
+                specularChance = clamp(texture(material.Specular, texCoord).r + (mesh.SpecularBias * 2.0 - 1.0), 0.0, 1.0);
+                roughness = clamp(texture(material.Roughness, texCoord).r + (mesh.RoughnessBias * 2.0 - 1.0), 0.0, 1.0);
                 emissive = mesh.Emissive * albedo;
 
                 normal = TBN * normalize(normal * 2.0 - 1.0);
