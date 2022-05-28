@@ -30,8 +30,8 @@ struct Mesh
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
-    float SpecularChance;
-    float Roughness;
+    float SpecularBias;
+    float RoughnessBias;
     float RefractionChance;
 };
 

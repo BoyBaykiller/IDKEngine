@@ -13,8 +13,8 @@ struct Mesh
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
-    float SpecularChance;
-    float Roughness;
+    float SpecularBias;
+    float RoughnessBias;
     float RefractionChance;
 };
 
@@ -96,8 +96,8 @@ void main()
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.Emissive = mesh.Emissive;
     outData.NormalMapStrength = mesh.NormalMapStrength;
-    outData.SpecularBias = mesh.SpecularChance;
-    outData.RoughnessBias = mesh.Roughness;
+    outData.SpecularBias = mesh.SpecularBias;
+    outData.RoughnessBias = mesh.RoughnessBias;
     
     int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(

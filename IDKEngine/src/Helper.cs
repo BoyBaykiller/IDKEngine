@@ -61,6 +61,12 @@ namespace IDKEngine
             return (T*)Marshal.AllocHGlobal(sizeof(T) * count);
         }
 
+        public static unsafe void MemCpy(void* src, void* dest, int len)
+        {
+            // I don't like having to specify a destination size so yeah
+            System.Buffer.MemoryCopy(src, dest, long.MaxValue, len);
+        }
+
         public static void Swap<T>(ref T first, ref T other) where T : struct
         {
             T temp = first;

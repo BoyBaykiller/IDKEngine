@@ -372,12 +372,12 @@ namespace IDKEngine.Render
                         hadChange = true;
                     }
 
-                    if (ImGui.SliderFloat("SpecularChance", ref mesh.SpecularChance, 0.0f, 1.0f))
+                    if (ImGui.SliderFloat("SpecularChance", ref mesh.SpecularBias, 0.0f, 1.0f))
                     {
                         hadChange = true;
                     }
 
-                    if (ImGui.SliderFloat("Roughness", ref mesh.Roughness, 0.0f, 1.0f))
+                    if (ImGui.SliderFloat("Roughness", ref mesh.RoughnessBias, 0.0f, 1.0f))
                     {
                         hadChange = true;
                     }

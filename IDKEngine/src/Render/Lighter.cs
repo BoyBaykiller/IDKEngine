@@ -52,7 +52,6 @@ namespace IDKEngine.Render
             vao.AddSourceBuffer(vbo, 0, sizeof(ObjectFactory.Vertex));
             vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0 * sizeof(float)); // Positions
             //vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 3 * sizeof(float)); // TexCoord
-            //vao.SetAttribFormat(0, 2, 3, VertexAttribType.Float, 5 * sizeof(float)); // Normals
 
             IndicisCount = indicis.Length;
         }
@@ -64,12 +63,15 @@ namespace IDKEngine.Render
             GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
         }
 
-        public unsafe void Add(GLSLLight[] lights)
+        public unsafe void Add(Span<GLSLLight> lights)
         {
             Debug.Assert(Count + lights.Length <= GLSL_MAX_UBO_LIGHT_COUNT);
 
-            bufferObject.SubData(Count * sizeof(GLSLLight), lights.Length * sizeof(GLSLLight), lights);
-            Array.Copy(lights, 0, Lights, Count, lights.Length);
+            fixed (void* src = &lights[0], dest = Lights)
+            {
+                bufferObject.SubData(Count * sizeof(GLSLLight), lights.Length * sizeof(GLSLLight), (IntPtr)src);
+                Helper.MemCpy(src, (GLSLLight*)dest + Count, sizeof(GLSLLight) * lights.Length);
+            }
             
             Count += lights.Length;
         }

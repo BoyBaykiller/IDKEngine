@@ -28,20 +28,6 @@ struct Material
     uvec2 _pad4;
 };
 
-struct Mesh
-{
-    int InstanceCount;
-    int MatrixStart;
-    int NodeStart;
-    int BLASDepth;
-    int MaterialIndex;
-    float Emissive;
-    float NormalMapStrength;
-    float SpecularChance;
-    float Roughness;
-    float RefractionChance;
-};
-
 struct Light
 {
     vec3 Position;
@@ -61,11 +47,6 @@ struct PointShadow
     vec3 _pad0;
     int LightIndex;
 };
-
-layout(std430, binding = 2) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {

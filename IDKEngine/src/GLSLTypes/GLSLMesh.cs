@@ -11,8 +11,8 @@ namespace IDKEngine
         public int MaterialIndex;
         public float Emissive;
         public float NormalMapStrength;
-        public float SpecularChance;
-        public float Roughness;
+        public float SpecularBias;
+        public float RoughnessBias;
         public float RefractionChance;
     }
 }
