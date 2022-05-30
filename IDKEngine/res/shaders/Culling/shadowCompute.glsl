@@ -1,6 +1,7 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
-layout(local_size_x = 12, local_size_y = 6, local_size_z = 1) in;
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 struct Frustum
 {
@@ -74,7 +75,7 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 3 // used in shader and client code - keep in sync!
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
@@ -89,42 +90,30 @@ layout(location = 0) uniform int ShadowIndex;
 // 2. Pack each visible face into a single int
 // 3. Write the packed int into the BaseInstance draw command paramter. The shadow vertex shader will access this variable
 // 4. Also write the InstanceCount into the draw command buffer - one instance for each mesh
-
-// Note: Meshes are processed in batches of LOCAL_SIZE_X Threads. Additionaly each mesh gets processed by 6 Threads one for each face.
-
-shared int SharedPackedValues[gl_WorkGroupSize.x];
-shared int SharedInstanceCounts[gl_WorkGroupSize.x];
 void main()
 {
-    uint globalMeshIndex = gl_GlobalInvocationID.x;
-    if (globalMeshIndex >= meshSSBO.Meshes.length())
+    const uint meshIndex = gl_GlobalInvocationID.x;
+    if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    int cubemapFace = int(gl_LocalInvocationID.y);
-    int localMeshIndex = int(gl_LocalInvocationID.x);
-
-    SharedPackedValues[localMeshIndex] = 0;
-    SharedInstanceCounts[localMeshIndex] = 0;
-
-    Mesh mesh = meshSSBO.Meshes[globalMeshIndex];
+    Mesh mesh = meshSSBO.Meshes[meshIndex];
     Node node = bvhSSBO.Nodes[mesh.NodeStart];
-    const int glInstanceID = 0; // TODO: Derive from built in variables
-    mat4 model = matrixSSBO.Models[mesh.MatrixStart + glInstanceID];
-    Frustum frustum = ExtractFrustum(shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[cubemapFace] * model);
+    PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
-    barrier();
-    if (AABBVsFrustum(frustum, node))
-    {
-        // Basically a atomic bitfieldInsert()
-        atomicOr(SharedPackedValues[localMeshIndex], cubemapFace << (3 * atomicAdd(SharedInstanceCounts[localMeshIndex], 1)));
-    }
+    int instances = 0;
+    int packedValue = 0;
+    mat4 model = matrixSSBO.Models[mesh.MatrixStart];
 
-    barrier();
-    if (cubemapFace == 0)
+    for (int i = 0; i < 6; i++)
     {
-        drawCommandsSSBO.DrawCommands[globalMeshIndex].InstanceCount = SharedInstanceCounts[localMeshIndex];
-        drawCommandsSSBO.DrawCommands[globalMeshIndex].BaseInstance = SharedPackedValues[localMeshIndex];
+        Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * model);
+        if (AABBVsFrustum(frustum, node))
+        {
+            packedValue = bitfieldInsert(packedValue, i, 3 * instances++, 3);
+        }
     }
+    drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = instances;
+    drawCommandsSSBO.DrawCommands[meshIndex].BaseInstance = packedValue;
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)

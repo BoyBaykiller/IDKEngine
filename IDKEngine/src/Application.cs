@@ -278,12 +278,22 @@ namespace IDKEngine
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
             if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
-            
-            List<GLSLLight> lights = new List<GLSLLight>();
-            lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
-            ForwardRenderer.LightingContext.Add(lights.ToArray());
+
+            {
+                List<GLSLLight> lights = new List<GLSLLight>(Lighter.GLSL_MAX_UBO_LIGHT_COUNT);
+                lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+                lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+                lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+
+                Random rng = new Random();
+                Vector3 minPos = new Vector3(-17.0f, 0.0f, -16.0f);
+                Vector3 maxPos = new Vector3( 17.0f, 20.0f, 16.0f);
+                for (int i = 3; i < Lighter.GLSL_MAX_UBO_LIGHT_COUNT; i++)
+                {
+                    lights.Add(new GLSLLight(Helper.RandomVec3(minPos, maxPos), Helper.RandomVec3(1.0f, 4.0f), Helper.RandomFloat(0.05f, 0.15f)));
+                }
+                ForwardRenderer.LightingContext.Add(lights.ToArray());
+            }
             
             pointShadows = new List<PointShadow>();
             pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, 0, 512, 0.5f, 60.0f));

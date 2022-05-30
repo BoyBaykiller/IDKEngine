@@ -1,7 +1,7 @@
 #version 460 core
 #define PI 3.14159265
 #define EPSILON 0.001
-#define ENTITY_BIFIELD_BITS_FOR_TYPE 3 // used in shader and client code - keep in sync!
+#define ENTITY_BIFIELD_BITS_FOR_TYPE 2 // used in shader and client code - keep in sync!
 #define ENTITY_TYPE_MESH 1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE) // used in shader and client code - keep in sync!
 #extension GL_ARB_bindless_texture : require
 layout(early_fragment_tests) in;
@@ -72,14 +72,14 @@ layout(std140, binding = 1) uniform MaterialUBO
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 3 // used in shader and client code - keep in sync!
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int PointCount;
 } shadowDataUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;

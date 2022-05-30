@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class PointShadow
     {
-        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 3; // used in shader and client code - keep in sync!
+        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
 
         public static readonly bool IS_VERTEX_LAYERED_RENDERING =
             (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
@@ -103,7 +103,7 @@ namespace IDKEngine.Render
             {
                 cullingProgram.Use();
                 cullingProgram.Upload(0, Instance);
-                GL.DispatchCompute((modelSystem.Meshes.Length + 12 - 1) / 12, 1, 1);
+                GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
             }
 
             if (Position != lightContext.Lights[glslPointShadow.LightIndex].Position)

@@ -54,27 +54,10 @@ namespace IDKEngine.Render
                     ImGui.EndCombo();
                 }
 
-                if (ImGui.CollapsingHeader("Bloom"))
-                {
-                    ImGui.Checkbox("IsBloom", ref window.IsBloom);
-                    if (window.IsBloom)
-                    {
-                        float tempBool = window.Bloom.Threshold;
-                        if (ImGui.SliderFloat("Threshold", ref tempBool, 0.0f, 10.0f))
-                        {
-                            window.Bloom.Threshold = tempBool;
-                        }
-
-                        tempBool = window.Bloom.Clamp;
-                        if (ImGui.SliderFloat("Clamp", ref tempBool, 0.0f, 100.0f))
-                        {
-                            window.Bloom.Clamp = tempBool;
-                        }
-                    }
-                }
-
                 if (!window.IsPathTracing)
                 {
+                    ImGui.Checkbox("DepthPrePass", ref window.ForwardRenderer.IsDepthPrePass);
+
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
                         if (!VariableRateShading.NV_SHADING_RATE_IMAGE)
@@ -156,7 +139,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = window.VolumetricLight.Strength;
-                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 50.0f))
+                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 500.0f))
                             {
                                 window.VolumetricLight.Strength = tempFloat;
                             }
@@ -284,6 +267,25 @@ namespace IDKEngine.Render
                     }
                 }
 
+                if (ImGui.CollapsingHeader("Bloom"))
+                {
+                    ImGui.Checkbox("IsBloom", ref window.IsBloom);
+                    if (window.IsBloom)
+                    {
+                        float tempBool = window.Bloom.Threshold;
+                        if (ImGui.SliderFloat("Threshold", ref tempBool, 0.0f, 10.0f))
+                        {
+                            window.Bloom.Threshold = tempBool;
+                        }
+
+                        tempBool = window.Bloom.Clamp;
+                        if (ImGui.SliderFloat("Clamp", ref tempBool, 0.0f, 100.0f))
+                        {
+                            window.Bloom.Clamp = tempBool;
+                        }
+                    }
+                }
+
                 if (ImGui.CollapsingHeader("EnvironmentMap"))
                 {
                     string[] resolutions = new string[] { "2048", "1024", "512", "256", "128", "64", "32" };
@@ -401,10 +403,11 @@ namespace IDKEngine.Render
             {
                 ImGui.Begin("Light properties", ImGuiWindowFlags.AlwaysAutoResize);
                 {
+                    bool hadChange = false;
                     ref GLSLLight light = ref window.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
 
-                    bool hadChange = false;
-                    
+                    ImGui.Text($"LightID: {selectedEntityIndex}");
+
                     System.Numerics.Vector3 systemVec3 = OpenTKToSystem(light.Position);
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {

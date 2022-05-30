@@ -9,13 +9,15 @@ namespace IDKEngine.Render
 {
     unsafe class Forward : IDisposable
     {
-        public const int ENTITY_BIFIELD_BITS_FOR_TYPE = 3; // used in shader and client code - keep in sync!
+        // this will be ceil(log2(EntityTypeValues))
+        public const int ENTITY_BIFIELD_BITS_FOR_TYPE = 2; // used in shader and client code - keep in sync!
+        
         /// <summary>
         /// Used to extract the entity type out of the entity indices textures. 16 matches bit depth of texture.
         /// </summary>
         public enum EntityType : uint
         {
-            None  = 0u,
+            None  = 0u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
             Mesh  = 1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
             Light = 2u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
         }
@@ -57,6 +59,8 @@ namespace IDKEngine.Render
             }
         }
 
+        public bool IsDepthPrePass = true;
+
         public Texture Result => isPing ? taaPing : taaPong;
 
         public readonly Framebuffer Framebuffer;
@@ -95,23 +99,22 @@ namespace IDKEngine.Render
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 
             shadingProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/TiledFordward/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/TiledFordward/fragment.glsl")));
 
-            taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Fordward/TAAResolve/compute.glsl")));
+            taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TAAResolve/compute.glsl")));
 
             depthOnlyProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/DepthOnly/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/TiledFordward/DepthOnly/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/TiledFordward/DepthOnly/fragment.glsl")));
 
             skyBoxProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/SkyBox/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/SkyBox/fragment.glsl")));
-
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/SkyBox/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/SkyBox/fragment.glsl")));
 
             aabbProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/AABB/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/AABB/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/AABB/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/AABB/fragment.glsl")));
 
             taaPing = new Texture(TextureTarget2d.Texture2D);
             taaPing.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -133,7 +136,7 @@ namespace IDKEngine.Render
             EntityIndicesTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             // if bitdepth changes also adjust enum "EntityClearColorMask"
             EntityIndicesTexture.MutableAllocate(width, height, 1, PixelInternalFormat.R16ui, (IntPtr)0, PixelFormat.RedInteger, PixelType.UnsignedInt);
-
+            
             VelocityTexture = new Texture(TextureTarget2d.Texture2D);
             VelocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             VelocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
@@ -184,14 +187,16 @@ namespace IDKEngine.Render
             else
                 Texture.UnbindFromUnit(0);
 
-            GL.ColorMask(false, false, false, false);
-            depthOnlyProgram.Use();
-            modelSystem.Draw();
+            if (IsDepthPrePass)
+            {
+                GL.ColorMask(false, false, false, false);
+                depthOnlyProgram.Use();
+                modelSystem.Draw();
 
-            GL.DepthFunc(DepthFunction.Equal);
-            GL.ColorMask(true, true, true, true);
-            GL.DepthMask(false);
-
+                GL.DepthFunc(DepthFunction.Equal);
+                GL.ColorMask(true, true, true, true);
+                GL.DepthMask(false);
+            }
             shadingProgram.Use();
             modelSystem.Draw();
 
