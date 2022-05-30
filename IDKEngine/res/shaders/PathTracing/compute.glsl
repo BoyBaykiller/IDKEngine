@@ -144,7 +144,7 @@ layout(std140, binding = 1) uniform MaterialUBO
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
@@ -353,8 +353,18 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
 {
     hitInfo.T = FLOAT_MAX;
     float t1, t2;
-    vec4 baryT;
 
+    for (int i = 0; i < lightsUBO.Count; i++)
+    {
+        Light light = lightsUBO.Lights[i];
+        if (RaySphereIntersect(ray, light, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
+        {
+            hitInfo.T = t1;
+            hitInfo.HitIndex = -i - 1;
+        }
+    }
+
+    vec4 baryT;
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         const Mesh mesh = meshSSBO.Meshes[i];
@@ -385,16 +395,6 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
             {
                 localNodeIndex = node.MissLink;
             }
-        }
-    }
-
-    for (int i = 0; i < lightsUBO.Count; i++)
-    {
-        Light light = lightsUBO.Lights[i];
-        if (RaySphereIntersect(ray, light, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
-        {
-            hitInfo.T = t1;
-            hitInfo.HitIndex = -i - 1;
         }
     }
 

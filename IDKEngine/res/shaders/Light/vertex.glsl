@@ -11,7 +11,7 @@ struct Light
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;

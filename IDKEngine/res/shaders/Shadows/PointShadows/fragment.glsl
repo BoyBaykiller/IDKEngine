@@ -23,14 +23,14 @@ struct PointShadow
 
 layout(std140, binding = 2) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 3 // used in shader and client code - keep in sync!
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 
 layout(std140, binding = 3) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 64 // used in shader and client code - keep in sync!
+    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;

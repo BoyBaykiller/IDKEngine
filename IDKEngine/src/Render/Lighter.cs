@@ -8,11 +8,11 @@ namespace IDKEngine.Render
 {
     class Lighter
     {
-        public const int GLSL_MAX_UBO_LIGHT_COUNT = 64; // used in shader and client code - keep in sync!
+        public const int GLSL_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
 
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
-            new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Fordward/Light/vertex.glsl")),
-            new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Fordward/Light/fragment.glsl")));
+            new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
+            new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
 
 
         private int _count;
