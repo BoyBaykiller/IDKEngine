@@ -11,7 +11,10 @@
 #define DEBUG_LUMINANCE 3
 #define DEBUG_LUMINANCE_VARIANCE 4
 
-#extension GL_KHR_shader_subgroup_basic : enable
+// Could also implement subgroup optimizations for AMD
+// using AMD_shader_ballot and ARB_shader_ballot but useless since
+// NV_shading_rate_image is only available on recent NVIDIA cards
+
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
 // Inserted by application.

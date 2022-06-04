@@ -34,6 +34,8 @@ namespace IDKEngine.GUI
             ImGuiIOPtr io = ImGui.GetIO();
             io.Fonts.AddFontDefault();
             io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
+            io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+            io.ConfigDockingWithShift = true;
 
             CreateDeviceResources();
             SetKeyMappings();

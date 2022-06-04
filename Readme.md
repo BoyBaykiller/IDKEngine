@@ -136,7 +136,6 @@ So it basically does a sum over values passed into the function in the scope of 
 Using this knowledge my optimized version of a workgroup wide sum looks like this:
 ```glsl
 #define SUBGROUP_SIZE __subroupSize__
-#extension GL_KHR_shader_subgroup_basic : require
 #extension GL_KHR_shader_subgroup_arithmetic : require
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;

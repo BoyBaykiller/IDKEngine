@@ -43,6 +43,7 @@ namespace IDKEngine
             {
                 _size = value;
                 GLFW.SetWindowSize(window, _size.X, _size.Y);
+                OnResize();
             }
         }
 
