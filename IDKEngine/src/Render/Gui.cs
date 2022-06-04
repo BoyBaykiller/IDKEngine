@@ -2,8 +2,8 @@
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using IDKEngine.GUI;
 using ImGuiNET;
+using IDKEngine.GUI;
 
 namespace IDKEngine.Render
 {
@@ -22,12 +22,15 @@ namespace IDKEngine.Render
         public void Draw(Application window, float frameTime)
         {
             ImGuiController.Update(window, frameTime);
+
             ImGui.Begin("Render");
             {
                 ImGui.Text($"FPS: {window.FPS}");
-                if (ImGui.Checkbox("IsDithering", ref window.IsDithering))
+
+                bool tempBool = window.PostCombine.IsDithering;
+                if (ImGui.Checkbox("IsDithering", ref tempBool))
                 {
-                    window.FinalProgram.Upload("IsDithering", window.IsDithering);
+                    window.PostCombine.IsDithering = tempBool;
                 }
 
                 string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
@@ -78,7 +81,7 @@ namespace IDKEngine.Render
                             "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
                             "shader invocations in regions where less detail may be required."
                         );
-                        
+
 
                         string[] debugModes = new string[]
                         {
@@ -224,7 +227,7 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("TAA"))
                     {
-                        bool tempBool = window.ForwardRenderer.TaaEnabled;
+                        tempBool = window.ForwardRenderer.TaaEnabled;
                         if (ImGui.Checkbox("IsTAA", ref tempBool))
                         {
                             window.ForwardRenderer.TaaEnabled = tempBool;
@@ -272,16 +275,16 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("IsBloom", ref window.IsBloom);
                     if (window.IsBloom)
                     {
-                        float tempBool = window.Bloom.Threshold;
-                        if (ImGui.SliderFloat("Threshold", ref tempBool, 0.0f, 10.0f))
+                        float tempFloat = window.Bloom.Threshold;
+                        if (ImGui.SliderFloat("Threshold", ref tempFloat, 0.0f, 10.0f))
                         {
-                            window.Bloom.Threshold = tempBool;
+                            window.Bloom.Threshold = tempFloat;
                         }
 
-                        tempBool = window.Bloom.Clamp;
-                        if (ImGui.SliderFloat("Clamp", ref tempBool, 0.0f, 100.0f))
+                        tempFloat = window.Bloom.Clamp;
+                        if (ImGui.SliderFloat("Clamp", ref tempFloat, 0.0f, 100.0f))
                         {
-                            window.Bloom.Clamp = tempBool;
+                            window.Bloom.Clamp = tempFloat;
                         }
                     }
                 }
@@ -439,7 +442,7 @@ namespace IDKEngine.Render
             ImGuiController.Render();
         }
 
-        private static void HelpMarker(string desc)
+        private static void HelpMarker(string text)
         {
             ImGui.TextDisabled("(?)");
 
@@ -447,7 +450,7 @@ namespace IDKEngine.Render
             {
                 ImGui.BeginTooltip();
                 ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0f);
-                ImGui.TextUnformatted(desc);
+                ImGui.TextUnformatted(text);
                 ImGui.PopTextWrapPos();
                 ImGui.EndTooltip();
             }
@@ -506,6 +509,11 @@ namespace IDKEngine.Render
         private static Vector3 SystemToOpenTK(System.Numerics.Vector3 vector3)
         {
             return new Vector3(vector3.X, vector3.Y, vector3.Z);
+        }
+
+        private static Vector2i SystemToOpenTK(System.Numerics.Vector2 vector2)
+        {
+            return new Vector2i((int)vector2.X, (int)vector2.Y);
         }
     }
 }

@@ -7,6 +7,19 @@ namespace IDKEngine.Render
 {
     class PostCombine
     {
+        private bool _isDithering;
+        public bool IsDithering
+        {
+            get => _isDithering;
+
+            set
+            {
+                _isDithering = value;
+                shaderProgram.Upload("IsDithering", _isDithering);
+            }
+        }
+
+
         public readonly Texture Result;
 
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
@@ -17,6 +30,8 @@ namespace IDKEngine.Render
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+
+            IsDithering = true;
         }
 
         public void Compute(Texture v0, Texture v1, Texture v2, Texture v3)

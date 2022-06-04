@@ -26,12 +26,13 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsDithering = true, IsShadows = true, IsVRSForwardRender = false;
+        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false;
         public int FPS;
 
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
+            GLSLBasicData.DeltaUpdate = dT;
             GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
             GLSLBasicData.ProjView = camera.View * GLSLBasicData.Projection;
             GLSLBasicData.View = camera.View;
@@ -39,7 +40,7 @@ namespace IDKEngine
             GLSLBasicData.CameraPos = camera.Position;
             GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
-            
+
             if (!IsPathTracing)
             {
                 // Compute last frames SSAO
@@ -58,7 +59,7 @@ namespace IDKEngine
 
                 ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
 
-                GL.Viewport(0, 0, Size.X, Size.Y);
+                GL.Viewport(0, 0, ForwardRenderer.Result.Width, ForwardRenderer.Result.Height);
 
                 if (IsVRSForwardRender)
                     VariableRateShading.IsEnabled = true;
@@ -108,11 +109,9 @@ namespace IDKEngine
             Framebuffer.Bind(0);
 
             PostCombine.Result.BindToUnit(0);
-
             FinalProgram.Use();
-
             GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
-            
+
             GLSLBasicData.FreezeFramesCounter++;
             gui.Draw(this, (float)dT);
 
@@ -124,7 +123,7 @@ namespace IDKEngine
         }
 
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        protected override void OnUpdate(float dT)
+        protected override unsafe void OnUpdate(float dT)
         {
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
@@ -164,7 +163,6 @@ namespace IDKEngine
                 if (hadCameraInputs)
                     GLSLBasicData.FreezeFramesCounter = 0;
             }
-            GLSLBasicData.DeltaUpdate = dT;
 
             gui.Update(this);
         }
@@ -180,11 +178,11 @@ namespace IDKEngine
         public SSR SSR;
         public SSAO SSAO;
         public PostCombine PostCombine;
-        public BVH Bvh;
         public VolumetricLighter VolumetricLight;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
-        public Gui gui;
+        private BVH bvh;
+        private Gui gui;
         public GLSLBasicData GLSLBasicData;
         protected override unsafe void OnStart()
         {
@@ -260,7 +258,7 @@ namespace IDKEngine
                 VariableRateShading.BindVRSNV(ForwardPassVRS);
                 VariableRateShading.SetShadingRatePaletteNV(shadingRates);
             }
-
+            
             ForwardRenderer = new Forward(new Lighter(20, 20), Size.X, Size.Y, 6);
             Bloom = new Bloom(Size.X, Size.Y, 1.0f, 8.0f);
             SSR = new SSR(Size.X, Size.Y, 30, 8, 50.0f);
@@ -270,30 +268,20 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            Bvh = new BVH(new BLAS(ModelSystem, 9));
+            bvh = new BVH(new BLAS(ModelSystem, 9));
             
-            PathTracer = new PathTracer(Bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
+            PathTracer = new PathTracer(bvh, ModelSystem, AtmosphericScatterer.Result, Size.X, Size.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
             if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
                 AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
-            {
-                List<GLSLLight> lights = new List<GLSLLight>(Lighter.GLSL_MAX_UBO_LIGHT_COUNT);
-                lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-                lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-                lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
-
-                Random rng = new Random();
-                Vector3 minPos = new Vector3(-17.0f, 0.0f, -16.0f);
-                Vector3 maxPos = new Vector3( 17.0f, 20.0f, 16.0f);
-                for (int i = 3; i < Lighter.GLSL_MAX_UBO_LIGHT_COUNT; i++)
-                {
-                    lights.Add(new GLSLLight(Helper.RandomVec3(minPos, maxPos), Helper.RandomVec3(1.0f, 4.0f), Helper.RandomFloat(0.05f, 0.15f)));
-                }
-                ForwardRenderer.LightingContext.Add(lights.ToArray());
-            }
+            List<GLSLLight> lights = new List<GLSLLight>();
+            lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+            ForwardRenderer.LightingContext.Add(lights.ToArray());
             
             pointShadows = new List<PointShadow>();
             pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, 0, 512, 0.5f, 60.0f));
@@ -321,8 +309,6 @@ namespace IDKEngine
             FinalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
-
-            FinalProgram.Upload("IsDithering", IsDithering);
 
             gui.ImGuiController.WindowResized(Size.X, Size.Y);
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), Size.X / (float)Size.Y, NEAR_PLANE, FAR_PLANE);

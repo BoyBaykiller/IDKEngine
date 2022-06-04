@@ -63,11 +63,6 @@ namespace IDKEngine.Render.Objects
             GL.BindFramebuffer(framebufferTarget, ID);
         }
 
-        public static void Bind(int id, FramebufferTarget framebufferTarget = FramebufferTarget.Framebuffer)
-        {
-            GL.BindFramebuffer(framebufferTarget, id);
-        }
-
         public FramebufferStatus GetStatus()
         {
             return GL.CheckNamedFramebufferStatus(ID, FramebufferTarget.Framebuffer);
@@ -97,6 +92,17 @@ namespace IDKEngine.Render.Objects
         public void Dispose()
         {
             GL.DeleteFramebuffer(ID);
+        }
+
+
+        public static void Bind(int id, FramebufferTarget framebufferTarget = FramebufferTarget.Framebuffer)
+        {
+            GL.BindFramebuffer(framebufferTarget, id);
+        }
+        public static void Clear(int id, ClearBufferMask clearBufferMask, FramebufferTarget framebufferTarget = FramebufferTarget.Framebuffer)
+        {
+            GL.BindFramebuffer(framebufferTarget, id);
+            GL.Clear(clearBufferMask);
         }
     }
 }
