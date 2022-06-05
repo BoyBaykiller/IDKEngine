@@ -8,7 +8,7 @@ using ImGuiNET;
 
 namespace IDKEngine.GUI
 {
-    class ImGuiController : IDisposable
+    class ImGuiBackend : IDisposable
     {
         public bool IsIgnoreMouseInput = false;
 
@@ -24,7 +24,7 @@ namespace IDKEngine.GUI
         private int Height;
 
         private System.Numerics.Vector2 scaleFactor = System.Numerics.Vector2.One;
-        public ImGuiController(int width, int height)
+        public ImGuiBackend(int width, int height)
         {
             Width = width;
             Height = height;

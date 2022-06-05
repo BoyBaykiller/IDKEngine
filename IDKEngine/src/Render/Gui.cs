@@ -9,29 +9,46 @@ namespace IDKEngine.Render
 {
     class Gui
     {
-        public ImGuiController ImGuiController;
+        public ImGuiBackend ImGuiBackend;
         private Forward.EntityType selectedEntityType;
         private uint selectedEntityIndex;
 
 
         public Gui(int width, int height)
         {
-            ImGuiController = new ImGuiController(width, height);
+            ImGuiBackend = new ImGuiBackend(width, height);
         }
 
-        public void Draw(Application window, float frameTime)
+        public bool isHoveredViewport = true;
+        public System.Numerics.Vector2 viewportPos;
+        public unsafe void Draw(Application window, float frameTime)
         {
-            ImGuiController.Update(window, frameTime);
+            ImGuiBackend.Update(window, frameTime);
+            ImGui.DockSpaceOverViewport();
 
-            ImGui.Begin("Render");
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(0.0f));
+            ImGui.Begin($"Viewport");
+            
+            System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
+            
+            System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
+            viewportPos = ImGui.GetWindowPos() + tileBar;
+            
+            ImGui.Image((IntPtr)window.PostCombine.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
+            isHoveredViewport = ImGui.IsItemHovered();
+
+            if (content.X != window.ViewportSize.X || content.Y != window.ViewportSize.Y)
+            {
+                window.SetViewportSize((int)content.X, (int)content.Y);
+            }
+
+            ImGui.End();
+            ImGui.PopStyleVar();
+
+            ImGui.Begin("Renderer");
             {
                 ImGui.Text($"FPS: {window.FPS}");
-
-                bool tempBool = window.PostCombine.IsDithering;
-                if (ImGui.Checkbox("IsDithering", ref tempBool))
-                {
-                    window.PostCombine.IsDithering = tempBool;
-                }
+                ImGui.Text($"Viewport size: {window.ViewportSize.X}x{window.ViewportSize.Y}");
 
                 string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
                 string current = window.IsPathTracing ? renderModes[1] : renderModes[0];
@@ -47,7 +64,7 @@ namespace IDKEngine.Render
                             window.GLSLBasicData.FreezeFramesCounter = 0;
                             if (current == "PathTracer")
                             {
-                                window.PathTracer.SetSize(window.Size.X, window.Size.Y);
+                                window.PathTracer.SetSize(window.WindowSize.X, window.WindowSize.Y);
                             }
                         }
 
@@ -56,6 +73,13 @@ namespace IDKEngine.Render
                     }
                     ImGui.EndCombo();
                 }
+
+                bool tempBool = window.PostCombine.IsDithering;
+                if (ImGui.Checkbox("IsDithering", ref tempBool))
+                {
+                    window.PostCombine.IsDithering = tempBool;
+                }
+
 
                 if (!window.IsPathTracing)
                 {
@@ -75,7 +99,7 @@ namespace IDKEngine.Render
                             ImGui.PopStyleVar();
                         }
                         ImGui.SameLine();
-                        HelpMarker(
+                        InfoMark(
                             "Requires support for NV_shading_rate_image. " +
                             "This feature when enabled allows the engine to choose a unique shading rate " +
                             "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
@@ -211,14 +235,14 @@ namespace IDKEngine.Render
                         ImGui.SameLine();
                         if (PointShadow.IS_VERTEX_LAYERED_RENDERING)
                         {
-                            HelpMarker(
+                            InfoMark(
                                 "This system supports vertex layered rendering. " +
                                 "Each pointshadow will be generated in only 1 draw call instead of 6."
                             );
                         }
                         else
                         {
-                            HelpMarker(
+                            InfoMark(
                                 "This system does not support vertex layered rendering. " +
                                 "Each pointshadow will be generated in 6 draw calls instead of 1."
                             );
@@ -286,6 +310,12 @@ namespace IDKEngine.Render
                         {
                             window.Bloom.Clamp = tempFloat;
                         }
+
+                        int tempInt = window.Bloom.MinusLods;
+                        if (ImGui.SliderInt("MinusLods", ref tempInt, 0, 10))
+                        {
+                            window.Bloom.MinusLods = tempInt;
+                        }
                     }
                 }
 
@@ -348,9 +378,9 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
-            if (selectedEntityType == Forward.EntityType.Mesh /* && !window.IsPathTracing*/)
+            ImGui.Begin("Entity properties");
             {
-                ImGui.Begin("Mesh properties", ImGuiWindowFlags.AlwaysAutoResize);
+                if (selectedEntityType == Forward.EntityType.Mesh)
                 {
                     bool hadChange = false;
                     ref GLSLMesh mesh = ref window.ModelSystem.Meshes[selectedEntityIndex];
@@ -398,13 +428,8 @@ namespace IDKEngine.Render
                         window.ModelSystem.UpdateMeshBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
                         window.ModelSystem.UpdateModelMatricesBuffer(0, window.ModelSystem.ModelMatrices.Length);
                     }
-                    ImGui.End();
                 }
-            }
-
-            if (selectedEntityType == Forward.EntityType.Light /* && !window.IsPathTracing*/)
-            {
-                ImGui.Begin("Light properties", ImGuiWindowFlags.AlwaysAutoResize);
+                else if (selectedEntityType == Forward.EntityType.Light)
                 {
                     bool hadChange = false;
                     ref GLSLLight light = ref window.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
@@ -434,15 +459,19 @@ namespace IDKEngine.Render
                     {
                         window.ForwardRenderer.LightingContext.UpdateLightBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
                     }
-
-                    ImGui.End();
                 }
+                else
+                {
+                    BothAxisCenteredText("PRESS E TO TOGGLE FREE CAMERA AND SELECT AN ENTITY");
+                }
+
+                ImGui.End();
             }
 
-            ImGuiController.Render();
+            ImGuiBackend.Render();
         }
 
-        private static void HelpMarker(string text)
+        private static void InfoMark(string text)
         {
             ImGui.TextDisabled("(?)");
 
@@ -456,14 +485,25 @@ namespace IDKEngine.Render
             }
         }
 
+        private static void BothAxisCenteredText(string text)
+        {
+            System.Numerics.Vector2 size = ImGui.GetWindowSize();
+            System.Numerics.Vector2 textWidth = ImGui.CalcTextSize(text);
+            ImGui.SetCursorPos((size - textWidth) * 0.5f);
+            ImGui.Text(text);
+        }
+
+
         public void Update(Application window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
-            if (/*!window.IsPathTracing && */window.MouseState.CursorMode == CursorModeValue.CursorNormal && window.MouseState[MouseButton.Left] == InputState.Touched && !io.WantCaptureKeyboard && !io.WantCaptureMouse)
+
+            if (!window.IsPathTracing && isHoveredViewport && window.MouseState[MouseButton.Left] == InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
-                point.Y = window.Size.Y - point.Y;
-                
+                point -= SystemToOpenTK(viewportPos);
+                point.Y = window.ViewportSize.Y - point.Y;
+
                 uint entityBitfield = 0u;
                 window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.UnsignedInt, ref entityBitfield);
 
@@ -493,9 +533,12 @@ namespace IDKEngine.Render
                         break;
 
                     default:
-            #if DEBUG
+#if DEBUG
                         throw new Exception($"Unknown selected type: {selectedEntityType}, index was: {selectedEntityIndex}");
-            #endif
+#endif
+                        // Something went wrong. If Release mode just set entity to none and act like everything is fine :)
+                        selectedEntityType = Forward.EntityType.None;
+                        window.ForwardRenderer.RenderMeshAABBIndex = -1;
                         break;
                 }
             }

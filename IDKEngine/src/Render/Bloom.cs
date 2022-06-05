@@ -42,6 +42,19 @@ namespace IDKEngine.Render
                 shaderProgram.Upload("Clamp", _clamp);
             }
         }
+
+        private int _minusLods;
+        public int MinusLods
+        {
+            get => _minusLods;
+
+            set
+            {
+                _minusLods = value;
+                SetSize(Result.Width, Result.Height);
+            }
+        }
+
         private enum Stage : int
         {
             Downsample = 0,
@@ -53,13 +66,13 @@ namespace IDKEngine.Render
         private Texture downscaleTexture;
         private Texture upsampleTexture;
         private readonly ShaderProgram shaderProgram;
-        public Bloom(int width, int height, float threshold, float clamp)
+        public Bloom(int width, int height, float threshold, float clamp, int minusLods = 3)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Bloom/compute.glsl")));
 
             width = (int)(width / 2.0f);
             height = (int)(height / 2.0f);
-            _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - 3, 1);
+            _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - minusLods, 2);
 
             downscaleTexture = new Texture(TextureTarget2d.Texture2D);
             downscaleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
@@ -73,6 +86,7 @@ namespace IDKEngine.Render
 
             Threshold = threshold;
             Clamp = clamp;
+            _minusLods = minusLods;
         }
 
         public void Compute(Texture src)
@@ -127,7 +141,7 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - 3, 1);
+            _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - MinusLods, 2);
 
             downscaleTexture.Dispose();
             
