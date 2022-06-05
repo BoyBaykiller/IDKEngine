@@ -368,25 +368,23 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         const Mesh mesh = meshSSBO.Meshes[i];
-        const Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[0]));
+        const int glInstanceID = 0; // TODO: Work out actual instanceID value
+        const Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[mesh.MatrixStart + glInstanceID]));
         uint localNodeIndex = 0u;
         while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
         {
             Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
             if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
             {
-                if (node.VertexCount > 0)
+                for (uint k = node.VerticesStart / 3; k < (node.VerticesStart + node.VertexCount) / 3; k++)
                 {
-                    for (uint k = node.VerticesStart / 3; k < (node.VerticesStart + node.VertexCount) / 3; k++)
+                    Triangle triangle = triangleSSBO.Triangles[k];
+                    if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
                     {
-                        Triangle triangle = triangleSSBO.Triangles[k];
-                        if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
-                        {
-                            hitInfo.Bary = baryT.xyz;
-                            hitInfo.T = baryT.w;
-                            hitInfo.HitIndex = i;
-                            hitInfo.TriangleIndex = k;
-                        }
+                        hitInfo.Bary = baryT.xyz;
+                        hitInfo.T = baryT.w;
+                        hitInfo.HitIndex = i;
+                        hitInfo.TriangleIndex = k;
                     }
                 }
                 localNodeIndex++;
@@ -478,7 +476,6 @@ Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel)
 // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
 vec3 CosineSampleHemisphere(vec3 normal)
 {
-
     float z = GetRandomFloat01() * 2.0 - 1.0;
     float a = GetRandomFloat01() * 2.0 * PI;
     float r = sqrt(1.0 - z * z);

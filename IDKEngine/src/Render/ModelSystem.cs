@@ -62,6 +62,7 @@ namespace IDKEngine.Render
             VAO.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
             VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 8); // Normals
         }
+
         public unsafe void Add(Model[] models)
         {
             int oldDrawCommandsLength = DrawCommands.Length;

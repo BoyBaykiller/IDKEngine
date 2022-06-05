@@ -10,7 +10,7 @@ namespace IDKEngine
     abstract unsafe class GameWindowBase
     {
         private string _title;
-        public string Title
+        public string WindowTitle
         {
             get => _title;
 
@@ -23,7 +23,7 @@ namespace IDKEngine
         }
 
         private bool _isVSync;
-        public bool IsVSync
+        public bool WindowVSync
         {
             get => _isVSync;
 
@@ -35,7 +35,7 @@ namespace IDKEngine
         }
 
         private Vector2i _size;
-        public Vector2i Size
+        public Vector2i WindowSize
         {
             get => _size;
 
@@ -48,7 +48,7 @@ namespace IDKEngine
         }
 
         private Vector2i _position;
-        public Vector2i Position
+        public Vector2i WindowPosition
         {
             get => _position;
 
@@ -60,7 +60,7 @@ namespace IDKEngine
         }
 
         private bool _isFullscreen;
-        public bool IsFullscreen
+        public bool WindowFullscreen
         {
             get => _isFullscreen;
 
@@ -71,25 +71,24 @@ namespace IDKEngine
                 {
                     GLFW.GetWindowPos(window, out cachedWindowPos.X, out cachedWindowPos.Y);
                     GLFW.GetWindowSize(window, out cachedWindowSize.X, out cachedWindowSize.Y);
-                    GLFW.SetWindowMonitor(window, Monitor, 0, 0, VideoMode->Width, VideoMode->Height, VideoMode->RefreshRate);
+                    GLFW.SetWindowMonitor(window, monitor, 0, 0, videoMode->Width, videoMode->Height, videoMode->RefreshRate);
                 }
                 else
                 {
                     GLFW.SetWindowMonitor(window, null, cachedWindowPos.X, cachedWindowPos.Y, cachedWindowSize.X, cachedWindowSize.Y, 0);
                 }
-                IsVSync = _isVSync;
+                WindowVSync = _isVSync;
             }
         }
 
-        private float _time;
-        public float Time => _time;
-
         private bool _isFocused = true;
-        public bool IsFocused => _isFocused;
+        public bool WindowFocused => _isFocused;
+        
+        private float _time;
+        public float WindowTime => _time;
 
-        public readonly VideoMode* VideoMode;
-        public readonly Monitor* Monitor;
-        public double UpdatePeriod = 1.0 / 60.0;
+        public int WindowRefreshRate => videoMode->RefreshRate;
+
         public readonly Keyboard KeyboardState;
         public readonly Mouse MouseState;
 
@@ -97,6 +96,9 @@ namespace IDKEngine
         private Vector2i cachedWindowSize;
 
         private readonly bool glfwInitialized = false;
+
+        private readonly VideoMode* videoMode;
+        private readonly Monitor* monitor;
         private readonly Window* window;
 
         /// <summary>
@@ -135,11 +137,11 @@ namespace IDKEngine
             windowCharDelegate = WindowCharCallback;
             GLFW.SetCharCallback(window, windowCharDelegate);
 
-            Monitor = GLFW.GetPrimaryMonitor();
-            VideoMode = GLFW.GetVideoMode(Monitor);
+            monitor = GLFW.GetPrimaryMonitor();
+            videoMode = GLFW.GetVideoMode(monitor);
             KeyboardState = new Keyboard(window);
             MouseState = new Mouse(window);
-            Position = new Vector2i(VideoMode->Width / 2 - _size.X / 2, VideoMode->Height / 2 - _size.Y / 2);
+            WindowPosition = new Vector2i(videoMode->Width / 2 - _size.X / 2, videoMode->Height / 2 - _size.Y / 2);
             updateTimer = new Stopwatch();
 
 
@@ -165,7 +167,7 @@ namespace IDKEngine
                 double runTime = currentTime - lastTime;
                 
                 GLFW.PollEvents();
-                if (IsFocused)
+                if (WindowFocused)
                 {
                     //DispatchUpdateFrame();
                     // TODO: Fix seperate update and render again without breaking camera, vrs or taa
@@ -191,19 +193,21 @@ namespace IDKEngine
         // Source: https://github.com/opentk/opentk/blob/558132bd2cc41eed704f6e6acd1e3fe5830df5ad/src/OpenTK.Windowing.Desktop/GameWindow.cs#L258
         private void DispatchUpdateFrame()
         {
+            double updatePeriod = 1.0 / WindowRefreshRate;
+
             double isRunningSlowlyRetries = 4;
             double elapsed = updateTimer.Elapsed.TotalSeconds;
 
-            while (elapsed > 0.0 && elapsed + updateEpsilon >= UpdatePeriod)
+            while (elapsed > 0.0 && elapsed + updateEpsilon >= updatePeriod)
             {
                 updateTimer.Restart();
                 KeyboardState.Update();
                 MouseState.Update();
                 OnUpdate((float)elapsed);
 
-                updateEpsilon += elapsed - UpdatePeriod;
+                updateEpsilon += elapsed - updatePeriod;
 
-                isRunningSlowly = updateEpsilon >= UpdatePeriod;
+                isRunningSlowly = updateEpsilon >= updatePeriod;
 
                 if (isRunningSlowly && --isRunningSlowlyRetries == 0)
                     break;
