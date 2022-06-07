@@ -19,7 +19,7 @@ Feature list:
  - Temporal Anti Aliasing
  - CoD-Modern-Warfare Bloom
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
- - Path Tracer with parallel BVH construction and stackless traversal (very much WIP)
+ - Path Tracer (very much WIP)
  
 Required OpenGL: 4.6 + `ARB_bindless_texture` and (`NV_gpu_shader5` or `ARB_shader_ballot`)
 
@@ -126,8 +126,8 @@ I decided to scale both of these factors add them together and then use that to 
 ### 1.2 Subgroup optimizations
 
 While operating on shared memory is fast Subgroup Intrinsics are faster.
-They are a relatively new topic on its own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are a lot of subgroup operations. The full thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt) but vendor specific/arb extensions with `GL_ARB_shader_group_vote` actually being part of core also exist.
-Anyway the one which is particular interesting for our case of computing a sum is `GL_KHR_shader_subgroup_arithmetic` or more specifically the function `subgroupInclusiveAdd`.
+They are a relatively new topic on its own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are a lot of subgroup operations. The full thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt) but vendor specific/arb extensions with `ARB_shader_group_vote` actually being part of core also exist.
+Anyway the one which is particular interesting for our case of computing a sum is `KHR_shader_subgroup_arithmetic` or more specifically the function `subgroupInclusiveAdd`.
 
 On my GPU a subgroup is 32 invocations big.
 If I call `subgroupInclusiveAdd(2)` the function will return 64.
@@ -223,11 +223,11 @@ RenderSceneInstanced(count: 6);
 ```
 
 ```glsl
-#define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array || GL_NV_viewport_array2)
 #extension GL_ARB_shader_viewport_layer_array : enable
 #extension GL_AMD_vertex_shader_layer : enable
 #extension GL_NV_viewport_array : enable
 #extension GL_NV_viewport_array2 : enable
+#define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array || GL_NV_viewport_array2)
 
 
 void main()

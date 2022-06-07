@@ -13,7 +13,6 @@ namespace IDKEngine.Render
         private Forward.EntityType selectedEntityType;
         private uint selectedEntityIndex;
 
-
         public Gui(int width, int height)
         {
             ImGuiBackend = new ImGuiBackend(width, height);
@@ -21,7 +20,7 @@ namespace IDKEngine.Render
 
         public bool isHoveredViewport = true;
         public System.Numerics.Vector2 viewportPos;
-        public unsafe void Draw(Application window, float frameTime)
+        public void Draw(Application window, float frameTime)
         {
             ImGuiBackend.Update(window, frameTime);
             ImGui.DockSpaceOverViewport();
@@ -493,7 +492,6 @@ namespace IDKEngine.Render
             ImGui.Text(text);
         }
 
-
         public void Update(Application window)
         {
             ImGuiIOPtr io = ImGui.GetIO();
@@ -507,7 +505,7 @@ namespace IDKEngine.Render
                 uint entityBitfield = 0u;
                 window.ForwardRenderer.Framebuffer.GetPixels(point.X, point.Y, 1, 1, PixelFormat.RedInteger, PixelType.UnsignedInt, ref entityBitfield);
 
-                selectedEntityType = window.ForwardRenderer.ExtractEntityAndIndex(entityBitfield, out selectedEntityIndex);
+                selectedEntityType = Forward.ExtractEntityAndIndex(entityBitfield, out selectedEntityIndex);
                 switch (selectedEntityType)
                 {
                     case Forward.EntityType.Mesh:

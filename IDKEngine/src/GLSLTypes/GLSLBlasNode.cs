@@ -5,10 +5,8 @@ namespace IDKEngine
 	struct GLSLBlasNode
 	{
 		public Vector3 Min;
-		public uint VerticesStart;
+		public uint TriStartOrLeftChild;
 		public Vector3 Max;
-		public uint VertexCount;
-		private readonly Vector3 _pad0;
-		public uint MissLink;
+		public uint TriCount;
 	}
 }

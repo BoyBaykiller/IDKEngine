@@ -118,19 +118,6 @@ namespace IDKEngine.Render
             }
         }
 
-        private static int currentlyBound = -1;
-        /// <summary>
-        /// NV_shading_rate_image must be available for this to take effect
-        /// </summary>
-        public static void BindVRSNV(VariableRateShading variableRateShading)
-        {
-            if (NV_SHADING_RATE_IMAGE)
-            {
-                GL.NV.BindShadingRateImage(variableRateShading.Result.ID);
-                currentlyBound = variableRateShading.Result.ID;
-            }
-        }
-
         public unsafe void Compute(Texture shaded, Texture velocity)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R8ui);
@@ -165,6 +152,19 @@ namespace IDKEngine.Render
             }
             this.width = width;
             this.height = height;
+        }
+
+        private static int currentlyBound = -1;
+        /// <summary>
+        /// NV_shading_rate_image must be available for this to take effect
+        /// </summary>
+        public static void BindVRSNV(VariableRateShading variableRateShading)
+        {
+            if (NV_SHADING_RATE_IMAGE && currentlyBound != variableRateShading.Result.ID)
+            {
+                GL.NV.BindShadingRateImage(variableRateShading.Result.ID);
+                currentlyBound = variableRateShading.Result.ID;
+            }
         }
     }
 }

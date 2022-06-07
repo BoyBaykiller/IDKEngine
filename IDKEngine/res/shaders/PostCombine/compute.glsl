@@ -24,7 +24,7 @@ const float BayerMatrix8[8][8] =
 	{ 43.0 / 65.0, 27.0 / 65.0, 39.0 / 65.0, 23.0 / 65.0, 42.0 / 65.0, 26.0 / 65.0, 38.0 / 65.0, 22.0 / 65.0 }
 };
 
-uniform int IsDithering;
+uniform bool IsDithering;
 
 void main()
 {

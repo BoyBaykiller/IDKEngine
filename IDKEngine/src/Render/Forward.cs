@@ -248,7 +248,7 @@ namespace IDKEngine.Render
             taaFrame++;
         }
 
-        public EntityType ExtractEntityAndIndex(uint entityIndexBitfield, out uint index)
+        public static EntityType ExtractEntityAndIndex(uint entityIndexBitfield, out uint index)
         {
             index = 0;
 

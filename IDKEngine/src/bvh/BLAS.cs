@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using OpenTK.Mathematics;
 using IDKEngine.Render;
 
@@ -9,172 +7,124 @@ namespace IDKEngine
 {
     class BLAS
     {
-        public const int BITS_FOR_VERTICES_START = 31;
+        public const int BLAS_MIN_TRIANGLE_COUNT_LEAF = 8;
 
-        public readonly int MaxTreeDepth;
-        public readonly GLSLBlasNode[][] Nodes;
-        public readonly GLSLVertex[][] Vertices;
-        public unsafe BLAS(ModelSystem modelSystem, int maxTreeDepth, uint trianglesPerLevelHint = 45u)
+        public readonly ModelSystem ModelSystem;
+        public readonly GLSLNode[] Nodes;
+        public readonly GLSLVertex[] Vertices;
+        public unsafe BLAS(ModelSystem modelSystem)
         {
-            MaxTreeDepth = maxTreeDepth;
-
-            List<GLSLVertex> vertices = new List<GLSLVertex>(modelSystem.Vertices.Length);
-            GLSLBlasNode[] rootNodes = new GLSLBlasNode[modelSystem.Meshes.Length];
+            Vertices = new GLSLVertex[modelSystem.Indices.Length];
+            Nodes = new GLSLNode[Vertices.Length / 3 * 2];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
-                rootNodes[i].Min = new Vector3(float.MaxValue);
-                rootNodes[i].Max = new Vector3(float.MinValue);
-                rootNodes[i].VerticesStart = (uint)vertices.Count;
-                for (int j = modelSystem.DrawCommands[i].FirstIndex; j < modelSystem.DrawCommands[i].FirstIndex + modelSystem.DrawCommands[i].Count; j++)
+                GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
+                for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j++)
                 {
-                    uint indici = (uint)modelSystem.DrawCommands[i].BaseVertex + modelSystem.Indices[j];
-                    GLSLVertex vertex = modelSystem.Vertices[indici];
-                    vertices.Add(vertex);
-
-                    rootNodes[i].Min = Vector3.ComponentMin(rootNodes[i].Min, vertex.Position);
-                    rootNodes[i].Max = Vector3.ComponentMax(rootNodes[i].Max, vertex.Position);
+                    Vertices[j] = modelSystem.Vertices[modelSystem.Indices[j] + cmd.BaseVertex];
                 }
-                rootNodes[i].VertexCount = (uint)vertices.Count - rootNodes[i].VerticesStart;
             }
 
-
-            Nodes = new GLSLBlasNode[modelSystem.Meshes.Length][];
-            Vertices = new GLSLVertex[modelSystem.Meshes.Length][];
-            ParallelLoopResult parallelLoopResult = Parallel.For(0, modelSystem.Meshes.Length, i =>
+            ParallelLoopResult bvhLoadResult = Parallel.For(0, modelSystem.Meshes.Length, (int i) =>
             {
-                GLSLBlasNode root = rootNodes[i];
-
-                int treeDepth = (int)Math.Max(Math.Min(root.VertexCount / trianglesPerLevelHint, MaxTreeDepth), 2u);
-                uint nodesForMesh = (1u << treeDepth) - 1u;
-                modelSystem.Meshes[i].BLASDepth = treeDepth;
-                int verticesStart = (int)root.VerticesStart;
-                int verticesEnd = (int)(root.VerticesStart + root.VertexCount);
-
-                List<GLSLVertex> localBVHVertices = new List<GLSLVertex>((int)(root.VertexCount * 1.5f));
-                GLSLBlasNode[] localNodes = new GLSLBlasNode[nodesForMesh];
-                root.VertexCount = 0; // only child nodes should have VertexCount > 0
-                localNodes[0] = root;
-                
-                for (int level = 0; level < treeDepth; level++)
+                GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
+                fixed (void* ptr = &Vertices[cmd.FirstIndex])
                 {
-                    uint localIndex = (uint)level;
-                    uint distance = GetDistanceSibling(level, nodesForMesh);
+                    Span<GLSLTriangle> triangles = new Span<GLSLTriangle>(ptr, cmd.Count / 3);
+                    Span<GLSLNode> nodes = new Span<GLSLNode>(Nodes, cmd.FirstIndex / 3 * 2, triangles.Length * 2);
 
-                    for (int horNode = 0; horNode < GetNodesOnLevel(level); horNode++)
+                    BuildBVH(triangles, nodes);
+
+                    for (int j = 0; j < nodes.Length; j++)
                     {
-                        if (horNode == GetNodesOnLevel(level) - 1)
-                            localNodes[localIndex].MissLink = nodesForMesh;
-                        else if (horNode % 2 == 0)
-                            localNodes[localIndex].MissLink = localIndex + distance;
-                        else
-                            localNodes[localIndex].MissLink = localIndex + GetDistanceInterNode(distance, horNode / 2) - 1u;
-
-                        if (level < treeDepth - 1)
+                        if (nodes[j].TriCount > 0)
                         {
-                            ConstructChildBounds(localNodes[localIndex], out GLSLBlasNode child0, out GLSLBlasNode child1);
-                            if (level == treeDepth - 2)
-                            {
-                                MakeLeaf(ref child0);
-                                MakeLeaf(ref child1);
-                            }
-
-                            localNodes[localIndex + 1] = child0;
-                            localNodes[GetRightChildIndex((int)localIndex, treeDepth, level)] = child1;
-
-                        }
-                        localIndex += horNode % 2 == 0 ? distance : GetDistanceInterNode(distance, horNode / 2);
-                    }
-                }
-                Nodes[i] = localNodes;
-                Vertices[i] = localBVHVertices.ToArray();
-
-                void MakeLeaf(ref GLSLBlasNode node)
-                {
-                    Debug.Assert((uint)localBVHVertices.Count < (1u << BITS_FOR_VERTICES_START));
-                    node.VerticesStart = (uint)localBVHVertices.Count;
-
-                    Vector3 center = (node.Min + node.Max) * 0.5f;
-                    Vector3 halfSize = (node.Max - node.Min) * (0.5f + 0.000001f);
-                    for (int i = verticesStart; i < verticesEnd; i += 3)
-                    {
-                        if (MyMath.TriangleVSBox(vertices[i + 0].Position, vertices[i + 1].Position, vertices[i + 2].Position, center, halfSize))
-                        {
-                            localBVHVertices.Add(vertices[i + 0]);
-                            localBVHVertices.Add(vertices[i + 1]);
-                            localBVHVertices.Add(vertices[i + 2]);
+                            nodes[j].TriStartOrLeftChild += (uint)cmd.FirstIndex / 3;
                         }
                     }
-                    uint count = (uint)localBVHVertices.Count - node.VerticesStart;
-                    node.VertexCount = count;
+                    modelSystem.Meshes[i].NodeStart = cmd.FirstIndex / 3 * 2;
                 }
             });
-            while (!parallelLoopResult.IsCompleted) ;
-
-            int nodesOffset = 0, verticesOffset = 0;
-            for (int i = 0; i < Nodes.Length; i++)
-            {
-                for (int j = 0; j < Nodes[i].Length; j++)
-                {
-                    if (Nodes[i][j].VertexCount > 0)
-                    {
-                        uint globalStart = (uint)verticesOffset + Nodes[i][j].VerticesStart;
-                        Nodes[i][j].VerticesStart = globalStart;
-                    }
-                }
-                modelSystem.Meshes[i].NodeStart = nodesOffset;
-
-                nodesOffset += Nodes[i].Length;
-                verticesOffset += Vertices[i].Length;
-            }
+            while (!bvhLoadResult.IsCompleted) ;
 
             modelSystem.UpdateMeshBuffer(0, modelSystem.Meshes.Length);
+            ModelSystem = modelSystem;
         }
 
-        private static void ConstructChildBounds(in GLSLBlasNode parent, out GLSLBlasNode child0, out GLSLBlasNode child1)
+        private static void BuildBVH(Span<GLSLTriangle> tris, Span<GLSLNode> nodes)
         {
-            child0 = new GLSLBlasNode();
-            child1 = new GLSLBlasNode();
+            int nodesUsed = 1;
+            ref GLSLNode root = ref nodes[0];
+            root.TriCount = (uint)tris.Length;
 
-            child0.Min = parent.Min;
-            child0.Max = parent.Max;
-            child1.Min = parent.Min;
-            child1.Max = parent.Max;
+            UpdateNodeBounds(tris, ref root);
+            Subdivide(tris, nodes);
 
-            Vector3 parentNodeSize = parent.Max - parent.Min;
-            int axis = 0;
-            if (parentNodeSize.Y > parentNodeSize.X) axis = 1;
-            if (parentNodeSize.Z > parentNodeSize[axis]) axis = 2; 
-
-            child0.Max[axis] -= parentNodeSize[axis] * 0.5f;
-            child1.Min[axis] += parentNodeSize[axis] * 0.5f;
-        }
-
-        private static int GetRightChildIndex(int parent, int treeDepth, int level)
-        {
-            return parent + (1 << (treeDepth - (level + 1)));
-        }
-        private static uint GetNodesOnLevel(int level)
-        {
-            return 1u << level;
-        }
-        private static uint GetDistanceInterNode(uint distanceSiblings, int n)
-        {
-            // Source: https://oeis.org/A090739
-
-            // Source: https://oeis.org/A007814
-            static uint A007814(int n)
+            void Subdivide(Span<GLSLTriangle> triangles, Span<GLSLNode> nodes, int nodeID = 0)
             {
-                if (n % 2 != 0)
-                    return 0u;
+                ref GLSLNode node = ref nodes[nodeID];
+                if (node.TriCount <= BLAS_MIN_TRIANGLE_COUNT_LEAF)
+                    return;
 
-                return 1u + A007814(n / 2);
+                Vector3 extent = node.Max - node.Min;
+                int axis = 0;
+                if (extent.Y > extent.X) axis = 1;
+                if (extent.Z > extent[axis]) axis = 2;
+
+                float splitPos = node.Min[axis] + extent[axis] * 0.5f;
+
+                int i = (int)node.TriStartOrLeftChild;
+                int j = (int)(i + node.TriCount - 1);
+                while (i <= j)
+                {
+                    ref GLSLTriangle tri = ref triangles[i];
+                    if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[axis] < splitPos)
+                        i++;
+                    else
+                        Helper.Swap(ref tri, ref triangles[j--]);
+                }
+
+                uint leftCount = (uint)(i - node.TriStartOrLeftChild);
+                if (leftCount == 0 || leftCount == node.TriCount)
+                    return;
+
+                int leftChildID = nodesUsed++;
+                int rightChildID = nodesUsed++;
+
+                nodes[leftChildID].TriStartOrLeftChild = node.TriStartOrLeftChild;
+                nodes[leftChildID].TriCount = leftCount;
+
+                nodes[rightChildID].TriStartOrLeftChild = (uint)i;
+                nodes[rightChildID].TriCount = node.TriCount - leftCount;
+
+                node.TriStartOrLeftChild = (uint)leftChildID;
+                node.TriCount = 0;
+
+                UpdateNodeBounds(triangles, ref nodes[leftChildID]);
+                UpdateNodeBounds(triangles, ref nodes[rightChildID]);
+
+                Subdivide(triangles, nodes, leftChildID);
+                Subdivide(triangles, nodes, rightChildID);
             }
-
-            return A007814(n + 1) + distanceSiblings + 1u;
         }
-        private static uint GetDistanceSibling(int level, uint allNodesCount)
+
+        private static unsafe void UpdateNodeBounds(Span<GLSLTriangle> triangles, ref GLSLNode node)
         {
-            return allNodesCount / (1u << level);
+            node.Min = new Vector3(float.MaxValue);
+            node.Max = new Vector3(float.MinValue);
+
+            for (int i = 0; i < node.TriCount; i++)
+            {
+                GLSLTriangle triangle = triangles[(int)(node.TriStartOrLeftChild + i)];
+                node.Min = Vector3.ComponentMin(node.Min, triangle.Vertex0.Position);
+                node.Min = Vector3.ComponentMin(node.Min, triangle.Vertex1.Position);
+                node.Min = Vector3.ComponentMin(node.Min, triangle.Vertex2.Position);
+                
+                node.Max = Vector3.ComponentMax(node.Max, triangle.Vertex0.Position);
+                node.Max = Vector3.ComponentMax(node.Max, triangle.Vertex1.Position);
+                node.Max = Vector3.ComponentMax(node.Max, triangle.Vertex2.Position);
+            }
         }
     }
+    
 }

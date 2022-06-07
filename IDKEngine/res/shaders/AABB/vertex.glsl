@@ -56,11 +56,9 @@ struct Mesh
 struct Node
 {
     vec3 Min;
-    uint VerticesStart;
+    uint TriStartOrLeftChild;
     vec3 Max;
-    uint VertexCount;
-    vec3 _pad0;
-    uint MissLink;
+    uint TriCount;
 };
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
