@@ -30,6 +30,7 @@ namespace IDKEngine
         public int FPS;
         public Vector2i ViewportSize { get; private set; }
 
+        private bool renderGui = true;
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
@@ -87,7 +88,6 @@ namespace IDKEngine
                 {
                     ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
                 }
-
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
             }
             else
@@ -109,12 +109,17 @@ namespace IDKEngine
             GL.Viewport(0, 0, WindowSize.X, WindowSize.Y);
             Framebuffer.Bind(0);
 
-            PostCombine.Result.BindToUnit(0);
-            FinalProgram.Use();
-            GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
-
+            if (renderGui)
+            {
+                gui.Draw(this, (float)dT);
+            }
+            else
+            {
+                PostCombine.Result.BindToUnit(0);
+                FinalProgram.Use();
+                GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
+            }
             GLSLBasicData.FreezeFramesCounter++;
-            gui.Draw(this, (float)dT);
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
@@ -142,6 +147,15 @@ namespace IDKEngine
 
             if (KeyboardState[Keys.F11] == InputState.Touched)
                 WindowFullscreen = !WindowFullscreen;
+
+            if (KeyboardState[Keys.G] == InputState.Touched)
+            {
+                renderGui = !renderGui;
+                if (!renderGui)
+                {
+                    SetViewportSize(WindowSize.X, WindowSize.Y);
+                }
+            }
 
             if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
             {
@@ -242,13 +256,11 @@ namespace IDKEngine
                     // https://github.com/opentk/opentk/issues/1450
                     const int SUBGROUP_SIZE_KHR = 0x9532;
                     const int SUBGROUP_SUPPORTED_FEATURES_KHR = 0x9534;
-                    const int SUBGROUP_FEATURE_BASIC_BIT_KHR = 0x00000001;
                     const int SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR = 0x00000004;
 
                     int bitfield = GL.GetInteger((GetPName)SUBGROUP_SUPPORTED_FEATURES_KHR);
                     
-                    if ((bitfield & SUBGROUP_FEATURE_BASIC_BIT_KHR) == SUBGROUP_FEATURE_BASIC_BIT_KHR &&
-                        (bitfield & SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR) == SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR)
+                    if ((bitfield & SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR) == SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR)
                     {
                         effectiveSubGroupSize = GL.GetInteger((GetPName)SUBGROUP_SIZE_KHR);
                     }
@@ -269,8 +281,8 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            bvh = new BVH(new BLAS(ModelSystem, 9));
-            
+            bvh = new BVH(new BLAS(ModelSystem));
+
             PathTracer = new PathTracer(bvh, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
@@ -326,6 +338,12 @@ namespace IDKEngine
         protected override void OnResize()
         {
             gui.ImGuiBackend.WindowResized(WindowSize.X, WindowSize.Y);
+
+            // if we don't render to the screen via gui always make viewport match window size
+            if (!renderGui)
+            {
+                SetViewportSize(WindowSize.X, WindowSize.Y);
+            }
         }
 
         public void SetViewportSize(int width, int height)

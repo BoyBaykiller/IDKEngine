@@ -86,11 +86,9 @@ struct Ray
 struct Node
 {
     vec3 Min;
-    uint VerticesStart;
+    uint TriStartOrLeftChild;
     vec3 Max;
-    uint VertexCount;
-    vec3 _pad0;
-    uint MissLink;
+    uint TriCount;
 };
 
 struct Triangle
@@ -228,7 +226,7 @@ vec3 Radiance(Ray ray)
                 
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
                 const int glInstanceID = 0; // TODO: Work out actual instanceID value
-                mat4 model = matrixSSBO.Models[glInstanceID];
+                mat4 model = matrixSSBO.Models[mesh.MatrixStart + glInstanceID];
 
                 vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
                 vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
@@ -365,34 +363,71 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     }
 
     vec4 baryT;
+    uint stack[32];
+    uint stackPtr;
+    uint index;
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         const Mesh mesh = meshSSBO.Meshes[i];
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
         const Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[mesh.MatrixStart + glInstanceID]));
-        uint localNodeIndex = 0u;
-        while (localNodeIndex < (1u << mesh.BLASDepth) - 1u)
+        
+        stackPtr = 0;
+        index = 0;
+        while (true)
         {
-            Node node = bvhSSBO.Nodes[mesh.NodeStart + localNodeIndex];
-            if (RayCuboidIntersect(localRay, node, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
+            Node node = bvhSSBO.Nodes[mesh.NodeStart + index];
+            if (node.TriCount > 0)
             {
-                for (uint k = node.VerticesStart / 3; k < (node.VerticesStart + node.VertexCount) / 3; k++)
+                for (uint j = node.TriStartOrLeftChild; j < node.TriStartOrLeftChild + node.TriCount; j++)
                 {
-                    Triangle triangle = triangleSSBO.Triangles[k];
+                    Triangle triangle = triangleSSBO.Triangles[j];
                     if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
                     {
                         hitInfo.Bary = baryT.xyz;
                         hitInfo.T = baryT.w;
                         hitInfo.HitIndex = i;
-                        hitInfo.TriangleIndex = k;
+                        hitInfo.TriangleIndex = j;
                     }
                 }
-                localNodeIndex++;
             }
             else
             {
-                localNodeIndex = node.MissLink;
+                float dist1;
+                float dist2;
+
+                uint child1 = node.TriStartOrLeftChild;
+                uint child2 = child1 + 1;
+
+                if (!(RayCuboidIntersect(localRay, bvhSSBO.Nodes[mesh.NodeStart + child1], dist1, t2) && t2 > 0.0 && dist1 < hitInfo.T))
+                    dist1 = FLOAT_MAX;
+                
+                if (!(RayCuboidIntersect(localRay, bvhSSBO.Nodes[mesh.NodeStart + child2], dist2, t2) && t2 > 0.0 && dist2 < hitInfo.T))
+                    dist2 = FLOAT_MAX;
+
+                // Make child1 and dist1 always be closest
+                if (dist1 > dist2)
+                {
+                    float tempDist = dist1;
+                    dist1 = dist2;
+                    dist2 = tempDist;
+                    
+                    uint tempIndex = child1;
+                    child1 = child2;
+                    child2 = tempIndex; 
+                }
+
+                if (dist1 != FLOAT_MAX)
+                {
+                    index = child1;
+                    if (dist2 != FLOAT_MAX)
+                        stack[stackPtr++] = child2;
+                    continue;
+                }
             }
+            if (stackPtr == 0)
+                    break;
+            index = stack[--stackPtr];
         }
     }
 
@@ -402,7 +437,6 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
 // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT)
 {
-
     vec3 v1v0 = v1 - v0;
     vec3 v2v0 = v2 - v0;
     vec3 rov0 = ray.Origin - v0;

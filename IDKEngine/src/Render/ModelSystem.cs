@@ -218,5 +218,13 @@ namespace IDKEngine.Render
                 updatedModelCounter += ModelMatrices[i].Length;
             }
         }
+
+        public int GetMeshVertexCount(int meshIndex)
+        {
+            Debug.Assert(meshIndex < Meshes.Length);
+
+            int nextMeshBaseVertex = (meshIndex < Meshes.Length - 1) ? DrawCommands[meshIndex + 1].BaseVertex : Vertices.Length;
+            return nextMeshBaseVertex - DrawCommands[meshIndex].BaseVertex;
+        }
     }
 }

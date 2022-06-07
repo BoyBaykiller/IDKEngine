@@ -20,11 +20,9 @@ struct DrawCommand
 struct Node
 {
     vec3 Min;
-    uint VerticesStart;
+    uint TriStartOrLeftChild;
     vec3 Max;
-    uint VertexCount;
-    vec3 _pad0;
-    uint MissLink;
+    uint TriCount;
 };
 
 struct Mesh
