@@ -1,14 +1,13 @@
 #version 460 core
 
 layout(location = 0) in vec3 Position;
-layout(location = 1) in vec2 TexCoord;
+layout(location = 1) in float TexCoordU;
+layout(location = 3) in float TexCoordV;
 
 struct Mesh
 {
     int InstanceCount;
-    int MatrixStart;
-    int NodeStart;
-    int BLASDepth;
+    int BaseMatrix;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -62,10 +61,10 @@ out InOutVars
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    mat4 model = matrixSSBO.Models[mesh.MatrixStart + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + gl_InstanceID];
 
     outData.MaterialIndex = mesh.MaterialIndex;
-    outData.TexCoord = TexCoord;
+    outData.TexCoord = vec2(TexCoordU, TexCoordV);
 
     vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
     

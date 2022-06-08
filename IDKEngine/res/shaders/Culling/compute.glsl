@@ -27,9 +27,7 @@ struct Node
 struct Mesh
 {
     int InstanceCount;
-    int MatrixStart;
-    int NodeStart;
-    int BLASDepth;
+    int BaseMatrix;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -38,7 +36,7 @@ struct Mesh
     float RefractionChance;
 };
 
-layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO
+layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
 } drawCommandsSSBO;
@@ -66,16 +64,19 @@ layout(location = 0) uniform mat4 ProjView;
 
 void main()
 {
-    if (gl_GlobalInvocationID.x >= meshSSBO.Meshes.length())
+    uint meshIndex = gl_GlobalInvocationID.x;
+    if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    Mesh mesh = meshSSBO.Meshes[gl_GlobalInvocationID.x];
-    Node node = bvhSSBO.Nodes[mesh.NodeStart];
+    int baseNode = (drawCommandsSSBO.DrawCommands[meshIndex].FirstIndex / 3);
+    Node node = bvhSSBO.Nodes[baseNode];
+    Mesh mesh = meshSSBO.Meshes[meshIndex];
+    
     const int glInstanceID = 0; // TODO: Derive from built in variables
-    mat4 model = matrixSSBO.Models[mesh.MatrixStart + glInstanceID];
+    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + glInstanceID];
     
     Frustum frustum = ExtractFrustum(ProjView * model);
-    drawCommandsSSBO.DrawCommands[gl_GlobalInvocationID.x].InstanceCount = int(AABBVsFrustum(frustum, node));
+    drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = int(AABBVsFrustum(frustum, node));
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)

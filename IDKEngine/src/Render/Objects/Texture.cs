@@ -199,6 +199,11 @@ namespace IDKEngine.Render.Objects
             GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
         }
 
+        public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, T value, int level = 0) where T : struct
+        {
+            GL.ClearTexImage(ID, level, pixelFormat, pixelType, ref value);
+        }
+
 
         /// <summary>
         /// To properly generate mipmaps <see cref="TextureMinFilter"/> must be set to one of the mipmap options 

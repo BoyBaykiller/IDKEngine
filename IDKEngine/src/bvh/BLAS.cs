@@ -11,43 +11,42 @@ namespace IDKEngine
 
         public readonly ModelSystem ModelSystem;
         public readonly GLSLBlasNode[] Nodes;
-        public readonly GLSLVertex[] Vertices;
+        public readonly GLSLTriangle[] Triangles;
         public unsafe BLAS(ModelSystem modelSystem)
         {
-            Vertices = new GLSLVertex[modelSystem.Indices.Length];
-            Nodes = new GLSLBlasNode[Vertices.Length / 3 * 2];
+            Triangles = new GLSLTriangle[modelSystem.Indices.Length / 3];
+            Nodes = new GLSLBlasNode[Triangles.Length];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
                 GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
-                for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j++)
+                for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j += 3)
                 {
-                    Vertices[j] = modelSystem.Vertices[modelSystem.Indices[j] + cmd.BaseVertex];
+                    Triangles[j / 3].Vertex0 = modelSystem.Vertices[modelSystem.Indices[j + 0] + cmd.BaseVertex];
+                    Triangles[j / 3].Vertex1 = modelSystem.Vertices[modelSystem.Indices[j + 1] + cmd.BaseVertex];
+                    Triangles[j / 3].Vertex2 = modelSystem.Vertices[modelSystem.Indices[j + 2] + cmd.BaseVertex];
                 }
             }
 
             ParallelLoopResult bvhLoadResult = Parallel.For(0, modelSystem.Meshes.Length, (int i) =>
             {
                 GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
-                fixed (void* ptr = &Vertices[cmd.FirstIndex])
+                int baseTriangleCount = cmd.FirstIndex / 3;
+
+                Span<GLSLTriangle> traverseTriangles = new Span<GLSLTriangle>(Triangles, baseTriangleCount, cmd.Count / 3);
+                Span<GLSLBlasNode> nodes = new Span<GLSLBlasNode>(Nodes, baseTriangleCount, traverseTriangles.Length);
+
+                BuildBVH(traverseTriangles, nodes);
+
+                for (int j = 0; j < nodes.Length; j++)
                 {
-                    Span<GLSLTriangle> triangles = new Span<GLSLTriangle>(ptr, cmd.Count / 3);
-                    Span<GLSLBlasNode> nodes = new Span<GLSLBlasNode>(Nodes, cmd.FirstIndex / 3 * 2, triangles.Length * 2);
-
-                    BuildBVH(triangles, nodes);
-
-                    for (int j = 0; j < nodes.Length; j++)
+                    if (nodes[j].TriCount > 0)
                     {
-                        if (nodes[j].TriCount > 0)
-                        {
-                            nodes[j].TriStartOrLeftChild += (uint)cmd.FirstIndex / 3;
-                        }
+                        nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
                     }
-                    modelSystem.Meshes[i].NodeStart = cmd.FirstIndex / 3 * 2;
                 }
             });
             while (!bvhLoadResult.IsCompleted) ;
 
-            modelSystem.UpdateMeshBuffer(0, modelSystem.Meshes.Length);
             ModelSystem = modelSystem;
         }
 
@@ -63,9 +62,9 @@ namespace IDKEngine
             void Subdivide(Span<GLSLTriangle> triangles, Span<GLSLBlasNode> nodes, int nodeID = 0)
             {
                 ref GLSLBlasNode node = ref nodes[nodeID];
-                if (node.TriCount <= BLAS_MIN_TRIANGLE_COUNT_LEAF)
+                if (node.TriCount < BLAS_MIN_TRIANGLE_COUNT_LEAF)
                     return;
-
+                                
                 Vector3 extent = node.Max - node.Min;
                 int axis = 0;
                 if (extent.Y > extent.X) axis = 1;
@@ -126,5 +125,4 @@ namespace IDKEngine
             }
         }
     }
-    
 }
