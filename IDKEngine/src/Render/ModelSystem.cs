@@ -59,8 +59,10 @@ namespace IDKEngine.Render
             VAO.SetElementBuffer(elementBuffer);
             VAO.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLVertex));
             VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
-            VAO.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
-            VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 8); // Normals
+            VAO.SetAttribFormat(0, 1, 1, VertexAttribType.Float, sizeof(float) * 3); // TexCoordU
+            VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 4); // Normal
+            VAO.SetAttribFormat(0, 3, 1, VertexAttribType.Float, sizeof(float) * 7); // TexCoordV
+            VAO.SetAttribFormat(0, 4, 3, VertexAttribType.Float, sizeof(float) * 8); // Tangent
         }
 
         public unsafe void Add(Model[] models)
@@ -108,7 +110,7 @@ namespace IDKEngine.Render
                 for (int j = oldMeshesLength + loadedMeshes; j < oldMeshesLength + loadedMeshes + model.Meshes.Length; j++)
                 {
                     Meshes[j].MaterialIndex += oldMaterialsLength + loadedMaterials;
-                    Meshes[j].MatrixStart += oldModelsLength + loadedModels;
+                    Meshes[j].BaseMatrix += oldModelsLength + loadedModels;
                 }
 
                 loadedModels += model.Models.Length;
@@ -124,14 +126,9 @@ namespace IDKEngine.Render
             materialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
             vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices);
             elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
-
-            loadedModels = 0;
             modelMatricesBuffer.MutableAllocate(ModelMatrices.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
-            for (int i = 0; i < ModelMatrices.Length; i++)
-            {
-                modelMatricesBuffer.SubData(loadedModels * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), ModelMatrices[i]);
-                loadedModels += ModelMatrices[i].Length;
-            }
+
+            UpdateModelMatricesBuffer(0, ModelMatrices.Length);
         }
 
         public void Draw()

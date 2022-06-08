@@ -26,7 +26,28 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsPathTracing = false, IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false;
+        private bool _isPathTracing;
+        public bool IsPathTracing
+        {
+            get => _isPathTracing;
+
+            set
+            {
+                _isPathTracing = value;
+                GLSLBasicData.FreezeFramesCounter = 0;
+
+                // TODO: Add comment as to why we do that here lol
+                int i = 0;
+                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                {
+                    cmd.InstanceCount = ModelSystem.Meshes[i].InstanceCount;
+                });
+                PathTracer.Result.Clear(PixelFormat.Rgba, PixelType.Float, 0.0f);
+            }
+
+        }
+
+        public bool IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false;
         public int FPS;
         public Vector2i ViewportSize { get; private set; }
 
@@ -196,7 +217,6 @@ namespace IDKEngine
         public VolumetricLighter VolumetricLight;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
-        private BVH bvh;
         private Gui gui;
         public GLSLBasicData GLSLBasicData;
         protected override unsafe void OnStart()
@@ -281,7 +301,7 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            bvh = new BVH(new BLAS(ModelSystem));
+            BVH bvh = new BVH(new BLAS(ModelSystem));
 
             PathTracer = new PathTracer(bvh, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
@@ -362,10 +382,7 @@ namespace IDKEngine
             SSR.SetSize(width, height);
             SSAO.SetSize(width, height);
             PostCombine.SetSize(width, height);
-            if (IsPathTracing)
-            {
-                PathTracer.SetSize(width, height);
-            }
+            PathTracer.SetSize(width, height);
             
             GLSLBasicData.FreezeFramesCounter = 0;
 

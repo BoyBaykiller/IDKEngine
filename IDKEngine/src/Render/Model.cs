@@ -37,7 +37,7 @@ namespace IDKEngine.Render.Objects
         {
             string dirPath = Path.GetDirectoryName(path);
             scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices |
-                                                   PostProcessSteps.ImproveCacheLocality | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.RemoveRedundantMaterials | // PostProcessSteps.OptimizeMeshes | PostProcessSteps.OptimizeGraph | 
+                                                   PostProcessSteps.RemoveRedundantMaterials | // PostProcessSteps.OptimizeMeshes | PostProcessSteps.OptimizeGraph | 
                                                    PostProcessSteps.FlipUVs);
             Debug.Assert(scene != null);
 
@@ -64,19 +64,24 @@ namespace IDKEngine.Render.Objects
                     Vertices[baseVertex + j].Position.Y = mesh.Vertices[j].Y;
                     Vertices[baseVertex + j].Position.Z = mesh.Vertices[j].Z;
 
-                    Vertices[baseVertex + j].TexCoord.X = mesh.TextureCoordinateChannels[0][j].X;
-                    Vertices[baseVertex + j].TexCoord.Y = mesh.TextureCoordinateChannels[0][j].Y;
+                    Vertices[baseVertex + j].TexCoordU = mesh.TextureCoordinateChannels[0][j].X;
+                    Vertices[baseVertex + j].TexCoordV = mesh.TextureCoordinateChannels[0][j].Y;
                       
                     Vertices[baseVertex + j].Normal.X = mesh.Normals[j].X;
                     Vertices[baseVertex + j].Normal.Y = mesh.Normals[j].Y;
                     Vertices[baseVertex + j].Normal.Z = mesh.Normals[j].Z;
+
+                    Vector3 c1 = Vector3.Cross(Vertices[baseVertex + j].Normal, Vector3.UnitZ);
+                    Vector3 c2 = Vector3.Cross(Vertices[baseVertex + j].Normal, Vector3.UnitY);
+                    Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
+                    Vertices[baseVertex + j].Tangent = tangent;
                 }
 
                 Models[i] = new Matrix4[1] { Matrix4.Identity };
 
                 Meshes[i].InstanceCount = Models[i].Length;
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
-                Meshes[i].MatrixStart = i;
+                Meshes[i].BaseMatrix = i;
                 Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
                 Meshes[i].SpecularBias = 0.5f;
                 Meshes[i].RoughnessBias = 0.5f;
