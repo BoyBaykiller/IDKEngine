@@ -10,12 +10,12 @@ namespace IDKEngine
         public const int BLAS_MIN_TRIANGLE_COUNT_LEAF = 8;
 
         public readonly ModelSystem ModelSystem;
-        public readonly GLSLNode[] Nodes;
+        public readonly GLSLBlasNode[] Nodes;
         public readonly GLSLVertex[] Vertices;
         public unsafe BLAS(ModelSystem modelSystem)
         {
             Vertices = new GLSLVertex[modelSystem.Indices.Length];
-            Nodes = new GLSLNode[Vertices.Length / 3 * 2];
+            Nodes = new GLSLBlasNode[Vertices.Length / 3 * 2];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
                 GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
@@ -31,7 +31,7 @@ namespace IDKEngine
                 fixed (void* ptr = &Vertices[cmd.FirstIndex])
                 {
                     Span<GLSLTriangle> triangles = new Span<GLSLTriangle>(ptr, cmd.Count / 3);
-                    Span<GLSLNode> nodes = new Span<GLSLNode>(Nodes, cmd.FirstIndex / 3 * 2, triangles.Length * 2);
+                    Span<GLSLBlasNode> nodes = new Span<GLSLBlasNode>(Nodes, cmd.FirstIndex / 3 * 2, triangles.Length * 2);
 
                     BuildBVH(triangles, nodes);
 
@@ -51,18 +51,18 @@ namespace IDKEngine
             ModelSystem = modelSystem;
         }
 
-        private static void BuildBVH(Span<GLSLTriangle> tris, Span<GLSLNode> nodes)
+        private static void BuildBVH(Span<GLSLTriangle> tris, Span<GLSLBlasNode> nodes)
         {
             int nodesUsed = 1;
-            ref GLSLNode root = ref nodes[0];
+            ref GLSLBlasNode root = ref nodes[0];
             root.TriCount = (uint)tris.Length;
 
             UpdateNodeBounds(tris, ref root);
             Subdivide(tris, nodes);
 
-            void Subdivide(Span<GLSLTriangle> triangles, Span<GLSLNode> nodes, int nodeID = 0)
+            void Subdivide(Span<GLSLTriangle> triangles, Span<GLSLBlasNode> nodes, int nodeID = 0)
             {
-                ref GLSLNode node = ref nodes[nodeID];
+                ref GLSLBlasNode node = ref nodes[nodeID];
                 if (node.TriCount <= BLAS_MIN_TRIANGLE_COUNT_LEAF)
                     return;
 
@@ -108,7 +108,7 @@ namespace IDKEngine
             }
         }
 
-        private static unsafe void UpdateNodeBounds(Span<GLSLTriangle> triangles, ref GLSLNode node)
+        private static unsafe void UpdateNodeBounds(Span<GLSLTriangle> triangles, ref GLSLBlasNode node)
         {
             node.Min = new Vector3(float.MaxValue);
             node.Max = new Vector3(float.MinValue);
