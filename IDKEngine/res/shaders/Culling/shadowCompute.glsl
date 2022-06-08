@@ -28,9 +28,7 @@ struct Node
 struct Mesh
 {
     int InstanceCount;
-    int MatrixStart;
-    int NodeStart;
-    int BLASDepth;
+    int BaseMatrix;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -51,7 +49,7 @@ struct PointShadow
     int LightIndex;
 };
 
-layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO
+layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
 } drawCommandsSSBO;
@@ -90,17 +88,18 @@ layout(location = 0) uniform int ShadowIndex;
 // 4. Also write the InstanceCount into the draw command buffer - one instance for each mesh
 void main()
 {
-    const uint meshIndex = gl_GlobalInvocationID.x;
+    uint meshIndex = gl_GlobalInvocationID.x;
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
+    int baseNode = (drawCommandsSSBO.DrawCommands[meshIndex].FirstIndex / 3);
+    Node node = bvhSSBO.Nodes[baseNode];
     Mesh mesh = meshSSBO.Meshes[meshIndex];
-    Node node = bvhSSBO.Nodes[mesh.NodeStart];
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
     int instances = 0;
     int packedValue = 0;
-    mat4 model = matrixSSBO.Models[mesh.MatrixStart];
+    mat4 model = matrixSSBO.Models[mesh.BaseMatrix];
 
     for (int i = 0; i < 6; i++)
     {

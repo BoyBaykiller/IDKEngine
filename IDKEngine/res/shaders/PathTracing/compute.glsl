@@ -43,12 +43,19 @@ struct Material
     float _pad4;
 };
 
+struct DrawCommand
+{
+    int Count;
+    int InstanceCount;
+    int FirstIndex;
+    int BaseVertex;
+    int BaseInstance;
+};
+
 struct Mesh
 {
     int InstanceCount;
-    int MatrixStart;
-    int NodeStart;
-    int BLASDepth;
+    int BaseMatrix;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -60,13 +67,13 @@ struct Mesh
 struct Vertex
 {
     vec3 Position;
-    float _pad0;
-
-    vec2 TexCoord;
-    vec2 _pad1;
+    float TexCoordU;
 
     vec3 Normal;
-    float _pad2;
+    float TexCoordV;
+
+    vec3 Tangent;
+    float _pad0;
 };
 
 struct HitInfo
@@ -97,6 +104,11 @@ struct Triangle
     Vertex Vertex1;
     Vertex Vertex2;
 };
+
+layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
+{
+    DrawCommand DrawCommands[];
+} drawCommandsSSBO;
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
@@ -195,7 +207,6 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 
-bool debug = false;
 vec3 Radiance(Ray ray)
 {
     vec3 throughput = vec3(1.0);
@@ -226,19 +237,16 @@ vec3 Radiance(Ray ray)
                 
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
                 const int glInstanceID = 0; // TODO: Work out actual instanceID value
-                mat4 model = matrixSSBO.Models[mesh.MatrixStart + glInstanceID];
+                mat4 model = matrixSSBO.Models[mesh.BaseMatrix + glInstanceID];
 
-                vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
+                vec2 texCoord = Interpolate(vec2(v0.TexCoordU, v0.TexCoordV), vec2(v1.TexCoordU, v1.TexCoordV), vec2(v2.TexCoordU, v2.TexCoordV), hitInfo.Bary);
                 vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
-                vec3 c1 = cross(geoNormal, vec3(0.0, 0.0, 1.0));
-                vec3 c2 = cross(geoNormal, vec3(0.0, 1.0, 0.0));
-                vec3 tangent = dot(c1, c1) > dot(c2, c2) ? c1 : c2;
+                vec3 tangent = normalize(Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary));
 
                 vec3 T = normalize(vec3(model * vec4(tangent, 0.0)));
                 vec3 N = normalize(vec3(model * vec4(geoNormal, 0.0)));
                 T = normalize(T - dot(T, N) * N);
                 vec3 B = cross(N, T);
-
                 mat3 TBN = mat3(T, B, N);
                 
             #ifdef GL_NV_gpu_shader5
@@ -275,8 +283,7 @@ vec3 Radiance(Ray ray)
 				ray.Origin += normal * EPSILON;
 
             radiance += emissive * throughput;
-            if (!debug)
-                throughput *= albedo;
+            throughput *= albedo;
             throughput /= rayProbability;
 
             // Russian Roulette - unbiased method to terminate rays and therefore lower render times (also reduces fireflies)
@@ -302,19 +309,14 @@ vec3 Radiance(Ray ray)
 
 vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, out float rayProbability)
 {
-    float refractionChance = 0.0;
-    // specularChance = 1.0;
     if (specularChance > 0.0)
     {
         specularChance = mix(specularChance, 1.0, FresnelSchlick(dot(-incomming, normal), 1.0, 1.0));
-        float diffuseChance = 1.0 - specularChance - refractionChance;
-        refractionChance = 1.0 - specularChance - diffuseChance;
     }
 
     vec3 diffuseRay = CosineSampleHemisphere(normal);
     float raySelectRoll = GetRandomFloat01();
     vec3 outgoing;
-    debug = false;
     if (specularChance > raySelectRoll)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);
@@ -322,18 +324,10 @@ vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, ou
         outgoing = reflectionRayDir;
         rayProbability = specularChance;
     }
-    else if (specularChance + refractionChance > raySelectRoll)
-    {
-        vec3 refractionRayDir = refract(incomming, normal, 1.0);
-        refractionRayDir = normalize(mix(refractionRayDir, CosineSampleHemisphere(-normal), 0.0));
-        outgoing = refractionRayDir;
-        rayProbability = refractionChance;
-        debug = true;
-    }
     else
     {
         outgoing = diffuseRay;
-        rayProbability = 1.0 - specularChance - refractionChance;
+        rayProbability = 1.0 - specularChance;
     }
     rayProbability = max(rayProbability, EPSILON);
 
@@ -366,17 +360,21 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     uint stack[32];
     uint stackPtr;
     uint index;
+    int instanceOffset = 0;
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
-        const Mesh mesh = meshSSBO.Meshes[i];
+        DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
+        int baseNode = (cmd.FirstIndex / 3);
+        
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
-        const Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[mesh.MatrixStart + glInstanceID]));
+        Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[instanceOffset + glInstanceID]));
+        instanceOffset += cmd.InstanceCount;
         
         stackPtr = 0;
         index = 0;
         while (true)
         {
-            Node node = bvhSSBO.Nodes[mesh.NodeStart + index];
+            Node node = bvhSSBO.Nodes[baseNode + index];
             if (node.TriCount > 0)
             {
                 for (uint j = node.TriStartOrLeftChild; j < node.TriStartOrLeftChild + node.TriCount; j++)
@@ -393,40 +391,43 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
             }
             else
             {
+                float dist0;
                 float dist1;
-                float dist2;
 
-                uint child1 = node.TriStartOrLeftChild;
-                uint child2 = child1 + 1;
+                bool child0Hit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, t2) && t2 > 0.0 && dist0 < hitInfo.T;
+                bool child1Hit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, t2) && t2 > 0.0 && dist1 < hitInfo.T;
 
-                if (!(RayCuboidIntersect(localRay, bvhSSBO.Nodes[mesh.NodeStart + child1], dist1, t2) && t2 > 0.0 && dist1 < hitInfo.T))
-                    dist1 = FLOAT_MAX;
-                
-                if (!(RayCuboidIntersect(localRay, bvhSSBO.Nodes[mesh.NodeStart + child2], dist2, t2) && t2 > 0.0 && dist2 < hitInfo.T))
-                    dist2 = FLOAT_MAX;
-
-                // Make child1 and dist1 always be closest
-                if (dist1 > dist2)
+                if (child0Hit && child1Hit)
                 {
-                    float tempDist = dist1;
-                    dist1 = dist2;
-                    dist2 = tempDist;
-                    
-                    uint tempIndex = child1;
-                    child1 = child2;
-                    child2 = tempIndex; 
+                    if (dist0 < dist1)
+                    {
+                        index = node.TriStartOrLeftChild;
+                        stack[stackPtr++] = node.TriStartOrLeftChild + 1;
+                    }
+                    else
+                    {
+                        index = node.TriStartOrLeftChild + 1;
+                        stack[stackPtr++] = node.TriStartOrLeftChild;
+                    }
+                    continue;
                 }
 
-                if (dist1 != FLOAT_MAX)
+                if (child0Hit && !child1Hit)
                 {
-                    index = child1;
-                    if (dist2 != FLOAT_MAX)
-                        stack[stackPtr++] = child2;
+                    index = node.TriStartOrLeftChild;
+                    continue;
+                }
+
+                if (child1Hit && !child0Hit)
+                {
+                    index = node.TriStartOrLeftChild + 1;
                     continue;
                 }
             }
+            // Here: Neither traversed triangles nor hit children
+
             if (stackPtr == 0)
-                    break;
+                break;
             index = stack[--stackPtr];
         }
     }

@@ -1,15 +1,15 @@
 #version 460 core
 
 layout(location = 0) in vec3 Position;
-layout(location = 1) in vec2 TexCoord;
+layout(location = 1) in float TexCoordU;
 layout(location = 2) in vec3 Normal;
+layout(location = 3) in float TexCoordV;
+layout(location = 4) in vec3 Tangent;
 
 struct Mesh
 {
     int InstanceCount;
-    int MatrixStart;
-    int NodeStart;
-    int BLASDepth;
+    int BaseMatrix;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -73,19 +73,15 @@ out InOutVars
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    mat4 model = matrixSSBO.Models[mesh.MatrixStart + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + gl_InstanceID];
 
-    vec3 c1 = cross(Normal, vec3(0.0, 0.0, 1.0));
-    vec3 c2 = cross(Normal, vec3(0.0, 1.0, 0.0));
-    vec3 tangent = dot(c1, c1) > dot(c2, c2) ? c1 : c2;
-    
-    vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
+    vec3 T = normalize((model * vec4(Tangent, 0.0)).xyz);
     vec3 N = normalize((model * vec4(Normal, 0.0)).xyz);
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
 
     outData.TBN = mat3(T, B, N);
-    outData.TexCoord = TexCoord;
+    outData.TexCoord = vec2(TexCoordU, TexCoordV);
     outData.FragPos = (model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
     
