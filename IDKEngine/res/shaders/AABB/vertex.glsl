@@ -39,12 +39,19 @@ const vec3 positions[24] =
     vec3( 0.5, -0.5, -0.5 )
 };
 
+struct DrawCommand
+{
+    int Count;
+    int InstanceCount;
+    int FirstIndex;
+    int BaseVertex;
+    int BaseInstance;
+};
+
 struct Mesh
 {
     int InstanceCount;
-    int MatrixStart;
-    int NodeStart;
-    int BLASDepth;
+    int BaseMatrix;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -60,6 +67,11 @@ struct Node
     vec3 Max;
     uint TriCount;
 };
+
+layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
+{
+    DrawCommand DrawCommands[];
+} drawCommandsSSBO;
 
 layout(std430, binding = 1) restrict readonly buffer BVHSSBO
 {
@@ -92,13 +104,15 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
 } basicDataUBO;
 
+
 layout(location = 0) uniform int MeshIndex;
 
 void main()
 {
+    int baseNode = (drawCommandsSSBO.DrawCommands[MeshIndex].FirstIndex / 3);
+    Node node = bvhSSBO.Nodes[baseNode];
     Mesh mesh = meshSSBO.Meshes[MeshIndex];
-    Node node = bvhSSBO.Nodes[mesh.NodeStart];
-    mat4 model = matrixSSBO.Models[mesh.MatrixStart + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + gl_InstanceID];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;

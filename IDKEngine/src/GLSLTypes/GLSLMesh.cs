@@ -1,13 +1,9 @@
-﻿using OpenTK.Mathematics;
-
-namespace IDKEngine
+﻿namespace IDKEngine
 {
     public struct GLSLMesh
     {
         public int InstanceCount;
-        public int MatrixStart;
-        public int NodeStart;
-        public int BLASDepth;
+        public int BaseMatrix;
         public int MaterialIndex;
         public float Emissive;
         public float NormalMapStrength;
