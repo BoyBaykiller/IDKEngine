@@ -12,7 +12,7 @@ namespace IDKEngine
         public unsafe BVH(BLAS blas)
         {
             BVHBuffer = new BufferObject();
-            BVHBuffer.ImmutableAllocate(sizeof(GLSLNode) * blas.Nodes.Length, blas.Nodes, BufferStorageFlags.DynamicStorageBit);
+            BVHBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blas.Nodes.Length, blas.Nodes, BufferStorageFlags.DynamicStorageBit);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
 
             VertexBuffer = new BufferObject();
