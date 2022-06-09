@@ -160,7 +160,7 @@ namespace IDKEngine.Render
         /// </summary>
         public static void BindVRSNV(VariableRateShading variableRateShading)
         {
-            if (NV_SHADING_RATE_IMAGE && currentlyBound != variableRateShading.Result.ID)
+            if (NV_SHADING_RATE_IMAGE)
             {
                 GL.NV.BindShadingRateImage(variableRateShading.Result.ID);
                 currentlyBound = variableRateShading.Result.ID;
