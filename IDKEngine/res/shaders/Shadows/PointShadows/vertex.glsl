@@ -24,7 +24,7 @@ struct PointShadow
 struct Mesh
 {
     int InstanceCount;
-    int BaseMatrix;
+    int VisibleCubemapFacesInfo;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -62,13 +62,15 @@ void main()
 {
 #if IS_VERTEX_LAYERED_RENDERING
 
-    // gl_BaseInstance is a specific manipulated value from the culling shadowCompute shader
+    // visibleCubemapFacesInfo is a specific manipulated value from the culling shadowCompute shader
     // It contains 3 bit values, six at maximum, which represent the faces each instance of a mesh is visible on
+    int visibleCubemapFacesInfo = meshSSBO.Meshes[gl_DrawID].VisibleCubemapFacesInfo;
+
     const int MAX = 2 * 2 * 2 - 1;
-    gl_Layer = bitfieldExtract(gl_BaseInstance, 3 * gl_InstanceID, 3) & MAX;
+    gl_Layer = bitfieldExtract(visibleCubemapFacesInfo, 3 * gl_InstanceID, 3) & MAX;
     
     const int glInstanceID = 0; // TODO: Work out actual instanceID value
-    mat4 model = matrixSSBO.Models[meshSSBO.Meshes[gl_DrawID].BaseMatrix + glInstanceID];
+    mat4 model = matrixSSBO.Models[gl_BaseInstance + glInstanceID];
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
 
@@ -76,7 +78,7 @@ void main()
 
     // In multi pass shadows the layer is simply passed as a uniform before each pass
 
-    mat4 model = matrixSSBO.Models[meshSSBO.Meshes[gl_DrawID].BaseMatrix + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
 

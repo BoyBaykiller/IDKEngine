@@ -3,7 +3,7 @@
     public struct GLSLMesh
     {
         public int InstanceCount;
-        public int BaseMatrix;
+        private int VisibleCubemapFacesInfo;
         public int MaterialIndex;
         public float Emissive;
         public float NormalMapStrength;

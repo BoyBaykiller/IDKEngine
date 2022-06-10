@@ -55,7 +55,7 @@ struct DrawCommand
 struct Mesh
 {
     int InstanceCount;
-    int BaseMatrix;
+    int VisibleCubemapFacesInfo;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -82,6 +82,7 @@ struct HitInfo
     float T;
     uint TriangleIndex;
     int HitIndex;
+    int InstanceID;
 };
 
 struct Ray
@@ -235,9 +236,7 @@ vec3 Radiance(Ray ray)
                 Vertex v1 = triangle.Vertex1;
                 Vertex v2 = triangle.Vertex2;
                 
-                Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
-                const int glInstanceID = 0; // TODO: Work out actual instanceID value
-                mat4 model = matrixSSBO.Models[mesh.BaseMatrix + glInstanceID];
+                mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
 
                 vec2 texCoord = Interpolate(vec2(v0.TexCoordU, v0.TexCoordV), vec2(v1.TexCoordU, v1.TexCoordV), vec2(v2.TexCoordU, v2.TexCoordV), hitInfo.Bary);
                 vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
@@ -249,6 +248,7 @@ vec3 Radiance(Ray ray)
                 vec3 B = cross(N, T);
                 mat3 TBN = mat3(T, B, N);
                 
+                Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
             #ifdef GL_NV_gpu_shader5
                 Material material = materialUBO.Materials[mesh.MaterialIndex];
             #else
@@ -360,15 +360,13 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     uint stack[32];
     uint stackPtr;
     uint index;
-    int instanceOffset = 0;
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
         int baseNode = (cmd.FirstIndex / 3);
         
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
-        Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[instanceOffset + glInstanceID]));
-        instanceOffset += cmd.InstanceCount;
+        Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
         
         stackPtr = 0;
         index = 0;
@@ -386,6 +384,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                         hitInfo.T = baryT.w;
                         hitInfo.HitIndex = i;
                         hitInfo.TriangleIndex = j;
+                        hitInfo.InstanceID = cmd.BaseInstance + glInstanceID;
                     }
                 }
             }

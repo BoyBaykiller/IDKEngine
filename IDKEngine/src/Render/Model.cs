@@ -36,8 +36,9 @@ namespace IDKEngine.Render.Objects
         public unsafe Model(string path)
         {
             string dirPath = Path.GetDirectoryName(path);
-            scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices |
-                                                   PostProcessSteps.RemoveRedundantMaterials | // PostProcessSteps.OptimizeMeshes | PostProcessSteps.OptimizeGraph | 
+
+            scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.GenerateNormals |
+                                                   PostProcessSteps.RemoveRedundantMaterials |
                                                    PostProcessSteps.FlipUVs);
             Debug.Assert(scene != null);
 
@@ -47,8 +48,8 @@ namespace IDKEngine.Render.Objects
             Vertices = new GLSLVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
             Models = new Matrix4[scene.MeshCount][];
             Image<Rgba32>[] images = new Image<Rgba32>[scene.MaterialCount * perMaterialTextures.Length];
-
-            ParallelLoopResult vertecisLoadResult = Parallel.For(0, scene.MeshCount, i =>
+            
+            Task vertecisLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
             {
                 Mesh mesh = scene.Meshes[i];
 
@@ -64,8 +65,12 @@ namespace IDKEngine.Render.Objects
                     Vertices[baseVertex + j].Position.Y = mesh.Vertices[j].Y;
                     Vertices[baseVertex + j].Position.Z = mesh.Vertices[j].Z;
 
-                    Vertices[baseVertex + j].TexCoordU = mesh.TextureCoordinateChannels[0][j].X;
-                    Vertices[baseVertex + j].TexCoordV = mesh.TextureCoordinateChannels[0][j].Y;
+                    if (mesh.TextureCoordinateChannels[0].Count > 0)
+                    {
+                        Vertices[baseVertex + j].TexCoordU = mesh.TextureCoordinateChannels[0][j].X;
+                        Vertices[baseVertex + j].TexCoordV = mesh.TextureCoordinateChannels[0][j].Y;
+                    }
+
                       
                     Vertices[baseVertex + j].Normal.X = mesh.Normals[j].X;
                     Vertices[baseVertex + j].Normal.Y = mesh.Normals[j].Y;
@@ -81,17 +86,16 @@ namespace IDKEngine.Render.Objects
 
                 Meshes[i].InstanceCount = Models[i].Length;
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
-                Meshes[i].BaseMatrix = i;
                 Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
                 Meshes[i].SpecularBias = 0.5f;
                 Meshes[i].RoughnessBias = 0.5f;
 
                 // Drawcommand instance count may differ depending on culling. Mesh instance count doesn't
                 DrawCommands[i].InstanceCount = Meshes[i].InstanceCount;
-                DrawCommands[i].BaseInstance = 0;
+                DrawCommands[i].BaseInstance = i;
             });
 
-            ParallelLoopResult texturesLoadResult = Parallel.For(0, scene.MaterialCount * perMaterialTextures.Length, i =>
+            Task texturesLoadResult = Helper.InParallel(0, scene.MaterialCount * perMaterialTextures.Length, i =>
             {
                 int materialIndex = i / perMaterialTextures.Length;
                 int textureIndex = i % perMaterialTextures.Length;
@@ -101,7 +105,9 @@ namespace IDKEngine.Render.Objects
                     images[i] = Image.Load<Rgba32>(Path.Combine(dirPath, textureSlot.FilePath));
             });
 
-            List<uint> indices = new List<uint>();
+
+            List<uint> indices = new List<uint>(scene.Meshes.Sum(m => m.VertexCount));
+            vertecisLoadResult.Wait();
             for (int i = 0; i < scene.MeshCount; i++)
             {
                 DrawCommands[i].FirstIndex = indices.Count;
@@ -113,23 +119,7 @@ namespace IDKEngine.Render.Objects
             }
             Indices = indices.ToArray();
 
-            while (!vertecisLoadResult.IsCompleted && !texturesLoadResult.IsCompleted) ;
-
-            PreTransformMeshes(scene.RootNode, AssimpToOpenTKMat4(scene.RootNode.Transform));
-            void PreTransformMeshes(Node node, Matrix4 model)
-            {
-                Matrix4 parent = model;
-                for (int i = 0; i < node.ChildCount; i++)
-                {
-                    Matrix4 child = parent * AssimpToOpenTKMat4(node.Children[i].Transform);
-                    for (int j = 0; j < node.Children[i].MeshCount; j++)
-                    {
-                        Models[node.Children[i].MeshIndices[j]][0] *= child;
-                    }
-                    PreTransformMeshes(node.Children[i], child);
-                }
-            }
-
+            texturesLoadResult.Wait();
             for (int i = 0; i < Materials.Length; i++)
             {
                 for (int j = 0; j < perMaterialTextures.Length; j++)

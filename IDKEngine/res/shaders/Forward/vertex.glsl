@@ -9,7 +9,7 @@ layout(location = 4) in vec3 Tangent;
 struct Mesh
 {
     int InstanceCount;
-    int BaseMatrix;
+    int VisibleCubemapFacesInfo;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -72,9 +72,7 @@ out InOutVars
 
 void main()
 {
-    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + gl_InstanceID];
-
+    mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
     vec3 T = normalize((model * vec4(Tangent, 0.0)).xyz);
     vec3 N = normalize((model * vec4(Normal, 0.0)).xyz);
     T = normalize(T - dot(T, N) * N);
@@ -87,6 +85,7 @@ void main()
     
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
     
+    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     outData.Normal = Normal;
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
