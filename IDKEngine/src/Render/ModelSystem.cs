@@ -103,6 +103,8 @@ namespace IDKEngine.Render
 
                 for (int j = oldDrawCommandsLength + loadedDrawCommands; j < oldDrawCommandsLength + loadedDrawCommands + model.DrawCommands.Length; j++)
                 {
+                    // TODO: Fix calculation of base instance to account for more than 1 instance per model
+                    DrawCommands[j].BaseInstance += oldModelsLength + loadedModels;
                     DrawCommands[j].BaseVertex += oldVerticesLength + loadedVertices;
                     DrawCommands[j].FirstIndex += oldIndicesLength + loadedIndices;
                 }
@@ -110,7 +112,6 @@ namespace IDKEngine.Render
                 for (int j = oldMeshesLength + loadedMeshes; j < oldMeshesLength + loadedMeshes + model.Meshes.Length; j++)
                 {
                     Meshes[j].MaterialIndex += oldMaterialsLength + loadedMaterials;
-                    Meshes[j].BaseMatrix += oldModelsLength + loadedModels;
                 }
 
                 loadedModels += model.Models.Length;

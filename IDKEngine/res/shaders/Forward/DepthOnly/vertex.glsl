@@ -7,7 +7,7 @@ layout(location = 3) in float TexCoordV;
 struct Mesh
 {
     int InstanceCount;
-    int BaseMatrix;
+    int VisibleCubemapFacesInfo;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -60,10 +60,9 @@ out InOutVars
 
 void main()
 {
-    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
 
-    outData.MaterialIndex = mesh.MaterialIndex;
+    outData.MaterialIndex = meshSSBO.Meshes[gl_DrawID].MaterialIndex;
     outData.TexCoord = vec2(TexCoordU, TexCoordV);
 
     vec3 fragPos = (model * vec4(Position, 1.0)).xyz;

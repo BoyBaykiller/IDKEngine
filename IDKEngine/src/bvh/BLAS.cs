@@ -27,7 +27,7 @@ namespace IDKEngine
                 }
             }
 
-            ParallelLoopResult bvhLoadResult = Parallel.For(0, modelSystem.Meshes.Length, (int i) =>
+            Helper.InParallel(0, modelSystem.Meshes.Length, i =>
             {
                 GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
                 int baseTriangleCount = cmd.FirstIndex / 3;
@@ -44,8 +44,7 @@ namespace IDKEngine
                         nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
                     }
                 }
-            });
-            while (!bvhLoadResult.IsCompleted) ;
+            }).Wait();
 
             ModelSystem = modelSystem;
         }

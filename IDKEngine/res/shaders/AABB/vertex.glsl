@@ -51,7 +51,7 @@ struct DrawCommand
 struct Mesh
 {
     int InstanceCount;
-    int BaseMatrix;
+    int VisibleCubemapFacesInfo;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -109,10 +109,9 @@ layout(location = 0) uniform int MeshIndex;
 
 void main()
 {
-    int baseNode = (drawCommandsSSBO.DrawCommands[MeshIndex].FirstIndex / 3);
-    Node node = bvhSSBO.Nodes[baseNode];
-    Mesh mesh = meshSSBO.Meshes[MeshIndex];
-    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + gl_InstanceID];
+    DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[MeshIndex];
+    Node node = bvhSSBO.Nodes[meshCMD.FirstIndex / 3];
+    mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + gl_InstanceID];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;

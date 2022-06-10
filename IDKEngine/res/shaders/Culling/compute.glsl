@@ -27,7 +27,7 @@ struct Node
 struct Mesh
 {
     int InstanceCount;
-    int BaseMatrix;
+    int VisibleCubemapFacesInfo;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -68,12 +68,11 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    int baseNode = (drawCommandsSSBO.DrawCommands[meshIndex].FirstIndex / 3);
-    Node node = bvhSSBO.Nodes[baseNode];
-    Mesh mesh = meshSSBO.Meshes[meshIndex];
+    DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[meshIndex];
+    Node node = bvhSSBO.Nodes[meshCMD.FirstIndex / 3];
     
     const int glInstanceID = 0; // TODO: Derive from built in variables
-    mat4 model = matrixSSBO.Models[mesh.BaseMatrix + glInstanceID];
+    mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + glInstanceID];
     
     Frustum frustum = ExtractFrustum(ProjView * model);
     drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = int(AABBVsFrustum(frustum, node));

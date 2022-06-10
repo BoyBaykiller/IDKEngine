@@ -28,7 +28,7 @@ struct Node
 struct Mesh
 {
     int InstanceCount;
-    int BaseMatrix;
+    int VisibleCubemapFacesInfo;
     int MaterialIndex;
     float Emissive;
     float NormalMapStrength;
@@ -59,7 +59,7 @@ layout(std430, binding = 1) restrict readonly buffer BVHSSBO
     Node Nodes[];
 } bvhSSBO;
 
-layout(std430, binding = 2) restrict readonly buffer MeshSSBO
+layout(std430, binding = 2) restrict writeonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
@@ -84,7 +84,7 @@ layout(location = 0) uniform int ShadowIndex;
 
 // 1. Count number of shadow-cubemap-faces the mesh is visible from the shadow source
 // 2. Pack each visible face into a single int
-// 3. Write the packed int into the BaseInstance draw command paramter. The shadow vertex shader will access this variable
+// 3. Write the packed int into a global variable. The shadow vertex shader will access this variable
 // 4. Also write the InstanceCount into the draw command buffer - one instance for each mesh
 void main()
 {
@@ -92,14 +92,13 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    int baseNode = (drawCommandsSSBO.DrawCommands[meshIndex].FirstIndex / 3);
-    Node node = bvhSSBO.Nodes[baseNode];
-    Mesh mesh = meshSSBO.Meshes[meshIndex];
+    DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[meshIndex];
+    Node node = bvhSSBO.Nodes[meshCMD.FirstIndex / 3];
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
     int instances = 0;
     int packedValue = 0;
-    mat4 model = matrixSSBO.Models[mesh.BaseMatrix];
+    mat4 model = matrixSSBO.Models[meshCMD.BaseInstance];
 
     for (int i = 0; i < 6; i++)
     {
@@ -110,7 +109,7 @@ void main()
         }
     }
     drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = instances;
-    drawCommandsSSBO.DrawCommands[meshIndex].BaseInstance = packedValue;
+    meshSSBO.Meshes[meshIndex].VisibleCubemapFacesInfo = packedValue;
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)

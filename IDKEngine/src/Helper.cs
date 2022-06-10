@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
@@ -73,6 +75,18 @@ namespace IDKEngine
             T temp = first;
             first = other;
             other = temp;
+        }
+
+        public delegate void FuncRunParallel(int i);
+        public static Task InParallel(int start, int endExclusive, FuncRunParallel func)
+        {
+            return Task.Run(() =>
+            {
+                Parallel.For(0, endExclusive, i =>
+                {
+                    func(start + i);
+                });
+            });
         }
 
         private static readonly Random rng = new Random();

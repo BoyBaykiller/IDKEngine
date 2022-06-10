@@ -48,6 +48,8 @@ namespace IDKEngine.Render
             {
                 ImGui.Text($"FPS: {window.FPS}");
                 ImGui.Text($"Viewport size: {window.ViewportSize.X}x{window.ViewportSize.Y}");
+                if (window.IsPathTracing)
+                    ImGui.Text($"Samples taken: {window.GLSLBasicData.FreezeFramesCounter}");
 
                 string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
                 string current = window.IsPathTracing ? renderModes[1] : renderModes[0];
@@ -383,11 +385,11 @@ namespace IDKEngine.Render
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"IndicesCount: {cmd.Count}");
 
-                    System.Numerics.Vector3 systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[mesh.BaseMatrix][0].ExtractTranslation());
+                    System.Numerics.Vector3 systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[cmd.BaseInstance][0].ExtractTranslation());
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
                         hadChange = true;
-                        window.ModelSystem.ModelMatrices[mesh.BaseMatrix][0] = window.ModelSystem.ModelMatrices[mesh.BaseMatrix][0].ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
+                        window.ModelSystem.ModelMatrices[cmd.BaseInstance][0] = window.ModelSystem.ModelMatrices[cmd.BaseInstance][0].ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
                     }
 
                     if (ImGui.SliderFloat("Emissive", ref mesh.Emissive, 0.0f, 100.0f))
