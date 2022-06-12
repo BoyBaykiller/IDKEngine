@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Linq;
 using System.Diagnostics;
-using System.Threading.Tasks;
+using System.Threading;
 using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
@@ -48,8 +48,8 @@ namespace IDKEngine.Render.Objects
             Vertices = new GLSLVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
             Models = new Matrix4[scene.MeshCount][];
             Image<Rgba32>[] images = new Image<Rgba32>[scene.MaterialCount * perMaterialTextures.Length];
-            
-            Task vertecisLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
+
+            Thread vertecisLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
             {
                 Mesh mesh = scene.Meshes[i];
 
@@ -95,7 +95,7 @@ namespace IDKEngine.Render.Objects
                 DrawCommands[i].BaseInstance = i;
             });
 
-            Task texturesLoadResult = Helper.InParallel(0, scene.MaterialCount * perMaterialTextures.Length, i =>
+            Thread texturesLoadResult = Helper.InParallel(0, scene.MaterialCount * perMaterialTextures.Length, i =>
             {
                 int materialIndex = i / perMaterialTextures.Length;
                 int textureIndex = i % perMaterialTextures.Length;
@@ -107,7 +107,7 @@ namespace IDKEngine.Render.Objects
 
 
             List<uint> indices = new List<uint>(scene.Meshes.Sum(m => m.VertexCount));
-            vertecisLoadResult.Wait();
+            vertecisLoadResult.Join();
             for (int i = 0; i < scene.MeshCount; i++)
             {
                 DrawCommands[i].FirstIndex = indices.Count;
@@ -119,7 +119,7 @@ namespace IDKEngine.Render.Objects
             }
             Indices = indices.ToArray();
 
-            texturesLoadResult.Wait();
+            texturesLoadResult.Join();
             for (int i = 0; i < Materials.Length; i++)
             {
                 for (int j = 0; j < perMaterialTextures.Length; j++)

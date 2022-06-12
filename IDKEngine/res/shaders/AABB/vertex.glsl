@@ -110,7 +110,7 @@ layout(location = 0) uniform int MeshIndex;
 void main()
 {
     DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[MeshIndex];
-    Node node = bvhSSBO.Nodes[meshCMD.FirstIndex / 3];
+    Node node = bvhSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + gl_InstanceID];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;

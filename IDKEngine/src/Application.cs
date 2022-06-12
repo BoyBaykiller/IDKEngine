@@ -129,6 +129,7 @@ namespace IDKEngine
 
             GL.Viewport(0, 0, WindowSize.X, WindowSize.Y);
             Framebuffer.Bind(0);
+            GLSLBasicData.FreezeFramesCounter++;
 
             if (renderGui)
             {
@@ -140,7 +141,6 @@ namespace IDKEngine
                 FinalProgram.Use();
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             }
-            GLSLBasicData.FreezeFramesCounter++;
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
@@ -245,6 +245,7 @@ namespace IDKEngine
             gui.ImGuiBackend.IsIgnoreMouseInput = true;
 
             camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
+            //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.Models.Length; i++) // 0.0145f
@@ -293,7 +294,7 @@ namespace IDKEngine
             }
             
             ForwardRenderer = new Forward(new Lighter(20, 20), WindowSize.X, WindowSize.Y, 6);
-            Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 8.0f);
+            Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 3.0f);
             SSR = new SSR(WindowSize.X, WindowSize.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             SSAO = new SSAO(WindowSize.X, WindowSize.Y, 16, 0.25f, 2.0f);
@@ -301,7 +302,10 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            BVH bvh = new BVH(new BLAS(ModelSystem));
+            var timer = Stopwatch.StartNew();
+            BVH bvh = new BVH(ModelSystem);
+            timer.Stop();
+            Console.WriteLine($"BVH build time in sec: {timer.ElapsedMilliseconds / 1000.0f}");
 
             PathTracer = new PathTracer(bvh, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube

@@ -189,8 +189,8 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rngSeed = basicDataUBO.FreezeFramesCounter;
-    //rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FreezeFramesCounter * 2699 | 1;
+    //rngSeed = basicDataUBO.FreezeFramesCounter;
+    rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FreezeFramesCounter * 2699 | 1;
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -363,7 +363,7 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
-        int baseNode = (cmd.FirstIndex / 3);
+        int baseNode = 2 * (cmd.FirstIndex / 3);
         
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
@@ -393,38 +393,32 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                 float dist0;
                 float dist1;
 
-                bool child0Hit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, t2) && t2 > 0.0 && dist0 < hitInfo.T;
-                bool child1Hit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, t2) && t2 > 0.0 && dist1 < hitInfo.T;
-
-                if (child0Hit && child1Hit)
+                bool leftChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, t2) && t2 > 0.0 && dist0 < hitInfo.T;
+                bool rightChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, t2) && t2 > 0.0 && dist1 < hitInfo.T;
+                
+                if (leftChildHit || rightChildHit)
                 {
-                    if (dist0 < dist1)
+                    // Note: We add 1 to the left child to get the right child
+                    // This allows to remove some branches by converting a bool to int and adding it
+
+                    // If both children are hit assign the closest to index to traverse down next
+                    // and put further onto stack for traversing up if we need to
+                    if (leftChildHit && rightChildHit)
                     {
-                        index = node.TriStartOrLeftChild;
-                        stack[stackPtr++] = node.TriStartOrLeftChild + 1;
+                        index = node.TriStartOrLeftChild + (1 - int(dist0 < dist1));
+                        stack[stackPtr++] = node.TriStartOrLeftChild + int(dist0 < dist1);
                     }
                     else
                     {
-                        index = node.TriStartOrLeftChild + 1;
-                        stack[stackPtr++] = node.TriStartOrLeftChild;
+                        // Assign the one child that was hit to index to traverse down next
+                        index = node.TriStartOrLeftChild + int(rightChildHit && !leftChildHit);
                     }
                     continue;
                 }
-
-                if (child0Hit && !child1Hit)
-                {
-                    index = node.TriStartOrLeftChild;
-                    continue;
-                }
-
-                if (child1Hit && !child0Hit)
-                {
-                    index = node.TriStartOrLeftChild + 1;
-                    continue;
-                }
+               
             }
-            // Here: Neither traversed triangles nor hit children
-
+            // Here: On a leaf node or didn't hit any children which means we should traverse up
+            
             if (stackPtr == 0)
                 break;
             index = stack[--stackPtr];

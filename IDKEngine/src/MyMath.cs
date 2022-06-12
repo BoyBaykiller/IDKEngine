@@ -233,5 +233,10 @@ namespace IDKEngine
         {
             return (p0 + p1 + p2) * (1.0f / 3.0f);
         }
+
+        public static float Area(Vector3 size)
+        {
+            return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+        }
     }
 }
