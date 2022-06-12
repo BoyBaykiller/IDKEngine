@@ -69,7 +69,7 @@ void main()
         return;
 
     DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[meshIndex];
-    Node node = bvhSSBO.Nodes[meshCMD.FirstIndex / 3];
+    Node node = bvhSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     
     const int glInstanceID = 0; // TODO: Derive from built in variables
     mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + glInstanceID];

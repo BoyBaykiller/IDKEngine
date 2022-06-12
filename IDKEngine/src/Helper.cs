@@ -78,15 +78,17 @@ namespace IDKEngine
         }
 
         public delegate void FuncRunParallel(int i);
-        public static Task InParallel(int start, int endExclusive, FuncRunParallel func)
+        public static Thread InParallel(int start, int endExclusive, FuncRunParallel func)
         {
-            return Task.Run(() =>
+            Thread thread = new Thread(() =>
             {
                 Parallel.For(0, endExclusive, i =>
                 {
                     func(start + i);
                 });
             });
+            thread.Start();
+            return thread;
         }
 
         private static readonly Random rng = new Random();

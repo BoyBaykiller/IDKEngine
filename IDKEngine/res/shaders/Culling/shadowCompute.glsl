@@ -93,7 +93,7 @@ void main()
         return;
 
     DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[meshIndex];
-    Node node = bvhSSBO.Nodes[meshCMD.FirstIndex / 3];
+    Node node = bvhSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
     int instances = 0;
