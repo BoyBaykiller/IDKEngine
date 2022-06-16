@@ -411,12 +411,12 @@ namespace IDKEngine.Render
                         hadChange = true;
                     }
 
-                    if (ImGui.SliderFloat("SpecularChance", ref mesh.SpecularBias, 0.0f, 1.0f))
+                    if (ImGui.SliderFloat("SpecularBias", ref mesh.SpecularBias, -1.0f, 1.0f))
                     {
                         hadChange = true;
                     }
 
-                    if (ImGui.SliderFloat("Roughness", ref mesh.RoughnessBias, 0.0f, 1.0f))
+                    if (ImGui.SliderFloat("RoughnessBias", ref mesh.RoughnessBias, -1.0f, 1.0f))
                     {
                         hadChange = true;
                     }
@@ -501,7 +501,7 @@ namespace IDKEngine.Render
         {
             ImGuiIOPtr io = ImGui.GetIO();
 
-            if (!window.IsPathTracing && isHoveredViewport && window.MouseState[MouseButton.Left] == InputState.Touched)
+            if (isHoveredViewport && window.MouseState[MouseButton.Left] == InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 point -= SystemToOpenTK(viewportPos);

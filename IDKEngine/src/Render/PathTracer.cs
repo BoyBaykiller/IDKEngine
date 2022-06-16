@@ -8,84 +8,84 @@ namespace IDKEngine.Render
     {
         public readonly Texture Result;
 
-		private int _rayDepth;
-		public int RayDepth
-		{
-			get => _rayDepth;
+        private int _rayDepth;
+        public int RayDepth
+        {
+            get => _rayDepth;
 
-			set
-			{
-				_rayDepth = value;
-				shaderProgram.Upload("RayDepth", value);
-			}
-		}
+            set
+            {
+                _rayDepth = value;
+                shaderProgram.Upload("RayDepth", value);
+            }
+        }
 
-		private float _focalLength;
-		public float FocalLength
-		{
-			get => _focalLength;
+        private float _focalLength;
+        public float FocalLength
+        {
+            get => _focalLength;
 
-			set
-			{
-				_focalLength = value;
-				shaderProgram.Upload("FocalLength", value);
-			}
-		}
+            set
+            {
+                _focalLength = value;
+                shaderProgram.Upload("FocalLength", value);
+            }
+        }
 
-		private float _apertureDiameter;
-		public float ApertureDiameter
-		{
-			get => _apertureDiameter;
+        private float _apertureDiameter;
+        public float ApertureDiameter
+        {
+            get => _apertureDiameter;
 
-			set
-			{
-				_apertureDiameter = value;
-				shaderProgram.Upload("ApertureDiameter", value);
-			}
-		}
+            set
+            {
+                _apertureDiameter = value;
+                shaderProgram.Upload("ApertureDiameter", value);
+            }
+        }
 
-		private bool _isDebugBVHTraversal;
-		public bool IsDebugBVHTraversal
-		{
-			get => _isDebugBVHTraversal;
+        private bool _isDebugBVHTraversal;
+        public bool IsDebugBVHTraversal
+        {
+            get => _isDebugBVHTraversal;
 
-			set
-			{
-				_isDebugBVHTraversal = value;
-				shaderProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
-				if (_isDebugBVHTraversal)
+            set
+            {
+                _isDebugBVHTraversal = value;
+                shaderProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
+                if (_isDebugBVHTraversal)
                 {
-					shaderProgram.Upload("ApertureDiameter", 0.0f);
-					shaderProgram.Upload("RayDepth", 1);
-				}
-				else
+                    shaderProgram.Upload("ApertureDiameter", 0.0f);
+                    shaderProgram.Upload("RayDepth", 1);
+                }
+                else
                 {
-					ApertureDiameter = _apertureDiameter;
-					RayDepth = _rayDepth;
-				}
-			}
-		}
+                    ApertureDiameter = _apertureDiameter;
+                    RayDepth = _rayDepth;
+                }
+            }
+        }
 
-		public Texture EnvironmentMap;
+        public Texture EnvironmentMap;
         public ModelSystem ModelSystem;
         public readonly BVH BVH;
-		private readonly ShaderProgram shaderProgram;
-		public PathTracer(BVH bvh, ModelSystem modelSystem, Texture environmentMap, int width, int height)
+        private readonly ShaderProgram shaderProgram;
+        public PathTracer(BVH bvh, ModelSystem modelSystem, Texture environmentMap, int width, int height)
         {
-			shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
+            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
 
-			Result = new Texture(TextureTarget2d.Texture2D);
+            Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-			Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba32f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba32f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
             EnvironmentMap = environmentMap;
             ModelSystem = modelSystem;
             BVH = bvh;
 
-			RayDepth = 6;
-			FocalLength = 10.0f;
-			ApertureDiameter = 0.03f;
+            RayDepth = 6;
+            FocalLength = 10.0f;
+            ApertureDiameter = 0.03f;
         }
 
         public void Compute()
@@ -101,6 +101,6 @@ namespace IDKEngine.Render
         public void SetSize(int width, int height)
         {
             Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
-		}
+        }
     }
 }
