@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    public struct GLSLVertex
+    public struct GLSLDrawVertex
     {
         public Vector3 Position;
         public float TexCoordU;

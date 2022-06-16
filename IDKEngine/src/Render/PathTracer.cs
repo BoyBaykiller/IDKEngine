@@ -44,6 +44,18 @@ namespace IDKEngine.Render
 			}
 		}
 
+		private bool _isDebugBVHTraversal;
+		public bool IsDebugBVHTraversal
+		{
+			get => _isDebugBVHTraversal;
+
+			set
+			{
+				_isDebugBVHTraversal = value;
+				shaderProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
+			}
+		}
+
 		public Texture EnvironmentMap;
         public ModelSystem ModelSystem;
         public readonly BVH BVH;

@@ -21,7 +21,7 @@ namespace IDKEngine.Render
         public GLSLMaterial[] Materials;
         private readonly BufferObject materialBuffer;
 
-        public GLSLVertex[] Vertices;
+        public GLSLDrawVertex[] Vertices;
         private readonly BufferObject vertexBuffer;
 
         public uint[] Indices;
@@ -45,7 +45,7 @@ namespace IDKEngine.Render
             materialBuffer = new BufferObject();
             materialBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
-            Vertices = new GLSLVertex[0];
+            Vertices = new GLSLDrawVertex[0];
             vertexBuffer = new BufferObject();
 
             Indices = new uint[0];
@@ -57,7 +57,7 @@ namespace IDKEngine.Render
 
             VAO = new VAO();
             VAO.SetElementBuffer(elementBuffer);
-            VAO.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLVertex));
+            VAO.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLDrawVertex));
             VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
             VAO.SetAttribFormat(0, 1, 1, VertexAttribType.Float, sizeof(float) * 3); // TexCoordU
             VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 4); // Normal
@@ -125,7 +125,7 @@ namespace IDKEngine.Render
             drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands);
             meshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes);
             materialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
-            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLVertex), Vertices);
+            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLDrawVertex), Vertices);
             elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
             modelMatricesBuffer.MutableAllocate(ModelMatrices.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
 

@@ -353,8 +353,6 @@ namespace IDKEngine
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
 
-            // I know this is bad practice but BVH polutes memory
-            // and it doesn't seem to get cleaned up anytime soon without this
             GC.Collect();
         }
 

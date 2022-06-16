@@ -27,7 +27,7 @@ namespace IDKEngine.Render.Objects
         public readonly GLSLDrawCommand[] DrawCommands;
         public readonly GLSLMesh[] Meshes;
         public readonly GLSLMaterial[] Materials;
-        public readonly GLSLVertex[] Vertices;
+        public readonly GLSLDrawVertex[] Vertices;
         public readonly uint[] Indices;
 
         public readonly Matrix4[][] Models;
@@ -45,7 +45,7 @@ namespace IDKEngine.Render.Objects
             DrawCommands = new GLSLDrawCommand[scene.MeshCount];
             Meshes = new GLSLMesh[scene.MeshCount];
             Materials = new GLSLMaterial[scene.MaterialCount];
-            Vertices = new GLSLVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
+            Vertices = new GLSLDrawVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
             Models = new Matrix4[scene.MeshCount][];
             Image<Rgba32>[] images = new Image<Rgba32>[scene.MaterialCount * perMaterialTextures.Length];
 
