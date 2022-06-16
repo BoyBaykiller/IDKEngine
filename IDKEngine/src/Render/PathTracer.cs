@@ -53,6 +53,16 @@ namespace IDKEngine.Render
 			{
 				_isDebugBVHTraversal = value;
 				shaderProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
+				if (_isDebugBVHTraversal)
+                {
+					shaderProgram.Upload("ApertureDiameter", 0.0f);
+					shaderProgram.Upload("RayDepth", 1);
+				}
+				else
+                {
+					ApertureDiameter = _apertureDiameter;
+					RayDepth = _rayDepth;
+				}
 			}
 		}
 

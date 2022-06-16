@@ -176,6 +176,7 @@ uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 uint EmulateNonUniform(uint index);
+vec3 SpectralJet(float w);
 
 uniform int RayDepth;
 uniform float FocalLength;
@@ -194,7 +195,7 @@ void main()
     //rngSeed = basicDataUBO.FreezeFramesCounter;
     rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FreezeFramesCounter * 2699 | 1;
 
-    vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
+    vec2 subPixelOffset = IsDebugBVHTraversal ? vec2(0.5) : vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
     Ray camRay = Ray(basicDataUBO.ViewPos, GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc));
 
@@ -206,10 +207,10 @@ void main()
     vec3 irradiance = Radiance(camRay);
     if (IsDebugBVHTraversal)
     {
-        const vec3 maxCol = vec3(1.0, 0.0, 0.0);
-        const vec3 minCol = vec3(0.0, 0.0, 1.0);
-
-        irradiance = mix(minCol, maxCol, clamp(debugBLASCounter / 200.0, 0.0, 1.0));
+        // use visible light spectrum as heatmap
+        float waveLength = min(debugBLASCounter * 2.5 + 400.0, 700.0);
+        vec3 col = SpectralJet(waveLength);
+        irradiance = col;
     }
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
@@ -223,7 +224,7 @@ vec3 Radiance(Ray ray)
     vec3 radiance = vec3(0.0);
 
     HitInfo hitInfo;
-    for (int i = 0; i < (IsDebugBVHTraversal ? 1 : RayDepth); i++)
+    for (int i = 0; i < RayDepth; i++)
     {
         if (TraceRay(ray, hitInfo))
         {
@@ -402,16 +403,40 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
                         hitInfo.InstanceID = cmd.BaseInstance + glInstanceID;
                     }
                 }
-                if (stackPtr == 0) break;
-                stackTop = stack[--stackPtr];
             }
             else
             {
                 debugBLASCounter++;
 
-                stackTop = node.TriStartOrLeftChild;
-                stack[stackPtr++] = node.TriStartOrLeftChild + 1;
+                float dist0;
+                float dist1;
+
+                bool leftChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, nodeTMax) && nodeTMax > 0.0 && dist0 < hitInfo.T;
+                bool rightChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, nodeTMax) && nodeTMax > 0.0 && dist1 < hitInfo.T;
+                
+                if (leftChildHit || rightChildHit)
+                {
+                    // Note: We add 1 to the left child to get the right child
+                    // This allows to remove some branches by converting a bool to int and adding it
+
+                    // If both children are hit assign the closest to stackTop to traverse down next
+                    // and put further onto stack for traversing up if we need to
+                    if (leftChildHit && rightChildHit)
+                    {
+                        stackTop = node.TriStartOrLeftChild + (1 - int(dist0 < dist1));
+                        stack[stackPtr++] = node.TriStartOrLeftChild + int(dist0 < dist1);
+                    }
+                    else
+                    {
+                        // Assign the one child that was hit to stackTop to traverse down next
+                        stackTop = node.TriStartOrLeftChild + int(rightChildHit && !leftChildHit);
+                    }
+                    continue;
+                }
             }
+            // Here: On a leaf node or didn't hit any children which means we should traverse up
+            if (stackPtr == 0) break;
+            stackTop = stack[--stackPtr];
         }
     }
 
@@ -544,3 +569,22 @@ uint EmulateNonUniform(uint index)
     }
 }
 #endif
+
+
+// Source: https://www.shadertoy.com/view/ls2Bz1
+vec3 SpectralJet(float w)
+{
+	float x = clamp((w - 400.0)/ 300.0, 0.0, 1.0);
+	vec3 c;
+
+	if (x < 0.25)
+		c = vec3(0.0, 4.0 * x, 1.0);
+	else if (x < 0.5)
+		c = vec3(0.0, 1.0, 1.0 + 4.0 * (0.25 - x));
+	else if (x < 0.75)
+		c = vec3(4.0 * (x - 0.5), 1.0, 0.0);
+	else
+		c = vec3(1.0, 1.0 + 4.0 * (0.75 - x), 0.0);
+
+	return clamp(c, vec3(0.0), vec3(1.0));
+}
