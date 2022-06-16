@@ -163,7 +163,7 @@ layout(std140, binding = 3) uniform LightsUBO
 vec3 Radiance(Ray ray);
 vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, out float rayProbability);
 float FresnelSchlick(float cosTheta, float n1, float n2);
-bool RayTrace(Ray ray, out HitInfo hitInfo);
+bool TraceRay(Ray ray, out HitInfo hitInfo);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
 bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
 bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
@@ -180,8 +180,10 @@ uint EmulateNonUniform(uint index);
 uniform int RayDepth;
 uniform float FocalLength;
 uniform float ApertureDiameter;
+uniform bool IsDebugBVHTraversal;
 
 uint rngSeed;
+uint debugBLASCounter = 0;
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);
@@ -202,6 +204,13 @@ void main()
     camRay.Origin = (basicDataUBO.InvView * vec4(offset, 0.0, 1.0)).xyz;
     camRay.Direction = normalize(focalPoint - camRay.Origin);
     vec3 irradiance = Radiance(camRay);
+    if (IsDebugBVHTraversal)
+    {
+        const vec3 maxCol = vec3(1.0, 0.0, 0.0);
+        const vec3 minCol = vec3(0.0, 0.0, 1.0);
+
+        irradiance = mix(minCol, maxCol, clamp(debugBLASCounter / 200.0, 0.0, 1.0));
+    }
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
     irradiance = mix(lastFrameColor, irradiance, 1.0 / (basicDataUBO.FreezeFramesCounter + 1.0));
@@ -214,9 +223,9 @@ vec3 Radiance(Ray ray)
     vec3 radiance = vec3(0.0);
 
     HitInfo hitInfo;
-    for (int i = 0; i < RayDepth; i++)
+    for (int i = 0; i < (IsDebugBVHTraversal ? 1 : RayDepth); i++)
     {
-        if (RayTrace(ray, hitInfo))
+        if (TraceRay(ray, hitInfo))
         {
             // Render wireframe
             // return float(any(lessThan(hitInfo.Bary, vec3(0.01)))).xxx;
@@ -341,25 +350,23 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }
 
-bool RayTrace(Ray ray, out HitInfo hitInfo)
+bool TraceRay(Ray ray, out HitInfo hitInfo)
 {
     hitInfo.T = FLOAT_MAX;
-    float t1, t2;
+    float rayTMin, rayTMax;
 
     for (int i = 0; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
-        if (RaySphereIntersect(ray, light, t1, t2) && t2 > 0.0 && t1 < hitInfo.T)
+        if (RaySphereIntersect(ray, light, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T)
         {
-            hitInfo.T = t1;
+            hitInfo.T = rayTMin;
             hitInfo.HitIndex = -i - 1;
         }
     }
 
     vec4 baryT;
-    uint stack[32];
-    uint stackPtr;
-    uint index;
+    float nodeTMin, nodeTMax;
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
@@ -368,11 +375,19 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
         
-        stackPtr = 0;
-        index = 0;
+        uint stack[32];
+        uint stackPtr = 0;
+        uint stackTop = 0;
         while (true)
         {
-            Node node = bvhSSBO.Nodes[baseNode + index];
+            Node node = bvhSSBO.Nodes[baseNode + stackTop];
+            if (!(RayCuboidIntersect(localRay, node, nodeTMin, nodeTMax) && nodeTMax > 0.0 && nodeTMin < hitInfo.T))
+            {
+                if (stackPtr == 0) break;
+                stackTop = stack[--stackPtr];
+                continue;
+            }
+
             if (node.TriCount > 0)
             {
                 for (uint j = node.TriStartOrLeftChild; j < node.TriStartOrLeftChild + node.TriCount; j++)
@@ -387,41 +402,16 @@ bool RayTrace(Ray ray, out HitInfo hitInfo)
                         hitInfo.InstanceID = cmd.BaseInstance + glInstanceID;
                     }
                 }
+                if (stackPtr == 0) break;
+                stackTop = stack[--stackPtr];
             }
             else
             {
-                float dist0;
-                float dist1;
+                debugBLASCounter++;
 
-                bool leftChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, t2) && t2 > 0.0 && dist0 < hitInfo.T;
-                bool rightChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, t2) && t2 > 0.0 && dist1 < hitInfo.T;
-                
-                if (leftChildHit || rightChildHit)
-                {
-                    // Note: We add 1 to the left child to get the right child
-                    // This allows to remove some branches by converting a bool to int and adding it
-
-                    // If both children are hit assign the closest to index to traverse down next
-                    // and put further onto stack for traversing up if we need to
-                    if (leftChildHit && rightChildHit)
-                    {
-                        index = node.TriStartOrLeftChild + (1 - int(dist0 < dist1));
-                        stack[stackPtr++] = node.TriStartOrLeftChild + int(dist0 < dist1);
-                    }
-                    else
-                    {
-                        // Assign the one child that was hit to index to traverse down next
-                        index = node.TriStartOrLeftChild + int(rightChildHit && !leftChildHit);
-                    }
-                    continue;
-                }
-               
+                stackTop = node.TriStartOrLeftChild;
+                stack[stackPtr++] = node.TriStartOrLeftChild + 1;
             }
-            // Here: On a leaf node or didn't hit any children which means we should traverse up
-            
-            if (stackPtr == 0)
-                break;
-            index = stack[--stackPtr];
         }
     }
 
@@ -457,13 +447,13 @@ bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2)
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
 
-#if GL_AMD_shader_trinary_minmax
+    #if GL_AMD_shader_trinary_minmax
     t1 = max(t1, max3(tsmaller.x, tsmaller.y, tsmaller.z));
     t2 = min(t2, min3(tbigger.x, tbigger.y, tbigger.z));
-#else
+    #else
     t1 = max(t1, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
     t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
-#endif
+    #endif
     return t1 <= t2;
 }
 

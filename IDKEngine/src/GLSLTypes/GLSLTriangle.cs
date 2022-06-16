@@ -2,8 +2,8 @@
 {
     struct GLSLTriangle
     {
-        public GLSLVertex Vertex0;
-        public GLSLVertex Vertex1;
-        public GLSLVertex Vertex2;
+        public GLSLDrawVertex Vertex0;
+        public GLSLDrawVertex Vertex1;
+        public GLSLDrawVertex Vertex2;
     }
 }

@@ -29,27 +29,23 @@ namespace IDKEngine
             {
                 GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
                 int baseTriangleCount = cmd.FirstIndex / 3;
-
-                Span<GLSLTriangle> meshTriangles = new Span<GLSLTriangle>(triangles, baseTriangleCount, cmd.Count / 3);
-                BLAS blas = new BLAS(meshTriangles);
-
-                for (int j = 0; j < blas.Nodes.Length; j++)
+                BLAS blas;
+                fixed (GLSLTriangle* ptr = triangles)
                 {
-                    if (blas.Nodes[j].TriCount > 0)
-                    {
-                        blas.Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
-                    }
+                    blas = new BLAS(ptr + baseTriangleCount, cmd.Count / 3);
                 }
+                for (int j = 0; j < blas.Nodes.Length; j++)
+                    if (blas.Nodes[j].TriCount > 0)
+                        blas.Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
+
                 nodes[i] = blas.Nodes;
             });
 
-            int nodesCount = nodes.Sum(arr => arr.Length);
+            int nodesCount = nodes.Sum(arr => arr.Length), nodesUploaded = 0;
 
             BVHBuffer = new BufferObject();
             BVHBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * nodesCount, (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
-
-            int nodesUploaded = 0;
             for (int i = 0; i < nodes.Length; i++)
             {
                 BVHBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), nodes[i].Length * sizeof(GLSLBlasNode), nodes[i]);

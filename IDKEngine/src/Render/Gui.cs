@@ -266,25 +266,34 @@ namespace IDKEngine.Render
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
-                        int tempInt = window.PathTracer.RayDepth;
-                        if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
+                        tempBool = window.PathTracer.IsDebugBVHTraversal;
+                        if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
                         {
                             window.GLSLBasicData.FreezeFramesCounter = 0;
-                            window.PathTracer.RayDepth = tempInt;
+                            window.PathTracer.IsDebugBVHTraversal = tempBool;
                         }
-
-                        float floatTemp = window.PathTracer.FocalLength;
-                        if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
+                        if (!window.PathTracer.IsDebugBVHTraversal)
                         {
-                            window.GLSLBasicData.FreezeFramesCounter = 0;
-                            window.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
-                        }
+                            int tempInt = window.PathTracer.RayDepth;
+                            if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
+                            {
+                                window.GLSLBasicData.FreezeFramesCounter = 0;
+                                window.PathTracer.RayDepth = tempInt;
+                            }
 
-                        floatTemp = window.PathTracer.ApertureDiameter;
-                        if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
-                        {
-                            window.GLSLBasicData.FreezeFramesCounter = 0;
-                            window.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
+                            float floatTemp = window.PathTracer.FocalLength;
+                            if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
+                            {
+                                window.GLSLBasicData.FreezeFramesCounter = 0;
+                                window.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
+                            }
+
+                            floatTemp = window.PathTracer.ApertureDiameter;
+                            if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
+                            {
+                                window.GLSLBasicData.FreezeFramesCounter = 0;
+                                window.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
+                            }
                         }
                     }
                 }
@@ -383,7 +392,7 @@ namespace IDKEngine.Render
 
                     ImGui.Text($"MeshID: {selectedEntityIndex}");
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
-                    ImGui.Text($"IndicesCount: {cmd.Count}");
+                    ImGui.Text($"Triangle Count: {cmd.Count / 3}");
 
                     System.Numerics.Vector3 systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[cmd.BaseInstance][0].ExtractTranslation());
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))

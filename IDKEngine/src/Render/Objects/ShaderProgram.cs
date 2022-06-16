@@ -38,10 +38,14 @@ namespace IDKEngine.Render.Objects
         public readonly int ID;
         public ShaderProgram(params Shader[] shaders)
         {
+            ID = GL.CreateProgram();
+            ReCompile(shaders);
+        }
+
+        public void ReCompile(params Shader[] shaders)
+        {
             Debug.Assert(shaders != null && shaders.All(s => s.ID != 0));
             Debug.Assert(shaders.All(s => shaders.All(s1 => s.ID == s1.ID || s1.ShaderType != s.ShaderType)));
-
-            ID = GL.CreateProgram();
 
             for (int i = 0; i < shaders.Length; i++)
                 GL.AttachShader(ID, shaders[i].ID);
