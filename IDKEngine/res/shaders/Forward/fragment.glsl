@@ -126,8 +126,8 @@ void main()
     
     Albedo = texture(material.Albedo, inData.TexCoord);
     Normal = texture(material.Normal, inData.TexCoord).rgb;
-    Roughness = clamp(texture(material.Roughness, inData.TexCoord).r + (inData.RoughnessBias * 2.0 - 1.0), 0.0, 1.0);
-    Specular = clamp(texture(material.Specular, inData.TexCoord).r + (inData.SpecularBias * 2.0 - 1.0), 0.0, 1.0);
+    Roughness = clamp(texture(material.Roughness, inData.TexCoord).r + inData.RoughnessBias, 0.0, 1.0);
+    Specular = clamp(texture(material.Specular, inData.TexCoord).r + inData.SpecularBias, 0.0, 1.0);
     float AO = texture(SamplerAO, uv).r;
 
     Normal = inData.TBN * normalize(Normal * 2.0 - 1.0);

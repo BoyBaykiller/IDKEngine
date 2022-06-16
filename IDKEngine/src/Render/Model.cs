@@ -87,8 +87,6 @@ namespace IDKEngine.Render.Objects
                 Meshes[i].InstanceCount = Models[i].Length;
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
                 Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
-                Meshes[i].SpecularBias = 0.5f;
-                Meshes[i].RoughnessBias = 0.5f;
 
                 // Drawcommand instance count may differ depending on culling. Mesh instance count doesn't
                 DrawCommands[i].InstanceCount = Meshes[i].InstanceCount;

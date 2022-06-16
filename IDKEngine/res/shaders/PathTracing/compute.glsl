@@ -161,7 +161,7 @@ layout(std140, binding = 3) uniform LightsUBO
 } lightsUBO;
 
 vec3 Radiance(Ray ray);
-vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, out float rayProbability);
+vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, vec3 normal, out float rayProbability, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 bool TraceRay(Ray ray, out HitInfo hitInfo);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
@@ -224,6 +224,7 @@ vec3 Radiance(Ray ray)
     vec3 radiance = vec3(0.0);
 
     HitInfo hitInfo;
+    bool isRefractive;
     for (int i = 0; i < RayDepth; i++)
     {
         if (TraceRay(ray, hitInfo))
@@ -267,8 +268,9 @@ vec3 Radiance(Ray ray)
 
                 albedo = texture(material.Albedo, texCoord).rgb;
                 normal = texture(material.Normal, texCoord).rgb;
-                specularChance = clamp(texture(material.Specular, texCoord).r + (mesh.SpecularBias * 2.0 - 1.0), 0.0, 1.0);
-                roughness = clamp(texture(material.Roughness, texCoord).r + (mesh.RoughnessBias * 2.0 - 1.0), 0.0, 1.0);
+                specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0);
+                roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
+                refractionChance = clamp(mesh.RefractionChance, 0.0, 1.0 - specularChance);
                 emissive = mesh.Emissive * albedo;
 
                 normal = TBN * normalize(normal * 2.0 - 1.0);
@@ -285,15 +287,15 @@ vec3 Radiance(Ray ray)
                 normal = (hitpos - light.Position) / light.Radius;
             }
 
-            // TOOD: Implement BSDF
             float rayProbability;
-            ray.Direction = BRDF(ray.Direction, specularChance, roughness, normal, rayProbability);
+            ray.Direction = BSDF(ray.Direction, specularChance, roughness, refractionChance, normal, rayProbability, isRefractive);
             ray.Origin = hitpos + ray.Direction * EPSILON;
-            if (dot(ray.Direction, normal) <= 0.0)
-				ray.Origin += normal * EPSILON;
-
+            
             radiance += emissive * throughput;
-            throughput *= albedo;
+            if (!isRefractive)
+            {
+                throughput *= albedo;
+            }
             throughput /= rayProbability;
 
             // Russian Roulette - unbiased method to terminate rays and therefore lower render times (also reduces fireflies)
@@ -317,27 +319,38 @@ vec3 Radiance(Ray ray)
     return radiance;
 }
 
-vec3 BRDF(vec3 incomming, float specularChance, float roughness, vec3 normal, out float rayProbability)
+vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, vec3 normal, out float rayProbability, out bool isRefractive)
 {
+    isRefractive = false;
     if (specularChance > 0.0)
     {
         specularChance = mix(specularChance, 1.0, FresnelSchlick(dot(-incomming, normal), 1.0, 1.0));
+        float diffuseChance = 1.0 - specularChance - refractionChance;
+        refractionChance = 1.0 - specularChance - diffuseChance;
     }
 
-    vec3 diffuseRay = CosineSampleHemisphere(normal);
+    vec3 diffuseRayDir = CosineSampleHemisphere(normal);
     float raySelectRoll = GetRandomFloat01();
     vec3 outgoing;
     if (specularChance > raySelectRoll)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);
-        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRay, roughness * roughness)); 
+        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, roughness * roughness)); 
         outgoing = reflectionRayDir;
         rayProbability = specularChance;
     }
+    else if (specularChance + refractionChance > raySelectRoll)
+    {
+        vec3 refractionRayDir = refract(incomming, normal, 1.0);
+        refractionRayDir = normalize(mix(refractionRayDir, CosineSampleHemisphere(-normal), roughness * roughness));
+        outgoing = refractionRayDir;
+        rayProbability = refractionChance;
+        isRefractive = true;
+    }
     else
     {
-        outgoing = diffuseRay;
-        rayProbability = 1.0 - specularChance;
+        outgoing = diffuseRayDir;
+        rayProbability = 1.0 - specularChance - refractionChance;
     }
     rayProbability = max(rayProbability, EPSILON);
 
@@ -574,7 +587,7 @@ uint EmulateNonUniform(uint index)
 // Source: https://www.shadertoy.com/view/ls2Bz1
 vec3 SpectralJet(float w)
 {
-	float x = clamp((w - 400.0)/ 300.0, 0.0, 1.0);
+	float x = clamp((w - 400.0) / 300.0, 0.0, 1.0);
 	vec3 c;
 
 	if (x < 0.25)
