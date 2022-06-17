@@ -10,8 +10,6 @@ namespace IDKEngine.Render
 {
     class ModelSystem
     {
-        public const int GLSL_MAX_UBO_MATERIAL_COUNT = 256; // used in shader and client code - keep in sync!
-
         public GLSLDrawCommand[] DrawCommands;
         private readonly BufferObject drawCommandBuffer;
 
@@ -43,7 +41,7 @@ namespace IDKEngine.Render
 
             Materials = new GLSLMaterial[0];
             materialBuffer = new BufferObject();
-            materialBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
+            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
 
             Vertices = new GLSLDrawVertex[0];
             vertexBuffer = new BufferObject();
@@ -67,59 +65,18 @@ namespace IDKEngine.Render
 
         public unsafe void Add(Model[] models)
         {
-            int oldDrawCommandsLength = DrawCommands.Length;
-            int oldMeshesLength = Meshes.Length;
-            int oldMaterialsLength = Materials.Length;
-            int oldVerticesLength = Vertices.Length;
-            int oldIndicesLength = Indices.Length;
-            int oldModelsLength = ModelMatrices.Length;
-
-            int loadedDrawCommands = 0;
-            int loadedMeshes = 0;
-            int loadedMaterials = 0;
-            int loadedVertices = 0;
-            int loadedIndices = 0;
-            int loadedModels = 0;
-
-            Array.Resize(ref DrawCommands, DrawCommands.Length + models.Sum(m => m.DrawCommands.Length));
-            Array.Resize(ref Meshes, Meshes.Length + models.Sum(m => m.Meshes.Length));
-            Array.Resize(ref Materials, Materials.Length + models.Sum(m => m.Materials.Length));
-            Array.Resize(ref Vertices, Vertices.Length + models.Sum(m => m.Vertices.Length));
-            Array.Resize(ref Indices, Indices.Length + models.Sum(m => m.Indices.Length));
-            Array.Resize(ref ModelMatrices, ModelMatrices.Length + models.Sum(m => m.Models.Length));
-
-            Debug.Assert(Materials.Length <= GLSL_MAX_UBO_MATERIAL_COUNT);
-
             for (int i = 0; i < models.Length; i++)
             {
-                Model model = models[i];
-                
-                Array.Copy(model.DrawCommands, 0, DrawCommands, oldDrawCommandsLength + loadedDrawCommands, model.DrawCommands.Length);
-                Array.Copy(model.Meshes, 0, Meshes, oldMeshesLength + loadedMeshes, model.Meshes.Length);
-                Array.Copy(model.Materials, 0, Materials, oldMaterialsLength + loadedMaterials, model.Materials.Length);
-                Array.Copy(model.Vertices, 0, Vertices, oldVerticesLength + loadedVertices, model.Vertices.Length);
-                Array.Copy(model.Indices, 0, Indices, oldIndicesLength + loadedIndices, model.Indices.Length);
-                Array.Copy(model.Models, 0, ModelMatrices, oldModelsLength + loadedModels, model.Models.Length);
+                // Don't modify order
+                LoadDrawCommands(models[i].DrawCommands);
+                LoadVertices(models[i].Vertices);
 
-                for (int j = oldDrawCommandsLength + loadedDrawCommands; j < oldDrawCommandsLength + loadedDrawCommands + model.DrawCommands.Length; j++)
-                {
-                    // TODO: Fix calculation of base instance to account for more than 1 instance per model
-                    DrawCommands[j].BaseInstance += oldModelsLength + loadedModels;
-                    DrawCommands[j].BaseVertex += oldVerticesLength + loadedVertices;
-                    DrawCommands[j].FirstIndex += oldIndicesLength + loadedIndices;
-                }
+                // Don't modify order
+                LoadMeshes(models[i].Meshes);
+                LoadMaterials(models[i].Materials);
 
-                for (int j = oldMeshesLength + loadedMeshes; j < oldMeshesLength + loadedMeshes + model.Meshes.Length; j++)
-                {
-                    Meshes[j].MaterialIndex += oldMaterialsLength + loadedMaterials;
-                }
-
-                loadedModels += model.Models.Length;
-                loadedDrawCommands += model.DrawCommands.Length;
-                loadedMeshes += model.Meshes.Length;
-                loadedMaterials += model.Materials.Length;
-                loadedVertices += model.Vertices.Length;
-                loadedIndices += model.Indices.Length;
+                LoadIndices(models[i].Indices);
+                LoadModelMatrices(models[i].ModelMatrices);
             }
 
             drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands);
@@ -209,20 +166,76 @@ namespace IDKEngine.Render
         {
             Debug.Assert(start >= 0 && end <= ModelMatrices.Length);
 
-            int updatedModelCounter = 0;
-            for (int i = 0; i < ModelMatrices.Length; i++)
+            for (int i = start; i < end; i++)
             {
-                modelMatricesBuffer.SubData(updatedModelCounter * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), ModelMatrices[i]);
-                updatedModelCounter += ModelMatrices[i].Length;
+                modelMatricesBuffer.SubData(DrawCommands[i].BaseInstance * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), ModelMatrices[i]);
             }
         }
 
         public int GetMeshVertexCount(int meshIndex)
         {
-            Debug.Assert(meshIndex < Meshes.Length);
+            return ((meshIndex + 1 > DrawCommands.Length - 1) ? Vertices.Length : DrawCommands[meshIndex + 1].BaseVertex) - DrawCommands[meshIndex].BaseVertex;
+        }
 
-            int nextMeshBaseVertex = (meshIndex < Meshes.Length - 1) ? DrawCommands[meshIndex + 1].BaseVertex : Vertices.Length;
-            return nextMeshBaseVertex - DrawCommands[meshIndex].BaseVertex;
+        private void LoadDrawCommands(GLSLDrawCommand[] drawCommands)
+        {
+            int prevCmdLength = DrawCommands.Length;
+            int prevIndicesLength = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].FirstIndex + DrawCommands[prevCmdLength - 1].Count;
+            int prevBaseVertex = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].BaseVertex + GetMeshVertexCount(prevCmdLength - 1);
+
+            Array.Resize(ref DrawCommands, prevCmdLength + drawCommands.Length);
+            Array.Copy(drawCommands, 0, DrawCommands, prevCmdLength, drawCommands.Length);
+
+            for (int i = 0; i < drawCommands.Length; i++)
+            {
+                // TODO: Fix calculation of base instance to account for more than 1 instance per model
+                DrawCommands[prevCmdLength + i].BaseInstance += prevCmdLength;
+                DrawCommands[prevCmdLength + i].BaseVertex += prevBaseVertex;
+                DrawCommands[prevCmdLength + i].FirstIndex += prevIndicesLength;
+            }
+        }
+
+        private void LoadMeshes(GLSLMesh[] meshes)
+        {
+            int prevMeshesLength = Meshes.Length;
+            int prevMaterialsLength = Materials.Length;
+            Array.Resize(ref Meshes, prevMeshesLength + meshes.Length);
+            Array.Copy(meshes, 0, Meshes, prevMeshesLength, meshes.Length);
+
+            for (int i = 0; i < meshes.Length; i++)
+            {
+                Meshes[prevMeshesLength + i].MaterialIndex += prevMaterialsLength;
+            }
+        }
+
+        private void LoadModelMatrices(Matrix4[][] matrices)
+        {
+            int prevMatricesLength = ModelMatrices.Length;
+            Array.Resize(ref ModelMatrices, prevMatricesLength + matrices.Length);
+            for (int i = 0; i < matrices.Length; i++)
+            {
+                ModelMatrices[prevMatricesLength + i] = new Matrix4[matrices[i].Length];
+                Array.Copy(matrices[i], 0, ModelMatrices[prevMatricesLength + i], 0, matrices[i].Length);
+            }
+        }
+
+        private void LoadMaterials(GLSLMaterial[] materials)
+        {
+            int prevMaterialsLength = Materials.Length;
+            Array.Resize(ref Materials, prevMaterialsLength + materials.Length);
+            Array.Copy(materials, 0, Materials, prevMaterialsLength, materials.Length);
+        }
+        private void LoadIndices(uint[] indices)
+        {
+            int prevIndicesLength = Indices.Length;
+            Array.Resize(ref Indices, prevIndicesLength + indices.Length);
+            Array.Copy(indices, 0, Indices, prevIndicesLength, indices.Length);
+        }
+        private void LoadVertices(GLSLDrawVertex[] vertices)
+        {
+            int prevVerticesLength = Vertices.Length;
+            Array.Resize(ref Vertices, prevVerticesLength + vertices.Length);
+            Array.Copy(vertices, 0, Vertices, prevVerticesLength, vertices.Length);
         }
     }
 }

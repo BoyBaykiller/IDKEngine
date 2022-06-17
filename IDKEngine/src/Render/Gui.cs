@@ -393,7 +393,7 @@ namespace IDKEngine.Render
                     ImGui.Text($"MeshID: {selectedEntityIndex}");
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");
-
+                    
                     System.Numerics.Vector3 systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[cmd.BaseInstance][0].ExtractTranslation());
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
@@ -401,12 +401,12 @@ namespace IDKEngine.Render
                         window.ModelSystem.ModelMatrices[cmd.BaseInstance][0] = window.ModelSystem.ModelMatrices[cmd.BaseInstance][0].ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
                     }
 
-                    if (ImGui.SliderFloat("Emissive", ref mesh.Emissive, 0.0f, 100.0f))
+                    if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
                     {
                         hadChange = true;
                     }
 
-                    if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
+                    if (ImGui.SliderFloat("EmissiveBias", ref mesh.EmissiveBias, 0.0f, 20.0f))
                     {
                         hadChange = true;
                     }
@@ -426,11 +426,23 @@ namespace IDKEngine.Render
                         hadChange = true;
                     }
 
+                    if (ImGui.SliderFloat("IOR", ref mesh.IOR, 1.0f, 5.0f))
+                    {
+                        hadChange = true;
+                    }
+
+                    systemVec3 = OpenTKToSystem(mesh.Absorbance);
+                    if (ImGui.SliderFloat3("Absorbance", ref systemVec3, 0.0f, 1.0f))
+                    {
+                        mesh.Absorbance = SystemToOpenTK(systemVec3);
+                        hadChange = true;
+                    }
+
                     if (hadChange)
                     {
                         window.GLSLBasicData.FreezeFramesCounter = 0;
                         window.ModelSystem.UpdateMeshBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
-                        window.ModelSystem.UpdateModelMatricesBuffer(0, window.ModelSystem.ModelMatrices.Length);
+                        window.ModelSystem.UpdateModelMatricesBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
                     }
                 }
                 else if (selectedEntityType == Forward.EntityType.Light)

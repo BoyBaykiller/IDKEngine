@@ -1,4 +1,5 @@
 #version 460 core
+#define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define PI 3.14159265
 #define EPSILON 0.001
 #define ENTITY_BIFIELD_BITS_FOR_TYPE 2 // used in shader and client code - keep in sync!
@@ -16,16 +17,10 @@ layout(binding = 0) uniform sampler2D SamplerAO;
 struct Material
 {
     sampler2D Albedo;
-    uvec2 _pad0;
-
     sampler2D Normal;
-    uvec2 _pad1;
-
     sampler2D Roughness;
-    uvec2 _pad3;
-
     sampler2D Specular;
-    uvec2 _pad4;
+    sampler2D Emissive;
 };
 
 struct Light
@@ -64,27 +59,26 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
 } basicDataUBO;
 
-layout(std140, binding = 1) uniform MaterialUBO
+layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
 {
-    #define GLSL_MAX_UBO_MATERIAL_COUNT 256 // used in shader and client code - keep in sync!
-    Material Materials[GLSL_MAX_UBO_MATERIAL_COUNT];
-} materialUBO;
+    Material Materials[];
+} materialSSBO;
 
-layout(std140, binding = 2) uniform ShadowDataUBO
+layout(std140, binding = 1) uniform ShadowDataUBO
 {
     #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int PointCount;
 } shadowDataUBO;
 
-layout(std140, binding = 3) uniform LightsUBO
+layout(std140, binding = 2) uniform LightsUBO
 {
     #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
-layout(std140, binding = 5) uniform TaaDataUBO
+layout(std140, binding = 3) uniform TaaDataUBO
 {
     #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
@@ -104,7 +98,7 @@ in InOutVars
     mat3 TBN;
     flat int MeshIndex;
     flat int MaterialIndex;
-    flat float Emissive;
+    flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;
     flat float RoughnessBias;
@@ -122,7 +116,7 @@ void main()
 {
     vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
 
-    Material material = materialUBO.Materials[inData.MaterialIndex];
+    Material material = materialSSBO.Materials[inData.MaterialIndex];
     
     Albedo = texture(material.Albedo, inData.TexCoord);
     Normal = texture(material.Normal, inData.TexCoord).rgb;
@@ -147,7 +141,7 @@ void main()
         irradiance += BlinnPhong(lightsUBO.Lights[i]);
     }
 
-    vec3 emissive = inData.Emissive * Albedo.rgb;
+    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * Albedo.rgb;
     FragColor = vec4(irradiance + emissive + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
     NormalSpecColor = vec4(Normal, Specular);
     MeshIndexColor = inData.MeshIndex | ENTITY_TYPE_MESH;

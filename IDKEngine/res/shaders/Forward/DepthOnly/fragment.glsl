@@ -7,23 +7,16 @@ layout(location = 0) out vec4 FragColor;
 struct Material
 {
     sampler2D Albedo;
-    uvec2 _pad0;
-
     sampler2D Normal;
-    uvec2 _pad1;
-
     sampler2D Roughness;
-    uvec2 _pad3;
-
     sampler2D Specular;
-    uvec2 _pad4;
+    sampler2D Emissive;
 };
 
-layout(std140, binding = 1) uniform MaterialUBO
+layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
 {
-    #define GLSL_MAX_UBO_MATERIAL_COUNT 256 // used in shader and client code - keep in sync!
-    Material Materials[GLSL_MAX_UBO_MATERIAL_COUNT];
-} materialUBO;
+    Material Materials[];
+} materialSSBO;
 
 in InOutVars
 {
@@ -33,7 +26,7 @@ in InOutVars
 
 void main()
 {
-    vec4 albedo = texture(materialUBO.Materials[inData.MaterialIndex].Albedo, inData.TexCoord);
+    vec4 albedo = texture(materialSSBO.Materials[inData.MaterialIndex].Albedo, inData.TexCoord);
     if (albedo.a < EPSILON)
         discard;
 }

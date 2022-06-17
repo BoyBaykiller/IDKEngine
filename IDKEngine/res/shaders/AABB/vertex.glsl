@@ -51,13 +51,15 @@ struct DrawCommand
 struct Mesh
 {
     int InstanceCount;
-    int VisibleCubemapFacesInfo;
     int MaterialIndex;
-    float Emissive;
     float NormalMapStrength;
+    float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
     float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    int VisibleCubemapFacesInfo;
 };
 
 struct Node

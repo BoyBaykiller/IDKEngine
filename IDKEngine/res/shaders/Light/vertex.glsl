@@ -9,7 +9,7 @@ struct Light
     float _pad0;
 };
 
-layout(std140, binding = 3) uniform LightsUBO
+layout(std140, binding = 2) uniform LightsUBO
 {
     #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
@@ -32,7 +32,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
 } basicDataUBO;
 
-layout(std140, binding = 5) uniform TaaDataUBO
+layout(std140, binding = 3) uniform TaaDataUBO
 {
     #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];

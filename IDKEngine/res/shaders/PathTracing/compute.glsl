@@ -1,4 +1,5 @@
 #version 460 core
+#define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -3.4028235e+38
 #define EPSILON 0.001
@@ -31,16 +32,10 @@ struct Light
 struct Material
 {
     sampler2D Albedo;
-    float _pad0;
-
     sampler2D Normal;
-    float _pad1;
-
     sampler2D Roughness;
-    float _pad3;
-
     sampler2D Specular;
-    float _pad4;
+    sampler2D Emissive;
 };
 
 struct DrawCommand
@@ -55,13 +50,15 @@ struct DrawCommand
 struct Mesh
 {
     int InstanceCount;
-    int VisibleCubemapFacesInfo;
     int MaterialIndex;
-    float Emissive;
     float NormalMapStrength;
+    float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
     float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    int VisibleCubemapFacesInfo;
 };
 
 struct Vertex
@@ -131,6 +128,11 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
     mat4 Models[];
 } matrixSSBO;
 
+layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
+{
+    Material Materials[];
+} materialSSBO;
+
 layout(std140, binding = 0) uniform BasicDataUBO
 {
     mat4 ProjView;
@@ -147,13 +149,8 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
 } basicDataUBO;
 
-layout(std140, binding = 1) uniform MaterialUBO
-{
-    #define GLSL_MAX_UBO_MATERIAL_COUNT 256 // used in shader and client code - keep in sync!
-    Material Materials[GLSL_MAX_UBO_MATERIAL_COUNT];
-} materialUBO;
 
-layout(std140, binding = 3) uniform LightsUBO
+layout(std140, binding = 2) uniform LightsUBO
 {
     #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
@@ -161,7 +158,7 @@ layout(std140, binding = 3) uniform LightsUBO
 } lightsUBO;
 
 vec3 Radiance(Ray ray);
-vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, vec3 normal, out float rayProbability, out bool isRefractive);
+vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, vec3 normal, out float rayProbability, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 bool TraceRay(Ray ray, out HitInfo hitInfo);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
@@ -237,6 +234,8 @@ vec3 Radiance(Ray ray)
             float refractionChance = 0.0;
             float roughness = 1.0;
             float alpha = 1.0;
+            float ior = 1.0;
+            vec3 absorbance = vec3(0.0);
             vec3 albedo;
             vec3 normal;
             vec3 emissive;
@@ -261,23 +260,22 @@ vec3 Radiance(Ray ray)
                 
                 Mesh mesh = meshSSBO.Meshes[hitInfo.HitIndex];
             #ifdef GL_NV_gpu_shader5
-                Material material = materialUBO.Materials[mesh.MaterialIndex];
+                Material material = materialSSBO.Materials[mesh.MaterialIndex];
             #else
-                Material material = materialUBO.Materials[EmulateNonUniform(mesh.MaterialIndex)];
+                Material material = materialSSBO.Materials[EmulateNonUniform(mesh.MaterialIndex)];
             #endif
-
-                albedo = texture(material.Albedo, texCoord).rgb;
-                normal = texture(material.Normal, texCoord).rgb;
-                specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0);
+                vec4 albedoAlpha = texture(material.Albedo, texCoord);
+                albedo = albedoAlpha.rgb;
+                refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
+                emissive = (texture(material.Emissive, texCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + mesh.EmissiveBias) * albedo;
+                specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
                 roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
-                refractionChance = clamp(mesh.RefractionChance, 0.0, 1.0 - specularChance);
-                emissive = mesh.Emissive * albedo;
+                normal = texture(material.Normal, texCoord).rgb;
+                ior = mesh.IOR;
+                absorbance = mesh.Absorbance;
 
                 normal = TBN * normalize(normal * 2.0 - 1.0);
                 normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength));
-
-                if (dot(-ray.Direction, normal) < 0.0)
-                    normal *= -1.0;
             }
             else
             {
@@ -287,8 +285,13 @@ vec3 Radiance(Ray ray)
                 normal = (hitpos - light.Position) / light.Radius;
             }
 
+            if (isRefractive)
+            {
+                throughput *= exp(-absorbance * hitInfo.T);
+            }
+
             float rayProbability;
-            ray.Direction = BSDF(ray.Direction, specularChance, roughness, refractionChance, normal, rayProbability, isRefractive);
+            ray.Direction = BSDF(ray.Direction, specularChance, roughness, refractionChance, ior, normal, rayProbability, isRefractive);
             ray.Origin = hitpos + ray.Direction * EPSILON;
             
             radiance += emissive * throughput;
@@ -319,12 +322,17 @@ vec3 Radiance(Ray ray)
     return radiance;
 }
 
-vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, vec3 normal, out float rayProbability, out bool isRefractive)
+vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, vec3 normal, out float rayProbability, out bool isRefractive)
 {
+    float cosTheta = dot(-incomming, normal);
+    bool fromInside = cosTheta < 0.0;
+    if (fromInside)
+        normal *= -1.0;
+
     isRefractive = false;
     if (specularChance > 0.0)
     {
-        specularChance = mix(specularChance, 1.0, FresnelSchlick(dot(-incomming, normal), 1.0, 1.0));
+        specularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, fromInside ? ior : 1.0, fromInside ? 1.0 : ior));
         float diffuseChance = 1.0 - specularChance - refractionChance;
         refractionChance = 1.0 - specularChance - diffuseChance;
     }
@@ -341,7 +349,7 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
     }
     else if (specularChance + refractionChance > raySelectRoll)
     {
-        vec3 refractionRayDir = refract(incomming, normal, 1.0);
+        vec3 refractionRayDir = refract(incomming, normal, fromInside ? (ior / 1.0) : (1.0 / ior));
         refractionRayDir = normalize(mix(refractionRayDir, CosineSampleHemisphere(-normal), roughness * roughness));
         outgoing = refractionRayDir;
         rayProbability = refractionChance;

@@ -9,13 +9,15 @@ layout(location = 4) in vec3 Tangent;
 struct Mesh
 {
     int InstanceCount;
-    int VisibleCubemapFacesInfo;
     int MaterialIndex;
-    float Emissive;
     float NormalMapStrength;
+    float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
     float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    int VisibleCubemapFacesInfo;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -44,7 +46,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
 } basicDataUBO;
 
-layout(std140, binding = 5) uniform TaaDataUBO
+layout(std140, binding = 3) uniform TaaDataUBO
 {
     #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
@@ -64,7 +66,7 @@ out InOutVars
     mat3 TBN;
     flat int MeshIndex;
     flat int MaterialIndex;
-    flat float Emissive;
+    flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;
     flat float RoughnessBias;
@@ -89,7 +91,7 @@ void main()
     outData.Normal = Normal;
     outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
-    outData.Emissive = mesh.Emissive;
+    outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;
     outData.SpecularBias = mesh.SpecularBias;
     outData.RoughnessBias = mesh.RoughnessBias;

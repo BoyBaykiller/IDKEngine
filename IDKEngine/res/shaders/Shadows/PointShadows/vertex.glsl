@@ -24,13 +24,15 @@ struct PointShadow
 struct Mesh
 {
     int InstanceCount;
-    int VisibleCubemapFacesInfo;
     int MaterialIndex;
-    float Emissive;
     float NormalMapStrength;
+    float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
     float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    int VisibleCubemapFacesInfo;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -43,7 +45,7 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
     mat4 Models[];
 } matrixSSBO;
 
-layout(std140, binding = 2) uniform ShadowDataUBO
+layout(std140, binding = 1) uniform ShadowDataUBO
 {
     #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];

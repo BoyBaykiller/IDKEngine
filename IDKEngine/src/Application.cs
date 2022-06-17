@@ -248,12 +248,16 @@ namespace IDKEngine
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
-            for (int i = 0; i < sponza.Models.Length; i++) // 0.0145f
-                sponza.Models[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
+            for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
+                sponza.ModelMatrices[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
 
-            Model horse = new Model("res/models/Horse/horse.gltf");
-            for (int i = 0; i < horse.Models.Length; i++)
-                horse.Models[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+            Model horse = new Model(@"res/models/Horse/horse.gltf");
+            for (int i = 0; i < horse.ModelMatrices.Length; i++)
+                horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+
+            //Model temple = new Model(@"C:\Users\Julian\Downloads\SunTemple\SunTemple.gltf");
+            //for (int i = 0; i < temple.ModelMatrices.Length; i++)
+            //    temple.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.01f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse });
@@ -319,7 +323,7 @@ namespace IDKEngine
             lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             ForwardRenderer.LightingContext.Add(lights.ToArray());
-            
+
             pointShadows = new List<PointShadow>();
             pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, 0, 512, 0.5f, 60.0f));
             pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, 1, 512, 0.5f, 60.0f));

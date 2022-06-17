@@ -32,14 +32,14 @@ layout(std140, binding = 4) uniform BlueNoiseUBO
     layout(rgba8) restrict readonly image2D ImgBlueNoise;
 } blueNoiseUBO;
 
-layout(std140, binding = 3) uniform LightsUBO
+layout(std140, binding = 2) uniform LightsUBO
 {
     #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
-layout(std140, binding = 2) uniform ShadowDataUBO
+layout(std140, binding = 1) uniform ShadowDataUBO
 {
     #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
