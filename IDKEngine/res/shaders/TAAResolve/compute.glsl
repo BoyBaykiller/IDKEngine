@@ -9,7 +9,7 @@ layout(binding = 0) uniform sampler2D SamplerLastForwardPass;
 layout(binding = 1) uniform sampler2D SamplerVelocity;
 layout(binding = 2) uniform sampler2D SamplerDepth;
 
-layout(std140, binding = 5) uniform TaaDataUBO
+layout(std140, binding = 3) uniform TaaDataUBO
 {
     #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];

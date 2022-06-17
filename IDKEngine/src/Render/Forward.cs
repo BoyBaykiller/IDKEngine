@@ -157,7 +157,7 @@ namespace IDKEngine.Render
 
             TaaBuffer = new BufferObject();
             TaaBuffer.ImmutableAllocate(sizeof(GLSLTaaData), (IntPtr)taaData, BufferStorageFlags.DynamicStorageBit);
-            TaaBuffer.BindBufferRange(BufferRangeTarget.UniformBuffer, 5, 0, TaaBuffer.Size);
+            TaaBuffer.BindBufferRange(BufferRangeTarget.UniformBuffer, 3, 0, TaaBuffer.Size);
 
             Framebuffer = new Framebuffer();
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, taaPing);

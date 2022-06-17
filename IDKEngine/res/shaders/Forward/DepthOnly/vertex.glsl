@@ -7,13 +7,15 @@ layout(location = 3) in float TexCoordV;
 struct Mesh
 {
     int InstanceCount;
-    int VisibleCubemapFacesInfo;
     int MaterialIndex;
-    float Emissive;
     float NormalMapStrength;
+    float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
     float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    int VisibleCubemapFacesInfo;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -42,7 +44,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
 } basicDataUBO;
 
-layout(std140, binding = 5) uniform TaaDataUBO
+layout(std140, binding = 3) uniform TaaDataUBO
 {
     #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];

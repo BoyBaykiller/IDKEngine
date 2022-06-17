@@ -13,15 +13,17 @@ namespace IDKEngine.Render.Objects
 {
     class Model
     {
-        public const int GLSL_TEXTURE_SIZE = sizeof(long) * 2;
+        public const int GLSL_TEXTURE_SIZE = sizeof(long) * 1;
         private static readonly AssimpContext assimpContext = new AssimpContext();
 
+        // If made changes also adjust the GLSLMaterial struct
         private static readonly TextureType[] perMaterialTextures = new TextureType[]
         {
             TextureType.Diffuse /* Albedo */,
             TextureType.Normals,
             TextureType.Shininess /* Roughness */,
             TextureType.Specular,
+            TextureType.Emissive,
         };
 
         public readonly GLSLDrawCommand[] DrawCommands;
@@ -30,7 +32,7 @@ namespace IDKEngine.Render.Objects
         public readonly GLSLDrawVertex[] Vertices;
         public readonly uint[] Indices;
 
-        public readonly Matrix4[][] Models;
+        public readonly Matrix4[][] ModelMatrices;
 
         private readonly Scene scene;
         public unsafe Model(string path)
@@ -46,7 +48,7 @@ namespace IDKEngine.Render.Objects
             Meshes = new GLSLMesh[scene.MeshCount];
             Materials = new GLSLMaterial[scene.MaterialCount];
             Vertices = new GLSLDrawVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
-            Models = new Matrix4[scene.MeshCount][];
+            ModelMatrices = new Matrix4[scene.MeshCount][];
             Image<Rgba32>[] images = new Image<Rgba32>[scene.MaterialCount * perMaterialTextures.Length];
 
             Thread vertecisLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
@@ -82,11 +84,12 @@ namespace IDKEngine.Render.Objects
                     Vertices[baseVertex + j].Tangent = tangent;
                 }
 
-                Models[i] = new Matrix4[1] { Matrix4.Identity };
+                ModelMatrices[i] = new Matrix4[1] { Matrix4.Identity };
 
-                Meshes[i].InstanceCount = Models[i].Length;
+                Meshes[i].InstanceCount = ModelMatrices[i].Length;
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
                 Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
+                Meshes[i].IOR = 1.0f;
 
                 // Drawcommand instance count may differ depending on culling. Mesh instance count doesn't
                 DrawCommands[i].InstanceCount = Meshes[i].InstanceCount;
@@ -100,7 +103,13 @@ namespace IDKEngine.Render.Objects
                 
                 Material material = scene.Materials[materialIndex];
                 if (material.GetMaterialTexture(perMaterialTextures[textureIndex], 0, out TextureSlot textureSlot))
-                    images[i] = Image.Load<Rgba32>(Path.Combine(dirPath, textureSlot.FilePath));
+                {
+                    string path = Path.Combine(dirPath, textureSlot.FilePath);
+                    if (File.Exists(path))
+                    {
+                        images[i] = Image.Load<Rgba32>(path);
+                    }
+                }
             });
 
 

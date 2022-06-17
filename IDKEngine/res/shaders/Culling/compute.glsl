@@ -27,13 +27,15 @@ struct Node
 struct Mesh
 {
     int InstanceCount;
-    int VisibleCubemapFacesInfo;
     int MaterialIndex;
-    float Emissive;
     float NormalMapStrength;
+    float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
     float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    int VisibleCubemapFacesInfo;
 };
 
 layout(std430, binding = 0) restrict buffer DrawCommandsSSBO

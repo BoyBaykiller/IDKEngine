@@ -1,14 +1,18 @@
-﻿namespace IDKEngine
+﻿using OpenTK.Mathematics;
+
+namespace IDKEngine
 {
     public struct GLSLMesh
     {
         public int InstanceCount;
-        private int VisibleCubemapFacesInfo;
         public int MaterialIndex;
-        public float Emissive;
         public float NormalMapStrength;
+        public float EmissiveBias;
         public float SpecularBias;
         public float RoughnessBias;
         public float RefractionChance;
+        public float IOR;
+        public Vector3 Absorbance;
+        private int VisibleCubemapFacesInfo;
     }
 }

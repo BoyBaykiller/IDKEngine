@@ -47,18 +47,18 @@ namespace IDKEngine
 #endif
 
                 {
-                    int i = (int)parentNode.TriStartOrLeftChild;
-                    int j = (int)(i + parentNode.TriCount - 1);
-                    while (i <= j)
+                    int rightStart = (int)parentNode.TriStartOrLeftChild;
+                    int endOfTris = (int)(rightStart + parentNode.TriCount - 1);
+                    while (rightStart <= endOfTris)
                     {
-                        ref GLSLTriangle tri = ref triangles[i];
+                        ref GLSLTriangle tri = ref triangles[rightStart];
                         if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[bestAxis] < splitPos)
-                            i++;
+                            rightStart++;
                         else
-                            Helper.Swap(ref tri, ref triangles[j--]);
+                            Helper.Swap(ref tri, ref triangles[endOfTris--]);
                     }
 
-                    uint leftCount = (uint)(i - parentNode.TriStartOrLeftChild);
+                    uint leftCount = (uint)(rightStart - parentNode.TriStartOrLeftChild);
                     if (leftCount == 0 || leftCount == parentNode.TriCount)
                         return;
 
@@ -68,7 +68,7 @@ namespace IDKEngine
                     Nodes[leftChildID].TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
                     Nodes[leftChildID].TriCount = leftCount;
 
-                    Nodes[rightChildID].TriStartOrLeftChild = (uint)i;
+                    Nodes[rightChildID].TriStartOrLeftChild = (uint)rightStart;
                     Nodes[rightChildID].TriCount = parentNode.TriCount - leftCount;
 
                     parentNode.TriStartOrLeftChild = (uint)leftChildID;
