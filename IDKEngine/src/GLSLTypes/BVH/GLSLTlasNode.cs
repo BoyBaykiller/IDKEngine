@@ -7,6 +7,6 @@ namespace IDKEngine
         public Vector3 Min;
         public uint LeftAndRightBlasIndex;
         public Vector3 Max;
-        public uint LeafBlasIndex;
+        public uint BlasIndex;
     }
 }

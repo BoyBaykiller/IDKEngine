@@ -54,12 +54,12 @@ struct PointShadow
 layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
-} drawCommandsSSBO;
+} drawCommandSSBO;
 
-layout(std430, binding = 1) restrict readonly buffer BVHSSBO
+layout(std430, binding = 1) restrict readonly buffer BlasSSBO
 {
     Node Nodes[];
-} bvhSSBO;
+} blasSSBO;
 
 layout(std430, binding = 2) restrict writeonly buffer MeshSSBO
 {
@@ -94,8 +94,8 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[meshIndex];
-    Node node = bvhSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
+    DrawCommand meshCMD = drawCommandSSBO.DrawCommands[meshIndex];
+    Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
     int instances = 0;
@@ -110,7 +110,7 @@ void main()
             packedValue = bitfieldInsert(packedValue, i, 3 * instances++, 3);
         }
     }
-    drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = instances;
+    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = instances;
     meshSSBO.Meshes[meshIndex].VisibleCubemapFacesInfo = packedValue;
 }
 

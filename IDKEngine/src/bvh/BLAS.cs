@@ -7,9 +7,12 @@ namespace IDKEngine
     {
 #if !USE_SAH
         public const int BLAS_MIN_TRIANGLE_COUNT_LEAF = 8;
+#else
+        public const int SAH_SAMPLES = 10;
 #endif
 
         public readonly GLSLBlasNode[] Nodes;
+        public readonly AABB RootBounds;
 
         private int nodesUsed = 2;
         public unsafe BLAS(GLSLTriangle* triangles, int count)
@@ -21,6 +24,8 @@ namespace IDKEngine
 
             UpdateNodeBounds(ref root);
             Subdivide();
+            RootBounds.Max = root.Max;
+            RootBounds.Min = root.Min;
 
             void Subdivide(int nodeID = 0)
             {
@@ -102,10 +107,9 @@ namespace IDKEngine
                     if (centroidBounds.Min[i] == centroidBounds.Max[i])
                         continue;
 
-                    const int INTERVALS = 8;
-                    float scale = (centroidBounds.Max[i] - centroidBounds.Min[i]) / INTERVALS;
+                    float scale = (centroidBounds.Max[i] - centroidBounds.Min[i]) / SAH_SAMPLES;
 
-                    for (int j = 1; j < INTERVALS; j++)
+                    for (int j = 1; j < SAH_SAMPLES; j++)
                     {
                         float candidatePos = centroidBounds.Min[i] + j * scale;
                         float cost = GetSAH(node, i, candidatePos);

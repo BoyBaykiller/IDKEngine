@@ -13,7 +13,6 @@ namespace IDKEngine.Render.Objects
 {
     class Model
     {
-        public const int GLSL_TEXTURE_SIZE = sizeof(long) * 1;
         private static readonly AssimpContext assimpContext = new AssimpContext();
 
         // If made changes also adjust the GLSLMaterial struct
@@ -40,7 +39,7 @@ namespace IDKEngine.Render.Objects
             string dirPath = Path.GetDirectoryName(path);
 
             scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.GenerateNormals |
-                                                   PostProcessSteps.RemoveRedundantMaterials |
+                                                   PostProcessSteps.RemoveRedundantMaterials |/* PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes |*/
                                                    PostProcessSteps.FlipUVs);
             Debug.Assert(scene != null);
 
@@ -171,9 +170,9 @@ namespace IDKEngine.Render.Objects
                     long textureHandle = texture.MakeHandleResidentARB();
 
                     /// Yes I prefer this pointer trickery over a long switch statement
-                    fixed (void* ptr = &Materials[i].Albedo)
+                    fixed (long* ptr = &Materials[i].Albedo)
                     {
-                        *(long*)((byte*)ptr + GLSL_TEXTURE_SIZE * j) = textureHandle;
+                        *(ptr + j) = textureHandle;
                     }
                 }
             }

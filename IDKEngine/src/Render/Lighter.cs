@@ -8,6 +8,12 @@ namespace IDKEngine.Render
 {
     class Lighter
     {
+        public struct HitInfo
+        {
+            public float T;
+            public int HitID;
+        }
+
         public const int GLSL_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
 
         private static readonly ShaderProgram shaderProgram = new ShaderProgram(
@@ -113,6 +119,24 @@ namespace IDKEngine.Render
             {
                 bufferObject.SubData(start * sizeof(GLSLLight), (end - start) * sizeof(GLSLLight), (IntPtr)ptr);
             }
+        }
+
+        public bool Intersect(Ray ray, out HitInfo hitInfo)
+        {
+            hitInfo = new HitInfo();
+            hitInfo.T = float.MaxValue;
+
+            for (int i = 0; i < Lights.Length; i++)
+            {
+                ref readonly GLSLLight light = ref Lights[i];
+                if (MyMath.RaySphereIntersect(ray, light, out float min, out float max) && min > 0.0f && max < hitInfo.T)
+                {
+                    hitInfo.T = min;
+                    hitInfo.HitID = i;
+                }
+            }
+
+            return hitInfo.T != float.MaxValue;
         }
     }
 }

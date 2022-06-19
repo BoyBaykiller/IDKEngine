@@ -73,12 +73,12 @@ struct Node
 layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
-} drawCommandsSSBO;
+} drawCommandSSBO;
 
-layout(std430, binding = 1) restrict readonly buffer BVHSSBO
+layout(std430, binding = 1) restrict readonly buffer BlasSSBO
 {
     Node Nodes[];
-} bvhSSBO;
+} blasSSBO;
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
@@ -111,8 +111,8 @@ layout(location = 0) uniform int MeshIndex;
 
 void main()
 {
-    DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[MeshIndex];
-    Node node = bvhSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
+    DrawCommand meshCMD = drawCommandSSBO.DrawCommands[MeshIndex];
+    Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + gl_InstanceID];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;

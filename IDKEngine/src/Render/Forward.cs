@@ -9,20 +9,6 @@ namespace IDKEngine.Render
 {
     unsafe class Forward : IDisposable
     {
-        // this will be ceil(log2(EntityTypeValues))
-        public const int ENTITY_BIFIELD_BITS_FOR_TYPE = 2; // used in shader and client code - keep in sync!
-        
-        /// <summary>
-        /// Used to extract the entity type out of the entity indices textures. 16 matches bit depth of texture.
-        /// </summary>
-        public enum EntityType : uint
-        {
-            None  = 0u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
-            Mesh  = 1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
-            Light = 2u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE),
-        }
-
-
         private int _renderMeshAABBIndex = -1;
         /// <summary>
         /// Any negative number will not render any AABB at all
@@ -65,7 +51,6 @@ namespace IDKEngine.Render
 
         public readonly Framebuffer Framebuffer;
         public readonly Texture NormalSpecTexture;
-        public readonly Texture EntityIndicesTexture;
         public readonly Texture VelocityTexture;
         public readonly Texture DepthTexture;
         public readonly BufferObject TaaBuffer;
@@ -131,12 +116,6 @@ namespace IDKEngine.Render
             NormalSpecTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             NormalSpecTexture.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba8Snorm, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
-            EntityIndicesTexture = new Texture(TextureTarget2d.Texture2D);
-            EntityIndicesTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            EntityIndicesTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            // if bitdepth changes also adjust enum "EntityClearColorMask"
-            EntityIndicesTexture.MutableAllocate(width, height, 1, PixelInternalFormat.R16ui, (IntPtr)0, PixelFormat.RedInteger, PixelType.UnsignedInt);
-            
             VelocityTexture = new Texture(TextureTarget2d.Texture2D);
             VelocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             VelocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
@@ -162,8 +141,7 @@ namespace IDKEngine.Render
             Framebuffer = new Framebuffer();
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, taaPing);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, NormalSpecTexture);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, EntityIndicesTexture);
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment3, VelocityTexture);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, VelocityTexture);
             Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture);
 
             Framebuffer.SetReadBuffer(ReadBufferMode.ColorAttachment2);
@@ -174,13 +152,9 @@ namespace IDKEngine.Render
 
         public void Render(ModelSystem modelSystem, Texture skyBox = null, Texture ambientOcclusion = null)
         {
-            Framebuffer.Bind();
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, isPing ? taaPing : taaPong);
-            Framebuffer.ClearBuffer(ClearBuffer.Color, 0, 0.0f);
-            Framebuffer.ClearBuffer(ClearBuffer.Color, 1, 0.0f);
-            Framebuffer.ClearBuffer(ClearBuffer.Color, 2, (uint)EntityType.None);
-            Framebuffer.ClearBuffer(ClearBuffer.Color, 3, 0.0f);
-            Framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
+            Framebuffer.Bind();
+            Framebuffer.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             if (ambientOcclusion != null)
                 ambientOcclusion.BindToUnit(0);
@@ -248,32 +222,12 @@ namespace IDKEngine.Render
             taaFrame++;
         }
 
-        public static EntityType ExtractEntityAndIndex(uint entityIndexBitfield, out uint index)
-        {
-            index = 0;
-
-            if ((entityIndexBitfield & (uint)EntityType.Mesh) == (uint)EntityType.Mesh)
-            {
-                index = entityIndexBitfield & ((1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE)) - 1);
-                return EntityType.Mesh;
-            }
-
-            if ((entityIndexBitfield & (uint)EntityType.Light) == (uint)EntityType.Light)
-            {
-                index = entityIndexBitfield & ((1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE)) - 1);
-                return EntityType.Light;
-            }
-
-            return EntityType.None;
-        }
-
         public void SetSize(int width, int height)
         {
             taaPing.MutableAllocate(width, height, 1, taaPing.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             taaPong.MutableAllocate(width, height, 1, taaPong.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             DepthTexture.MutableAllocate(width, height, 1, DepthTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.DepthComponent, PixelType.Float);
             NormalSpecTexture.MutableAllocate(width, height, 1, NormalSpecTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgb, PixelType.Float);
-            EntityIndicesTexture.MutableAllocate(width, height, 1, EntityIndicesTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.RedInteger, PixelType.Int);
             VelocityTexture.MutableAllocate(width, height, 1, VelocityTexture.PixelInternalFormat, (IntPtr)0, PixelFormat.Rg, PixelType.Float);
 
             Span<float> jitterData = new Span<float>(taaData->Jitter, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);

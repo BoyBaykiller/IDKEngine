@@ -190,7 +190,7 @@ void main()
         return;
 
     //rngSeed = basicDataUBO.FreezeFramesCounter;
-    rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + basicDataUBO.FreezeFramesCounter * 2699 | 1;
+    rngSeed = gl_GlobalInvocationID.x * 2873 + gl_GlobalInvocationID.y * 312 + basicDataUBO.FreezeFramesCounter * 2699;
 
     vec2 subPixelOffset = IsDebugBVHTraversal ? vec2(0.5) : vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -388,7 +388,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
     }
 
     vec4 baryT;
-    float nodeTMin, nodeTMax;
+    uint stack[32];
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
@@ -397,13 +397,12 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
         
-        uint stack[32];
         uint stackPtr = 0;
         uint stackTop = 0;
         while (true)
         {
             Node node = bvhSSBO.Nodes[baseNode + stackTop];
-            if (!(RayCuboidIntersect(localRay, node, nodeTMin, nodeTMax) && nodeTMax > 0.0 && nodeTMin < hitInfo.T))
+            if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T))
             {
                 if (stackPtr == 0) break;
                 stackTop = stack[--stackPtr];
@@ -432,8 +431,8 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
                 float dist0;
                 float dist1;
 
-                bool leftChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, nodeTMax) && nodeTMax > 0.0 && dist0 < hitInfo.T;
-                bool rightChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, nodeTMax) && nodeTMax > 0.0 && dist1 < hitInfo.T;
+                bool leftChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, rayTMax) && rayTMax > 0.0 && dist0 < hitInfo.T;
+                bool rightChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, rayTMax) && rayTMax > 0.0 && dist1 < hitInfo.T;
                 
                 if (leftChildHit || rightChildHit)
                 {
@@ -503,9 +502,9 @@ bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2)
     return t1 <= t2;
 }
 
+// Source: https://antongerdelan.net/opengl/raycasting.html
 bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2)
 {
-    // Source: https://antongerdelan.net/opengl/raycasting.html
     t1 = t2 = FLOAT_MAX;
 
     vec3 sphereToRay = ray.Origin - light.Position;

@@ -64,7 +64,6 @@ out InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat int MeshIndex;
     flat int MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
@@ -89,7 +88,6 @@ void main()
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     outData.Normal = Normal;
-    outData.MeshIndex = gl_DrawID;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;
