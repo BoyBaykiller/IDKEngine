@@ -48,7 +48,6 @@ out InOutVars
     vec3 FragPos;
     vec4 ClipPos;
     vec4 PrevClipPos;
-    flat int LightIndex;
     flat vec3 Position;
     flat float Radius;
 } outData;
@@ -66,7 +65,6 @@ void main()
 
 
     outData.FragColor = light.Color;
-    outData.LightIndex = gl_InstanceID;
     outData.FragPos = (model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);

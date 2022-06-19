@@ -2,15 +2,12 @@
 #define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define PI 3.14159265
 #define EPSILON 0.001
-#define ENTITY_BIFIELD_BITS_FOR_TYPE 2 // used in shader and client code - keep in sync!
-#define ENTITY_TYPE_MESH 1u << (16 - ENTITY_BIFIELD_BITS_FOR_TYPE) // used in shader and client code - keep in sync!
 #extension GL_ARB_bindless_texture : require
 layout(early_fragment_tests) in;
 
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 NormalSpecColor;
-layout(location = 2) out uint MeshIndexColor;
-layout(location = 3) out vec2 VelocityColor;
+layout(location = 2) out vec2 VelocityColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
 
@@ -96,7 +93,6 @@ in InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat int MeshIndex;
     flat int MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
@@ -144,7 +140,6 @@ void main()
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * Albedo.rgb;
     FragColor = vec4(irradiance + emissive + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
     NormalSpecColor = vec4(Normal, Specular);
-    MeshIndexColor = inData.MeshIndex | ENTITY_TYPE_MESH;
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
     VelocityColor = (uv - prevUV) * taaDataUBO.VelScale;

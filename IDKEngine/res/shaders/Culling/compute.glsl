@@ -41,12 +41,12 @@ struct Mesh
 layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
-} drawCommandsSSBO;
+} drawCommandSSBO;
 
-layout(std430, binding = 1) restrict readonly buffer BVHSSBO
+layout(std430, binding = 1) restrict readonly buffer BlasSSBO
 {
     Node Nodes[];
-} bvhSSBO;
+} blasSSBO;
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
@@ -70,14 +70,14 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    DrawCommand meshCMD = drawCommandsSSBO.DrawCommands[meshIndex];
-    Node node = bvhSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
+    DrawCommand meshCMD = drawCommandSSBO.DrawCommands[meshIndex];
+    Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     
     const int glInstanceID = 0; // TODO: Derive from built in variables
     mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + glInstanceID];
     
     Frustum frustum = ExtractFrustum(ProjView * model);
-    drawCommandsSSBO.DrawCommands[meshIndex].InstanceCount = int(AABBVsFrustum(frustum, node));
+    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(AABBVsFrustum(frustum, node));
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
@@ -8,11 +9,25 @@ namespace IDKEngine
 {
     class BVH
     {
-        private readonly BufferObject BVHBuffer;
+        public struct HitInfo
+        {
+            public float T;
+            public int HitID;
+            public int InstanceID;
+            public Vector3 Bary;
+            public GLSLTriangle Triangle;
+        }
+
+        private ModelSystem ModelSystem;
+        private readonly BufferObject BlasBuffer;
         private readonly BufferObject TriangleBuffer;
+        private readonly BLAS[] blases;
+        private readonly GLSLTriangle[] triangles;
         public unsafe BVH(ModelSystem modelSystem)
         {
-            GLSLTriangle[] triangles = new GLSLTriangle[modelSystem.Indices.Length / 3];
+            ModelSystem = modelSystem;
+
+            triangles = new GLSLTriangle[modelSystem.Indices.Length / 3];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
                 GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
@@ -24,37 +39,104 @@ namespace IDKEngine
                 }
             }
 
-            GLSLBlasNode[][] nodes = new GLSLBlasNode[modelSystem.Meshes.Length][];
+            blases = new BLAS[modelSystem.Meshes.Length];
             System.Threading.Tasks.Parallel.For(0, modelSystem.Meshes.Length, i =>
             {
                 GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
                 int baseTriangleCount = cmd.FirstIndex / 3;
-                BLAS blas;
                 fixed (GLSLTriangle* ptr = triangles)
                 {
-                    blas = new BLAS(ptr + baseTriangleCount, cmd.Count / 3);
+                    blases[i] = new BLAS(ptr + baseTriangleCount, cmd.Count / 3);
                 }
-                for (int j = 0; j < blas.Nodes.Length; j++)
-                    if (blas.Nodes[j].TriCount > 0)
-                        blas.Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
-
-                nodes[i] = blas.Nodes;
+                for (int j = 0; j < blases[i].Nodes.Length; j++)
+                    if (blases[i].Nodes[j].TriCount > 0)
+                        blases[i].Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
             });
 
-            int nodesCount = nodes.Sum(arr => arr.Length), nodesUploaded = 0;
-
-            BVHBuffer = new BufferObject();
-            BVHBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * nodesCount, (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            BVHBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BVHBuffer.Size);
-            for (int i = 0; i < nodes.Length; i++)
+            BlasBuffer = new BufferObject();
+            BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            BlasBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BlasBuffer.Size);
+            int nodesUploaded = 0;
+            for (int i = 0; i < blases.Length; i++)
             {
-                BVHBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), nodes[i].Length * sizeof(GLSLBlasNode), nodes[i]);
-                nodesUploaded += nodes[i].Length;
+                BlasBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), blases[i].Nodes.Length * sizeof(GLSLBlasNode), blases[i].Nodes);
+                nodesUploaded += blases[i].Nodes.Length;
             }
 
             TriangleBuffer = new BufferObject();
             TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.DynamicStorageBit);
             TriangleBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, TriangleBuffer.Size);
+        }
+
+        public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo)
+        {
+            hitInfo = new HitInfo();
+            hitInfo.T = float.MaxValue;
+
+            float rayTMin = 0.0f;
+            float rayTMax = 0.0f;
+            uint* stack = stackalloc uint[32];
+            for (int i = 0; i < ModelSystem.Meshes.Length; i++)
+            {
+                const uint glInstanceID = 0; // TODO: Work out actual instanceID value
+                Ray localRay = ray.Transformed(ModelSystem.ModelMatrices[i][glInstanceID]);
+
+                uint stackPtr = 0;
+                uint stackTop = 0;
+                while (true)
+                {
+                    ref readonly GLSLBlasNode node = ref blases[i].Nodes[stackTop];
+                    if (!(MyMath.RayCuboidIntersect(localRay, node.Min, node.Max, out rayTMin, out rayTMax) && rayTMax > 0.0f && rayTMin < hitInfo.T))
+                    {
+                        if (stackPtr == 0) break;
+                        stackTop = stack[--stackPtr];
+                        continue;
+                    }
+
+                    if (node.TriCount > 0)
+                    {
+                        for (int k = (int)node.TriStartOrLeftChild; k < node.TriStartOrLeftChild + node.TriCount; k++)
+                        {
+                            ref readonly GLSLTriangle triangle = ref triangles[k];
+                            if (MyMath.RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, out Vector4 baryT) && baryT.W > 0.0f && baryT.W < hitInfo.T)
+                            {
+                                hitInfo.Bary = baryT.Xyz;
+                                hitInfo.T = baryT.W;
+                                hitInfo.HitID = i;
+                                hitInfo.Triangle = triangle;
+                                hitInfo.InstanceID = k;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ref readonly GLSLBlasNode child0 = ref blases[i].Nodes[node.TriStartOrLeftChild];
+                        ref readonly GLSLBlasNode child1 = ref blases[i].Nodes[node.TriStartOrLeftChild + 1];
+
+                        bool leftChildHit = MyMath.RayCuboidIntersect(localRay, child0.Min, child0.Max, out float dist0, out rayTMax) && rayTMax > 0.0f && dist0 < hitInfo.T;
+                        bool rightChildHit = MyMath.RayCuboidIntersect(localRay, child1.Min, child1.Max, out float dist1, out rayTMax) && rayTMax > 0.0f && dist1 < hitInfo.T;
+
+                        if (leftChildHit || rightChildHit)
+                        {
+                            if (leftChildHit && rightChildHit)
+                            {
+                                stackTop = node.TriStartOrLeftChild + (1u - (dist0 < dist1 ? 1u : 0u));
+                                stack[stackPtr++] = node.TriStartOrLeftChild + (dist0 < dist1 ? 1u : 0u);
+                            }
+                            else
+                            {
+                                stackTop = node.TriStartOrLeftChild + ((rightChildHit && !leftChildHit) ? 1u : 0u);
+                            }
+                            continue;
+                        }
+                    }
+                    // Here: On a leaf node or didn't hit any children which means we should traverse up
+                    if (stackPtr == 0) break;
+                    stackTop = stack[--stackPtr];
+                }
+            }
+
+            return hitInfo.T != float.MaxValue;
         }
     }
 }

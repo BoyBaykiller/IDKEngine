@@ -217,6 +217,7 @@ namespace IDKEngine
         public VolumetricLighter VolumetricLight;
         public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
+        public BVH BVH;
         private Gui gui;
         public GLSLBasicData GLSLBasicData;
         protected override unsafe void OnStart()
@@ -255,9 +256,9 @@ namespace IDKEngine
             for (int i = 0; i < horse.ModelMatrices.Length; i++)
                 horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
-            //Model temple = new Model(@"C:\Users\Julian\Downloads\SunTemple\SunTemple.gltf");
+            //Model temple = new Model(@"C:\Users\Julian\Downloads\SunTempleSmall\SunTempleSmall.gltf");
             //for (int i = 0; i < temple.ModelMatrices.Length; i++)
-            //    temple.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.01f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+            //    temple.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(180.0f)) * Matrix4.CreateScale(0.01f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse });
@@ -277,17 +278,10 @@ namespace IDKEngine
                 int effectiveSubGroupSize = 1;
                 if (Helper.IsExtensionsAvailable("GL_KHR_shader_subgroup"))
                 {
-                    // "do it yourself" until opentk provides these enums
-                    // https://github.com/opentk/opentk/issues/1450
-                    const int SUBGROUP_SIZE_KHR = 0x9532;
-                    const int SUBGROUP_SUPPORTED_FEATURES_KHR = 0x9534;
-                    const int SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR = 0x00000004;
-
-                    int bitfield = GL.GetInteger((GetPName)SUBGROUP_SUPPORTED_FEATURES_KHR);
-                    
-                    if ((bitfield & SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR) == SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR)
+                    SubgroupSupportedFeatures bitfield = (SubgroupSupportedFeatures)GL.GetInteger(GetPName.SubgroupSupportedFeaturesKhr);
+                    if ((bitfield & SubgroupSupportedFeatures.SubgroupFeatureArithmeticBitKhr) == SubgroupSupportedFeatures.SubgroupFeatureArithmeticBitKhr)
                     {
-                        effectiveSubGroupSize = GL.GetInteger((GetPName)SUBGROUP_SIZE_KHR);
+                        effectiveSubGroupSize = GL.GetInteger(GetPName.SubgroupSizeKhr);
                     }
                 }
                 srcCode = srcCode.Replace("__effectiveSubroupSize__", Convert.ToString(effectiveSubGroupSize));
@@ -306,12 +300,12 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            var timer = Stopwatch.StartNew();
-            BVH bvh = new BVH(ModelSystem);
+            Stopwatch timer = Stopwatch.StartNew();
+            BVH = new BVH(ModelSystem);
             timer.Stop();
             Console.WriteLine($"BVH build time in sec: {timer.ElapsedMilliseconds / 1000.0f}");
 
-            PathTracer = new PathTracer(bvh, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
+            PathTracer = new PathTracer(BVH, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
             /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
             /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless

@@ -234,9 +234,64 @@ namespace IDKEngine
             return (p0 + p1 + p2) * (1.0f / 3.0f);
         }
 
-        public static float Area(Vector3 size)
+        public static float Area(in Vector3 size)
         {
             return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+        }
+
+        // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
+        public static bool RayTriangleIntersect(in Ray ray, in Vector3 v0, in Vector3 v1, in Vector3 v2, out Vector4 baryT)
+        {
+            Vector3 v1v0 = v1 - v0;
+            Vector3 v2v0 = v2 - v0;
+            Vector3 rov0 = ray.Origin - v0;
+            Vector3 normal = Vector3.Cross(v1v0, v2v0);
+            Vector3 q = Vector3.Cross(rov0, ray.Direction);
+
+            // baryT = <u, v, w, t>
+            baryT = new Vector4();
+            baryT.Xyw = new Vector3(Vector3.Dot(-q, v2v0), Vector3.Dot(q, v1v0), Vector3.Dot(-normal, rov0)) / Vector3.Dot(ray.Direction, normal);
+            baryT.Z = 1.0f - baryT.X - baryT.Y;
+            
+            return (baryT.X >= 0.0f) && (baryT.Y >= 0.0f) && (baryT.Z >= 0.0f);
+        }
+
+        // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
+        public static bool RayCuboidIntersect(in Ray ray, in Vector3 min, Vector3 max, out float t1, out float t2)
+        {
+            t1 = float.MinValue;
+            t2 = float.MaxValue;
+
+            Vector3 t0s = (min - ray.Origin) / ray.Direction;
+            Vector3 t1s = (max - ray.Origin) / ray.Direction;
+
+            Vector3 tsmaller = Vector3.ComponentMin(t0s, t1s);
+            Vector3 tbigger = Vector3.ComponentMax(t0s, t1s);
+
+
+            t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, tsmaller.Z)));
+            t2 = MathF.Min(t2, MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z)));
+
+            return t1 <= t2;
+        }
+
+        // Source: https://antongerdelan.net/opengl/raycasting.html
+        public static bool RaySphereIntersect(in Ray ray, in GLSLLight light, out float t1, out float t2)
+        {
+            t1 = t2 = float.MaxValue;
+
+            Vector3 sphereToRay = ray.Origin - light.Position;
+            float b = Vector3.Dot(ray.Direction, sphereToRay);
+            float c = Vector3.Dot(sphereToRay, sphereToRay) - light.Radius * light.Radius;
+            float discriminant = b * b - c;
+            if (discriminant < 0.0f)
+                return false;
+
+            float squareRoot = MathF.Sqrt(discriminant);
+            t1 = -b - squareRoot;
+            t2 = -b + squareRoot;
+
+            return t1 <= t2;
         }
     }
 }
