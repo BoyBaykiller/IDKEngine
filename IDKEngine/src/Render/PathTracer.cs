@@ -66,6 +66,18 @@ namespace IDKEngine.Render
             }
         }
 
+        private bool _isRNGFrameBased;
+        public bool IsRNGFrameBased
+        {
+            get => _isRNGFrameBased;
+
+            set
+            {
+                _isRNGFrameBased = value;
+                shaderProgram.Upload("IsRNGFrameBased", _isRNGFrameBased);
+            }
+        }
+
         public Texture EnvironmentMap;
         public ModelSystem ModelSystem;
         public readonly BVH BVH;

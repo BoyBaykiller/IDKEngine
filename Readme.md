@@ -25,7 +25,7 @@ Required OpenGL: 4.6 + `ARB_bindless_texture` and (`NV_gpu_shader5` or `ARB_shad
 
 # Path Traced Render Samples
 
-![PTTempleDark](Screenshots/PTTempleDark.png?raw=true)
+![PTTempleDark](Screenshots/PTTemple.png?raw=true)
 ![PTSponza](Screenshots/PTSponza.png?raw=true)
 ![PTHorse](Screenshots/PTHorse.png?raw=true)
 

@@ -273,6 +273,12 @@ namespace IDKEngine.Render
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
+                        tempBool = window.PathTracer.IsRNGFrameBased;
+                        if (ImGui.Checkbox("IsRNGFrameBased", ref tempBool))
+                        {
+                            window.PathTracer.IsRNGFrameBased = tempBool;
+                        }
+
                         tempBool = window.PathTracer.IsDebugBVHTraversal;
                         if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
                         {

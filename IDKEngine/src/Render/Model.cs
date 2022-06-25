@@ -33,13 +33,12 @@ namespace IDKEngine.Render.Objects
 
         public readonly Matrix4[][] ModelMatrices;
 
-        private readonly Scene scene;
         public unsafe Model(string path)
         {
             string dirPath = Path.GetDirectoryName(path);
 
-            scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.GenerateNormals |
-                                                   PostProcessSteps.RemoveRedundantMaterials |/* PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes |*/
+            Scene scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.GenerateNormals |
+                                                   PostProcessSteps.RemoveRedundantMaterials | /*PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes |*/
                                                    PostProcessSteps.FlipUVs);
             Debug.Assert(scene != null);
 
@@ -152,7 +151,7 @@ namespace IDKEngine.Render.Objects
                     {
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
                         texture.SetWrapMode(OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat, OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
-                        texture.ImmutableAllocate(img.Width, img.Height, 1, format, Texture.GetMaxMipmapLevel(img.Width, img.Height, 1));
+                        texture.ImmutableAllocate(img.Width, img.Height, 1, format, System.Math.Max(Texture.GetMaxMipmapLevel(img.Width, img.Height, 1), 1));
                         fixed (void* ptr = img.GetPixelRowSpan(0))
                         {
                             texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (System.IntPtr)ptr);
