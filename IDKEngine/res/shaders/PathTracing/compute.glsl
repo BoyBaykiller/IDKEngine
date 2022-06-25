@@ -108,10 +108,10 @@ layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
     DrawCommand DrawCommands[];
 } drawCommandsSSBO;
 
-layout(std430, binding = 1) restrict readonly buffer BVHSSBO
+layout(std430, binding = 1) restrict readonly buffer BlasSSBO
 {
     Node Nodes[];
-} bvhSSBO;
+} blasSSBO;
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
@@ -160,15 +160,18 @@ layout(std140, binding = 2) uniform LightsUBO
 vec3 Radiance(Ray ray);
 vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, vec3 normal, out float rayProbability, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
-bool TraceRay(Ray ray, out HitInfo hitInfo);
+bool ClosestHit(Ray ray, out HitInfo hitInfo);
+bool AnyHit(Ray ray, float maxValue);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
 bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
 bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary);
 vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
+vec3 UniformSampleSphere();
 vec3 CosineSampleHemisphere(vec3 normal);
-vec2 UniformSampleUnitCircle();
+vec3 UniformSampleHemisphere(vec3 normal);
+vec2 UniformSampleCircle();
 uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
@@ -179,6 +182,7 @@ uniform int RayDepth;
 uniform float FocalLength;
 uniform float ApertureDiameter;
 uniform bool IsDebugBVHTraversal;
+uniform bool IsRNGFrameBased;
 
 uint rngSeed;
 uint debugBLASCounter = 0;
@@ -189,15 +193,21 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    //rngSeed = basicDataUBO.FreezeFramesCounter;
-    rngSeed = gl_GlobalInvocationID.x * 2873 + gl_GlobalInvocationID.y * 312 + basicDataUBO.FreezeFramesCounter * 2699;
+    if (IsRNGFrameBased)
+    {
+        rngSeed = basicDataUBO.FreezeFramesCounter * 2699;
+    }
+    else
+    {
+        rngSeed = gl_GlobalInvocationID.x * 2873 + gl_GlobalInvocationID.y * 312 + basicDataUBO.FreezeFramesCounter * 2699;
+    }
 
     vec2 subPixelOffset = IsDebugBVHTraversal ? vec2(0.5) : vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
     Ray camRay = Ray(basicDataUBO.ViewPos, GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc));
 
     vec3 focalPoint = camRay.Origin + camRay.Direction * FocalLength;
-    vec2 offset = ApertureDiameter * 0.5 * UniformSampleUnitCircle();
+    vec2 offset = ApertureDiameter * 0.5 * UniformSampleCircle();
     
     camRay.Origin = (basicDataUBO.InvView * vec4(offset, 0.0, 1.0)).xyz;
     camRay.Direction = normalize(focalPoint - camRay.Origin);
@@ -224,7 +234,7 @@ vec3 Radiance(Ray ray)
     bool isRefractive;
     for (int i = 0; i < RayDepth; i++)
     {
-        if (TraceRay(ray, hitInfo))
+        if (ClosestHit(ray, hitInfo))
         {
             // Render wireframe
             // return float(any(lessThan(hitInfo.Bary, vec3(0.01)))).xxx;
@@ -301,7 +311,6 @@ vec3 Radiance(Ray ray)
             }
             throughput /= rayProbability;
 
-            // Russian Roulette - unbiased method to terminate rays and therefore lower render times (also reduces fireflies)
         #if GL_AMD_shader_trinary_minmax
             float p = max3(throughput.x, throughput.y, throughput.z);
         #else
@@ -372,7 +381,7 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }
 
-bool TraceRay(Ray ray, out HitInfo hitInfo)
+bool ClosestHit(Ray ray, out HitInfo hitInfo)
 {
     hitInfo.T = FLOAT_MAX;
     float rayTMin, rayTMax;
@@ -401,7 +410,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
         uint stackTop = 0;
         while (true)
         {
-            Node node = bvhSSBO.Nodes[baseNode + stackTop];
+            Node node = blasSSBO.Nodes[baseNode + stackTop];
             if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T))
             {
                 if (stackPtr == 0) break;
@@ -427,28 +436,21 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
             else
             {
                 debugBLASCounter++;
+                float tMinLeft;
+                float tMinRight;
 
-                float dist0;
-                float dist1;
-
-                bool leftChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild], dist0, rayTMax) && rayTMax > 0.0 && dist0 < hitInfo.T;
-                bool rightChildHit = RayCuboidIntersect(localRay, bvhSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], dist1, rayTMax) && rayTMax > 0.0 && dist1 < hitInfo.T;
+                bool leftChildHit = RayCuboidIntersect(localRay, blasSSBO.Nodes[baseNode + node.TriStartOrLeftChild], tMinLeft, rayTMax) && rayTMax > 0.0 && tMinLeft < hitInfo.T;
+                bool rightChildHit = RayCuboidIntersect(localRay, blasSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
                 
                 if (leftChildHit || rightChildHit)
                 {
-                    // Note: We add 1 to the left child to get the right child
-                    // This allows to remove some branches by converting a bool to int and adding it
-
-                    // If both children are hit assign the closest to stackTop to traverse down next
-                    // and put further onto stack for traversing up if we need to
                     if (leftChildHit && rightChildHit)
                     {
-                        stackTop = node.TriStartOrLeftChild + (1 - int(dist0 < dist1));
-                        stack[stackPtr++] = node.TriStartOrLeftChild + int(dist0 < dist1);
+                        stackTop = node.TriStartOrLeftChild + (1 - int(tMinLeft < tMinRight));
+                        stack[stackPtr++] = node.TriStartOrLeftChild + int(tMinLeft < tMinRight);
                     }
                     else
                     {
-                        // Assign the one child that was hit to stackTop to traverse down next
                         stackTop = node.TriStartOrLeftChild + int(rightChildHit && !leftChildHit);
                     }
                     continue;
@@ -461,6 +463,65 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
     }
 
     return hitInfo.T != FLOAT_MAX;
+}
+
+bool AnyHit(Ray ray, float maxValue)
+{
+    float rayTMin, rayTMax;
+
+    // for (int i = 0; i < lightsUBO.Count; i++)
+    // {
+    //     Light light = lightsUBO.Lights[i];
+    //     if (RaySphereIntersect(ray, light, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < maxValue)
+    //     {
+    //         return true;
+    //     }
+    // }
+
+    vec4 baryT;
+    uint stack[32];
+    for (int i = 0; i < meshSSBO.Meshes.length(); i++)
+    {
+        DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
+        int baseNode = 2 * (cmd.FirstIndex / 3);
+        
+        const int glInstanceID = 0; // TODO: Work out actual instanceID value
+        Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
+        
+        uint stackPtr = 0;
+        uint stackTop = 0;
+        while (true)
+        {
+            Node node = blasSSBO.Nodes[baseNode + stackTop];
+            if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < maxValue))
+            {
+                if (stackPtr == 0) break;
+                stackTop = stack[--stackPtr];
+                continue;
+            }
+
+            if (node.TriCount > 0)
+            {
+                for (uint j = node.TriStartOrLeftChild; j < node.TriStartOrLeftChild + node.TriCount; j++)
+                {
+                    Triangle triangle = triangleSSBO.Triangles[j];
+                    if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < maxValue)
+                    {
+                        return true;
+                    }
+                }
+                if (stackPtr == 0) break;
+                stackTop = stack[--stackPtr];
+            }
+            else
+            {
+                stackTop = node.TriStartOrLeftChild;
+                stack[stackPtr++] = node.TriStartOrLeftChild + 1;
+            }
+        }
+    }
+
+    return false;
 }
 
 // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
@@ -536,8 +597,7 @@ Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel)
     return Ray((invModel * vec4(ray.Origin, 1.0)).xyz, (invModel * vec4(ray.Direction, 0.0)).xyz);
 }
 
-// Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
-vec3 CosineSampleHemisphere(vec3 normal)
+vec3 UniformSampleSphere()
 {
     float z = GetRandomFloat01() * 2.0 - 1.0;
     float a = GetRandomFloat01() * 2.0 * PI;
@@ -545,19 +605,32 @@ vec3 CosineSampleHemisphere(vec3 normal)
     float x = r * cos(a);
     float y = r * sin(a);
 
-    // Convert unit vector in sphere to a cosine weighted vector in hemisphere
-    return normalize(normal + vec3(x, y, z));
+    return vec3(x, y, z);
 }
 
-vec2 UniformSampleUnitCircle()
+// Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
+vec3 CosineSampleHemisphere(vec3 normal)
+{
+    // Convert unit vector in sphere to a cosine weighted vector in hemisphere
+    return normalize(normal + UniformSampleSphere());
+}
+
+vec3 UniformSampleHemisphere(vec3 normal)
+{
+    vec3 sphereSample = UniformSampleSphere();
+    return sphereSample * sign(dot(sphereSample, normal));
+}
+
+vec2 UniformSampleCircle()
 {
     float angle = GetRandomFloat01() * 2.0 * PI;
     float r = sqrt(GetRandomFloat01());
     return vec2(cos(angle), sin(angle)) * r;
 }
 
+
 // Faster and much more random than Wang Hash
-// See: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
+// Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
 uint GetPCGHash(inout uint seed)
 {
     seed = seed * 747796405u + 2891336453u;
@@ -589,7 +662,6 @@ uint EmulateNonUniform(uint index)
     }
 }
 #endif
-
 
 // Source: https://www.shadertoy.com/view/ls2Bz1
 vec3 SpectralJet(float w)

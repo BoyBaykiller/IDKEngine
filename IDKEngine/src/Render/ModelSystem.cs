@@ -65,6 +65,9 @@ namespace IDKEngine.Render
 
         public unsafe void Add(Model[] models)
         {
+            if (models.Length == 0)
+                return;
+
             for (int i = 0; i < models.Length; i++)
             {
                 // Don't modify order

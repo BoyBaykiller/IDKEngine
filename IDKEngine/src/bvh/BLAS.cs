@@ -5,22 +5,23 @@ namespace IDKEngine
 {
     class BLAS
     {
-#if !USE_SAH
-        public const int BLAS_MIN_TRIANGLE_COUNT_LEAF = 8;
-#else
-        public const int SAH_SAMPLES = 10;
+        public const int MIN_TRIANGLE_LEAF_COUNT = 3;
+#if USE_SAH
+        public const int SAH_SAMPLES = 8;
 #endif
 
         public readonly GLSLBlasNode[] Nodes;
         public readonly AABB RootBounds;
 
-        private int nodesUsed = 2;
+        private int nodesUsed;
         public unsafe BLAS(GLSLTriangle* triangles, int count)
         {
             Nodes = new GLSLBlasNode[2 * count];
-
             ref GLSLBlasNode root = ref Nodes[0];
             root.TriCount = (uint)count;
+            nodesUsed++;
+
+            // max depth ceil(log2(triangles))+1
 
             UpdateNodeBounds(ref root);
             Subdivide();
@@ -31,24 +32,24 @@ namespace IDKEngine
             {
                 ref GLSLBlasNode parentNode = ref Nodes[nodeID];
 #if !USE_SAH
-                if (parentNode.TriCount < BLAS_MIN_TRIANGLE_COUNT_LEAF)
+                if (parentNode.TriCount <= MIN_TRIANGLE_LEAF_COUNT)
                     return;
 #endif
 
 #if USE_SAH
-                float splitSAH = FindBestSplitPlane(ref parentNode, out int bestAxis, out float splitPos);
+                float splitSAH = FindBestSplitPlane(ref parentNode, out int splitAxis, out float splitPos);
 
                 float parentSAH = GetLeafSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount);
-                if (splitSAH >= parentSAH)
+                if (splitSAH >= parentSAH || parentNode.TriCount <= MIN_TRIANGLE_LEAF_COUNT)
                     return;
 
 #else
                 Vector3 extent = parentNode.Max - parentNode.Min;
-                int bestAxis = 0;
-                if (extent.Y > extent.X) bestAxis = 1;
-                if (extent.Z > extent[bestAxis]) bestAxis = 2;
+                int splitAxis = 0;
+                if (extent.Y > extent.X) splitAxis = 1;
+                if (extent.Z > extent[splitAxis]) splitAxis = 2;
 
-                float splitPos = parentNode.Min[bestAxis] + extent[bestAxis] * 0.5f;
+                float splitPos = parentNode.Min[splitAxis] + extent[splitAxis] * 0.5f;
 #endif
 
                 {
@@ -57,7 +58,7 @@ namespace IDKEngine
                     while (rightStart <= endOfTris)
                     {
                         ref GLSLTriangle tri = ref triangles[rightStart];
-                        if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[bestAxis] < splitPos)
+                        if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[splitAxis] < splitPos)
                             rightStart++;
                         else
                             Helper.Swap(ref tri, ref triangles[endOfTris--]);
@@ -71,10 +72,10 @@ namespace IDKEngine
                     int rightChildID = nodesUsed++;
 
                     Nodes[leftChildID].TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
-                    Nodes[leftChildID].TriCount = leftCount;
+                    Nodes[leftChildID].TriCount |= leftCount;
 
                     Nodes[rightChildID].TriStartOrLeftChild = (uint)rightStart;
-                    Nodes[rightChildID].TriCount = parentNode.TriCount - leftCount;
+                    Nodes[rightChildID].TriCount |= parentNode.TriCount - leftCount;
 
                     parentNode.TriStartOrLeftChild = (uint)leftChildID;
                     parentNode.TriCount = 0;
@@ -88,9 +89,9 @@ namespace IDKEngine
             }
 
 #if USE_SAH
-            unsafe float FindBestSplitPlane(ref GLSLBlasNode node, out int bestAxis, out float splitPos)
+            unsafe float FindBestSplitPlane(ref GLSLBlasNode node, out int splitAxis, out float splitPos)
             {
-                bestAxis = -1;
+                splitAxis = -1;
                 splitPos = 0;
                 float bestSAH = float.MaxValue;
 
@@ -109,14 +110,14 @@ namespace IDKEngine
 
                     float scale = (centroidBounds.Max[i] - centroidBounds.Min[i]) / SAH_SAMPLES;
 
-                    for (int j = 1; j < SAH_SAMPLES; j++)
+                    for (int j = 0; j < SAH_SAMPLES; j++)
                     {
                         float candidatePos = centroidBounds.Min[i] + j * scale;
                         float cost = GetSAH(node, i, candidatePos);
                         if (cost < bestSAH)
                         {
                             splitPos = candidatePos;
-                            bestAxis = i;
+                            splitAxis = i;
                             bestSAH = cost;
                         }
                     }

@@ -71,6 +71,9 @@ namespace IDKEngine.Render
 
         public unsafe void Add(Span<GLSLLight> lights)
         {
+            if (lights.Length == 0)
+                return;
+
             Debug.Assert(Count + lights.Length <= GLSL_MAX_UBO_LIGHT_COUNT);
 
             fixed (void* src = &lights[0], dest = Lights)

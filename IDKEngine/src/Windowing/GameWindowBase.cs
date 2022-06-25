@@ -174,13 +174,12 @@ namespace IDKEngine
                     KeyboardState.Update();
                     MouseState.Update();
                     OnUpdate((float)runTime);
-                    OnRender((float)runTime);
-
-                    GLFW.SwapBuffers(window);
-
-                    lastTime = currentTime;
-                    _time += (float)runTime;
                 }
+                OnRender((float)runTime);
+                GLFW.SwapBuffers(window);
+
+                lastTime = currentTime;
+                _time += (float)runTime;
             }
 
             OnEnd();

@@ -18,7 +18,7 @@ namespace IDKEngine
             public GLSLTriangle Triangle;
         }
 
-        private ModelSystem ModelSystem;
+        private readonly ModelSystem ModelSystem;
         private readonly BufferObject BlasBuffer;
         private readonly BufferObject TriangleBuffer;
         private readonly BLAS[] blases;
@@ -107,32 +107,14 @@ namespace IDKEngine
                                 hitInfo.InstanceID = k;
                             }
                         }
+                        if (stackPtr == 0) break;
+                        stackTop = stack[--stackPtr];
                     }
                     else
                     {
-                        ref readonly GLSLBlasNode child0 = ref blases[i].Nodes[node.TriStartOrLeftChild];
-                        ref readonly GLSLBlasNode child1 = ref blases[i].Nodes[node.TriStartOrLeftChild + 1];
-
-                        bool leftChildHit = MyMath.RayCuboidIntersect(localRay, child0.Min, child0.Max, out float dist0, out rayTMax) && rayTMax > 0.0f && dist0 < hitInfo.T;
-                        bool rightChildHit = MyMath.RayCuboidIntersect(localRay, child1.Min, child1.Max, out float dist1, out rayTMax) && rayTMax > 0.0f && dist1 < hitInfo.T;
-
-                        if (leftChildHit || rightChildHit)
-                        {
-                            if (leftChildHit && rightChildHit)
-                            {
-                                stackTop = node.TriStartOrLeftChild + (1u - (dist0 < dist1 ? 1u : 0u));
-                                stack[stackPtr++] = node.TriStartOrLeftChild + (dist0 < dist1 ? 1u : 0u);
-                            }
-                            else
-                            {
-                                stackTop = node.TriStartOrLeftChild + ((rightChildHit && !leftChildHit) ? 1u : 0u);
-                            }
-                            continue;
-                        }
+                        stackTop = node.TriStartOrLeftChild;
+                        stack[stackPtr++] = node.TriStartOrLeftChild + 1;
                     }
-                    // Here: On a leaf node or didn't hit any children which means we should traverse up
-                    if (stackPtr == 0) break;
-                    stackTop = stack[--stackPtr];
                 }
             }
 
