@@ -19,9 +19,13 @@ Feature list:
  - Temporal Anti Aliasing
  - CoD-Modern-Warfare Bloom
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
- - Path Tracer (very much WIP)
+ - Path Tracer (WIP<sup>[1](#f1)</sup>)
  
 Required OpenGL: 4.6 + `ARB_bindless_texture` and (`NV_gpu_shader5` or `ARB_shader_ballot`)
+
+<font size="1"><b id="f1">1</b>
+In `Model.cs` load with `PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes` for PT fps boost. This however will make the rasterizer slightly slower because less meshes can be culled
+</font>
 
 # Path Traced Render Samples
 
@@ -45,7 +49,7 @@ Here is a generated shading image while the camera was moving:
 Red stands for 1 invocation per 4x4 pixels which means 4x less fragment shader invocations in those regions.
 No color is the default - 1 invocation per pixel.
 
-### 1.1 Shading Rate Image generation
+### 2.0 Shading Rate Image generation
 
 The ultimate goal of the algorithm should be to apply a as low as possible shading rate without the user noticing. I assume the following are cases where we can safely reduce the shading rate:
 
@@ -98,7 +102,7 @@ $$V(x) = \sum_{i = 1}^{n}(x_{i} - \overline{x})^{2} \times \frac{1}{n - 1}$$
 $$VN = \frac{\sqrt{V(x)}}{\overline{x}}$$
 
 Like before $\overline{x}$ is the mean of set $x$ and $n$ the number of elements. $V(x)$ tells us the variance of that set.
-However $V(x)$ is dependent on scale which is not what we want. $\{5, 10\}$ should result in the same variance as $\{10, 20\}$.
+However $V(x)$ is dependent on scale which is not what we want. {5, 10} should result in the same variance as {10, 20}.
 The second part solves this by [normalizing the variance](https://www.vosesoftware.com/riskwiki/Normalizedmeasuresofspread-theCofV.php).
 
 Here's a implementation. I put the parallel adding stuff from above in the function `ParallelSum`.
@@ -129,7 +133,7 @@ void main()
 At this point using both average speed and variance of luminance you can obtain an appropriate shading rate. This is not the most interesting part.
 I decided to scale both of these factors add them together and then use that to mix between different rates. You can find the code [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/ShadingRateClassification/compute.glsl).
 
-### 1.2 Subgroup optimizations
+### 3.0 Subgroup optimizations
 
 While operating on shared memory is fast Subgroup Intrinsics are faster.
 They are a relatively new topic on its own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are a lot of subgroup operations. The full thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt) but vendor specific/arb extensions with `ARB_shader_group_vote` actually being part of core also exist.
@@ -175,7 +179,7 @@ void main()
 Note how the workgroup expands the size of a subgroup so we still have to use shared memory to obtain a workgroup wide result.
 However in the for loop it now only has to iterate through `log2(gl_NumSubgroups / 2)` values instead of `log2(gl_WorkGroupSize.x / 2)`.
 
-## Single pass Point Shadow rendering
+## Point Shadows
 
 ### 1.0 Rendering
 
@@ -247,3 +251,71 @@ void main()
 }
 ```
 Since vertex shaders can't generate vertices like geometry shader we'll use a instanced draw command to tell OpenGL to render every vertex 6 times. Inside the shader we can then use the current instance (`gl_InstanceID`) as the face to render to.
+
+### 2.0 Sampling
+
+Just want to mention that OpenGL provides useful shadow sampler types like `samplerCubeShadow` or `sampler2DShadow`.
+When using shadow samplers texture lookup functions accept an additional parameter with which the depth value in the texture
+is compaired. Also the returned value is no longer the depth value but instead a visibility ratio in the range of [0, 1].
+When using linear filtering the compairson is evaluted and averaged for a 2x2 block of pixels.
+And all that in one function!
+
+To configure a texture such that it can be sampled by a shadow sampler you can do this:
+```cs
+GL.TextureParameter(texture, TextureParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
+GL.TextureParameter(texture, TextureParameterName.TextureCompareFunc, (int)All.Less);
+```
+And sample it in glsl like that:
+```glsl
+layout(binding = 0) uniform samplerCubeShadow SamplerShadow;
+
+void main()
+{
+    float fragDepth = GetDepthRange0_1(); 
+    float visibility = texture(SamplerShadow, vec3(coords, fragDepth));
+}
+```
+
+Here is a comparison of using shadow samplers (right) vs not using them.
+![SamplingComparison](Screenshots/SamplingComparison.png?raw=true)
+
+Obviously you can combine this with software filtering like PCF to get even better results.
+
+## GPU Driven Rendering
+
+### 1.0 Multi Draw Indirect
+
+This "Engine" does a modern low overhead MDI approach to rendering.
+MDI stands for multi draw indirect. The most commonly used MDI function is probably `MultiDrawElementsIndirect`.
+As the name suggests it does multiple draws under the hood. In fact `MultiDrawElementsIndirect` is equivalent
+to calling `DrawElementsInstancedBaseVertexBaseInstance` in a for loop with `drawcount` iterations.
+Arguments for these underlying draw calls are provided by us and expected to have the following format:
+```cs
+struct DrawCommand
+{
+    int Count; // indices count
+    int InstanceCount; // number of instances
+    int FirstIndex; // offset in indices array
+    int BaseVertex; // offset in vertex array
+    int BaseInstance; // unimportant unless you're doing old school instancing - can be useful for own purposes
+}
+```
+The way you supply the draw commands to the API is with a buffer - that's what the "indirect" suffix says.
+So to render 5 meshes you'd need to put all of their vertices and indices into two single big arrays and
+configure 5 `DrawCommand` structs and upload them to a buffer.
+
+The final draw could then be as simple as:
+```cs
+public void Draw()
+{
+    vao.Bind(); // contains big vertex and indices array + vertex format
+    drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer); // contains DrawCommand[Meshes.Length]
+
+    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
+}
+```
+While this renders all geometry just fine you might be wondering how to access the entirety of materials to compute proper shading. After all scenes like Sponza come with a lot of textures and the usual method of manually declaring `sampler2D` in glsl quickly becomes insufficient as we can't do state changes between draw calls anymore (which is good).
+
+### 2.0 Bindless Textures
+
+This is where Bindless Textures comes in...

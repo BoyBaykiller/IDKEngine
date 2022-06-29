@@ -185,7 +185,7 @@ uniform bool IsDebugBVHTraversal;
 uniform bool IsRNGFrameBased;
 
 uint rngSeed;
-uint debugBLASCounter = 0;
+int debugBLASCounter = 0;
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);

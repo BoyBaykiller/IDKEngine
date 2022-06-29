@@ -205,5 +205,5 @@ float Visibility(PointShadow pointShadow)
         shadowFactor += texture(pointShadow.Sampler, vec4(lightToFrag + SampleOffsetDirections[i] * DISK_RADIUS, mapedDepth));
     }
 
-    return shadowFactor / 20.0;
+    return shadowFactor / 21.0;
 }

@@ -30,7 +30,7 @@ namespace IDKEngine
             triangles = new GLSLTriangle[modelSystem.Indices.Length / 3];
             for (int i = 0; i < modelSystem.Meshes.Length; i++)
             {
-                GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
+                ref readonly GLSLDrawCommand cmd = ref modelSystem.DrawCommands[i];
                 for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j += 3)
                 {
                     triangles[j / 3].Vertex0 = modelSystem.Vertices[modelSystem.Indices[j + 0] + cmd.BaseVertex];
@@ -42,7 +42,7 @@ namespace IDKEngine
             blases = new BLAS[modelSystem.Meshes.Length];
             System.Threading.Tasks.Parallel.For(0, modelSystem.Meshes.Length, i =>
             {
-                GLSLDrawCommand cmd = modelSystem.DrawCommands[i];
+                ref readonly GLSLDrawCommand cmd = ref modelSystem.DrawCommands[i];
                 int baseTriangleCount = cmd.FirstIndex / 3;
                 fixed (GLSLTriangle* ptr = triangles)
                 {

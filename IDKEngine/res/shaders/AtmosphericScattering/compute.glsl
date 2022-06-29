@@ -10,7 +10,6 @@ layout(binding = 0, rgba32f) restrict writeonly uniform imageCube ImgResult;
 
 vec2 Rsi(vec3 r0, vec3 rd, float sr);
 vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAtmos, vec3 kRlh, float kMie, float shRlh, float shMie, float g);
-bool IsInside(vec2 pos, vec2 size);
 vec3 GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 
 uniform vec3 LightPos;
@@ -24,8 +23,6 @@ void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
-    if (!IsInside(imgCoord.xy, imgResultSize))
-        return;
     
     vec2 ndc = vec2(imgCoord.xy) / imgResultSize * 2.0 - 1.0;
     
@@ -151,11 +148,6 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
 
     // Calculate and return the final color.
     return iSun * (pRlh * kRlh * totalRlh + pMie * kMie * totalMie);
-}
-
-bool IsInside(vec2 pos, vec2 size)
-{
-    return pos.x < size.x && pos.y < size.y;
 }
 
 vec3 GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)
