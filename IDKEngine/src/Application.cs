@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
+using System.Collections.Generic;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
 using OpenTK.Graphics.OpenGL4;
@@ -8,7 +9,6 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using System.Collections.Generic;
 
 namespace IDKEngine
 {
@@ -303,7 +303,7 @@ namespace IDKEngine
             Stopwatch timer = Stopwatch.StartNew();
             BVH = new BVH(ModelSystem);
             timer.Stop();
-            Console.WriteLine($"BVH build time in sec: {timer.ElapsedMilliseconds / 1000.0f}");
+            Console.WriteLine($"BVH build time: {timer.ElapsedMilliseconds / 1000.0f} sec");
 
             PathTracer = new PathTracer(BVH, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
             /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
@@ -314,9 +314,9 @@ namespace IDKEngine
 
             List<GLSLLight> lights = new List<GLSLLight>();
             //lights.Add(new GLSLLight(new Vector3(-0.5f, 8.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 1.0f));
-            //lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-            //lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-            //lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+            lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             ForwardRenderer.LightingContext.Add(lights.ToArray());
             
             pointShadows = new List<PointShadow>();

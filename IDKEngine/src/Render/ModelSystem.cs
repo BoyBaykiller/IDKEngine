@@ -28,7 +28,7 @@ namespace IDKEngine.Render
         public Matrix4[][] ModelMatrices;
         private readonly BufferObject modelMatricesBuffer;
 
-        public readonly VAO VAO;
+        private readonly VAO vao;
         public unsafe ModelSystem()
         {
             DrawCommands = new GLSLDrawCommand[0];
@@ -53,14 +53,14 @@ namespace IDKEngine.Render
             modelMatricesBuffer = new BufferObject();
             modelMatricesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
-            VAO = new VAO();
-            VAO.SetElementBuffer(elementBuffer);
-            VAO.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLDrawVertex));
-            VAO.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
-            VAO.SetAttribFormat(0, 1, 1, VertexAttribType.Float, sizeof(float) * 3); // TexCoordU
-            VAO.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 4); // Normal
-            VAO.SetAttribFormat(0, 3, 1, VertexAttribType.Float, sizeof(float) * 7); // TexCoordV
-            VAO.SetAttribFormat(0, 4, 3, VertexAttribType.Float, sizeof(float) * 8); // Tangent
+            vao = new VAO();
+            vao.SetElementBuffer(elementBuffer);
+            vao.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLDrawVertex));
+            vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
+            vao.SetAttribFormat(0, 1, 1, VertexAttribType.Float, sizeof(float) * 3); // TexCoordU
+            vao.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 4); // Normal
+            vao.SetAttribFormat(0, 3, 1, VertexAttribType.Float, sizeof(float) * 7); // TexCoordV
+            vao.SetAttribFormat(0, 4, 3, VertexAttribType.Float, sizeof(float) * 8); // Tangent
         }
 
         public unsafe void Add(Model[] models)
@@ -94,7 +94,7 @@ namespace IDKEngine.Render
 
         public void Draw()
         {
-            VAO.Bind();
+            vao.Bind();
             drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
 
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);

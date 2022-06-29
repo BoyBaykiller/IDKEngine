@@ -138,6 +138,8 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample)
 
     // Map from [nearPlane; farPlane] to [0.0; 1.0]
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
+    // Texture lookups with no shadowsampler but compairson mode to != None on is actually UB
+    // Works on both my nvidia and amd card though
     float closestDepth = texture(pointShadow.Sampler, lightToSample).r;
 
     return mapedDepth > closestDepth;
