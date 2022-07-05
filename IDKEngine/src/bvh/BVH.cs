@@ -9,12 +9,19 @@ namespace IDKEngine
 {
     class BVH
     {
-        public struct HitInfo
+        public struct RayHitInfo
         {
             public float T;
             public int HitID;
             public int InstanceID;
             public Vector3 Bary;
+            public GLSLTriangle Triangle;
+        }
+
+        public struct AABBHitInfo
+        {
+            public int HitID;
+            public int InstanceID;
             public GLSLTriangle Triangle;
         }
 
@@ -55,7 +62,7 @@ namespace IDKEngine
 
             BlasBuffer = new BufferObject();
             BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            BlasBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 1, 0, BlasBuffer.Size);
+            BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
             int nodesUploaded = 0;
             for (int i = 0; i < blases.Length; i++)
             {
@@ -65,12 +72,12 @@ namespace IDKEngine
 
             TriangleBuffer = new BufferObject();
             TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.DynamicStorageBit);
-            TriangleBuffer.BindBufferRange(BufferRangeTarget.ShaderStorageBuffer, 3, 0, TriangleBuffer.Size);
+            TriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
         }
 
-        public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo)
+        public unsafe bool Intersect(in Ray ray, out RayHitInfo hitInfo)
         {
-            hitInfo = new HitInfo();
+            hitInfo = new RayHitInfo();
             hitInfo.T = float.MaxValue;
 
             float rayTMin = 0.0f;
@@ -119,6 +126,44 @@ namespace IDKEngine
             }
 
             return hitInfo.T != float.MaxValue;
+        }
+
+        public unsafe bool Intersect(in AABB aabb, out AABBHitInfo hitInfo)
+        {
+            hitInfo = new AABBHitInfo();
+
+            Vector3 boxCenter = aabb.Center;
+            Vector3 halfSize = aabb.HalfSize;
+            
+            for (int i = 0; i < ModelSystem.Meshes.Length; i++)
+            {
+                const int glInstanceID = 0; // TODO: Work out actual instanceID value
+                
+                Matrix4 invModel = Matrix4.Invert(ModelSystem.ModelMatrices[i][glInstanceID]);
+                
+                Vector3 localCenter = (new Vector4(boxCenter, 1.0f) * invModel).Xyz;
+                AABB localAabb = aabb;
+                localAabb.Transform(invModel);
+
+                ref readonly GLSLBlasNode topNode = ref blases[i].Nodes[0];
+                if (MyMath.AabbAabbIntersect(localAabb, topNode.Min, topNode.Max))
+                {
+                    ref readonly GLSLDrawCommand cmd = ref ModelSystem.DrawCommands[i];
+                    for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j += 3)
+                    {
+                        hitInfo.Triangle = triangles[j / 3];
+                        if (MyMath.TriangleBoxIntersect(hitInfo.Triangle.Vertex0.Position, hitInfo.Triangle.Vertex1.Position, hitInfo.Triangle.Vertex2.Position, localCenter, halfSize))
+                        {
+                            hitInfo.HitID = i;
+                            hitInfo.InstanceID = glInstanceID;
+                            return true;
+                        }
+                    }
+
+                }
+            }
+
+            return false;
         }
     }
 }

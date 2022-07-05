@@ -43,7 +43,7 @@ namespace IDKEngine.Render
 
             bufferObject = new BufferObject();
             bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 2, 0, bufferObject.Size);
+            bufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
 
             ObjectFactory.Vertex[] vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
             BufferObject vbo = new BufferObject();

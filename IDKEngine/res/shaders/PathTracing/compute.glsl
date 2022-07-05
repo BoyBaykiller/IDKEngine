@@ -106,7 +106,7 @@ struct Triangle
 layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
-} drawCommandsSSBO;
+} drawCommandSSBO;
 
 layout(std430, binding = 1) restrict readonly buffer BlasSSBO
 {
@@ -400,7 +400,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
     uint stack[32];
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
-        DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
+        DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
         int baseNode = 2 * (cmd.FirstIndex / 3);
         
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
@@ -482,7 +482,7 @@ bool AnyHit(Ray ray, float maxValue)
     uint stack[32];
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
-        DrawCommand cmd = drawCommandsSSBO.DrawCommands[i];
+        DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
         int baseNode = 2 * (cmd.FirstIndex / 3);
         
         const int glInstanceID = 0; // TODO: Work out actual instanceID value
