@@ -147,7 +147,7 @@ namespace IDKEngine.Render
         {
             BufferObject bufferObject = new BufferObject();
             bufferObject.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), (System.IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            bufferObject.BindBufferRange(BufferRangeTarget.UniformBuffer, 1, 0, bufferObject.Size);
+            bufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
             return bufferObject;
         }

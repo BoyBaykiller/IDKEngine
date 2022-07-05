@@ -23,9 +23,8 @@ Feature list:
  
 Required OpenGL: 4.6 + `ARB_bindless_texture` and (`NV_gpu_shader5` or `ARB_shader_ballot`)
 
-<font size="1"><b id="f1">1</b>
+<b id="f1">1</b>
 In `Model.cs` load with `PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes` for PT fps boost. This however will make the rasterizer slightly slower because less meshes can be culled
-</font>
 
 # Path Traced Render Samples
 
@@ -257,7 +256,7 @@ Since vertex shaders can't generate vertices like geometry shader we'll use a in
 Just want to mention that OpenGL provides useful shadow sampler types like `samplerCubeShadow` or `sampler2DShadow`.
 When using shadow samplers texture lookup functions accept an additional parameter with which the depth value in the texture
 is compaired. Also the returned value is no longer the depth value but instead a visibility ratio in the range of [0, 1].
-When using linear filtering the compairson is evaluted and averaged for a 2x2 block of pixels.
+When using linear filtering the comparison is evaluted and averaged for a 2x2 block of pixels.
 And all that in one function!
 
 To configure a texture such that it can be sampled by a shadow sampler you can do this:
@@ -314,8 +313,71 @@ public void Draw()
     GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
 }
 ```
-While this renders all geometry just fine you might be wondering how to access the entirety of materials to compute proper shading. After all scenes like Sponza come with a lot of textures and the usual method of manually declaring `sampler2D` in glsl quickly becomes insufficient as we can't do state changes between draw calls anymore (which is good).
+While this renders all geometry just fine you might be wondering how to access the entirety of materials to compute proper shading. After all scenes like Sponza come with a lot of textures and the usual method of manually declaring `sampler2D` in glsl quickly becomes insufficient as we can't do state changes between draw calls anymore (which is good) to swap out materials. This is where Bindless Textures comes in.
 
 ### 2.0 Bindless Textures
 
-This is where Bindless Textures comes in...
+First of all `ARB_bindless_texture` is not a core extension. Nonetheless almost all AMD and Nvidia GPUs implement it as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately render doc doesn't support it.
+
+The main idea behind bindless textures is the ability to generate a unique 64 bit handle from any texture which can then be used to represent it inside glsl and therefore no longer depend on previous state based mechanics.
+Concrete that means no longer having to call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.
+Instead generate a handle and somehow communicate it to the gpu (most likely with a buffer).
+
+Example:
+```cs
+long handle = GL.Arb.GetTextureHandle(texture);
+GL.Arb.MakeTextureHandleResident(handle);
+
+GL.CreateBuffers(1, out int buffer);
+GL.NamedBufferStorage(buffer, sizeof(long), ref handle, BufferStorageFlags.DynamicStorageBit);
+GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0, buffer);
+```
+```glsl
+#version 460 core
+#extension GL_ARB_bindless_texture : require
+
+layout(std430, binding = 0) restrict readonly buffer TextureSSBO
+{
+    sampler2D Textures[];
+} textureSSBO;
+
+void main()
+{
+    sampler2D myTexture = textureSSBO.Textures[0];
+    vec4 color = texture(myTexture, coords);
+}
+```
+Here we generate a handle upload that to a buffer and then access it through a shader storage block which exposes the buffer to the shader.
+After the handle is generated the texture's state is immutable. This can not be undone.
+To sample a bindless texture it's handle must also be made resident.
+The extension allows you to directly store `sampler2D` inside the shader storage block as shown. Note however that you could also do `uvec2 Textures[];` and then perform a cast like: `sampler2D myTexture = sampler2D(textureSSBO.Textures[0])`.
+
+In the case of a MDI renderer as described in [1.0 Multi Draw Indirect](#1.0-multi-draw-indirect)
+the process of fetching each mesh's texture would look something along the lines of:
+```glsl
+#version 460 core
+#extension GL_ARB_bindless_texture : require
+
+layout(std430, binding = 0) restrict readonly buffer MaterialSSBO
+{
+    Material Materials[];
+} materialSSBO;
+
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
+{
+    Mesh Meshes[];
+} meshSSBO;
+
+void main()
+{
+    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
+    Material material = materialSSBO.Materials[mesh.MaterialIndex];
+
+    vec4 albedo = texture(material.Albedo, coords);
+}
+```
+`gl_DrawID` is in the range of [0, drawcount - 1] and identifies the current sub draw inside a multi draw. And each sub draw corresponds to a mesh.
+`Material` is just a struct which contains one or more bindless textures.
+
+There is one caveat (which is not exclusive to bindless textures) which is that they must be indexed with a [dynamically uniform expression](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)#Dynamically_uniform_expression). Luckily `gl_DrawID` is defined to fulfill that requirement.
+

@@ -199,7 +199,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = window.SSAO.Strength;
-                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 20.0f))
+                            if (ImGui.SliderFloat("Strength ", ref tempFloat, 0.0f, 20.0f))
                             {
                                 window.SSAO.Strength = tempFloat;
                             }
@@ -535,7 +535,7 @@ namespace IDKEngine.Render
 
                 Vector2 ndc = new Vector2((float)point.X / window.ForwardRenderer.Result.Width, (float)point.Y / window.ForwardRenderer.Result.Height) * 2.0f - new Vector2(1.0f);
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(window.GLSLBasicData.CameraPos, window.GLSLBasicData.InvProjection, window.GLSLBasicData.InvView, ndc);
-                bool hitMesh = window.BVH.Intersect(worldSpaceRay, out BVH.HitInfo meshHitInfo);
+                bool hitMesh = window.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
                 bool hitLight = window.ForwardRenderer.LightingContext.Intersect(worldSpaceRay, out Lighter.HitInfo lightHitInfo);
 
                 if (!hitMesh && !hitLight)

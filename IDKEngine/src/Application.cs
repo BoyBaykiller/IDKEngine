@@ -295,7 +295,7 @@ namespace IDKEngine
             Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 3.0f);
             SSR = new SSR(WindowSize.X, WindowSize.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
-            SSAO = new SSAO(WindowSize.X, WindowSize.Y, 16, 0.25f, 2.0f);
+            SSAO = new SSAO(WindowSize.X, WindowSize.Y, 10, 0.25f, 2.0f);
             PostCombine = new PostCombine(WindowSize.X, WindowSize.Y);
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
@@ -327,7 +327,7 @@ namespace IDKEngine
 
             basicDataUBO = new BufferObject();
             basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            basicDataUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 0, 0, basicDataUBO.Size);
+            basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             Image<Rgba32> img = SixLabors.ImageSharp.Image.Load<Rgba32>("res/textures/blueNoise/LDR_RGBA_1024.png");
             Texture blueNoise = new Texture(TextureTarget2d.Texture2D);
@@ -338,10 +338,10 @@ namespace IDKEngine
             {
                 blueNoise.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
             }
-            
+
             BufferObject blueNoiseUBO = new BufferObject();
             blueNoiseUBO.ImmutableAllocate(sizeof(long), blueNoise.MakeImageHandleResidentARB(0, false, 0, SizedInternalFormat.Rgba8, TextureAccess.ReadOnly), BufferStorageFlags.DynamicStorageBit);
-            blueNoiseUBO.BindBufferRange(BufferRangeTarget.UniformBuffer, 4, 0, blueNoiseUBO.Size);
+            blueNoiseUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
 
             FinalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),

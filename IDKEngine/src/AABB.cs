@@ -4,12 +4,32 @@ namespace IDKEngine
 {
     struct AABB
     {
+        public Vector3 Center => (Max + Min) * 0.5f;
+        public Vector3 HalfSize => (Max - Min) * 0.5f;
+        public Vector3 this[uint vertex]
+        {
+            get
+            {
+                System.Diagnostics.Debug.Assert(vertex < 8);
+                bool isMaxX = (vertex & 1) == 0 ? false : true;
+                bool isMaxY = (vertex & 2) == 0 ? false : true;
+                bool isMaxZ = (vertex & 4) == 0 ? false : true;
+                return new Vector3(isMaxX ? Max.X : Min.X, isMaxY ? Max.Y : Min.Y, isMaxZ ? Max.Z : Min.Z);
+            }
+        }
+
         public Vector3 Min;
         public Vector3 Max;
         public AABB()
         {
             Min = new Vector3(float.MaxValue);
             Max = new Vector3(float.MinValue);
+        }
+
+        public AABB(Vector3 min, Vector3 max)
+        {
+            Min = min;
+            Max = max;
         }
 
         public void Grow(in Vector3 value)
@@ -37,14 +57,11 @@ namespace IDKEngine
             return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
         }
 
-        public void Transform(Matrix4 model)
+        public void Transform(Matrix4 invModel)
         {
-            for (int i = 0; i < 8; i++)
+            for (uint i = 0; i < 8; i++)
             {
-                bool isX = (i & 1) == 0 ? false : true;
-                bool isY = (i & 2) == 0 ? false : true;
-                bool isZ = (i & 4) == 0 ? false : true;
-                Grow((new Vector4(isX ? Max.X : Min.X, isY ? Max.Y : Min.Y, isZ ? Max.Z : Min.Z, 1.0f) * model).Xyz);
+                Grow((new Vector4(this[i], 1.0f) * invModel).Xyz);
             }
         }
     }

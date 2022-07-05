@@ -60,11 +60,31 @@ namespace IDKEngine
             return (data >> offset) & mask;
         }
 
-        public static bool TriangleVSBox(in Vector3 a, in Vector3 b, in Vector3 c, in Vector3 boxCenter, in Vector3 halfSize)
+        public static Vector3 Average(in Vector3 p0, in Vector3 p1, in Vector3 p2)
         {
-            // From the book "Real-Time Collision Detection" by Christer Ericson, page 169
-            // See also the published Errata at http://realtimecollisiondetection.net/books/rtcd/errata/
+            return (p0 + p1 + p2) * (1.0f / 3.0f);
+        }
+        
+        public static float Area(in Vector3 size)
+        {
+            return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+        }
 
+        public static bool AabbAabbIntersect(in AABB first, in Vector3 min, Vector3 max)
+        {
+            return  first.Min.X < max.X &&
+                    first.Min.Y < max.Y &&
+                    first.Min.Z < max.Z &&
+
+                    first.Max.X > min.X &&
+                    first.Max.Y > min.Y &&
+                    first.Max.Z > min.Z;
+        }
+
+        // Source: "Real-Time Collision Detection" by Christer Ericson, page 169
+        // See also the published Errata at http://realtimecollisiondetection.net/books/rtcd/errata/
+        public static bool TriangleBoxIntersect(in Vector3 a, in Vector3 b, in Vector3 c, in Vector3 boxCenter, in Vector3 halfSize)
+        {
             // Translate triangle as conceptually moving AABB to origin
             var v0 = (a - boxCenter);
             var v1 = (b - boxCenter);
@@ -227,16 +247,6 @@ namespace IDKEngine
             {
                 return MathF.Max(a, MathF.Max(b, c));
             }
-        }
-
-        public static Vector3 Average(in Vector3 p0, in Vector3 p1, in Vector3 p2)
-        {
-            return (p0 + p1 + p2) * (1.0f / 3.0f);
-        }
-
-        public static float Area(in Vector3 size)
-        {
-            return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
         }
 
         // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
