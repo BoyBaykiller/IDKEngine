@@ -25,14 +25,14 @@ namespace IDKEngine.Render.Objects
 
         public void SetAttribFormat(int bindingIndex, int attribIndex, int attribTypeElements, VertexAttribType vertexAttribType, int relativeOffset, bool normalize = false)
         {
-            EnableVertexAttribute(attribIndex);
+            GL.EnableVertexArrayAttrib(ID, attribIndex);
             GL.VertexArrayAttribFormat(ID, attribIndex, attribTypeElements, vertexAttribType, normalize, relativeOffset);
             GL.VertexArrayAttribBinding(ID, attribIndex, bindingIndex);
         }
 
         public void SetAttribFormatI(int bindingIndex, int attribIndex, int attribTypeElements, VertexAttribType vertexAttribType, int relativeOffset)
         {
-            EnableVertexAttribute(attribIndex);
+            GL.EnableVertexArrayAttrib(ID, attribIndex);
             GL.VertexArrayAttribIFormat(ID, attribIndex, attribTypeElements, vertexAttribType, relativeOffset);
             GL.VertexArrayAttribBinding(ID, attribIndex, bindingIndex);
         }
@@ -40,11 +40,6 @@ namespace IDKEngine.Render.Objects
         public void SetPerBufferDivisor(int bindingIndex, int divisor)
         {
             GL.VertexArrayBindingDivisor(ID, bindingIndex, divisor);
-        }
-
-        public void EnableVertexAttribute(int attribIndex)
-        {
-            GL.EnableVertexArrayAttrib(ID, attribIndex);
         }
 
         public void DisableVertexAttribute(int attribIndex)

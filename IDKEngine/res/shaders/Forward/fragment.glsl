@@ -46,7 +46,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFramesCounter;
+    int FreezeFrameCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -55,11 +55,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float FarPlane;
     float DeltaUpdate;
 } basicDataUBO;
-
-layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
-{
-    Material Materials[];
-} materialSSBO;
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
@@ -93,7 +88,7 @@ in InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat int MaterialIndex;
+    flat Material Material;
     flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;
@@ -112,7 +107,7 @@ void main()
 {
     vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
 
-    Material material = materialSSBO.Materials[inData.MaterialIndex];
+    Material material = inData.Material;
     
     Albedo = texture(material.Albedo, inData.TexCoord);
     Normal = texture(material.Normal, inData.TexCoord).rgb;
@@ -123,7 +118,7 @@ void main()
     Normal = inData.TBN * normalize(Normal * 2.0 - 1.0);
     Normal = normalize(mix(normalize(inData.Normal), Normal, inData.NormalMapStrength));
 
-    ViewDir = normalize(basicDataUBO.ViewPos - inData.FragPos);
+    ViewDir = normalize(inData.FragPos - basicDataUBO.ViewPos);
 
     vec3 irradiance = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
@@ -157,7 +152,7 @@ vec3 BlinnPhong(Light light)
         vec3 diffuse = light.Color * cosTerm * Albedo.rgb;  
     
         vec3 specular = vec3(0.0);
-        vec3 halfwayDir = normalize(lightDir + ViewDir);
+        vec3 halfwayDir = normalize(lightDir + -ViewDir);
         float temp = dot(Normal, halfwayDir);
         if (temp > 0.0)
         {

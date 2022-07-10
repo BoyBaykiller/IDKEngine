@@ -19,7 +19,7 @@ layout(derivative_group_quadsNV) in;
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
-layout(binding = 0) uniform samplerCube SamplerEnvironment;
+layout(binding = 0) uniform samplerCube SamplerSkyBox;
 
 struct Light
 {
@@ -139,7 +139,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFramesCounter;
+    int FreezeFrameCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -195,11 +195,11 @@ void main()
 
     if (IsRNGFrameBased)
     {
-        rngSeed = basicDataUBO.FreezeFramesCounter * 2699;
+        rngSeed = basicDataUBO.FreezeFrameCounter * 2699;
     }
     else
     {
-        rngSeed = gl_GlobalInvocationID.x * 2873 + gl_GlobalInvocationID.y * 312 + basicDataUBO.FreezeFramesCounter * 2699;
+        rngSeed = imgCoord.x * 2873 + imgCoord.y * 312 + basicDataUBO.FreezeFrameCounter * 2699;
     }
 
     vec2 subPixelOffset = IsDebugBVHTraversal ? vec2(0.5) : vec2(GetRandomFloat01(), GetRandomFloat01());
@@ -221,7 +221,7 @@ void main()
     }
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameColor, irradiance, 1.0 / (basicDataUBO.FreezeFramesCounter + 1.0));
+    irradiance = mix(lastFrameColor, irradiance, 1.0 / (basicDataUBO.FreezeFrameCounter + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 
@@ -323,7 +323,7 @@ vec3 Radiance(Ray ray)
         }
         else
         {
-            radiance += texture(SamplerEnvironment, ray.Direction).rgb * throughput;
+            radiance += texture(SamplerSkyBox, ray.Direction).rgb * throughput;
             break;
         }
     }

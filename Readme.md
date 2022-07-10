@@ -352,7 +352,7 @@ After the handle is generated the texture's state is immutable. This can not be 
 To sample a bindless texture it's handle must also be made resident.
 The extension allows you to directly store `sampler2D` inside the shader storage block as shown. Note however that you could also do `uvec2 Textures[];` and then perform a cast like: `sampler2D myTexture = sampler2D(textureSSBO.Textures[0])`.
 
-In the case of a MDI renderer as described in [1.0 Multi Draw Indirect](#1.0-multi-draw-indirect)
+In the case of a MDI renderer as described in "1.0 Multi Draw Indirect".
 the process of fetching each mesh's texture would look something along the lines of:
 ```glsl
 #version 460 core

@@ -56,7 +56,7 @@ namespace IDKEngine.Render
                 ImGui.Text($"FPS: {window.FPS}");
                 ImGui.Text($"Viewport size: {window.ViewportSize.X}x{window.ViewportSize.Y}");
                 if (window.IsPathTracing)
-                    ImGui.Text($"Samples taken: {window.GLSLBasicData.FreezeFramesCounter}");
+                    ImGui.Text($"Samples taken: {window.GLSLBasicData.FreezeFrameCounter}");
 
                 string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
                 string current = window.IsPathTracing ? renderModes[1] : renderModes[0];
@@ -282,7 +282,7 @@ namespace IDKEngine.Render
                         tempBool = window.PathTracer.IsDebugBVHTraversal;
                         if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
                         {
-                            window.GLSLBasicData.FreezeFramesCounter = 0;
+                            window.GLSLBasicData.FreezeFrameCounter = 0;
                             window.PathTracer.IsDebugBVHTraversal = tempBool;
                         }
                         if (!window.PathTracer.IsDebugBVHTraversal)
@@ -290,21 +290,21 @@ namespace IDKEngine.Render
                             int tempInt = window.PathTracer.RayDepth;
                             if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                             {
-                                window.GLSLBasicData.FreezeFramesCounter = 0;
+                                window.GLSLBasicData.FreezeFrameCounter = 0;
                                 window.PathTracer.RayDepth = tempInt;
                             }
 
                             float floatTemp = window.PathTracer.FocalLength;
                             if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                             {
-                                window.GLSLBasicData.FreezeFramesCounter = 0;
+                                window.GLSLBasicData.FreezeFrameCounter = 0;
                                 window.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
                             }
 
                             floatTemp = window.PathTracer.ApertureDiameter;
                             if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
                             {
-                                window.GLSLBasicData.FreezeFramesCounter = 0;
+                                window.GLSLBasicData.FreezeFrameCounter = 0;
                                 window.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
                             }
                         }
@@ -336,7 +336,7 @@ namespace IDKEngine.Render
                     }
                 }
 
-                if (ImGui.CollapsingHeader("EnvironmentMap"))
+                if (ImGui.CollapsingHeader("SkyBox"))
                 {
                     string[] resolutions = new string[] { "2048", "1024", "512", "256", "128", "64", "32" };
                     current = window.AtmosphericScatterer.Result.Width.ToString();
@@ -350,7 +350,7 @@ namespace IDKEngine.Render
                                 current = resolutions[i];
                                 window.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
                                 window.AtmosphericScatterer.Compute();
-                                window.GLSLBasicData.FreezeFramesCounter = 0;
+                                window.GLSLBasicData.FreezeFrameCounter = 0;
                             }
 
                             if (isSelected)
@@ -359,36 +359,41 @@ namespace IDKEngine.Render
                         ImGui.EndCombo();
                     }
 
+                    bool hadChange = false;
+
                     int tempInt = window.AtmosphericScatterer.ISteps;
                     if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                     {
                         window.AtmosphericScatterer.ISteps = tempInt;
-                        window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FreezeFramesCounter = 0;
+                        hadChange = true;
                     }
 
                     tempInt = window.AtmosphericScatterer.JSteps;
                     if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
                     {
                         window.AtmosphericScatterer.JSteps = tempInt;
-                        window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FreezeFramesCounter = 0;
+                        hadChange = true;
                     }
 
                     float tempFloat = window.AtmosphericScatterer.Time;
                     if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
                     {
                         window.AtmosphericScatterer.Time = tempFloat;
-                        window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FreezeFramesCounter = 0;
+                        hadChange = true;
                     }
 
                     tempFloat = window.AtmosphericScatterer.LightIntensity;
                     if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
                     {
                         window.AtmosphericScatterer.LightIntensity = tempFloat;
+                        
+                        hadChange = true;
+                    }
+
+                    if (hadChange)
+                    {
+                        window.GLSLBasicData.FreezeFrameCounter = 0;
                         window.AtmosphericScatterer.Compute();
-                        window.GLSLBasicData.FreezeFramesCounter = 0;
                     }
                 }
 
@@ -457,7 +462,7 @@ namespace IDKEngine.Render
 
                     if (hadChange)
                     {
-                        window.GLSLBasicData.FreezeFramesCounter = 0;
+                        window.GLSLBasicData.FreezeFrameCounter = 0;
                         window.ModelSystem.UpdateMeshBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
                         window.ModelSystem.UpdateModelMatricesBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
                     }
@@ -488,7 +493,7 @@ namespace IDKEngine.Render
 
                     if (hadChange)
                     {
-                        window.GLSLBasicData.FreezeFramesCounter = 0;
+                        window.GLSLBasicData.FreezeFrameCounter = 0;
                         window.ForwardRenderer.LightingContext.UpdateLightBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
                     }
                 }

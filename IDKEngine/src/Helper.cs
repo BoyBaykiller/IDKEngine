@@ -1,10 +1,15 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
@@ -56,6 +61,38 @@ namespace IDKEngine
                     Console.ReadLine();
                 }
                 Console.WriteLine();
+            }
+        }
+
+        public static unsafe void ParallelLoadCubemap(Texture texture, string[] paths, SizedInternalFormat sizedInternalFormat)
+        {
+            if (texture.Target != TextureTarget.TextureCubeMap)
+                throw new ArgumentException($"texture must be {TextureTarget.TextureCubeMap}");
+
+            if (paths.Length != 6)
+                throw new ArgumentException($"Number of images must be equal to six");
+
+            if (!paths.All(p => File.Exists(p)))
+                throw new FileNotFoundException($"At least on of the specified paths is invalid");
+
+            Image<Rgba32>[] images = new Image<Rgba32>[6];
+            Parallel.For(0, 6, i =>
+            {
+                images[i] = Image.Load<Rgba32>(paths[i]);
+            });
+
+            if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
+                throw new ArgumentException($"Cubemap images must be squares and every texture must be of the same size");
+
+            int size = images[0].Width;
+            texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
+            for (int i = 0; i < 6; i++)
+            {
+                fixed (void* ptr = images[i].GetPixelRowSpan(0))
+                {
+                    texture.SubTexture3D(size, size, 1, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr, 0, 0, 0, i);
+                    images[i].Dispose();
+                }
             }
         }
 

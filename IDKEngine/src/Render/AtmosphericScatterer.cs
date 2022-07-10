@@ -57,30 +57,16 @@ namespace IDKEngine.Render
         }
 
         public readonly Texture Result;
-        private readonly ShaderProgram shaderProgram;
+        private static readonly ShaderProgram shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/AtmosphericScattering/compute.glsl")));
         public unsafe AtmosphericScatterer(int size)
         {
             Result = new Texture(TextureTarget2d.TextureCubeMap);
             Result.MutableAllocate(size, size, 1, PixelInternalFormat.Rgba32f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/AtmosphericScattering/compute.glsl")));
-            
-            Matrix4 invProjection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 0.1f, 10f).Inverted();
-            Matrix4[] invViews = new Matrix4[]
-            {
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveX
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeX
-               
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)).Inverted(), // PositiveY
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)).Inverted(), // NegativeY
-
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveZ
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeZ
-            };
-
-            shaderProgram.Upload("InvViews[0]", 6, ref invViews[0]);
-            shaderProgram.Upload("InvProjection", ref invProjection);
+            /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
+            /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
+            /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
+            Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             Time = 0.05f;
             ISteps = 40;
@@ -88,11 +74,6 @@ namespace IDKEngine.Render
             LightIntensity = 15.0f;
         }
 
-
-        /// <summary>
-        /// This method computes a whole cubemap rather than just whats visible. It is meant for precomputation and should not be called frequently for performance reasons
-        /// </summary>
-        /// <param name="renderParams"></param>
         public void Compute()
         {
             Result.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba32f);

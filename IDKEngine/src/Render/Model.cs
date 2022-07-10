@@ -70,7 +70,6 @@ namespace IDKEngine.Render.Objects
                         Vertices[baseVertex + j].TexCoordU = mesh.TextureCoordinateChannels[0][j].X;
                         Vertices[baseVertex + j].TexCoordV = mesh.TextureCoordinateChannels[0][j].Y;
                     }
-
                       
                     Vertices[baseVertex + j].Normal.X = mesh.Normals[j].X;
                     Vertices[baseVertex + j].Normal.Y = mesh.Normals[j].Y;
@@ -110,7 +109,6 @@ namespace IDKEngine.Render.Objects
                 }
             });
 
-
             List<uint> indices = new List<uint>(scene.Meshes.Sum(m => m.VertexCount));
             vertecisLoadResult.Join();
             for (int i = 0; i < scene.MeshCount; i++)
@@ -127,6 +125,7 @@ namespace IDKEngine.Render.Objects
             texturesLoadResult.Join();
             for (int i = 0; i < Materials.Length; i++)
             {
+                bool metallicRoughnessPossiblyPacked = !scene.Materials[i].HasTextureSpecular;
                 for (int j = 0; j < perMaterialTextures.Length; j++)
                 {
                     Texture texture = new Texture(TextureTarget2d.Texture2D);
@@ -137,12 +136,26 @@ namespace IDKEngine.Render.Objects
                             format = SizedInternalFormat.Srgb8Alpha8;
                             break;
 
-                        case TextureType.Shininess or TextureType.Specular or TextureType.Metalness or TextureType.Ambient or TextureType.Roughness:
+                        case TextureType.Normals:
+                            format = SizedInternalFormat.Rgba8;
+                            break;
+
+                        case TextureType.Shininess: // Roughness
+                            format = metallicRoughnessPossiblyPacked ? SizedInternalFormat.Rg8 : SizedInternalFormat.R8;
+                            break;
+
+                        case TextureType.Specular:
                             format = SizedInternalFormat.R8;
                             break;
 
+                        case TextureType.Emissive:
+                            format = SizedInternalFormat.Rgb8;
+                            break;
+
                         default:
-                            format = SizedInternalFormat.Rgba8;
+                            const SizedInternalFormat def = SizedInternalFormat.Rgba8;
+                            System.Console.WriteLine($"Unhandled texture type: {perMaterialTextures[j]}. Default to {def}");
+                            format = def;
                             break;
                     }
 
