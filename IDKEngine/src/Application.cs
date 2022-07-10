@@ -7,8 +7,6 @@ using IDKEngine.Render.Objects;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace IDKEngine
 {
@@ -299,7 +297,6 @@ namespace IDKEngine
             ModelSystem.Add(new Model[] { sponza, horse, helmet });
     
             {
-                IsVRSForwardRender = VariableRateShading.NV_SHADING_RATE_IMAGE;
                 Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
                 {
                     NvShadingRateImage.ShadingRate1InvocationPerPixelNv,

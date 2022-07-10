@@ -7,15 +7,6 @@ layout(location = 2) in vec3 Normal;
 layout(location = 3) in float TexCoordV;
 layout(location = 4) in vec3 Tangent;
 
-struct Material
-{
-    sampler2D Albedo;
-    sampler2D Normal;
-    sampler2D Roughness;
-    sampler2D Specular;
-    sampler2D Emissive;
-};
-
 struct Mesh
 {
     int InstanceCount;
@@ -39,11 +30,6 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
     mat4 Models[];
 } matrixSSBO;
-
-layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
-{
-    Material Materials[];
-} materialSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -79,7 +65,7 @@ out InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat Material Material;
+    flat int MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;
@@ -103,7 +89,7 @@ void main()
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     outData.Normal = Normal;
-    outData.Material = materialSSBO.Materials[mesh.MaterialIndex];
+    outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;
     outData.SpecularBias = mesh.SpecularBias;

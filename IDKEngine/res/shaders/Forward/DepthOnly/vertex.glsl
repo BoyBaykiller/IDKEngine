@@ -1,18 +1,8 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
 layout(location = 0) in vec3 Position;
 layout(location = 1) in float TexCoordU;
 layout(location = 3) in float TexCoordV;
-
-struct Material
-{
-    sampler2D Albedo;
-    sampler2D Normal;
-    sampler2D Roughness;
-    sampler2D Specular;
-    sampler2D Emissive;
-};
 
 struct Mesh
 {
@@ -38,18 +28,13 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
     mat4 Models[];
 } matrixSSBO;
 
-layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
-{
-    Material Materials[];
-} materialSSBO;
-
 layout(std140, binding = 0) uniform BasicDataUBO
 {
     mat4 ProjView;
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFrameCounter;
+    int FreezeFramesCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -72,14 +57,14 @@ layout(std140, binding = 3) uniform TaaDataUBO
 out InOutVars
 {
     vec2 TexCoord;
-    flat sampler2D Albedo;
+    flat int MaterialIndex;
 } outData;
 
 void main()
 {
     mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
 
-    outData.Albedo = materialSSBO.Materials[meshSSBO.Meshes[gl_DrawID].MaterialIndex].Albedo;
+    outData.MaterialIndex = meshSSBO.Meshes[gl_DrawID].MaterialIndex;
     outData.TexCoord = vec2(TexCoordU, TexCoordV);
 
     vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
