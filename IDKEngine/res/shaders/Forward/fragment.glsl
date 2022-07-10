@@ -40,6 +40,11 @@ struct PointShadow
     int LightIndex;
 };
 
+layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
+{
+    Material Materials[];
+} materialSSBO;
+
 layout(std140, binding = 0) uniform BasicDataUBO
 {
     mat4 ProjView;
@@ -88,7 +93,7 @@ in InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat Material Material;
+    flat int MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;
@@ -107,7 +112,7 @@ void main()
 {
     vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
 
-    Material material = inData.Material;
+    Material material = materialSSBO.Materials[inData.MaterialIndex];
     
     Albedo = texture(material.Albedo, inData.TexCoord);
     Normal = texture(material.Normal, inData.TexCoord).rgb;
