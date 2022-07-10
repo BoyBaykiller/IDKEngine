@@ -1,10 +1,20 @@
 #version 460 core
+#extension GL_ARB_bindless_texture : require
 
 layout(location = 0) in vec3 Position;
 layout(location = 1) in float TexCoordU;
 layout(location = 2) in vec3 Normal;
 layout(location = 3) in float TexCoordV;
 layout(location = 4) in vec3 Tangent;
+
+struct Material
+{
+    sampler2D Albedo;
+    sampler2D Normal;
+    sampler2D Roughness;
+    sampler2D Specular;
+    sampler2D Emissive;
+};
 
 struct Mesh
 {
@@ -30,13 +40,18 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
     mat4 Models[];
 } matrixSSBO;
 
+layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
+{
+    Material Materials[];
+} materialSSBO;
+
 layout(std140, binding = 0) uniform BasicDataUBO
 {
     mat4 ProjView;
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFramesCounter;
+    int FreezeFrameCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -64,7 +79,7 @@ out InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat int MaterialIndex;
+    flat Material Material;
     flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;
@@ -88,7 +103,7 @@ void main()
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     outData.Normal = Normal;
-    outData.MaterialIndex = mesh.MaterialIndex;
+    outData.Material = materialSSBO.Materials[mesh.MaterialIndex];
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;
     outData.SpecularBias = mesh.SpecularBias;

@@ -8,7 +8,7 @@ namespace IDKEngine
         public Matrix4 View;
         public Matrix4 InvView;
         public Vector3 CameraPos;
-        public int FreezeFramesCounter;
+        public int FreezeFrameCounter;
         public Matrix4 Projection;
         public Matrix4 InvProjection;
         public Matrix4 InvProjView;

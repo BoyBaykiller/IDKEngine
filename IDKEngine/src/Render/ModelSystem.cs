@@ -100,12 +100,12 @@ namespace IDKEngine.Render
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
         }
 
-        private static readonly ShaderProgram cullingProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/compute.glsl")));
-        public void ViewCull(ref Matrix4 projView)
+        private static readonly ShaderProgram frustumCullingProgram = new ShaderProgram(
+            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/compute.glsl")));
+        public void FrustumCull(ref Matrix4 projView)
         {
-            cullingProgram.Use();
-            cullingProgram.Upload(0, ref projView);
+            frustumCullingProgram.Use();
+            frustumCullingProgram.Upload(0, ref projView);
 
             GL.DispatchCompute((Meshes.Length + 64 - 1) / 64, 1, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);

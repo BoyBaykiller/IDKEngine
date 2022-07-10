@@ -34,7 +34,7 @@ namespace IDKEngine
             set
             {
                 _isPathTracing = value;
-                GLSLBasicData.FreezeFramesCounter = 0;
+                GLSLBasicData.FreezeFrameCounter = 0;
 
                 // TODO: Add comment as to why we do that here lol
                 int i = 0;
@@ -80,14 +80,14 @@ namespace IDKEngine
                     GL.ColorMask(true, true, true, true);
                 }
 
-                ModelSystem.ViewCull(ref GLSLBasicData.ProjView);
+                ModelSystem.FrustumCull(ref GLSLBasicData.ProjView);
 
                 GL.Viewport(0, 0, ForwardRenderer.Result.Width, ForwardRenderer.Result.Height);
 
                 if (IsVRSForwardRender)
                     VariableRateShading.IsEnabled = true;
 
-                ForwardRenderer.Render(ModelSystem, AtmosphericScatterer.Result, IsSSAO ? SSAO.Result : null);
+                ForwardRenderer.Render(ModelSystem, IsSSAO ? SSAO.Result : null);
                 VariableRateShading.IsEnabled = false;
 
                 if (IsBloom)
@@ -129,7 +129,7 @@ namespace IDKEngine
 
             GL.Viewport(0, 0, WindowSize.X, WindowSize.Y);
             Framebuffer.Bind(0);
-            GLSLBasicData.FreezeFramesCounter++;
+            GLSLBasicData.FreezeFrameCounter++;
 
             if (renderGui)
             {
@@ -197,7 +197,7 @@ namespace IDKEngine
             {
                 camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
                 if (hadCameraInputs)
-                    GLSLBasicData.FreezeFramesCounter = 0;
+                    GLSLBasicData.FreezeFrameCounter = 0;
             }
 
             gui.Update(this);
@@ -245,6 +245,37 @@ namespace IDKEngine
             gui = new Gui(WindowSize.X, WindowSize.Y);
             gui.ImGuiBackend.IsIgnoreMouseInput = true;
 
+            Matrix4[] invViewsAndInvprojecion = new Matrix4[]
+            {
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveX
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeX
+               
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)).Inverted(), // PositiveY
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)).Inverted(), // NegativeY
+
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveZ
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeZ
+
+                Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 69.0f, 420.0f).Inverted()
+            };
+            BufferObject cubeMapMatricesUBO = new BufferObject();
+            cubeMapMatricesUBO.ImmutableAllocate(sizeof(Matrix4) * invViewsAndInvprojecion.Length, invViewsAndInvprojecion, BufferStorageFlags.DynamicStorageBit);
+            cubeMapMatricesUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
+
+            basicDataUBO = new BufferObject();
+            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
+
+            FinalProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
+
+            gui.ImGuiBackend.WindowResized(WindowSize.X, WindowSize.Y);
+            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), WindowSize.X / (float)WindowSize.Y, NEAR_PLANE, FAR_PLANE);
+            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
+            GLSLBasicData.NearPlane = NEAR_PLANE;
+            GLSLBasicData.FarPlane = FAR_PLANE;
+
             camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
@@ -256,13 +287,17 @@ namespace IDKEngine
             for (int i = 0; i < horse.ModelMatrices.Length; i++)
                 horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
+            Model helmet = new Model("res/models/Helmet/Helmet.gltf");
+            for (int i = 0; i < helmet.ModelMatrices.Length; i++)
+                helmet.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(90.0f));
+
             //Model temple = new Model(@"C:\Users\Julian\Downloads\SunTempleSmall\SunTempleSmall.gltf");
             //for (int i = 0; i < temple.ModelMatrices.Length; i++)
             //    temple.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(180.0f)) * Matrix4.CreateScale(0.01f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza, horse });
-
+            ModelSystem.Add(new Model[] { sponza, horse, helmet });
+    
             {
                 IsVRSForwardRender = VariableRateShading.NV_SHADING_RATE_IMAGE;
                 Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
@@ -290,27 +325,19 @@ namespace IDKEngine
                 VariableRateShading.BindVRSNV(ForwardPassVRS);
                 VariableRateShading.SetShadingRatePaletteNV(shadingRates);
             }
-            
-            ForwardRenderer = new Forward(new Lighter(20, 20), WindowSize.X, WindowSize.Y, 6);
+
+            AtmosphericScatterer = new AtmosphericScatterer(256);
+            AtmosphericScatterer.Compute();
+
+            ForwardRenderer = new Forward(new Lighter(20, 20), WindowSize.X, WindowSize.Y, 6, AtmosphericScatterer.Result);
             Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 3.0f);
             SSR = new SSR(WindowSize.X, WindowSize.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             SSAO = new SSAO(WindowSize.X, WindowSize.Y, 10, 0.25f, 2.0f);
             PostCombine = new PostCombine(WindowSize.X, WindowSize.Y);
-            AtmosphericScatterer = new AtmosphericScatterer(256);
-            AtmosphericScatterer.Compute();
-
-            Stopwatch timer = Stopwatch.StartNew();
+            
             BVH = new BVH(ModelSystem);
-            timer.Stop();
-            Console.WriteLine($"BVH build time: {timer.ElapsedMilliseconds / 1000.0f} sec");
-
             PathTracer = new PathTracer(BVH, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
-            /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
-            /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
-            /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
-            if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
-                AtmosphericScatterer.Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             List<GLSLLight> lights = new List<GLSLLight>();
             //lights.Add(new GLSLLight(new Vector3(-0.5f, 8.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 1.0f));
@@ -324,34 +351,6 @@ namespace IDKEngine
             {
                 pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, i, 512, 0.5f, 60.0f));
             }
-
-            basicDataUBO = new BufferObject();
-            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
-
-            Image<Rgba32> img = SixLabors.ImageSharp.Image.Load<Rgba32>("res/textures/blueNoise/LDR_RGBA_1024.png");
-            Texture blueNoise = new Texture(TextureTarget2d.Texture2D);
-            blueNoise.ImmutableAllocate(img.Width, img.Height, 1, SizedInternalFormat.Rgba8);
-            blueNoise.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            blueNoise.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            fixed (void* ptr = img.GetPixelRowSpan(0))
-            {
-                blueNoise.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
-            }
-
-            BufferObject blueNoiseUBO = new BufferObject();
-            blueNoiseUBO.ImmutableAllocate(sizeof(long), blueNoise.MakeImageHandleResidentARB(0, false, 0, SizedInternalFormat.Rgba8, TextureAccess.ReadOnly), BufferStorageFlags.DynamicStorageBit);
-            blueNoiseUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
-
-            FinalProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
-
-            gui.ImGuiBackend.WindowResized(WindowSize.X, WindowSize.Y);
-            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), WindowSize.X / (float)WindowSize.Y, NEAR_PLANE, FAR_PLANE);
-            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
-            GLSLBasicData.NearPlane = NEAR_PLANE;
-            GLSLBasicData.FarPlane = FAR_PLANE;
 
             GC.Collect();
         }
@@ -386,7 +385,7 @@ namespace IDKEngine
             PostCombine.SetSize(width, height);
             PathTracer.SetSize(width, height);
             
-            GLSLBasicData.FreezeFramesCounter = 0;
+            GLSLBasicData.FreezeFrameCounter = 0;
 
             ViewportSize = new Vector2i(width, height);
         }

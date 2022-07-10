@@ -78,11 +78,11 @@ namespace IDKEngine.Render
             }
         }
 
-        public Texture EnvironmentMap;
         public ModelSystem ModelSystem;
         public readonly BVH BVH;
         private readonly ShaderProgram shaderProgram;
-        public PathTracer(BVH bvh, ModelSystem modelSystem, Texture environmentMap, int width, int height)
+        private readonly Texture skyBox;
+        public PathTracer(BVH bvh, ModelSystem modelSystem, Texture skyBox, int width, int height)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
 
@@ -91,7 +91,7 @@ namespace IDKEngine.Render
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba32f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
 
-            EnvironmentMap = environmentMap;
+            this.skyBox = skyBox;
             ModelSystem = modelSystem;
             BVH = bvh;
 
@@ -103,7 +103,7 @@ namespace IDKEngine.Render
         public void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
-            EnvironmentMap.BindToUnit(0);
+            skyBox.BindToUnit(0);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

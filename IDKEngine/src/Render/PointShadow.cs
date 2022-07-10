@@ -56,7 +56,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
 
         private static readonly ShaderProgram cullingProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/shadowCompute.glsl")));
+            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/shadowCompute.glsl")));
 
         private static readonly BufferObject shadowsBuffer = InitShadowBuffer();
         
@@ -129,7 +129,7 @@ namespace IDKEngine.Render
                     for (int i = 0; i < 6; i++)
                     {
                         Matrix4 projView = *(ptr + i);
-                        modelSystem.ViewCull(ref projView);
+                        modelSystem.FrustumCull(ref projView);
 
                         framebuffer.SetTextureLayer(FramebufferAttachment.DepthAttachment, Result, i);
 

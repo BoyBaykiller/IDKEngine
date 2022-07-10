@@ -53,6 +53,7 @@ namespace IDKEngine.Render
         public readonly Texture NormalSpecTexture;
         public readonly Texture VelocityTexture;
         public readonly Texture DepthTexture;
+        public readonly Texture SkyBox;
         public readonly BufferObject TaaBuffer;
         public readonly Lighter LightingContext;
 
@@ -78,8 +79,7 @@ namespace IDKEngine.Render
         private readonly Texture taaPing;
         private readonly Texture taaPong;
         private bool isPing = true;
-
-        public Forward(Lighter lighter, int width, int height, int taaSamples)
+        public Forward(Lighter lighter, int width, int height, int taaSamples, Texture skyBox = null)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 
@@ -148,9 +148,10 @@ namespace IDKEngine.Render
             Framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3 });
 
             LightingContext = lighter;
+            SkyBox = skyBox;
         }
 
-        public void Render(ModelSystem modelSystem, Texture skyBox = null, Texture ambientOcclusion = null)
+        public void Render(ModelSystem modelSystem, Texture ambientOcclusion = null)
         {
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, isPing ? taaPing : taaPong);
             Framebuffer.Bind();
@@ -174,9 +175,9 @@ namespace IDKEngine.Render
             shadingProgram.Use();
             modelSystem.Draw();
 
-            if (skyBox != null)
+            if (SkyBox != null)
             {
-                skyBox.BindToUnit(0);
+                SkyBox.BindToUnit(0);
 
                 GL.DepthMask(false);
                 GL.Disable(EnableCap.CullFace);
@@ -192,7 +193,6 @@ namespace IDKEngine.Render
             GL.DepthMask(true);
 
             LightingContext.Draw();
-
             if (taaData->IsEnabled == 1)
             {
                 (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);

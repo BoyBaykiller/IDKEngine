@@ -16,8 +16,12 @@ uniform vec3 LightPos;
 uniform float LightIntensity;
 uniform int ISteps;
 uniform int JSteps;
-uniform mat4 InvViews[6];
-uniform mat4 InvProjection;
+
+layout(std140, binding = 6) uniform CubemapMatricesUBO
+{
+    mat4 InvViews[6];
+    mat4 InvProjection;
+} cubeMapMatricesUBO;
 
 void main()
 {
@@ -26,10 +30,10 @@ void main()
     
     vec2 ndc = vec2(imgCoord.xy) / imgResultSize * 2.0 - 1.0;
     
-    vec3 eyeToWorld = GetWorldSpaceRay(InvProjection, InvViews[imgCoord.z], ndc);
-    
+    vec3 toCubemap = GetWorldSpaceRay(cubeMapMatricesUBO.InvProjection, cubeMapMatricesUBO.InvViews[imgCoord.z], ndc);
+
     vec3 color = Atmosphere(
-        eyeToWorld,                     // normalized ray direction
+        toCubemap,                     // normalized ray direction
         vec3(0, 6376e3, 0),             // ray origin
         LightPos,                       // position of the sun
         LightIntensity,                 // intensity of the sun
