@@ -104,6 +104,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float NearPlane;
     float FarPlane;
     float DeltaUpdate;
+    float Time;
 } basicDataUBO;
 
 

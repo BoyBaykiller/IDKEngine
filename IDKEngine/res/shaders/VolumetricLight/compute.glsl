@@ -55,6 +55,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float NearPlane;
     float FarPlane;
     float DeltaUpdate;
+    float Time;
 } basicDataUBO;
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);

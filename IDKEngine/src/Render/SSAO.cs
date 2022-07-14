@@ -45,15 +45,12 @@ namespace IDKEngine.Render
 
         private readonly ShaderProgram shaderProgram;
 
-        public readonly Texture Result;
+        public Texture Result;
         public SSAO(int width, int height, int samples, float radius, float strength)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/SSAO/compute.glsl")));
 
-            Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.R8, (System.IntPtr)0, PixelFormat.Red, PixelType.Float);
+            SetSize(width, height);
 
             Samples = samples;
             Radius = radius;
@@ -73,7 +70,11 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Red, PixelType.Float);
+            if (Result != null) Result.Dispose();
+            Result = new Texture(TextureTarget2d.Texture2D);
+            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.R8);
         }
     }
 }

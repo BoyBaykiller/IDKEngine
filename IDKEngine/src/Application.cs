@@ -45,7 +45,7 @@ namespace IDKEngine
 
         }
 
-        public bool IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false;
+        public bool IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false, IsWireframe = false;
         public int FPS;
         public Vector2i ViewportSize { get; private set; }
 
@@ -60,10 +60,16 @@ namespace IDKEngine
             GLSLBasicData.InvView = camera.View.Inverted();
             GLSLBasicData.CameraPos = camera.Position;
             GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
+            GLSLBasicData.Time = WindowTime;
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
 
             if (!IsPathTracing)
             {
+                if (IsWireframe)
+                {
+                    GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
+                }
+
                 // Compute last frames SSAO
                 if (IsSSAO) 
                     SSAO.Compute(ForwardRenderer.DepthTexture, ForwardRenderer.NormalSpecTexture);
@@ -95,7 +101,7 @@ namespace IDKEngine
                     VolumetricLight.Compute(ForwardRenderer.DepthTexture);
 
                 if (IsSSR)
-                    SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpecTexture, ForwardRenderer.DepthTexture, AtmosphericScatterer.Result);
+                    SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpecTexture, ForwardRenderer.DepthTexture);
 
                 // Small "hack" to enable VRS debug image even on systems that don't support the extension
                 if (VariableRateShading.NV_SHADING_RATE_IMAGE)
@@ -108,6 +114,11 @@ namespace IDKEngine
                     ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
                 }
                 PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
+
+                if (IsWireframe)
+                {
+                    GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
+                }
             }
             else
             {
@@ -233,6 +244,7 @@ namespace IDKEngine
             GL.PointSize(1.3f);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
+            GL.Enable(EnableCap.Blend);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 #if DEBUG
             GL.Enable(EnableCap.DebugOutputSynchronous);
@@ -256,9 +268,9 @@ namespace IDKEngine
 
                 Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 69.0f, 420.0f).Inverted()
             };
-            BufferObject cubeMapMatricesUBO = new BufferObject();
-            cubeMapMatricesUBO.ImmutableAllocate(sizeof(Matrix4) * invViewsAndInvprojecion.Length, invViewsAndInvprojecion, BufferStorageFlags.DynamicStorageBit);
-            cubeMapMatricesUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
+            BufferObject skyBoxUBO = new BufferObject();
+            skyBoxUBO.ImmutableAllocate(sizeof(Matrix4) * invViewsAndInvprojecion.Length, invViewsAndInvprojecion, BufferStorageFlags.DynamicStorageBit);
+            skyBoxUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
 
             basicDataUBO = new BufferObject();
             basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
@@ -273,7 +285,7 @@ namespace IDKEngine
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
-
+            
             camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
@@ -295,7 +307,7 @@ namespace IDKEngine
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse, helmet });
-    
+
             {
                 Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
                 {
@@ -326,7 +338,7 @@ namespace IDKEngine
             AtmosphericScatterer = new AtmosphericScatterer(256);
             AtmosphericScatterer.Compute();
 
-            ForwardRenderer = new Forward(new Lighter(20, 20), WindowSize.X, WindowSize.Y, 6, AtmosphericScatterer.Result);
+            ForwardRenderer = new Forward(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6, AtmosphericScatterer.Result);
             Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 3.0f);
             SSR = new SSR(WindowSize.X, WindowSize.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));

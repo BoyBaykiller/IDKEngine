@@ -42,27 +42,24 @@ namespace IDKEngine.Render
             }
         }
 
-        public readonly Texture Result;
+        public Texture Result;
         private readonly ShaderProgram shaderProgram;
         public SSR(int width, int height, int samples, int binarySearchSamples, float maxDist)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/SSR/compute.glsl")));
 
-            Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            SetSize(width, height);
 
             Samples = samples;
             BinarySearchSamples = binarySearchSamples;
             MaxDist = maxDist;
         }
 
-        public unsafe void Compute(Texture samplerSrc, Texture normalTexture, Texture depthTexture, Texture cubemap)
+        public unsafe void Compute(Texture samplerSrc, Texture normalTexture, Texture depthTexture)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
-            int* textures = stackalloc int[] { samplerSrc.ID, normalTexture.ID, depthTexture.ID, cubemap.ID };
+            int* textures = stackalloc int[] { samplerSrc.ID, normalTexture.ID, depthTexture.ID };
             Texture.MultiBindToUnit(0, 4, textures);
 
             shaderProgram.Use();
@@ -72,7 +69,11 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            if (Result != null) Result.Dispose();
+            Result = new Texture(TextureTarget2d.Texture2D);
+            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
         }
     }
 }

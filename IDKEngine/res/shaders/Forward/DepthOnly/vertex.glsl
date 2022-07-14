@@ -34,7 +34,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFramesCounter;
+    int FreezeFrameCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -42,6 +42,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float NearPlane;
     float FarPlane;
     float DeltaUpdate;
+    float Time;
 } basicDataUBO;
 
 layout(std140, binding = 3) uniform TaaDataUBO

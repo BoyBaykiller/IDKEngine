@@ -6,8 +6,6 @@ namespace IDKEngine.Render
 {
     class PathTracer
     {
-        public readonly Texture Result;
-
         private int _rayDepth;
         public int RayDepth
         {
@@ -79,6 +77,7 @@ namespace IDKEngine.Render
         }
 
         public ModelSystem ModelSystem;
+        public Texture Result;
         public readonly BVH BVH;
         private readonly ShaderProgram shaderProgram;
         private readonly Texture skyBox;
@@ -86,10 +85,7 @@ namespace IDKEngine.Render
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/compute.glsl")));
 
-            Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba32f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            SetSize(width, height);
 
             this.skyBox = skyBox;
             ModelSystem = modelSystem;
@@ -112,7 +108,11 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            if (Result != null) Result.Dispose();
+            Result = new Texture(TextureTarget2d.Texture2D);
+            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba32f);
         }
     }
 }

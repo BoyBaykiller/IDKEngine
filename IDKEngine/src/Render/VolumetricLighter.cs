@@ -67,16 +67,13 @@ namespace IDKEngine.Render
         }
 
 
-        public readonly Texture Result;
+        public Texture Result;
         private readonly ShaderProgram shaderProgram;
         public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
 
-            Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            SetSize(width, height);
 
             Samples = samples;
             Scattering = scattering;
@@ -97,7 +94,11 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (System.IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            if (Result != null) Result.Dispose();
+            Result = new Texture(TextureTarget2d.Texture2D);
+            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
         }
     }
 }

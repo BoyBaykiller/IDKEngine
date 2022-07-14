@@ -5,7 +5,7 @@ namespace IDKEngine
 {
     class BLAS
     {
-        public const int MIN_TRIANGLE_LEAF_COUNT = 3;
+        public const int MIN_TRIANGLES_PER_LEAF_COUNT = 3;
 #if USE_SAH
         public const int SAH_SAMPLES = 8;
 #endif
@@ -40,7 +40,7 @@ namespace IDKEngine
                 float splitSAH = FindBestSplitPlane(ref parentNode, out int splitAxis, out float splitPos);
 
                 float parentSAH = GetLeafSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount);
-                if (splitSAH >= parentSAH || parentNode.TriCount <= MIN_TRIANGLE_LEAF_COUNT)
+                if (splitSAH >= parentSAH || parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
                     return;
 
 #else

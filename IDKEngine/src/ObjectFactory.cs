@@ -1,6 +1,6 @@
-﻿using System;
+﻿using OpenTK.Mathematics;
+using System;
 using System.Collections.Generic;
-using OpenTK.Mathematics;
 
 namespace IDKEngine
 {
@@ -13,12 +13,7 @@ namespace IDKEngine
             public Vector3 Normal;
         }
 
-        /// <summary>
-        /// Source: <see href="https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc">https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc</see>
-        /// </summary>
-        /// <param name="radius"></param>
-        /// <param name="latitudes"></param>
-        /// <param name="longitudes"></param>
+        // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
         public static Vertex[] GenerateSmoothSphere(float radius, int latitudes, int longitudes)
         {
             if (longitudes < 3)
@@ -62,12 +57,7 @@ namespace IDKEngine
             return vertecis.ToArray();
         }
 
-        /// <summary>
-        /// Source: <see href="https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc">https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc</see>
-        /// </summary>
-        /// <param name="latitudes"></param>
-        /// <param name="longitudes"></param>
-        /// <returns></returns>
+        // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
         public static uint[] GenerateSmoothSphereIndicis(uint latitudes, uint longitudes)
         {
             List<uint> indicis = new List<uint>((int)(latitudes * longitudes));
@@ -96,6 +86,41 @@ namespace IDKEngine
             }
 
             return indicis.ToArray();
+        }
+
+        public static unsafe Vector3[] GeneratePlane(float width, float depth, int subdivideX, int subdivideZ)
+        {
+            List<Vector3> positions = new List<Vector3>();
+            float stepX = width / subdivideX;
+            float stepZ = depth / subdivideZ;
+            for (float x = -width / 2.0f; x < width / 2.0f; x += stepX)
+            {
+                for (float z = -depth / 2.0f; z < depth / 2.0f; z += stepZ)
+                {
+                    positions.AddRange(new Vector3[]
+                    {
+                        new Vector3( x + stepX / 2.0f, 0.0f,  z +  stepZ / 2.0f),
+                        new Vector3( x + stepX / 2.0f, 0.0f,  z + -stepZ / 2.0f),
+                        new Vector3( x + -stepX / 2.0f, 0.0f, z +  stepZ / 2.0f),
+
+                        new Vector3( x + stepX / 2.0f, 0.0f,  z + -stepZ / 2.0f),
+                        new Vector3( x + -stepX / 2.0f, 0.0f, z + -stepZ / 2.0f),
+                        new Vector3( x + -stepX / 2.0f, 0.0f, z +  stepZ / 2.0f),
+                    });
+                }
+            }
+            return positions.ToArray();
+
+            //return new Vector3[]
+            //{
+            //    new Vector3( width / 2.0f, 0.0f,  depth / 2.0f),
+            //    new Vector3( width / 2.0f, 0.0f, -depth / 2.0f),
+            //    new Vector3(-width / 2.0f, 0.0f,  depth / 2.0f),
+
+            //    new Vector3( width / 2.0f, 0.0f, -depth / 2.0f),
+            //    new Vector3(-width / 2.0f, 0.0f, -depth / 2.0f),
+            //    new Vector3(-width / 2.0f, 0.0f,  depth / 2.0f),
+            //};
         }
     }
 }

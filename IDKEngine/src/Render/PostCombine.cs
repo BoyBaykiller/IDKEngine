@@ -20,17 +20,14 @@ namespace IDKEngine.Render
         }
 
 
-        public readonly Texture Result;
+        public Texture Result;
 
-        private static readonly ShaderProgram shaderProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PostCombine/compute.glsl")));
+        private readonly ShaderProgram shaderProgram;
         public PostCombine(int width, int height)
         {
-            Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.MutableAllocate(width, height, 1, PixelInternalFormat.Rgba16f, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PostCombine/compute.glsl")));
 
+            SetSize(width, height);
             IsDithering = true;
         }
 
@@ -59,7 +56,11 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            Result.MutableAllocate(width, height, 1, Result.PixelInternalFormat, (IntPtr)0, PixelFormat.Rgba, PixelType.Float);
+            if (Result != null) Result.Dispose();
+            Result = new Texture(TextureTarget2d.Texture2D);
+            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
         }
     }
 }

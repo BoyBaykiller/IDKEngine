@@ -72,21 +72,12 @@ namespace IDKEngine.Render
 
             width = (int)(width / 2.0f);
             height = (int)(height / 2.0f);
-            _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - minusLods, 2);
 
-            downscaleTexture = new Texture(TextureTarget2d.Texture2D);
-            downscaleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
-            downscaleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            downscaleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, _lod);
-
-            upsampleTexture = new Texture(TextureTarget2d.Texture2D);
-            upsampleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
-            upsampleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            upsampleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, _lod);
-
+            _minusLods = minusLods;
             Threshold = threshold;
             Clamp = clamp;
-            _minusLods = minusLods;
+
+            SetSize(width, height);
         }
 
         public void Compute(Texture src)
@@ -143,16 +134,13 @@ namespace IDKEngine.Render
         {
             _lod = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - MinusLods, 2);
 
-            downscaleTexture.Dispose();
-            
+            if (downscaleTexture != null) downscaleTexture.Dispose();
             downscaleTexture = new Texture(TextureTarget2d.Texture2D);
             downscaleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
             downscaleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             downscaleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, _lod);
 
-
-            upsampleTexture.Dispose();
-
+            if (upsampleTexture != null) upsampleTexture.Dispose();
             upsampleTexture = new Texture(TextureTarget2d.Texture2D);
             upsampleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
             upsampleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);

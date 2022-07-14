@@ -38,8 +38,9 @@ namespace IDKEngine.Render.Objects
             string dirPath = Path.GetDirectoryName(path);
 
             Scene scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.GenerateNormals |
-                                                   PostProcessSteps.RemoveRedundantMaterials | /*PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes |*/
+                                                   PostProcessSteps.RemoveRedundantMaterials | /*PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes*/
                                                    PostProcessSteps.FlipUVs);
+            
             Debug.Assert(scene != null);
 
             DrawCommands = new GLSLDrawCommand[scene.MeshCount];
@@ -188,13 +189,6 @@ namespace IDKEngine.Render.Objects
                     }
                 }
             }
-        }
-
-        private static unsafe Matrix4 AssimpToOpenTKMat4(Matrix4x4 matrix)
-        {
-            Matrix4 result = *(Matrix4*)&matrix;
-            result.Transpose();
-            return result;
         }
     }
 }

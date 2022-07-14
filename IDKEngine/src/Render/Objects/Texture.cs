@@ -31,7 +31,7 @@ namespace IDKEngine.Render.Objects
         public int Width { get; private set; } = 1;
         public int Height { get; private set; } = 1;
         public int Depth { get; private set; } = 1;
-        public PixelInternalFormat PixelInternalFormat { get; private set; }
+        public SizedInternalFormat PixelInternalFormat { get; private set; }
 
         private static readonly int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
         private static int GetDummyTexture(TextureTarget textureTarget)
@@ -229,36 +229,6 @@ namespace IDKEngine.Render.Objects
             return new Vector3i(width / (1 << level), height / (1 << level), depth / (1 << level));
         }
 
-        public void MutableAllocate(int width, int height, int depth, PixelInternalFormat pixelInternalFormat, IntPtr intPtr, PixelFormat pixelFormat, PixelType pixelType)
-        {
-            Bind();
-            switch (Dimension)
-            {
-                case TextureDimension.One:
-                    GL.TexImage1D(Target, 0, pixelInternalFormat, width, 0, pixelFormat, pixelType, intPtr);
-                    Width = width;
-                    break;
-
-                case TextureDimension.Two:
-                    if (Target == TextureTarget.TextureCubeMap)
-                        for (int i = 0; i < 6; i++)
-                            GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, pixelInternalFormat, width, height, 0, pixelFormat, pixelType, intPtr);
-                    else
-                        GL.TexImage2D(Target, 0, pixelInternalFormat, width, height, 0, pixelFormat, pixelType, intPtr);
-                    Width = width; Height = height;
-                    break;
-
-                case TextureDimension.Three:
-                    GL.TexImage3D(Target, 0, pixelInternalFormat, width, height, depth, 0, pixelFormat, pixelType, intPtr);
-                    Width = width; Height = height; Depth = depth;
-                    break;
-
-                default:
-                    return;
-            }
-            PixelInternalFormat = pixelInternalFormat;
-        }
-
         public void ImmutableAllocate(int width, int height, int depth, SizedInternalFormat sizedInternalFormat, int levels = 1)
         {
             switch (Dimension)
@@ -281,7 +251,7 @@ namespace IDKEngine.Render.Objects
                 default:
                     return;
             }
-            PixelInternalFormat = (PixelInternalFormat)sizedInternalFormat;
+            PixelInternalFormat = sizedInternalFormat;
         }
 
         /// <summary>

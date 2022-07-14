@@ -16,5 +16,6 @@ namespace IDKEngine
         public float NearPlane;
         public float FarPlane;
         public float DeltaUpdate;
+        public float Time;
     }
 }
