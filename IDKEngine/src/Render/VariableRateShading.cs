@@ -49,7 +49,6 @@ namespace IDKEngine.Render
         }
 
 
-
         private DebugMode _debug;
         public DebugMode DebugValue
         {
@@ -88,19 +87,12 @@ namespace IDKEngine.Render
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        private int width;
-        private int height;
         public VariableRateShading(Shader classificationComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.3f)
         {
             shaderProgram = new ShaderProgram(classificationComputeShader);
 
-            Result = new Texture(TextureTarget2d.Texture2D);
-            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            // Shading rate texture must be imuutable by spec
-            Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R8ui);
+            SetSize(width, height);
             
-            this.width = width;
-            this.height = height;
             SpeedFactor = speedFactor;
             LumVarianceFactor = lumVarianceFactor;
         }
@@ -126,7 +118,7 @@ namespace IDKEngine.Render
             velocity.BindToUnit(0);
 
             shaderProgram.Use();
-            GL.DispatchCompute((width + TILE_SIZE - 1) / TILE_SIZE, (height + TILE_SIZE - 1) / TILE_SIZE, 1);
+            GL.DispatchCompute((shaded.Width + TILE_SIZE - 1) / TILE_SIZE, (shaded.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
 
             if (NV_SHADING_RATE_IMAGE)
                 GL.NV.ShadingRateImageBarrier(true);
@@ -134,24 +126,17 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            // Shading rate texture must be immutable by spec so recreate the whole texture
-            if (NV_SHADING_RATE_IMAGE)
-            {
-                GL.NV.BindShadingRateImage(0);
-            }
-            bool wasBound = Result.ID == currentlyBound;
+            bool isBound = (Result != null) && (Result.ID == currentlyBound);
 
-            Result.Dispose();
+            if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R8ui);
 
-            if (wasBound)
+            if (isBound)
             {
                 BindVRSNV(this);
             }
-            this.width = width;
-            this.height = height;
         }
 
         private static int currentlyBound = -1;

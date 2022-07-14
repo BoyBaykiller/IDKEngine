@@ -7,7 +7,6 @@ layout(binding = 0, rgba16f) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerSrc;
 layout(binding = 1) uniform sampler2D SamplerNormalSpec;
 layout(binding = 2) uniform sampler2D SamplerDepth;
-layout(binding = 3) uniform samplerCube SamplerSkyBox;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -23,6 +22,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float NearPlane;
     float FarPlane;
     float DeltaUpdate;
+    float Time;
 } basicDataUBO;
 
 vec3 SSR(vec3 normal, vec3 fragPos);
@@ -71,7 +71,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
         if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))))
         {
             // TODO: Parallax corrected cubemap reflections as fallback? 
-            return texture(SamplerSkyBox, reflectDir).rgb;
+            return vec3(0.0);
         }
 
         float depth = texture(SamplerDepth, projectedSample.xy).r;
@@ -82,7 +82,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
         }
     }
 
-    return texture(SamplerSkyBox, reflectDir).rgb;
+    return vec3(0.0);
 }
 
 void CustomBinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)

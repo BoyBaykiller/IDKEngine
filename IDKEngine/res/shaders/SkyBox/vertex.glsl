@@ -45,13 +45,15 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FrameCount;
+    int FreezeFrameCounter;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
     mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
+    float DeltaUpdate;
+    float Time;
 } basicDataUBO;
 
 out InOutVars

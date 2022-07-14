@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using SixLabors.ImageSharp;
@@ -99,6 +100,11 @@ namespace IDKEngine
         public static unsafe T* Malloc<T>(int count = 1) where T : unmanaged
         {
             return (T*)Marshal.AllocHGlobal(sizeof(T) * count);
+        }
+
+        public static unsafe void MemSet(void* ptr, byte value, uint byteCount)
+        {
+            Unsafe.InitBlock(ptr, value, byteCount);
         }
 
         public static unsafe void MemCpy(void* src, void* dest, int len)

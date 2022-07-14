@@ -85,6 +85,7 @@ namespace IDKEngine.Render
 
                 if (!window.IsPathTracing)
                 {
+                    ImGui.Checkbox("IsWireframe", ref window.IsWireframe);
                     ImGui.Checkbox("DepthPrePass", ref window.ForwardRenderer.IsDepthPrePass);
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
@@ -535,7 +536,7 @@ namespace IDKEngine.Render
             if (isHoveredViewport && window.MouseState[MouseButton.Left] == InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
-                point -= SystemToOpenTK(viewportPos);
+                point -= (Vector2i)SystemToOpenTK(viewportPos);
                 point.Y = window.ViewportSize.Y - point.Y;
 
                 Vector2 ndc = new Vector2((float)point.X / window.ForwardRenderer.Result.Width, (float)point.Y / window.ForwardRenderer.Result.Height) * 2.0f - new Vector2(1.0f);
@@ -580,14 +581,19 @@ namespace IDKEngine.Render
             return new System.Numerics.Vector3(vector3.X, vector3.Y, vector3.Z);
         }
 
+        private static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)
+        {
+            return new System.Numerics.Vector2(vector2.X, vector2.Y);
+        }
+
         private static Vector3 SystemToOpenTK(System.Numerics.Vector3 vector3)
         {
             return new Vector3(vector3.X, vector3.Y, vector3.Z);
         }
 
-        private static Vector2i SystemToOpenTK(System.Numerics.Vector2 vector2)
+        private static Vector2 SystemToOpenTK(System.Numerics.Vector2 vector2)
         {
-            return new Vector2i((int)vector2.X, (int)vector2.Y);
+            return new Vector2(vector2.X, vector2.Y);
         }
     }
 }
