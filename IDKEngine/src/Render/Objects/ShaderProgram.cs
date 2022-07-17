@@ -33,16 +33,16 @@ namespace IDKEngine.Render.Objects
 
     class ShaderProgram : IDisposable
     {
-        private static int lastBindedID = -1;
+        private static int lastBindedID = 0;
 
         public readonly int ID;
         public ShaderProgram(params Shader[] shaders)
         {
             ID = GL.CreateProgram();
-            ReCompile(shaders);
+            Link(shaders);
         }
 
-        public void ReCompile(params Shader[] shaders)
+        public void Link(params Shader[] shaders)
         {
             Debug.Assert(shaders != null && shaders.All(s => s.ID != 0));
             Debug.Assert(shaders.All(s => shaders.All(s1 => s.ID == s1.ID || s1.ShaderType != s.ShaderType)));
@@ -165,6 +165,10 @@ namespace IDKEngine.Render.Objects
         public void Dispose()
         {
             GL.DeleteProgram(ID);
+            if (ID == lastBindedID)
+            {
+                lastBindedID = 0;
+            }
         }
     }
 }

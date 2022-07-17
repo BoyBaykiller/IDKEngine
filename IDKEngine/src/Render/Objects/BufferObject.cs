@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL4;
 
@@ -13,11 +12,6 @@ namespace IDKEngine.Render.Objects
         public BufferObject()
         {
             GL.CreateBuffers(1, out ID);
-        }
-
-        public void BindBufferRange(BufferRangeTarget target, int index, int offset, int size)
-        {
-            GL.BindBufferRange(target, index, ID, (IntPtr)offset, size);
         }
 
         public void BindBufferBase(BufferRangeTarget target, int index)

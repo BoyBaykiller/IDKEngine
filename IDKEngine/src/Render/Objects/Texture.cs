@@ -86,15 +86,6 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureMagFilter, (int)magFilter);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="value">Range of [1.0; MaxTextureMaxAnisotropy]</param>
-        public void SetAnisotropy(float value)
-        {
-            GL.TextureParameter(ID, TextureParameterName.TextureMaxAnisotropy, value);
-        }
-
         public void SetWrapMode(TextureWrapMode wrapS, TextureWrapMode wrapT)
         {
             GL.TextureParameter(ID, TextureParameterName.TextureWrapS, (int)wrapS);
@@ -106,6 +97,11 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureWrapS, (int)wrapS);
             GL.TextureParameter(ID, TextureParameterName.TextureWrapT, (int)wrapT);
             GL.TextureParameter(ID, TextureParameterName.TextureWrapR, (int)wrapR);
+        }
+
+        public void SetAnisotropy(float value)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureMaxAnisotropy, value);
         }
 
         public void SetCompareMode(TextureCompareMode textureCompareMode)

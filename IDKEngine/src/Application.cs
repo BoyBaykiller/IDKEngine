@@ -49,7 +49,7 @@ namespace IDKEngine
         public int FPS;
         public Vector2i ViewportSize { get; private set; }
 
-        private bool renderGui = true;
+        public bool RenderGui { get; private set; } = true;
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
@@ -140,7 +140,7 @@ namespace IDKEngine
             Framebuffer.Bind(0);
             GLSLBasicData.FreezeFrameCounter++;
 
-            if (renderGui)
+            if (RenderGui)
             {
                 gui.Draw(this, (float)dT);
             }
@@ -180,8 +180,8 @@ namespace IDKEngine
 
             if (KeyboardState[Keys.G] == InputState.Touched)
             {
-                renderGui = !renderGui;
-                if (!renderGui)
+                RenderGui = !RenderGui;
+                if (!RenderGui)
                 {
                     SetViewportSize(WindowSize.X, WindowSize.Y);
                 }
@@ -285,7 +285,8 @@ namespace IDKEngine
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
-            
+
+
             camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
@@ -370,7 +371,7 @@ namespace IDKEngine
             gui.ImGuiBackend.WindowResized(WindowSize.X, WindowSize.Y);
 
             // if we don't render to the screen via gui always make viewport match window size
-            if (!renderGui)
+            if (!RenderGui)
             {
                 SetViewportSize(WindowSize.X, WindowSize.Y);
             }
