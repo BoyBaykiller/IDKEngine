@@ -5,7 +5,7 @@ namespace IDKEngine.Render.Objects
 {
     class VAO : IDisposable
     {
-        private static int lastBindedID = -1;
+        private static int lastBindedID = 0;
 
         public readonly int ID;
         public VAO()
@@ -68,6 +68,10 @@ namespace IDKEngine.Render.Objects
         public void Dispose()
         {
             GL.DeleteVertexArray(ID);
+            if (ID == lastBindedID)
+            {
+                lastBindedID = 0;
+            }
         }
     }
 }

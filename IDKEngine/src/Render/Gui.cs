@@ -26,7 +26,7 @@ namespace IDKEngine.Render
         }
 
         public bool isHoveredViewport = true;
-        public System.Numerics.Vector2 viewportPos;
+        public System.Numerics.Vector2 viewportHeaderSize;
         public void Draw(Application window, float frameTime)
         {
             ImGuiBackend.Update(window, frameTime);
@@ -38,7 +38,7 @@ namespace IDKEngine.Render
             System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
             
             System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
-            viewportPos = ImGui.GetWindowPos() + tileBar;
+            viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
             
             ImGui.Image((IntPtr)window.PostCombine.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
             isHoveredViewport = ImGui.IsItemHovered();
@@ -533,11 +533,14 @@ namespace IDKEngine.Render
 
         public void Update(Application window)
         {
-            if (isHoveredViewport && window.MouseState[MouseButton.Left] == InputState.Touched)
+            if ((!window.RenderGui || isHoveredViewport) && window.MouseState[MouseButton.Left] == InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
-                point -= (Vector2i)SystemToOpenTK(viewportPos);
-                point.Y = window.ViewportSize.Y - point.Y;
+                if (window.RenderGui)
+                {
+                    point -= (Vector2i)SystemToOpenTK(viewportHeaderSize);
+                }
+                point.Y = window.ForwardRenderer.Result.Height - point.Y;
 
                 Vector2 ndc = new Vector2((float)point.X / window.ForwardRenderer.Result.Width, (float)point.Y / window.ForwardRenderer.Result.Height) * 2.0f - new Vector2(1.0f);
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(window.GLSLBasicData.CameraPos, window.GLSLBasicData.InvProjection, window.GLSLBasicData.InvView, ndc);

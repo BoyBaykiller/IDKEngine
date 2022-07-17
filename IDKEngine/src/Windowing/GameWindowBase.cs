@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
@@ -7,7 +8,7 @@ namespace IDKEngine
     /// <summary>
     /// Represents window with OpenGL context and helpul game functionality
     /// </summary>
-    abstract unsafe class GameWindowBase
+    abstract unsafe class GameWindowBase : IDisposable
     {
         private string _title;
         public string WindowTitle
@@ -95,7 +96,7 @@ namespace IDKEngine
         private Vector2i cachedWindowPos;
         private Vector2i cachedWindowSize;
 
-        private readonly bool glfwInitialized = false;
+        private static bool glfwInitialized = false;
 
         private readonly VideoMode* videoMode;
         private readonly Monitor* monitor;
@@ -109,16 +110,16 @@ namespace IDKEngine
             if (!glfwInitialized)
             {
                 GLFW.Init();
-#if DEBUG
-                GLFW.WindowHint(WindowHintBool.OpenGLDebugContext, true);
-#else
-                GLFW.WindowHint(WindowHintBool.ContextNoError, true);
-#endif
-                GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Compat);
-                GLFW.WindowHint(WindowHintInt.ContextVersionMajor, 4);
-                GLFW.WindowHint(WindowHintInt.ContextVersionMinor, 6);
                 glfwInitialized = true;
             }
+#if DEBUG
+            GLFW.WindowHint(WindowHintBool.OpenGLDebugContext, true);
+#else
+            GLFW.WindowHint(WindowHintBool.ContextNoError, true);
+#endif
+            GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Compat);
+            GLFW.WindowHint(WindowHintInt.ContextVersionMajor, 4);
+            GLFW.WindowHint(WindowHintInt.ContextVersionMinor, 6);
             _title = title;
             _size.X = width;
             _size.Y = heigth;
@@ -136,7 +137,7 @@ namespace IDKEngine
 
             windowCharDelegate = WindowCharCallback;
             GLFW.SetCharCallback(window, windowCharDelegate);
-
+            
             monitor = GLFW.GetPrimaryMonitor();
             videoMode = GLFW.GetVideoMode(monitor);
             KeyboardState = new Keyboard(window);
@@ -149,16 +150,9 @@ namespace IDKEngine
             OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
         }
 
-        /// <summary>
-        /// Starts the applications game loop
-        /// </summary>
-        /// <param name="ups">Limits the number of times <see cref="OnUpdate(float)"/> is dispatched per second. Unlimited if 0</param>
-        /// <param name="fps">Limits the number of times <see cref="OnRender(float)"/> is dispatched per second. Unlimited if 0</param>
         public void Start()
         {
             OnStart();
-
-            updateTimer.Start();
             double lastTime = 0.0;
             GLFW.SetTime(0.0);
             while (!GLFW.WindowShouldClose(window))
@@ -183,7 +177,6 @@ namespace IDKEngine
             }
 
             OnEnd();
-            GLFW.DestroyWindow(window);
         }
 
         private readonly Stopwatch updateTimer;
@@ -216,7 +209,7 @@ namespace IDKEngine
         }
 
         /// <summary>
-        /// Initiates the first step of SetWindowShouldClose -> OnEnd -> DestroyWindow
+        /// Initiates the first step of SetWindowShouldClose -> OnEnd
         /// </summary>
         public void ShouldClose()
         {
@@ -260,6 +253,12 @@ namespace IDKEngine
         private void WindowCharCallback(Window* window, uint codepoint)
         {
             OnKeyPress((char)codepoint);
+        }
+
+        public void Dispose()
+        {
+            GLFW.DestroyWindow(window);
+            glfwInitialized = false;
         }
     }
 }
