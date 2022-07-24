@@ -381,3 +381,79 @@ void main()
 
 There is one caveat (which is not exclusive to bindless textures) which is that they must be indexed with a [dynamically uniform expression](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)#Dynamically_uniform_expression). Luckily `gl_DrawID` is defined to fulfill that requirement.
 
+### 3.0 Frustum Culling
+
+Frustum culling is the process of determining objects outside a camera frustum and consequently avoiding unnecessary computations for those.
+I find the following implementation to be fairly elegant and low overhead because it perfectly fits into the whole gpu driven rendering thing.
+
+The ingredients needed to get started are:
+- A projection + view matrix
+- A list of each mesh's model matrix
+- A list of each mesh's draw command
+- A list of each mesh's bounding box
+
+In a MDI renderer like described in "1.0 Multi Draw Indirect" the first three points are required anyway.
+And getting a local space bounding box from each mesh's vertices shouldn't be a problem.
+
+Remember how `MultiDrawElementsIndirect` reads draw commands from a buffer object?
+This means the gpu can modify it's own drawing parameters by writing into that buffer object (using shader storage blocks).
+And that's the clue to gpu accelerated frustum culling without any cpu readback.
+
+Basically the cpu side of things is as simple as:
+```cs
+void Render()
+{
+    // Frustum Culling
+    frustumCullingProgram.Use();
+    GL.DispatchCompute((Meshes.Length + 64 - 1) / 64, 1, 1);
+    GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
+
+    // Drawing
+    drawingProgram.Use();
+    vao.Bind(); 
+    drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
+    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
+}
+```
+A compute shader is dispatched which does the culling and accordingly adjusts the content of `drawCommandBuffer`.
+The memory barrier ensures that at the point where `MultiDrawElementsIndirect` reads from `drawCommandBuffer` all previous
+incoherent writes into that buffer are visible.
+
+Let's get to the culling shader:
+```glsl
+#version 460 core
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct DrawCommand
+{
+    int Count;
+    int InstanceCount;
+    int FirstIndex;
+    int BaseVertex;
+    int BaseInstance;
+};
+
+layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO
+{
+    DrawCommand DrawCommands[];
+} drawCommandSSBO;
+
+void main()
+{
+    uint meshIndex = gl_GlobalInvocationID.x;
+    if (meshIndex >= meshSSBO.Meshes.length())
+        return;
+
+    Mesh mesh = meshSSBO.Meshes[meshIndex];
+    AABB aabb = mesh.AABB;
+        
+    Frustum frustum = ExtractFrustum(ProjView * mesh.ModelMatrix);
+    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumAABBIntersect(frustum, aabb));
+}
+```
+The implementation of `ExtractFrustum` and `FrustumAABBIntersect` can be found [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/Culling/Frustum/compute.glsl).
+
+Each thread grabs a mesh builds a frustum and then compares it against the aabb.
+`drawCommandSSBO` is a shader storage block giving us access to the buffer which holds the draw commands that are used by `MultiDrawElementsIndirect`.
+If the test fails `InstanceCount` is set to 0 otherwise 1.
+A mesh with `InstanceCount = 0` will not cause any vertex shader invocations later when things are drawn saving us a lot of computations.

@@ -38,7 +38,7 @@ namespace IDKEngine.Render.Objects
             string dirPath = Path.GetDirectoryName(path);
 
             Scene scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.GenerateNormals |
-                                                   PostProcessSteps.RemoveRedundantMaterials | /*PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes*/
+                                                   PostProcessSteps.RemoveRedundantMaterials | /*PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes |*/
                                                    PostProcessSteps.FlipUVs);
             
             Debug.Assert(scene != null);

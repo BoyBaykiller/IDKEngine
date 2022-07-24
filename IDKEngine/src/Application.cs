@@ -304,7 +304,7 @@ namespace IDKEngine
 
             //Model temple = new Model(@"C:\Users\Julian\Downloads\SunTempleSmall\SunTempleSmall.gltf");
             //for (int i = 0; i < temple.ModelMatrices.Length; i++)
-            //    temple.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(180.0f)) * Matrix4.CreateScale(0.01f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+            //    temple.ModelMatrices[i][0] = Matrix4.CreateScale(0.01f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, horse, helmet });
