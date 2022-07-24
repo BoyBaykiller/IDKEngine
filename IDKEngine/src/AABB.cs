@@ -57,11 +57,11 @@ namespace IDKEngine
             return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
         }
 
-        public void Transform(Matrix4 invModel)
+        public void Transform(Matrix4 model)
         {
             for (uint i = 0; i < 8; i++)
             {
-                Grow((new Vector4(this[i], 1.0f) * invModel).Xyz);
+                Grow((new Vector4(this[i], 1.0f) * model).Xyz);
             }
         }
     }

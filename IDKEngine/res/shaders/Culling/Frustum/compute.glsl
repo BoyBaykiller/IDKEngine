@@ -59,8 +59,8 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 } matrixSSBO;
 
 vec3 NegativeVertex(Node node, vec3 normal);
-bool AABBVsFrustum(Frustum frustum, Node node);
-Frustum ExtractFrustum(mat4 projViewModel);
+bool FrustumAABBIntersect(Frustum frustum, Node node);
+Frustum ExtractFrustum(mat4 matrix);
 
 layout(location = 0) uniform mat4 ProjView;
 
@@ -77,33 +77,33 @@ void main()
     mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + glInstanceID];
     
     Frustum frustum = ExtractFrustum(ProjView * model);
-    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(AABBVsFrustum(frustum, node));
+    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumAABBIntersect(frustum, node));
 }
 
-Frustum ExtractFrustum(mat4 projViewModel)
+Frustum ExtractFrustum(mat4 matrix)
 {
     Frustum frustum;
 	for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < 2; j++)
         {
-            frustum.Planes[i * 2 + j].x = projViewModel[0][3] + (j == 0 ? projViewModel[0][i] : -projViewModel[0][i]);
-            frustum.Planes[i * 2 + j].y = projViewModel[1][3] + (j == 0 ? projViewModel[1][i] : -projViewModel[1][i]);
-            frustum.Planes[i * 2 + j].z = projViewModel[2][3] + (j == 0 ? projViewModel[2][i] : -projViewModel[2][i]);
-            frustum.Planes[i * 2 + j].w = projViewModel[3][3] + (j == 0 ? projViewModel[3][i] : -projViewModel[3][i]);
+            frustum.Planes[i * 2 + j].x = matrix[0][3] + (j == 0 ? matrix[0][i] : -matrix[0][i]);
+            frustum.Planes[i * 2 + j].y = matrix[1][3] + (j == 0 ? matrix[1][i] : -matrix[1][i]);
+            frustum.Planes[i * 2 + j].z = matrix[2][3] + (j == 0 ? matrix[2][i] : -matrix[2][i]);
+            frustum.Planes[i * 2 + j].w = matrix[3][3] + (j == 0 ? matrix[3][i] : -matrix[3][i]);
             frustum.Planes[i * 2 + j] *= length(frustum.Planes[i * 2 + j].xyz);
         }
     }
 	return frustum;
 }
 
-bool AABBVsFrustum(Frustum frustum, Node node)
+bool FrustumAABBIntersect(Frustum frustum, Node node)
 {
 	float a = 1.0;
 
-	for (int i = 0; i < 6 && a >= 0.0; i++) {
-		vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
-
+	for (int i = 0; i < 6 && a >= 0.0; i++)
+    {
+        vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
 		a = dot(vec4(negative, 1.0), frustum.Planes[i]);
 	}
 

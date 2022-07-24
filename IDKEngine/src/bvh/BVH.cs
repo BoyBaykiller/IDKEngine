@@ -128,12 +128,12 @@ namespace IDKEngine
             return hitInfo.T != float.MaxValue;
         }
 
-        public unsafe bool Intersect(in AABB aabb, out AABBHitInfo hitInfo)
+        public unsafe bool Intersect(in AABB worldSpaceAabb, out AABBHitInfo hitInfo)
         {
             hitInfo = new AABBHitInfo();
 
-            Vector3 boxCenter = aabb.Center;
-            Vector3 halfSize = aabb.HalfSize;
+            Vector3 boxCenter = worldSpaceAabb.Center;
+            Vector3 halfSize = worldSpaceAabb.HalfSize;
             
             for (int i = 0; i < ModelSystem.Meshes.Length; i++)
             {
@@ -142,7 +142,7 @@ namespace IDKEngine
                 Matrix4 invModel = Matrix4.Invert(ModelSystem.ModelMatrices[i][glInstanceID]);
                 
                 Vector3 localCenter = (new Vector4(boxCenter, 1.0f) * invModel).Xyz;
-                AABB localAabb = aabb;
+                AABB localAabb = worldSpaceAabb;
                 localAabb.Transform(invModel);
 
                 ref readonly GLSLBlasNode topNode = ref blases[i].Nodes[0];
