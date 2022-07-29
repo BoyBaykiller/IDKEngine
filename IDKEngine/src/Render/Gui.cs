@@ -412,7 +412,7 @@ namespace IDKEngine.Render
                 {
                     bool hadChange = false;
                     ref GLSLMesh mesh = ref window.ModelSystem.Meshes[selectedEntityIndex];
-                    GLSLDrawCommand cmd = window.ModelSystem.DrawCommands[selectedEntityIndex];
+                    ref readonly GLSLDrawCommand cmd = ref window.ModelSystem.DrawCommands[selectedEntityIndex];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");

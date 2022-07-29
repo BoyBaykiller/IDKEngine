@@ -123,8 +123,6 @@ namespace IDKEngine
             else
             {
                 PathTracer.Compute();
-                Texture.UnbindFromUnit(1);
-                Texture.UnbindFromUnit(2);
 
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
@@ -296,7 +294,9 @@ namespace IDKEngine
 
             Model horse = new Model("res/models/Horse/horse.gltf");
             for (int i = 0; i < horse.ModelMatrices.Length; i++)
+            {
                 horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+            }
 
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
             for (int i = 0; i < helmet.ModelMatrices.Length; i++)

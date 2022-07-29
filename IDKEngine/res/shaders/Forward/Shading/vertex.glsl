@@ -2,10 +2,9 @@
 #extension GL_ARB_bindless_texture : require
 
 layout(location = 0) in vec3 Position;
-layout(location = 1) in float TexCoordU;
-layout(location = 2) in vec3 Normal;
-layout(location = 3) in float TexCoordV;
-layout(location = 4) in vec3 Tangent;
+layout(location = 1) in vec2 TexCoord;
+layout(location = 2) in uint Tangent;
+layout(location = 3) in uint Normal;
 
 struct Mesh
 {
@@ -73,23 +72,28 @@ out InOutVars
     flat float RoughnessBias;
 } outData;
 
+vec3 UnpackR10G10B10(uint v);
+
 void main()
 {
+    vec3 normal = UnpackR10G10B10(Normal) * 2.0 - 1.0;
+    vec3 tangent = UnpackR10G10B10(Tangent) * 2.0 - 1.0;
+
     mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
-    vec3 T = normalize((model * vec4(Tangent, 0.0)).xyz);
-    vec3 N = normalize((model * vec4(Normal, 0.0)).xyz);
+    vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
+    vec3 N = normalize((model * vec4(normal, 0.0)).xyz);
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
 
     outData.TBN = mat3(T, B, N);
-    outData.TexCoord = vec2(TexCoordU, TexCoordV);
+    outData.TexCoord = TexCoord;
     outData.FragPos = (model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
     
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    outData.Normal = Normal;
+    outData.Normal = normal;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;
@@ -106,4 +110,17 @@ void main()
     jitteredClipPos.xy += offset * outData.ClipPos.w * taaDataUBO.Enabled;
     
     gl_Position = jitteredClipPos;
+}
+
+vec3 UnpackR10G10B10(uint v)
+{
+    const uint BITS = 10u;
+    const uint MAX_NUM = (1u << BITS) - 1u;
+
+    uint x = (v >> (BITS * 0u)) & MAX_NUM;
+    uint y = (v >> (BITS * 1u)) & MAX_NUM;
+    uint z = (v >> (BITS * 2u)) & MAX_NUM;
+
+    vec3 unpacked = vec3(x, y, z) * (1.0f / MAX_NUM);
+    return unpacked;
 }

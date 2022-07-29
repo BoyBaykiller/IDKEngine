@@ -1,8 +1,7 @@
 #version 460 core
 
 layout(location = 0) in vec3 Position;
-layout(location = 1) in float TexCoordU;
-layout(location = 3) in float TexCoordV;
+layout(location = 1) in vec2 TexCoord;
 
 struct Mesh
 {
@@ -66,7 +65,7 @@ void main()
     mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
 
     outData.MaterialIndex = meshSSBO.Meshes[gl_DrawID].MaterialIndex;
-    outData.TexCoord = vec2(TexCoordU, TexCoordV);
+    outData.TexCoord = TexCoord;
 
     vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
     
