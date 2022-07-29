@@ -113,6 +113,36 @@ namespace IDKEngine
             System.Buffer.MemoryCopy(src, dest, long.MaxValue, len);
         }
 
+        public static uint PackR10G10B10(Vector3 v)
+        {
+            const int BITS = 10;
+            const uint MAX_NUM = (1u << BITS) - 1;
+
+            uint cX = (uint)MathF.Round(v.X * MAX_NUM);
+            uint cY = (uint)MathF.Round(v.Y * MAX_NUM);
+            uint cZ = (uint)MathF.Round(v.Z * MAX_NUM);
+
+            uint packed = (cX << (BITS * 0)) | (cY << (BITS * 1)) | (cZ << (BITS * 2));
+
+            return packed;
+        }
+
+        public static Vector3 UnpackR10G10B10(uint v)
+        {
+            const int BITS = 10;
+            const uint MAX_NUM = (1u << BITS) - 1;
+
+            uint x = (v >> (BITS * 0)) & MAX_NUM;
+            uint y = (v >> (BITS * 1)) & MAX_NUM;
+            uint z = (v >> (BITS * 2)) & MAX_NUM;
+
+            float cX = x * (1.0f / MAX_NUM);
+            float cY = y * (1.0f / MAX_NUM);
+            float cZ = z * (1.0f / MAX_NUM);
+
+            return new Vector3(cX, cY, cZ);
+        }
+
         public static void Swap<T>(ref T first, ref T other) where T : struct
         {
             T temp = first;

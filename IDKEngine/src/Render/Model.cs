@@ -68,18 +68,17 @@ namespace IDKEngine.Render.Objects
 
                     if (mesh.TextureCoordinateChannels[0].Count > 0)
                     {
-                        Vertices[baseVertex + j].TexCoordU = mesh.TextureCoordinateChannels[0][j].X;
-                        Vertices[baseVertex + j].TexCoordV = mesh.TextureCoordinateChannels[0][j].Y;
+                        Vertices[baseVertex + j].TexCoord.X = mesh.TextureCoordinateChannels[0][j].X;
+                        Vertices[baseVertex + j].TexCoord.Y = mesh.TextureCoordinateChannels[0][j].Y;
                     }
-                      
-                    Vertices[baseVertex + j].Normal.X = mesh.Normals[j].X;
-                    Vertices[baseVertex + j].Normal.Y = mesh.Normals[j].Y;
-                    Vertices[baseVertex + j].Normal.Z = mesh.Normals[j].Z;
 
-                    Vector3 c1 = Vector3.Cross(Vertices[baseVertex + j].Normal, Vector3.UnitZ);
-                    Vector3 c2 = Vector3.Cross(Vertices[baseVertex + j].Normal, Vector3.UnitY);
+                    Vector3 normal = new Vector3(mesh.Normals[j].X, mesh.Normals[j].Y, mesh.Normals[j].Z);
+                    Vertices[baseVertex + j].Normal = Helper.PackR10G10B10(normal * 0.5f + new Vector3(0.5f));
+
+                    Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
+                    Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
                     Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
-                    Vertices[baseVertex + j].Tangent = tangent;
+                    Vertices[baseVertex + j].Tangent = Helper.PackR10G10B10(tangent * 0.5f + new Vector3(0.5f));
                 }
 
                 ModelMatrices[i] = new Matrix4[1] { Matrix4.Identity };
@@ -126,7 +125,6 @@ namespace IDKEngine.Render.Objects
             texturesLoadResult.Join();
             for (int i = 0; i < Materials.Length; i++)
             {
-                bool metallicRoughnessPossiblyPacked = !scene.Materials[i].HasTextureSpecular;
                 for (int j = 0; j < perMaterialTextures.Length; j++)
                 {
                     Texture texture = new Texture(TextureTarget2d.Texture2D);
@@ -142,7 +140,7 @@ namespace IDKEngine.Render.Objects
                             break;
 
                         case TextureType.Shininess: // Roughness
-                            format = metallicRoughnessPossiblyPacked ? SizedInternalFormat.Rg8 : SizedInternalFormat.R8;
+                            format = SizedInternalFormat.R8;
                             break;
 
                         case TextureType.Specular:

@@ -31,25 +31,25 @@ namespace IDKEngine.Render
         private readonly VAO vao;
         public unsafe ModelSystem()
         {
-            DrawCommands = new GLSLDrawCommand[0];
+            DrawCommands = Array.Empty<GLSLDrawCommand>();
             drawCommandBuffer = new BufferObject();
             drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
 
-            Meshes = new GLSLMesh[0];
+            Meshes = Array.Empty<GLSLMesh>();
             meshBuffer = new BufferObject();
             meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
 
-            Materials = new GLSLMaterial[0];
+            Materials = Array.Empty<GLSLMaterial>();
             materialBuffer = new BufferObject();
             materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
 
-            Vertices = new GLSLDrawVertex[0];
+            Vertices = Array.Empty<GLSLDrawVertex>();
             vertexBuffer = new BufferObject();
 
-            Indices = new uint[0];
+            Indices = Array.Empty<uint>();
             elementBuffer = new BufferObject();
 
-            ModelMatrices = new Matrix4[0][];
+            ModelMatrices = Array.Empty<Matrix4[]>();
             modelMatricesBuffer = new BufferObject();
             modelMatricesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
@@ -57,10 +57,9 @@ namespace IDKEngine.Render
             vao.SetElementBuffer(elementBuffer);
             vao.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLDrawVertex));
             vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
-            vao.SetAttribFormat(0, 1, 1, VertexAttribType.Float, sizeof(float) * 3); // TexCoordU
-            vao.SetAttribFormat(0, 2, 3, VertexAttribType.Float, sizeof(float) * 4); // Normal
-            vao.SetAttribFormat(0, 3, 1, VertexAttribType.Float, sizeof(float) * 7); // TexCoordV
-            vao.SetAttribFormat(0, 4, 3, VertexAttribType.Float, sizeof(float) * 8); // Tangent
+            vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
+            vao.SetAttribFormatI(0, 2, 1, VertexAttribType.UnsignedInt, sizeof(float) * 6); // Tangent
+            vao.SetAttribFormatI(0, 3, 1, VertexAttribType.UnsignedInt, sizeof(float) * 7); // Normal
         }
 
         public unsafe void Add(Model[] models)

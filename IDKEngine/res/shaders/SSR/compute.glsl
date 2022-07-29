@@ -28,7 +28,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 vec3 SSR(vec3 normal, vec3 fragPos);
 void CustomBinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample);
 vec3 ViewToNDC(vec3 viewPos);
-vec3 NDCToViewSpace(vec3 ndc);
+vec3 NDCToView(vec3 ndc);
 
 uniform int Samples;
 uniform int BinarySearchSamples;
@@ -47,7 +47,7 @@ void main()
         return;
     }
 
-    vec3 fragPos = NDCToViewSpace(vec3(uv, depth) * 2.0 - 1.0);
+    vec3 fragPos = NDCToView(vec3(uv, depth) * 2.0 - 1.0);
     vec3 color = SSR(normalize((basicDataUBO.View * vec4(normalSpec.rgb, 0.0)).xyz), fragPos);
 
     imageStore(ImgResult, imgCoord, vec4(color * normalSpec.a, 1.0));
@@ -113,7 +113,7 @@ vec3 ViewToNDC(vec3 viewPos)
     return clipPos.xyz / clipPos.w;
 }
 
-vec3 NDCToViewSpace(vec3 ndc)
+vec3 NDCToView(vec3 ndc)
 {
     vec4 viewPos = basicDataUBO.InvProjection * vec4(ndc, 1.0);
     return viewPos.xyz / viewPos.w;

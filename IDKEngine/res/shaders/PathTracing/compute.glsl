@@ -64,13 +64,11 @@ struct Mesh
 struct Vertex
 {
     vec3 Position;
-    float TexCoordU;
-
-    vec3 Normal;
-    float TexCoordV;
-
-    vec3 Tangent;
     float _pad0;
+
+    vec2 TexCoord;
+    uint Tangent;
+    uint Normal;
 };
 
 struct HitInfo
@@ -178,6 +176,7 @@ float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 uint EmulateNonUniform(uint index);
 vec3 SpectralJet(float w);
+vec3 UnpackR10G10B10(uint v);
 
 uniform int RayDepth;
 uniform float FocalLength;
@@ -259,9 +258,9 @@ vec3 Radiance(Ray ray)
                 
                 mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
 
-                vec2 texCoord = Interpolate(vec2(v0.TexCoordU, v0.TexCoordV), vec2(v1.TexCoordU, v1.TexCoordV), vec2(v2.TexCoordU, v2.TexCoordV), hitInfo.Bary);
-                vec3 geoNormal = normalize(Interpolate(v0.Normal, v1.Normal, v2.Normal, hitInfo.Bary));
-                vec3 tangent = normalize(Interpolate(v0.Tangent, v1.Tangent, v2.Tangent, hitInfo.Bary));
+                vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
+                vec3 geoNormal = normalize(Interpolate(UnpackR10G10B10(v0.Normal) * 2.0 - 1.0, UnpackR10G10B10(v1.Normal) * 2.0 - 1.0, UnpackR10G10B10(v2.Normal) * 2.0 - 1.0, hitInfo.Bary));
+                vec3 tangent = normalize(Interpolate(UnpackR10G10B10(v0.Tangent) * 2.0 - 1.0, UnpackR10G10B10(v1.Tangent) * 2.0 - 1.0, UnpackR10G10B10(v2.Tangent) * 2.0 - 1.0, hitInfo.Bary));
 
                 vec3 T = normalize(vec3(model * vec4(tangent, 0.0)));
                 vec3 N = normalize(vec3(model * vec4(geoNormal, 0.0)));
@@ -680,4 +679,17 @@ vec3 SpectralJet(float w)
 		c = vec3(1.0, 1.0 + 4.0 * (0.75 - x), 0.0);
 
 	return clamp(c, vec3(0.0), vec3(1.0));
+}
+
+vec3 UnpackR10G10B10(uint v)
+{
+    const uint BITS = 10u;
+    const uint MAX_NUM = (1u << BITS) - 1u;
+
+    uint x = (v >> (BITS * 0u)) & MAX_NUM;
+    uint y = (v >> (BITS * 1u)) & MAX_NUM;
+    uint z = (v >> (BITS * 2u)) & MAX_NUM;
+
+    vec3 unpacked = vec3(x, y, z) * (1.0f / MAX_NUM);
+    return unpacked;
 }
