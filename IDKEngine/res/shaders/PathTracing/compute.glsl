@@ -160,7 +160,6 @@ vec3 Radiance(Ray ray);
 vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, vec3 normal, out float rayProbability, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 bool ClosestHit(Ray ray, out HitInfo hitInfo);
-bool AnyHit(Ray ray, float maxValue);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
 bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
 bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
@@ -169,14 +168,13 @@ vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
 vec3 UniformSampleSphere();
 vec3 CosineSampleHemisphere(vec3 normal);
-vec3 UniformSampleHemisphere(vec3 normal);
 vec2 UniformSampleCircle();
 uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 uint EmulateNonUniform(uint index);
 vec3 SpectralJet(float w);
-vec3 UnpackR10G10B10(uint v);
+vec3 UnpackR11G11B10(uint v);
 
 uniform int RayDepth;
 uniform float FocalLength;
@@ -259,8 +257,8 @@ vec3 Radiance(Ray ray)
                 mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
 
                 vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
-                vec3 geoNormal = normalize(Interpolate(UnpackR10G10B10(v0.Normal) * 2.0 - 1.0, UnpackR10G10B10(v1.Normal) * 2.0 - 1.0, UnpackR10G10B10(v2.Normal) * 2.0 - 1.0, hitInfo.Bary));
-                vec3 tangent = normalize(Interpolate(UnpackR10G10B10(v0.Tangent) * 2.0 - 1.0, UnpackR10G10B10(v1.Tangent) * 2.0 - 1.0, UnpackR10G10B10(v2.Tangent) * 2.0 - 1.0, hitInfo.Bary));
+                vec3 geoNormal = normalize(Interpolate(UnpackR11G11B10(v0.Normal) * 2.0 - 1.0, UnpackR11G11B10(v1.Normal) * 2.0 - 1.0, UnpackR11G11B10(v2.Normal) * 2.0 - 1.0, hitInfo.Bary));
+                vec3 tangent = normalize(Interpolate(UnpackR11G11B10(v0.Tangent) * 2.0 - 1.0, UnpackR11G11B10(v1.Tangent) * 2.0 - 1.0, UnpackR11G11B10(v2.Tangent) * 2.0 - 1.0, hitInfo.Bary));
 
                 vec3 T = normalize(vec3(model * vec4(tangent, 0.0)));
                 vec3 N = normalize(vec3(model * vec4(geoNormal, 0.0)));
@@ -465,65 +463,6 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
     return hitInfo.T != FLOAT_MAX;
 }
 
-bool AnyHit(Ray ray, float maxValue)
-{
-    float rayTMin, rayTMax;
-
-    // for (int i = 0; i < lightsUBO.Count; i++)
-    // {
-    //     Light light = lightsUBO.Lights[i];
-    //     if (RaySphereIntersect(ray, light, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < maxValue)
-    //     {
-    //         return true;
-    //     }
-    // }
-
-    vec4 baryT;
-    uint stack[32];
-    for (int i = 0; i < meshSSBO.Meshes.length(); i++)
-    {
-        DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
-        int baseNode = 2 * (cmd.FirstIndex / 3);
-        
-        const int glInstanceID = 0; // TODO: Work out actual instanceID value
-        Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
-        
-        uint stackPtr = 0;
-        uint stackTop = 0;
-        while (true)
-        {
-            Node node = blasSSBO.Nodes[baseNode + stackTop];
-            if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < maxValue))
-            {
-                if (stackPtr == 0) break;
-                stackTop = stack[--stackPtr];
-                continue;
-            }
-
-            if (node.TriCount > 0)
-            {
-                for (uint j = node.TriStartOrLeftChild; j < node.TriStartOrLeftChild + node.TriCount; j++)
-                {
-                    Triangle triangle = triangleSSBO.Triangles[j];
-                    if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < maxValue)
-                    {
-                        return true;
-                    }
-                }
-                if (stackPtr == 0) break;
-                stackTop = stack[--stackPtr];
-            }
-            else
-            {
-                stackTop = node.TriStartOrLeftChild;
-                stack[stackPtr++] = node.TriStartOrLeftChild + 1;
-            }
-        }
-    }
-
-    return false;
-}
-
 // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT)
 {
@@ -615,19 +554,12 @@ vec3 CosineSampleHemisphere(vec3 normal)
     return normalize(normal + UniformSampleSphere());
 }
 
-vec3 UniformSampleHemisphere(vec3 normal)
-{
-    vec3 sphereSample = UniformSampleSphere();
-    return sphereSample * sign(dot(sphereSample, normal));
-}
-
 vec2 UniformSampleCircle()
 {
     float angle = GetRandomFloat01() * 2.0 * PI;
     float r = sqrt(GetRandomFloat01());
     return vec2(cos(angle), sin(angle)) * r;
 }
-
 
 // Faster and much more random than Wang Hash
 // Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
@@ -681,15 +613,15 @@ vec3 SpectralJet(float w)
 	return clamp(c, vec3(0.0), vec3(1.0));
 }
 
-vec3 UnpackR10G10B10(uint v)
+vec3 UnpackR11G11B10(uint v)
 {
-    const uint BITS = 10u;
-    const uint MAX_NUM = (1u << BITS) - 1u;
+    float r = (v >> 0) & ((1u << 11) - 1);
+    float g = (v >> 11) & ((1u << 11) - 1);
+    float b = (v >> 22) & ((1u << 10) - 1);
 
-    uint x = (v >> (BITS * 0u)) & MAX_NUM;
-    uint y = (v >> (BITS * 1u)) & MAX_NUM;
-    uint z = (v >> (BITS * 2u)) & MAX_NUM;
+    r *= (1.0 / ((1u << 11) - 1));
+    g *= (1.0 / ((1u << 11) - 1));
+    b *= (1.0 / ((1u << 10) - 1));
 
-    vec3 unpacked = vec3(x, y, z) * (1.0f / MAX_NUM);
-    return unpacked;
+    return vec3(r, g, b);
 }

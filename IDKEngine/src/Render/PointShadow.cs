@@ -13,7 +13,6 @@ namespace IDKEngine.Render
         public static readonly bool IS_VERTEX_LAYERED_RENDERING =
             (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
             Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer") ||
-            Helper.IsExtensionsAvailable("GL_NV_viewport_array") ||
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2"));
 
         private static int _countPointShadows;
@@ -115,7 +114,7 @@ namespace IDKEngine.Render
 
             renderProgram.Upload(0, Instance);
 
-            if (IS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array or GL_NV_viewport_array2
+            if (IS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array2
             {
                 GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
                 renderProgram.Use();

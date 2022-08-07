@@ -174,10 +174,10 @@ namespace IDKEngine.Render
                                 window.VolumetricLight.Strength = tempFloat;
                             }
 
-                            System.Numerics.Vector3 tempVec = OpenTKToSystem(window.VolumetricLight.Absorbance);
+                            System.Numerics.Vector3 tempVec = window.VolumetricLight.Absorbance.ToSystemVec();
                             if (ImGui.SliderFloat3("Absorbance", ref tempVec, 0.0f, 0.2f))
                             {
-                                window.VolumetricLight.Absorbance = SystemToOpenTK(tempVec);
+                                window.VolumetricLight.Absorbance = tempVec.ToOpenTKVec();
                             }
                         }
                     }
@@ -417,11 +417,11 @@ namespace IDKEngine.Render
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");
                     
-                    System.Numerics.Vector3 systemVec3 = OpenTKToSystem(window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation());
+                    System.Numerics.Vector3 systemVec3 = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
                         hadChange = true;
-                        window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(SystemToOpenTK(systemVec3));
+                        window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTKVec());
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
@@ -454,18 +454,18 @@ namespace IDKEngine.Render
                         hadChange = true;
                     }
 
-                    systemVec3 = OpenTKToSystem(mesh.Absorbance);
+                    systemVec3 = mesh.Absorbance.ToSystemVec();
                     if (ImGui.SliderFloat3("Absorbance", ref systemVec3, 0.0f, 1.0f))
                     {
-                        mesh.Absorbance = SystemToOpenTK(systemVec3);
+                        mesh.Absorbance = systemVec3.ToOpenTKVec();
                         hadChange = true;
                     }
 
                     if (hadChange)
                     {
                         window.GLSLBasicData.FreezeFrameCounter = 0;
-                        window.ModelSystem.UpdateMeshBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
-                        window.ModelSystem.UpdateModelMatricesBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
+                        window.ModelSystem.UpdateMeshBuffer(selectedEntityIndex, selectedEntityIndex + 1);
+                        window.ModelSystem.UpdateModelMatricesBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                     }
                 }
                 else if (selectedEntityType == EntityType.Light)
@@ -473,22 +473,23 @@ namespace IDKEngine.Render
                     bool hadChange = false;
                     ref GLSLLight light = ref window.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
 
-                    System.Numerics.Vector3 systemVec3 = OpenTKToSystem(light.Position);
+                    System.Numerics.Vector3 systemVec3 = light.Position.ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
                         hadChange = true;
-                        light.Position = SystemToOpenTK(systemVec3);
+                        light.Position = systemVec3.ToOpenTKVec();
                     }
 
-                    systemVec3 = OpenTKToSystem(light.Color);
+                    systemVec3 = light.Color.ToSystemVec();
                     if (ImGui.DragFloat3("Color", ref systemVec3, 0.1f, 0.0f))
                     {
                         hadChange = true;
-                        light.Color = SystemToOpenTK(systemVec3);
+                        light.Color = systemVec3.ToOpenTKVec();
                     }
 
-                    if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f, 0.0f))
+                    if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f))
                     {
+                        light.Radius = MathF.Max(light.Radius, 0.0f);
                         hadChange = true;
                     }
 
@@ -538,7 +539,7 @@ namespace IDKEngine.Render
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 if (window.RenderGui)
                 {
-                    point -= (Vector2i)SystemToOpenTK(viewportHeaderSize);
+                    point -= (Vector2i)viewportHeaderSize.ToOpenTKVec();
                 }
                 point.Y = window.ForwardRenderer.Result.Height - point.Y;
 
@@ -577,26 +578,6 @@ namespace IDKEngine.Render
                     window.ForwardRenderer.RenderMeshAABBIndex = -1;
                 }
             }
-        }
-
-        private static System.Numerics.Vector3 OpenTKToSystem(Vector3 vector3)
-        {
-            return new System.Numerics.Vector3(vector3.X, vector3.Y, vector3.Z);
-        }
-
-        private static System.Numerics.Vector2 OpenTKToSystem(Vector2 vector2)
-        {
-            return new System.Numerics.Vector2(vector2.X, vector2.Y);
-        }
-
-        private static Vector3 SystemToOpenTK(System.Numerics.Vector3 vector3)
-        {
-            return new Vector3(vector3.X, vector3.Y, vector3.Z);
-        }
-
-        private static Vector2 SystemToOpenTK(System.Numerics.Vector2 vector2)
-        {
-            return new Vector2(vector2.X, vector2.Y);
         }
     }
 }
