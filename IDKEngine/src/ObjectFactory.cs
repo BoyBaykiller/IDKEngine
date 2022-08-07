@@ -1,6 +1,7 @@
-﻿using OpenTK.Mathematics;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using OpenTK.Mathematics;
 
 namespace IDKEngine
 {
@@ -14,7 +15,7 @@ namespace IDKEngine
         }
 
         // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
-        public static Vertex[] GenerateSmoothSphere(float radius, int latitudes, int longitudes)
+        public static Span<Vertex> GenerateSmoothSphere(float radius, int latitudes, int longitudes)
         {
             if (longitudes < 3)
                 longitudes = 3;
@@ -54,11 +55,11 @@ namespace IDKEngine
                 }
             }
 
-            return vertecis.ToArray();
+            return CollectionsMarshal.AsSpan(vertecis);
         }
 
         // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
-        public static uint[] GenerateSmoothSphereIndicis(uint latitudes, uint longitudes)
+        public static Span<uint> GenerateSmoothSphereIndicis(uint latitudes, uint longitudes)
         {
             List<uint> indicis = new List<uint>((int)(latitudes * longitudes));
             uint k1, k2;
@@ -85,10 +86,10 @@ namespace IDKEngine
                 }
             }
 
-            return indicis.ToArray();
+            return CollectionsMarshal.AsSpan(indicis);
         }
 
-        public static unsafe Vector3[] GeneratePlane(float width, float depth, int subdivideX, int subdivideZ)
+        public static unsafe Span<Vector3> GeneratePlane(float width, float depth, int subdivideX, int subdivideZ)
         {
             List<Vector3> positions = new List<Vector3>();
             float stepX = width / subdivideX;
@@ -109,18 +110,7 @@ namespace IDKEngine
                     });
                 }
             }
-            return positions.ToArray();
-
-            //return new Vector3[]
-            //{
-            //    new Vector3( width / 2.0f, 0.0f,  depth / 2.0f),
-            //    new Vector3( width / 2.0f, 0.0f, -depth / 2.0f),
-            //    new Vector3(-width / 2.0f, 0.0f,  depth / 2.0f),
-
-            //    new Vector3( width / 2.0f, 0.0f, -depth / 2.0f),
-            //    new Vector3(-width / 2.0f, 0.0f, -depth / 2.0f),
-            //    new Vector3(-width / 2.0f, 0.0f,  depth / 2.0f),
-            //};
+            return CollectionsMarshal.AsSpan(positions);
         }
     }
 }

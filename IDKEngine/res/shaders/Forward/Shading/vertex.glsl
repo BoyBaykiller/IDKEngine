@@ -72,12 +72,12 @@ out InOutVars
     flat float RoughnessBias;
 } outData;
 
-vec3 UnpackR10G10B10(uint v);
+vec3 UnpackR11G11B10(uint v);
 
 void main()
 {
-    vec3 normal = UnpackR10G10B10(Normal) * 2.0 - 1.0;
-    vec3 tangent = UnpackR10G10B10(Tangent) * 2.0 - 1.0;
+    vec3 normal = UnpackR11G11B10(Normal) * 2.0 - 1.0;
+    vec3 tangent = UnpackR11G11B10(Tangent) * 2.0 - 1.0;
 
     mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
     vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
@@ -112,15 +112,15 @@ void main()
     gl_Position = jitteredClipPos;
 }
 
-vec3 UnpackR10G10B10(uint v)
+vec3 UnpackR11G11B10(uint v)
 {
-    const uint BITS = 10u;
-    const uint MAX_NUM = (1u << BITS) - 1u;
+    float r = (v >> 0) & ((1u << 11) - 1);
+    float g = (v >> 11) & ((1u << 11) - 1);
+    float b = (v >> 22) & ((1u << 10) - 1);
 
-    uint x = (v >> (BITS * 0u)) & MAX_NUM;
-    uint y = (v >> (BITS * 1u)) & MAX_NUM;
-    uint z = (v >> (BITS * 2u)) & MAX_NUM;
+    r *= (1.0 / ((1u << 11) - 1));
+    g *= (1.0 / ((1u << 11) - 1));
+    b *= (1.0 / ((1u << 10) - 1));
 
-    vec3 unpacked = vec3(x, y, z) * (1.0f / MAX_NUM);
-    return unpacked;
+    return vec3(r, g, b);
 }

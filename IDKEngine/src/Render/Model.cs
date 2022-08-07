@@ -49,7 +49,6 @@ namespace IDKEngine.Render.Objects
             Vertices = new GLSLDrawVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
             ModelMatrices = new Matrix4[scene.MeshCount][];
             Image<Rgba32>[] images = new Image<Rgba32>[scene.MaterialCount * perMaterialTextures.Length];
-
             Thread vertecisLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
             {
                 Mesh mesh = scene.Meshes[i];
@@ -73,12 +72,12 @@ namespace IDKEngine.Render.Objects
                     }
 
                     Vector3 normal = new Vector3(mesh.Normals[j].X, mesh.Normals[j].Y, mesh.Normals[j].Z);
-                    Vertices[baseVertex + j].Normal = Helper.PackR10G10B10(normal * 0.5f + new Vector3(0.5f));
-
+                    Vertices[baseVertex + j].Normal = Helper.PackR11G11B10(normal * 0.5f + new Vector3(0.5f));
+                    
                     Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
                     Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
                     Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
-                    Vertices[baseVertex + j].Tangent = Helper.PackR10G10B10(tangent * 0.5f + new Vector3(0.5f));
+                    Vertices[baseVertex + j].Tangent = Helper.PackR11G11B10(tangent * 0.5f + new Vector3(0.5f));
                 }
 
                 ModelMatrices[i] = new Matrix4[1] { Matrix4.Identity };
@@ -133,22 +132,26 @@ namespace IDKEngine.Render.Objects
                     {
                         case TextureType.Diffuse:
                             format = SizedInternalFormat.Srgb8Alpha8;
+                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedSrgbAlphaS3tcDxt5Ext;
                             break;
 
                         case TextureType.Normals:
-                            format = SizedInternalFormat.Rgba8;
+                            format = SizedInternalFormat.Rgb8;
                             break;
 
                         case TextureType.Shininess: // Roughness
                             format = SizedInternalFormat.R8;
+                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedRed;
                             break;
 
                         case TextureType.Specular:
                             format = SizedInternalFormat.R8;
+                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedRed;
                             break;
 
                         case TextureType.Emissive:
                             format = SizedInternalFormat.Rgb8;
+                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedRgb;
                             break;
 
                         default:

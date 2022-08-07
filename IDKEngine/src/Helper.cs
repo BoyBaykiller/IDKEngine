@@ -11,12 +11,38 @@ using OpenTK.Graphics.OpenGL4;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using IDKEngine.Render.Objects;
+using Assimp;
 
 namespace IDKEngine
 {
     static class Helper
     {
         public static readonly double APIVersion = Convert.ToDouble($"{GL.GetInteger(GetPName.MajorVersion)}{GL.GetInteger(GetPName.MinorVersion)}") / 10.0;
+
+        public static System.Numerics.Vector3 ToSystemVec(this Vector3 vector3)
+        {
+            return Unsafe.As<Vector3, System.Numerics.Vector3>(ref vector3);
+        }
+
+        public static System.Numerics.Vector2 ToSystemVec(this Vector2 vector2)
+        {
+            return Unsafe.As<Vector2, System.Numerics.Vector2>(ref vector2);
+        }
+
+        public static Vector3 ToOpenTKVec(this System.Numerics.Vector3 vector3)
+        {
+            return Unsafe.As<System.Numerics.Vector3, Vector3>(ref vector3);
+        }
+
+        public static Vector2 ToOpenTKVec(this System.Numerics.Vector2 vector2)
+        {
+            return new Vector2(vector2.X, vector2.Y);
+        }
+
+        public static Matrix4 ToOpenTKMat(this Matrix4x4 matrix4x4)
+        {
+            return Matrix4.Transpose(Unsafe.As<Matrix4x4, Matrix4>(ref matrix4x4));
+        }
 
         private static HashSet<string> GetExtensions()
         {
@@ -113,34 +139,28 @@ namespace IDKEngine
             System.Buffer.MemoryCopy(src, dest, long.MaxValue, len);
         }
 
-        public static uint PackR10G10B10(Vector3 v)
+        public static uint PackR11G11B10(Vector3 v)
         {
-            const int BITS = 10;
-            const uint MAX_NUM = (1u << BITS) - 1;
+            uint r = (uint)MathF.Round(v.X * ((1u << 11) - 1));
+            uint g = (uint)MathF.Round(v.Y * ((1u << 11) - 1));
+            uint b = (uint)MathF.Round(v.Z * ((1u << 10) - 1));
 
-            uint cX = (uint)MathF.Round(v.X * MAX_NUM);
-            uint cY = (uint)MathF.Round(v.Y * MAX_NUM);
-            uint cZ = (uint)MathF.Round(v.Z * MAX_NUM);
-
-            uint packed = (cX << (BITS * 0)) | (cY << (BITS * 1)) | (cZ << (BITS * 2));
+            uint packed = (r << 0) | (g << 11) | (b << 22);
 
             return packed;
         }
 
-        public static Vector3 UnpackR10G10B10(uint v)
+        public static Vector3 UnpackR11G11B10(uint v)
         {
-            const int BITS = 10;
-            const uint MAX_NUM = (1u << BITS) - 1;
+            float r = (v >> 0) & ((1u << 11) - 1);
+            float g = (v >> 11) & ((1u << 11) - 1);
+            float b = (v >> 22) & ((1u << 10) - 1);
 
-            uint x = (v >> (BITS * 0)) & MAX_NUM;
-            uint y = (v >> (BITS * 1)) & MAX_NUM;
-            uint z = (v >> (BITS * 2)) & MAX_NUM;
+            r *= (1.0f / ((1u << 11) - 1));
+            g *= (1.0f / ((1u << 11) - 1));
+            b *= (1.0f / ((1u << 10) - 1));
 
-            float cX = x * (1.0f / MAX_NUM);
-            float cY = y * (1.0f / MAX_NUM);
-            float cZ = z * (1.0f / MAX_NUM);
-
-            return new Vector3(cX, cY, cZ);
+            return new Vector3(r, g, b);
         }
 
         public static void Swap<T>(ref T first, ref T other) where T : struct

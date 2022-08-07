@@ -71,7 +71,6 @@ namespace IDKEngine.Render.Objects
 
             GL.CreateTextures(Target, 1, out ID);
             GL.TextureBuffer(ID, sizedInternalFormat, bufferObject.ID);
-            GL.TextureBufferRange(ID, sizedInternalFormat, bufferObject.ID, IntPtr.Zero, bufferObject.Size);
         }
 
         public void SetFilter(TextureMinFilter minFilter, TextureMagFilter magFilter)

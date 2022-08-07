@@ -45,13 +45,19 @@ namespace IDKEngine.Render
             bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             bufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
 
-            ObjectFactory.Vertex[] vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
+            Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
             BufferObject vbo = new BufferObject();
-            vbo.ImmutableAllocate(vertecis.Length * sizeof(ObjectFactory.Vertex), vertecis, BufferStorageFlags.DynamicStorageBit);
+            fixed (ObjectFactory.Vertex* ptr = &vertecis[0])
+            {
+                vbo.ImmutableAllocate(vertecis.Length * sizeof(ObjectFactory.Vertex), (IntPtr)ptr, BufferStorageFlags.DynamicStorageBit);
+            }
 
-            uint[] indicis = ObjectFactory.GenerateSmoothSphereIndicis((uint)latitudes, (uint)longitudes);
+            Span<uint> indicis = ObjectFactory.GenerateSmoothSphereIndicis((uint)latitudes, (uint)longitudes);
             BufferObject ebo = new BufferObject();
-            ebo.ImmutableAllocate(indicis.Length * sizeof(uint), indicis, BufferStorageFlags.DynamicStorageBit);
+            fixed (uint* ptr = &indicis[0])
+            {
+                ebo.ImmutableAllocate(indicis.Length * sizeof(uint), (IntPtr)ptr, BufferStorageFlags.DynamicStorageBit);
+            }
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);

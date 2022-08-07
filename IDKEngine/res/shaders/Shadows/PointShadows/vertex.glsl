@@ -2,10 +2,9 @@
 #extension GL_ARB_bindless_texture : require
 #extension GL_ARB_shader_viewport_layer_array : enable
 #extension GL_AMD_vertex_shader_layer : enable
-#extension GL_NV_viewport_array : enable
 #extension GL_NV_viewport_array2 : enable
 
-#define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array || GL_NV_viewport_array2)
+#define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array2)
 
 layout(location = 0) in vec3 Position;
 

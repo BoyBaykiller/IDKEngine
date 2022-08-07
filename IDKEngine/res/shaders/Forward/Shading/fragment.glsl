@@ -173,15 +173,15 @@ vec3 BlinnPhong(Light light)
     return vec3(0.0);
 }
 
-// From: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
-const vec3 SampleOffsetDirections[20] =
+// Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
+const vec3 SHADOW_SAMPLE_OFFSETS[20] =
 {
    vec3( 1.0,  1.0,  1.0 ), vec3(  1.0, -1.0,  1.0 ), vec3( -1.0, -1.0,  1.0 ), vec3( -1.0,  1.0,  1.0 ), 
    vec3( 1.0,  1.0, -1.0 ), vec3(  1.0, -1.0, -1.0 ), vec3( -1.0, -1.0, -1.0 ), vec3( -1.0,  1.0, -1.0 ),
    vec3( 1.0,  1.0,  0.0 ), vec3(  1.0, -1.0,  0.0 ), vec3( -1.0, -1.0,  0.0 ), vec3( -1.0,  1.0,  0.0 ),
    vec3( 1.0,  0.0,  1.0 ), vec3( -1.0,  0.0,  1.0 ), vec3(  1.0,  0.0, -1.0 ), vec3( -1.0,  0.0, -1.0 ),
    vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
-};  
+};
 
 float Visibility(PointShadow pointShadow)
 {
@@ -196,14 +196,14 @@ float Visibility(PointShadow pointShadow)
     const float MAX_BIAS = 1.5;
     float twoBias = mix(MAX_BIAS * MAX_BIAS, MIN_BIAS * MIN_BIAS, max(dot(Normal, lightToFrag / lightToFragLength), 0.0));
 
-    // Map from [nearPlane; farPlane] to [0.0; 1.0]
+    // Map from [nearPlane, farPlane] to [0.0, 1.0]
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
     
     const float DISK_RADIUS = 0.08;
     float shadowFactor = texture(pointShadow.Sampler, vec4(lightToFrag, mapedDepth));
     for (int i = 0; i < 20; i++)
     {
-        shadowFactor += texture(pointShadow.Sampler, vec4(lightToFrag + SampleOffsetDirections[i] * DISK_RADIUS, mapedDepth));
+        shadowFactor += texture(pointShadow.Sampler, vec4(lightToFrag + SHADOW_SAMPLE_OFFSETS[i] * DISK_RADIUS, mapedDepth));
     }
 
     return shadowFactor / 21.0;

@@ -284,7 +284,6 @@ namespace IDKEngine
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
 
-
             camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
@@ -294,9 +293,7 @@ namespace IDKEngine
 
             Model horse = new Model("res/models/Horse/horse.gltf");
             for (int i = 0; i < horse.ModelMatrices.Length; i++)
-            {
                 horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
-            }
 
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
             for (int i = 0; i < helmet.ModelMatrices.Length; i++)
@@ -350,7 +347,7 @@ namespace IDKEngine
             PathTracer = new PathTracer(BVH, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
 
             List<GLSLLight> lights = new List<GLSLLight>();
-            //lights.Add(new GLSLLight(new Vector3(-0.5f, 8.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 1.0f));
+            //lights.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
             lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
             lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
