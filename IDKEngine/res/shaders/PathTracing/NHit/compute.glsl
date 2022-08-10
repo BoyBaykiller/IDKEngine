@@ -12,9 +12,10 @@
 #extension GL_ARB_shader_ballot : require
 #endif
 
-#ifdef GL_NV_compute_shader_derivatives
-layout(derivative_group_quadsNV) in;
-#endif
+// TODO: Make it work again for the new work group layout 
+// #ifdef GL_NV_compute_shader_derivatives
+// layout(derivative_group_quadsNV) in;
+// #endif
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -112,7 +113,7 @@ struct TransportRay
     uint DebugFirstHitInteriorNodeCounter;
 
     vec3 Radiance;
-    float _pad1;
+    float _pad0;
 };
 
 struct DispatchCommand
@@ -152,7 +153,7 @@ layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
     Material Materials[];
 } materialSSBO;
 
-layout(std430, binding = 6) restrict writeonly buffer TransportRaySSBO
+layout(std430, binding = 6) restrict buffer TransportRaySSBO
 {
     TransportRay Rays[];
 } transportRaySSBO;

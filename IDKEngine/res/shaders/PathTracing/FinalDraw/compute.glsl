@@ -16,10 +16,10 @@ struct TransportRay
     uint DebugFirstHitInteriorNodeCounter;
 
     vec3 Radiance;
-    float _pad1;
+    float _pad0;
 };
 
-layout(std430, binding = 6) restrict writeonly buffer TransportRaySSBO
+layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
 {
     TransportRay Rays[];
 } transportRaySSBO;
@@ -56,7 +56,7 @@ void main()
     if (IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
-        float waveLength = min(transportRay.DebugFirstHitInteriorNodeCounter * 2.5 + 400.0, 700.0);
+        float waveLength = min(float(transportRay.DebugFirstHitInteriorNodeCounter) * 2.5 + 400.0, 700.0);
         vec3 col = SpectralJet(waveLength);
         irradiance = col;
     }
