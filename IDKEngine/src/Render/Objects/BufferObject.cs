@@ -24,16 +24,6 @@ namespace IDKEngine.Render.Objects
             GL.BindBuffer(bufferTarget, ID);
         }
 
-        /// <summary>
-        /// Sets the content of this buffer to 0
-        /// </summary>
-        public void Reset()
-        {
-            IntPtr data = Marshal.AllocHGlobal(Size);
-            GL.NamedBufferSubData(ID, IntPtr.Zero, Size, data);
-            Marshal.FreeHGlobal(data);
-        }
-
         public void SubData<T>(int offset, int size, T data) where T : unmanaged
         {
             GL.NamedBufferSubData(ID, (IntPtr)offset, size, ref data);
@@ -91,6 +81,11 @@ namespace IDKEngine.Render.Objects
         public void GetSubData(int offset, int size, IntPtr data)
         {
             GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, data);
+        }
+
+        public void Clear(float data = 0.0f)
+        {
+            GL.ClearNamedBufferSubData(ID, PixelInternalFormat.R32f, (IntPtr)0, Size, PixelFormat.Red, PixelType.Float, ref data);
         }
 
         public void Dispose()

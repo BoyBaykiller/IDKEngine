@@ -72,7 +72,7 @@ namespace IDKEngine.Render
         {
             shaderProgram.Use();
             vao.Bind();
-            GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
+            GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, (IntPtr)0, Count);
         }
 
         public unsafe void Add(Span<GLSLLight> lights)

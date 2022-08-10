@@ -105,7 +105,7 @@ namespace IDKEngine.Render
             Framebuffer = new Framebuffer();
 
             TaaBuffer = new BufferObject();
-            TaaBuffer.ImmutableAllocate(sizeof(GLSLTaaData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            TaaBuffer.ImmutableAllocate(sizeof(GLSLTaaData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             TaaBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             taaData = Helper.Malloc<GLSLTaaData>();
