@@ -14,6 +14,6 @@ namespace IDKEngine
         public uint DebugFirstHitInteriorNodeCounter;
 
         public Vector3 Radiance;
-        private readonly float _pad1;
+        private readonly float _pad0;
     }
 }
