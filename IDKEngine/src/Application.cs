@@ -246,7 +246,7 @@ namespace IDKEngine
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 #if DEBUG
             GL.Enable(EnableCap.DebugOutputSynchronous);
-            GL.DebugMessageCallback(Helper.DebugCallback, IntPtr.Zero);
+            GL.DebugMessageCallback(Helper.DebugCallback, (IntPtr)0);
 #endif
             WindowVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorDisabled;
