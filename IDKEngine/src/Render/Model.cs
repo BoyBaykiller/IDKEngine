@@ -38,7 +38,7 @@ namespace IDKEngine.Render.Objects
             string dirPath = Path.GetDirectoryName(path);
 
             Scene scene = assimpContext.ImportFile(path, PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.GenerateNormals |
-                                                   PostProcessSteps.RemoveRedundantMaterials | /*PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes |*/
+                                                   PostProcessSteps.RemoveRedundantMaterials | PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes |
                                                    PostProcessSteps.FlipUVs);
             
             Debug.Assert(scene != null);
@@ -72,12 +72,12 @@ namespace IDKEngine.Render.Objects
                     }
 
                     Vector3 normal = new Vector3(mesh.Normals[j].X, mesh.Normals[j].Y, mesh.Normals[j].Z);
-                    Vertices[baseVertex + j].Normal = Helper.PackR11G11B10(normal * 0.5f + new Vector3(0.5f));
+                    Vertices[baseVertex + j].Normal = Helper.CompressNormal(normal * 0.5f + new Vector3(0.5f));
                     
                     Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
                     Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
                     Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
-                    Vertices[baseVertex + j].Tangent = Helper.PackR11G11B10(tangent * 0.5f + new Vector3(0.5f));
+                    Vertices[baseVertex + j].Tangent = Helper.CompressNormal(tangent * 0.5f + new Vector3(0.5f));
                 }
 
                 ModelMatrices[i] = new Matrix4[1] { Matrix4.Identity };

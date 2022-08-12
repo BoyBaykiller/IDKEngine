@@ -139,7 +139,7 @@ namespace IDKEngine
             System.Buffer.MemoryCopy(src, dest, long.MaxValue, len);
         }
 
-        public static uint PackR11G11B10(Vector3 v)
+        public static uint CompressNormal(Vector3 v)
         {
             uint r = (uint)MathF.Round(v.X * ((1u << 11) - 1));
             uint g = (uint)MathF.Round(v.Y * ((1u << 11) - 1));
@@ -150,7 +150,7 @@ namespace IDKEngine
             return packed;
         }
 
-        public static Vector3 UnpackR11G11B10(uint v)
+        public static Vector3 UncompressNormal(uint v)
         {
             float r = (v >> 0) & ((1u << 11) - 1);
             float g = (v >> 11) & ((1u << 11) - 1);

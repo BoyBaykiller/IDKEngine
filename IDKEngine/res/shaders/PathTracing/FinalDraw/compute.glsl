@@ -1,4 +1,5 @@
 #version 460 core
+#define N_HIT_PROGRAM_LOCAL_SIZE_X 64 // used in shader and client code - keep in sync!
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -19,10 +20,28 @@ struct TransportRay
     float _pad0;
 };
 
+struct DispatchCommand
+{
+    uint NumGroupsX;
+    uint NumGroupsY;
+    uint NumGroupsZ;
+};
+
 layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
 {
     TransportRay Rays[];
 } transportRaySSBO;
+
+layout(std430, binding = 7) restrict writeonly buffer RayIndicesSSBO
+{
+    uint Length;
+    uint Indices[];
+} rayIndicesSSBO;
+
+layout(std430, binding = 8) restrict writeonly buffer DispatchCommandSSBO
+{
+    DispatchCommand DispatchCommand;
+} dispatchCommandSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -41,15 +60,30 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
+layout(binding = 0, offset = 0) uniform atomic_uint AliveRaysCounter;
+
 vec3 SpectralJet(float w);
 
 uniform bool IsDebugBVHTraversal;
 
 void main()
 {
+    ivec2 imgResultSize = imageSize(ImgResult);
+
+    // Reset global memory for next frame
+    if (gl_GlobalInvocationID.x == 0)
+    {
+        uint maxPossibleRayCount = imgResultSize.x * imgResultSize.y;
+        uint maxPossibleNumGroupsX = (maxPossibleRayCount + N_HIT_PROGRAM_LOCAL_SIZE_X - 1) / N_HIT_PROGRAM_LOCAL_SIZE_X;
+        
+        dispatchCommandSSBO.DispatchCommand.NumGroupsX = maxPossibleNumGroupsX;
+        rayIndicesSSBO.Length = 0u;
+        atomicCounterExchange(AliveRaysCounter, maxPossibleRayCount);
+    }
+
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    const uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
+    uint rayIndex = imgCoord.y * imgResultSize.x + imgCoord.x;
     TransportRay transportRay = transportRaySSBO.Rays[rayIndex];
 
     vec3 irradiance = transportRay.Radiance;
