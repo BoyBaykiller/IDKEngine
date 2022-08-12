@@ -112,30 +112,24 @@ namespace IDKEngine.Render
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             skyBox.BindToUnit(0);
 
-            uint maxPossibleRayCount = (uint)(Result.Width * Result.Height);
-            uint maxPossibleWorkGroupSizeX = (uint)Math.Ceiling(Result.Width * Result.Height / 64.0f);
-            aliveRaysBuffer.SubData(0, sizeof(uint), maxPossibleRayCount);
-            dispatchCommandBuffer.SubData(0, sizeof(uint), maxPossibleWorkGroupSizeX);
-            dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
-
-            rayIndicesBuffer.SubData(0, sizeof(uint), 0u);
-
             firstHitProgram.Use();
-            GL.DispatchComputeIndirect((IntPtr)0);
+            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
 
+            dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
             nHitProgram.Use();
             for (int i = 1; i < RayDepth; i++)
             {
-                const uint rayIndicesLength = 0u;
-                rayIndicesBuffer.SubData(0, sizeof(uint), rayIndicesLength);
+                const uint RAY_INDICES_LENGTH = 0u;
+                rayIndicesBuffer.SubData(0, sizeof(uint), RAY_INDICES_LENGTH);
 
-                GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
                 GL.DispatchComputeIndirect((IntPtr)0);
+                GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
             }
 
             finalDrawProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
         }
 
         public unsafe void SetSize(int width, int height)

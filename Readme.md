@@ -19,12 +19,9 @@ Feature list:
  - Temporal Anti Aliasing
  - CoD-Modern-Warfare Bloom
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
- - Path Tracer (WIP<sup>[1](#f1)</sup>)
+ - Wavefront Path Tracer
  
 Required OpenGL: 4.6 + `ARB_bindless_texture` and (`NV_gpu_shader5` or `ARB_shader_ballot`)
-
-<b id="f1">1</b>
-In `Model.cs` load with `PostProcessSteps.OptimizeGraph | PostProcessSteps.OptimizeMeshes` for PT fps boost. This however will make the rasterizer slightly slower because less meshes can be culled
 
 # Path Traced Render Samples
 

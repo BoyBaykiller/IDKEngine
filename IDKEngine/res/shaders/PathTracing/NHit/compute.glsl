@@ -1,4 +1,5 @@
 #version 460 core
+#define N_HIT_PROGRAM_LOCAL_SIZE_X 64 // used in shader and client code - keep in sync!
 #define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -3.4028235e+38
@@ -6,18 +7,12 @@
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 #extension GL_AMD_shader_trinary_minmax : enable
-#extension GL_NV_compute_shader_derivatives : enable
 #extension GL_NV_gpu_shader5 : enable
 #ifndef GL_NV_gpu_shader5
 #extension GL_ARB_shader_ballot : require
 #endif
 
-// TODO: Make it work again for the new work group layout 
-// #ifdef GL_NV_compute_shader_derivatives
-// layout(derivative_group_quadsNV) in;
-// #endif
-
-layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) uniform samplerCube SamplerSkyBox;
 
@@ -215,7 +210,6 @@ uint EmulateNonUniform(uint index);
 vec3 UnpackR11G11B10(uint v);
 
 uniform bool IsRNGFrameBased;
-layout(location = 10) uniform int Debug;
 
 uint rngSeed;
 
@@ -244,7 +238,7 @@ void main()
     {
         uint aliveRayCount = atomicCounterDecrement(AliveRaysCounter);
 
-        uint numWorkGroupsX = (aliveRayCount + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
+        uint numWorkGroupsX = (aliveRayCount + N_HIT_PROGRAM_LOCAL_SIZE_X - 1) / N_HIT_PROGRAM_LOCAL_SIZE_X;
         atomicMin(dispatchCommandSSBO.DispatchCommand.NumGroupsX, numWorkGroupsX);
     }
 }

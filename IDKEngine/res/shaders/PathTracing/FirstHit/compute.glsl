@@ -1,4 +1,5 @@
 #version 460 core
+#define N_HIT_PROGRAM_LOCAL_SIZE_X 64 // used in shader and client code - keep in sync!
 #define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -3.4028235e+38
@@ -12,12 +13,11 @@
 #extension GL_ARB_shader_ballot : require
 #endif
 
-// TODO: Make it work again for the new work group layout 
-// #ifdef GL_NV_compute_shader_derivatives
-// layout(derivative_group_quadsNV) in;
-// #endif
+#ifdef GL_NV_compute_shader_derivatives
+layout(derivative_group_quadsNV) in;
+#endif
 
-layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba32f) restrict writeonly readonly uniform image2D ImgResult;
 layout(binding = 0) uniform samplerCube SamplerSkyBox;
@@ -224,7 +224,7 @@ uint rngSeed;
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);
-    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.x % imgResultSize.x, gl_GlobalInvocationID.x / imgResultSize.x);
+    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
@@ -234,7 +234,7 @@ void main()
     }
     else
     {
-        rngSeed = gl_GlobalInvocationID.x * 312 + basicDataUBO.FreezeFrameCounter * 2699;
+        rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + basicDataUBO.FreezeFrameCounter * 2699;
     }
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
@@ -269,7 +269,7 @@ void main()
     {
         uint aliveRayCount = atomicCounterDecrement(AliveRaysCounter);
 
-        uint numWorkGroupsX = (aliveRayCount + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
+        uint numWorkGroupsX = (aliveRayCount + N_HIT_PROGRAM_LOCAL_SIZE_X - 1) / N_HIT_PROGRAM_LOCAL_SIZE_X;
         atomicMin(dispatchCommandSSBO.DispatchCommand.NumGroupsX, numWorkGroupsX);
     }
 }

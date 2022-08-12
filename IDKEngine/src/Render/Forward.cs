@@ -75,7 +75,7 @@ namespace IDKEngine.Render
             }
         }
 
-        private GLSLTaaData* taaData;
+        private readonly GLSLTaaData* taaData;
 
         private Texture taaPing;
         private Texture taaPong;
@@ -244,6 +244,22 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
+            DepthTexture.Dispose();
+            VelocityTexture.Dispose();
+            NormalSpecTexture.Dispose();
+            taaPong.Dispose();
+            taaPing.Dispose();
+
+            Framebuffer.Dispose();
+
+            TaaBuffer.Dispose();
+            
+            shadingProgram.Dispose();
+            taaResolveProgram.Dispose();
+            depthOnlyProgram.Dispose();
+            skyBoxProgram.Dispose();
+            aabbProgram.Dispose();
+
             System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)taaData);
         }
     }
