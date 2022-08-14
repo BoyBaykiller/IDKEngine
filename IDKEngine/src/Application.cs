@@ -10,9 +10,6 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine
 {
-    /// <summary>
-    /// This class represents the engine which can be run inside of an OpenGL context
-    /// </summary>
     class Application : GameWindowBase
     {
         public Application(int width, int height, string title)
@@ -352,7 +349,7 @@ namespace IDKEngine
             lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             ForwardRenderer.LightingContext.Add(lights.ToArray());
-            
+
             pointShadows = new List<PointShadow>();
             for (int i = 0; i < lights.Count; i++)
             {

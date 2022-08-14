@@ -1,4 +1,5 @@
 ﻿#define USE_SAH
+using System;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
@@ -14,14 +15,15 @@ namespace IDKEngine
         public readonly AABB RootBounds;
 
         private int nodesUsed;
-        public unsafe BLAS(GLSLTriangle* triangles, int count)
+        public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
         {
-            Nodes = new GLSLBlasNode[2 * count];
-            ref GLSLBlasNode root = ref Nodes[0];
-            root.TriCount = (uint)count;
-            nodesUsed++;
+            treeDepth = (int)MathF.Ceiling(MathF.Log2(count));
 
-            // max depth ceil(log2(triangles))+1
+            Nodes = new GLSLBlasNode[2 * count];
+            ref GLSLBlasNode root = ref Nodes[nodesUsed++];
+            root.TriCount = (uint)count;
+
+            nodesUsed++; // one empty node to align following childs in single 64 cache line (in theory)
 
             UpdateNodeBounds(ref root);
             Subdivide();
@@ -32,7 +34,7 @@ namespace IDKEngine
             {
                 ref GLSLBlasNode parentNode = ref Nodes[nodeID];
 #if !USE_SAH
-                if (parentNode.TriCount <= MIN_TRIANGLE_LEAF_COUNT)
+                if (parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
                     return;
 #endif
 
@@ -52,40 +54,38 @@ namespace IDKEngine
                 float splitPos = parentNode.Min[splitAxis] + extent[splitAxis] * 0.5f;
 #endif
 
+                int rightStart = (int)parentNode.TriStartOrLeftChild;
+                int endOfTris = (int)(rightStart + parentNode.TriCount - 1);
+                while (rightStart <= endOfTris)
                 {
-                    int rightStart = (int)parentNode.TriStartOrLeftChild;
-                    int endOfTris = (int)(rightStart + parentNode.TriCount - 1);
-                    while (rightStart <= endOfTris)
-                    {
-                        ref GLSLTriangle tri = ref triangles[rightStart];
-                        if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[splitAxis] < splitPos)
-                            rightStart++;
-                        else
-                            Helper.Swap(ref tri, ref triangles[endOfTris--]);
-                    }
-
-                    uint leftCount = (uint)(rightStart - parentNode.TriStartOrLeftChild);
-                    if (leftCount == 0 || leftCount == parentNode.TriCount)
-                        return;
-
-                    int leftChildID = nodesUsed++;
-                    int rightChildID = nodesUsed++;
-
-                    Nodes[leftChildID].TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
-                    Nodes[leftChildID].TriCount |= leftCount;
-
-                    Nodes[rightChildID].TriStartOrLeftChild = (uint)rightStart;
-                    Nodes[rightChildID].TriCount |= parentNode.TriCount - leftCount;
-
-                    parentNode.TriStartOrLeftChild = (uint)leftChildID;
-                    parentNode.TriCount = 0;
-
-                    UpdateNodeBounds(ref Nodes[leftChildID]);
-                    UpdateNodeBounds(ref Nodes[rightChildID]);
-
-                    Subdivide(leftChildID);
-                    Subdivide(rightChildID);
+                    ref GLSLTriangle tri = ref triangles[rightStart];
+                    if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[splitAxis] < splitPos)
+                        rightStart++;
+                    else
+                        Helper.Swap(ref tri, ref triangles[endOfTris--]);
                 }
+
+                uint leftCount = (uint)(rightStart - parentNode.TriStartOrLeftChild);
+                if (leftCount == 0 || leftCount == parentNode.TriCount)
+                    return;
+
+                int leftChildID = nodesUsed++;
+                int rightChildID = nodesUsed++;
+
+                Nodes[leftChildID].TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
+                Nodes[leftChildID].TriCount |= leftCount;
+
+                Nodes[rightChildID].TriStartOrLeftChild = (uint)rightStart;
+                Nodes[rightChildID].TriCount |= parentNode.TriCount - leftCount;
+
+                parentNode.TriStartOrLeftChild = (uint)leftChildID;
+                parentNode.TriCount = 0;
+
+                UpdateNodeBounds(ref Nodes[leftChildID]);
+                UpdateNodeBounds(ref Nodes[rightChildID]);
+
+                Subdivide(leftChildID);
+                Subdivide(rightChildID);
             }
 
 #if USE_SAH

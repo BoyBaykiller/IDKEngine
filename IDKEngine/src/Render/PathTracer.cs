@@ -67,7 +67,6 @@ namespace IDKEngine.Render
             {
                 _isRNGFrameBased = value;
                 firstHitProgram.Upload("IsRNGFrameBased", _isRNGFrameBased);
-                nHitProgram.Upload("IsRNGFrameBased", _isRNGFrameBased);
             }
         }
 
@@ -84,8 +83,14 @@ namespace IDKEngine.Render
         private BufferObject rayIndicesBuffer;
         public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, Texture skyBox, int width, int height)
         {
-            firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl")));
-            nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl")));
+            string firstHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl");
+            firstHitProgramSrc = firstHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{bvh.MaxBlasTreeDepth}");
+            firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, firstHitProgramSrc));
+
+            string nHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl");
+            nHitProgramSrc = nHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{bvh.MaxBlasTreeDepth}");
+            nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, nHitProgramSrc));
+            
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
             SetSize(width, height);
@@ -107,7 +112,7 @@ namespace IDKEngine.Render
             ApertureDiameter = 0.03f;
         }
 
-        public unsafe void Compute()
+        public void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             skyBox.BindToUnit(0);
@@ -120,6 +125,16 @@ namespace IDKEngine.Render
             nHitProgram.Use();
             for (int i = 1; i < RayDepth; i++)
             {
+                // TODO: Small delta for rayIndicesLength and aliveRaysCount which should not be the case I think
+                // May explain the subtle artifacts in simple scenes
+
+                //rayIndicesBuffer.GetSubData(0, sizeof(uint), out uint rayIndicesLength);
+                //aliveRaysBuffer.GetSubData(0, sizeof(uint), out uint aliveRaysCount);
+
+                //Console.WriteLine(rayIndicesLength);
+                //Console.WriteLine(aliveRaysCount);
+                //Console.WriteLine("=================");
+
                 const uint RAY_INDICES_LENGTH = 0u;
                 rayIndicesBuffer.SubData(0, sizeof(uint), RAY_INDICES_LENGTH);
 

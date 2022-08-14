@@ -8,7 +8,7 @@ layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 struct TransportRay
 {
     vec3 Origin;
-    uint IsRefractive;
+    float _pad0;
 
     vec3 Direction;
     float CurrentIOR;
@@ -17,7 +17,7 @@ struct TransportRay
     uint DebugFirstHitInteriorNodeCounter;
 
     vec3 Radiance;
-    float _pad0;
+    bool IsRefractive;
 };
 
 struct DispatchCommand
@@ -34,7 +34,7 @@ layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
 
 layout(std430, binding = 7) restrict writeonly buffer RayIndicesSSBO
 {
-    uint Length;
+    uint Count;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -69,6 +69,7 @@ uniform bool IsDebugBVHTraversal;
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);
+    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
     // Reset global memory for next frame
     if (gl_GlobalInvocationID.x == 0)
@@ -77,11 +78,10 @@ void main()
         uint maxPossibleNumGroupsX = (maxPossibleRayCount + N_HIT_PROGRAM_LOCAL_SIZE_X - 1) / N_HIT_PROGRAM_LOCAL_SIZE_X;
         
         dispatchCommandSSBO.DispatchCommand.NumGroupsX = maxPossibleNumGroupsX;
-        rayIndicesSSBO.Length = 0u;
+        rayIndicesSSBO.Count = 0u;
         atomicCounterExchange(AliveRaysCounter, maxPossibleRayCount);
     }
 
-    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
     uint rayIndex = imgCoord.y * imgResultSize.x + imgCoord.x;
     TransportRay transportRay = transportRaySSBO.Rays[rayIndex];

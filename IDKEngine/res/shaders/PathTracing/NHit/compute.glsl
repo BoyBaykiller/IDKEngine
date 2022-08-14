@@ -12,6 +12,9 @@
 #extension GL_ARB_shader_ballot : require
 #endif
 
+// Inserted by application.
+#define MAX_BLAS_TREE_DEPTH __maxBlasTreeDepth__
+
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) uniform samplerCube SamplerSkyBox;
@@ -99,7 +102,7 @@ struct Triangle
 struct TransportRay
 {
     vec3 Origin;
-    uint IsRefractive;
+    float _pad0;
 
     vec3 Direction;
     float CurrentIOR;
@@ -108,7 +111,7 @@ struct TransportRay
     uint DebugFirstHitInteriorNodeCounter;
 
     vec3 Radiance;
-    float _pad0;
+    bool IsRefractive;
 };
 
 struct DispatchCommand
@@ -155,7 +158,7 @@ layout(std430, binding = 6) restrict buffer TransportRaySSBO
 
 layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
-    uint Length;
+    uint Count;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -202,27 +205,18 @@ vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
 vec3 UniformSampleSphere();
 vec3 CosineSampleHemisphere(vec3 normal);
-vec2 UniformSampleCircle();
 uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
-vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 uint EmulateNonUniform(uint index);
 vec3 UnpackR11G11B10(uint v);
 
-uniform bool IsRNGFrameBased;
+shared uint SharedStack[N_HIT_PROGRAM_LOCAL_SIZE_X][MAX_BLAS_TREE_DEPTH];
 
 uint rngSeed;
 
 void main()
 {
-    if (IsRNGFrameBased)
-    {
-        rngSeed = basicDataUBO.FreezeFrameCounter * 2699;
-    }
-    else
-    {
-        rngSeed = gl_GlobalInvocationID.x * 312 + basicDataUBO.FreezeFrameCounter * 2699;
-    }
+    rngSeed = gl_GlobalInvocationID.x * 312 + basicDataUBO.FreezeFrameCounter * 2699;
 
     uint rayIndex = rayIndicesSSBO.Indices[gl_GlobalInvocationID.x];
     TransportRay transportRay = transportRaySSBO.Rays[rayIndex];
@@ -232,7 +226,7 @@ void main()
 
     if (!isRayTerminated)
     {
-        rayIndicesSSBO.Indices[atomicAdd(rayIndicesSSBO.Length, 1u)] = rayIndex;
+        rayIndicesSSBO.Indices[atomicAdd(rayIndicesSSBO.Count, 1u)] = rayIndex;
     }
     else
     {
@@ -248,9 +242,6 @@ bool TraceRay(inout TransportRay transportRay)
     HitInfo hitInfo;
     if (ClosestHit(Ray(transportRay.Origin, transportRay.Direction), hitInfo))
     {
-        // Render wireframe
-        // return float(any(lessThan(hitInfo.Bary, vec3(0.01)))).xxx;
-
         vec3 hitpos = transportRay.Origin + transportRay.Direction * hitInfo.T;
         float specularChance = 0.0;
         float refractionChance = 0.0;
@@ -307,20 +298,18 @@ bool TraceRay(inout TransportRay transportRay)
             normal = (hitpos - light.Position) / light.Radius;
         }
 
-        bool isRefractive = bool(transportRay.IsRefractive);
-        if (isRefractive)
+        if (transportRay.IsRefractive)
         {
             transportRay.Throughput *= exp(-absorbance * hitInfo.T);
         }
 
         float rayProbability;
-        transportRay.Direction = BSDF(transportRay.Direction, specularChance, roughness, refractionChance, ior, transportRay.CurrentIOR, normal, rayProbability, isRefractive);
+        transportRay.Direction = BSDF(transportRay.Direction, specularChance, roughness, refractionChance, ior, transportRay.CurrentIOR, normal, rayProbability, transportRay.IsRefractive);
         transportRay.Origin = hitpos + transportRay.Direction * EPSILON;
-        transportRay.IsRefractive = uint(isRefractive);
         transportRay.CurrentIOR = ior;
         
         transportRay.Radiance += emissive * transportRay.Throughput;
-        if (!isRefractive)
+        if (!transportRay.IsRefractive)
         {
             transportRay.Throughput *= albedo;
         }
@@ -422,7 +411,6 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
     }
 
     vec4 baryT;
-    uint stack[32];
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
@@ -439,7 +427,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
             if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T))
             {
                 if (stackPtr == 0) break;
-                stackTop = stack[--stackPtr];
+                stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];
                 continue;
             }
 
@@ -471,7 +459,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
                     if (leftChildHit && rightChildHit)
                     {
                         stackTop = node.TriStartOrLeftChild + (1 - int(tMinLeft < tMinRight));
-                        stack[stackPtr++] = node.TriStartOrLeftChild + int(tMinLeft < tMinRight);
+                        SharedStack[gl_LocalInvocationIndex][stackPtr++] = node.TriStartOrLeftChild + int(tMinLeft < tMinRight);
                     }
                     else
                     {
@@ -482,7 +470,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
             }
             // Here: On a leaf node or didn't hit any children which means we should traverse up
             if (stackPtr == 0) break;
-            stackTop = stack[--stackPtr];
+            stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];
         }
     }
 
@@ -580,13 +568,6 @@ vec3 CosineSampleHemisphere(vec3 normal)
     return normalize(normal + UniformSampleSphere());
 }
 
-vec2 UniformSampleCircle()
-{
-    float angle = GetRandomFloat01() * 2.0 * PI;
-    float r = sqrt(GetRandomFloat01());
-    return vec2(cos(angle), sin(angle)) * r;
-}
-
 // Faster and much more random than Wang Hash
 // Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
 uint GetPCGHash(inout uint seed)
@@ -599,13 +580,6 @@ uint GetPCGHash(inout uint seed)
 float GetRandomFloat01()
 {
     return float(GetPCGHash(rngSeed)) / 4294967296.0;
-}
-
-vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)
-{
-    vec4 rayEye = inverseProj * vec4(normalizedDeviceCoords, -1.0, 0.0);
-    rayEye.zw = vec2(-1.0, 0.0);
-    return normalize((inverseView * rayEye).xyz);
 }
 
 #ifndef GL_NV_gpu_shader5
