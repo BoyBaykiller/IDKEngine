@@ -184,6 +184,20 @@ namespace IDKEngine
             return thread;
         }
 
+        public static float InterlockedMax(ref int location1, int value)
+        {
+            int initialValue;
+            int newValue;
+            do
+            {
+                initialValue = location1;
+                newValue = Math.Max(initialValue, value);
+            }
+            while (Interlocked.CompareExchange(ref location1, newValue, initialValue) != initialValue);
+            
+            return initialValue;
+        }
+
         private static readonly Random rng = new Random();
         public static Vector3 RandomVec3(float min, float max)
         {

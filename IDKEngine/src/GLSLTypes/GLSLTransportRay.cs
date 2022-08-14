@@ -2,10 +2,10 @@
 
 namespace IDKEngine
 {
-    struct GLSLTransportRay
+    unsafe struct GLSLTransportRay
     {
         public Vector3 Origin;
-        public uint IsRefractive;
+        private readonly float _pad0;
 
         public Vector3 Direction;
         public float CurrentIOR;
@@ -14,6 +14,7 @@ namespace IDKEngine
         public uint DebugFirstHitInteriorNodeCounter;
 
         public Vector3 Radiance;
-        private readonly float _pad0;
+        public bool IsRefractive;
+        private fixed bool _pad1[3];
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
@@ -25,6 +26,7 @@ namespace IDKEngine
             public GLSLTriangle Triangle;
         }
 
+        public readonly int MaxBlasTreeDepth;
         private readonly ModelSystem ModelSystem;
         private readonly BufferObject BlasBuffer;
         private readonly BufferObject TriangleBuffer;
@@ -46,6 +48,7 @@ namespace IDKEngine
                 }
             }
 
+            int maxTreeDepth = 0;
             blases = new BLAS[modelSystem.Meshes.Length];
             System.Threading.Tasks.Parallel.For(0, modelSystem.Meshes.Length, i =>
             {
@@ -53,12 +56,14 @@ namespace IDKEngine
                 int baseTriangleCount = cmd.FirstIndex / 3;
                 fixed (GLSLTriangle* ptr = triangles)
                 {
-                    blases[i] = new BLAS(ptr + baseTriangleCount, cmd.Count / 3);
+                    blases[i] = new BLAS(ptr + baseTriangleCount, cmd.Count / 3, out int treeDepth);
+                    Helper.InterlockedMax(ref maxTreeDepth, treeDepth);
                 }
                 for (int j = 0; j < blases[i].Nodes.Length; j++)
                     if (blases[i].Nodes[j].TriCount > 0)
                         blases[i].Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
             });
+            MaxBlasTreeDepth = maxTreeDepth;
 
             BlasBuffer = new BufferObject();
             BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
@@ -82,7 +87,7 @@ namespace IDKEngine
 
             float rayTMin = 0.0f;
             float rayTMax = 0.0f;
-            uint* stack = stackalloc uint[32];
+            uint* stack = stackalloc uint[MaxBlasTreeDepth];
             for (int i = 0; i < ModelSystem.Meshes.Length; i++)
             {
                 const uint glInstanceID = 0; // TODO: Work out actual instanceID value

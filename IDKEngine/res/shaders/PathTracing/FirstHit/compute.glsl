@@ -13,6 +13,9 @@
 #extension GL_ARB_shader_ballot : require
 #endif
 
+// Inserted by application.
+#define MAX_BLAS_TREE_DEPTH __maxBlasTreeDepth__
+
 #ifdef GL_NV_compute_shader_derivatives
 layout(derivative_group_quadsNV) in;
 #endif
@@ -105,7 +108,7 @@ struct Triangle
 struct TransportRay
 {
     vec3 Origin;
-    uint IsRefractive;
+    float _pad0;
 
     vec3 Direction;
     float CurrentIOR;
@@ -114,7 +117,7 @@ struct TransportRay
     uint DebugFirstHitInteriorNodeCounter;
 
     vec3 Radiance;
-    float _pad0;
+    bool IsRefractive;
 };
 
 struct DispatchCommand
@@ -161,7 +164,7 @@ layout(std430, binding = 6) restrict writeonly buffer TransportRaySSBO
 
 layout(std430, binding = 7) restrict writeonly buffer RayIndicesSSBO
 {
-    uint Length;
+    uint Count;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -219,6 +222,8 @@ uniform float FocalLength;
 uniform float ApertureDiameter;
 uniform bool IsRNGFrameBased;
 
+shared uint SharedStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
+
 uint rngSeed;
 
 void main()
@@ -254,7 +259,7 @@ void main()
     transportRay.Throughput = vec3(1.0);
     transportRay.Radiance = vec3(0.0);
     transportRay.CurrentIOR = 1.0;
-    transportRay.IsRefractive = 0;
+    transportRay.IsRefractive = false;
     
     uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
 
@@ -263,7 +268,7 @@ void main()
 
     if (!isRayTerminated)
     {
-        rayIndicesSSBO.Indices[atomicAdd(rayIndicesSSBO.Length, 1u)] = rayIndex;
+        rayIndicesSSBO.Indices[atomicAdd(rayIndicesSSBO.Count, 1u)] = rayIndex;
     }
     else
     {
@@ -279,9 +284,6 @@ bool TraceRay(inout TransportRay transportRay)
     HitInfo hitInfo;
     if (ClosestHit(Ray(transportRay.Origin, transportRay.Direction), hitInfo, transportRay.DebugFirstHitInteriorNodeCounter))
     {
-        // Render wireframe
-        // return float(any(lessThan(hitInfo.Bary, vec3(0.01)))).xxx;
-
         vec3 hitpos = transportRay.Origin + transportRay.Direction * hitInfo.T;
         float specularChance = 0.0;
         float refractionChance = 0.0;
@@ -338,20 +340,18 @@ bool TraceRay(inout TransportRay transportRay)
             normal = (hitpos - light.Position) / light.Radius;
         }
 
-        bool isRefractive = bool(transportRay.IsRefractive);
-        if (isRefractive)
+        if (transportRay.IsRefractive)
         {
             transportRay.Throughput *= exp(-absorbance * hitInfo.T);
         }
 
         float rayProbability;
-        transportRay.Direction = BSDF(transportRay.Direction, specularChance, roughness, refractionChance, ior, transportRay.CurrentIOR, normal, rayProbability, isRefractive);
+        transportRay.Direction = BSDF(transportRay.Direction, specularChance, roughness, refractionChance, ior, transportRay.CurrentIOR, normal, rayProbability, transportRay.IsRefractive);
         transportRay.Origin = hitpos + transportRay.Direction * EPSILON;
-        transportRay.IsRefractive = uint(isRefractive);
         transportRay.CurrentIOR = ior;
         
         transportRay.Radiance += emissive * transportRay.Throughput;
-        if (!isRefractive)
+        if (!transportRay.IsRefractive)
         {
             transportRay.Throughput *= albedo;
         }
@@ -453,7 +453,6 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
     }
 
     vec4 baryT;
-    uint stack[32];
     for (int i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
@@ -470,7 +469,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
             if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T))
             {
                 if (stackPtr == 0) break;
-                stackTop = stack[--stackPtr];
+                stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];
                 continue;
             }
 
@@ -503,7 +502,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
                     if (leftChildHit && rightChildHit)
                     {
                         stackTop = node.TriStartOrLeftChild + (1 - int(tMinLeft < tMinRight));
-                        stack[stackPtr++] = node.TriStartOrLeftChild + int(tMinLeft < tMinRight);
+                        SharedStack[gl_LocalInvocationIndex][stackPtr++] = node.TriStartOrLeftChild + int(tMinLeft < tMinRight);
                     }
                     else
                     {
@@ -514,7 +513,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
             }
             // Here: On a leaf node or didn't hit any children which means we should traverse up
             if (stackPtr == 0) break;
-            stackTop = stack[--stackPtr];
+            stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];
         }
     }
 
