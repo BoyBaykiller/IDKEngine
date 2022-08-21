@@ -83,11 +83,6 @@ namespace IDKEngine.Render.Objects
             GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, data);
         }
 
-        public void Clear(float data = 0.0f)
-        {
-            GL.ClearNamedBufferSubData(ID, PixelInternalFormat.R32f, (IntPtr)0, Size, PixelFormat.Red, PixelType.Float, ref data);
-        }
-
         public void Dispose()
         {
             GL.DeleteBuffer(ID);

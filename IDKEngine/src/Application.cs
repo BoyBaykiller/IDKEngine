@@ -31,19 +31,15 @@ namespace IDKEngine
                 _isPathTracing = value;
                 GLSLBasicData.FreezeFrameCounter = 0;
 
-                // TODO: Add comment as to why we do that here lol
-                int i = 0;
-                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
-                {
-                    cmd.InstanceCount = ModelSystem.Meshes[i].InstanceCount;
-                });
                 PathTracer.Result.Clear(PixelFormat.Rgba, PixelType.Float, 0.0f);
             }
 
         }
 
+
         public bool IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false, IsWireframe = false;
         public int FPS;
+
         public Vector2i ViewportSize { get; private set; }
 
         public bool RenderGui { get; private set; } = true;
@@ -204,6 +200,7 @@ namespace IDKEngine
                     GLSLBasicData.FreezeFrameCounter = 0;
             }
 
+
             gui.Update(this);
         }
 
@@ -219,7 +216,7 @@ namespace IDKEngine
         public SSAO SSAO;
         public PostCombine PostCombine;
         public VolumetricLighter VolumetricLight;
-        public AtmosphericScatterer AtmosphericScatterer;
+        //public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         public BVH BVH;
         private Gui gui;
@@ -248,7 +245,6 @@ namespace IDKEngine
             WindowVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorDisabled;
             gui = new Gui(WindowSize.X, WindowSize.Y);
-            gui.ImGuiBackend.IsIgnoreMouseInput = true;
 
             Matrix4[] invViewsAndInvprojecion = new Matrix4[]
             {
@@ -281,27 +277,41 @@ namespace IDKEngine
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
 
-            camera = new Camera(new Vector3(6.252f, 9.49f, -1.96f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
+            camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
                 sponza.ModelMatrices[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
+            sponza.Meshes[10].EmissiveBias = 11.0f;
+            sponza.Meshes[8].NormalMapStrength = 0.4f;
+            sponza.Meshes[8].SpecularBias = 0.3f;
+            sponza.Meshes[8].RoughnessBias = -1.0f;
+            sponza.Meshes[3].EmissiveBias = 2.67f;
+            sponza.Meshes[3].EmissiveBias = 2.67f;
+            sponza.Meshes[17].RefractionChance = 0.9f;
+            sponza.Meshes[17].RoughnessBias = -0.5f;
 
-            Model horse = new Model("res/models/Horse/horse.gltf");
-            for (int i = 0; i < horse.ModelMatrices.Length; i++)
-                horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+            //Model horse = new Model("res/models/Horse/horse.gltf");
+            //for (int i = 0; i < horse.Meshes.Length; i++)
+            //    horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
-            for (int i = 0; i < helmet.ModelMatrices.Length; i++)
-                helmet.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(90.0f));
+            helmet.Meshes[0].SpecularBias = 1.0f;
+
+            Model lucy = new Model("res/models/Lucy/Lucy.gltf");
+            for (int i = 0; i < lucy.Meshes.Length; i++)
+                lucy.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(5.02f, -4.9f, 0.0f);
+            lucy.Meshes[0].RefractionChance = 0.878f;
+            lucy.Meshes[0].IOR = 1.174f;
+            lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
 
             //Model temple = new Model(@"C:\Users\Julian\Downloads\SunTempleSmall\SunTempleSmall.gltf");
-            //for (int i = 0; i < temple.ModelMatrices.Length; i++)
-            //    temple.ModelMatrices[i][0] = Matrix4.CreateScale(0.01f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+            //for (int i = 0; i < temple.Meshes.Length; i++)
+            //    temple.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(180.0f)) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza, horse, helmet });
+            ModelSystem.Add(new Model[] { sponza, lucy, helmet });
 
             {
                 Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
@@ -330,18 +340,34 @@ namespace IDKEngine
                 VariableRateShading.SetShadingRatePaletteNV(shadingRates);
             }
 
-            AtmosphericScatterer = new AtmosphericScatterer(256);
-            AtmosphericScatterer.Compute();
+            //AtmosphericScatterer = new AtmosphericScatterer(128);
+            //AtmosphericScatterer.Compute();
+            Texture skyBox = new Texture(TextureTarget2d.TextureCubeMap);
+            skyBox.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Linear);
+            Helper.ParallelLoadCubemap(skyBox, new string[]
+            {
+                "res/Textures/EnvironmentMap/posx.jpg",
+                "res/Textures/EnvironmentMap/negx.jpg",
+                "res/Textures/EnvironmentMap/posy.jpg",
+                "res/Textures/EnvironmentMap/negy.jpg",
+                "res/Textures/EnvironmentMap/posz.jpg",
+                "res/Textures/EnvironmentMap/negz.jpg"
+            }, (SizedInternalFormat)PixelInternalFormat.Srgb8Alpha8);
+            /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
+            skyBox.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
-            ForwardRenderer = new Forward(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6, AtmosphericScatterer.Result);
+            ForwardRenderer = new Forward(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6, skyBox);
             Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 3.0f);
             SSR = new SSR(WindowSize.X, WindowSize.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             SSAO = new SSAO(WindowSize.X, WindowSize.Y, 10, 0.25f, 2.0f);
             PostCombine = new PostCombine(WindowSize.X, WindowSize.Y);
-            
+
+
             BVH = new BVH(ModelSystem);
-            PathTracer = new PathTracer(BVH, ModelSystem, AtmosphericScatterer.Result, WindowSize.X, WindowSize.Y);
+            PathTracer = new PathTracer(BVH, ModelSystem, skyBox, WindowSize.X, WindowSize.Y);
+            PathTracer.FocalLength = 2.4f;
+            PathTracer.ApertureDiameter = 0.056f;
 
             List<GLSLLight> lights = new List<GLSLLight>();
             //lights.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
@@ -355,6 +381,9 @@ namespace IDKEngine
             {
                 pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, i, 512, 0.5f, 60.0f));
             }
+
+            MouseState.CursorMode = CursorModeValue.CursorNormal;
+            IsPathTracing = true;
 
             GC.Collect();
         }
@@ -376,6 +405,8 @@ namespace IDKEngine
             if (width < 16 || height < 16)
                 return;
 
+            ViewportSize = new Vector2i(width, height);
+
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), width / (float)height, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
@@ -391,7 +422,6 @@ namespace IDKEngine
             
             GLSLBasicData.FreezeFrameCounter = 0;
 
-            ViewportSize = new Vector2i(width, height);
         }
 
         protected override void OnEnd()

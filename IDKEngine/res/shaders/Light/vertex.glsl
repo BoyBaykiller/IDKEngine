@@ -78,7 +78,7 @@ void main()
         taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 1]
     );
 
-    vec4 jitteredClipPos = basicDataUBO.ProjView * model * vec4(Position, 1.0);
+    vec4 jitteredClipPos = outData.ClipPos;
     jitteredClipPos.xy += offset * jitteredClipPos.w * taaDataUBO.Enabled;
 
     gl_Position = jitteredClipPos;

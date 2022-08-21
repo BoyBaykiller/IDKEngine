@@ -41,25 +41,11 @@ const vec3 positions[24] =
 
 struct DrawCommand
 {
-    int Count;
-    int InstanceCount;
-    int FirstIndex;
-    int BaseVertex;
-    int BaseInstance;
-};
-
-struct Mesh
-{
-    int InstanceCount;
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float RefractionChance;
-    float IOR;
-    vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
 };
 
 struct Node
@@ -79,11 +65,6 @@ layout(std430, binding = 1) restrict readonly buffer BlasSSBO
 {
     Node Nodes[];
 } blasSSBO;
-
-layout(std430, binding = 2) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {

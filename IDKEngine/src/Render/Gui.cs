@@ -55,6 +55,7 @@ namespace IDKEngine.Render
             {
                 ImGui.Text($"FPS: {window.FPS}");
                 ImGui.Text($"Viewport size: {window.ViewportSize.X}x{window.ViewportSize.Y}");
+
                 if (window.IsPathTracing)
                     ImGui.Text($"Samples taken: {window.GLSLBasicData.FreezeFrameCounter}");
 
@@ -175,9 +176,11 @@ namespace IDKEngine.Render
                             }
 
                             System.Numerics.Vector3 tempVec = window.VolumetricLight.Absorbance.ToSystemVec();
-                            if (ImGui.SliderFloat3("Absorbance", ref tempVec, 0.0f, 0.2f))
+                            if (ImGui.InputFloat3("Absorbance", ref tempVec))
                             {
-                                window.VolumetricLight.Absorbance = tempVec.ToOpenTKVec();
+                                Vector3 temp = tempVec.ToOpenTKVec();
+                                temp = Vector3.ComponentMax(temp, Vector3.Zero);
+                                window.VolumetricLight.Absorbance = temp;
                             }
                         }
                     }
@@ -337,66 +340,66 @@ namespace IDKEngine.Render
                     }
                 }
 
-                if (ImGui.CollapsingHeader("SkyBox"))
-                {
-                    string[] resolutions = new string[] { "2048", "1024", "512", "256", "128", "64", "32" };
-                    current = window.AtmosphericScatterer.Result.Width.ToString();
-                    if (ImGui.BeginCombo("Resolution", current))
-                    {
-                        for (int i = 0; i < resolutions.Length; i++)
-                        {
-                            bool isSelected = current == resolutions[i];
-                            if (ImGui.Selectable(resolutions[i], isSelected))
-                            {
-                                current = resolutions[i];
-                                window.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
-                                window.AtmosphericScatterer.Compute();
-                                window.GLSLBasicData.FreezeFrameCounter = 0;
-                            }
+                //if (ImGui.CollapsingHeader("SkyBox"))
+                //{
+                //    string[] resolutions = new string[] { "1024", "512", "256", "128", "64", "32" };
+                //    current = window.AtmosphericScatterer.Result.Width.ToString();
+                //    if (ImGui.BeginCombo("Resolution", current))
+                //    {
+                //        for (int i = 0; i < resolutions.Length; i++)
+                //        {
+                //            bool isSelected = current == resolutions[i];
+                //            if (ImGui.Selectable(resolutions[i], isSelected))
+                //            {
+                //                current = resolutions[i];
+                //                window.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
+                //                window.AtmosphericScatterer.Compute();
+                //                window.GLSLBasicData.FreezeFrameCounter = 0;
+                //            }
 
-                            if (isSelected)
-                                ImGui.SetItemDefaultFocus();
-                        }
-                        ImGui.EndCombo();
-                    }
+                //            if (isSelected)
+                //                ImGui.SetItemDefaultFocus();
+                //        }
+                //        ImGui.EndCombo();
+                //    }
 
-                    bool hadChange = false;
+                //    bool hadChange = false;
 
-                    int tempInt = window.AtmosphericScatterer.ISteps;
-                    if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
-                    {
-                        window.AtmosphericScatterer.ISteps = tempInt;
-                        hadChange = true;
-                    }
+                //    int tempInt = window.AtmosphericScatterer.ISteps;
+                //    if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
+                //    {
+                //        window.AtmosphericScatterer.ISteps = tempInt;
+                //        hadChange = true;
+                //    }
 
-                    tempInt = window.AtmosphericScatterer.JSteps;
-                    if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
-                    {
-                        window.AtmosphericScatterer.JSteps = tempInt;
-                        hadChange = true;
-                    }
+                //    tempInt = window.AtmosphericScatterer.JSteps;
+                //    if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
+                //    {
+                //        window.AtmosphericScatterer.JSteps = tempInt;
+                //        hadChange = true;
+                //    }
 
-                    float tempFloat = window.AtmosphericScatterer.Time;
-                    if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
-                    {
-                        window.AtmosphericScatterer.Time = tempFloat;
-                        hadChange = true;
-                    }
+                //    float tempFloat = window.AtmosphericScatterer.Time;
+                //    if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
+                //    {
+                //        window.AtmosphericScatterer.Time = tempFloat;
+                //        hadChange = true;
+                //    }
 
-                    tempFloat = window.AtmosphericScatterer.LightIntensity;
-                    if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
-                    {
-                        window.AtmosphericScatterer.LightIntensity = tempFloat;
+                //    tempFloat = window.AtmosphericScatterer.LightIntensity;
+                //    if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
+                //    {
+                //        window.AtmosphericScatterer.LightIntensity = tempFloat;
                         
-                        hadChange = true;
-                    }
+                //        hadChange = true;
+                //    }
 
-                    if (hadChange)
-                    {
-                        window.GLSLBasicData.FreezeFrameCounter = 0;
-                        window.AtmosphericScatterer.Compute();
-                    }
-                }
+                //    if (hadChange)
+                //    {
+                //        window.GLSLBasicData.FreezeFrameCounter = 0;
+                //        window.AtmosphericScatterer.Compute();
+                //    }
+                //}
 
                 ImGui.End();
             }
@@ -455,9 +458,12 @@ namespace IDKEngine.Render
                     }
 
                     systemVec3 = mesh.Absorbance.ToSystemVec();
-                    if (ImGui.SliderFloat3("Absorbance", ref systemVec3, 0.0f, 1.0f))
+                    if (ImGui.InputFloat3("Absorbance", ref systemVec3))
                     {
-                        mesh.Absorbance = systemVec3.ToOpenTKVec();
+                        Vector3 temp = systemVec3.ToOpenTKVec();
+                        temp = Vector3.ComponentMax(temp, Vector3.Zero);
+
+                        mesh.Absorbance = temp;
                         hadChange = true;
                     }
 
@@ -534,7 +540,7 @@ namespace IDKEngine.Render
 
         public void Update(Application window)
         {
-            if ((!window.RenderGui || isHoveredViewport) && window.MouseState[MouseButton.Left] == InputState.Touched)
+            if (window.RenderGui && isHoveredViewport && window.MouseState[MouseButton.Left] == InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
                 if (window.RenderGui)
@@ -559,16 +565,16 @@ namespace IDKEngine.Render
                 {
                     selectedEntityType = EntityType.Mesh;
                     selectedEntityDist = meshHitInfo.T;
-                    if (meshHitInfo.HitID == window.ForwardRenderer.RenderMeshAABBIndex)
+                    if (meshHitInfo.MeshIndex == window.ForwardRenderer.RenderMeshAABBIndex)
                     {
                         window.ForwardRenderer.RenderMeshAABBIndex = -1;
                         selectedEntityType = EntityType.None;
                     }
                     else
                     {
-                        window.ForwardRenderer.RenderMeshAABBIndex = meshHitInfo.HitID;
+                        window.ForwardRenderer.RenderMeshAABBIndex = meshHitInfo.MeshIndex;
                     }
-                    selectedEntityIndex = meshHitInfo.HitID;
+                    selectedEntityIndex = meshHitInfo.MeshIndex;
                 }
                 else
                 {

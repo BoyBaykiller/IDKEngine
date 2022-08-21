@@ -4,7 +4,6 @@
 #define EPSILON 0.0001
 #define DOWNSAMPLE_STAGE 0
 #define UPSAMPLE_STAGE 1
-#extension GL_AMD_shader_trinary_minmax : enable
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -104,11 +103,7 @@ vec3 Prefilter(vec3 color)
     const float Knee = 0.2;
     color = min(vec3(Clamp), color);
 
-#ifdef GL_AMD_shader_trinary_minmax
-    float brightness = max3(color.r, color.g, color.b);
-#else
     float brightness = max(max(color.r, color.g), color.b);
-#endif
 
     vec3 curve = vec3(Threshold - Knee, Knee * 2.0, 0.25 / Knee);
     float rq = clamp(brightness - curve.x, 0.0, curve.y);

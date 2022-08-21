@@ -239,7 +239,7 @@ namespace IDKEngine.Render
             Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture);
 
             Framebuffer.SetReadBuffer(ReadBufferMode.ColorAttachment2);
-            Framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3 });
+            Framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2});
         }
 
         public void Dispose()

@@ -13,6 +13,6 @@ namespace IDKEngine
         public float RefractionChance;
         public float IOR;
         public Vector3 Absorbance;
-        private int VisibleCubemapFacesInfo;
+        public int VisibleCubemapFacesInfo;
     }
 }

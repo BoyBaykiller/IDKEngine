@@ -44,6 +44,7 @@ namespace IDKEngine.Render
             {
                 _isDebugBVHTraversal = value;
                 finalDrawProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
+                firstHitProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
                 if (_isDebugBVHTraversal)
                 {
                     firstHitProgram.Upload("ApertureDiameter", 0.0f);
@@ -90,7 +91,7 @@ namespace IDKEngine.Render
             string nHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl");
             nHitProgramSrc = nHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{bvh.MaxBlasTreeDepth}");
             nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, nHitProgramSrc));
-            
+
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
             SetSize(width, height);
@@ -107,7 +108,7 @@ namespace IDKEngine.Render
             ModelSystem = modelSystem;
             BVH = bvh;
 
-            RayDepth = 6;
+            RayDepth = 7;
             FocalLength = 10.0f;
             ApertureDiameter = 0.03f;
         }
@@ -125,21 +126,17 @@ namespace IDKEngine.Render
             nHitProgram.Use();
             for (int i = 1; i < RayDepth; i++)
             {
-                // TODO: Small delta for rayIndicesLength and aliveRaysCount which should not be the case I think
-                // May explain the subtle artifacts in simple scenes
-
-                //rayIndicesBuffer.GetSubData(0, sizeof(uint), out uint rayIndicesLength);
-                //aliveRaysBuffer.GetSubData(0, sizeof(uint), out uint aliveRaysCount);
-
-                //Console.WriteLine(rayIndicesLength);
-                //Console.WriteLine(aliveRaysCount);
-                //Console.WriteLine("=================");
-
                 const uint RAY_INDICES_LENGTH = 0u;
                 rayIndicesBuffer.SubData(0, sizeof(uint), RAY_INDICES_LENGTH);
 
                 GL.DispatchComputeIndirect((IntPtr)0);
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
+
+                // TODO: Small delta for rayIndicesLength and aliveRaysCount which should not be the case I think
+                //dispatchCommandBuffer.GetSubData(0, sizeof(uint), out uint numX);
+                //rayIndicesBuffer.GetSubData(0, sizeof(uint), out uint rayIndicesCount);
+                //aliveRaysBuffer.GetSubData(0, sizeof(uint), out uint aliveRaysCount);
+                //Console.WriteLine($"i: {i}, rayIndicesCount: {rayIndicesCount}, aliveRaysCount: {aliveRaysCount}, numX: {numX}");
             }
 
             finalDrawProgram.Use();

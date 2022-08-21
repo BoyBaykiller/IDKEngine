@@ -65,19 +65,19 @@ out InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat int MaterialIndex;
+    flat uint MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;
     flat float RoughnessBias;
 } outData;
 
-vec3 UncompressNormal(uint v);
+vec3 DecompressSNorm32Fast(uint v);
 
 void main()
 {
-    vec3 normal = UncompressNormal(Normal) * 2.0 - 1.0;
-    vec3 tangent = UncompressNormal(Tangent) * 2.0 - 1.0;
+    vec3 normal = DecompressSNorm32Fast(Normal);
+    vec3 tangent = DecompressSNorm32Fast(Tangent);
 
     mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
     vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
@@ -112,15 +112,15 @@ void main()
     gl_Position = jitteredClipPos;
 }
 
-vec3 UncompressNormal(uint v)
+vec3 DecompressSNorm32Fast(uint data)
 {
-    float r = (v >> 0) & ((1u << 11) - 1);
-    float g = (v >> 11) & ((1u << 11) - 1);
-    float b = (v >> 22) & ((1u << 10) - 1);
+    float r = (data >> 0) & ((1u << 11) - 1);
+    float g = (data >> 11) & ((1u << 11) - 1);
+    float b = (data >> 22) & ((1u << 10) - 1);
 
-    r *= (1.0 / float((1u << 11) - 1));
-    g *= (1.0 / float((1u << 11) - 1));
-    b *= (1.0 / float((1u << 10) - 1));
+    r /= (1u << 11) - 1;
+    g /= (1u << 11) - 1;
+    b /= (1u << 10) - 1;
 
-    return vec3(r, g, b);
+    return vec3(r, g, b) * 2.0 - 1.0;
 }
