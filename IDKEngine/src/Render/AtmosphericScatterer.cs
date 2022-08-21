@@ -62,7 +62,7 @@ namespace IDKEngine.Render
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/AtmosphericScattering/compute.glsl")));
 
-            SetSize(size);   
+            SetSize(size);
 
             Time = 0.05f;
             ISteps = 40;
@@ -85,10 +85,6 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.TextureCubeMap);
             Result.ImmutableAllocate(size, size, 1, SizedInternalFormat.Rgba32f);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            /// Driver bug: Global seamless cubemap feature may be ignored when sampling from uniform samplerCube
-            /// in Compute Shader with ARB_bindless_texture activated. So try switching to seamless_cubemap_per_texture
-            /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
-            Result.SetSeamlessCubeMapPerTextureARB_AMD(true);
         }
     }
 }

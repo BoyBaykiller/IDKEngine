@@ -139,26 +139,102 @@ namespace IDKEngine
             System.Buffer.MemoryCopy(src, dest, long.MaxValue, len);
         }
 
-        public static uint CompressNormal(Vector3 v)
+        // Source: https://www.shadertoy.com/view/llfcRl
+        public static uint CompressSNorm32Good(Vector3 data)
         {
-            uint r = (uint)MathF.Round(v.X * ((1u << 11) - 1));
-            uint g = (uint)MathF.Round(v.Y * ((1u << 11) - 1));
-            uint b = (uint)MathF.Round(v.Z * ((1u << 10) - 1));
+            static Vector2 Sign(Vector2 v)
+            {
+                return new Vector2((v.X >= 0.0f) ? 1.0f : -1.0f, (v.Y >= 0.0f) ? 1.0f : -1.0f);
+            }
+
+            data.Xy /= (MathF.Abs(data.X) + MathF.Abs(data.Y) + MathF.Abs(data.Z));
+            data.Xy = (data.Z >= 0.0) ? data.Xy : (new Vector2(1.0f) - new Vector2(MathF.Abs(data.Y), MathF.Abs(data.X))) * Sign(data.Xy);
+
+            uint x = (uint)MathF.Round(32767.5f + data.X * 32767.5f);
+            uint y = (uint)MathF.Round(32767.5f + data.Y * 32767.5f);
+            return x | (y << 16);
+        }
+        public static Vector3 DecompressSNorm32Good(uint data)
+        {
+            uint x = data & 65535u;
+            uint y = (data >> 16) & 65535u;
+            Vector2 v = new Vector2(x / 32767.5f - 1.0f, y / 32767.5f - 1.0f);
+
+            Vector3 normal = new Vector3(v.X, v.Y, 1.0f - MathF.Abs(v.X) - MathF.Abs(v.Y)); // Rune Stubbe's version,
+            float t = MathF.Max(-normal.Z, 0.0f);                                           // much faster than original
+            normal.X += (normal.X > 0.0f) ? -t : t;                                         // implementation of this
+            normal.Y += (normal.Y > 0.0f) ? -t : t;                                         // technique
+
+            return Vector3.Normalize(normal);
+        }
+
+        public static uint CompressSNorm32Fast(Vector3 data)
+        {
+            data = data * 0.5f + new Vector3(0.5f);
+
+            uint r = (uint)MathF.Round(data.X * ((1u << 11) - 1));
+            uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
+            uint b = (uint)MathF.Round(data.Z * ((1u << 10) - 1));
 
             uint packed = (r << 0) | (g << 11) | (b << 22);
 
             return packed;
         }
-
-        public static Vector3 UncompressNormal(uint v)
+        public static Vector3 DecompressSNorm32Fast(uint data)
         {
-            float r = (v >> 0) & ((1u << 11) - 1);
-            float g = (v >> 11) & ((1u << 11) - 1);
-            float b = (v >> 22) & ((1u << 10) - 1);
+            float r = (data >> 0) & ((1u << 11) - 1);
+            float g = (data >> 11) & ((1u << 11) - 1);
+            float b = (data >> 22) & ((1u << 10) - 1);
 
             r *= (1.0f / ((1u << 11) - 1));
             g *= (1.0f / ((1u << 11) - 1));
             b *= (1.0f / ((1u << 10) - 1));
+
+            return new Vector3(r, g, b) * 2.0f - new Vector3(1.0f);
+        }
+
+        public static uint CompressUNorm32Fast(Vector3 data)
+        {
+            uint r = (uint)MathF.Round(data.X * ((1u << 11) - 1));
+            uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
+            uint b = (uint)MathF.Round(data.Z * ((1u << 10) - 1));
+
+            uint packed = (r << 0) | (g << 11) | (b << 22);
+
+            return packed;
+        }
+        public static Vector3 DecompressUNorm32Fast(uint data)
+        {
+            float r = (data >> 0) & ((1u << 11) - 1);
+            float g = (data >> 11) & ((1u << 11) - 1);
+            float b = (data >> 22) & ((1u << 10) - 1);
+
+            r *= (1.0f / ((1u << 11) - 1));
+            g *= (1.0f / ((1u << 11) - 1));
+            b *= (1.0f / ((1u << 10) - 1));
+
+            return new Vector3(r, g, b);
+        }
+
+        public static ulong CompressUNorm64Fast(Vector3 data)
+        {
+            ulong r = (ulong)MathF.Round(data.X * ((1u << 21) - 1));
+            ulong g = (ulong)MathF.Round(data.Y * ((1u << 21) - 1));
+            ulong b = (ulong)MathF.Round(data.Z * ((1u << 21) - 1));
+
+            ulong packed = (r << 0) | (g << 21) | (b << 42);
+            
+            return packed;
+        }
+        public static Vector3 DecompressUNorm64Fast(ulong data)
+        {
+            float r = (data >> 0) & ((1u << 21) - 1);
+            float g = (data >> 21) & ((1u << 21) - 1);
+            float b = (data >> 42) & ((1u << 21) - 1);
+
+            r /= (1u << 21) - 1;
+            g /= (1u << 21) - 1;
+            b /= (1u << 21) - 1;
 
             return new Vector3(r, g, b);
         }

@@ -94,7 +94,7 @@ in InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat int MaterialIndex;
+    flat uint MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
     flat float SpecularBias;

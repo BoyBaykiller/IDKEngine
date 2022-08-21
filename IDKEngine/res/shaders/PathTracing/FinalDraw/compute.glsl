@@ -8,13 +8,10 @@ layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 struct TransportRay
 {
     vec3 Origin;
-    float _pad0;
-
-    vec3 Direction;
-    float CurrentIOR;
+    uint Direction;
 
     vec3 Throughput;
-    uint DebugFirstHitInteriorNodeCounter;
+    float PrevIOROrDebugNodeCounter;
 
     vec3 Radiance;
     bool IsRefractive;
@@ -82,7 +79,6 @@ void main()
         atomicCounterExchange(AliveRaysCounter, maxPossibleRayCount);
     }
 
-
     uint rayIndex = imgCoord.y * imgResultSize.x + imgCoord.x;
     TransportRay transportRay = transportRaySSBO.Rays[rayIndex];
 
@@ -90,7 +86,7 @@ void main()
     if (IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
-        float waveLength = min(float(transportRay.DebugFirstHitInteriorNodeCounter) * 2.5 + 400.0, 700.0);
+        float waveLength = min(transportRay.PrevIOROrDebugNodeCounter * 2.5 + 400.0, 700.0);
         vec3 col = SpectralJet(waveLength);
         irradiance = col;
     }

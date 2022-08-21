@@ -1,8 +1,5 @@
 # IDKEngine
 
-This is some OpenGL stuff I've been experimenting with lately.
-I am using a lot of modern OpenGL features like Direct State Access, Indirect Multi Drawing or Bindless Textures to create a efficient renderer.
-
 Feature list:
  - HDR + Gamma correction
  - ImGui
@@ -20,8 +17,20 @@ Feature list:
  - CoD-Modern-Warfare Bloom
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
  - Wavefront Path Tracer
- 
-Required OpenGL: 4.6 + `ARB_bindless_texture` and (`NV_gpu_shader5` or `ARB_shader_ballot`)
+
+Required OpenGL: 4.6 + `ARB_bindless_texture`
+
+# Controlls
+| Key         | Action               | 
+|-------------|----------------------| 
+|  W, A, S, D | Movment              |
+|  Shift      | Move Faster          |
+|  G          | Toggle GUI           |
+|  E          | Toggle Cursor        |
+|  R-Click    | Select Object        |
+|  V          | Toggle VSync         |
+|  F11        | Toggle Fullscreen    |
+|  ESC        | Exit                 |
 
 # Path Traced Render Samples
 
@@ -422,11 +431,11 @@ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 struct DrawCommand
 {
-    int Count;
-    int InstanceCount;
-    int FirstIndex;
-    int BaseVertex;
-    int BaseInstance;
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
 };
 
 layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO

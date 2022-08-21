@@ -36,6 +36,7 @@ uniform float Radius;
 uniform float Strength;
 
 uint rngSeed;
+
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);

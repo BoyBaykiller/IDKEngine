@@ -10,11 +10,11 @@ struct Frustum
 
 struct DrawCommand
 {
-    int Count;
-    int InstanceCount;
-    int FirstIndex;
-    int BaseVertex;
-    int BaseInstance;
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
 };
 
 struct Node

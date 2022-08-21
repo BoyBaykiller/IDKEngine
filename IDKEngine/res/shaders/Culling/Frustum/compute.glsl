@@ -9,11 +9,11 @@ struct Frustum
 
 struct DrawCommand
 {
-    int Count;
-    int InstanceCount;
-    int FirstIndex;
-    int BaseVertex;
-    int BaseInstance;
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
 };
 
 struct Node
@@ -73,7 +73,7 @@ void main()
     DrawCommand meshCMD = drawCommandSSBO.DrawCommands[meshIndex];
     Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     
-    const int glInstanceID = 0; // TODO: Derive from built in variables
+    const uint glInstanceID = 0;  // TODO: Derive from built in variables
     mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + glInstanceID];
     
     Frustum frustum = ExtractFrustum(ProjView * model);

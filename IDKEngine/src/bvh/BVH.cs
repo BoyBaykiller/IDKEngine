@@ -13,7 +13,7 @@ namespace IDKEngine
         public struct RayHitInfo
         {
             public float T;
-            public int HitID;
+            public int MeshIndex;
             public int InstanceID;
             public Vector3 Bary;
             public GLSLTriangle Triangle;
@@ -22,7 +22,7 @@ namespace IDKEngine
         public struct AABBHitInfo
         {
             public int HitID;
-            public int InstanceID;
+            public uint InstanceID;
             public GLSLTriangle Triangle;
         }
 
@@ -109,13 +109,12 @@ namespace IDKEngine
                     {
                         for (int k = (int)node.TriStartOrLeftChild; k < node.TriStartOrLeftChild + node.TriCount; k++)
                         {
-                            ref readonly GLSLTriangle triangle = ref triangles[k];
-                            if (MyMath.RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, out Vector4 baryT) && baryT.W > 0.0f && baryT.W < hitInfo.T)
+                            hitInfo.Triangle = triangles[k];
+                            if (MyMath.RayTriangleIntersect(localRay, hitInfo.Triangle.Vertex0.Position, hitInfo.Triangle.Vertex1.Position, hitInfo.Triangle.Vertex2.Position, out Vector4 baryT) && baryT.W > 0.0f && baryT.W < hitInfo.T)
                             {
                                 hitInfo.Bary = baryT.Xyz;
                                 hitInfo.T = baryT.W;
-                                hitInfo.HitID = i;
-                                hitInfo.Triangle = triangle;
+                                hitInfo.MeshIndex = i;
                                 hitInfo.InstanceID = k;
                             }
                         }
@@ -142,7 +141,7 @@ namespace IDKEngine
             
             for (int i = 0; i < ModelSystem.Meshes.Length; i++)
             {
-                const int glInstanceID = 0; // TODO: Work out actual instanceID value
+                const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
                 
                 Matrix4 invModel = Matrix4.Invert(ModelSystem.ModelMatrices[i][glInstanceID]);
                 
