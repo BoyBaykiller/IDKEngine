@@ -31,7 +31,8 @@ namespace IDKEngine
                 _isPathTracing = value;
                 GLSLBasicData.FreezeFrameCounter = 0;
 
-                PathTracer.Result.Clear(PixelFormat.Rgba, PixelType.Float, 0.0f);
+                float clearData = 0.0f;
+                PathTracer.Result.Clear(PixelFormat.Rgba, PixelType.Float, ref clearData);
             }
 
         }
@@ -237,6 +238,7 @@ namespace IDKEngine
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.Blend);
+            GL.Enable(EnableCap.ScissorTest);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 #if DEBUG
             GL.Enable(EnableCap.DebugOutputSynchronous);
@@ -260,7 +262,7 @@ namespace IDKEngine
                 Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 69.0f, 420.0f).Inverted()
             };
             BufferObject skyBoxUBO = new BufferObject();
-            skyBoxUBO.ImmutableAllocate(sizeof(Matrix4) * invViewsAndInvprojecion.Length, invViewsAndInvprojecion, BufferStorageFlags.DynamicStorageBit);
+            skyBoxUBO.ImmutableAllocate(sizeof(Matrix4) * invViewsAndInvprojecion.Length, invViewsAndInvprojecion, BufferStorageFlags.None);
             skyBoxUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
 
             basicDataUBO = new BufferObject();
@@ -289,10 +291,10 @@ namespace IDKEngine
             sponza.Meshes[8].RoughnessBias = -1.0f;
             sponza.Meshes[3].EmissiveBias = 2.67f;
             sponza.Meshes[3].EmissiveBias = 2.67f;
-            sponza.Meshes[17].RefractionChance = 0.9f;
+            sponza.Meshes[17].RefractionChance = 1.0f;
             sponza.Meshes[17].RoughnessBias = -0.5f;
 
-            //Model horse = new Model("res/models/Horse/horse.gltf");
+            //Model horse = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
             //for (int i = 0; i < horse.Meshes.Length; i++)
             //    horse.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
 
@@ -301,8 +303,8 @@ namespace IDKEngine
 
             Model lucy = new Model("res/models/Lucy/Lucy.gltf");
             for (int i = 0; i < lucy.Meshes.Length; i++)
-                lucy.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(5.02f, -4.9f, 0.0f);
-            lucy.Meshes[0].RefractionChance = 0.878f;
+                lucy.ModelMatrices[i][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, -4.9f, 0.0f);
+            lucy.Meshes[0].RefractionChance = 0.9f;
             lucy.Meshes[0].IOR = 1.174f;
             lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
 
@@ -343,7 +345,7 @@ namespace IDKEngine
             //AtmosphericScatterer = new AtmosphericScatterer(128);
             //AtmosphericScatterer.Compute();
             Texture skyBox = new Texture(TextureTarget2d.TextureCubeMap);
-            skyBox.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Linear);
+            skyBox.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Helper.ParallelLoadCubemap(skyBox, new string[]
             {
                 "res/Textures/EnvironmentMap/posx.jpg",
@@ -353,7 +355,7 @@ namespace IDKEngine
                 "res/Textures/EnvironmentMap/posz.jpg",
                 "res/Textures/EnvironmentMap/negz.jpg"
             }, (SizedInternalFormat)PixelInternalFormat.Srgb8Alpha8);
-            /// More info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
+            /// Info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
             skyBox.SetSeamlessCubeMapPerTextureARB_AMD(true);
 
             ForwardRenderer = new Forward(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6, skyBox);
@@ -363,11 +365,8 @@ namespace IDKEngine
             SSAO = new SSAO(WindowSize.X, WindowSize.Y, 10, 0.25f, 2.0f);
             PostCombine = new PostCombine(WindowSize.X, WindowSize.Y);
 
-
             BVH = new BVH(ModelSystem);
             PathTracer = new PathTracer(BVH, ModelSystem, skyBox, WindowSize.X, WindowSize.Y);
-            PathTracer.FocalLength = 2.4f;
-            PathTracer.ApertureDiameter = 0.056f;
 
             List<GLSLLight> lights = new List<GLSLLight>();
             //lights.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));

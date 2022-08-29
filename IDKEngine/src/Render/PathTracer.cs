@@ -78,7 +78,6 @@ namespace IDKEngine.Render
         private readonly ShaderProgram nHitProgram;
         private readonly ShaderProgram finalDrawProgram;
         private readonly BufferObject dispatchCommandBuffer;
-        private readonly BufferObject aliveRaysBuffer;
         private readonly Texture skyBox;
         private BufferObject transportRayBuffer;
         private BufferObject rayIndicesBuffer;
@@ -94,58 +93,52 @@ namespace IDKEngine.Render
 
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
-            SetSize(width, height);
-
             dispatchCommandBuffer = new BufferObject();
-            dispatchCommandBuffer.ImmutableAllocate(sizeof(GLSLDispatchCommand), new Vector3i(1), BufferStorageFlags.DynamicStorageBit);
+            dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GLSLDispatchCommand), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
-            aliveRaysBuffer = new BufferObject();
-            aliveRaysBuffer.ImmutableAllocate(sizeof(uint), 0u, BufferStorageFlags.DynamicStorageBit);
-            aliveRaysBuffer.BindBufferBase(BufferRangeTarget.AtomicCounterBuffer, 0);
+            SetSize(width, height);
 
             this.skyBox = skyBox;
             ModelSystem = modelSystem;
             BVH = bvh;
 
             RayDepth = 7;
-            FocalLength = 10.0f;
-            ApertureDiameter = 0.03f;
+            FocalLength = 8.0f;
+            ApertureDiameter = 0.02f;
         }
 
-        public void Compute()
+        public unsafe void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             skyBox.BindToUnit(0);
 
             firstHitProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
 
             dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
             nHitProgram.Use();
             for (int i = 1; i < RayDepth; i++)
             {
-                const uint RAY_INDICES_LENGTH = 0u;
-                rayIndicesBuffer.SubData(0, sizeof(uint), RAY_INDICES_LENGTH);
+                int pingPongIndex = 1 - (i % 2);
+                nHitProgram.Upload(0, pingPongIndex);
+                rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // set count
 
-                GL.DispatchComputeIndirect((IntPtr)0);
-                GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
-
-                // TODO: Small delta for rayIndicesLength and aliveRaysCount which should not be the case I think
-                //dispatchCommandBuffer.GetSubData(0, sizeof(uint), out uint numX);
-                //rayIndicesBuffer.GetSubData(0, sizeof(uint), out uint rayIndicesCount);
-                //aliveRaysBuffer.GetSubData(0, sizeof(uint), out uint aliveRaysCount);
-                //Console.WriteLine($"i: {i}, rayIndicesCount: {rayIndicesCount}, aliveRaysCount: {aliveRaysCount}, numX: {numX}");
+                GL.DispatchComputeIndirect((IntPtr)(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex)));
+                GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
             }
 
             finalDrawProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit | MemoryBarrierFlags.AtomicCounterBarrierBit);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
         }
 
         public unsafe void SetSize(int width, int height)
         {
+            dispatchCommandBuffer.SubData(0, sizeof(GLSLDispatchCommand), new GLSLDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
+            dispatchCommandBuffer.SubData(sizeof(GLSLDispatchCommand), sizeof(GLSLDispatchCommand), new GLSLDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
+
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -154,12 +147,13 @@ namespace IDKEngine.Render
 
             if (transportRayBuffer != null) transportRayBuffer.Dispose();
             transportRayBuffer = new BufferObject();
-            transportRayBuffer.ImmutableAllocate(width * height * sizeof(GLSLTransportRay), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            transportRayBuffer.ImmutableAllocate(width * height * sizeof(GLSLTransportRay), (IntPtr)0, BufferStorageFlags.None);
             transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
 
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
             rayIndicesBuffer = new BufferObject();
-            rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + sizeof(uint), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 2 * sizeof(uint), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            rayIndicesBuffer.SubData(0, sizeof(Vector2i), new Vector2i(0));
             rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
         }
     }

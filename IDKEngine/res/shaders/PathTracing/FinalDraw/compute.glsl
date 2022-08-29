@@ -31,13 +31,13 @@ layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
 
 layout(std430, binding = 7) restrict writeonly buffer RayIndicesSSBO
 {
-    uint Count;
+    uint Counts[2];
     uint Indices[];
 } rayIndicesSSBO;
 
 layout(std430, binding = 8) restrict writeonly buffer DispatchCommandSSBO
 {
-    DispatchCommand DispatchCommand;
+    DispatchCommand DispatchCommands[2];
 } dispatchCommandSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -57,8 +57,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
-layout(binding = 0, offset = 0) uniform atomic_uint AliveRaysCounter;
-
 vec3 SpectralJet(float w);
 
 uniform bool IsDebugBVHTraversal;
@@ -74,9 +72,11 @@ void main()
         uint maxPossibleRayCount = imgResultSize.x * imgResultSize.y;
         uint maxPossibleNumGroupsX = (maxPossibleRayCount + N_HIT_PROGRAM_LOCAL_SIZE_X - 1) / N_HIT_PROGRAM_LOCAL_SIZE_X;
         
-        dispatchCommandSSBO.DispatchCommand.NumGroupsX = maxPossibleNumGroupsX;
-        rayIndicesSSBO.Count = 0u;
-        atomicCounterExchange(AliveRaysCounter, maxPossibleRayCount);
+        dispatchCommandSSBO.DispatchCommands[0].NumGroupsX = 0u;
+        dispatchCommandSSBO.DispatchCommands[1].NumGroupsX = 0u;
+        
+        rayIndicesSSBO.Counts[0] = 0u;
+        rayIndicesSSBO.Counts[1] = 0u;
     }
 
     uint rayIndex = imgCoord.y * imgResultSize.x + imgCoord.x;
