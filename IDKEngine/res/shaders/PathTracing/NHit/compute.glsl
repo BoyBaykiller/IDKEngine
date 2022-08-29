@@ -2,7 +2,7 @@
 #define N_HIT_PROGRAM_LOCAL_SIZE_X 64 // used in shader and client code - keep in sync!
 #define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define FLOAT_MAX 3.4028235e+38
-#define FLOAT_MIN -3.4028235e+38
+#define FLOAT_MIN -FLOAT_MAX
 #define EPSILON 0.001
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
@@ -143,13 +143,13 @@ layout(std430, binding = 6) restrict buffer TransportRaySSBO
 
 layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
-    uint Count;
+    uint Counts[2];
     uint Indices[];
 } rayIndicesSSBO;
 
 layout(std430, binding = 8) restrict buffer DispatchCommandSSBO
 {
-    DispatchCommand DispatchCommand;
+    DispatchCommand DispatchCommands[2];
 } dispatchCommandSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -169,8 +169,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
-layout(binding = 0, offset = 0) uniform atomic_uint AliveRaysCounter;
-
 bool TraceRay(inout TransportRay transportRay);
 vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
@@ -187,12 +185,22 @@ float GetRandomFloat01();
 uint CompressSNorm32Fast(vec3 data);
 vec3 DecompressSNorm32Fast(uint data);
 
+layout(location = 0) uniform int PingPongIndex;
+
 shared uint SharedStack[N_HIT_PROGRAM_LOCAL_SIZE_X][MAX_BLAS_TREE_DEPTH];
 
 uint rngSeed;
 
 void main()
 {
+    if (gl_GlobalInvocationID.x > rayIndicesSSBO.Counts[1 - PingPongIndex])
+        return;
+
+    if (gl_GlobalInvocationID.x == 0)
+    {
+        dispatchCommandSSBO.DispatchCommands[1 - PingPongIndex].NumGroupsX = 0u;
+    }
+
     rngSeed = gl_GlobalInvocationID.x * 312 + basicDataUBO.FreezeFrameCounter * 2699;
 
     uint rayIndex = rayIndicesSSBO.Indices[gl_GlobalInvocationID.x];
@@ -203,16 +211,13 @@ void main()
 
     if (continueRay)
     {
-        rayIndicesSSBO.Indices[atomicAdd(rayIndicesSSBO.Count, 1u)] = rayIndex;
-    }
-    else
-    {
-        uint aliveRayCount = atomicCounterDecrement(AliveRaysCounter);
+        uint index = atomicAdd(rayIndicesSSBO.Counts[PingPongIndex], 1u);
+        rayIndicesSSBO.Indices[index] = rayIndex;
 
-        uint numWorkGroupsX = (aliveRayCount + N_HIT_PROGRAM_LOCAL_SIZE_X - 1) / N_HIT_PROGRAM_LOCAL_SIZE_X;
-        // Doing this instead of atomicMin results in a race condition and generally a slightly higher value for NumGroupsX
-        // than required however overall it yields better performance
-        dispatchCommandSSBO.DispatchCommand.NumGroupsX = min(dispatchCommandSSBO.DispatchCommand.NumGroupsX, numWorkGroupsX);
+        if (index % N_HIT_PROGRAM_LOCAL_SIZE_X == 0)
+        {
+            atomicAdd(dispatchCommandSSBO.DispatchCommands[PingPongIndex].NumGroupsX, 1u);
+        }
     }
 }
 
@@ -223,15 +228,6 @@ bool TraceRay(inout TransportRay transportRay)
     if (ClosestHit(Ray(transportRay.Origin, uncompressedRayDir), hitInfo))
     {
         transportRay.Origin += uncompressedRayDir * hitInfo.T;
-
-        float refractionChance = 0.0;
-        float ior = 1.0;
-        vec3 absorbance = vec3(0.0);
-        vec3 albedo;
-        vec3 normal;
-        float roughness = 1.0;
-        float specularChance = 0.0;
-        vec3 emissive;
 
         Triangle triangle = triangleSSBO.Triangles[hitInfo.TriangleIndex];
         Vertex v0 = triangle.Vertex0;
@@ -255,39 +251,28 @@ bool TraceRay(inout TransportRay transportRay)
         Material material = materialSSBO.Materials[mesh.MaterialIndex];
         
         vec4 albedoAlpha = texture(material.Albedo, texCoord);
-        albedo = albedoAlpha.rgb;
-        refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
-        emissive = (texture(material.Emissive, texCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + mesh.EmissiveBias) * albedo;
-        specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
-        roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
-        normal = texture(material.Normal, texCoord).rgb;
-        ior = mesh.IOR;
-        absorbance = mesh.Absorbance;
-        
+        vec3 albedo = albedoAlpha.rgb;
+        float refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
+        vec3 emissive = (texture(material.Emissive, texCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + mesh.EmissiveBias) * albedo;
+        float specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+        float roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
+        vec3 normal = texture(material.Normal, texCoord).rgb;
         normal = TBN * normalize(normal * 2.0 - 1.0);
         normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength));
 
         if (transportRay.IsRefractive)
         {
-            transportRay.Throughput *= exp(-absorbance * hitInfo.T);
+            transportRay.Throughput *= exp(-mesh.Absorbance * hitInfo.T);
         }
-
-        float cosTheta = dot(-uncompressedRayDir, normal);
-        bool fromInside = cosTheta < 0.0;
-        if (fromInside)
-            normal *= -1.0;
 
         float rayProbability;
-        uncompressedRayDir = BSDF(uncompressedRayDir, specularChance, roughness, refractionChance, ior, transportRay.PrevIOROrDebugNodeCounter, normal, rayProbability, transportRay.IsRefractive);
+        uncompressedRayDir = BSDF(uncompressedRayDir, specularChance, roughness, refractionChance, mesh.IOR, transportRay.PrevIOROrDebugNodeCounter, normal, rayProbability, transportRay.IsRefractive);
         transportRay.Origin += uncompressedRayDir * EPSILON;
-        transportRay.PrevIOROrDebugNodeCounter = ior;
-        
-        // Normal maps might cause rays to aim towards the object they reflected off. In that case offset them 
-        normal = transportRay.IsRefractive ? -normal : normal;
-        if (dot(uncompressedRayDir, normal) <= 0.0)
-        {
-            transportRay.Origin += normal * EPSILON;
-        }
+        // Might not be correct if meshes intersect each other or Total Internal Reflection
+        if (transportRay.IsRefractive)
+            transportRay.PrevIOROrDebugNodeCounter = mesh.IOR;
+        else
+            transportRay.PrevIOROrDebugNodeCounter = 1.0;
 
         transportRay.Radiance += emissive * transportRay.Throughput;
         if (!transportRay.IsRefractive)
@@ -299,7 +284,6 @@ bool TraceRay(inout TransportRay transportRay)
         float p = max(transportRay.Throughput.x, max(transportRay.Throughput.y, transportRay.Throughput.z));
         if (GetRandomFloat01() > p)
             return false;
-
         transportRay.Throughput /= p;
 
         transportRay.Direction = CompressSNorm32Fast(uncompressedRayDir);
@@ -316,6 +300,8 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
 {
     float cosTheta = dot(-incomming, normal);
     bool fromInside = cosTheta < 0.0;
+    if (fromInside)
+        normal *= -1.0;
 
     isRefractive = false;
     if (specularChance > 0.0)
@@ -326,11 +312,11 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
     }
 
     float raySelectRoll = GetRandomFloat01();
+    vec3 diffuseRayDir = CosineSampleHemisphere(normal);
     vec3 outgoing;
     if (specularChance > raySelectRoll)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);
-        vec3 diffuseRayDir = CosineSampleHemisphere(normal);
         reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, roughness * roughness));
         outgoing = reflectionRayDir;
         rayProbability = specularChance;
@@ -338,15 +324,14 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
     else if (specularChance + refractionChance > raySelectRoll)
     {
         vec3 refractionRayDir = refract(incomming, normal, fromInside ? (ior / prevIor) : (prevIor / ior));
-        vec3 diffuseRayDir = CosineSampleHemisphere(normal);
-        refractionRayDir = normalize(mix(refractionRayDir, diffuseRayDir, roughness * roughness));
+        refractionRayDir = normalize(mix(refractionRayDir, -diffuseRayDir, roughness * roughness));
         outgoing = refractionRayDir;
         rayProbability = refractionChance;
         isRefractive = true;
     }
     else
     {
-        outgoing = CosineSampleHemisphere(normal);
+        outgoing = diffuseRayDir;
         rayProbability = 1.0 - specularChance - refractionChance;
     }
     rayProbability = max(rayProbability, EPSILON);
@@ -363,7 +348,7 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     {
         float n = n1 / n2;
         float sinT2 = n * n * (1.0 - cosTheta * cosTheta);
-        // Total internal reflection
+
         if (sinT2 > 1.0)
             return 1.0;
         cosTheta = sqrt(1.0 - sinT2);

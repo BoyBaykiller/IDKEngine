@@ -164,10 +164,6 @@ namespace IDKEngine.Render.Objects
             GL.BindTextures(first, length, textures);
         }
 
-        public void SubTexture3D<T>(int width, int heigth, int depth, PixelFormat pixelFormat, PixelType pixelType, T[,,] pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : struct
-        {
-            GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, heigth, depth, pixelFormat, pixelType, pixels);
-        }
         public void SubTexture3D<T>(int width, int heigth, int depth, PixelFormat pixelFormat, PixelType pixelType, T[] pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : struct
         {
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, heigth, depth, pixelFormat, pixelType, pixels);
@@ -177,10 +173,6 @@ namespace IDKEngine.Render.Objects
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, heigth, depth, pixelFormat, pixelType, pixels);
         }
 
-        public void SubTexture2D<T>(int width, int heigth, PixelFormat pixelFormat, PixelType pixelType, T[,] pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : struct
-        {
-            GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, heigth, pixelFormat, pixelType, pixels);
-        }
         public void SubTexture2D<T>(int width, int heigth, PixelFormat pixelFormat, PixelType pixelType, T[] pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : struct
         {
             GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, heigth, pixelFormat, pixelType, pixels);
@@ -199,16 +191,15 @@ namespace IDKEngine.Render.Objects
             GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
         }
 
-        public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, T value, int level = 0) where T : struct
+        public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, ref T value, int level = 0) where T : struct
         {
             GL.ClearTexImage(ID, level, pixelFormat, pixelType, ref value);
         }
+        public void Clear(PixelFormat pixelFormat, PixelType pixelType, IntPtr value, int level = 0)
+        {
+            GL.ClearTexImage(ID, level, pixelFormat, pixelType, value);
+        }
 
-
-        /// <summary>
-        /// To properly generate mipmaps <see cref="TextureMinFilter"/> must be set to one of the mipmap options 
-        /// and if immutable storage is used the level parameter should match the number of desired mipmap levels to generate (default: 1).
-        /// </summary>
         public void GenerateMipmap()
         {
             GL.GenerateTextureMipmap(ID);

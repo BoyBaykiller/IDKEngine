@@ -76,7 +76,7 @@ namespace IDKEngine
             }
 
             TriangleBuffer = new BufferObject();
-            TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.DynamicStorageBit);
+            TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.None);
             TriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
         }
 

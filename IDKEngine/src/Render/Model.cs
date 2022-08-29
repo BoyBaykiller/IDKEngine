@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using System.Diagnostics;
 using System.Threading;
@@ -156,7 +157,7 @@ namespace IDKEngine.Render.Objects
 
                         default:
                             const SizedInternalFormat def = SizedInternalFormat.Rgba8;
-                            System.Console.WriteLine($"Unhandled texture type: {perMaterialTextures[j]}. Default to {def}");
+                            Console.WriteLine($"Unhandled texture type: {perMaterialTextures[j]}. Default to {def}");
                             format = def;
                             break;
                     }
@@ -166,10 +167,10 @@ namespace IDKEngine.Render.Objects
                     {
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
                         texture.SetWrapMode(OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat, OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
-                        texture.ImmutableAllocate(img.Width, img.Height, 1, format, System.Math.Max(Texture.GetMaxMipmapLevel(img.Width, img.Height, 1), 1));
+                        texture.ImmutableAllocate(img.Width, img.Height, 1, format, Math.Max(Texture.GetMaxMipmapLevel(img.Width, img.Height, 1), 1));
                         fixed (void* ptr = img.GetPixelRowSpan(0))
                         {
-                            texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (System.IntPtr)ptr);
+                            texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
                         }
                         texture.GenerateMipmap();
                         texture.SetAnisotropy(4.0f);
@@ -180,6 +181,12 @@ namespace IDKEngine.Render.Objects
                     {
                         // Create dummy texture
                         texture.ImmutableAllocate(1, 1, 1, format);
+
+                        if (perMaterialTextures[j] == TextureType.Diffuse)
+                        {
+                            float* dummyAlbedoData = stackalloc float[] { 1.0f, 1.0f, 1.0f, 1.0f };
+                            texture.Clear(PixelFormat.Rgba, PixelType.Float, (IntPtr)dummyAlbedoData);
+                        }
                     }
                     long textureHandle = texture.MakeHandleResidentARB();
 
