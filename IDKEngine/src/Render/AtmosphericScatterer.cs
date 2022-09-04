@@ -6,7 +6,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class AtmosphericScatterer
+    class AtmosphericScatterer : IDisposable
     {
         private int _iSteps;
         public int ISteps
@@ -62,6 +62,22 @@ namespace IDKEngine.Render
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/AtmosphericScattering/compute.glsl")));
 
+            Matrix4[] invViewsAndInvprojecion = new Matrix4[]
+            {
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveX
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeX
+               
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)).Inverted(), // PositiveY
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)).Inverted(), // NegativeY
+
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveZ
+                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeZ
+            };
+
+            Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 69.0f, 420.0f).Inverted();
+            shaderProgram.Upload("InvProjection", ref projection);
+            shaderProgram.Upload("InvViews[0]", invViewsAndInvprojecion.Length, ref invViewsAndInvprojecion[0]);
+
             SetSize(size);
 
             Time = 0.05f;
@@ -85,6 +101,12 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.TextureCubeMap);
             Result.ImmutableAllocate(size, size, 1, SizedInternalFormat.Rgba32f);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+        }
+
+        public void Dispose()
+        {
+            shaderProgram.Dispose();
+            Result.Dispose();
         }
     }
 }

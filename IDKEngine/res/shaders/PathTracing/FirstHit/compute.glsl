@@ -19,7 +19,6 @@ layout(derivative_group_quadsNV) in;
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba32f) restrict writeonly readonly uniform image2D ImgResult;
-layout(binding = 0) uniform samplerCube SamplerSkyBox;
 
 struct Material
 {
@@ -174,6 +173,11 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
     float Time;
 } basicDataUBO;
+
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
 
 bool TraceRay(inout TransportRay transportRay);
 vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out bool isRefractive);
@@ -331,7 +335,7 @@ bool TraceRay(inout TransportRay transportRay)
     }
     else
     {
-        transportRay.Radiance += texture(SamplerSkyBox, uncompressedRayDir).rgb * transportRay.Throughput;
+        transportRay.Radiance += texture(skyBoxUBO.Albedo, uncompressedRayDir).rgb * transportRay.Throughput;
         return false;
     }
 }

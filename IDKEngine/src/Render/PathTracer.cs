@@ -78,7 +78,6 @@ namespace IDKEngine.Render
         private readonly ShaderProgram nHitProgram;
         private readonly ShaderProgram finalDrawProgram;
         private readonly BufferObject dispatchCommandBuffer;
-        private readonly Texture skyBox;
         private BufferObject transportRayBuffer;
         private BufferObject rayIndicesBuffer;
         public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, Texture skyBox, int width, int height)
@@ -99,7 +98,6 @@ namespace IDKEngine.Render
 
             SetSize(width, height);
 
-            this.skyBox = skyBox;
             ModelSystem = modelSystem;
             BVH = bvh;
 
@@ -111,7 +109,6 @@ namespace IDKEngine.Render
         public unsafe void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
-            skyBox.BindToUnit(0);
 
             firstHitProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

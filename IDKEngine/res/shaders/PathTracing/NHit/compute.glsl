@@ -13,8 +13,6 @@
 
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
-layout(binding = 0) uniform samplerCube SamplerSkyBox;
-
 struct Material
 {
     sampler2D Albedo;
@@ -169,6 +167,11 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
+
 bool TraceRay(inout TransportRay transportRay);
 vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
@@ -291,7 +294,7 @@ bool TraceRay(inout TransportRay transportRay)
     }
     else
     {
-        transportRay.Radiance += texture(SamplerSkyBox, uncompressedRayDir).rgb * transportRay.Throughput;
+        transportRay.Radiance += texture(skyBoxUBO.Albedo, uncompressedRayDir).rgb * transportRay.Throughput;
         return false;
     }
 }

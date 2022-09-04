@@ -54,7 +54,6 @@ namespace IDKEngine.Render
         public Texture NormalSpecTexture;
         public Texture VelocityTexture;
         public Texture DepthTexture;
-        public Texture SkyBox;
         public readonly BufferObject TaaBuffer;
         public readonly Lighter LightingContext;
 
@@ -80,7 +79,7 @@ namespace IDKEngine.Render
         private Texture taaPing;
         private Texture taaPong;
         private bool isPing = true;
-        public Forward(Lighter lighter, int width, int height, int taaSamples, Texture skyBox = null)
+        public Forward(Lighter lighter, int width, int height, int taaSamples)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 
@@ -118,7 +117,6 @@ namespace IDKEngine.Render
             TaaBuffer.SubData(0, sizeof(GLSLTaaData), (IntPtr)taaData);
 
             LightingContext = lighter;
-            SkyBox = skyBox;
         }
 
         public void Render(ModelSystem modelSystem, Texture ambientOcclusion = null)
@@ -142,24 +140,20 @@ namespace IDKEngine.Render
                 GL.ColorMask(true, true, true, true);
                 GL.DepthMask(false);
             }
+
             shadingProgram.Use();
             modelSystem.Draw();
 
-            if (SkyBox != null)
-            {
-                SkyBox.BindToUnit(0);
 
-                GL.DepthMask(false);
-                GL.Disable(EnableCap.CullFace);
-                GL.DepthFunc(DepthFunction.Lequal);
+            GL.DepthMask(false);
+            GL.Disable(EnableCap.CullFace);
+            GL.DepthFunc(DepthFunction.Lequal);
 
-                skyBoxProgram.Use();
-                GL.DrawArrays(PrimitiveType.Quads, 0, 24);
-
-                GL.Enable(EnableCap.CullFace);
-            }
+            skyBoxProgram.Use();
+            GL.DrawArrays(PrimitiveType.Quads, 0, 24);
 
             GL.DepthFunc(DepthFunction.Less);
+            GL.Enable(EnableCap.CullFace);
             GL.DepthMask(true);
 
             LightingContext.Draw();

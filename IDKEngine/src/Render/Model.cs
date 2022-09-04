@@ -188,10 +188,10 @@ namespace IDKEngine.Render.Objects
                             texture.Clear(PixelFormat.Rgba, PixelType.Float, (IntPtr)dummyAlbedoData);
                         }
                     }
-                    long textureHandle = texture.MakeHandleResidentARB();
+                    ulong textureHandle = texture.GenTextureHandleARB();
 
                     /// Yes I prefer this pointer trickery over a long switch statement
-                    fixed (long* ptr = &Materials[i].Albedo)
+                    fixed (ulong* ptr = &Materials[i].Albedo)
                     {
                         *(ptr + j) = textureHandle;
                     }

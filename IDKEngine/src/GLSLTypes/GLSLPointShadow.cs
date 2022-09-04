@@ -4,9 +4,8 @@ namespace IDKEngine
 {
     struct GLSLPointShadow
     {
-        public long Sampler;
-        public float NearPlane;
-        public float FarPlane;
+        public ulong Sampler;
+        public ulong SamplerShadow;
 
         // Can't store array of non primitive types as value type in C# (or can u?),
         // so here I am hardcoding each matrix..
@@ -17,7 +16,9 @@ namespace IDKEngine
         public Matrix4 PosZ;
         public Matrix4 NegZ;
 
-        private readonly Vector3 _pad0;
+        public float NearPlane;
+        public float FarPlane;
         public int LightIndex;
+        private readonly float _pad0;
     }
 }
