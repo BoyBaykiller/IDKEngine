@@ -17,11 +17,8 @@ uniform float LightIntensity;
 uniform int ISteps;
 uniform int JSteps;
 
-layout(std140, binding = 6) uniform SkyBoxUBO
-{
-    mat4 InvViews[6];
-    mat4 InvProjection;
-} skyBoxUBO;
+uniform mat4 InvViews[6];
+uniform mat4 InvProjection;
 
 void main()
 {
@@ -30,7 +27,7 @@ void main()
     
     vec2 ndc = vec2(imgCoord.xy) / imgResultSize * 2.0 - 1.0;
     
-    vec3 toCubemap = GetWorldSpaceRay(skyBoxUBO.InvProjection, skyBoxUBO.InvViews[imgCoord.z], ndc);
+    vec3 toCubemap = GetWorldSpaceRay(InvProjection, InvViews[imgCoord.z], ndc);
 
     vec3 color = Atmosphere(
         toCubemap,                     // normalized ray direction

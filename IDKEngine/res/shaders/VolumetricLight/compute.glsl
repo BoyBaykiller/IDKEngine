@@ -18,13 +18,14 @@ struct Light
 struct PointShadow
 {
     samplerCube Sampler;
-    float NearPlane;
-    float FarPlane;
-
+    samplerCubeShadow SamplerShadow;
+    
     mat4 ProjViewMatrices[6];
 
-    vec3 _pad0;
+    float NearPlane;
+    float FarPlane;
     int LightIndex;
+    float _pad0;
 };
 
 layout(std140, binding = 2) uniform LightsUBO
@@ -149,8 +150,6 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample)
 
     // Map from [nearPlane; farPlane] to [0.0; 1.0]
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
-    // Texture lookups with no shadowsampler but comparison mode to != None on is actually UB
-    // Works on both my nvidia and amd card though
     float closestDepth = texture(pointShadow.Sampler, lightToSample).r;
 
     return mapedDepth > closestDepth;

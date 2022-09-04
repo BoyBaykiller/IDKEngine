@@ -2,10 +2,10 @@
 {
     public struct GLSLMaterial
     {
-        public readonly long Albedo;
-        public readonly long Normal;
-        public readonly long Roughness;
-        public readonly long Specular;
-        public readonly long Emissive;
+        public readonly ulong Albedo;
+        public readonly ulong Normal;
+        public readonly ulong Roughness;
+        public readonly ulong Specular;
+        public readonly ulong Emissive;
     }
 }

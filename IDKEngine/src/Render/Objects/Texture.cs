@@ -244,9 +244,9 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long MakeHandleResidentARB()
+        public ulong GenTextureHandleARB()
         {
-            long textureHandle = GL.Arb.GetTextureHandle(ID);
+            ulong textureHandle = (ulong)GL.Arb.GetTextureHandle(ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
             return textureHandle;
         }
@@ -255,9 +255,9 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long MakeSamplerHandleResidentARB(SamplerObject samplerObject)
+        public ulong GenTextureSamplerHandleARB(SamplerObject samplerObject)
         {
-            long textureHandle = GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
+            ulong textureHandle = (ulong)GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
             return textureHandle;
         }
@@ -266,23 +266,18 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public static bool UnmakeHandleResidentARB(long textureHandle)
+        public static void UnmakeTextureHandleResidentARB(ulong textureHandle)
         {
-            if (GL.Arb.IsTextureHandleResident(textureHandle))
-            {
-                GL.Arb.MakeTextureHandleNonResident(textureHandle);
-                return true;
-            }
-            return false;
+            GL.Arb.MakeTextureHandleNonResident(textureHandle);
         }
 
         /// <summary>
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long MakeImageHandleResidentARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
+        public ulong GetImageHandleARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
         {
-            long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
+            ulong imageHandle = (ulong)GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
             GL.Arb.MakeImageHandleResident(imageHandle, (All)textureAccess);
             return imageHandle;
         }
@@ -291,14 +286,9 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public static bool UnmakeImageHandleResidentARB(long imageHandle)
+        public static void UnmakeImageHandleResidentARB(ulong imageHandle)
         {
-            if (GL.Arb.IsImageHandleResident(imageHandle))
-            {
-                GL.Arb.MakeImageHandleNonResident(imageHandle);
-                return true;
-            }
-            return false;
+            GL.Arb.MakeImageHandleNonResident(imageHandle);
         }
 
         public void GetSizeMipmap(out int width, out int height, out int depth, int level = 0)

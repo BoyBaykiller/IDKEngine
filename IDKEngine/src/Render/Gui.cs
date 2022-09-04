@@ -340,66 +340,79 @@ namespace IDKEngine.Render
                     }
                 }
 
-                //if (ImGui.CollapsingHeader("SkyBox"))
-                //{
-                //    string[] resolutions = new string[] { "1024", "512", "256", "128", "64", "32" };
-                //    current = window.AtmosphericScatterer.Result.Width.ToString();
-                //    if (ImGui.BeginCombo("Resolution", current))
-                //    {
-                //        for (int i = 0; i < resolutions.Length; i++)
-                //        {
-                //            bool isSelected = current == resolutions[i];
-                //            if (ImGui.Selectable(resolutions[i], isSelected))
-                //            {
-                //                current = resolutions[i];
-                //                window.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
-                //                window.AtmosphericScatterer.Compute();
-                //                window.GLSLBasicData.FreezeFrameCounter = 0;
-                //            }
+                if (ImGui.CollapsingHeader("SkyBox"))
+                {
+                    bool shouldResetPT = false;
 
-                //            if (isSelected)
-                //                ImGui.SetItemDefaultFocus();
-                //        }
-                //        ImGui.EndCombo();
-                //    }
+                    tempBool = SkyBoxManager.IsExternalSkyBox;
+                    if (ImGui.Checkbox("IsExternalSkyBox", ref tempBool))
+                    {
+                        SkyBoxManager.IsExternalSkyBox = tempBool;
+                        shouldResetPT = true;
+                    }
 
-                //    bool hadChange = false;
+                    if (!SkyBoxManager.IsExternalSkyBox)
+                    {
+                        string[] resolutions = new string[] { "1024", "512", "256", "128", "64", "32" };
+                        current = SkyBoxManager.AtmosphericScatterer.Result.Width.ToString();
+                        if (ImGui.BeginCombo("Resolution", current))
+                        {
+                            for (int i = 0; i < resolutions.Length; i++)
+                            {
+                                bool isSelected = current == resolutions[i];
+                                if (ImGui.Selectable(resolutions[i], isSelected))
+                                {
+                                    current = resolutions[i];
+                                    SkyBoxManager.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
+                                    SkyBoxManager.AtmosphericScatterer.Compute();
+                                    window.GLSLBasicData.FreezeFrameCounter = 0;
+                                }
 
-                //    int tempInt = window.AtmosphericScatterer.ISteps;
-                //    if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
-                //    {
-                //        window.AtmosphericScatterer.ISteps = tempInt;
-                //        hadChange = true;
-                //    }
+                                if (isSelected)
+                                    ImGui.SetItemDefaultFocus();
+                            }
+                            ImGui.EndCombo();
+                        }
 
-                //    tempInt = window.AtmosphericScatterer.JSteps;
-                //    if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
-                //    {
-                //        window.AtmosphericScatterer.JSteps = tempInt;
-                //        hadChange = true;
-                //    }
+                        int tempInt = SkyBoxManager.AtmosphericScatterer.ISteps;
+                        if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
+                        {
+                            SkyBoxManager.AtmosphericScatterer.ISteps = tempInt;
+                            shouldResetPT = true;
+                        }
 
-                //    float tempFloat = window.AtmosphericScatterer.Time;
-                //    if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
-                //    {
-                //        window.AtmosphericScatterer.Time = tempFloat;
-                //        hadChange = true;
-                //    }
+                        tempInt = SkyBoxManager.AtmosphericScatterer.JSteps;
+                        if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
+                        {
+                            SkyBoxManager.AtmosphericScatterer.JSteps = tempInt;
+                            shouldResetPT = true;
+                        }
 
-                //    tempFloat = window.AtmosphericScatterer.LightIntensity;
-                //    if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
-                //    {
-                //        window.AtmosphericScatterer.LightIntensity = tempFloat;
-                        
-                //        hadChange = true;
-                //    }
+                        float tempFloat = SkyBoxManager.AtmosphericScatterer.Time;
+                        if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
+                        {
+                            SkyBoxManager.AtmosphericScatterer.Time = tempFloat;
+                            shouldResetPT = true;
+                        }
 
-                //    if (hadChange)
-                //    {
-                //        window.GLSLBasicData.FreezeFrameCounter = 0;
-                //        window.AtmosphericScatterer.Compute();
-                //    }
-                //}
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.LightIntensity;
+                        if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
+                        {
+                            SkyBoxManager.AtmosphericScatterer.LightIntensity = tempFloat;
+
+                            shouldResetPT = true;
+                        }
+
+                        if (shouldResetPT)
+                        {
+                            SkyBoxManager.AtmosphericScatterer.Compute();
+                        }
+                    }
+                    if (shouldResetPT)
+                    {
+                        window.GLSLBasicData.FreezeFrameCounter = 0;
+                    }
+                }
 
                 ImGui.End();
             }
@@ -413,7 +426,7 @@ namespace IDKEngine.Render
                 }
                 if (selectedEntityType == EntityType.Mesh)
                 {
-                    bool hadChange = false;
+                    bool shouldResetPT = false;
                     ref GLSLMesh mesh = ref window.ModelSystem.Meshes[selectedEntityIndex];
                     ref readonly GLSLDrawCommand cmd = ref window.ModelSystem.DrawCommands[selectedEntityIndex];
 
@@ -423,38 +436,38 @@ namespace IDKEngine.Render
                     System.Numerics.Vector3 systemVec3 = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                         window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTKVec());
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
                     if (ImGui.SliderFloat("EmissiveBias", ref mesh.EmissiveBias, 0.0f, 20.0f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
                     if (ImGui.SliderFloat("SpecularBias", ref mesh.SpecularBias, -1.0f, 1.0f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
                     if (ImGui.SliderFloat("RoughnessBias", ref mesh.RoughnessBias, -1.0f, 1.0f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
                     if (ImGui.SliderFloat("RefractionChance", ref mesh.RefractionChance, 0.0f, 1.0f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
                     if (ImGui.SliderFloat("IOR", ref mesh.IOR, 1.0f, 5.0f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
                     systemVec3 = mesh.Absorbance.ToSystemVec();
@@ -464,10 +477,10 @@ namespace IDKEngine.Render
                         temp = Vector3.ComponentMax(temp, Vector3.Zero);
 
                         mesh.Absorbance = temp;
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
-                    if (hadChange)
+                    if (shouldResetPT)
                     {
                         window.GLSLBasicData.FreezeFrameCounter = 0;
                         window.ModelSystem.UpdateMeshBuffer(selectedEntityIndex, selectedEntityIndex + 1);
@@ -476,30 +489,30 @@ namespace IDKEngine.Render
                 }
                 else if (selectedEntityType == EntityType.Light)
                 {
-                    bool hadChange = false;
+                    bool shouldResetPT = false;
                     ref GLSLLight light = ref window.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                         light.Position = systemVec3.ToOpenTKVec();
                     }
 
                     systemVec3 = light.Color.ToSystemVec();
                     if (ImGui.DragFloat3("Color", ref systemVec3, 0.1f, 0.0f))
                     {
-                        hadChange = true;
+                        shouldResetPT = true;
                         light.Color = systemVec3.ToOpenTKVec();
                     }
 
                     if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f))
                     {
                         light.Radius = MathF.Max(light.Radius, 0.0f);
-                        hadChange = true;
+                        shouldResetPT = true;
                     }
 
-                    if (hadChange)
+                    if (shouldResetPT)
                     {
                         window.GLSLBasicData.FreezeFrameCounter = 0;
                         window.ForwardRenderer.LightingContext.UpdateLightBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);

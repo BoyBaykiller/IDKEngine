@@ -72,11 +72,18 @@ namespace IDKEngine.Render
 
             Instance = CountPointShadows++;
 
+            SamplerObject shadowSampler = new SamplerObject();
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareFunc, (int)All.Less);
+
             Result = new Texture(TextureTarget2d.TextureCubeMap);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.SetCompareMode(TextureCompareMode.CompareRefToTexture);
-            Result.SetCompareFunc(All.Less);
             Result.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
 
             framebuffer = new Framebuffer();
@@ -86,7 +93,8 @@ namespace IDKEngine.Render
 
             projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, nearPlane, farPlane);
 
-            glslPointShadow.Sampler = Result.MakeHandleResidentARB();
+            glslPointShadow.Sampler = Result.GenTextureHandleARB();
+            glslPointShadow.SamplerShadow = Result.GenTextureSamplerHandleARB(shadowSampler);
             glslPointShadow.NearPlane = nearPlane;
             glslPointShadow.FarPlane = farPlane;
             glslPointShadow.LightIndex = lightIndex;
@@ -122,9 +130,9 @@ namespace IDKEngine.Render
             }
             else
             {
-                // Using geometry shader would be slower
                 fixed (Matrix4* ptr = &glslPointShadow.PosX)
                 {
+                    // Using geometry shader would be slower
                     for (int i = 0; i < 6; i++)
                     {
                         Matrix4 projView = *(ptr + i);

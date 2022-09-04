@@ -41,14 +41,15 @@ struct Mesh
 
 struct PointShadow
 {
-    samplerCubeShadow Sampler;
-    float NearPlane;
-    float FarPlane;
-
+    samplerCube Sampler;
+    samplerCubeShadow SamplerShadow;
+    
     mat4 ProjViewMatrices[6];
 
-    vec3 _pad0;
+    float NearPlane;
+    float FarPlane;
     int LightIndex;
+    float _pad0;
 };
 
 layout(std430, binding = 0) restrict buffer DrawCommandsSSBO

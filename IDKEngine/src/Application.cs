@@ -217,7 +217,6 @@ namespace IDKEngine
         public SSAO SSAO;
         public PostCombine PostCombine;
         public VolumetricLighter VolumetricLight;
-        //public AtmosphericScatterer AtmosphericScatterer;
         public PathTracer PathTracer;
         public BVH BVH;
         private Gui gui;
@@ -248,23 +247,6 @@ namespace IDKEngine
             MouseState.CursorMode = CursorModeValue.CursorDisabled;
             gui = new Gui(WindowSize.X, WindowSize.Y);
 
-            Matrix4[] invViewsAndInvprojecion = new Matrix4[]
-            {
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveX
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeX
-               
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)).Inverted(), // PositiveY
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)).Inverted(), // NegativeY
-
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // PositiveZ
-                Camera.GenerateMatrix(Vector3.Zero, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)).Inverted(), // NegativeZ
-
-                Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 69.0f, 420.0f).Inverted()
-            };
-            BufferObject skyBoxUBO = new BufferObject();
-            skyBoxUBO.ImmutableAllocate(sizeof(Matrix4) * invViewsAndInvprojecion.Length, invViewsAndInvprojecion, BufferStorageFlags.None);
-            skyBoxUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
-
             basicDataUBO = new BufferObject();
             basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
@@ -281,6 +263,16 @@ namespace IDKEngine
 
             camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
+
+            SkyBoxManager.Init(new string[]
+            {
+                "res/Textures/EnvironmentMap/posx.jpg",
+                "res/Textures/EnvironmentMap/negx.jpg",
+                "res/Textures/EnvironmentMap/posy.jpg",
+                "res/Textures/EnvironmentMap/negy.jpg",
+                "res/Textures/EnvironmentMap/posz.jpg",
+                "res/Textures/EnvironmentMap/negz.jpg"
+            });
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
@@ -342,23 +334,7 @@ namespace IDKEngine
                 VariableRateShading.SetShadingRatePaletteNV(shadingRates);
             }
 
-            //AtmosphericScatterer = new AtmosphericScatterer(128);
-            //AtmosphericScatterer.Compute();
-            Texture skyBox = new Texture(TextureTarget2d.TextureCubeMap);
-            skyBox.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Helper.ParallelLoadCubemap(skyBox, new string[]
-            {
-                "res/Textures/EnvironmentMap/posx.jpg",
-                "res/Textures/EnvironmentMap/negx.jpg",
-                "res/Textures/EnvironmentMap/posy.jpg",
-                "res/Textures/EnvironmentMap/negy.jpg",
-                "res/Textures/EnvironmentMap/posz.jpg",
-                "res/Textures/EnvironmentMap/negz.jpg"
-            }, (SizedInternalFormat)PixelInternalFormat.Srgb8Alpha8);
-            /// Info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
-            skyBox.SetSeamlessCubeMapPerTextureARB_AMD(true);
-
-            ForwardRenderer = new Forward(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6, skyBox);
+            ForwardRenderer = new Forward(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6);
             Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 3.0f);
             SSR = new SSR(WindowSize.X, WindowSize.Y, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
@@ -366,7 +342,7 @@ namespace IDKEngine
             PostCombine = new PostCombine(WindowSize.X, WindowSize.Y);
 
             BVH = new BVH(ModelSystem);
-            PathTracer = new PathTracer(BVH, ModelSystem, skyBox, WindowSize.X, WindowSize.Y);
+            PathTracer = new PathTracer(BVH, ModelSystem, SkyBoxManager.SkyBoxTexture, WindowSize.X, WindowSize.Y);
 
             List<GLSLLight> lights = new List<GLSLLight>();
             //lights.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));

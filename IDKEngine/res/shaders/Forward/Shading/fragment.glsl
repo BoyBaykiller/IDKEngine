@@ -30,14 +30,15 @@ struct Light
 
 struct PointShadow
 {
-    samplerCubeShadow Sampler;
-    float NearPlane;
-    float FarPlane;
-
+    samplerCube Sampler;
+    samplerCubeShadow SamplerShadow;
+    
     mat4 ProjViewMatrices[6];
 
-    vec3 _pad0;
+    float NearPlane;
+    float FarPlane;
     int LightIndex;
+    float _pad0;
 };
 
 layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
@@ -200,10 +201,10 @@ float Visibility(PointShadow pointShadow)
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
     
     const float DISK_RADIUS = 0.08;
-    float shadowFactor = texture(pointShadow.Sampler, vec4(lightToFrag, mapedDepth));
+    float shadowFactor = texture(pointShadow.SamplerShadow, vec4(lightToFrag, mapedDepth));
     for (int i = 0; i < 20; i++)
     {
-        shadowFactor += texture(pointShadow.Sampler, vec4(lightToFrag + SHADOW_SAMPLE_OFFSETS[i] * DISK_RADIUS, mapedDepth));
+        shadowFactor += texture(pointShadow.SamplerShadow, vec4(lightToFrag + SHADOW_SAMPLE_OFFSETS[i] * DISK_RADIUS, mapedDepth));
     }
 
     return shadowFactor / 21.0;
