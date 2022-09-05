@@ -20,7 +20,7 @@ namespace IDKEngine
                 if (SkyBoxTexture != null)
                 {
                     skyBoxTextureUBO.GetSubData(0, sizeof(ulong), out ulong currentTextureHandle);
-                    Texture.UnmakeTextureHandleResidentARB(currentTextureHandle);
+                    Texture.UnmakeTextureHandleResidentARB(currentTextureHandle); // unmake handle resident to properly delete texture
                 }
 
                 if (_isExternalSkyBox)
@@ -43,7 +43,7 @@ namespace IDKEngine
                         externalSkyBox = null;
                     }
 
-                    AtmosphericScatterer = new AtmosphericScatterer(256);
+                    AtmosphericScatterer = new AtmosphericScatterer(128);
                     AtmosphericScatterer.Compute();
                 }
 
