@@ -1,7 +1,5 @@
 # IDKEngine
 
-Currently there is a bug on NVIDIA GPUs in the Path Tracer which causes the Application to run at near 0 fps in certain scenes. The default scene is one of those. 
-
 Feature list:
  - HDR + Gamma correction
  - ImGui

@@ -566,6 +566,7 @@ namespace IDKEngine.Render
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(window.GLSLBasicData.CameraPos, window.GLSLBasicData.InvProjection, window.GLSLBasicData.InvView, ndc);
                 bool hitMesh = window.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
                 bool hitLight = window.ForwardRenderer.LightingContext.Intersect(worldSpaceRay, out Lighter.HitInfo lightHitInfo);
+                if (window.IsPathTracing) hitLight = false;
 
                 if (!hitMesh && !hitLight)
                 {
@@ -573,6 +574,9 @@ namespace IDKEngine.Render
                     selectedEntityType = EntityType.None;
                     return;
                 }
+
+                if (!hitLight) lightHitInfo.T = float.MaxValue;
+                if (!hitMesh) meshHitInfo.T = float.MaxValue;
 
                 if (meshHitInfo.T < lightHitInfo.T)
                 {
