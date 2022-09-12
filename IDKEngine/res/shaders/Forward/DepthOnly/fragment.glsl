@@ -26,7 +26,7 @@ in InOutVars
 
 void main()
 {
-    vec4 albedo = texture(materialSSBO.Materials[inData.MaterialIndex].Albedo, inData.TexCoord);
-    if (albedo.a < EPSILON)
+    float alpha = texture(materialSSBO.Materials[inData.MaterialIndex].Albedo, inData.TexCoord).a;
+    if (alpha < EPSILON)
         discard;
 }

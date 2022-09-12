@@ -7,6 +7,14 @@
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 #extension GL_NV_gpu_shader5 : enable
+#extension GL_AMD_gpu_shader_half_float : enable
+#extension GL_AMD_gpu_shader_half_float_fetch : enable // requires GL_AMD_gpu_shader_half_float
+
+#ifdef GL_AMD_gpu_shader_half_float_fetch
+#define HF_SAMPLER_2D f16sampler2D
+#else
+#define HF_SAMPLER_2D sampler2D
+#endif
 
 // Inserted by application.
 #define MAX_BLAS_TREE_DEPTH __maxBlasTreeDepth__
@@ -15,11 +23,11 @@ layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z
 
 struct Material
 {
-    sampler2D Albedo;
-    sampler2D Normal;
-    sampler2D Roughness;
-    sampler2D Specular;
-    sampler2D Emissive;
+    HF_SAMPLER_2D Albedo;
+    HF_SAMPLER_2D Normal;
+    HF_SAMPLER_2D Roughness;
+    HF_SAMPLER_2D Specular;
+    HF_SAMPLER_2D Emissive;
 };
 
 struct DrawCommand
@@ -251,6 +259,7 @@ bool TraceRay(inout TransportRay transportRay)
 
         Mesh mesh = meshSSBO.Meshes[hitInfo.MeshIndex];
         // If no GL_NV_gpu_shader5 this is UB due to non dynamically uniform indexing
+        // Can't use GL_EXT_nonuniform_qualifier because only modern amd drivers get the implementation right without compile errors
         Material material = materialSSBO.Materials[mesh.MaterialIndex];
         
         vec4 albedoAlpha = texture(material.Albedo, texCoord);

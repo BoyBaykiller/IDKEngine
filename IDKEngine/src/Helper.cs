@@ -6,12 +6,11 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using Assimp;
+using StbImageSharp;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using IDKEngine.Render.Objects;
-using Assimp;
 
 namespace IDKEngine
 {
@@ -49,7 +48,7 @@ namespace IDKEngine
             HashSet<string> extensions = new HashSet<string>(GL.GetInteger(GetPName.NumExtensions));
             for (int i = 0; i < GL.GetInteger(GetPName.NumExtensions); i++)
                 extensions.Add(GL.GetString(StringNameIndexed.Extensions, i));
-            
+
             return extensions;
         }
 
@@ -81,7 +80,7 @@ namespace IDKEngine
             // Filter shader compile error and "... will use bla bla ..."
             if (id != 2000 && id != 131185)
             {
-                Console.WriteLine($"\nType: {type},\nSeverity: {severity},\nMessage: {Marshal.PtrToStringAnsi(message, length - 1)}");
+                Console.WriteLine($"\nType: {type},\nSeverity: {severity},\nMessage: {Marshal.PtrToStringAnsi(message, length)}");
                 if (severity == DebugSeverity.DebugSeverityHigh)
                 {
                     Console.WriteLine($"Critical error detected, press enter to continue");
@@ -102,23 +101,39 @@ namespace IDKEngine
             if (!paths.All(p => File.Exists(p)))
                 throw new FileNotFoundException($"At least on of the specified paths is invalid");
 
-            Image<Rgba32>[] images = new Image<Rgba32>[6];
-            Parallel.For(0, 6, i =>
+            ImageResult[] images = new ImageResult[6];
+            Parallel.For(0, images.Length, i =>
             {
-                images[i] = Image.Load<Rgba32>(paths[i]);
+                using FileStream stream = File.OpenRead(paths[i]);
+                images[i] = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
             });
-
+            
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
                 throw new ArgumentException($"Cubemap images must be squares and every texture must be of the same size");
-
             int size = images[0].Width;
-            texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
-            for (int i = 0; i < 6; i++)
+
+            const bool AMD_DRIVER_BAD = true; // since 22.7.1
+            if (AMD_DRIVER_BAD)
             {
-                fixed (void* ptr = images[i].GetPixelRowSpan(0))
+                // use old style non dsa mutable for buggy driver
+                GL.BindTexture(TextureTarget.TextureCubeMap, texture.ID);
+                for (int i = 0; i < 6; i++)
                 {
-                    texture.SubTexture3D(size, size, 1, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr, 0, 0, 0, i);
-                    images[i].Dispose();
+                    fixed (void* ptr = images[i].Data)
+                    {
+                        GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, (PixelInternalFormat)sizedInternalFormat, size, size, 0, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
+                    }
+                }
+            }
+            else
+            {
+                texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
+                for (int i = 0; i < 6; i++)
+                {
+                    fixed (void* ptr = images[i].Data)
+                    {
+                        texture.SubTexture3D(size, size, 1, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr, 0, 0, 0, i);
+                    }
                 }
             }
         }
@@ -260,7 +275,7 @@ namespace IDKEngine
             return thread;
         }
 
-        public static float InterlockedMax(ref int location1, int value)
+        public static int InterlockedMax(ref int location1, int value)
         {
             int initialValue;
             int newValue;

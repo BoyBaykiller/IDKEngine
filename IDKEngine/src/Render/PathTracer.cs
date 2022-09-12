@@ -59,15 +59,15 @@ namespace IDKEngine.Render
             }
         }
 
-        private bool _isRNGFrameBased;
-        public bool IsRNGFrameBased
+        private float _rayCoherency;
+        public float RayCoherency
         {
-            get => _isRNGFrameBased;
+            get => _rayCoherency;
 
             set
             {
-                _isRNGFrameBased = value;
-                firstHitProgram.Upload("IsRNGFrameBased", _isRNGFrameBased);
+                _rayCoherency = value;
+                firstHitProgram.Upload("RayCoherency", _rayCoherency);
             }
         }
 
@@ -80,7 +80,7 @@ namespace IDKEngine.Render
         private readonly BufferObject dispatchCommandBuffer;
         private BufferObject transportRayBuffer;
         private BufferObject rayIndicesBuffer;
-        public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, Texture skyBox, int width, int height)
+        public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, int width, int height)
         {
             string firstHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl");
             firstHitProgramSrc = firstHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{bvh.MaxBlasTreeDepth}");
@@ -104,6 +104,7 @@ namespace IDKEngine.Render
             RayDepth = 7;
             FocalLength = 8.0f;
             ApertureDiameter = 0.02f;
+            RayCoherency = 0.0f;
         }
 
         public unsafe void Compute()
