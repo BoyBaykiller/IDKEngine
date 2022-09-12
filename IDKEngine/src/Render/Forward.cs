@@ -45,7 +45,6 @@ namespace IDKEngine.Render
             }
         }
 
-        public bool IsDepthPrePass = true;
         public bool IsExperimentalOcean = false;
 
         public Texture Result => isPing ? taaPing : taaPong;
@@ -130,22 +129,17 @@ namespace IDKEngine.Render
             else
                 Texture.UnbindFromUnit(0);
 
-            if (IsDepthPrePass)
-            {
-                GL.ColorMask(false, false, false, false);
-                depthOnlyProgram.Use();
-                modelSystem.Draw();
+            GL.ColorMask(false, false, false, false);
+            depthOnlyProgram.Use();
+            modelSystem.Draw();
 
-                GL.DepthFunc(DepthFunction.Equal);
-                GL.ColorMask(true, true, true, true);
-                GL.DepthMask(false);
-            }
+            GL.DepthFunc(DepthFunction.Equal);
+            GL.ColorMask(true, true, true, true);
+            GL.DepthMask(false);
 
             shadingProgram.Use();
             modelSystem.Draw();
 
-
-            GL.DepthMask(false);
             GL.Disable(EnableCap.CullFace);
             GL.DepthFunc(DepthFunction.Lequal);
 

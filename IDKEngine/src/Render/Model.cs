@@ -7,8 +7,7 @@ using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using Assimp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using StbImageSharp;
 
 namespace IDKEngine.Render.Objects
 {
@@ -49,8 +48,8 @@ namespace IDKEngine.Render.Objects
             Materials = new GLSLMaterial[scene.MaterialCount];
             Vertices = new GLSLDrawVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
             ModelMatrices = new Matrix4[scene.MeshCount][];
-            Image<Rgba32>[] images = new Image<Rgba32>[scene.MaterialCount * perMaterialTextures.Length];
-            Thread vertecisLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
+            ImageResult[] images = new ImageResult[scene.MaterialCount * perMaterialTextures.Length];
+            Thread verticesLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
             {
                 Mesh mesh = scene.Meshes[i];
 
@@ -104,13 +103,18 @@ namespace IDKEngine.Render.Objects
                     string path = Path.Combine(dirPath, textureSlot.FilePath);
                     if (File.Exists(path))
                     {
-                        images[i] = Image.Load<Rgba32>(path);
+                        using FileStream stream = File.OpenRead(path);
+                        images[i] = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{path} is not found");
                     }
                 }
             });
 
             List<uint> indices = new List<uint>(scene.Meshes.Sum(m => m.VertexCount));
-            vertecisLoadResult.Join();
+            verticesLoadResult.Join();
             for (int i = 0; i < scene.MeshCount; i++)
             {
                 DrawCommands[i].FirstIndex = indices.Count;
@@ -162,20 +166,18 @@ namespace IDKEngine.Render.Objects
                             break;
                     }
 
-                    Image<Rgba32> img = images[perMaterialTextures.Length * i + j];
+                    ImageResult img = images[perMaterialTextures.Length * i + j];
                     if (img != null)
                     {
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
                         texture.SetWrapMode(OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat, OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
                         texture.ImmutableAllocate(img.Width, img.Height, 1, format, Math.Max(Texture.GetMaxMipmapLevel(img.Width, img.Height, 1), 1));
-                        fixed (void* ptr = img.GetPixelRowSpan(0))
+                        fixed (void* ptr = img.Data)
                         {
                             texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
                         }
                         texture.GenerateMipmap();
                         texture.SetAnisotropy(4.0f);
-
-                        img.Dispose();
                     }
                     else
                     {
@@ -184,8 +186,8 @@ namespace IDKEngine.Render.Objects
 
                         if (perMaterialTextures[j] == TextureType.Diffuse)
                         {
-                            float* dummyAlbedoData = stackalloc float[] { 1.0f, 1.0f, 1.0f, 1.0f };
-                            texture.Clear(PixelFormat.Rgba, PixelType.Float, (IntPtr)dummyAlbedoData);
+                            Vector4 dummyAlbedoData = new Vector4(0.371f, 0.676f, 0.336f, 1.0f);
+                            texture.Clear(PixelFormat.Rgba, PixelType.Float, ref dummyAlbedoData);
                         }
                     }
                     ulong textureHandle = texture.GenTextureHandleARB();

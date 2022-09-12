@@ -87,7 +87,6 @@ namespace IDKEngine.Render
                 if (!window.IsPathTracing)
                 {
                     ImGui.Checkbox("IsWireframe", ref window.IsWireframe);
-                    ImGui.Checkbox("DepthPrePass", ref window.ForwardRenderer.IsDepthPrePass);
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
@@ -105,7 +104,7 @@ namespace IDKEngine.Render
                         ImGui.SameLine();
                         InfoMark(
                             "Requires support for NV_shading_rate_image. " +
-                            "This feature when enabled allows the engine to choose a unique shading rate " +
+                            "This feature allows the engine to choose a unique shading rate " +
                             "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
                             "shader invocations in regions where less detail may be required."
                         );
@@ -277,18 +276,19 @@ namespace IDKEngine.Render
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
-                        tempBool = window.PathTracer.IsRNGFrameBased;
-                        if (ImGui.Checkbox("IsRNGFrameBased", ref tempBool))
-                        {
-                            window.PathTracer.IsRNGFrameBased = tempBool;
-                        }
-
                         tempBool = window.PathTracer.IsDebugBVHTraversal;
                         if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
                         {
                             window.GLSLBasicData.FreezeFrameCounter = 0;
                             window.PathTracer.IsDebugBVHTraversal = tempBool;
                         }
+
+                        float tempFloat = window.PathTracer.RayCoherency;
+                        if (ImGui.SliderFloat("RayCoherency", ref tempFloat, 0.0f, 1.0f))
+                        {
+                            window.PathTracer.RayCoherency = tempFloat;
+                        }
+
                         if (!window.PathTracer.IsDebugBVHTraversal)
                         {
                             int tempInt = window.PathTracer.RayDepth;
@@ -438,6 +438,14 @@ namespace IDKEngine.Render
                     {
                         shouldResetPT = true;
                         window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTKVec());
+                    }
+
+                    systemVec3 = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractScale().ToSystemVec();
+                    if (ImGui.DragFloat3("Scale", ref systemVec3, 0.005f))
+                    {
+                        shouldResetPT = true;
+                        Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTKVec(), new Vector3(0.001f));
+                        window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = Matrix4.CreateScale(temp) * window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearScale();
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))

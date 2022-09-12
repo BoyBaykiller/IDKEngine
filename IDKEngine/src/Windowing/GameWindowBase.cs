@@ -6,7 +6,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 namespace IDKEngine
 {
     /// <summary>
-    /// Represents window with OpenGL context and helpul game functionality
+    /// Represents window with OpenGL context and helpul functionality
     /// </summary>
     abstract unsafe class GameWindowBase : IDisposable
     {

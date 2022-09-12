@@ -6,15 +6,18 @@
 #define EPSILON 0.001
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
-#extension GL_NV_compute_shader_derivatives : enable
 #extension GL_NV_gpu_shader5 : enable
+#extension GL_AMD_gpu_shader_half_float : enable
+#extension GL_AMD_gpu_shader_half_float_fetch : enable // requires GL_AMD_gpu_shader_half_float
+
+#ifdef GL_AMD_gpu_shader_half_float_fetch
+#define HF_SAMPLER_2D f16sampler2D
+#else
+#define HF_SAMPLER_2D sampler2D
+#endif
 
 // Inserted by application.
 #define MAX_BLAS_TREE_DEPTH __maxBlasTreeDepth__
-
-#ifdef GL_NV_compute_shader_derivatives
-layout(derivative_group_quadsNV) in;
-#endif
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -22,11 +25,11 @@ layout(binding = 0, rgba32f) restrict writeonly readonly uniform image2D ImgResu
 
 struct Material
 {
-    sampler2D Albedo;
-    sampler2D Normal;
-    sampler2D Roughness;
-    sampler2D Specular;
-    sampler2D Emissive;
+    HF_SAMPLER_2D Albedo;
+    HF_SAMPLER_2D Normal;
+    HF_SAMPLER_2D Roughness;
+    HF_SAMPLER_2D Specular;
+    HF_SAMPLER_2D Emissive;
 };
 
 struct DrawCommand
@@ -201,12 +204,11 @@ ivec2 ReorderInvocations(uint n);
 uniform bool IsDebugBVHTraversal;
 uniform float FocalLength;
 uniform float ApertureDiameter;
-uniform bool IsRNGFrameBased;
+uniform float RayCoherency;
 
 shared uint SharedStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
 
 uint rngSeed;
-
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);
@@ -214,14 +216,9 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    if (IsRNGFrameBased)
-    {
+    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + basicDataUBO.FreezeFrameCounter * 2699;
+    if (GetRandomFloat01() < RayCoherency)
         rngSeed = basicDataUBO.FreezeFrameCounter * 2699;
-    }
-    else
-    {
-        rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + basicDataUBO.FreezeFrameCounter * 2699;
-    }
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -292,6 +289,7 @@ bool TraceRay(inout TransportRay transportRay)
 
         Mesh mesh = meshSSBO.Meshes[hitInfo.MeshIndex];
         // If no GL_NV_gpu_shader5 this is UB due to non dynamically uniform indexing
+        // Can't use GL_EXT_nonuniform_qualifier because only modern amd drivers get the implementation right without compile errors
         Material material = materialSSBO.Materials[mesh.MaterialIndex];
         
         vec4 albedoAlpha = texture(material.Albedo, texCoord);

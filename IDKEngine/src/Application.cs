@@ -64,7 +64,7 @@ namespace IDKEngine
                     GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
                 }
 
-                // Compute last frames SSAO
+                // Last frames SSAO
                 if (IsSSAO) 
                     SSAO.Compute(ForwardRenderer.DepthTexture, ForwardRenderer.NormalSpecTexture);
 
@@ -97,12 +97,12 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpecTexture, ForwardRenderer.DepthTexture);
 
-                // Small "hack" to enable VRS debug image even on systems that don't support the extension
                 if (VariableRateShading.NV_SHADING_RATE_IMAGE)
                 {
                     if (IsVRSForwardRender)
                         ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
                 }
+                // Small "hack" to enable VRS debug image even on systems that don't support the extension
                 else if (ForwardPassVRS.DebugValue != VariableRateShading.DebugMode.NoDebug)
                 {
                     ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
@@ -160,7 +160,7 @@ namespace IDKEngine
                 fps = 0;
                 fpsTimer.Restart();
             }
-
+            
             if (KeyboardState[Keys.Escape] == InputState.Pressed)
                 ShouldClose();
                 
@@ -277,14 +277,14 @@ namespace IDKEngine
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
                 sponza.ModelMatrices[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
+
             sponza.Meshes[10].EmissiveBias = 11.0f;
-            sponza.Meshes[8].NormalMapStrength = 0.4f;
-            sponza.Meshes[8].SpecularBias = 0.3f;
+            sponza.Meshes[8].SpecularBias = -0.65f;
             sponza.Meshes[8].RoughnessBias = -1.0f;
             sponza.Meshes[3].EmissiveBias = 2.67f;
             sponza.Meshes[3].EmissiveBias = 2.67f;
             sponza.Meshes[17].RefractionChance = 1.0f;
-            sponza.Meshes[17].RoughnessBias = -0.5f;
+            sponza.Meshes[17].RoughnessBias = -0.7f;
 
             //Model horse = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
             //for (int i = 0; i < horse.Meshes.Length; i++)
@@ -300,9 +300,9 @@ namespace IDKEngine
             lucy.Meshes[0].IOR = 1.174f;
             lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
 
-            //Model temple = new Model(@"C:\Users\Julian\Downloads\SunTempleSmall\SunTempleSmall.gltf");
-            //for (int i = 0; i < temple.Meshes.Length; i++)
-            //    temple.ModelMatrices[i][0] = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(180.0f)) * Matrix4.CreateTranslation(-12.0f, -1.05f, -0.5f);
+            //Model dragon = new Model(@"C:\Users\Julian\Downloads\stanford_dragon_pbr\scene.gltf");
+            //for (int i = 0; i < dragon.Meshes.Length; i++)
+            //    dragon.ModelMatrices[i][0] = Matrix4.CreateScale(0.03f) * Matrix4.CreateTranslation(0.0f, 5.0f, 0.0f);
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });
@@ -342,7 +342,7 @@ namespace IDKEngine
             PostCombine = new PostCombine(WindowSize.X, WindowSize.Y);
 
             BVH = new BVH(ModelSystem);
-            PathTracer = new PathTracer(BVH, ModelSystem, SkyBoxManager.SkyBoxTexture, WindowSize.X, WindowSize.Y);
+            PathTracer = new PathTracer(BVH, ModelSystem, WindowSize.X, WindowSize.Y);
 
             List<GLSLLight> lights = new List<GLSLLight>();
             //lights.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));

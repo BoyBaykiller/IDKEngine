@@ -17,8 +17,8 @@ namespace IDKEngine
         private int nodesUsed;
         public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
         {
-            treeDepth = (int)MathF.Ceiling(MathF.Log2(count));
-
+            treeDepth = (int)MathF.Ceiling(MathF.Log2(count)) + 1;
+            
             Nodes = new GLSLBlasNode[2 * count];
             ref GLSLBlasNode root = ref Nodes[nodesUsed++];
             root.TriCount = (uint)count;
@@ -39,9 +39,9 @@ namespace IDKEngine
 #endif
 
 #if USE_SAH
-                float splitSAH = FindBestSplitPlane(ref parentNode, out int splitAxis, out float splitPos);
+                float splitSAH = FindBestSplitAxis(ref parentNode, out int splitAxis, out float splitPos);
 
-                float parentSAH = GetLeafSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount);
+                float parentSAH = CalculateSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
                 if (splitSAH >= parentSAH || parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
                     return;
 
@@ -89,36 +89,35 @@ namespace IDKEngine
             }
 
 #if USE_SAH
-            unsafe float FindBestSplitPlane(ref GLSLBlasNode node, out int splitAxis, out float splitPos)
+            float FindBestSplitAxis(ref GLSLBlasNode node, out int splitAxis, out float splitPos)
             {
                 splitAxis = -1;
                 splitPos = 0;
-                float bestSAH = float.MaxValue;
 
-                AABB centroidBounds = new AABB();
+                AABB uniformDivideArea = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
                 for (int i = 0; i < node.TriCount; i++)
                 {
                     ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
                     Vector3 centroid = MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position);
-                    centroidBounds.Grow(centroid);
+                    uniformDivideArea.Shrink(centroid);
                 }
 
+                float bestSAH = float.MaxValue;
                 for (int i = 0; i < 3; i++)
                 {
-                    if (centroidBounds.Min[i] == centroidBounds.Max[i])
+                    if (uniformDivideArea.Min[i] == uniformDivideArea.Max[i])
                         continue;
 
-                    float scale = (centroidBounds.Max[i] - centroidBounds.Min[i]) / SAH_SAMPLES;
-
-                    for (int j = 0; j < SAH_SAMPLES; j++)
+                    float scale = (uniformDivideArea.Max[i] - uniformDivideArea.Min[i]) / SAH_SAMPLES;
+                    for (int j = 1; j < SAH_SAMPLES; j++)
                     {
-                        float candidatePos = centroidBounds.Min[i] + j * scale;
-                        float cost = GetSAH(node, i, candidatePos);
-                        if (cost < bestSAH)
+                        float currentSplitPos = uniformDivideArea.Min[i] + j * scale;
+                        float currentSAH = EvaluateSAH(node, i, currentSplitPos);
+                        if (currentSAH < bestSAH)
                         {
-                            splitPos = candidatePos;
+                            splitPos = currentSplitPos;
                             splitAxis = i;
-                            bestSAH = cost;
+                            bestSAH = currentSAH;
                         }
                     }
                 }
@@ -126,32 +125,34 @@ namespace IDKEngine
                 return bestSAH;
             }
 
-            unsafe float GetSAH(in GLSLBlasNode node, int axis, float pos)
+            float EvaluateSAH(in GLSLBlasNode node, int splitAxis, float splitPos)
             {
-                AABB leftBox = new AABB();
-                AABB rightBox = new AABB();
+                AABB leftBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+                AABB rightBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
-                uint leftCount = 0, rightCount = 0;
+                uint leftCount = 0;
                 for (uint i = 0; i < node.TriCount; i++)
                 {
                     ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
-                    if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[axis] < pos)
+                    float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) * (1.0f / 3.0f);
+                    if (triSplitPos < splitPos)
                     {
                         leftCount++;
-                        leftBox.Grow(tri);
+                        leftBox.Shrink(tri);
                     }
                     else
                     {
-                        rightCount++;
-                        rightBox.Grow(tri);
+                        rightBox.Shrink(tri);
                     }
                 }
-                float sah = GetLeafSAH(leftBox.Area(), leftCount) + GetLeafSAH(rightBox.Area(), rightCount);
-                return sah > 0 ? sah : float.MaxValue;
+                uint rightCount = node.TriCount - leftCount;
+                
+                float sah = CalculateSAH(leftBox.Area(), leftCount, rightBox.Area(), rightCount);
+                return sah;
             }
 #endif
 
-            unsafe void UpdateNodeBounds(ref GLSLBlasNode node)
+            void UpdateNodeBounds(ref GLSLBlasNode node)
             {
                 node.Min = new Vector3(float.MaxValue);
                 node.Max = new Vector3(float.MinValue);
@@ -171,9 +172,9 @@ namespace IDKEngine
             }
         }
 
-        private static float GetLeafSAH(float area, uint triangles)
+        private static float CalculateSAH(float area0, uint triangles0, float area1, uint triangles1)
         {
-            return area * triangles;
+            return area0 * triangles0 + area1 * triangles1;
         }
     }
 }

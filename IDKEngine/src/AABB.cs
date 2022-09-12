@@ -20,11 +20,6 @@ namespace IDKEngine
 
         public Vector3 Min;
         public Vector3 Max;
-        public AABB()
-        {
-            Min = new Vector3(float.MaxValue);
-            Max = new Vector3(float.MinValue);
-        }
 
         public AABB(Vector3 min, Vector3 max)
         {
@@ -32,23 +27,23 @@ namespace IDKEngine
             Max = max;
         }
 
-        public void Grow(in Vector3 value)
+        public void Shrink(in Vector3 value)
         {
             Min = Vector3.ComponentMin(Min, value);
             Max = Vector3.ComponentMax(Max, value);
         }
 
-        public void Grow(in AABB aaab)
+        public void Shrink(in AABB aaab)
         {
-            Grow(aaab.Min);
-            Grow(aaab.Max);
+            Shrink(aaab.Min);
+            Shrink(aaab.Max);
         }
 
-        public void Grow(in GLSLTriangle tri)
+        public void Shrink(in GLSLTriangle tri)
         {
-            Grow(tri.Vertex0.Position);
-            Grow(tri.Vertex1.Position);
-            Grow(tri.Vertex2.Position);
+            Shrink(tri.Vertex0.Position);
+            Shrink(tri.Vertex1.Position);
+            Shrink(tri.Vertex2.Position);
         }
 
         public float Area()
@@ -61,7 +56,7 @@ namespace IDKEngine
         {
             for (uint i = 0; i < 8; i++)
             {
-                Grow((new Vector4(this[i], 1.0f) * model).Xyz);
+                Shrink((new Vector4(this[i], 1.0f) * model).Xyz);
             }
         }
     }
