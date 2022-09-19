@@ -104,7 +104,7 @@ namespace IDKEngine.Render
             RayDepth = 7;
             FocalLength = 8.0f;
             ApertureDiameter = 0.02f;
-            RayCoherency = 0.0f;
+            RayCoherency = 0.2f;
         }
 
         public unsafe void Compute()

@@ -43,9 +43,9 @@ namespace IDKEngine.Render
             ImGui.Image((IntPtr)window.PostCombine.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
             isHoveredViewport = ImGui.IsItemHovered();
 
-            if (content.X != window.ViewportSize.X || content.Y != window.ViewportSize.Y)
+            if (content.X != window.ViewportResolution.X || content.Y != window.ViewportResolution.Y)
             {
-                window.SetViewportSize((int)content.X, (int)content.Y);
+                window.SetViewportResolution((int)content.X, (int)content.Y);
             }
 
             ImGui.End();
@@ -54,7 +54,7 @@ namespace IDKEngine.Render
             ImGui.Begin("Renderer");
             {
                 ImGui.Text($"FPS: {window.FPS}");
-                ImGui.Text($"Viewport size: {window.ViewportSize.X}x{window.ViewportSize.Y}");
+                ImGui.Text($"Viewport size: {window.ViewportResolution.X}x{window.ViewportResolution.Y}");
 
                 if (window.IsPathTracing)
                     ImGui.Text($"Samples taken: {window.GLSLBasicData.FreezeFrameCounter}");
@@ -196,7 +196,7 @@ namespace IDKEngine.Render
                             }
 
                             float tempFloat = window.SSAO.Radius;
-                            if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 2.0f))
+                            if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 0.5f))
                             {
                                 window.SSAO.Radius = tempFloat;
                             }
@@ -353,27 +353,6 @@ namespace IDKEngine.Render
 
                     if (!SkyBoxManager.IsExternalSkyBox)
                     {
-                        string[] resolutions = new string[] { "1024", "512", "256", "128", "64", "32" };
-                        current = SkyBoxManager.AtmosphericScatterer.Result.Width.ToString();
-                        if (ImGui.BeginCombo("Resolution", current))
-                        {
-                            for (int i = 0; i < resolutions.Length; i++)
-                            {
-                                bool isSelected = current == resolutions[i];
-                                if (ImGui.Selectable(resolutions[i], isSelected))
-                                {
-                                    current = resolutions[i];
-                                    SkyBoxManager.AtmosphericScatterer.SetSize(Convert.ToInt32(current));
-                                    SkyBoxManager.AtmosphericScatterer.Compute();
-                                    window.GLSLBasicData.FreezeFrameCounter = 0;
-                                }
-
-                                if (isSelected)
-                                    ImGui.SetItemDefaultFocus();
-                            }
-                            ImGui.EndCombo();
-                        }
-
                         int tempInt = SkyBoxManager.AtmosphericScatterer.ISteps;
                         if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                         {
@@ -432,6 +411,11 @@ namespace IDKEngine.Render
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");
+                    ImGui.SameLine(); if (ImGui.Button("Teleport to camera"))
+                    {
+                        window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(window.Camera.Position);
+                        shouldResetPT = true;
+                    }
                     
                     System.Numerics.Vector3 systemVec3 = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))

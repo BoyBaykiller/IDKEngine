@@ -181,7 +181,7 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 } skyBoxUBO;
 
 bool TraceRay(inout TransportRay transportRay);
-vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out bool isRefractive, out float newIor);
+vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out float newIor, out bool isRefractive, out bool fromInside);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 bool ClosestHit(Ray ray, out HitInfo hitInfo);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
@@ -272,15 +272,16 @@ bool TraceRay(inout TransportRay transportRay)
         normal = TBN * normalize(normal * 2.0 - 1.0);
         normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength));
 
-        if (transportRay.IsRefractive)
+        bool fromInside;
+        float rayProbability, newIor;
+        uncompressedRayDir = BSDF(uncompressedRayDir, specularChance, roughness, refractionChance, mesh.IOR, transportRay.PrevIOROrDebugNodeCounter, normal, rayProbability, newIor, transportRay.IsRefractive, fromInside);
+        transportRay.Origin += uncompressedRayDir * EPSILON;
+        transportRay.PrevIOROrDebugNodeCounter = newIor; // ior of the object we are currently in
+
+        if (fromInside)
         {
             transportRay.Throughput *= exp(-mesh.Absorbance * hitInfo.T);
         }
-
-        float rayProbability, newIor;
-        uncompressedRayDir = BSDF(uncompressedRayDir, specularChance, roughness, refractionChance, mesh.IOR, transportRay.PrevIOROrDebugNodeCounter, normal, rayProbability, transportRay.IsRefractive, newIor);
-        transportRay.Origin += uncompressedRayDir * EPSILON;
-        transportRay.PrevIOROrDebugNodeCounter = newIor;
 
         transportRay.Radiance += emissive * transportRay.Throughput;
         if (!transportRay.IsRefractive)
@@ -304,15 +305,15 @@ bool TraceRay(inout TransportRay transportRay)
     }
 }
 
-vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out bool isRefractive, out float newIor)
+vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out float newIor, out bool isRefractive, out bool fromInside)
 {
     float cosTheta = dot(-incomming, normal);
-    bool fromInside = cosTheta < 0.0;
+    fromInside = cosTheta < 0.0;
     if (fromInside)
         normal *= -1.0;
 
     isRefractive = false;
-    if (specularChance > 0.0)
+    if (specularChance > 0.0) // adjust specular chance based on view angle
     {
         specularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, fromInside ? ior : prevIor, fromInside ? prevIor : ior));
         float diffuseChance = 1.0 - specularChance - refractionChance;

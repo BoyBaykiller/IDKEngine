@@ -60,11 +60,6 @@ namespace IDKEngine
             return (data >> offset) & mask;
         }
 
-        public static Vector3 Average(in Vector3 p0, in Vector3 p1, in Vector3 p2)
-        {
-            return (p0 + p1 + p2) * (1.0f / 3.0f);
-        }
-        
         public static float Area(in Vector3 size)
         {
             return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
