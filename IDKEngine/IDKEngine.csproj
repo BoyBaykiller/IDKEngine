@@ -29,7 +29,7 @@
     <PackageReference Include="AssimpNet" Version="5.0.0-beta1" />
     <PackageReference Include="ImGui.NET" Version="1.87.3" />
     <PackageReference Include="OpenTK" Version="4.7.5" />
-    <PackageReference Include="StbImageSharp" Version="2.27.11" />
+    <PackageReference Include="StbImageSharp" Version="2.27.12" />
   </ItemGroup>
 
 </Project>

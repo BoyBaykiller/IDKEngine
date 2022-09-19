@@ -105,7 +105,7 @@ namespace IDKEngine
         /// <summary>
         /// Creates a window with OpenGL context
         /// </summary>
-        public GameWindowBase(int width, int heigth, string title)
+        public GameWindowBase(int width, int heigth, string title, int openglMajor, int openglMinor)
         {
             if (!glfwInitialized)
             {
@@ -118,13 +118,19 @@ namespace IDKEngine
             GLFW.WindowHint(WindowHintBool.ContextNoError, true);
 #endif
             GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Compat);
-            GLFW.WindowHint(WindowHintInt.ContextVersionMajor, 4);
-            GLFW.WindowHint(WindowHintInt.ContextVersionMinor, 6);
+            GLFW.WindowHint(WindowHintInt.ContextVersionMajor, openglMajor);
+            GLFW.WindowHint(WindowHintInt.ContextVersionMinor, openglMinor);
             _title = title;
             _size.X = width;
             _size.Y = heigth;
 
             window = GLFW.CreateWindow(_size.X, _size.Y, _title, null, null);
+            if (window == null)
+            {
+                Console.WriteLine($"Window creation failed. Make sure you have support for OpenGL {openglMajor}.{openglMinor}. Press Enter to exit");
+                Console.ReadLine();
+                Environment.Exit(1);
+            }
 
             framebufferSizeDelegate = FramebufferSizeCallback;
             GLFW.SetFramebufferSizeCallback(window, framebufferSizeDelegate);

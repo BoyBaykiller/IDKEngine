@@ -7,14 +7,6 @@ namespace IDKEngine.Render.Objects
 {
     class Texture : IDisposable
     {
-        public enum PixelTypeSize : int
-        {
-            TextureRedSize = 32860,
-            TextureGreenSize = 32861,
-            TextureBlueSize = 32862,
-            TextureAlphaSize = 32863,
-        }
-
         public enum TextureDimension : byte
         {
             Undefined = 0,
@@ -296,22 +288,6 @@ namespace IDKEngine.Render.Objects
             GL.GetTextureLevelParameter(ID, level, GetTextureParameter.TextureWidth, out width);
             GL.GetTextureLevelParameter(ID, level, GetTextureParameter.TextureHeight, out height);
             GL.GetTextureLevelParameter(ID, level, GetTextureParameter.TextureDepth, out depth);
-        }
-
-        public int GetPixelTypeComponentSize(PixelTypeSize pixelTypeSize, int level = 0)
-        {
-            GL.GetTextureLevelParameter(ID, level, (GetTextureParameter)pixelTypeSize, out int bitSize);
-            return bitSize / 8;
-        }
-
-        public int GetPixelSize(int level = 0)
-        {
-            int r = GetPixelTypeComponentSize(PixelTypeSize.TextureRedSize, level);
-            int g = GetPixelTypeComponentSize(PixelTypeSize.TextureGreenSize, level);
-            int b = GetPixelTypeComponentSize(PixelTypeSize.TextureBlueSize, level);
-            int a = GetPixelTypeComponentSize(PixelTypeSize.TextureAlphaSize, level);
-
-            return r + g + b + a;
         }
 
         public void Dispose()

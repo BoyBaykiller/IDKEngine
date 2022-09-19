@@ -12,7 +12,6 @@ namespace IDKEngine
 #endif
 
         public readonly GLSLBlasNode[] Nodes;
-        public readonly AABB RootBounds;
 
         private int nodesUsed;
         public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
@@ -27,8 +26,6 @@ namespace IDKEngine
 
             UpdateNodeBounds(ref root);
             Subdivide();
-            RootBounds.Max = root.Max;
-            RootBounds.Min = root.Min;
 
             void Subdivide(int nodeID = 0)
             {
@@ -59,7 +56,7 @@ namespace IDKEngine
                 while (rightStart <= endOfTris)
                 {
                     ref GLSLTriangle tri = ref triangles[rightStart];
-                    if (MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position)[splitAxis] < splitPos)
+                    if ((tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) * (1.0f / 3.0f) < splitPos)
                         rightStart++;
                     else
                         Helper.Swap(ref tri, ref triangles[endOfTris--]);
@@ -98,7 +95,7 @@ namespace IDKEngine
                 for (int i = 0; i < node.TriCount; i++)
                 {
                     ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
-                    Vector3 centroid = MyMath.Average(tri.Vertex0.Position, tri.Vertex1.Position, tri.Vertex2.Position);
+                    Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) * (1.0f / 3.0f);
                     uniformDivideArea.Shrink(centroid);
                 }
 
@@ -112,7 +109,7 @@ namespace IDKEngine
                     for (int j = 1; j < SAH_SAMPLES; j++)
                     {
                         float currentSplitPos = uniformDivideArea.Min[i] + j * scale;
-                        float currentSAH = EvaluateSAH(node, i, currentSplitPos);
+                        float currentSAH = FindSAH(node, i, currentSplitPos);
                         if (currentSAH < bestSAH)
                         {
                             splitPos = currentSplitPos;
@@ -125,7 +122,7 @@ namespace IDKEngine
                 return bestSAH;
             }
 
-            float EvaluateSAH(in GLSLBlasNode node, int splitAxis, float splitPos)
+            float FindSAH(in GLSLBlasNode node, int splitAxis, float splitPos)
             {
                 AABB leftBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
                 AABB rightBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
