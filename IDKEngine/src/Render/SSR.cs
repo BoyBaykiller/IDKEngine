@@ -55,12 +55,12 @@ namespace IDKEngine.Render
             MaxDist = maxDist;
         }
 
-        public unsafe void Compute(Texture samplerSrc, Texture normalTexture, Texture depthTexture)
+        public unsafe void Compute(Texture colorTexture, Texture normalTexture, Texture depthTexture)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
-            int* textures = stackalloc int[] { samplerSrc.ID, normalTexture.ID, depthTexture.ID };
-            Texture.MultiBindToUnit(0, 4, textures);
+            int* textures = stackalloc int[] { colorTexture.ID, normalTexture.ID, depthTexture.ID };
+            Texture.MultiBindToUnit(0, 3, textures);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

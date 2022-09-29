@@ -95,7 +95,7 @@ void main()
 {
     DrawCommand meshCMD = drawCommandSSBO.DrawCommands[MeshIndex];
     Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
-    mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[gl_InstanceID + meshCMD.BaseInstance];
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;

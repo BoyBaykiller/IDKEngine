@@ -81,7 +81,7 @@ void main()
 
     // In multi pass shadows the layer is simply passed as a uniform before each pass
 
-    mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[gl_InstanceID + gl_BaseInstance];
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
 

@@ -193,7 +193,7 @@ vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
 vec3 UniformSampleSphere();
 vec3 CosineSampleHemisphere(vec3 normal);
-vec2 UniformSampleCircle();
+vec2 UniformSampleDisk();
 uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
@@ -225,7 +225,7 @@ void main()
 
     vec3 camDir = GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc);
     vec3 focalPoint = basicDataUBO.ViewPos + camDir * FocalLength;
-    vec3 aperturePoint = (basicDataUBO.InvView * vec4(ApertureDiameter * 0.5 * UniformSampleCircle(), 0.0, 1.0)).xyz;
+    vec3 aperturePoint = (basicDataUBO.InvView * vec4(ApertureDiameter * 0.5 * UniformSampleDisk(), 0.0, 1.0)).xyz;
 
     camDir = normalize(focalPoint - aperturePoint);
 
@@ -549,11 +549,17 @@ vec3 CosineSampleHemisphere(vec3 normal)
     return normalize(normal + UniformSampleSphere());
 }
 
-vec2 UniformSampleCircle()
+vec2 UniformSampleDisk()
 {
-    float angle = GetRandomFloat01() * 2.0 * PI;
-    float r = sqrt(GetRandomFloat01());
-    return vec2(cos(angle), sin(angle)) * r;
+    vec2 point;
+    float dist;
+    do
+    {
+        point = vec2(GetRandomFloat01(), GetRandomFloat01()) * 2.0 - 1.0;
+        dist = dot(point, point);
+    } while (dist > 1.0);
+
+    return point;
 }
 
 // Faster and much more random than Wang Hash

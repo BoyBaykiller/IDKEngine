@@ -50,7 +50,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
-    int Frame;
+    uint Frame;
     float VelScale;
 } taaDataUBO;
 
@@ -62,14 +62,14 @@ out InOutVars
 
 void main()
 {
-    mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[gl_InstanceID + gl_BaseInstance];
 
     outData.MaterialIndex = meshSSBO.Meshes[gl_DrawID].MaterialIndex;
     outData.TexCoord = TexCoord;
 
     vec3 fragPos = (model * vec4(Position, 1.0)).xyz;
     
-    int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
+    uint rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(
         taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 0],
         taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 1]
