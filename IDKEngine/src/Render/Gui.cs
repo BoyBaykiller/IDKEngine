@@ -40,7 +40,7 @@ namespace IDKEngine.Render
             System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
             viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
             
-            ImGui.Image((IntPtr)window.PostCombine.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
+            ImGui.Image((IntPtr)window.PostProcessor.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
             isHoveredViewport = ImGui.IsItemHovered();
 
             if (content.X != window.ViewportResolution.X || content.Y != window.ViewportResolution.Y)
@@ -78,10 +78,10 @@ namespace IDKEngine.Render
                     ImGui.EndCombo();
                 }
 
-                bool tempBool = window.PostCombine.IsDithering;
+                bool tempBool = window.PostProcessor.IsDithering;
                 if (ImGui.Checkbox("IsDithering", ref tempBool))
                 {
-                    window.PostCombine.IsDithering = tempBool;
+                    window.PostProcessor.IsDithering = tempBool;
                 }
 
                 if (!window.IsPathTracing)
@@ -181,6 +181,19 @@ namespace IDKEngine.Render
                                 temp = Vector3.ComponentMax(temp, Vector3.Zero);
                                 window.VolumetricLight.Absorbance = temp;
                             }
+
+                            tempBool = window.VolumetricLight.IsTemporalAccumulation;
+                            if (!window.PostProcessor.TaaEnabled) ImGui.BeginDisabled();
+                            if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
+                            {
+                                window.VolumetricLight.IsTemporalAccumulation = tempBool;
+                            }
+                            ImGui.SameLine();
+                            InfoMark(
+                                "Requires TAA to be enabled. " +
+                                $"When active samples are accumulated over {window.PostProcessor.TaaSamples} frames (based on TAA setting)."
+                            );
+                            if (!window.PostProcessor.TaaEnabled) ImGui.EndDisabled();
                         }
                     }
 
@@ -238,36 +251,50 @@ namespace IDKEngine.Render
                     {
                         ImGui.Checkbox("IsShadows", ref window.IsShadows);
                         ImGui.SameLine();
+                        string appendText;
                         if (PointShadow.IS_VERTEX_LAYERED_RENDERING)
                         {
-                            InfoMark(
+                            appendText =
                                 "This system supports vertex layered rendering. " +
-                                "Each pointshadow will be generated in only 1 draw call instead of 6."
-                            );
+                                "Each pointshadow will be generated in only 1 draw call instead of 6.";
                         }
                         else
                         {
-                            InfoMark(
+                            appendText =
                                 "This system does not support vertex layered rendering. " +
-                                "Each pointshadow will be generated in 6 draw calls instead of 1."
-                            );
+                                "Each pointshadow will be generated in 6 draw calls instead of 1.";
                         }
+                        InfoMark(
+                            "Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps. " +
+                            appendText
+                        );
                     }
 
                     if (ImGui.CollapsingHeader("TAA"))
                     {
-                        tempBool = window.ForwardRenderer.TaaEnabled;
+                        tempBool = window.PostProcessor.TaaEnabled;
                         if (ImGui.Checkbox("IsTAA", ref tempBool))
                         {
-                            window.ForwardRenderer.TaaEnabled = tempBool;
+                            window.PostProcessor.TaaEnabled = tempBool;
                         }
 
-                        if (window.ForwardRenderer.TaaEnabled)
+                        if (window.PostProcessor.TaaEnabled)
                         {
-                            int tempInt = window.ForwardRenderer.TaaSamples;
+                            tempBool = window.PostProcessor.IsTaaArtifactMitigation;
+                            if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
+                            {
+                                window.PostProcessor.IsTaaArtifactMitigation = tempBool;
+                            }
+                            ImGui.SameLine();
+                            InfoMark(
+                                "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass. " +
+                                "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
+                            );
+
+                            int tempInt = window.PostProcessor.TaaSamples;
                             if (ImGui.SliderInt("Samples   ", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
                             {
-                                window.ForwardRenderer.TaaSamples = tempInt;
+                                window.PostProcessor.TaaSamples = tempInt;
                             }
                         }
                     }

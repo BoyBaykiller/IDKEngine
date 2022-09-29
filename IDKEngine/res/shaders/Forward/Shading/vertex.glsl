@@ -53,7 +53,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
-    int Frame;
+    uint Frame;
     float VelScale;
 } taaDataUBO;
 
@@ -79,7 +79,7 @@ void main()
     vec3 normal = DecompressSNorm32Fast(Normal);
     vec3 tangent = DecompressSNorm32Fast(Tangent);
 
-    mat4 model = matrixSSBO.Models[gl_BaseInstance + gl_InstanceID];
+    mat4 model = matrixSSBO.Models[gl_InstanceID + gl_BaseInstance];
     vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
     vec3 N = normalize((model * vec4(normal, 0.0)).xyz);
     T = normalize(T - dot(T, N) * N);
@@ -100,7 +100,7 @@ void main()
     outData.SpecularBias = mesh.SpecularBias;
     outData.RoughnessBias = mesh.RoughnessBias;
     
-    int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
+    uint rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(
         taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 0],
         taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 1]

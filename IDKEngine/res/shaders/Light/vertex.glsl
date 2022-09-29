@@ -39,7 +39,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
-    int Frame;
+    uint Frame;
     float VelScale;
 } taaDataUBO;
 
@@ -72,7 +72,7 @@ void main()
     outData.Position = light.Position;
     outData.Radius = light.Radius;
 
-    int rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
+    uint rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(
         taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 0],
         taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 1]

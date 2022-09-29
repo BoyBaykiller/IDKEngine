@@ -142,10 +142,10 @@ I decided to scale both of these factors add them together and then use that to 
 
 While operating on shared memory is fast Subgroup Intrinsics are faster.
 They are a relatively new topic on its own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are a lot of subgroup operations. The full thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt) but vendor specific/arb extensions with `ARB_shader_group_vote` actually being part of core also exist.
-Anyway the one which is particular interesting for our case of computing a sum is `KHR_shader_subgroup_arithmetic` or more specifically the function `subgroupInclusiveAdd`.
+Anyway the one which is particular interesting for our case of computing a sum is `KHR_shader_subgroup_arithmetic` or more specifically the function `subgroupAdd`.
 
 On my GPU a subgroup is 32 invocations big.
-If I call `subgroupInclusiveAdd(2)` the function will return 64.
+If I call `subgroupAdd(2)` the function will return 64.
 So it basically does a sum over values passed into the function in the scope of a subgroup.
 
 Using this knowledge my optimized version of a workgroup wide sum looks like this:
@@ -158,7 +158,7 @@ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 shared float SharedSums[gl_WorkGroupSize.x / SUBGROUP_SIZE];
 void main()
 {
-    float subgroupSum = subgroupInclusiveAdd(GetValueToAdd());
+    float subgroupSum = subgroupAdd(GetValueToAdd());
 
     // single invocation of the subgroup should write result
     // into shared mem for further workgroup wide processing

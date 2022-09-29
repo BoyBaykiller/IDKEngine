@@ -8,7 +8,7 @@
         public fixed float Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2];
         public int Samples;
         public int IsEnabled;
-        public int Frame;
+        public uint Frame;
         public float Scale;
     }
 }

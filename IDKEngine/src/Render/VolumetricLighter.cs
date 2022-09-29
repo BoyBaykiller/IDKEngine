@@ -66,10 +66,22 @@ namespace IDKEngine.Render
             }
         }
 
+        private bool _isTemporalAccumulation;
+        public bool IsTemporalAccumulation
+        {
+            get => _isTemporalAccumulation;
+
+            set
+            {
+                _isTemporalAccumulation = value;
+                shaderProgram.Upload("IsTemporalAccumulation", _isTemporalAccumulation);
+            }
+        }
+
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance)
+        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance, bool isTemporalAccumulation = true)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
 
@@ -80,6 +92,8 @@ namespace IDKEngine.Render
             MaxDist = maxDist;
             Strength = strength;
             Absorbance = absorbance;
+
+            IsTemporalAccumulation = isTemporalAccumulation;
         }
 
         public void Compute(Texture depth)

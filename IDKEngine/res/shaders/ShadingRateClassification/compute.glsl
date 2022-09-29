@@ -10,16 +10,7 @@
 #define DEBUG_SPEED 2
 #define DEBUG_LUMINANCE 3
 #define DEBUG_LUMINANCE_VARIANCE 4
-
-// Could also implement subgroup optimizations for AMD
-// using AMD_shader_ballot and ARB_shader_ballot but useless since
-// NV_shading_rate_image is only available on recent NVIDIA cards
-
 #extension GL_KHR_shader_subgroup_arithmetic : enable
-
-// Inserted by application.
-// Will be 1 if no subgroup features are available
-#define EFFECTIVE_SUBGROUP_SIZE __effectiveSubroupSize__
 
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
@@ -50,7 +41,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
-    int Frame;
+    uint Frame;
     float VelScale;
 } taaDataUBO;
 
@@ -62,27 +53,40 @@ uniform float LumVarianceFactor;
 
 shared uint SharedDebugShadingRate;
 
-shared float SharedMeanSpeed[TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE];
-shared float SharedMeanLum[TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE];
-shared float SharedMeanLumVariance[TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE];
+#ifndef GL_KHR_shader_subgroup_arithmetic
+#define MIN_ASSUMED_SUBGROUP_SIZE 1
+#elif GL_NV_gpu_shader5
+#define MIN_ASSUMED_SUBGROUP_SIZE 32 // nvidia device
+#else
+#define MIN_ASSUMED_SUBGROUP_SIZE 8 // worst case on Intel hardware
+#endif
 
-const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE);
-const float VARIANCE_AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE - 1);
+shared float SharedMeanSpeed[TILE_SIZE * TILE_SIZE / MIN_ASSUMED_SUBGROUP_SIZE];
+shared float SharedMeanLum[TILE_SIZE * TILE_SIZE / MIN_ASSUMED_SUBGROUP_SIZE];
+shared float SharedMeanLumVariance[TILE_SIZE * TILE_SIZE / MIN_ASSUMED_SUBGROUP_SIZE];
+
+const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
+const float VARIANCE_AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE - 1);
 
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgShaded);
 
+    uint subgroupSize;
+
     vec2 vel = texture(SamplerVelocity, uv).rg / taaDataUBO.VelScale;
     vec3 srcColor = imageLoad(ImgShaded, imgCoord).rgb;
     float luminance = GetLuminance(srcColor);
-#if EFFECTIVE_SUBGROUP_SIZE == 1
+#ifndef GL_KHR_shader_subgroup_arithmetic
     SharedMeanSpeed[gl_LocalInvocationIndex] = dot(vel, vel) * AVG_MULTIPLIER;
     SharedMeanLum[gl_LocalInvocationIndex] = luminance * AVG_MULTIPLIER;
+    subgroupSize = 1u;
 #else
-    float subgroupAddedSpeed = subgroupInclusiveAdd(dot(vel, vel) * AVG_MULTIPLIER);
-    float subgroupAddedLum = subgroupInclusiveAdd(luminance * AVG_MULTIPLIER);
+    subgroupSize = gl_SubgroupSize;
+
+    float subgroupAddedSpeed = subgroupAdd(dot(vel, vel) * AVG_MULTIPLIER);
+    float subgroupAddedLum = subgroupAdd(luminance * AVG_MULTIPLIER);
 
     if (subgroupElect())
     {
@@ -94,7 +98,7 @@ void main()
 
     // Use parallel reduction to calculate sum (average) of all velocity and luminance values
     // Final results will have been collapsed into the first array element
-    for (int cutoff = (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE) / 2; cutoff > 0; cutoff /= 2)
+    for (uint cutoff = (TILE_SIZE * TILE_SIZE / subgroupSize) / 2; cutoff > 0; cutoff /= 2)
     {
         if (gl_LocalInvocationIndex < cutoff)
         {
@@ -105,10 +109,10 @@ void main()
     }
 
     float deltaLumMean = luminance - SharedMeanLum[0];
-#if EFFECTIVE_SUBGROUP_SIZE == 1
+#ifndef GL_KHR_shader_subgroup_arithmetic
     SharedMeanLumVariance[gl_LocalInvocationIndex] = pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER;
 #else
-    float subgroupAddedDeltaLumMean = subgroupInclusiveAdd(pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER);
+    float subgroupAddedDeltaLumMean = subgroupAdd(pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER);
 
     if (subgroupElect())
     {
@@ -119,7 +123,7 @@ void main()
 
     // Use parallel reduction to calculate sum (average) of squared luminance deltas - variance
     // Final luminance variance will have been collapsed into the first array element
-    for (int cutoff = (TILE_SIZE * TILE_SIZE / EFFECTIVE_SUBGROUP_SIZE) / 2; cutoff > 0; cutoff /= 2)
+    for (uint cutoff = (TILE_SIZE * TILE_SIZE / subgroupSize) / 2; cutoff > 0; cutoff /= 2)
     {
         if (gl_LocalInvocationIndex < cutoff)
         {

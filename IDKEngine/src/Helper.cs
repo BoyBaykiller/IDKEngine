@@ -119,10 +119,7 @@ namespace IDKEngine
                 GL.BindTexture(TextureTarget.TextureCubeMap, texture.ID);
                 for (int i = 0; i < 6; i++)
                 {
-                    fixed (void* ptr = images[i].Data)
-                    {
-                        GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, (PixelInternalFormat)sizedInternalFormat, size, size, 0, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
-                    }
+                    GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, (PixelInternalFormat)sizedInternalFormat, size, size, 0, PixelFormat.Rgba, PixelType.UnsignedByte, images[i].Data);
                 }
             }
             else
@@ -130,10 +127,7 @@ namespace IDKEngine
                 texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
                 for (int i = 0; i < 6; i++)
                 {
-                    fixed (void* ptr = images[i].Data)
-                    {
-                        texture.SubTexture3D(size, size, 1, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr, 0, 0, 0, i);
-                    }
+                    texture.SubTexture3D(size, size, 1, PixelFormat.Rgba, PixelType.UnsignedByte, images[i].Data, 0, 0, 0, i);
                 }
             }
         }

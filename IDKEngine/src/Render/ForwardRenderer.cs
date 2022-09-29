@@ -7,7 +7,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    unsafe class Forward : IDisposable
+    unsafe class ForwardRenderer : IDisposable
     {
         private int _renderMeshAABBIndex = -1;
         /// <summary>
@@ -24,69 +24,27 @@ namespace IDKEngine.Render
             }
         }
 
-        public bool TaaEnabled
-        {
-            get => taaData->IsEnabled == 1 ? true : false;
-
-            set
-            {
-                taaData->IsEnabled = value ? 1 : 0;
-                TaaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + sizeof(int), sizeof(int), taaData->IsEnabled);
-            }
-        }
-        public int TaaSamples
-        {
-            get => taaData->Samples;
-
-            set
-            {
-                taaData->Samples = value;
-                TaaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT, sizeof(int), taaData->Samples);
-            }
-        }
-
-        public bool IsExperimentalOcean = false;
-
-        public Texture Result => isPing ? taaPing : taaPong;
-
         public readonly Framebuffer Framebuffer;
         public Texture NormalSpecTexture;
         public Texture VelocityTexture;
         public Texture DepthTexture;
-        public readonly BufferObject TaaBuffer;
         public readonly Lighter LightingContext;
 
         private readonly ShaderProgram shadingProgram;
-        private readonly ShaderProgram taaResolveProgram;
         private readonly ShaderProgram depthOnlyProgram;
         private readonly ShaderProgram skyBoxProgram;
         private readonly ShaderProgram aabbProgram;
 
-        private int taaFrame
-        {
-            get => taaData->Frame;
-
-            set
-            {
-                taaData->Frame = value;
-                TaaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + 2 * sizeof(int), sizeof(int), taaData->Frame);
-            }
-        }
-
         private readonly GLSLTaaData* taaData;
 
-        private Texture taaPing;
-        private Texture taaPong;
-        private bool isPing = true;
-        public Forward(Lighter lighter, int width, int height, int taaSamples)
+        public Texture Result;
+        public ForwardRenderer(Lighter lighter, int width, int height, int taaSamples)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 
             shadingProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Forward/Shading/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Forward/Shading/fragment.glsl")));
-
-            taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TAAResolve/compute.glsl")));
 
             depthOnlyProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Forward/DepthOnly/vertex.glsl")),
@@ -102,25 +60,13 @@ namespace IDKEngine.Render
 
             Framebuffer = new Framebuffer();
 
-            TaaBuffer = new BufferObject();
-            TaaBuffer.ImmutableAllocate(sizeof(GLSLTaaData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            TaaBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
-
-            taaData = Helper.Malloc<GLSLTaaData>();
-            taaData->Samples = taaSamples;
-            taaData->IsEnabled = 1;
-            taaData->Scale = 5.0f;
-
             SetSize(width, height);
-
-            TaaBuffer.SubData(0, sizeof(GLSLTaaData), (IntPtr)taaData);
 
             LightingContext = lighter;
         }
 
         public void Render(ModelSystem modelSystem, Texture ambientOcclusion = null)
         {
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, isPing ? taaPing : taaPong);
             Framebuffer.Bind();
             Framebuffer.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -152,17 +98,6 @@ namespace IDKEngine.Render
 
             LightingContext.Draw();
 
-            if (taaData->IsEnabled == 1)
-            {
-                (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
-                (isPing ? taaPong : taaPing).BindToUnit(0);
-                VelocityTexture.BindToUnit(1);
-                DepthTexture.BindToUnit(2);
-                taaResolveProgram.Use();
-                GL.DispatchCompute((taaPing.Width + 8 - 1) / 8, (taaPing.Height + 8 - 1) / 8, 1);
-                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-            }
-
             if (RenderMeshAABBIndex >= 0)
             {
                 GL.DepthFunc(DepthFunction.Always);
@@ -176,24 +111,15 @@ namespace IDKEngine.Render
                 GL.Enable(EnableCap.CullFace);
                 GL.DepthFunc(DepthFunction.Less);
             }
-
-            isPing = !isPing;
-            taaFrame++;
         }
 
         public void SetSize(int width, int height)
         {
-            if (taaPing != null) taaPing.Dispose();
-            taaPing = new Texture(TextureTarget2d.Texture2D);
-            taaPing.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            taaPing.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPing.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
-
-            if (taaPong != null) taaPong.Dispose();
-            taaPong = new Texture(TextureTarget2d.Texture2D);
-            taaPong.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            taaPong.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPong.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+            if (Result != null) Result.Dispose();
+            Result = new Texture(TextureTarget2d.Texture2D);
+            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
 
             if (NormalSpecTexture != null) NormalSpecTexture.Dispose();
             NormalSpecTexture = new Texture(TextureTarget2d.Texture2D);
@@ -213,21 +139,13 @@ namespace IDKEngine.Render
             DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             DepthTexture.ImmutableAllocate(width, height, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent24);
 
-            Span<float> jitterData = new Span<float>(taaData->Jitters, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT * 2);
-            MyMath.GetHaltonSequence_2_3(jitterData);
-            MyMath.MapHaltonSequence(jitterData, width, height);
-            fixed (void* ptr = jitterData)
-            {
-                TaaBuffer.SubData(0, sizeof(float) * jitterData.Length, (IntPtr)ptr);
-            }
-
-            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, taaPing);
+            Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, NormalSpecTexture);
             Framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, VelocityTexture);
             Framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture);
 
             Framebuffer.SetReadBuffer(ReadBufferMode.ColorAttachment2);
-            Framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2});
+            Framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2 });
         }
 
         public void Dispose()
@@ -235,15 +153,11 @@ namespace IDKEngine.Render
             DepthTexture.Dispose();
             VelocityTexture.Dispose();
             NormalSpecTexture.Dispose();
-            taaPong.Dispose();
-            taaPing.Dispose();
+            Result.Dispose();
 
             Framebuffer.Dispose();
-
-            TaaBuffer.Dispose();
             
             shadingProgram.Dispose();
-            taaResolveProgram.Dispose();
             depthOnlyProgram.Dispose();
             skyBoxProgram.Dispose();
             aabbProgram.Dispose();

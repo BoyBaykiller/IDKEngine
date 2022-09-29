@@ -66,7 +66,7 @@ namespace IDKEngine
                 }
 
                 // Last frames SSAO
-                if (IsSSAO) 
+                if (IsSSAO)
                     SSAO.Compute(ForwardRenderer.DepthTexture, ForwardRenderer.NormalSpecTexture);
 
                 if (IsShadows)
@@ -108,7 +108,7 @@ namespace IDKEngine
                 {
                     ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
                 }
-                PostCombine.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
+                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null, ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
 
                 if (IsWireframe)
                 {
@@ -122,7 +122,7 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
-                PostCombine.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
+                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null, null, null);
             }
 
             GL.Disable(EnableCap.DepthTest);
@@ -139,7 +139,7 @@ namespace IDKEngine
             }
             else
             {
-                PostCombine.Result.BindToUnit(0);
+                PostProcessor.Result.BindToUnit(0);
                 FinalProgram.Use();
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             }
@@ -211,12 +211,12 @@ namespace IDKEngine
         private List<PointShadow> pointShadows;
         public ShaderProgram FinalProgram;
         public ModelSystem ModelSystem;
-        public Forward ForwardRenderer;
+        public ForwardRenderer ForwardRenderer;
         public Bloom Bloom;
         public VariableRateShading ForwardPassVRS;
         public SSR SSR;
         public SSAO SSAO;
-        public PostCombine PostCombine;
+        public PostProcessor PostProcessor;
         public VolumetricLighter VolumetricLight;
         public PathTracer PathTracer;
         public BVH BVH;
@@ -248,20 +248,19 @@ namespace IDKEngine
             MouseState.CursorMode = CursorModeValue.CursorDisabled;
             gui = new Gui(WindowSize.X, WindowSize.Y);
 
-            basicDataUBO = new BufferObject();
-            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
-
-            FinalProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
-
             gui.ImGuiBackend.WindowResized(WindowSize.X, WindowSize.Y);
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), WindowSize.X / (float)WindowSize.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
 
+            basicDataUBO = new BufferObject();
+            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), GLSLBasicData, BufferStorageFlags.DynamicStorageBit);
+            basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
+
+            FinalProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
 
             Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
@@ -304,39 +303,25 @@ namespace IDKEngine
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });
 
+            Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
             {
-                Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
-                {
-                    NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
-                };
+                NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
+                NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
+                NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
+                NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
+                NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
+            };
+            VariableRateShading.SetShadingRatePaletteNV(shadingRates);
                 
-                string srcCode = File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl");
-                int effectiveSubGroupSize = 1;
-                if (Helper.IsExtensionsAvailable("GL_KHR_shader_subgroup"))
-                {
-                    SubgroupSupportedFeatures bitfield = (SubgroupSupportedFeatures)GL.GetInteger(GetPName.SubgroupSupportedFeaturesKhr);
-                    if ((bitfield & SubgroupSupportedFeatures.SubgroupFeatureArithmeticBitKhr) == SubgroupSupportedFeatures.SubgroupFeatureArithmeticBitKhr)
-                    {
-                        effectiveSubGroupSize = GL.GetInteger(GetPName.SubgroupSizeKhr);
-                    }
-                }
-                srcCode = srcCode.Replace("__effectiveSubroupSize__", Convert.ToString(effectiveSubGroupSize));
-                
-                ForwardPassVRS = new VariableRateShading(new Shader(ShaderType.ComputeShader, srcCode), WindowSize.X, WindowSize.Y);
-                VariableRateShading.BindVRSNV(ForwardPassVRS);
-                VariableRateShading.SetShadingRatePaletteNV(shadingRates);
-            }
+            ForwardPassVRS = new VariableRateShading(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")), WindowSize.X, WindowSize.Y);
+            VariableRateShading.BindVRSNV(ForwardPassVRS);
 
-            ForwardRenderer = new Forward(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6);
+            ForwardRenderer = new ForwardRenderer(new Lighter(12, 12), WindowSize.X, WindowSize.Y, 6);
             Bloom = new Bloom(WindowSize.X, WindowSize.Y, 1.0f, 3.0f);
             SSR = new SSR(WindowSize.X, WindowSize.Y, 30, 8, 50.0f);
-            VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 14, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
+            VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             SSAO = new SSAO(WindowSize.X, WindowSize.Y, 10, 0.1f, 2.0f);
-            PostCombine = new PostCombine(WindowSize.X, WindowSize.Y);
+            PostProcessor = new PostProcessor(WindowSize.X, WindowSize.Y);
 
             BVH = new BVH(ModelSystem);
             PathTracer = new PathTracer(BVH, ModelSystem, WindowSize.X, WindowSize.Y);
@@ -389,11 +374,11 @@ namespace IDKEngine
             VolumetricLight.SetSize(width, height);
             SSR.SetSize(width, height);
             SSAO.SetSize(width, height);
-            PostCombine.SetSize(width, height);
+            PostProcessor.SetSize(width, height);
             PathTracer.SetSize(width, height);
-            
-            GLSLBasicData.FreezeFrameCounter = 0;
 
+
+            GLSLBasicData.FreezeFrameCounter = 0;
         }
 
         protected override void OnEnd()

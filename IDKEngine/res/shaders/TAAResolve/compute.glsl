@@ -1,6 +1,6 @@
 #version 460 core
 #define FLOAT_MAX 3.4028235e+38
-#define FLOAT_MIN -3.4028235e+38
+#define FLOAT_MIN -FLOAT_MAX
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -15,17 +15,34 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
-    int Frame;
+    uint Frame;
     float VelScale;
 } taaDataUBO;
 
 void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 currentColor, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
 vec4 SampleTextureCatmullRom(sampler2D srcTexture, vec2 uv);
 
+uniform bool IsTaaArtifactMitigation;
+
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
+
+    if (!IsTaaArtifactMitigation)
+    {
+        vec2 velocity = texelFetch(SamplerVelocity, imgCoord, 0).rg / taaDataUBO.VelScale;
+        vec2 oldUV = uv - velocity;
+
+        vec3 currentColor = imageLoad(ImgResult, imgCoord).rgb;
+        vec3 historyColor = texture(SamplerLastForwardPass, oldUV).rgb;
+
+        float blend = 1.0 / taaDataUBO.Samples;
+
+        vec3 color = mix(historyColor, currentColor, blend);
+        imageStore(ImgResult, imgCoord, vec4(color, 1.0));
+        return;
+    }
 
     ivec2 bestVelocityPixel;
     vec3 neighborhoodMin, neighborhoodMax;

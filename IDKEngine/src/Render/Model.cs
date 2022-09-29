@@ -172,10 +172,7 @@ namespace IDKEngine.Render.Objects
                         texture.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
                         texture.SetWrapMode(OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat, OpenTK.Graphics.OpenGL4.TextureWrapMode.Repeat);
                         texture.ImmutableAllocate(img.Width, img.Height, 1, format, Math.Max(Texture.GetMaxMipmapLevel(img.Width, img.Height, 1), 1));
-                        fixed (void* ptr = img.Data)
-                        {
-                            texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)ptr);
-                        }
+                        texture.SubTexture2D(img.Width, img.Height, PixelFormat.Rgba, PixelType.UnsignedByte, img.Data);
                         texture.GenerateMipmap();
                         texture.SetAnisotropy(4.0f);
                     }

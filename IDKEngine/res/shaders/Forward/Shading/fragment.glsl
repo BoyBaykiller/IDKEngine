@@ -83,7 +83,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
-    int Frame;
+    uint Frame;
     float VelScale;
 } taaDataUBO;
 
