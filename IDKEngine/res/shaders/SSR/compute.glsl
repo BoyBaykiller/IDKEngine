@@ -67,7 +67,6 @@ vec3 SSR(vec3 normal, vec3 fragPos)
         samplePoint += deltaStep;
 
         vec3 projectedSample = ViewToNDC(samplePoint) * 0.5 + 0.5;
-        
         if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))))
         {
             // TODO: Parallax corrected cubemap reflections as fallback? 

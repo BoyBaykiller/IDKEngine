@@ -94,7 +94,7 @@ in InOutVars
     vec4 ClipPos;
     vec4 PrevClipPos;
     vec3 Normal;
-    mat3 TBN;
+    mat3 TangentToWorld;
     flat uint MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
@@ -122,7 +122,7 @@ void main()
     Specular = clamp(texture(material.Specular, inData.TexCoord).r + inData.SpecularBias, 0.0, 1.0);
     float AO = texture(SamplerAO, uv).r;
 
-    Normal = inData.TBN * normalize(Normal * 2.0 - 1.0);
+    Normal = inData.TangentToWorld * normalize(Normal * 2.0 - 1.0);
     Normal = normalize(mix(normalize(inData.Normal), Normal, inData.NormalMapStrength));
 
     ViewDir = normalize(inData.FragPos - basicDataUBO.ViewPos);

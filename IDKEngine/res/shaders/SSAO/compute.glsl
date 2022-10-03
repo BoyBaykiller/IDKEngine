@@ -48,8 +48,8 @@ void main()
     
     vec2 uv = (imgCoord + 0.5) / imgResultSize;
 
-    mat3 worldToViewNormal = mat3(transpose(basicDataUBO.InvView));
-    vec3 normal = worldToViewNormal * texture(SamplerNormalSpec, uv).rgb;
+    mat3 worldToView = mat3(transpose(basicDataUBO.InvView));
+    vec3 normal = worldToView * texture(SamplerNormalSpec, uv).rgb;
     vec3 fragPos = NDCToViewSpace(vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0);
 
     float occlusion = 0.0;

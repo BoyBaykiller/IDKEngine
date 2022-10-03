@@ -88,7 +88,7 @@ namespace IDKEngine.Render
             IsTaaArtifactMitigation = true;
         }
 
-        public void Compute(Texture v0, Texture v1, Texture v2, Texture v3, Texture velocityTexture, Texture depthTexture)
+        public void Compute(Texture v0, Texture v1, Texture v2, Texture v3)
         {
             (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
@@ -107,8 +107,11 @@ namespace IDKEngine.Render
             combineProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+        }
 
-            if (taaData->IsEnabled == 1 && velocityTexture != null && depthTexture != null)
+        public void TaaCompute(Texture velocityTexture, Texture depthTexture)
+        {
+            if (taaData->IsEnabled == 1)
             {
                 (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
                 (isPing ? taaPong : taaPing).BindToUnit(0);
@@ -123,7 +126,6 @@ namespace IDKEngine.Render
             }
             isPing = !isPing;
         }
-
 
         public void SetSize(int width, int height)
         {

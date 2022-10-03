@@ -310,6 +310,13 @@ namespace IDKEngine.Render
                             window.PathTracer.IsDebugBVHTraversal = tempBool;
                         }
 
+                        tempBool = window.PathTracer.IsTraceLights;
+                        if (ImGui.Checkbox("IsTraceLights", ref tempBool))
+                        {
+                            window.GLSLBasicData.FreezeFrameCounter = 0;
+                            window.PathTracer.IsTraceLights = tempBool;
+                        }
+
                         float tempFloat = window.PathTracer.RayCoherency;
                         if (ImGui.SliderFloat("RayCoherency", ref tempFloat, 0.0f, 1.0f))
                         {
@@ -585,7 +592,7 @@ namespace IDKEngine.Render
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(window.GLSLBasicData.CameraPos, window.GLSLBasicData.InvProjection, window.GLSLBasicData.InvView, ndc);
                 bool hitMesh = window.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
                 bool hitLight = window.ForwardRenderer.LightingContext.Intersect(worldSpaceRay, out Lighter.HitInfo lightHitInfo);
-                if (window.IsPathTracing) hitLight = false;
+                if (window.IsPathTracing && !window.PathTracer.IsTraceLights) hitLight = false;
 
                 if (!hitMesh && !hitLight)
                 {

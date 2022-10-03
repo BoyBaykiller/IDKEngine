@@ -64,7 +64,7 @@ out InOutVars
     vec4 ClipPos;
     vec4 PrevClipPos;
     vec3 Normal;
-    mat3 TBN;
+    mat3 TangentToWorld;
     flat uint MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
@@ -85,15 +85,14 @@ void main()
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
 
-    outData.TBN = mat3(T, B, N);
+    outData.TangentToWorld = mat3(T, B, N);
     outData.TexCoord = TexCoord;
     outData.FragPos = (model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
-    
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    outData.Normal = normal;
+    outData.Normal = normal; // TODO: Should be transformed to world space, thinking of dropping this feature
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;

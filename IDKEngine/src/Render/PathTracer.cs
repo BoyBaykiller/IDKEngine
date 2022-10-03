@@ -11,30 +11,6 @@ namespace IDKEngine.Render
         private int cachedRayDepth;
         public int RayDepth;
 
-        private float _focalLength;
-        public float FocalLength
-        {
-            get => _focalLength;
-
-            set
-            {
-                _focalLength = value;
-                firstHitProgram.Upload("FocalLength", value);
-            }
-        }
-
-        private float _apertureDiameter;
-        public float ApertureDiameter
-        {
-            get => _apertureDiameter;
-
-            set
-            {
-                _apertureDiameter = value;
-                firstHitProgram.Upload("ApertureDiameter", value);
-            }
-        }
-
         private bool _isDebugBVHTraversal;
         public bool IsDebugBVHTraversal
         {
@@ -56,6 +32,43 @@ namespace IDKEngine.Render
                     ApertureDiameter = _apertureDiameter;
                     RayDepth = cachedRayDepth;
                 }
+            }
+        }
+
+        private bool _isTraceLights;
+        public bool IsTraceLights
+        {
+            get => _isTraceLights;
+
+            set
+            {
+                _isTraceLights = value;
+                firstHitProgram.Upload("IsTraceLights", _isTraceLights);
+                nHitProgram.Upload("IsTraceLights", _isTraceLights);
+            }
+        }
+
+        private float _focalLength;
+        public float FocalLength
+        {
+            get => _focalLength;
+
+            set
+            {
+                _focalLength = value;
+                firstHitProgram.Upload("FocalLength", value);
+            }
+        }
+
+        private float _apertureDiameter;
+        public float ApertureDiameter
+        {
+            get => _apertureDiameter;
+
+            set
+            {
+                _apertureDiameter = value;
+                firstHitProgram.Upload("ApertureDiameter", value);
             }
         }
 
@@ -83,11 +96,11 @@ namespace IDKEngine.Render
         public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, int width, int height)
         {
             string firstHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl");
-            firstHitProgramSrc = firstHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{bvh.MaxBlasTreeDepth}");
+            firstHitProgramSrc = firstHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
             firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, firstHitProgramSrc));
 
             string nHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl");
-            nHitProgramSrc = nHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{bvh.MaxBlasTreeDepth}");
+            nHitProgramSrc = nHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
             nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, nHitProgramSrc));
 
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
