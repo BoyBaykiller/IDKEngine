@@ -35,8 +35,6 @@ namespace IDKEngine.Render
         private readonly ShaderProgram skyBoxProgram;
         private readonly ShaderProgram aabbProgram;
 
-        private readonly GLSLTaaData* taaData;
-
         public Texture Result;
         public ForwardRenderer(Lighter lighter, int width, int height, int taaSamples)
         {
@@ -161,8 +159,6 @@ namespace IDKEngine.Render
             depthOnlyProgram.Dispose();
             skyBoxProgram.Dispose();
             aabbProgram.Dispose();
-
-            System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)taaData);
         }
     }
 }

@@ -67,7 +67,7 @@ struct HitInfo
 {
     vec3 Bary;
     float T;
-    uint TriangleIndex;
+    int TriangleIndex;
     uint MeshIndex;
     uint InstanceID;
 };
@@ -96,7 +96,10 @@ struct Triangle
 struct TransportRay
 {
     vec3 Origin;
-    uint Direction;
+    float _pad0;
+
+    vec3 Direction;
+    float _pad1;
 
     vec3 Throughput;
     float PrevIOROrDebugNodeCounter;
@@ -110,6 +113,14 @@ struct DispatchCommand
     uint NumGroupsX;
     uint NumGroupsY;
     uint NumGroupsZ;
+};
+
+struct Light
+{
+    vec3 Position;
+    float Radius;
+    vec3 Color;
+    float _pad0;
 };
 
 layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
@@ -175,6 +186,13 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
+layout(std140, binding = 2) uniform LightsUBO
+{
+    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
+    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
+    int Count;
+} lightsUBO;
+
 layout(std140, binding = 4) uniform SkyBoxUBO
 {
     samplerCube Albedo;
@@ -186,6 +204,7 @@ float FresnelSchlick(float cosTheta, float n1, float n2);
 bool ClosestHit(Ray ray, out HitInfo hitInfo);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
 bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
+bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary);
 vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
@@ -193,10 +212,10 @@ vec3 UniformSampleSphere();
 vec3 CosineSampleHemisphere(vec3 normal);
 uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
-uint CompressSNorm32Fast(vec3 data);
 vec3 DecompressSNorm32Fast(uint data);
 
 layout(location = 0) uniform int PingPongIndex;
+uniform bool IsTraceLights;
 
 shared uint SharedStack[N_HIT_PROGRAM_LOCAL_SIZE_X][MAX_BLAS_TREE_DEPTH];
 
@@ -235,52 +254,77 @@ void main()
 bool TraceRay(inout TransportRay transportRay)
 {
     HitInfo hitInfo;
-    vec3 uncompressedRayDir = DecompressSNorm32Fast(transportRay.Direction);
-    if (ClosestHit(Ray(transportRay.Origin, uncompressedRayDir), hitInfo))
+    if (ClosestHit(Ray(transportRay.Origin, transportRay.Direction), hitInfo))
     {
-        transportRay.Origin += uncompressedRayDir * hitInfo.T;
+        transportRay.Origin += transportRay.Direction * hitInfo.T;
 
-        Triangle triangle = triangleSSBO.Triangles[hitInfo.TriangleIndex];
-        Vertex v0 = triangle.Vertex0;
-        Vertex v1 = triangle.Vertex1;
-        Vertex v2 = triangle.Vertex2;
+        vec3 albedo;
+        vec3 normal;
+        vec3 emissive;
+        float refractionChance;
+        float specularChance;
+        float roughness;
+        float ior;
+        vec3 absorbance;
+        // This if statement somehow improves performance even if the condition is always true on RX 5700 XT
+        if (hitInfo.TriangleIndex != -1)
+        {
+            Triangle triangle = triangleSSBO.Triangles[hitInfo.TriangleIndex];
+            Vertex v0 = triangle.Vertex0;
+            Vertex v1 = triangle.Vertex1;
+            Vertex v2 = triangle.Vertex2;
 
-        vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
-        vec3 geoNormal = normalize(Interpolate(DecompressSNorm32Fast(v0.Normal), DecompressSNorm32Fast(v1.Normal), DecompressSNorm32Fast(v2.Normal), hitInfo.Bary));
-        vec3 tangent = normalize(Interpolate(DecompressSNorm32Fast(v0.Tangent), DecompressSNorm32Fast(v1.Tangent), DecompressSNorm32Fast(v2.Tangent), hitInfo.Bary));
+            vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
+            vec3 geoNormal = normalize(Interpolate(DecompressSNorm32Fast(v0.Normal), DecompressSNorm32Fast(v1.Normal), DecompressSNorm32Fast(v2.Normal), hitInfo.Bary));
+            vec3 tangent = normalize(Interpolate(DecompressSNorm32Fast(v0.Tangent), DecompressSNorm32Fast(v1.Tangent), DecompressSNorm32Fast(v2.Tangent), hitInfo.Bary));
 
-        mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
-        vec3 T = normalize((model * vec4(tangent, 0.0f)).xyz);
-        vec3 N = normalize((model * vec4(geoNormal, 0.0)).xyz);
-    
-        T = normalize(T - dot(T, N) * N);
-        vec3 B = cross(N, T);
-        mat3 TBN = mat3(T, B, N);
+            mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
+            vec3 T = normalize((model * vec4(tangent, 0.0f)).xyz);
+            vec3 N = normalize((model * vec4(geoNormal, 0.0)).xyz);
+            T = normalize(T - dot(T, N) * N);
+            vec3 B = cross(N, T);
+            mat3 TBN = mat3(T, B, N);
 
-        Mesh mesh = meshSSBO.Meshes[hitInfo.MeshIndex];
-        // If no GL_NV_gpu_shader5 this is UB due to non dynamically uniform indexing
-        // Can't use GL_EXT_nonuniform_qualifier because only modern amd drivers get the implementation right without compile errors
-        Material material = materialSSBO.Materials[mesh.MaterialIndex];
-        
-        vec4 albedoAlpha = texture(material.Albedo, texCoord);
-        vec3 albedo = albedoAlpha.rgb;
-        float refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
-        vec3 emissive = (texture(material.Emissive, texCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + mesh.EmissiveBias) * albedo;
-        float specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
-        float roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
-        vec3 normal = texture(material.Normal, texCoord).rgb;
-        normal = TBN * normalize(normal * 2.0 - 1.0);
-        normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength));
+            Mesh mesh = meshSSBO.Meshes[hitInfo.MeshIndex];
+            // If no GL_NV_gpu_shader5 this is UB due to non dynamically uniform indexing
+            // Can't use GL_EXT_nonuniform_qualifier because only modern amd drivers get the implementation right without compile errors
+            Material material = materialSSBO.Materials[mesh.MaterialIndex];
+
+            vec4 albedoAlpha = texture(material.Albedo, texCoord);
+            albedo = albedoAlpha.rgb;
+            refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
+            emissive = (texture(material.Emissive, texCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + mesh.EmissiveBias) * albedo;
+            specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+            roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
+            normal = texture(material.Normal, texCoord).rgb;
+            normal = TBN * normalize(normal * 2.0 - 1.0);
+            normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength)); // TODO: geoNormal should be transformed to world space here, thinking of dropping this feature
+            ior = mesh.IOR;
+            absorbance = mesh.Absorbance;
+        }
+        else if (IsTraceLights)
+        {
+            Light light = lightsUBO.Lights[hitInfo.MeshIndex];
+            emissive = light.Color;
+            albedo = light.Color;
+            normal = (transportRay.Origin - light.Position) / light.Radius;
+
+            refractionChance = 0.0;
+            specularChance = 0.0;
+            roughness = 0.0;
+            ior = 1.0;
+            absorbance = vec3(0.0);
+        }
 
         bool fromInside;
         float rayProbability, newIor;
-        uncompressedRayDir = BSDF(uncompressedRayDir, specularChance, roughness, refractionChance, mesh.IOR, transportRay.PrevIOROrDebugNodeCounter, normal, rayProbability, newIor, transportRay.IsRefractive, fromInside);
-        transportRay.Origin += uncompressedRayDir * EPSILON;
+        transportRay.Direction = BSDF(transportRay.Direction, specularChance, roughness, refractionChance, ior, transportRay.PrevIOROrDebugNodeCounter, normal, rayProbability, newIor, transportRay.IsRefractive, fromInside);
+        transportRay.Origin += transportRay.Direction * EPSILON;
         transportRay.PrevIOROrDebugNodeCounter = newIor; // ior of the object we are currently in
 
         if (fromInside)
         {
-            transportRay.Throughput *= exp(-mesh.Absorbance * hitInfo.T);
+            transportRay.Throughput *= exp(-absorbance * hitInfo.T);
         }
 
         transportRay.Radiance += emissive * transportRay.Throughput;
@@ -295,12 +339,11 @@ bool TraceRay(inout TransportRay transportRay)
             return false;
         transportRay.Throughput /= p;
 
-        transportRay.Direction = CompressSNorm32Fast(uncompressedRayDir);
         return true;
     }
     else
     {
-        transportRay.Radiance += texture(skyBoxUBO.Albedo, uncompressedRayDir).rgb * transportRay.Throughput;
+        transportRay.Radiance += texture(skyBoxUBO.Albedo, transportRay.Direction).rgb * transportRay.Throughput;
         return false;
     }
 }
@@ -381,7 +424,21 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
 bool ClosestHit(Ray ray, out HitInfo hitInfo)
 {
     hitInfo.T = FLOAT_MAX;
+    hitInfo.TriangleIndex = -1;
     float rayTMin, rayTMax;
+
+    if (IsTraceLights)
+    {
+        for (int i = 0; i < lightsUBO.Count; i++)
+        {
+            Light light = lightsUBO.Lights[i];
+            if (RaySphereIntersect(ray, light, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T)
+            {
+                hitInfo.T = rayTMin;
+                hitInfo.MeshIndex = i;
+            }
+        }
+    }
 
     vec4 baryT;
     for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
@@ -414,7 +471,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
                         hitInfo.Bary = baryT.xyz;
                         hitInfo.T = baryT.w;
                         hitInfo.MeshIndex = i;
-                        hitInfo.TriangleIndex = j;
+                        hitInfo.TriangleIndex = int(j);
                         hitInfo.InstanceID = cmd.BaseInstance + glInstanceID;
                     }
                 }
@@ -485,6 +542,25 @@ bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2)
     return t1 <= t2;
 }
 
+// Source: https://antongerdelan.net/opengl/raycasting.html
+bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2)
+{
+    t1 = t2 = FLOAT_MAX;
+
+    vec3 sphereToRay = ray.Origin - light.Position;
+    float b = dot(ray.Direction, sphereToRay);
+    float c = dot(sphereToRay, sphereToRay) - light.Radius * light.Radius;
+    float discriminant = b * b - c;
+    if (discriminant < 0.0)
+        return false;
+
+    float squareRoot = sqrt(discriminant);
+    t1 = -b - squareRoot;
+    t2 = -b + squareRoot;
+
+    return t1 <= t2;
+}
+
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary)
 {
     return v0 * bary.z + v1 * bary.x + v2 * bary.y;
@@ -530,17 +606,6 @@ uint GetPCGHash(inout uint seed)
 float GetRandomFloat01()
 {
     return float(GetPCGHash(rngSeed)) / 4294967296.0;
-}
-
-uint CompressSNorm32Fast(vec3 data)
-{
-    data = data * 0.5 + 0.5;
-
-    uint r = uint(round(data.x * ((1u << 11) - 1)));
-    uint g = uint(round(data.y * ((1u << 11) - 1)));
-    uint b = uint(round(data.z * ((1u << 10) - 1)));
-
-    return (r << 0) | (g << 11) | (b << 22);
 }
 
 vec3 DecompressSNorm32Fast(uint data)

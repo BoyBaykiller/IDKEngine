@@ -65,18 +65,22 @@ namespace IDKEngine
             MaxBlasTreeDepth = maxTreeDepth;
 
             BlasBuffer = new BufferObject();
-            BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
-            int nodesUploaded = 0;
-            for (int i = 0; i < blases.Length; i++)
-            {
-                BlasBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), blases[i].Nodes.Length * sizeof(GLSLBlasNode), blases[i].Nodes);
-                nodesUploaded += blases[i].Nodes.Length;
-            }
-
             TriangleBuffer = new BufferObject();
-            TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.None);
-            TriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
+
+            if (triangles.Length > 0)
+            {
+                BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+                BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
+                int nodesUploaded = 0;
+                for (int i = 0; i < blases.Length; i++)
+                {
+                    BlasBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), blases[i].Nodes.Length * sizeof(GLSLBlasNode), blases[i].Nodes);
+                    nodesUploaded += blases[i].Nodes.Length;
+                }
+
+                TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.None);
+                TriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
+            }
         }
 
         public unsafe bool Intersect(in Ray ray, out RayHitInfo hitInfo)

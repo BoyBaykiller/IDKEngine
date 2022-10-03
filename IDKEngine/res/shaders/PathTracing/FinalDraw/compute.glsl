@@ -8,7 +8,10 @@ layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 struct TransportRay
 {
     vec3 Origin;
-    uint Direction;
+    float _pad0;
+
+    vec3 Direction;
+    float _pad1;
 
     vec3 Throughput;
     float PrevIOROrDebugNodeCounter;

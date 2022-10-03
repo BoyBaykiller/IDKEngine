@@ -108,7 +108,8 @@ namespace IDKEngine
                 {
                     ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
                 }
-                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null, ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
+                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
+                PostProcessor.TaaCompute(ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
 
                 if (IsWireframe)
                 {
@@ -122,7 +123,7 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
-                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null, null, null);
+                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
             }
 
             GL.Disable(EnableCap.DepthTest);
@@ -201,7 +202,6 @@ namespace IDKEngine
                 if (hadCameraInputs)
                     GLSLBasicData.FreezeFrameCounter = 0;
             }
-
 
             gui.Update(this);
         }
@@ -332,9 +332,9 @@ namespace IDKEngine
             lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             ForwardRenderer.LightingContext.Add(CollectionsMarshal.AsSpan(lights));
-            
+
             pointShadows = new List<PointShadow>();
-            for (int i = 0; i < lights.Count; i++)
+            for (int i = 0; i < 3; i++)
             {
                 pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, i, 512, 0.5f, 60.0f));
             }
