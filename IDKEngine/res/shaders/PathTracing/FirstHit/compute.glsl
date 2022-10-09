@@ -160,9 +160,10 @@ layout(std430, binding = 6) restrict writeonly buffer TransportRaySSBO
     TransportRay Rays[];
 } transportRaySSBO;
 
-layout(std430, binding = 7) restrict writeonly buffer RayIndicesSSBO
+layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
+    uint FreezeFramesCounter;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -177,7 +178,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFrameCounter;
+    float _pad0;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -235,9 +236,9 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + basicDataUBO.FreezeFrameCounter * 2699;
+    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + rayIndicesSSBO.FreezeFramesCounter * 2699;
     if (GetRandomFloat01() < RayCoherency)
-        rngSeed = basicDataUBO.FreezeFrameCounter * 2699;
+        rngSeed = rayIndicesSSBO.FreezeFramesCounter * 2699;
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;

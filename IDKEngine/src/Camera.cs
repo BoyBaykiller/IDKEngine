@@ -18,37 +18,28 @@ namespace IDKEngine
             LookX = lookX;
             LookY = lookY;
 
-            ViewDir.X = MathF.Cos(MathHelper.DegreesToRadians(LookX)) * MathF.Cos(MathHelper.DegreesToRadians(LookY));
-            ViewDir.Y = MathF.Sin(MathHelper.DegreesToRadians(LookY));
-            ViewDir.Z = MathF.Sin(MathHelper.DegreesToRadians(LookX)) * MathF.Cos(MathHelper.DegreesToRadians(LookY));
+            ViewDir = GetViewDirFromAngles(LookX, LookY);
+            View = GenerateViewMatrix(position, ViewDir, up);
 
-            View = GenerateMatrix(position, ViewDir, up);
             Position = position;
             Up = up;
             Speed = speed;
             Sensitivity = mouseSensitivity;
         }
 
-
         public float LookX { get; private set; }
         public float LookY { get; private set; }
-        public void ProcessInputs(Keyboard keyboard, Mouse mouse, float dT, out bool didMove)
+        public void ProcessInputs(Keyboard keyboard, Mouse mouse, float dT)
         {
-            didMove = false;
-
             Vector2 mouseDelta = mouse.Position - mouse.LastPosition;
 
             LookX += mouseDelta.X * Sensitivity;
             LookY -= mouseDelta.Y * Sensitivity;
-            if (mouseDelta.X != 0 || mouseDelta.Y != 0)
-                didMove = true;
 
             if (LookY >= 90) LookY = 89.999f;
             if (LookY <= -90) LookY = -89.999f;
 
-            ViewDir.X = MathF.Cos(MathHelper.DegreesToRadians(LookX)) * MathF.Cos(MathHelper.DegreesToRadians(LookY));
-            ViewDir.Y = MathF.Sin(MathHelper.DegreesToRadians(LookY));
-            ViewDir.Z = MathF.Sin(MathHelper.DegreesToRadians(LookX)) * MathF.Cos(MathHelper.DegreesToRadians(LookY));
+            ViewDir = GetViewDirFromAngles(LookX, LookY);
 
             Vector3 acceleration = Vector3.Zero;
             if (keyboard[Keys.W] == InputState.Pressed)
@@ -63,9 +54,6 @@ namespace IDKEngine
             if (keyboard[Keys.A] == InputState.Pressed)
                 acceleration -= Vector3.Cross(ViewDir, Up).Normalized();
 
-            if (acceleration != Vector3.Zero || Velocity != Vector3.Zero)
-                didMove = true;
-
             acceleration *= 144.0f;
 
             Velocity *= MathF.Exp(MathF.Log10(0.95f) * 144.0f * dT);
@@ -75,10 +63,31 @@ namespace IDKEngine
             if (Vector3.Dot(Velocity, Velocity) < 0.01f)
                 Velocity = Vector3.Zero;
 
-            View = GenerateMatrix(Position, ViewDir, Up);
+            View = GenerateViewMatrix(Position, ViewDir, Up);
         }
 
-        public static Matrix4 GenerateMatrix(Vector3 position, Vector3 viewDir, Vector3 up)
+        public void SetState(in RecordableState state)
+        {
+            Position = state.CamPosition;
+            Up = state.CamUp;
+            LookX = state.LookX;
+            LookY = state.LookY;
+
+            ViewDir = GetViewDirFromAngles(LookX, LookY);
+            View = GenerateViewMatrix(Position, ViewDir, Up);
+        }
+
+        public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
+        {
+            Vector3 viewDir;
+            viewDir.X = MathF.Cos(MathHelper.DegreesToRadians(lookX)) * MathF.Cos(MathHelper.DegreesToRadians(lookY));
+            viewDir.Y = MathF.Sin(MathHelper.DegreesToRadians(lookY));
+            viewDir.Z = MathF.Sin(MathHelper.DegreesToRadians(lookX)) * MathF.Cos(MathHelper.DegreesToRadians(lookY));
+
+            return viewDir;
+        }
+
+        public static Matrix4 GenerateViewMatrix(Vector3 position, Vector3 viewDir, Vector3 up)
         {
             return Matrix4.LookAt(position, position + viewDir, up);
         }

@@ -84,6 +84,8 @@ namespace IDKEngine.Render
             }
         }
 
+        public int SPP = 1;
+
         public ModelSystem ModelSystem;
         public Texture Result;
         public readonly BVH BVH;
@@ -120,29 +122,41 @@ namespace IDKEngine.Render
             RayCoherency = 0.2f;
         }
 
+        public uint FreezeFramesCounter { get; private set; }
         public unsafe void Compute()
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
-
-            firstHitProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
-
-            dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
-            nHitProgram.Use();
-            for (int i = 1; i < RayDepth; i++)
+            for (int i = 0; i < SPP; i++)
             {
-                int pingPongIndex = 1 - (i % 2);
-                nHitProgram.Upload(0, pingPongIndex);
-                rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // set count
+                Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
 
-                GL.DispatchComputeIndirect((IntPtr)(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex)));
+                firstHitProgram.Use();
+                GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
-            }
 
-            finalDrawProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
+                dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
+                nHitProgram.Use();
+                for (int j = 1; j < RayDepth; j++)
+                {
+                    int pingPongIndex = 1 - (j % 2);
+                    nHitProgram.Upload(0, pingPongIndex);
+                    rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // set count
+
+                    GL.DispatchComputeIndirect((IntPtr)(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex)));
+                    GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
+                }
+
+                finalDrawProgram.Use();
+                GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
+
+                rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), FreezeFramesCounter++);
+            }
+        }
+
+        public void ResetRender()
+        {
+            FreezeFramesCounter = 0;
+            rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), FreezeFramesCounter);
         }
 
         public unsafe void SetSize(int width, int height)
@@ -163,8 +177,8 @@ namespace IDKEngine.Render
 
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
             rayIndicesBuffer = new BufferObject();
-            rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 2 * sizeof(uint), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            rayIndicesBuffer.SubData(0, sizeof(Vector2i), new Vector2i(0));
+            rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0));
             rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
         }
     }

@@ -161,6 +161,7 @@ layout(std430, binding = 6) restrict buffer TransportRaySSBO
 layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
+    uint FreezeFramesCounter;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -175,7 +176,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFrameCounter;
+    float _pad0;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -231,7 +232,7 @@ void main()
         dispatchCommandSSBO.DispatchCommands[1 - PingPongIndex].NumGroupsX = 0u;
     }
 
-    rngSeed = gl_GlobalInvocationID.x * 312 + basicDataUBO.FreezeFrameCounter * 2699;
+    rngSeed = gl_GlobalInvocationID.x * 312 + rayIndicesSSBO.FreezeFramesCounter * 2699;
 
     uint rayIndex = rayIndicesSSBO.Indices[gl_GlobalInvocationID.x];
     TransportRay transportRay = transportRaySSBO.Rays[rayIndex];

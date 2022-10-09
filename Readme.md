@@ -3,10 +3,10 @@
 Feature list:
  - HDR + Gamma correction
  - ImGui
- - Depth Pre Pass
  - Multithreaded model loader
  - (Copied) Atmospheric Scattering, ported to Compute Shader and precomputed
  - Shadow Samplers for hardware filtering + PCF
+ - Recording and loading camera movment with user interface
  - Screen Space Reflections
  - Screen Space Ambient Occlusion
  - Single pass Vertex Layered Rendering for point shadows
@@ -26,6 +26,8 @@ Required OpenGL: 4.6 + `ARB_bindless_texture`
 |  W, A, S, D | Movment              |
 |  Shift      | Move Faster          |
 |  G          | Toggle GUI           |
+|  R          | Toogle Recording     |
+|  Space      | Toogle Replay        |
 |  E          | Toggle Cursor        |
 |  R-Click    | Select Object        |
 |  V          | Toggle VSync         |

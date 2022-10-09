@@ -40,12 +40,12 @@ namespace IDKEngine.Render
             {
                 _position = value;
 
-                glslPointShadow.PosX = Camera.GenerateMatrix(_position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.NegX = Camera.GenerateMatrix(_position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.PosY = Camera.GenerateMatrix(_position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
-                glslPointShadow.NegY = Camera.GenerateMatrix(_position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
-                glslPointShadow.PosZ = Camera.GenerateMatrix(_position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.NegZ = Camera.GenerateMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.PosX = Camera.GenerateViewMatrix(_position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.NegX = Camera.GenerateViewMatrix(_position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.PosY = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
+                glslPointShadow.NegY = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
+                glslPointShadow.PosZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.NegZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
 
                 shadowsBuffer.SubData(Instance * sizeof(GLSLPointShadow), sizeof(GLSLPointShadow), glslPointShadow);
             }

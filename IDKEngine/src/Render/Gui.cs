@@ -1,7 +1,7 @@
 ﻿using System;
+using ImGuiNET;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using ImGuiNET;
 using IDKEngine.GUI;
 
 namespace IDKEngine.Render
@@ -15,6 +15,14 @@ namespace IDKEngine.Render
             Light = 2,
         }
 
+        public enum FrameRecorderState : uint
+        {
+            Nothing = 0,
+            Recording = 1,
+            Replaying = 2,
+        }
+
+        public FrameRecorderState FrameRecState { get; private set; } = FrameRecorderState.Nothing;
         public ImGuiBackend ImGuiBackend;
         private EntityType selectedEntityType;
         private int selectedEntityIndex;
@@ -27,9 +35,9 @@ namespace IDKEngine.Render
 
         public bool isHoveredViewport = true;
         public System.Numerics.Vector2 viewportHeaderSize;
-        public void Draw(Application window, float frameTime)
+        public void Draw(Application app, float frameTime)
         {
-            ImGuiBackend.Update(window, frameTime);
+            ImGuiBackend.Update(app, frameTime);
             ImGui.DockSpaceOverViewport();
 
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(0.0f));
@@ -40,27 +48,83 @@ namespace IDKEngine.Render
             System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
             viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
             
-            ImGui.Image((IntPtr)window.PostProcessor.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
+            ImGui.Image((IntPtr)app.PostProcessor.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
             isHoveredViewport = ImGui.IsItemHovered();
 
-            if (content.X != window.ViewportResolution.X || content.Y != window.ViewportResolution.Y)
+            if (content.X != app.ViewportResolution.X || content.Y != app.ViewportResolution.Y)
             {
-                window.SetViewportResolution((int)content.X, (int)content.Y);
+                app.SetViewportResolution((int)content.X, (int)content.Y);
             }
 
             ImGui.End();
             ImGui.PopStyleVar();
 
+            ImGui.Begin("Frame Recorder");
+            {
+                if (FrameRecState != FrameRecorderState.Replaying)
+                {
+                    bool isRecording = FrameRecState == FrameRecorderState.Recording;
+                    if (ImGui.Checkbox("IsRecording (R)", ref isRecording))
+                    {
+                        if (isRecording)
+                        {
+                            app.StateRecorder.Clear();
+                            FrameRecState = FrameRecorderState.Recording;
+                        }
+                        else
+                        {
+                            FrameRecState = FrameRecorderState.Nothing;
+                        }
+                    }
+                    if (FrameRecState == FrameRecorderState.Recording)
+                    {
+                        ImGui.Text($"   * Recorded frames: {app.StateRecorder.FrameCount}");
+                        unsafe
+                        {
+                            ImGui.Text($"   * File size: {app.StateRecorder.FrameCount * sizeof(RecordableState) / 1000}kb");
+                        }
+                    }
+                }
+
+                if (FrameRecState != FrameRecorderState.Recording && app.StateRecorder.FrameCount > 0)
+                {
+                    bool isReplaying = FrameRecState == FrameRecorderState.Replaying;
+                    if (ImGui.Checkbox("IsReplaying (Space)", ref isReplaying))
+                    {
+                        if (isReplaying)
+                            FrameRecState = FrameRecorderState.Replaying;
+                        else
+                            FrameRecState = FrameRecorderState.Nothing;
+                    }
+                    ImGui.Text($"    * Replayed frames: {app.StateRecorder.ReplayFrame} / {app.StateRecorder.FrameCount}");
+
+                    if (ImGui.Button($"Save"))
+                    {
+                        app.StateRecorder.SaveToFile("framesStateData.fsf");
+                    }
+                    ImGui.SameLine();
+                }
+
+                if (ImGui.Button("Load"))
+                {
+                    app.StateRecorder.Load("framesStateData.fsf");
+                }
+
+                ImGui.End();
+            }
+
             ImGui.Begin("Renderer");
             {
-                ImGui.Text($"FPS: {window.FPS}");
-                ImGui.Text($"Viewport size: {window.ViewportResolution.X}x{window.ViewportResolution.Y}");
+                ImGui.Text($"FPS: {app.FPS}");
+                ImGui.Text($"Viewport size: {app.ViewportResolution.X}x{app.ViewportResolution.Y}");
 
-                if (window.IsPathTracing)
-                    ImGui.Text($"Samples taken: {window.GLSLBasicData.FreezeFrameCounter}");
+                if (app.IsPathTracing)
+                {
+                    ImGui.Text($"Samples taken: {app.PathTracer.FreezeFramesCounter}");
+                }
 
                 string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
-                string current = window.IsPathTracing ? renderModes[1] : renderModes[0];
+                string current = app.IsPathTracing ? renderModes[1] : renderModes[0];
                 if (ImGui.BeginCombo("Render Path", current))
                 {
                     for (int i = 0; i < renderModes.Length; i++)
@@ -69,7 +133,7 @@ namespace IDKEngine.Render
                         if (ImGui.Selectable(renderModes[i], isSelected))
                         {
                             current = renderModes[i];
-                            window.IsPathTracing = current == renderModes[1];
+                            app.IsPathTracing = current == renderModes[1];
                         }
 
                         if (isSelected)
@@ -78,15 +142,15 @@ namespace IDKEngine.Render
                     ImGui.EndCombo();
                 }
 
-                bool tempBool = window.PostProcessor.IsDithering;
+                bool tempBool = app.PostProcessor.IsDithering;
                 if (ImGui.Checkbox("IsDithering", ref tempBool))
                 {
-                    window.PostProcessor.IsDithering = tempBool;
+                    app.PostProcessor.IsDithering = tempBool;
                 }
 
-                if (!window.IsPathTracing)
+                if (!app.IsPathTracing)
                 {
-                    ImGui.Checkbox("IsWireframe", ref window.IsWireframe);
+                    ImGui.Checkbox("IsWireframe", ref app.IsWireframe);
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
@@ -95,7 +159,7 @@ namespace IDKEngine.Render
                             ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f);
                             ImGui.BeginDisabled();
                         }
-                        ImGui.Checkbox("IsVRS", ref window.IsVRSForwardRender);
+                        ImGui.Checkbox("IsVRS", ref app.IsVRSForwardRender);
                         if (!VariableRateShading.NV_SHADING_RATE_IMAGE)
                         {
                             ImGui.EndDisabled();
@@ -119,7 +183,7 @@ namespace IDKEngine.Render
                             nameof(VariableRateShading.DebugMode.LuminanceVariance),
                         };
 
-                        current = window.ForwardPassVRS.DebugValue.ToString();
+                        current = app.ForwardPassVRS.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
                             for (int i = 0; i < debugModes.Length; i++)
@@ -128,7 +192,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(debugModes[i], isSelected))
                                 {
                                     current = debugModes[i];
-                                    window.ForwardPassVRS.DebugValue = VariableRateShading.DebugMode.NoDebug + i;
+                                    app.ForwardPassVRS.DebugValue = VariableRateShading.DebugMode.NoDebug + i;
                                 }
 
                                 if (isSelected)
@@ -137,119 +201,119 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        float tempFloat = window.ForwardPassVRS.SpeedFactor;
+                        float tempFloat = app.ForwardPassVRS.SpeedFactor;
                         if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
-                            window.ForwardPassVRS.SpeedFactor = tempFloat;
+                            app.ForwardPassVRS.SpeedFactor = tempFloat;
                         }
 
-                        tempFloat = window.ForwardPassVRS.LumVarianceFactor;
+                        tempFloat = app.ForwardPassVRS.LumVarianceFactor;
                         if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
                         {
-                            window.ForwardPassVRS.LumVarianceFactor = tempFloat;
+                            app.ForwardPassVRS.LumVarianceFactor = tempFloat;
                         }
                     }
 
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
                     {
-                        ImGui.Checkbox("IsVolumetricLighting", ref window.IsVolumetricLighting);
-                        if (window.IsVolumetricLighting)
+                        ImGui.Checkbox("IsVolumetricLighting", ref app.IsVolumetricLighting);
+                        if (app.IsVolumetricLighting)
                         {
-                            int tempInt = window.VolumetricLight.Samples;
+                            int tempInt = app.VolumetricLight.Samples;
                             if (ImGui.SliderInt("Samples", ref tempInt, 1, 100))
                             {
-                                window.VolumetricLight.Samples = tempInt;
+                                app.VolumetricLight.Samples = tempInt;
                             }
 
 
-                            float tempFloat = window.VolumetricLight.Scattering;
+                            float tempFloat = app.VolumetricLight.Scattering;
                             if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
                             {
-                                window.VolumetricLight.Scattering = tempFloat;
+                                app.VolumetricLight.Scattering = tempFloat;
                             }
 
-                            tempFloat = window.VolumetricLight.Strength;
+                            tempFloat = app.VolumetricLight.Strength;
                             if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 500.0f))
                             {
-                                window.VolumetricLight.Strength = tempFloat;
+                                app.VolumetricLight.Strength = tempFloat;
                             }
 
-                            System.Numerics.Vector3 tempVec = window.VolumetricLight.Absorbance.ToSystemVec();
+                            System.Numerics.Vector3 tempVec = app.VolumetricLight.Absorbance.ToSystemVec();
                             if (ImGui.InputFloat3("Absorbance", ref tempVec))
                             {
                                 Vector3 temp = tempVec.ToOpenTKVec();
                                 temp = Vector3.ComponentMax(temp, Vector3.Zero);
-                                window.VolumetricLight.Absorbance = temp;
+                                app.VolumetricLight.Absorbance = temp;
                             }
 
-                            tempBool = window.VolumetricLight.IsTemporalAccumulation;
-                            if (!window.PostProcessor.TaaEnabled) ImGui.BeginDisabled();
+                            tempBool = app.VolumetricLight.IsTemporalAccumulation;
+                            if (!app.PostProcessor.TaaEnabled) ImGui.BeginDisabled();
                             if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
                             {
-                                window.VolumetricLight.IsTemporalAccumulation = tempBool;
+                                app.VolumetricLight.IsTemporalAccumulation = tempBool;
                             }
                             ImGui.SameLine();
                             InfoMark(
                                 "Requires TAA to be enabled. " +
-                                $"When active samples are accumulated over {window.PostProcessor.TaaSamples} frames (based on TAA setting)."
+                                $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)."
                             );
-                            if (!window.PostProcessor.TaaEnabled) ImGui.EndDisabled();
+                            if (!app.PostProcessor.TaaEnabled) ImGui.EndDisabled();
                         }
                     }
 
                     if (ImGui.CollapsingHeader("SSAO"))
                     {
-                        ImGui.Checkbox("IsSSAO", ref window.IsSSAO);
-                        if (window.IsSSAO)
+                        ImGui.Checkbox("IsSSAO", ref app.IsSSAO);
+                        if (app.IsSSAO)
                         {
-                            int tempInt = window.SSAO.Samples;
+                            int tempInt = app.SSAO.Samples;
                             if (ImGui.SliderInt("Samples  ", ref tempInt, 1, 50))
                             {
-                                window.SSAO.Samples = tempInt;
+                                app.SSAO.Samples = tempInt;
                             }
 
-                            float tempFloat = window.SSAO.Radius;
+                            float tempFloat = app.SSAO.Radius;
                             if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 0.5f))
                             {
-                                window.SSAO.Radius = tempFloat;
+                                app.SSAO.Radius = tempFloat;
                             }
 
-                            tempFloat = window.SSAO.Strength;
+                            tempFloat = app.SSAO.Strength;
                             if (ImGui.SliderFloat("Strength ", ref tempFloat, 0.0f, 20.0f))
                             {
-                                window.SSAO.Strength = tempFloat;
+                                app.SSAO.Strength = tempFloat;
                             }
                         }
                     }
 
                     if (ImGui.CollapsingHeader("SSR"))
                     {
-                        ImGui.Checkbox("IsSSR", ref window.IsSSR);
-                        if (window.IsSSR)
+                        ImGui.Checkbox("IsSSR", ref app.IsSSR);
+                        if (app.IsSSR)
                         {
-                            int tempInt = window.SSR.Samples;
+                            int tempInt = app.SSR.Samples;
                             if (ImGui.SliderInt("Samples ", ref tempInt, 1, 100))
                             {
-                                window.SSR.Samples = tempInt;
+                                app.SSR.Samples = tempInt;
                             }
 
-                            tempInt = window.SSR.BinarySearchSamples;
+                            tempInt = app.SSR.BinarySearchSamples;
                             if (ImGui.SliderInt("BinarySearchSamples", ref tempInt, 0, 40))
                             {
-                                window.SSR.BinarySearchSamples = tempInt;
+                                app.SSR.BinarySearchSamples = tempInt;
                             }
 
-                            float tempFloat = window.SSR.MaxDist;
+                            float tempFloat = app.SSR.MaxDist;
                             if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1, 100))
                             {
-                                window.SSR.MaxDist = tempFloat;
+                                app.SSR.MaxDist = tempFloat;
                             }
                         }
                     }
 
                     if (ImGui.CollapsingHeader("Shadows"))
                     {
-                        ImGui.Checkbox("IsShadows", ref window.IsShadows);
+                        ImGui.Checkbox("IsShadows", ref app.IsShadows);
                         ImGui.SameLine();
                         string appendText;
                         if (PointShadow.IS_VERTEX_LAYERED_RENDERING)
@@ -272,18 +336,18 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("TAA"))
                     {
-                        tempBool = window.PostProcessor.TaaEnabled;
+                        tempBool = app.PostProcessor.TaaEnabled;
                         if (ImGui.Checkbox("IsTAA", ref tempBool))
                         {
-                            window.PostProcessor.TaaEnabled = tempBool;
+                            app.PostProcessor.TaaEnabled = tempBool;
                         }
 
-                        if (window.PostProcessor.TaaEnabled)
+                        if (app.PostProcessor.TaaEnabled)
                         {
-                            tempBool = window.PostProcessor.IsTaaArtifactMitigation;
+                            tempBool = app.PostProcessor.IsTaaArtifactMitigation;
                             if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
                             {
-                                window.PostProcessor.IsTaaArtifactMitigation = tempBool;
+                                app.PostProcessor.IsTaaArtifactMitigation = tempBool;
                             }
                             ImGui.SameLine();
                             InfoMark(
@@ -291,10 +355,10 @@ namespace IDKEngine.Render
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
                             );
 
-                            int tempInt = window.PostProcessor.TaaSamples;
+                            int tempInt = app.PostProcessor.TaaSamples;
                             if (ImGui.SliderInt("Samples   ", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
                             {
-                                window.PostProcessor.TaaSamples = tempInt;
+                                app.PostProcessor.TaaSamples = tempInt;
                             }
                         }
                     }
@@ -303,47 +367,51 @@ namespace IDKEngine.Render
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
-                        tempBool = window.PathTracer.IsDebugBVHTraversal;
+                        tempBool = app.PathTracer.IsDebugBVHTraversal;
                         if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
                         {
-                            window.GLSLBasicData.FreezeFrameCounter = 0;
-                            window.PathTracer.IsDebugBVHTraversal = tempBool;
+                            app.PathTracer.ResetRender();
+                            app.PathTracer.IsDebugBVHTraversal = tempBool;
                         }
 
-                        tempBool = window.PathTracer.IsTraceLights;
+                        tempBool = app.PathTracer.IsTraceLights;
                         if (ImGui.Checkbox("IsTraceLights", ref tempBool))
                         {
-                            window.GLSLBasicData.FreezeFrameCounter = 0;
-                            window.PathTracer.IsTraceLights = tempBool;
+                            app.PathTracer.ResetRender();
+                            app.PathTracer.IsTraceLights = tempBool;
                         }
 
-                        float tempFloat = window.PathTracer.RayCoherency;
+                        float tempFloat = app.PathTracer.RayCoherency;
                         if (ImGui.SliderFloat("RayCoherency", ref tempFloat, 0.0f, 1.0f))
                         {
-                            window.PathTracer.RayCoherency = tempFloat;
+                            app.PathTracer.RayCoherency = tempFloat;
                         }
 
-                        if (!window.PathTracer.IsDebugBVHTraversal)
+                        if (!app.PathTracer.IsDebugBVHTraversal)
                         {
-                            int tempInt = window.PathTracer.RayDepth;
+                            int tempInt = app.PathTracer.RayDepth;
                             if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                             {
-                                window.GLSLBasicData.FreezeFrameCounter = 0;
-                                window.PathTracer.RayDepth = tempInt;
+                                app.PathTracer.ResetRender();
+                                app.PathTracer.RayDepth = tempInt;
                             }
 
-                            float floatTemp = window.PathTracer.FocalLength;
+                            float floatTemp = app.PathTracer.FocalLength;
                             if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                             {
-                                window.GLSLBasicData.FreezeFrameCounter = 0;
-                                window.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
+                                app.PathTracer.ResetRender();
+                                app.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
                             }
 
-                            floatTemp = window.PathTracer.ApertureDiameter;
+                            floatTemp = app.PathTracer.ApertureDiameter;
                             if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
                             {
-                                window.GLSLBasicData.FreezeFrameCounter = 0;
-                                window.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
+                                app.PathTracer.ResetRender();
+                                app.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
+                            }
+                            if (ImGui.InputInt("SPP", ref app.PathTracer.SPP))
+                            {
+                                app.PathTracer.SPP = Math.Max(app.PathTracer.SPP, 0);
                             }
                         }
                     }
@@ -351,25 +419,25 @@ namespace IDKEngine.Render
 
                 if (ImGui.CollapsingHeader("Bloom"))
                 {
-                    ImGui.Checkbox("IsBloom", ref window.IsBloom);
-                    if (window.IsBloom)
+                    ImGui.Checkbox("IsBloom", ref app.IsBloom);
+                    if (app.IsBloom)
                     {
-                        float tempFloat = window.Bloom.Threshold;
+                        float tempFloat = app.Bloom.Threshold;
                         if (ImGui.SliderFloat("Threshold", ref tempFloat, 0.0f, 10.0f))
                         {
-                            window.Bloom.Threshold = tempFloat;
+                            app.Bloom.Threshold = tempFloat;
                         }
 
-                        tempFloat = window.Bloom.Clamp;
+                        tempFloat = app.Bloom.Clamp;
                         if (ImGui.SliderFloat("Clamp", ref tempFloat, 0.0f, 100.0f))
                         {
-                            window.Bloom.Clamp = tempFloat;
+                            app.Bloom.Clamp = tempFloat;
                         }
 
-                        int tempInt = window.Bloom.MinusLods;
+                        int tempInt = app.Bloom.MinusLods;
                         if (ImGui.SliderInt("MinusLods", ref tempInt, 0, 10))
                         {
-                            window.Bloom.MinusLods = tempInt;
+                            app.Bloom.MinusLods = tempInt;
                         }
                     }
                 }
@@ -423,7 +491,7 @@ namespace IDKEngine.Render
                     }
                     if (shouldResetPT)
                     {
-                        window.GLSLBasicData.FreezeFrameCounter = 0;
+                        app.PathTracer.ResetRender();
                     }
                 }
 
@@ -440,30 +508,30 @@ namespace IDKEngine.Render
                 if (selectedEntityType == EntityType.Mesh)
                 {
                     bool shouldResetPT = false;
-                    ref GLSLMesh mesh = ref window.ModelSystem.Meshes[selectedEntityIndex];
-                    ref readonly GLSLDrawCommand cmd = ref window.ModelSystem.DrawCommands[selectedEntityIndex];
+                    ref GLSLMesh mesh = ref app.ModelSystem.Meshes[selectedEntityIndex];
+                    ref readonly GLSLDrawCommand cmd = ref app.ModelSystem.DrawCommands[selectedEntityIndex];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");
                     ImGui.SameLine(); if (ImGui.Button("Teleport to camera"))
                     {
-                        window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(window.Camera.Position);
+                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(app.Camera.Position);
                         shouldResetPT = true;
                     }
                     
-                    System.Numerics.Vector3 systemVec3 = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToSystemVec();
+                    System.Numerics.Vector3 systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
                         shouldResetPT = true;
-                        window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTKVec());
+                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTKVec());
                     }
 
-                    systemVec3 = window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractScale().ToSystemVec();
+                    systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractScale().ToSystemVec();
                     if (ImGui.DragFloat3("Scale", ref systemVec3, 0.005f))
                     {
                         shouldResetPT = true;
                         Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTKVec(), new Vector3(0.001f));
-                        window.ModelSystem.ModelMatrices[selectedEntityIndex][0] = Matrix4.CreateScale(temp) * window.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearScale();
+                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = Matrix4.CreateScale(temp) * app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearScale();
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
@@ -508,15 +576,15 @@ namespace IDKEngine.Render
 
                     if (shouldResetPT)
                     {
-                        window.GLSLBasicData.FreezeFrameCounter = 0;
-                        window.ModelSystem.UpdateMeshBuffer(selectedEntityIndex, selectedEntityIndex + 1);
-                        window.ModelSystem.UpdateModelMatricesBuffer(selectedEntityIndex, selectedEntityIndex + 1);
+                        app.PathTracer.ResetRender();
+                        app.ModelSystem.UpdateMeshBuffer(selectedEntityIndex, selectedEntityIndex + 1);
+                        app.ModelSystem.UpdateModelMatricesBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                     }
                 }
                 else if (selectedEntityType == EntityType.Light)
                 {
                     bool shouldResetPT = false;
-                    ref GLSLLight light = ref window.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
+                    ref GLSLLight light = ref app.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
@@ -540,8 +608,8 @@ namespace IDKEngine.Render
 
                     if (shouldResetPT)
                     {
-                        window.GLSLBasicData.FreezeFrameCounter = 0;
-                        window.ForwardRenderer.LightingContext.UpdateLightBuffer((int)selectedEntityIndex, (int)selectedEntityIndex + 1);
+                        app.PathTracer.ResetRender();
+                        app.ForwardRenderer.LightingContext.UpdateLightBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                     }
                 }
                 else
@@ -577,26 +645,53 @@ namespace IDKEngine.Render
             ImGui.Text(text);
         }
 
-        public void Update(Application window)
+        public void Update(Application app)
         {
-            if (window.RenderGui && isHoveredViewport && window.MouseState[MouseButton.Left] == InputState.Touched)
+            if (FrameRecState != FrameRecorderState.Replaying && app.KeyboardState[Keys.R] == InputState.Touched)
             {
-                Vector2i point = new Vector2i((int)window.MouseState.Position.X, (int)window.MouseState.Position.Y);
-                if (window.RenderGui)
+                if (FrameRecState == FrameRecorderState.Recording)
+                {
+                    FrameRecState = FrameRecorderState.Nothing;
+                }
+                else
+                {
+                    FrameRecState = FrameRecorderState.Recording;
+                    app.StateRecorder.Clear();
+                }
+            }
+
+            if (FrameRecState != FrameRecorderState.Recording && app.StateRecorder.FrameCount > 0 && app.KeyboardState[Keys.Space] == InputState.Touched)
+            {
+                if (FrameRecState == FrameRecorderState.Replaying)
+                    FrameRecState = FrameRecorderState.Nothing;
+                else
+                    FrameRecState = FrameRecorderState.Replaying;
+
+                if (FrameRecState == FrameRecorderState.Replaying)
+                {
+                    app.MouseState.CursorMode = CursorModeValue.CursorNormal;
+                    ImGuiBackend.IsIgnoreMouseInput = false;
+                }
+            }
+
+            if (app.RenderGui && isHoveredViewport && app.MouseState[MouseButton.Left] == InputState.Touched)
+            {
+                Vector2i point = new Vector2i((int)app.MouseState.Position.X, (int)app.MouseState.Position.Y);
+                if (app.RenderGui)
                 {
                     point -= (Vector2i)viewportHeaderSize.ToOpenTKVec();
                 }
-                point.Y = window.ForwardRenderer.Result.Height - point.Y;
+                point.Y = app.ForwardRenderer.Result.Height - point.Y;
 
-                Vector2 ndc = new Vector2((float)point.X / window.ForwardRenderer.Result.Width, (float)point.Y / window.ForwardRenderer.Result.Height) * 2.0f - new Vector2(1.0f);
-                Ray worldSpaceRay = Ray.GetWorldSpaceRay(window.GLSLBasicData.CameraPos, window.GLSLBasicData.InvProjection, window.GLSLBasicData.InvView, ndc);
-                bool hitMesh = window.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
-                bool hitLight = window.ForwardRenderer.LightingContext.Intersect(worldSpaceRay, out Lighter.HitInfo lightHitInfo);
-                if (window.IsPathTracing && !window.PathTracer.IsTraceLights) hitLight = false;
+                Vector2 ndc = new Vector2((float)point.X / app.ForwardRenderer.Result.Width, (float)point.Y / app.ForwardRenderer.Result.Height) * 2.0f - new Vector2(1.0f);
+                Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
+                bool hitMesh = app.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
+                bool hitLight = app.ForwardRenderer.LightingContext.Intersect(worldSpaceRay, out Lighter.HitInfo lightHitInfo);
+                if (app.IsPathTracing && !app.PathTracer.IsTraceLights) hitLight = false;
 
                 if (!hitMesh && !hitLight)
                 {
-                    window.ForwardRenderer.RenderMeshAABBIndex = -1;
+                    app.ForwardRenderer.RenderMeshAABBIndex = -1;
                     selectedEntityType = EntityType.None;
                     return;
                 }
@@ -608,14 +703,14 @@ namespace IDKEngine.Render
                 {
                     selectedEntityType = EntityType.Mesh;
                     selectedEntityDist = meshHitInfo.T;
-                    if (meshHitInfo.MeshIndex == window.ForwardRenderer.RenderMeshAABBIndex)
+                    if (meshHitInfo.MeshIndex == app.ForwardRenderer.RenderMeshAABBIndex)
                     {
-                        window.ForwardRenderer.RenderMeshAABBIndex = -1;
+                        app.ForwardRenderer.RenderMeshAABBIndex = -1;
                         selectedEntityType = EntityType.None;
                     }
                     else
                     {
-                        window.ForwardRenderer.RenderMeshAABBIndex = meshHitInfo.MeshIndex;
+                        app.ForwardRenderer.RenderMeshAABBIndex = meshHitInfo.MeshIndex;
                     }
                     selectedEntityIndex = meshHitInfo.MeshIndex;
                 }
@@ -624,7 +719,7 @@ namespace IDKEngine.Render
                     selectedEntityType = EntityType.Light;
                     selectedEntityDist = lightHitInfo.T;
                     selectedEntityIndex = lightHitInfo.HitID;
-                    window.ForwardRenderer.RenderMeshAABBIndex = -1;
+                    app.ForwardRenderer.RenderMeshAABBIndex = -1;
                 }
             }
         }
