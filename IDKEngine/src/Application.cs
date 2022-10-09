@@ -3,11 +3,11 @@ using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using IDKEngine.Render;
-using IDKEngine.Render.Objects;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using IDKEngine.Render;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
@@ -30,14 +30,13 @@ namespace IDKEngine
             set
             {
                 _isPathTracing = value;
-                GLSLBasicData.FreezeFrameCounter = 0;
+                PathTracer.ResetRender();
 
                 float clearData = 0.0f;
                 PathTracer.Result.Clear(PixelFormat.Rgba, PixelType.Float, ref clearData);
             }
 
         }
-
 
         public bool IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false, IsWireframe = false;
         public int FPS;
@@ -56,6 +55,10 @@ namespace IDKEngine
             GLSLBasicData.CameraPos = Camera.Position;
             GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
             GLSLBasicData.Time = WindowTime;
+            if (GLSLBasicData.PrevProjView != GLSLBasicData.ProjView)
+            {
+                PathTracer.ResetRender();
+            }
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
 
             if (!IsPathTracing)
@@ -132,7 +135,6 @@ namespace IDKEngine
 
             GL.Viewport(0, 0, WindowSize.X, WindowSize.Y);
             Framebuffer.Bind(0);
-            GLSLBasicData.FreezeFrameCounter++;
 
             if (RenderGui)
             {
@@ -162,16 +164,13 @@ namespace IDKEngine
                 fps = 0;
                 fpsTimer.Restart();
             }
-            
+
             if (KeyboardState[Keys.Escape] == InputState.Pressed)
                 ShouldClose();
-                
+
             if (KeyboardState[Keys.V] == InputState.Touched)
                 WindowVSync = !WindowVSync;
-
-            if (KeyboardState[Keys.F11] == InputState.Touched)
-                WindowFullscreen = !WindowFullscreen;
-
+            
             if (KeyboardState[Keys.G] == InputState.Touched)
             {
                 RenderGui = !RenderGui;
@@ -181,26 +180,45 @@ namespace IDKEngine
                 }
             }
 
-            if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+            if (KeyboardState[Keys.F11] == InputState.Touched)
+            WindowFullscreen = !WindowFullscreen;
+
+            if (gui.FrameRecState == Gui.FrameRecorderState.Replaying)
             {
+                RecordableState state = StateRecorder.Replay();
+                Camera.SetState(state);
+            }
+            else
+            {
+                if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+                {
+                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                    {
+                        MouseState.CursorMode = CursorModeValue.CursorNormal;
+                        gui.ImGuiBackend.IsIgnoreMouseInput = false;
+                        Camera.Velocity = Vector3.Zero;
+                    }
+                    else
+                    {
+                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
+                        gui.ImGuiBackend.IsIgnoreMouseInput = true;
+                    }
+                }
+
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
-                    MouseState.CursorMode = CursorModeValue.CursorNormal;
-                    gui.ImGuiBackend.IsIgnoreMouseInput = false;
-                    Camera.Velocity = Vector3.Zero;
-                }
-                else
-                {
-                    MouseState.CursorMode = CursorModeValue.CursorDisabled;
-                    gui.ImGuiBackend.IsIgnoreMouseInput = true;
+                    Camera.ProcessInputs(KeyboardState, MouseState, dT);
                 }
             }
 
-            if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+            if (gui.FrameRecState == Gui.FrameRecorderState.Recording)
             {
-                Camera.ProcessInputs(KeyboardState, MouseState, dT, out bool hadCameraInputs);
-                if (hadCameraInputs)
-                    GLSLBasicData.FreezeFrameCounter = 0;
+                RecordableState recordableState;
+                recordableState.CamPosition = Camera.Position;
+                recordableState.CamUp = Camera.Up;
+                recordableState.LookX = Camera.LookX;
+                recordableState.LookY = Camera.LookY;
+                StateRecorder.Record(recordableState);
             }
 
             gui.Update(this);
@@ -222,6 +240,7 @@ namespace IDKEngine
         public BVH BVH;
         private Gui gui;
         public GLSLBasicData GLSLBasicData;
+        public FrameRecorder<RecordableState> StateRecorder;
         protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
@@ -339,6 +358,8 @@ namespace IDKEngine
                 pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, i, 512, 0.5f, 60.0f));
             }
 
+            StateRecorder = new FrameRecorder<RecordableState>();
+
             MouseState.CursorMode = CursorModeValue.CursorNormal;
             IsPathTracing = true;
 
@@ -376,9 +397,6 @@ namespace IDKEngine
             SSAO.SetSize(width, height);
             PostProcessor.SetSize(width, height);
             PathTracer.SetSize(width, height);
-
-
-            GLSLBasicData.FreezeFrameCounter = 0;
         }
 
         protected override void OnEnd()

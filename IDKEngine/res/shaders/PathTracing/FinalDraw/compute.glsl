@@ -32,9 +32,10 @@ layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
     TransportRay Rays[];
 } transportRaySSBO;
 
-layout(std430, binding = 7) restrict writeonly buffer RayIndicesSSBO
+layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
+    uint FreezeFramesCounter;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -49,7 +50,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 View;
     mat4 InvView;
     vec3 ViewPos;
-    int FreezeFrameCounter;
+    float _pad0;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -95,7 +96,7 @@ void main()
     }
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameColor, irradiance, 1.0 / (basicDataUBO.FreezeFrameCounter + 1.0));
+    irradiance = mix(lastFrameColor, irradiance, 1.0 / (rayIndicesSSBO.FreezeFramesCounter + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 
