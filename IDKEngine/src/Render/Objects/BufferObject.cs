@@ -53,12 +53,12 @@ namespace IDKEngine.Render.Objects
             Size = size;
         }
 
-        public void ImmutableAllocate<T>(int size, T data, BufferStorageFlags bufferStorageFlags) where T : struct
+        public void ImmutableAllocate<T>(int size, T data, BufferStorageFlags bufferStorageFlags) where T : unmanaged
         {
             GL.NamedBufferStorage(ID, size, ref data, bufferStorageFlags);
             Size = size;
         }
-        public void ImmutableAllocate<T>(int size, T[] data, BufferStorageFlags bufferStorageFlags) where T : struct
+        public void ImmutableAllocate<T>(int size, T[] data, BufferStorageFlags bufferStorageFlags) where T : unmanaged
         {
             GL.NamedBufferStorage(ID, size, data, bufferStorageFlags);
             Size = size;
@@ -69,12 +69,12 @@ namespace IDKEngine.Render.Objects
             Size = size;
         }
 
-        public void GetSubData<T>(int offset, int size, out T data) where T : struct
+        public void GetSubData<T>(int offset, int size, out T data) where T : unmanaged
         {
             data = new T();
             GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, ref data);
         }
-        public void GetSubData<T>(int offset, int size, T[] data) where T : struct
+        public void GetSubData<T>(int offset, int size, T[] data) where T : unmanaged
         {
             GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, data);
         }

@@ -137,6 +137,11 @@ namespace IDKEngine
             return (T*)Marshal.AllocHGlobal(sizeof(T) * count);
         }
 
+        public static unsafe void Free(void* ptr)
+        {
+            Marshal.FreeHGlobal((IntPtr)ptr);
+        }
+
         public static unsafe void MemSet(void* ptr, byte value, uint byteCount)
         {
             Unsafe.InitBlock(ptr, value, byteCount);

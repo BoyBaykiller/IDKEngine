@@ -167,7 +167,6 @@ void main()
                 debugcolor += vec3(0, 4, 0);
             else if (SharedDebugShadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
                 debugcolor += vec3(0, 0, 4);
-
         }
         else if (DebugMode == DEBUG_LUMINANCE)
         {

@@ -84,7 +84,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public int SPP = 1;
+        public uint AccumulatedSamples { get; private set; }
 
         public ModelSystem ModelSystem;
         public Texture Result;
@@ -122,41 +122,36 @@ namespace IDKEngine.Render
             RayCoherency = 0.2f;
         }
 
-        public uint FreezeFramesCounter { get; private set; }
         public unsafe void Compute()
         {
-            for (int i = 0; i < SPP; i++)
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+            firstHitProgram.Use();
+            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
+
+            dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
+            nHitProgram.Use();
+            for (int j = 1; j < RayDepth; j++)
             {
-                Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+                int pingPongIndex = 1 - (j % 2);
+                nHitProgram.Upload(0, pingPongIndex);
+                rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // set count
 
-                firstHitProgram.Use();
-                GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                GL.DispatchComputeIndirect((IntPtr)(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex)));
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
-
-                dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
-                nHitProgram.Use();
-                for (int j = 1; j < RayDepth; j++)
-                {
-                    int pingPongIndex = 1 - (j % 2);
-                    nHitProgram.Upload(0, pingPongIndex);
-                    rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // set count
-
-                    GL.DispatchComputeIndirect((IntPtr)(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex)));
-                    GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
-                }
-
-                finalDrawProgram.Use();
-                GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
-
-                rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), FreezeFramesCounter++);
             }
+
+            finalDrawProgram.Use();
+            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
+
+            rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), AccumulatedSamples++);
         }
 
         public void ResetRender()
         {
-            FreezeFramesCounter = 0;
-            rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), FreezeFramesCounter);
+            AccumulatedSamples = 0;
+            rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), AccumulatedSamples);
         }
 
         public unsafe void SetSize(int width, int height)

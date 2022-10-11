@@ -96,7 +96,7 @@ void main()
     }
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameColor, irradiance, 1.0 / (rayIndicesSSBO.FreezeFramesCounter + 1.0));
+    irradiance = mix(lastFrameColor, irradiance, 1.0 / (float(rayIndicesSSBO.FreezeFramesCounter) + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 

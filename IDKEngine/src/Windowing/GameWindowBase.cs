@@ -167,14 +167,11 @@ namespace IDKEngine
                 double runTime = currentTime - lastTime;
                 
                 GLFW.PollEvents();
-                if (WindowFocused)
-                {
-                    //DispatchUpdateFrame();
-                    // TODO: Fix seperate update and render again without breaking camera, vrs or taa
-                    KeyboardState.Update();
-                    MouseState.Update();
-                    OnUpdate((float)runTime);
-                }
+                //DispatchUpdateFrame();
+                // TODO: Fix seperate update and render again without breaking camera, vrs or taa
+                KeyboardState.Update();
+                MouseState.Update();
+                OnUpdate((float)runTime);
                 OnRender((float)runTime);
                 GLFW.SwapBuffers(window);
 
