@@ -101,18 +101,18 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpecTexture, ForwardRenderer.DepthTexture);
 
+                PostProcessor.CombineCompute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
+                PostProcessor.TaaCompute(ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
                 if (VariableRateShading.NV_SHADING_RATE_IMAGE)
                 {
                     if (IsVRSForwardRender)
-                        ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
+                        ForwardPassVRS.Compute(PostProcessor.Result, ForwardRenderer.VelocityTexture);
                 }
                 // Small "hack" to enable VRS debug image even on systems that don't support the extension
                 else if (ForwardPassVRS.DebugValue != VariableRateShading.DebugMode.NoDebug)
                 {
-                    ForwardPassVRS.Compute(ForwardRenderer.Result, ForwardRenderer.VelocityTexture);
+                    ForwardPassVRS.Compute(PostProcessor.Result, ForwardRenderer.VelocityTexture);
                 }
-                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
-                PostProcessor.TaaCompute(ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
 
                 if (IsWireframe)
                 {
@@ -126,7 +126,7 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
-                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
+                PostProcessor.CombineCompute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
             }
 
             GL.Disable(EnableCap.DepthTest);
@@ -150,7 +150,7 @@ namespace IDKEngine
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
             GL.Disable(EnableCap.Blend);
-
+            
             fps++;
         }
 
@@ -181,47 +181,9 @@ namespace IDKEngine
             }
 
             if (KeyboardState[Keys.F11] == InputState.Touched)
-            WindowFullscreen = !WindowFullscreen;
+                WindowFullscreen = !WindowFullscreen;
 
-            if (gui.FrameRecState == Gui.FrameRecorderState.Replaying)
-            {
-                RecordableState state = StateRecorder.Replay();
-                Camera.SetState(state);
-            }
-            else
-            {
-                if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
-                {
-                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorNormal;
-                        gui.ImGuiBackend.IsIgnoreMouseInput = false;
-                        Camera.Velocity = Vector3.Zero;
-                    }
-                    else
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
-                        gui.ImGuiBackend.IsIgnoreMouseInput = true;
-                    }
-                }
-
-                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                {
-                    Camera.ProcessInputs(KeyboardState, MouseState, dT);
-                }
-            }
-
-            if (gui.FrameRecState == Gui.FrameRecorderState.Recording)
-            {
-                RecordableState recordableState;
-                recordableState.CamPosition = Camera.Position;
-                recordableState.CamUp = Camera.Up;
-                recordableState.LookX = Camera.LookX;
-                recordableState.LookY = Camera.LookY;
-                StateRecorder.Record(recordableState);
-            }
-
-            gui.Update(this);
+            gui.Update(this, dT);
         }
 
         public Camera Camera;
@@ -240,7 +202,7 @@ namespace IDKEngine
         public BVH BVH;
         private Gui gui;
         public GLSLBasicData GLSLBasicData;
-        public FrameRecorder<RecordableState> StateRecorder;
+        public FrameRecorder<RecordableState> FrameRecorder;
         protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
@@ -358,10 +320,10 @@ namespace IDKEngine
                 pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, i, 512, 0.5f, 60.0f));
             }
 
-            StateRecorder = new FrameRecorder<RecordableState>();
+            FrameRecorder = new FrameRecorder<RecordableState>();
 
             MouseState.CursorMode = CursorModeValue.CursorNormal;
-            IsPathTracing = true;
+            IsPathTracing = false;
 
             GC.Collect();
         }

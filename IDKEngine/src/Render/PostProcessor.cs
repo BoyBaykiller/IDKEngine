@@ -88,7 +88,7 @@ namespace IDKEngine.Render
             IsTaaArtifactMitigation = true;
         }
 
-        public void Compute(Texture v0, Texture v1, Texture v2, Texture v3)
+        public void CombineCompute(Texture v0, Texture v1, Texture v2, Texture v3)
         {
             (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 

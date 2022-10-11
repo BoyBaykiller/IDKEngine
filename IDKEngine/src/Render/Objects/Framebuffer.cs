@@ -68,27 +68,6 @@ namespace IDKEngine.Render.Objects
             return GL.CheckNamedFramebufferStatus(ID, FramebufferTarget.Framebuffer);
         }
 
-        public void GetPixels(int x, int y, int width, int height, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels)
-        {
-            Bind(FramebufferTarget.ReadFramebuffer);
-            GL.ReadPixels(x, y, width, height, pixelFormat, pixelType, pixels);
-            GL.Finish();
-        }
-
-        public void GetPixels<T>(int x, int y, int width, int height, PixelFormat pixelFormat, PixelType pixelType, T[] pixels) where T : struct
-        {
-            Bind(FramebufferTarget.ReadFramebuffer);
-            GL.ReadPixels(x, y, width, height, pixelFormat, pixelType, pixels);
-            GL.Finish();
-        }
-
-        public void GetPixels<T>(int x, int y, int width, int height, PixelFormat pixelFormat, PixelType pixelType, ref T pixels) where T : struct
-        {
-            Bind(FramebufferTarget.ReadFramebuffer);
-            GL.ReadPixels(x, y, width, height, pixelFormat, pixelType, ref pixels);
-            GL.Finish();
-        }
-
         public void Dispose()
         {
             GL.DeleteFramebuffer(ID);

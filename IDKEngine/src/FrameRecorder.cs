@@ -15,6 +15,8 @@ namespace IDKEngine
             }
         }
 
+        public bool FramesLoaded => FrameCount > 0;
+
         public int FrameCount { get; private set; }
 
         private int _replayFrame;
