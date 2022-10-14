@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using Assimp;
 using StbImageSharp;
+using StbImageWriteSharp;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
@@ -105,7 +106,7 @@ namespace IDKEngine
             Parallel.For(0, images.Length, i =>
             {
                 using FileStream stream = File.OpenRead(paths[i]);
-                images[i] = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+                images[i] = ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
             });
             
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
@@ -302,6 +303,20 @@ namespace IDKEngine
         public static float RandomFloat(float min, float max)
         {
             return min + (float)rng.NextDouble() * (max - min);
+        }
+
+        public static unsafe void TextureToDisk(Texture texture, string path, int quality = 90, bool flipVertically = true)
+        {
+            StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
+
+            byte* pixels = Malloc<byte>(texture.Width * texture.Height * 3);
+            texture.GetTextureImage(PixelFormat.Rgb, PixelType.UnsignedByte, (IntPtr)pixels);
+
+            ImageWriter imageWriter = new ImageWriter();
+            using FileStream fileStream = File.OpenWrite($"{path}.jpg");
+            imageWriter.WriteJpg(pixels, texture.Width, texture.Height, StbImageWriteSharp.ColorComponents.RedGreenBlue, fileStream, quality);
+            
+            Free(pixels);
         }
     }
 }

@@ -4,7 +4,7 @@ using System.Diagnostics;
 
 namespace IDKEngine
 {
-    class FrameRecorder<T> where T : unmanaged
+    class FrameStateRecorder<T> where T : unmanaged
     {
         public ref readonly T this[int index]
         {
@@ -15,12 +15,12 @@ namespace IDKEngine
             }
         }
 
-        public bool FramesLoaded => FrameCount > 0;
+        public bool IsFramesLoaded => FrameCount > 0;
 
         public int FrameCount { get; private set; }
 
         private int _replayFrame;
-        public int ReplayFrame
+        public int ReplayFrameIndex
         {
             get => _replayFrame;
             set
@@ -35,7 +35,7 @@ namespace IDKEngine
         }
 
         private T[] recordedFrames;
-        public FrameRecorder()
+        public FrameStateRecorder()
         {
             
         }
@@ -63,12 +63,12 @@ namespace IDKEngine
                 Console.WriteLine("Error: Can't replay state. Nothing is loaded");
                 return new T();
             }
-            return recordedFrames[ReplayFrame++];
+            return recordedFrames[ReplayFrameIndex++];
         }
 
         public void Clear()
         {
-            ReplayFrame = 0;
+            ReplayFrameIndex = 0;
             FrameCount = 0;
         }
 
@@ -84,7 +84,7 @@ namespace IDKEngine
                     fileStream.Read(data);
                 }
                 FrameCount = recordedFrames.Length;
-                ReplayFrame = 0;
+                ReplayFrameIndex = 0;
             }
             catch (Exception ex)
             {
@@ -94,6 +94,7 @@ namespace IDKEngine
 
         public unsafe void SaveToFile(string path)
         {
+            if (File.Exists(path)) File.Delete(path);
             using FileStream file = File.OpenWrite(path);
             fixed (void* ptr = recordedFrames)
             {

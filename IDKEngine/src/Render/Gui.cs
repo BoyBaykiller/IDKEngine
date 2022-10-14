@@ -1,9 +1,9 @@
 ﻿using System;
 using ImGuiNET;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.GUI;
+using System.IO;
 
 namespace IDKEngine.Render
 {
@@ -32,12 +32,20 @@ namespace IDKEngine.Render
         private EntityType selectedEntityType;
         private int selectedEntityIndex;
         private float selectedEntityDist;
+        private int recordingFPS;
+
+        // TODO: Make more dynamic maybe
+        const string FRAME_OUTPUT_DIR = "RecordedFrames";
+        const string FRAME_RECORD_DATA_PATH = "frameRecordData.frd";
         public Gui(int width, int height)
         {
             ImGuiBackend = new ImGuiBackend(width, height);
             frameRecState = FrameRecorderState.Nothing;
             isInfiniteReplay = false;
             pathTracerRenderSampleGoal = 1;
+            recordingFPS = 48;
+
+            Directory.CreateDirectory(FRAME_OUTPUT_DIR);
         }
 
         private bool isHoveredViewport = true;
@@ -85,6 +93,11 @@ namespace IDKEngine.Render
                         }
                     }
 
+                    if (ImGui.InputInt("Recording FPS", ref recordingFPS))
+                    {
+                        recordingFPS = Math.Max(5, recordingFPS);
+                    }
+
                     if (frameRecState == FrameRecorderState.Recording)
                     {
                         ImGui.Text($"   * Recorded frames: {app.FrameRecorder.FrameCount}");
@@ -96,19 +109,39 @@ namespace IDKEngine.Render
                     ImGui.Separator();
                 }
 
-                // TODO: Make more dynamic maybe
-                const string FRAME_RECORD_DATA_PATH = "frameRecordData.frd";
-
                 bool isReplaying = frameRecState == FrameRecorderState.Replaying;
-                if ((frameRecState == FrameRecorderState.Nothing && app.FrameRecorder.FramesLoaded) || isReplaying)
+                if ((frameRecState == FrameRecorderState.Nothing && app.FrameRecorder.IsFramesLoaded) || isReplaying)
                 {
                     ImGui.Checkbox("IsInfite Replay", ref isInfiniteReplay);
                     if (ImGui.Checkbox("IsReplaying (Space)", ref isReplaying))
                     {
                         frameRecState = isReplaying ? FrameRecorderState.Replaying : FrameRecorderState.Nothing;
-                        if (isVideoRender) isVideoRender = false;
+                        if (app.IsPathTracing && frameRecState == FrameRecorderState.Replaying)
+                        {
+                            RecordableState state = app.FrameRecorder.Replay();
+                            app.Camera.SetState(state);
+                        }
                     }
-                    ImGui.Text($"    * Replayed frames: {app.FrameRecorder.ReplayFrame} / {app.FrameRecorder.FrameCount}");
+                    int replayFrame = app.FrameRecorder.ReplayFrameIndex;
+                    if (ImGui.SliderInt("ReplayFrame", ref replayFrame, 0, app.FrameRecorder.FrameCount - 1))
+                    {
+                        app.FrameRecorder.ReplayFrameIndex = replayFrame;
+                        RecordableState state = app.FrameRecorder[replayFrame];
+                        app.Camera.SetState(state);
+                    }
+                    ImGui.Separator();
+
+                    ImGui.Checkbox("IsVideoRender", ref isVideoRender);
+                    ImGui.SameLine(); InfoMark($"When enabled rendered images are saved into a folder.");
+
+                    if (app.IsPathTracing)
+                    {
+                        int tempInt = pathTracerRenderSampleGoal;
+                        if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
+                        {
+                            pathTracerRenderSampleGoal = Math.Max(1, tempInt);
+                        }
+                    }
                     ImGui.Separator();
                 }
 
@@ -124,40 +157,6 @@ namespace IDKEngine.Render
                         app.FrameRecorder.Load(FRAME_RECORD_DATA_PATH);
                     }
                     ImGui.Separator();
-                }
-
-                if (frameRecState == FrameRecorderState.Nothing)
-                {
-                    if (!app.FrameRecorder.FramesLoaded) ImGui.BeginDisabled();
-                    if (ImGui.Button($"Start Video Render##VideoRender"))
-                    {
-                        app.FrameRecorder.ReplayFrame = 0;
-                        frameRecState = FrameRecorderState.Replaying;
-                        isVideoRender = true;
-                    }
-
-                    ImGui.SameLine();
-                    if (!app.FrameRecorder.FramesLoaded)
-                    {
-                        ImGui.EndDisabled();
-                        InfoMark($"Can't start render. No Frame Record Data loaded.");
-                        ImGui.BeginDisabled();
-                    }
-                    else
-                    {
-                        InfoMark($"This just replays the Frame Record Data from the first frame but outputs rendered images into a folder.");
-                    }
-
-                    if (app.IsPathTracing)
-                    {
-                        int tempInt = pathTracerRenderSampleGoal;
-                        if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
-                        {
-                            pathTracerRenderSampleGoal = Math.Max(1, tempInt);
-                        }
-                    }
-
-                    if (!app.FrameRecorder.FramesLoaded) ImGui.EndDisabled();
                 }
 
 
@@ -699,32 +698,55 @@ namespace IDKEngine.Render
             ImGui.Text(text);
         }
 
+        private bool takeScreenshotNextFrame = false;
+        private long lastMilliseconds = 0;
         public unsafe void Update(Application app, float dT)
         {
+            void TakeScreenshot()
+            {
+                int frameIndex = app.FrameRecorder.ReplayFrameIndex;
+                if (frameIndex == 0) frameIndex = app.FrameRecorder.FrameCount;
+                
+                Helper.TextureToDisk(app.PostProcessor.Result, $"{FRAME_OUTPUT_DIR}/{frameIndex}");
+                takeScreenshotNextFrame = false;
+            }
+
+            if (takeScreenshotNextFrame)
+            {
+                TakeScreenshot();
+                takeScreenshotNextFrame = false;
+            }
+
             if (frameRecState == FrameRecorderState.Replaying)
             {
                 if (app.IsPathTracing)
                 {
                     if (app.PathTracer.AccumulatedSamples >= pathTracerRenderSampleGoal)
                     {
+                        if (isVideoRender)
+                            TakeScreenshot();
+
                         RecordableState state = app.FrameRecorder.Replay();
                         app.Camera.SetState(state);
+
+                        if (!isInfiniteReplay && app.FrameRecorder.ReplayFrameIndex == 0)
+                        {
+                            frameRecState = FrameRecorderState.Nothing;
+                        }
                     }
                 }
                 else
                 {
                     RecordableState state = app.FrameRecorder.Replay();
                     app.Camera.SetState(state);
-                }
-                //Vector3* pixels = Helper.Malloc<Vector3>(app.PostProcessor.Result.Width * app.PostProcessor.Result.Height);
-                //int bufSize = sizeof(Vector3) * app.PostProcessor.Result.Width * app.PostProcessor.Result.Height;
-                //app.PostProcessor.Result.GetTextureImage(PixelFormat.Rgb, PixelType.Float, bufSize, (IntPtr)pixels);
-                //Helper.Free(pixels);
+                    takeScreenshotNextFrame = isVideoRender;
 
-                if (!isInfiniteReplay && app.FrameRecorder.ReplayFrame == 0)
-                {
-                    frameRecState = FrameRecorderState.Nothing;
+                    if (!isInfiniteReplay && app.FrameRecorder.ReplayFrameIndex == 0)
+                    {
+                        frameRecState = FrameRecorderState.Nothing;
+                    }
                 }
+
             }
             else
             {
@@ -733,8 +755,8 @@ namespace IDKEngine.Render
                     if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
                     {
                         app.MouseState.CursorMode = CursorModeValue.CursorNormal;
-                        ImGuiBackend.IsIgnoreMouseInput = false;
                         app.Camera.Velocity = Vector3.Zero;
+                        ImGuiBackend.IsIgnoreMouseInput = false;
                     }
                     else
                     {
@@ -749,7 +771,8 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (frameRecState == FrameRecorderState.Recording)
+            long nowMilliseconds = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            if (frameRecState == FrameRecorderState.Recording && (nowMilliseconds - lastMilliseconds) >= (1.0f / recordingFPS))
             {
                 RecordableState recordableState;
                 recordableState.CamPosition = app.Camera.Position;
@@ -757,6 +780,7 @@ namespace IDKEngine.Render
                 recordableState.LookX = app.Camera.LookX;
                 recordableState.LookY = app.Camera.LookY;
                 app.FrameRecorder.Record(recordableState);
+                lastMilliseconds = DateTimeOffset.Now.ToUnixTimeMilliseconds();
             }
 
             if (frameRecState != FrameRecorderState.Replaying && app.KeyboardState[Keys.R] == InputState.Touched)
@@ -772,17 +796,19 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (frameRecState != FrameRecorderState.Recording && app.FrameRecorder.FramesLoaded && app.KeyboardState[Keys.Space] == InputState.Touched)
+            if (frameRecState != FrameRecorderState.Recording && app.FrameRecorder.IsFramesLoaded && app.KeyboardState[Keys.Space] == InputState.Touched)
             {
-                if (frameRecState == FrameRecorderState.Replaying)
-                    frameRecState = FrameRecorderState.Nothing;
-                else
-                    frameRecState = FrameRecorderState.Replaying;
-
+                frameRecState = frameRecState == FrameRecorderState.Replaying ? FrameRecorderState.Nothing : FrameRecorderState.Replaying;
                 if (frameRecState == FrameRecorderState.Replaying)
                 {
                     app.MouseState.CursorMode = CursorModeValue.CursorNormal;
                     ImGuiBackend.IsIgnoreMouseInput = false;
+
+                    if (app.IsPathTracing)
+                    {
+                        RecordableState state = app.FrameRecorder.Replay();
+                        app.Camera.SetState(state);
+                    }
                 }
             }
 

@@ -58,7 +58,7 @@ namespace IDKEngine
 
             Velocity *= MathF.Exp(MathF.Log10(0.95f) * 144.0f * dT);
             Position += dT * Velocity * Speed + 0.5f * acceleration * dT * dT;
-            Velocity += (keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.35f : acceleration)) * dT;
+            Velocity += (keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.25f : acceleration)) * dT;
 
             if (Vector3.Dot(Velocity, Velocity) < 0.01f)
                 Velocity = Vector3.Zero;
