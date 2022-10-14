@@ -47,18 +47,6 @@ namespace IDKEngine
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
-            GLSLBasicData.DeltaUpdate = dT;
-            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
-            GLSLBasicData.ProjView = Camera.View * GLSLBasicData.Projection;
-            GLSLBasicData.View = Camera.View;
-            GLSLBasicData.InvView = Camera.View.Inverted();
-            GLSLBasicData.CameraPos = Camera.Position;
-            GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
-            GLSLBasicData.Time = WindowTime;
-            if (GLSLBasicData.PrevProjView != GLSLBasicData.ProjView)
-            {
-                PathTracer.ResetRender();
-            }
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
 
             if (!IsPathTracing)
@@ -101,8 +89,8 @@ namespace IDKEngine
                 if (IsSSR)
                     SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpecTexture, ForwardRenderer.DepthTexture);
 
-                PostProcessor.CombineCompute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null);
-                PostProcessor.TaaCompute(ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
+                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null, ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
+                
                 if (VariableRateShading.NV_SHADING_RATE_IMAGE)
                 {
                     if (IsVRSForwardRender)
@@ -126,7 +114,7 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
-                PostProcessor.CombineCompute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null);
+                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null, null, null);
             }
 
             GL.Disable(EnableCap.DepthTest);
@@ -150,7 +138,20 @@ namespace IDKEngine
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
             GL.Disable(EnableCap.Blend);
-            
+
+            GLSLBasicData.DeltaUpdate = dT;
+            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
+            GLSLBasicData.ProjView = Camera.View * GLSLBasicData.Projection;
+            GLSLBasicData.View = Camera.View;
+            GLSLBasicData.InvView = Camera.View.Inverted();
+            GLSLBasicData.CameraPos = Camera.Position;
+            GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
+            GLSLBasicData.Time = WindowTime;
+            if (GLSLBasicData.PrevProjView != GLSLBasicData.ProjView)
+            {
+                PathTracer.ResetRender();
+            }
+
             fps++;
         }
 
@@ -202,7 +203,7 @@ namespace IDKEngine
         public BVH BVH;
         private Gui gui;
         public GLSLBasicData GLSLBasicData;
-        public FrameRecorder<RecordableState> FrameRecorder;
+        public FrameStateRecorder<RecordableState> FrameRecorder;
         protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
@@ -266,7 +267,7 @@ namespace IDKEngine
             sponza.Meshes[2].RoughnessBias = -1.0f;
 
             sponza.Meshes[10].EmissiveBias = 11.0f;
-            sponza.Meshes[8].SpecularBias = -0.65f;
+            sponza.Meshes[8].SpecularBias = 1.0f;
             sponza.Meshes[8].RoughnessBias = -1.0f;
             sponza.Meshes[3].EmissiveBias = 2.67f;
             sponza.Meshes[17].RefractionChance = 1.0f;
@@ -280,6 +281,26 @@ namespace IDKEngine
 
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
             helmet.Meshes[0].SpecularBias = 1.0f;
+
+            //Model horse0 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
+            //horse0.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, 20.0f, -20.0f);
+            //horse0.Meshes[0].RefractionChance = 1.0f;
+            //horse0.Meshes[0].RoughnessBias = 0.66f;
+            //horse0.Meshes[0].Absorbance = new Vector3(0.0f, 1.0f, 0.0f);
+            
+            //Model horse1 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
+            //horse1.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-9.0f, 20.0f, -20.0f);
+            //horse1.Meshes[0].SpecularBias = 1.0f;
+
+            //Model horse2 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
+            //horse2.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-6.0f, 20.0f, -20.0f);
+            //horse2.Meshes[0].RefractionChance = 1.0f;
+            //horse2.Meshes[0].IOR = 1.2f;
+
+            //Model horse3 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
+            //horse3.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-3.0f, 20.0f, -20.0f);
+            //horse3.Meshes[0].SpecularBias = 1.0f;
+            //horse3.Meshes[0].RoughnessBias = 0.761f;
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });
@@ -303,7 +324,6 @@ namespace IDKEngine
             VolumetricLight = new VolumetricLighter(WindowSize.X, WindowSize.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             SSAO = new SSAO(WindowSize.X, WindowSize.Y, 10, 0.1f, 2.0f);
             PostProcessor = new PostProcessor(WindowSize.X, WindowSize.Y);
-
             BVH = new BVH(ModelSystem);
             PathTracer = new PathTracer(BVH, ModelSystem, WindowSize.X, WindowSize.Y);
 
@@ -320,7 +340,7 @@ namespace IDKEngine
                 pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, i, 512, 0.5f, 60.0f));
             }
 
-            FrameRecorder = new FrameRecorder<RecordableState>();
+            FrameRecorder = new FrameStateRecorder<RecordableState>();
 
             MouseState.CursorMode = CursorModeValue.CursorNormal;
             IsPathTracing = false;

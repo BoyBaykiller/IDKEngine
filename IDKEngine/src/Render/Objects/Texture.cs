@@ -183,9 +183,9 @@ namespace IDKEngine.Render.Objects
             GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
         }
 
-        public void GetTextureImage(PixelFormat pixelFormat, PixelType pixelType, int bufSize, IntPtr pixels, int level = 0)
+        public void GetTextureImage(PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0)
         {
-            GL.GetTextureImage(ID, level, pixelFormat, pixelType, bufSize, pixels);
+            GL.GetTextureImage(ID, level, pixelFormat, pixelType, int.MaxValue, pixels);
         }
 
         public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, ref T value, int level = 0) where T : unmanaged

@@ -64,7 +64,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram taaResolveProgram;
         private readonly ShaderProgram combineProgram;
         private readonly GLSLTaaData* taaData;
-        private bool isPing = true;
+        private bool isPing;
         public PostProcessor(int width, int height, int taaSamples = 6)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
@@ -88,8 +88,9 @@ namespace IDKEngine.Render
             IsTaaArtifactMitigation = true;
         }
 
-        public void CombineCompute(Texture v0, Texture v1, Texture v2, Texture v3)
+        public void Compute(Texture v0, Texture v1, Texture v2, Texture v3, Texture velocityTexture, Texture depthTexture)
         {
+            isPing = !isPing;
             (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
 
             if (v0 != null) v0.BindToUnit(0);
@@ -107,11 +108,8 @@ namespace IDKEngine.Render
             combineProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-        }
 
-        public void TaaCompute(Texture velocityTexture, Texture depthTexture)
-        {
-            if (taaData->IsEnabled == 1)
+            if (taaData->IsEnabled == 1 && velocityTexture != null && depthTexture != null)
             {
                 (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
                 (isPing ? taaPong : taaPing).BindToUnit(0);
@@ -124,7 +122,6 @@ namespace IDKEngine.Render
                 taaData->Frame++;
                 taaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + 2 * sizeof(uint), sizeof(uint), taaData->Frame);
             }
-            isPing = !isPing;
         }
 
         public void SetSize(int width, int height)
