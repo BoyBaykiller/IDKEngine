@@ -282,26 +282,6 @@ namespace IDKEngine
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
             helmet.Meshes[0].SpecularBias = 1.0f;
 
-            //Model horse0 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
-            //horse0.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-12.0f, 20.0f, -20.0f);
-            //horse0.Meshes[0].RefractionChance = 1.0f;
-            //horse0.Meshes[0].RoughnessBias = 0.66f;
-            //horse0.Meshes[0].Absorbance = new Vector3(0.0f, 1.0f, 0.0f);
-            
-            //Model horse1 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
-            //horse1.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-9.0f, 20.0f, -20.0f);
-            //horse1.Meshes[0].SpecularBias = 1.0f;
-
-            //Model horse2 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
-            //horse2.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-6.0f, 20.0f, -20.0f);
-            //horse2.Meshes[0].RefractionChance = 1.0f;
-            //horse2.Meshes[0].IOR = 1.2f;
-
-            //Model horse3 = new Model(@"C:\Users\Julian\Downloads\Horse\Horse.gltf");
-            //horse3.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(120.0f)) * Matrix4.CreateScale(25.0f) * Matrix4.CreateTranslation(-3.0f, 20.0f, -20.0f);
-            //horse3.Meshes[0].SpecularBias = 1.0f;
-            //horse3.Meshes[0].RoughnessBias = 0.761f;
-
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });
 
@@ -335,7 +315,7 @@ namespace IDKEngine
             ForwardRenderer.LightingContext.Add(CollectionsMarshal.AsSpan(lights));
 
             pointShadows = new List<PointShadow>();
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < lights.Count; i++)
             {
                 pointShadows.Add(new PointShadow(ForwardRenderer.LightingContext, i, 512, 0.5f, 60.0f));
             }
@@ -347,7 +327,6 @@ namespace IDKEngine
 
             GC.Collect();
         }
-
 
         protected override void OnResize()
         {

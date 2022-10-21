@@ -36,7 +36,7 @@ namespace IDKEngine
 
         public static Vector2 ToOpenTKVec(this System.Numerics.Vector2 vector2)
         {
-            return new Vector2(vector2.X, vector2.Y);
+            return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
         }
 
         public static Matrix4 ToOpenTKMat(this Matrix4x4 matrix4x4)

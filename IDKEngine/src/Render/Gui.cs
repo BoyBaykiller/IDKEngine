@@ -1,9 +1,9 @@
 ﻿using System;
+using System.IO;
 using ImGuiNET;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.GUI;
-using System.IO;
 
 namespace IDKEngine.Render
 {

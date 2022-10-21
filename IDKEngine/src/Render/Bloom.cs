@@ -134,7 +134,7 @@ namespace IDKEngine.Render
             upsampleTexture = new Texture(TextureTarget2d.Texture2D);
             upsampleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
             upsampleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            upsampleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, lodCount);
+            upsampleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, lodCount - 1);
         }
     }
 }

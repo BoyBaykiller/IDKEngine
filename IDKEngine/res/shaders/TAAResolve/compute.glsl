@@ -20,7 +20,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 } taaDataUBO;
 
 void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 currentColor, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
-vec4 SampleTextureCatmullRom(sampler2D srcTexture, vec2 uv);
+vec4 SampleTextureCatmullRom(sampler2D src, vec2 uv);
 
 uniform bool IsTaaArtifactMitigation;
 
@@ -109,9 +109,9 @@ void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 curren
 // This filter is better suited than the standard bilinear procedure
 // as to not introducing too much of a blur
 // Source: https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
-vec4 SampleTextureCatmullRom(sampler2D srcTexture, vec2 uv)
+vec4 SampleTextureCatmullRom(sampler2D src, vec2 uv)
 {
-    vec2 texelSize = 1.0 / textureSize(srcTexture, 0);
+    vec2 texelSize = 1.0 / textureSize(src, 0);
 
     // We're going to sample a a 4x4 grid of texels surrounding the target UV coordinate. We'll do this by rounding
     // down the sample location to get the exact center of our "starting" texel. The starting texel will be at
@@ -145,17 +145,17 @@ vec4 SampleTextureCatmullRom(sampler2D srcTexture, vec2 uv)
     texPos3 *= texelSize;
     texPos12 *= texelSize;
 
-    vec4 result = texture(srcTexture, vec2(texPos0.x, texPos0.y)) * w0.x * w0.y;
-    result += texture(srcTexture, vec2(texPos12.x, texPos0.y)) * w12.x * w0.y;
-    result += texture(srcTexture, vec2(texPos3.x, texPos0.y)) * w3.x * w0.y;
+    vec4 result = texture(src, vec2(texPos0.x, texPos0.y)) * w0.x * w0.y;
+    result += texture(src, vec2(texPos12.x, texPos0.y)) * w12.x * w0.y;
+    result += texture(src, vec2(texPos3.x, texPos0.y)) * w3.x * w0.y;
 
-    result += texture(srcTexture, vec2(texPos0.x, texPos12.y)) * w0.x * w12.y;
-    result += texture(srcTexture, vec2(texPos12.x, texPos12.y)) * w12.x * w12.y;
-    result += texture(srcTexture, vec2(texPos3.x, texPos12.y)) * w3.x * w12.y;
+    result += texture(src, vec2(texPos0.x, texPos12.y)) * w0.x * w12.y;
+    result += texture(src, vec2(texPos12.x, texPos12.y)) * w12.x * w12.y;
+    result += texture(src, vec2(texPos3.x, texPos12.y)) * w3.x * w12.y;
 
-    result += texture(srcTexture, vec2(texPos0.x, texPos3.y)) * w0.x * w3.y;
-    result += texture(srcTexture, vec2(texPos12.x, texPos3.y)) * w12.x * w3.y;
-    result += texture(srcTexture, vec2(texPos3.x, texPos3.y)) * w3.x * w3.y;
+    result += texture(src, vec2(texPos0.x, texPos3.y)) * w0.x * w3.y;
+    result += texture(src, vec2(texPos12.x, texPos3.y)) * w12.x * w3.y;
+    result += texture(src, vec2(texPos3.x, texPos3.y)) * w3.x * w3.y;
 
     return result;
 }
