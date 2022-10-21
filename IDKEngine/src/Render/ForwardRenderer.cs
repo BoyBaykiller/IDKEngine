@@ -25,6 +25,7 @@ namespace IDKEngine.Render
         }
 
         public readonly Framebuffer Framebuffer;
+        public Texture Result;
         public Texture NormalSpecTexture;
         public Texture VelocityTexture;
         public Texture DepthTexture;
@@ -35,7 +36,6 @@ namespace IDKEngine.Render
         private readonly ShaderProgram skyBoxProgram;
         private readonly ShaderProgram aabbProgram;
 
-        public Texture Result;
         public ForwardRenderer(Lighter lighter, int width, int height, int taaSamples)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
@@ -66,7 +66,7 @@ namespace IDKEngine.Render
         public void Render(ModelSystem modelSystem, Texture ambientOcclusion = null)
         {
             Framebuffer.Bind();
-            Framebuffer.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            Framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
             if (ambientOcclusion != null)
                 ambientOcclusion.BindToUnit(0);
@@ -77,10 +77,9 @@ namespace IDKEngine.Render
             depthOnlyProgram.Use();
             modelSystem.Draw();
 
-            GL.DepthFunc(DepthFunction.Equal);
             GL.ColorMask(true, true, true, true);
+            GL.DepthFunc(DepthFunction.Equal);
             GL.DepthMask(false);
-
             shadingProgram.Use();
             modelSystem.Draw();
 
@@ -90,8 +89,8 @@ namespace IDKEngine.Render
             skyBoxProgram.Use();
             GL.DrawArrays(PrimitiveType.Quads, 0, 24);
 
-            GL.DepthFunc(DepthFunction.Less);
             GL.Enable(EnableCap.CullFace);
+            GL.DepthFunc(DepthFunction.Less);
             GL.DepthMask(true);
 
             LightingContext.Draw();

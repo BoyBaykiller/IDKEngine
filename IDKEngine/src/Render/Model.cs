@@ -137,7 +137,6 @@ namespace IDKEngine.Render.Objects
                     {
                         case TextureType.Diffuse:
                             format = SizedInternalFormat.Srgb8Alpha8;
-                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedSrgbAlphaS3tcDxt5Ext;
                             break;
 
                         case TextureType.Normals:
@@ -146,17 +145,14 @@ namespace IDKEngine.Render.Objects
 
                         case TextureType.Shininess: // Roughness
                             format = SizedInternalFormat.R8;
-                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedRed;
                             break;
 
                         case TextureType.Specular:
                             format = SizedInternalFormat.R8;
-                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedRed;
                             break;
 
                         case TextureType.Emissive:
                             format = SizedInternalFormat.Rgb8;
-                            //format = (SizedInternalFormat)PixelInternalFormat.CompressedRgb;
                             break;
 
                         default:

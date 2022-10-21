@@ -1,5 +1,7 @@
 ﻿#define USE_SAH
 using System;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
@@ -8,7 +10,7 @@ namespace IDKEngine
     {
         public const int MIN_TRIANGLES_PER_LEAF_COUNT = 3;
 #if USE_SAH
-        public const int SAH_SAMPLES = 8;
+        public const int SAH_SAMPLES = 7;
 #endif
 
         public readonly GLSLBlasNode[] Nodes;
@@ -30,18 +32,13 @@ namespace IDKEngine
             void Subdivide(int nodeID = 0)
             {
                 ref GLSLBlasNode parentNode = ref Nodes[nodeID];
-#if !USE_SAH
                 if (parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
                     return;
-#endif
-
 #if USE_SAH
                 float splitSAH = FindBestSplitAxis(ref parentNode, out int splitAxis, out float splitPos);
-
                 float parentSAH = CalculateSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
-                if (splitSAH >= parentSAH || parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
+                if (splitSAH >= parentSAH)
                     return;
-
 #else
                 Vector3 extent = parentNode.Max - parentNode.Min;
                 int splitAxis = 0;
@@ -51,29 +48,32 @@ namespace IDKEngine
                 float splitPos = parentNode.Min[splitAxis] + extent[splitAxis] * 0.5f;
 #endif
 
-                int rightStart = (int)parentNode.TriStartOrLeftChild;
-                int endOfTris = (int)(rightStart + parentNode.TriCount - 1);
-                while (rightStart <= endOfTris)
+                uint start = parentNode.TriStartOrLeftChild;
+                uint end = start + parentNode.TriCount;
+
+                uint mid = start;
+                for (uint i = start; i < end; i++)
                 {
-                    ref GLSLTriangle tri = ref triangles[rightStart];
+                    ref GLSLTriangle tri = ref triangles[i];
                     if ((tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) * (1.0f / 3.0f) < splitPos)
-                        rightStart++;
-                    else
-                        Helper.Swap(ref tri, ref triangles[endOfTris--]);
+                    {
+                        Helper.Swap(ref tri, ref triangles[mid++]);
+                    }
                 }
 
-                uint leftCount = (uint)(rightStart - parentNode.TriStartOrLeftChild);
-                if (leftCount == 0 || leftCount == parentNode.TriCount)
-                    return;
+                if (mid == start || mid == end)
+                {
+                    mid = start + (end - start) / 2;
+                }
 
                 int leftChildID = nodesUsed++;
                 int rightChildID = nodesUsed++;
 
-                Nodes[leftChildID].TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
-                Nodes[leftChildID].TriCount |= leftCount;
+                Nodes[leftChildID].TriStartOrLeftChild = start;
+                Nodes[leftChildID].TriCount |= mid - start;
 
-                Nodes[rightChildID].TriStartOrLeftChild = (uint)rightStart;
-                Nodes[rightChildID].TriCount |= parentNode.TriCount - leftCount;
+                Nodes[rightChildID].TriStartOrLeftChild = mid;
+                Nodes[rightChildID].TriCount |= end - mid;
 
                 parentNode.TriStartOrLeftChild = (uint)leftChildID;
                 parentNode.TriCount = 0;
@@ -99,7 +99,7 @@ namespace IDKEngine
                     uniformDivideArea.Shrink(centroid);
                 }
 
-                float bestSAH = float.MaxValue;
+                float bestSplitCost = float.MaxValue;
                 for (int i = 0; i < 3; i++)
                 {
                     if (uniformDivideArea.Min[i] == uniformDivideArea.Max[i])
@@ -109,20 +109,20 @@ namespace IDKEngine
                     for (int j = 1; j < SAH_SAMPLES; j++)
                     {
                         float currentSplitPos = uniformDivideArea.Min[i] + j * scale;
-                        float currentSAH = FindSAH(node, i, currentSplitPos);
-                        if (currentSAH < bestSAH)
+                        float currentSplitCost = GetSplitCost(node, i, currentSplitPos);
+                        if (currentSplitCost < bestSplitCost)
                         {
                             splitPos = currentSplitPos;
                             splitAxis = i;
-                            bestSAH = currentSAH;
+                            bestSplitCost = currentSplitCost;
                         }
                     }
                 }
 
-                return bestSAH;
+                return bestSplitCost;
             }
 
-            float FindSAH(in GLSLBlasNode node, int splitAxis, float splitPos)
+            float GetSplitCost(in GLSLBlasNode node, int splitAxis, float splitPos)
             {
                 AABB leftBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
                 AABB rightBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
@@ -151,21 +151,28 @@ namespace IDKEngine
 
             void UpdateNodeBounds(ref GLSLBlasNode node)
             {
-                node.Min = new Vector3(float.MaxValue);
-                node.Max = new Vector3(float.MinValue);
+                Vector128<float> nodeMin = Vector128.Create(float.MaxValue);
+                Vector128<float> nodeMax = Vector128.Create(float.MinValue);
 
                 for (int i = 0; i < node.TriCount; i++)
                 {
                     ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
 
-                    node.Min = Vector3.ComponentMin(node.Min, tri.Vertex0.Position);
-                    node.Min = Vector3.ComponentMin(node.Min, tri.Vertex1.Position);
-                    node.Min = Vector3.ComponentMin(node.Min, tri.Vertex2.Position);
+                    Vector128<float> v0 = Vector128.Create(tri.Vertex0.Position.X, tri.Vertex0.Position.Y, tri.Vertex0.Position.Z, 0.0f);
+                    Vector128<float> v1 = Vector128.Create(tri.Vertex1.Position.X, tri.Vertex1.Position.Y, tri.Vertex1.Position.Z, 0.0f);
+                    Vector128<float> v2 = Vector128.Create(tri.Vertex2.Position.X, tri.Vertex2.Position.Y, tri.Vertex2.Position.Z, 0.0f);
 
-                    node.Max = Vector3.ComponentMax(node.Max, tri.Vertex0.Position);
-                    node.Max = Vector3.ComponentMax(node.Max, tri.Vertex1.Position);
-                    node.Max = Vector3.ComponentMax(node.Max, tri.Vertex2.Position);
+                    nodeMin = Sse.Min(nodeMin, v0);
+                    nodeMin = Sse.Min(nodeMin, v1);
+                    nodeMin = Sse.Min(nodeMin, v2);
+
+                    nodeMax = Sse.Max(nodeMax, v0);
+                    nodeMax = Sse.Max(nodeMax, v1);
+                    nodeMax = Sse.Max(nodeMax, v2);
                 }
+
+                node.Min = nodeMin.AsVector3().ToOpenTKVec();
+                node.Max = nodeMax.AsVector3().ToOpenTKVec();
             }
         }
 

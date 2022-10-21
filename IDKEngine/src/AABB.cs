@@ -1,4 +1,6 @@
 ﻿using OpenTK.Mathematics;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 namespace IDKEngine
 {
@@ -27,10 +29,14 @@ namespace IDKEngine
             Max = max;
         }
 
-        public void Shrink(in Vector3 value)
+        public void Shrink(in Vector3 point)
         {
-            Min = Vector3.ComponentMin(Min, value);
-            Max = Vector3.ComponentMax(Max, value);
+            Vector128<float> p = Vector128.Create(point.X, point.Y, point.Z, 0.0f);
+            Vector128<float> min = Vector128.Create(Min.X, Min.Y, Min.Z, 0.0f);
+            Vector128<float> max = Vector128.Create(Max.X, Max.Y, Max.Z, 0.0f);
+
+            Min = Sse.Min(min, p).AsVector3().ToOpenTKVec();
+            Max = Sse.Max(max, p).AsVector3().ToOpenTKVec();
         }
 
         public void Shrink(in AABB aaab)
@@ -49,7 +55,7 @@ namespace IDKEngine
         public float Area()
         {
             Vector3 size = Max - Min;
-            return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+            return 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
         }
 
         public void Transform(Matrix4 model)
