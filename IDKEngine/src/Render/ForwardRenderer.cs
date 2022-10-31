@@ -66,7 +66,7 @@ namespace IDKEngine.Render
         public void Render(ModelSystem modelSystem, Texture ambientOcclusion = null)
         {
             Framebuffer.Bind();
-            Framebuffer.Clear(ClearBufferMask.DepthBufferBit);
+            Framebuffer.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             if (ambientOcclusion != null)
                 ambientOcclusion.BindToUnit(0);

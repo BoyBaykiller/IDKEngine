@@ -292,20 +292,20 @@ namespace IDKEngine
         private static readonly Random rng = new Random();
         public static Vector3 RandomVec3(float min, float max)
         {
-            return new Vector3(min) + new Vector3((float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble()) * (max - min);
+            return new Vector3(min) + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
         }
 
         public static Vector3 RandomVec3(Vector3 min, Vector3 max)
         {
-            return min + new Vector3((float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble()) * (max - min);
+            return min + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
         }
 
         public static float RandomFloat(float min, float max)
         {
-            return min + (float)rng.NextDouble() * (max - min);
+            return min + rng.NextSingle() * (max - min);
         }
 
-        public static unsafe void TextureToDisk(Texture texture, string path, int quality = 90, bool flipVertically = true)
+        public static unsafe void TextureToDisk(Texture texture, string path, int quality = 200, bool flipVertically = true)
         {
             StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
 

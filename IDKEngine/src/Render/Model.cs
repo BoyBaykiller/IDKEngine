@@ -179,7 +179,7 @@ namespace IDKEngine.Render.Objects
 
                         if (perMaterialTextures[j] == TextureType.Diffuse)
                         {
-                            Vector4 dummyAlbedoData = new Vector4(0.371f, 0.676f, 0.336f, 1.0f);
+                            Vector4 dummyAlbedoData = new Vector4(1.0f);
                             texture.Clear(PixelFormat.Rgba, PixelType.Float, ref dummyAlbedoData);
                         }
                     }

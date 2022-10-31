@@ -222,6 +222,7 @@ namespace IDKEngine
             GL.Enable(EnableCap.Blend);
             GL.Enable(EnableCap.ScissorTest);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
 #if DEBUG
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.DebugCallback, (IntPtr)0);
