@@ -35,7 +35,7 @@ layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
 layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
-    uint FreezeFramesCounter;
+    uint AccumulatedSamples;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -96,7 +96,7 @@ void main()
     }
 
     vec3 lastFrameColor = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameColor, irradiance, 1.0 / (float(rayIndicesSSBO.FreezeFramesCounter) + 1.0));
+    irradiance = mix(lastFrameColor, irradiance, 1.0 / (float(rayIndicesSSBO.AccumulatedSamples) + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 

@@ -163,7 +163,7 @@ layout(std430, binding = 6) restrict writeonly buffer TransportRaySSBO
 layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
-    uint FreezeFramesCounter;
+    uint AccumulatedSamples;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -236,9 +236,9 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + rayIndicesSSBO.FreezeFramesCounter * 2699;
+    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + rayIndicesSSBO.AccumulatedSamples * 2699;
     if (GetRandomFloat01() < RayCoherency)
-        rngSeed = rayIndicesSSBO.FreezeFramesCounter * 2699;
+        rngSeed = rayIndicesSSBO.AccumulatedSamples * 2699;
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;

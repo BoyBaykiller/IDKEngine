@@ -161,7 +161,7 @@ layout(std430, binding = 6) restrict buffer TransportRaySSBO
 layout(std430, binding = 7) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
-    uint FreezeFramesCounter;
+    uint AccumulatedSamples;
     uint Indices[];
 } rayIndicesSSBO;
 
@@ -232,7 +232,7 @@ void main()
         dispatchCommandSSBO.DispatchCommands[1 - PingPongIndex].NumGroupsX = 0u;
     }
 
-    rngSeed = gl_GlobalInvocationID.x * 312 + rayIndicesSSBO.FreezeFramesCounter * 2699;
+    rngSeed = gl_GlobalInvocationID.x * 312 + rayIndicesSSBO.AccumulatedSamples * 2699;
 
     uint rayIndex = rayIndicesSSBO.Indices[gl_GlobalInvocationID.x];
     TransportRay transportRay = transportRaySSBO.Rays[rayIndex];
@@ -280,7 +280,7 @@ bool TraceRay(inout TransportRay transportRay)
             vec3 tangent = normalize(Interpolate(DecompressSNorm32Fast(v0.Tangent), DecompressSNorm32Fast(v1.Tangent), DecompressSNorm32Fast(v2.Tangent), hitInfo.Bary));
 
             mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
-            vec3 T = normalize((model * vec4(tangent, 0.0f)).xyz);
+            vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
             vec3 N = normalize((model * vec4(geoNormal, 0.0)).xyz);
             T = normalize(T - dot(T, N) * N);
             vec3 B = cross(N, T);
