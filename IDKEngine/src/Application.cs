@@ -31,9 +31,6 @@ namespace IDKEngine
             {
                 _isPathTracing = value;
                 PathTracer.ResetRender();
-
-                float clearData = 0.0f;
-                PathTracer.Result.Clear(PixelFormat.Rgba, PixelType.Float, ref clearData);
             }
 
         }
@@ -47,6 +44,18 @@ namespace IDKEngine
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
+            GLSLBasicData.DeltaUpdate = dT;
+            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
+            GLSLBasicData.ProjView = Camera.ViewMatrix * GLSLBasicData.Projection;
+            GLSLBasicData.View = Camera.ViewMatrix;
+            GLSLBasicData.InvView = Camera.ViewMatrix.Inverted();
+            GLSLBasicData.CameraPos = Camera.Position;
+            GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
+            GLSLBasicData.Time = WindowTime;
+            if (IsPathTracing && GLSLBasicData.PrevProjView != GLSLBasicData.ProjView)
+            {
+                PathTracer.ResetRender();
+            }
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
 
             if (!IsPathTracing)
@@ -138,19 +147,6 @@ namespace IDKEngine
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
             GL.Disable(EnableCap.Blend);
-
-            GLSLBasicData.DeltaUpdate = dT;
-            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
-            GLSLBasicData.ProjView = Camera.View * GLSLBasicData.Projection;
-            GLSLBasicData.View = Camera.View;
-            GLSLBasicData.InvView = Camera.View.Inverted();
-            GLSLBasicData.CameraPos = Camera.Position;
-            GLSLBasicData.InvProjView = (GLSLBasicData.View * GLSLBasicData.Projection).Inverted();
-            GLSLBasicData.Time = WindowTime;
-            if (GLSLBasicData.PrevProjView != GLSLBasicData.ProjView)
-            {
-                PathTracer.ResetRender();
-            }
 
             fps++;
         }

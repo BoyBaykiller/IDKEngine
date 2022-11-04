@@ -10,7 +10,7 @@ namespace IDKEngine
     {
         public const int MIN_TRIANGLES_PER_LEAF_COUNT = 3;
 #if USE_SAH
-        public const int SAH_SAMPLES = 7;
+        public const int SAH_SAMPLES = 8;
 #endif
 
         public readonly GLSLBlasNode[] Nodes;

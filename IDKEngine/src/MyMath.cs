@@ -262,7 +262,7 @@ namespace IDKEngine
         }
 
         // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
-        public static bool RayCuboidIntersect(in Ray ray, in Vector3 min, Vector3 max, out float t1, out float t2)
+        public static bool RayCuboidIntersect(in Ray ray, in Vector3 min, in Vector3 max, out float t1, out float t2)
         {
             t1 = float.MinValue;
             t2 = float.MaxValue;

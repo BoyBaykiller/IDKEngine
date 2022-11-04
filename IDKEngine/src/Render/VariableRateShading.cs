@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -7,7 +6,7 @@ namespace IDKEngine.Render
 {
     class VariableRateShading
     {
-        // Definied by spec
+        // Defined by spec
         public const int TILE_SIZE = 16;
 
         public static readonly bool NV_SHADING_RATE_IMAGE = Helper.IsExtensionsAvailable("GL_NV_shading_rate_image");
@@ -87,7 +86,7 @@ namespace IDKEngine.Render
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        public VariableRateShading(Shader classificationComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.3f)
+        public VariableRateShading(Shader classificationComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.25f)
         {
             shaderProgram = new ShaderProgram(classificationComputeShader);
 

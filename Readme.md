@@ -51,9 +51,9 @@ a 16x16 tile of the framebuffer. The hardware then fetches this texture looks up
 
 Here is a generated shading image while the camera was moving:
 
-![ShadingRateImage](Screenshots/VRSExample.png?raw=true)
+![ShadingRateImage](Screenshots/ShadingRateImageExample.png?raw=true)
 
-Red stands for 1 invocation per 4x4 pixels which means 4x less fragment shader invocations in those regions.
+Red stands for 1 invocation per 4x4 pixels which means 16x less fragment shader invocations in those regions.
 No color is the default - 1 invocation per pixel.
 
 ### 2.0 Shading Rate Image generation
@@ -326,7 +326,7 @@ While this renders all geometry just fine you might be wondering how to access t
 First of all `ARB_bindless_texture` is not a core extension. Nonetheless almost all AMD and Nvidia GPUs implement it as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately render doc doesn't support it.
 
 The main idea behind bindless textures is the ability to generate a unique 64 bit handle from any texture which can then be used to represent it inside glsl and therefore no longer depend on previous state based mechanics.
-Concrete that means no longer having to call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.
+Specifically that means no longer having to call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.
 Instead generate a handle and somehow communicate it to the gpu (most likely with a buffer).
 
 Example:
@@ -403,7 +403,7 @@ And getting a local space bounding box from each mesh's vertices shouldn't be a 
 
 Remember how `MultiDrawElementsIndirect` reads draw commands from a buffer object?
 This means the gpu can modify it's own drawing parameters by writing into that buffer object (using shader storage blocks).
-And that's the clue to gpu accelerated frustum culling without any cpu readback.
+And that's the key to gpu accelerated frustum culling without any cpu readback.
 
 Basically the cpu side of things is as simple as:
 ```cs

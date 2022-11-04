@@ -6,20 +6,20 @@ namespace IDKEngine
 {
     class Camera
     {
-        public Vector3 Position;
-        public Vector3 ViewDir;
-        public Vector3 Up;
+        public Vector3 Position { get; private set; }
+        public Vector3 ViewDir { get; private set; }
+        public Vector3 Up { get; private set; }
         public Vector3 Velocity;
         public float Speed;
         public float Sensitivity;
-        public Matrix4 View { get; private set; }
+        public Matrix4 ViewMatrix;
         public Camera(Vector3 position, Vector3 up, float lookX = -90.0f, float lookY = 0.0f, float mouseSensitivity = 0.1f, float speed = 1.0f)
         {
             LookX = lookX;
             LookY = lookY;
 
             ViewDir = GetViewDirFromAngles(LookX, LookY);
-            View = GenerateViewMatrix(position, ViewDir, up);
+            ViewMatrix = GenerateViewMatrix(position, ViewDir, up);
 
             Position = position;
             Up = up;
@@ -63,7 +63,7 @@ namespace IDKEngine
             if (Vector3.Dot(Velocity, Velocity) < 0.01f)
                 Velocity = Vector3.Zero;
 
-            View = GenerateViewMatrix(Position, ViewDir, Up);
+            ViewMatrix = GenerateViewMatrix(Position, ViewDir, Up);
         }
 
         public void SetState(in RecordableState state)
@@ -74,7 +74,7 @@ namespace IDKEngine
             LookY = state.LookY;
 
             ViewDir = GetViewDirFromAngles(LookX, LookY);
-            View = GenerateViewMatrix(Position, ViewDir, Up);
+            ViewMatrix = GenerateViewMatrix(Position, ViewDir, Up);
         }
 
         public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
@@ -87,7 +87,7 @@ namespace IDKEngine
             return viewDir;
         }
 
-        public static Matrix4 GenerateViewMatrix(Vector3 position, Vector3 viewDir, Vector3 up)
+        public static Matrix4 GenerateViewMatrix(in Vector3 position, in Vector3 viewDir, in Vector3 up)
         {
             return Matrix4.LookAt(position, position + viewDir, up);
         }

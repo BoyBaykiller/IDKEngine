@@ -84,10 +84,10 @@ namespace IDKEngine
             }
         }
 
-        public unsafe bool Intersect(in Ray ray, out RayHitInfo hitInfo)
+        public unsafe bool Intersect(in Ray ray, out RayHitInfo hitInfo, float maxT = float.MaxValue)
         {
             hitInfo = new RayHitInfo();
-            hitInfo.T = float.MaxValue;
+            hitInfo.T = maxT;
 
             float rayTMin = 0.0f;
             float rayTMax = 0.0f;
@@ -133,7 +133,7 @@ namespace IDKEngine
                 }
             }
 
-            return hitInfo.T != float.MaxValue;
+            return hitInfo.T != maxT;
         }
 
         public unsafe bool Intersect(in AABB worldSpaceAabb, out AABBHitInfo hitInfo)
