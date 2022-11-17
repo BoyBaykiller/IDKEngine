@@ -35,11 +35,6 @@ in InOutVars
 
 void main()
 {
-    // if (any(lessThan(inData.FragPos, vxgiDataUBO.GridMin)) && any(greaterThan(inData.FragPos, vxgiDataUBO.GridMax)))
-    // {
-    //     discard;
-    // }
-
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     vec4 albedo = texture(material.Albedo, inData.TexCoord);
 
