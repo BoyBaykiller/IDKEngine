@@ -99,15 +99,20 @@ Frustum ExtractFrustum(mat4 matrix)
 
 bool FrustumAABBIntersect(Frustum frustum, Node node)
 {
-	float a = 1.0;
+    float a = 1.0;
 
-	for (int i = 0; i < 6 && a >= 0.0; i++)
+    for (int i = 0; i < 6; i++)
     {
         vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
-		a = dot(vec4(negative, 1.0), frustum.Planes[i]);
-	}
+        a = dot(vec4(negative, 1.0), frustum.Planes[i]);
 
-	return a >= 0.0;
+        if (a < 0.0)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 vec3 NegativeVertex(Node node, vec3 normal)

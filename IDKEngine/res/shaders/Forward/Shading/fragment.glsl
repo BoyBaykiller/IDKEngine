@@ -202,7 +202,7 @@ float Visibility(PointShadow pointShadow)
     
     const float DISK_RADIUS = 0.08;
     float shadowFactor = texture(pointShadow.SamplerShadow, vec4(lightToFrag, mapedDepth));
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < SHADOW_SAMPLE_OFFSETS.length(); i++)
     {
         shadowFactor += texture(pointShadow.SamplerShadow, vec4(lightToFrag + SHADOW_SAMPLE_OFFSETS[i] * DISK_RADIUS, mapedDepth));
     }

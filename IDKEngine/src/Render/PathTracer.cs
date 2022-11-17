@@ -6,7 +6,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class PathTracer
+    class PathTracer : IDisposable
     {
         private int cachedRayDepth;
         public int RayDepth;
@@ -24,7 +24,7 @@ namespace IDKEngine.Render
                 if (_isDebugBVHTraversal)
                 {
                     firstHitProgram.Upload("ApertureDiameter", 0.0f);
-                    cachedRayDepth = RayDepth; 
+                    cachedRayDepth = RayDepth;
                     RayDepth = 1;
                 }
                 else
@@ -88,7 +88,6 @@ namespace IDKEngine.Render
 
         public ModelSystem ModelSystem;
         public Texture Result;
-        public readonly BVH BVH;
         private readonly ShaderProgram firstHitProgram;
         private readonly ShaderProgram nHitProgram;
         private readonly ShaderProgram finalDrawProgram;
@@ -114,7 +113,6 @@ namespace IDKEngine.Render
             SetSize(width, height);
 
             ModelSystem = modelSystem;
-            BVH = bvh;
 
             RayDepth = 7;
             FocalLength = 8.0f;
@@ -137,7 +135,7 @@ namespace IDKEngine.Render
                 nHitProgram.Upload(0, pingPongIndex);
                 rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // set count
 
-                GL.DispatchComputeIndirect((IntPtr)(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex)));
+                GL.DispatchComputeIndirect(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex));
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
             }
 
@@ -175,6 +173,17 @@ namespace IDKEngine.Render
             rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
             rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0));
             rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
+        }
+
+        public void Dispose()
+        {
+            Result.Dispose();
+            firstHitProgram.Dispose();
+            nHitProgram.Dispose();
+            finalDrawProgram.Dispose();
+            dispatchCommandBuffer.Dispose();
+            transportRayBuffer.Dispose();
+            rayIndicesBuffer.Dispose();
         }
     }
 }

@@ -447,7 +447,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
         DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
         uint baseNode = 2 * (cmd.FirstIndex / 3);
 
-        const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
+        const uint glInstanceID = 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
 
         uint stackPtr = 0;

@@ -6,7 +6,7 @@ using OpenTK.Graphics.OpenGL4;
 
 namespace IDKEngine.Render.Objects
 {
-    struct Shader : IDisposable
+    readonly struct Shader : IDisposable
     {
         public readonly int ID;
         public readonly ShaderType ShaderType;
@@ -80,87 +80,106 @@ namespace IDKEngine.Render.Objects
             }
         }
 
-        public void Upload(int location, ref Matrix4 matrix4, bool transpose = false)
+        public unsafe void Upload(int location, in Matrix4 matrix4, int count = 1, bool transpose = false)
         {
-            GL.ProgramUniformMatrix4(ID, location, transpose, ref matrix4);
+            fixed (float* ptr = &matrix4.Row0.X)
+            {
+                GL.ProgramUniformMatrix4(ID, location, count, transpose, ptr);
+            }
         }
-        public void Upload(string name, ref Matrix4 matrix4, bool transpose = false)
+        public unsafe void Upload(string name, in Matrix4 matrix4, int count = 1, bool transpose = false)
         {
-            GL.ProgramUniformMatrix4(ID, GetUniformLocation(name), transpose, ref matrix4);
-        }
-        public void Upload(string name, int count, ref Matrix4 matrices, bool transpose = false)
-        {
-            GL.ProgramUniformMatrix4(ID, GetUniformLocation(name), count, transpose, ref matrices.Row0.X);
-        }
-
-        public void Upload(int location, Vector4 vector4)
-        {
-            GL.ProgramUniform4(ID, location, vector4);
-        }
-        public void Upload(string name, Vector4 vector4)
-        {
-            GL.ProgramUniform4(ID, GetUniformLocation(name), vector4);
+            fixed (float* ptr = &matrix4.Row0.X)
+            {
+                GL.ProgramUniformMatrix4(ID, GetUniformLocation(name), count, transpose, ptr);
+            }
         }
 
-        public void Upload(int location, Vector3 vector3)
+        public unsafe void Upload(int location, in Vector4 vector4, int count = 1)
         {
-            GL.ProgramUniform3(ID, location, vector3);
+            fixed (float* ptr = &vector4.X)
+            {
+                GL.ProgramUniform4(ID, location, count, ptr);
+            }
         }
-        public void Upload(string name, Vector3 vector3)
+        public unsafe void Upload(string name, in Vector4 vector4, int count = 1)
         {
-            GL.ProgramUniform3(ID, GetUniformLocation(name), vector3);
-        }
-
-        public void Upload(int location, Vector2 vector2)
-        {
-            GL.ProgramUniform2(ID, location, vector2);
-        }
-        public void Upload(string name, Vector2 vector2)
-        {
-            GL.ProgramUniform2(ID, GetUniformLocation(name), vector2);
+            fixed (float* ptr = &vector4.X)
+            {
+                GL.ProgramUniform4(ID, GetUniformLocation(name), count, ptr);
+            }
         }
 
-        public void Upload(int location, float x)
+        public unsafe void Upload(int location, in Vector3 vector3, int count = 1)
         {
-            GL.ProgramUniform1(ID, location, x);
+            fixed (float* ptr = &vector3.X)
+            {
+                GL.ProgramUniform3(ID, location, count, ptr);
+            }
         }
-        public void Upload(string name, float x)
+        public unsafe void Upload(string name, in Vector3 vector3, int count = 1)
         {
-            GL.ProgramUniform1(ID, GetUniformLocation(name), x);
-        }
-
-        public void Upload(int location, int x)
-        {
-            GL.ProgramUniform1(ID, location, x);
-        }
-        public void Upload(string name, int x)
-        {
-            GL.ProgramUniform1(ID, GetUniformLocation(name), x);
+            fixed (float* ptr = &vector3.X)
+            {
+                GL.ProgramUniform3(ID, GetUniformLocation(name), count, ptr);
+            }
         }
 
-        public void Upload(int location, uint x)
+        public unsafe void Upload(int location, in Vector2 vector2, int count = 1)
         {
-            GL.ProgramUniform1((uint)ID, location, x);
+            fixed (float* ptr = &vector2.X)
+            {
+                GL.ProgramUniform2(ID, location, count, ptr);
+            }
         }
-        public void Upload(string name, uint x)
+        public unsafe void Upload(string name, in Vector2 vector2, int count = 1)
         {
-            GL.ProgramUniform1((uint)ID, GetUniformLocation(name), x);
+            fixed (float* ptr = &vector2.X)
+            {
+                GL.ProgramUniform2(ID, GetUniformLocation(name), count, ptr);
+            }
+        }
+
+        public void Upload(int location, float x, int count = 1)
+        {
+            GL.ProgramUniform1(ID, location, count, ref x);
+        }
+        public void Upload(string name, float x, int count = 1)
+        {
+            GL.ProgramUniform1(ID, GetUniformLocation(name), count, ref x);
+        }
+
+        public void Upload(int location, int x, int count = 1)
+        {
+            GL.ProgramUniform1(ID, location, count, ref x);
+        }
+        public void Upload(string name, int x, int count = 1)
+        {
+            GL.ProgramUniform1(ID, GetUniformLocation(name), count, ref x);
+        }
+
+        public void Upload(int location, uint x, int count = 1)
+        {
+            GL.ProgramUniform1((uint)ID, location, count, ref x);
+        }
+        public void Upload(string name, uint x, int count = 1)
+        {
+            GL.ProgramUniform1((uint)ID, GetUniformLocation(name), count, ref x);
         }
 
         public void Upload(int location, bool x)
         {
-            GL.ProgramUniform1(ID, location, x ? 1 : 0);
+            Upload(location, x ? 1 : 0);
         }
         public void Upload(string name, bool x)
         {
-            GL.ProgramUniform1(ID, GetUniformLocation(name), x ? 1 : 0);
+            Upload(name, x ? 1 : 0);
         }
 
         public int GetUniformLocation(string name)
         {
             return GL.GetUniformLocation(ID, name);
         }
-
 
         public void Dispose()
         {

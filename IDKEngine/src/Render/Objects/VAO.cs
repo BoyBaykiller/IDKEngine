@@ -20,7 +20,7 @@ namespace IDKEngine.Render.Objects
 
         public void AddSourceBuffer(BufferObject sourceBuffer, int bindingIndex, int vertexSize, int bufferOffset = 0)
         {
-            GL.VertexArrayVertexBuffer(ID, bindingIndex, sourceBuffer.ID, (IntPtr)bufferOffset, vertexSize);
+            GL.VertexArrayVertexBuffer(ID, bindingIndex, sourceBuffer.ID, bufferOffset, vertexSize);
         }
 
         public void SetAttribFormat(int bindingIndex, int attribIndex, int attribTypeElements, VertexAttribType vertexAttribType, int relativeOffset, bool normalize = false)

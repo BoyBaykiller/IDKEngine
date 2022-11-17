@@ -1,13 +1,13 @@
 ﻿using System;
 using System.IO;
-using ImGuiNET;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.GUI;
+using ImGuiNET;
 
 namespace IDKEngine.Render
 {
-    class Gui
+    class Gui : IDisposable
     {
         enum EntityType
         {
@@ -55,27 +55,8 @@ namespace IDKEngine.Render
             ImGuiBackend.Update(app, frameTime);
             ImGui.DockSpaceOverViewport();
 
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(0.0f));
-            ImGui.Begin($"Viewport");
-            
-            System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
-            
-            System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
-            viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
-
-            ImGui.Image((IntPtr)app.PostProcessor.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
-            isHoveredViewport = ImGui.IsItemHovered();
-
-            if (content.X != app.ViewportResolution.X || content.Y != app.ViewportResolution.Y)
-            {
-                app.SetViewportResolution((int)content.X, (int)content.Y);
-            }
-
-            ImGui.End();
-            ImGui.PopStyleVar();
-
-            const string FRAME_RECORDER_SECTION_NAME = "Frame Recorder";
-            ImGui.Begin(FRAME_RECORDER_SECTION_NAME);
+            bool shouldResetPT = false;
+            ImGui.Begin("Frame Recorder");
             {
                 bool isRecording = frameRecState == FrameRecorderState.Recording;
                 if (frameRecState == FrameRecorderState.Nothing || isRecording)
@@ -116,7 +97,7 @@ namespace IDKEngine.Render
                     if (ImGui.Checkbox("IsReplaying (Space)", ref isReplaying))
                     {
                         frameRecState = isReplaying ? FrameRecorderState.Replaying : FrameRecorderState.Nothing;
-                        if (app.IsPathTracing && frameRecState == FrameRecorderState.Replaying)
+                        if (app.GetRenderMode() == RenderMode.PathTracer && frameRecState == FrameRecorderState.Replaying)
                         {
                             RecordableState state = app.FrameRecorder.Replay();
                             app.Camera.SetState(state);
@@ -134,7 +115,7 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("IsVideoRender", ref isVideoRender);
                     ImGui.SameLine(); InfoMark($"When enabled rendered images are saved into a folder.");
 
-                    if (app.IsPathTracing)
+                    if (app.GetRenderMode() == RenderMode.PathTracer)
                     {
                         int tempInt = pathTracerRenderSampleGoal;
                         if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
@@ -168,14 +149,14 @@ namespace IDKEngine.Render
                 ImGui.Text($"FPS: {app.FPS}");
                 ImGui.Text($"Viewport size: {app.ViewportResolution.X}x{app.ViewportResolution.Y}");
 
-                if (app.IsPathTracing)
+                if (app.GetRenderMode() == RenderMode.PathTracer)
                 {
                     ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
                 }
 
-                string[] renderModes = new string[] { "Rasterizer", "PathTracer" };
-                string current = app.IsPathTracing ? renderModes[1] : renderModes[0];
-                if (ImGui.BeginCombo("Render Path", current))
+                string[] renderModes = (string[])Enum.GetNames(typeof(RenderMode));
+                string current = app.GetRenderMode().ToString();
+                if (ImGui.BeginCombo("Render Mode", current))
                 {
                     for (int i = 0; i < renderModes.Length; i++)
                     {
@@ -183,7 +164,7 @@ namespace IDKEngine.Render
                         if (ImGui.Selectable(renderModes[i], isSelected))
                         {
                             current = renderModes[i];
-                            app.IsPathTracing = current == renderModes[1];
+                            app.SetRenderMode(((RenderMode[])Enum.GetValues(typeof(RenderMode)))[i]);
                         }
 
                         if (isSelected)
@@ -198,19 +179,19 @@ namespace IDKEngine.Render
                     app.PostProcessor.IsDithering = tempBool;
                 }
 
-                if (!app.IsPathTracing)
+                if (app.GetRenderMode() == RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.IsWireframe);
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
-                        if (!VariableRateShading.NV_SHADING_RATE_IMAGE)
+                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING)
                         {
                             ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f);
                             ImGui.BeginDisabled();
                         }
                         ImGui.Checkbox("IsVRS", ref app.IsVRSForwardRender);
-                        if (!VariableRateShading.NV_SHADING_RATE_IMAGE)
+                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING)
                         {
                             ImGui.EndDisabled();
                             ImGui.PopStyleVar();
@@ -226,14 +207,14 @@ namespace IDKEngine.Render
 
                         string[] debugModes = new string[]
                         {
-                            nameof(VariableRateShading.DebugMode.NoDebug),
-                            nameof(VariableRateShading.DebugMode.ShadingRate),
-                            nameof(VariableRateShading.DebugMode.Speed),
-                            nameof(VariableRateShading.DebugMode.Luminance),
-                            nameof(VariableRateShading.DebugMode.LuminanceVariance),
+                            nameof(ShadingRateClassifier.DebugMode.NoDebug),
+                            nameof(ShadingRateClassifier.DebugMode.ShadingRate),
+                            nameof(ShadingRateClassifier.DebugMode.Speed),
+                            nameof(ShadingRateClassifier.DebugMode.Luminance),
+                            nameof(ShadingRateClassifier.DebugMode.LuminanceVariance),
                         };
 
-                        current = app.ForwardPassVRS.DebugValue.ToString();
+                        current = app.ShadingRateClassifier.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
                             for (int i = 0; i < debugModes.Length; i++)
@@ -242,7 +223,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(debugModes[i], isSelected))
                                 {
                                     current = debugModes[i];
-                                    app.ForwardPassVRS.DebugValue = VariableRateShading.DebugMode.NoDebug + i;
+                                    app.ShadingRateClassifier.DebugValue = ShadingRateClassifier.DebugMode.NoDebug + i;
                                 }
 
                                 if (isSelected)
@@ -251,16 +232,16 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        float tempFloat = app.ForwardPassVRS.SpeedFactor;
+                        float tempFloat = app.ShadingRateClassifier.SpeedFactor;
                         if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
-                            app.ForwardPassVRS.SpeedFactor = tempFloat;
+                            app.ShadingRateClassifier.SpeedFactor = tempFloat;
                         }
 
-                        tempFloat = app.ForwardPassVRS.LumVarianceFactor;
+                        tempFloat = app.ShadingRateClassifier.LumVarianceFactor;
                         if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
                         {
-                            app.ForwardPassVRS.LumVarianceFactor = tempFloat;
+                            app.ShadingRateClassifier.LumVarianceFactor = tempFloat;
                         }
                     }
 
@@ -365,7 +346,7 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsShadows", ref app.IsShadows);
                         ImGui.SameLine();
                         string appendText;
-                        if (PointShadow.IS_VERTEX_LAYERED_RENDERING)
+                        if (PointShadow.HAS_VERTEX_LAYERED_RENDERING)
                         {
                             appendText =
                                 "This system supports vertex layered rendering. " +
@@ -412,21 +393,21 @@ namespace IDKEngine.Render
                         }
                     }
                 }
-                else
+                else if (app.GetRenderMode() == RenderMode.PathTracer)
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
                         tempBool = app.PathTracer.IsDebugBVHTraversal;
                         if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
                         {
-                            app.PathTracer.ResetRender();
+                            shouldResetPT = true;
                             app.PathTracer.IsDebugBVHTraversal = tempBool;
                         }
 
                         tempBool = app.PathTracer.IsTraceLights;
                         if (ImGui.Checkbox("IsTraceLights", ref tempBool))
                         {
-                            app.PathTracer.ResetRender();
+                            shouldResetPT = true;
                             app.PathTracer.IsTraceLights = tempBool;
                         }
 
@@ -441,21 +422,21 @@ namespace IDKEngine.Render
                             int tempInt = app.PathTracer.RayDepth;
                             if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                             {
-                                app.PathTracer.ResetRender();
+                                shouldResetPT = true;
                                 app.PathTracer.RayDepth = tempInt;
                             }
 
                             float floatTemp = app.PathTracer.FocalLength;
                             if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                             {
-                                app.PathTracer.ResetRender();
+                                shouldResetPT = true;
                                 app.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
                             }
 
                             floatTemp = app.PathTracer.ApertureDiameter;
                             if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
                             {
-                                app.PathTracer.ResetRender();
+                                shouldResetPT = true;
                                 app.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
                             }
                         }
@@ -489,7 +470,7 @@ namespace IDKEngine.Render
 
                 if (ImGui.CollapsingHeader("SkyBox"))
                 {
-                    bool shouldResetPT = false;
+                    bool shouldUpdateSkyBox = false;
 
                     tempBool = SkyBoxManager.IsExternalSkyBox;
                     if (ImGui.Checkbox("IsExternalSkyBox", ref tempBool))
@@ -504,21 +485,21 @@ namespace IDKEngine.Render
                         if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                         {
                             SkyBoxManager.AtmosphericScatterer.ISteps = tempInt;
-                            shouldResetPT = true;
+                            shouldUpdateSkyBox = true;
                         }
 
                         tempInt = SkyBoxManager.AtmosphericScatterer.JSteps;
                         if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
                         {
                             SkyBoxManager.AtmosphericScatterer.JSteps = tempInt;
-                            shouldResetPT = true;
+                            shouldUpdateSkyBox = true;
                         }
 
                         float tempFloat = SkyBoxManager.AtmosphericScatterer.Time;
                         if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
                         {
                             SkyBoxManager.AtmosphericScatterer.Time = tempFloat;
-                            shouldResetPT = true;
+                            shouldUpdateSkyBox = true;
                         }
 
                         tempFloat = SkyBoxManager.AtmosphericScatterer.LightIntensity;
@@ -526,17 +507,13 @@ namespace IDKEngine.Render
                         {
                             SkyBoxManager.AtmosphericScatterer.LightIntensity = tempFloat;
 
-                            shouldResetPT = true;
+                            shouldUpdateSkyBox = true;
                         }
-
-                        if (shouldResetPT)
+                        if (shouldUpdateSkyBox)
                         {
+                            shouldResetPT = true;
                             SkyBoxManager.AtmosphericScatterer.Compute();
                         }
-                    }
-                    if (shouldResetPT)
-                    {
-                        app.PathTracer.ResetRender();
                     }
                 }
 
@@ -552,7 +529,7 @@ namespace IDKEngine.Render
                 }
                 if (selectedEntityType == EntityType.Mesh)
                 {
-                    bool shouldResetPT = false;
+                    bool shouldUpdateMesh = false;
                     ref GLSLMesh mesh = ref app.ModelSystem.Meshes[selectedEntityIndex];
                     ref readonly GLSLDrawCommand cmd = ref app.ModelSystem.DrawCommands[selectedEntityIndex];
 
@@ -561,52 +538,52 @@ namespace IDKEngine.Render
                     ImGui.SameLine(); if (ImGui.Button("Teleport to camera"))
                     {
                         app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(app.Camera.Position);
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
                     
                     System.Numerics.Vector3 systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                         app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTKVec());
                     }
 
                     systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractScale().ToSystemVec();
                     if (ImGui.DragFloat3("Scale", ref systemVec3, 0.005f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                         Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTKVec(), new Vector3(0.001f));
                         app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = Matrix4.CreateScale(temp) * app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearScale();
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
 
                     if (ImGui.SliderFloat("EmissiveBias", ref mesh.EmissiveBias, 0.0f, 20.0f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
 
                     if (ImGui.SliderFloat("SpecularBias", ref mesh.SpecularBias, -1.0f, 1.0f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
 
                     if (ImGui.SliderFloat("RoughnessBias", ref mesh.RoughnessBias, -1.0f, 1.0f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
 
                     if (ImGui.SliderFloat("RefractionChance", ref mesh.RefractionChance, 0.0f, 1.0f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
 
                     if (ImGui.SliderFloat("IOR", ref mesh.IOR, 1.0f, 5.0f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
 
                     systemVec3 = mesh.Absorbance.ToSystemVec();
@@ -616,44 +593,44 @@ namespace IDKEngine.Render
                         temp = Vector3.ComponentMax(temp, Vector3.Zero);
 
                         mesh.Absorbance = temp;
-                        shouldResetPT = true;
+                        shouldUpdateMesh = true;
                     }
 
-                    if (shouldResetPT)
+                    if (shouldUpdateMesh)
                     {
-                        app.PathTracer.ResetRender();
+                        shouldResetPT = true;
                         app.ModelSystem.UpdateMeshBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                         app.ModelSystem.UpdateModelMatricesBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                     }
                 }
                 else if (selectedEntityType == EntityType.Light)
                 {
-                    bool shouldResetPT = false;
+                    bool shouldUpdateLight = false;
                     ref GLSLLight light = ref app.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateLight = true;
                         light.Position = systemVec3.ToOpenTKVec();
                     }
 
                     systemVec3 = light.Color.ToSystemVec();
                     if (ImGui.DragFloat3("Color", ref systemVec3, 0.1f, 0.0f))
                     {
-                        shouldResetPT = true;
+                        shouldUpdateLight = true;
                         light.Color = systemVec3.ToOpenTKVec();
                     }
 
                     if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f))
                     {
                         light.Radius = MathF.Max(light.Radius, 0.0f);
-                        shouldResetPT = true;
+                        shouldUpdateLight = true;
                     }
 
-                    if (shouldResetPT)
+                    if (shouldUpdateLight)
                     {
-                        app.PathTracer.ResetRender();
+                        shouldResetPT = true;
                         app.ForwardRenderer.LightingContext.UpdateLightBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                     }
                 }
@@ -665,6 +642,30 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(0.0f));
+            ImGui.Begin($"Viewport");
+            {
+
+                System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
+                if (content.X != app.ViewportResolution.X || content.Y != app.ViewportResolution.Y)
+                {
+                    app.SetViewportResolution((int)content.X, (int)content.Y);
+                }
+
+                System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
+                viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
+
+                ImGui.Image(app.PostProcessor.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
+                isHoveredViewport = ImGui.IsItemHovered();
+
+                ImGui.End();
+                ImGui.PopStyleVar();
+            }
+
+            if (shouldResetPT)
+            {
+                if (app.PathTracer != null) app.PathTracer.ResetRender();
+            }
             ImGuiBackend.Render();
         }
 
@@ -719,7 +720,7 @@ namespace IDKEngine.Render
 
             if (frameRecState == FrameRecorderState.Replaying)
             {
-                if (app.IsPathTracing)
+                if (app.GetRenderMode() == RenderMode.PathTracer)
                 {
                     if (app.PathTracer.AccumulatedSamples >= pathTracerRenderSampleGoal)
                     {
@@ -804,7 +805,7 @@ namespace IDKEngine.Render
                     app.MouseState.CursorMode = CursorModeValue.CursorNormal;
                     ImGuiBackend.IsIgnoreMouseInput = false;
 
-                    if (app.IsPathTracing)
+                    if (app.GetRenderMode() == RenderMode.PathTracer)
                     {
                         RecordableState state = app.FrameRecorder.Replay();
                         app.Camera.SetState(state);
@@ -812,24 +813,24 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (app.RenderGui && isHoveredViewport && app.MouseState[MouseButton.Left] == InputState.Touched)
+            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && isHoveredViewport && app.MouseState[MouseButton.Left] == InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)app.MouseState.Position.X, (int)app.MouseState.Position.Y);
                 if (app.RenderGui)
                 {
                     point -= (Vector2i)viewportHeaderSize.ToOpenTKVec();
                 }
-                point.Y = app.ForwardRenderer.Result.Height - point.Y;
+                point.Y = app.PostProcessor.Result.Height - point.Y;
 
-                Vector2 ndc = new Vector2((float)point.X / app.ForwardRenderer.Result.Width, (float)point.Y / app.ForwardRenderer.Result.Height) * 2.0f - new Vector2(1.0f);
+                Vector2 ndc = new Vector2((float)point.X / app.PostProcessor.Result.Width, (float)point.Y / app.PostProcessor.Result.Height) * 2.0f - new Vector2(1.0f);
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
                 bool hitMesh = app.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
-                bool hitLight = app.ForwardRenderer.LightingContext.Intersect(worldSpaceRay, out Lighter.HitInfo lightHitInfo);
-                if (app.IsPathTracing && !app.PathTracer.IsTraceLights) hitLight = false;
+                bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);
+                if (app.GetRenderMode() == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
 
                 if (!hitMesh && !hitLight)
                 {
-                    app.ForwardRenderer.RenderMeshAABBIndex = -1;
+                    app.MeshOutlineRenderer.MeshIndex = -1;
                     selectedEntityType = EntityType.None;
                     return;
                 }
@@ -841,14 +842,14 @@ namespace IDKEngine.Render
                 {
                     selectedEntityType = EntityType.Mesh;
                     selectedEntityDist = meshHitInfo.T;
-                    if (meshHitInfo.MeshIndex == app.ForwardRenderer.RenderMeshAABBIndex)
+                    if (meshHitInfo.MeshIndex == app.MeshOutlineRenderer.MeshIndex)
                     {
-                        app.ForwardRenderer.RenderMeshAABBIndex = -1;
+                        app.MeshOutlineRenderer.MeshIndex = -1;
                         selectedEntityType = EntityType.None;
                     }
                     else
                     {
-                        app.ForwardRenderer.RenderMeshAABBIndex = meshHitInfo.MeshIndex;
+                        app.MeshOutlineRenderer.MeshIndex = meshHitInfo.MeshIndex;
                     }
                     selectedEntityIndex = meshHitInfo.MeshIndex;
                 }
@@ -857,9 +858,15 @@ namespace IDKEngine.Render
                     selectedEntityType = EntityType.Light;
                     selectedEntityDist = lightHitInfo.T;
                     selectedEntityIndex = lightHitInfo.HitID;
-                    app.ForwardRenderer.RenderMeshAABBIndex = -1;
+                    app.MeshOutlineRenderer.MeshIndex = -1;
                 }
             }
         }
+
+        public void Dispose()
+        {
+            ImGuiBackend.Dispose();
+        }
     }
+
 }

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
+using System.Runtime.InteropServices;
 
 namespace IDKEngine.Render
 {
@@ -91,20 +92,19 @@ namespace IDKEngine.Render
             UpdateModelMatricesBuffer(0, ModelMatrices.Length);
         }
 
-        public void Draw()
+        public unsafe void Draw()
         {
             vao.Bind();
             drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-
-            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
+            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GLSLDrawCommand));
         }
 
         private static readonly ShaderProgram frustumCullingProgram = new ShaderProgram(
             new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/compute.glsl")));
-        public void FrustumCull(ref Matrix4 projView)
+        public void FrustumCull(in Matrix4 projView)
         {
             frustumCullingProgram.Use();
-            frustumCullingProgram.Upload(0, ref projView);
+            frustumCullingProgram.Upload(0, projView);
 
             GL.DispatchCompute((Meshes.Length + 64 - 1) / 64, 1, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);

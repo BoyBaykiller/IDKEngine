@@ -125,6 +125,8 @@ namespace IDKEngine
             _size.Y = heigth;
 
             window = GLFW.CreateWindow(_size.X, _size.Y, _title, null, null);
+            GLFW.SwapBuffers(window);
+
             if (window == null)
             {
                 Console.WriteLine($"Window creation failed. Make sure you have support for OpenGL {openglMajor}.{openglMinor}. Press Enter to exit");
@@ -150,7 +152,6 @@ namespace IDKEngine
             MouseState = new Mouse(window);
             WindowPosition = new Vector2i(videoMode->Width / 2 - _size.X / 2, videoMode->Height / 2 - _size.Y / 2);
             updateTimer = new Stopwatch();
-
 
             GLFW.MakeContextCurrent(window);
             OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());

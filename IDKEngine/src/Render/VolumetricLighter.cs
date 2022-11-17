@@ -1,10 +1,11 @@
-﻿using OpenTK.Mathematics;
+﻿using System;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class VolumetricLighter
+    class VolumetricLighter : IDisposable
     {
         private int _samples;
         public int Samples
@@ -78,7 +79,6 @@ namespace IDKEngine.Render
             }
         }
 
-
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
         public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance, bool isTemporalAccumulation = true)
@@ -113,6 +113,12 @@ namespace IDKEngine.Render
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+        }
+
+        public void Dispose()
+        {
+            Result.Dispose();
+            shaderProgram.Dispose();
         }
     }
 }

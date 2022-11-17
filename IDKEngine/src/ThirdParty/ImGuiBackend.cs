@@ -91,7 +91,7 @@ namespace IDKEngine.GUI
             fontTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
             fontTexture.SubTexture2D(width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
 
-            io.Fonts.SetTexID((IntPtr)fontTexture.ID);
+            io.Fonts.SetTexID(fontTexture.ID);
             io.Fonts.ClearTexData();
 
             string vertexSource = @"#version 460 core
@@ -243,7 +243,7 @@ namespace IDKEngine.GUI
             Matrix4 projection = Matrix4.CreateOrthographicOffCenter(0.0f, io.DisplaySize.X, io.DisplaySize.Y, 0.0f, -1.0f, 1.0f);
 
             shaderProgram.Use();
-            shaderProgram.Upload(0, ref projection);
+            shaderProgram.Upload(0, projection);
 
             vao.Bind();
 

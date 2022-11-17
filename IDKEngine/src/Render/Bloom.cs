@@ -1,12 +1,19 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class Bloom
+    class Bloom : IDisposable
     {
+        private enum Stage : int
+        {
+            Downsample = 0,
+            Upsample = 1,
+        }
+
         private float _threshold;
         public float Threshold
         {
@@ -40,14 +47,8 @@ namespace IDKEngine.Render
             {
                 _minusLods = value;
                 // Multiply with 2 to get size of original src texture
-                SetSize(downscaleTexture.Width * 2, downscaleTexture.Height * 2);
+                SetSize(Result.Width * 2, Result.Height * 2);
             }
-        }
-
-        private enum Stage : int
-        {
-            Downsample = 0,
-            Upsample = 1,
         }
 
         public Texture Result => upsampleTexture;
@@ -62,7 +63,7 @@ namespace IDKEngine.Render
 
             SetSize(width, height);
 
-            _minusLods = minusLods;
+            MinusLods = minusLods;
             Threshold = threshold;
             Clamp = clamp;
         }
@@ -92,7 +93,7 @@ namespace IDKEngine.Render
                 GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
             }
             #endregion
-
+            
             #region Upsample
             downscaleTexture.BindToUnit(1);
             shaderProgram.Upload(4, (int)Stage.Upsample);
@@ -122,7 +123,7 @@ namespace IDKEngine.Render
             width /= 2;
             height /= 2;
 
-            lodCount = System.Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - MinusLods, 2);
+            lodCount = Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - MinusLods, 2);
 
             if (downscaleTexture != null) downscaleTexture.Dispose();
             downscaleTexture = new Texture(TextureTarget2d.Texture2D);
@@ -135,6 +136,13 @@ namespace IDKEngine.Render
             upsampleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
             upsampleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             upsampleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, lodCount - 1);
+        }
+
+        public void Dispose()
+        {
+            downscaleTexture.Dispose();
+            upsampleTexture.Dispose();
+            shaderProgram.Dispose();
         }
     }
 }

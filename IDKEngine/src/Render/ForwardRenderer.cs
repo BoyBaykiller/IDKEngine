@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -9,34 +8,18 @@ namespace IDKEngine.Render
 {
     unsafe class ForwardRenderer : IDisposable
     {
-        private int _renderMeshAABBIndex = -1;
-        /// <summary>
-        /// Any negative number will not render any AABB at all
-        /// </summary>
-        public int RenderMeshAABBIndex
-        {
-            get => _renderMeshAABBIndex;
-
-            set
-            {
-                _renderMeshAABBIndex = value;
-                aabbProgram.Upload(0, _renderMeshAABBIndex);
-            }
-        }
-
         public readonly Framebuffer Framebuffer;
         public Texture Result;
         public Texture NormalSpecTexture;
         public Texture VelocityTexture;
         public Texture DepthTexture;
-        public readonly Lighter LightingContext;
+        public readonly LightManager LightingContext;
 
         private readonly ShaderProgram shadingProgram;
         private readonly ShaderProgram depthOnlyProgram;
         private readonly ShaderProgram skyBoxProgram;
-        private readonly ShaderProgram aabbProgram;
 
-        public ForwardRenderer(Lighter lighter, int width, int height, int taaSamples)
+        public ForwardRenderer(LightManager lighter, int width, int height, int taaSamples)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 
@@ -51,10 +34,6 @@ namespace IDKEngine.Render
             skyBoxProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/SkyBox/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/SkyBox/fragment.glsl")));
-
-            aabbProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/AABB/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/AABB/fragment.glsl")));
 
             Framebuffer = new Framebuffer();
 
@@ -94,20 +73,6 @@ namespace IDKEngine.Render
             GL.DepthMask(true);
 
             LightingContext.Draw();
-
-            if (RenderMeshAABBIndex >= 0)
-            {
-                GL.DepthFunc(DepthFunction.Always);
-                GL.Disable(EnableCap.CullFace);
-                GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
-
-                aabbProgram.Use();
-                GL.DrawArrays(PrimitiveType.Quads, 0, 24);
-
-                GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
-                GL.Enable(EnableCap.CullFace);
-                GL.DepthFunc(DepthFunction.Less);
-            }
         }
 
         public void SetSize(int width, int height)
@@ -147,17 +112,16 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
-            DepthTexture.Dispose();
-            VelocityTexture.Dispose();
-            NormalSpecTexture.Dispose();
-            Result.Dispose();
-
             Framebuffer.Dispose();
+
+            Result.Dispose();
+            NormalSpecTexture.Dispose();
+            VelocityTexture.Dispose();
+            DepthTexture.Dispose();
             
             shadingProgram.Dispose();
             depthOnlyProgram.Dispose();
             skyBoxProgram.Dispose();
-            aabbProgram.Dispose();
         }
     }
 }

@@ -1,9 +1,10 @@
-﻿using OpenTK.Graphics.OpenGL4;
+﻿using System;
+using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class SSR
+    class SSR : IDisposable
     {
         private int _samples;
         public int Samples
@@ -73,6 +74,12 @@ namespace IDKEngine.Render
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+        }
+
+        public void Dispose()
+        {
+            Result.Dispose();
+            shaderProgram.Dispose();
         }
     }
 }

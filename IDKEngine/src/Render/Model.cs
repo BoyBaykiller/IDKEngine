@@ -125,7 +125,7 @@ namespace IDKEngine.Render.Objects
                 DrawCommands[i].Count = thisIndices.Length;
             }
             Indices = indices.ToArray();
-
+            
             texturesLoadResult.Join();
             for (int i = 0; i < Materials.Length; i++)
             {
@@ -179,8 +179,7 @@ namespace IDKEngine.Render.Objects
 
                         if (perMaterialTextures[j] == TextureType.Diffuse)
                         {
-                            Vector4 dummyAlbedoData = new Vector4(1.0f);
-                            texture.Clear(PixelFormat.Rgba, PixelType.Float, ref dummyAlbedoData);
+                            texture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
                         }
                     }
                     ulong textureHandle = texture.GenTextureHandleARB();

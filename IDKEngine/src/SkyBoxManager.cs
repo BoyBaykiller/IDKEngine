@@ -1,5 +1,4 @@
-﻿using System;
-using IDKEngine.Render;
+﻿using IDKEngine.Render;
 using IDKEngine.Render.Objects;
 using OpenTK.Graphics.OpenGL4;
 

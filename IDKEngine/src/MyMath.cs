@@ -298,5 +298,10 @@ namespace IDKEngine
 
             return t1 <= t2;
         }
+
+        public static Vector3 Abs(Vector3 a)
+        {
+            return new Vector3(MathF.Abs(a.X), MathF.Abs(a.Y), MathF.Abs(a.Z));
+        }
     }
 }

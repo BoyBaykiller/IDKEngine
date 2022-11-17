@@ -75,8 +75,8 @@ namespace IDKEngine.Render
             };
 
             Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 69.0f, 420.0f).Inverted();
-            shaderProgram.Upload("InvProjection", ref projection);
-            shaderProgram.Upload("InvViews[0]", invViewsAndInvprojecion.Length, ref invViewsAndInvprojecion[0]);
+            shaderProgram.Upload("InvProjection", projection);
+            shaderProgram.Upload("InvViews[0]", invViewsAndInvprojecion[0], invViewsAndInvprojecion.Length);
 
             SetSize(size);
 
@@ -105,8 +105,8 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
-            shaderProgram.Dispose();
             Result.Dispose();
+            shaderProgram.Dispose();
         }
     }
 }

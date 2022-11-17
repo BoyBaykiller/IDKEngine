@@ -21,7 +21,7 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0, rgba32f) restrict readonly writeonly uniform image2D ImgResult;
+layout(binding = 0) restrict readonly writeonly uniform image2D ImgResult;
 
 struct Material
 {
@@ -477,7 +477,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
         DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
         uint baseNode = 2 * (cmd.FirstIndex / 3);
 
-        const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
+        const uint glInstanceID = 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
 
         uint stackPtr = 0;
