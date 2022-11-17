@@ -4,10 +4,11 @@ using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using System.Runtime.InteropServices;
 
 namespace IDKEngine.Render
 {
-    unsafe class PostProcessor
+    unsafe class PostProcessor : IDisposable
     {
         public bool TaaEnabled
         {
@@ -57,12 +58,11 @@ namespace IDKEngine.Render
 
         public Texture Result => isPing ? taaPing : taaPong;
 
-        private readonly BufferObject taaBuffer;
-
         private Texture taaPing;
         private Texture taaPong;
         private readonly ShaderProgram taaResolveProgram;
         private readonly ShaderProgram combineProgram;
+        private readonly BufferObject taaBuffer;
         private readonly GLSLTaaData* taaData;
         private bool isPing;
         public PostProcessor(int width, int height, int taaSamples = 6)
@@ -146,5 +146,16 @@ namespace IDKEngine.Render
                 taaBuffer.SubData(0, sizeof(float) * jitterData.Length, (IntPtr)ptr);
             }
         }
+
+        public void Dispose()
+        {
+            taaPing.Dispose();
+            taaPong.Dispose();
+            taaResolveProgram.Dispose();
+            combineProgram.Dispose();
+            taaBuffer.Dispose();
+            Marshal.FreeHGlobal((nint)taaData);
+        }
+
     }
 }

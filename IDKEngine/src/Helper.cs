@@ -106,7 +106,7 @@ namespace IDKEngine
             Parallel.For(0, images.Length, i =>
             {
                 using FileStream stream = File.OpenRead(paths[i]);
-                images[i] = ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+                images[i] = ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlue);
             });
             
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
@@ -120,7 +120,7 @@ namespace IDKEngine
                 GL.BindTexture(TextureTarget.TextureCubeMap, texture.ID);
                 for (int i = 0; i < 6; i++)
                 {
-                    GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, (PixelInternalFormat)sizedInternalFormat, size, size, 0, PixelFormat.Rgba, PixelType.UnsignedByte, images[i].Data);
+                    GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, (PixelInternalFormat)sizedInternalFormat, size, size, 0, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data);
                 }
             }
             else
@@ -128,7 +128,7 @@ namespace IDKEngine
                 texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
                 for (int i = 0; i < 6; i++)
                 {
-                    texture.SubTexture3D(size, size, 1, PixelFormat.Rgba, PixelType.UnsignedByte, images[i].Data, 0, 0, 0, i);
+                    texture.SubTexture3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data, 0, 0, 0, i);
                 }
             }
         }

@@ -6,20 +6,15 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class Lighter
+    class LightManager : IDisposable
     {
+        public const int GLSL_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
+
         public struct HitInfo
         {
             public float T;
             public int HitID;
         }
-
-        public const int GLSL_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
-
-        private static readonly ShaderProgram shaderProgram = new ShaderProgram(
-            new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
-            new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
-
 
         private int _count;
         public int Count
@@ -36,10 +31,15 @@ namespace IDKEngine.Render
         public readonly int IndicisCount;
         public readonly GLSLLight[] Lights;
         private readonly BufferObject bufferObject;
-        private static VAO vao;
-        public unsafe Lighter(int latitudes, int longitudes)
+        private readonly ShaderProgram shaderProgram;
+        private readonly VAO vao;
+        public unsafe LightManager(int latitudes, int longitudes)
         {
             Lights = new GLSLLight[GLSL_MAX_UBO_LIGHT_COUNT];
+
+            shaderProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
 
             bufferObject = new BufferObject();
             bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
@@ -146,6 +146,13 @@ namespace IDKEngine.Render
             }
 
             return hitInfo.T != float.MaxValue;
+        }
+
+        public void Dispose()
+        {
+            bufferObject.Dispose();
+            shaderProgram.Dispose();
+            vao.Dispose();
         }
     }
 }

@@ -1,35 +1,25 @@
-﻿using System.IO;
-using System.Diagnostics;
-using OpenTK.Mathematics;
+﻿using System;
+using System.IO;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class PointShadow
+    class PointShadow : IDisposable
     {
-        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
-
-        public static readonly bool IS_VERTEX_LAYERED_RENDERING =
+        public static readonly bool HAS_VERTEX_LAYERED_RENDERING =
             Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
             Helper.IsExtensionsAvailable("GL_ARB_viewport_array") ||
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
             Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer");
 
-        private static int _countPointShadows;
-        public static int CountPointShadows
-        {
-            get => _countPointShadows;
+        private static readonly ShaderProgram renderProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
 
-            protected set
-            {
-                unsafe
-                {
-                    _countPointShadows = value;
-                    shadowsBuffer.SubData(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow), sizeof(int), _countPointShadows);
-                }
-            }
-        }
+        private static readonly ShaderProgram cullingProgram = new ShaderProgram(
+                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/shadowCompute.glsl")));
 
         private Vector3 _position;
         public unsafe Vector3 Position
@@ -46,34 +36,20 @@ namespace IDKEngine.Render
                 glslPointShadow.NegY = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
                 glslPointShadow.PosZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
                 glslPointShadow.NegZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-
-                shadowsBuffer.SubData(Instance * sizeof(GLSLPointShadow), sizeof(GLSLPointShadow), glslPointShadow);
             }
         }
 
-        private static readonly ShaderProgram renderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
 
-        private static readonly ShaderProgram cullingProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/shadowCompute.glsl")));
-
-        private static readonly BufferObject shadowsBuffer = InitShadowBuffer();
-        
-        public readonly int Instance;
-        public readonly Texture Result;
-        private readonly Matrix4 projection;
-
+        public Texture Result;
         private readonly Framebuffer framebuffer;
-        private readonly Lighter lightContext;
+        private readonly SamplerObject shadowSampler;
+
         private GLSLPointShadow glslPointShadow;
-        public PointShadow(Lighter lightContext, int lightIndex, int size, float nearPlane, float farPlane)
+        private readonly Matrix4 projection;
+        public LightManager LightContext;
+        public PointShadow(LightManager lightContext, int lightIndex, int size, float nearPlane, float farPlane)
         {
-            Debug.Assert(CountPointShadows + 1 <= GLSL_MAX_UBO_POINT_SHADOW_COUNT);
-
-            Instance = CountPointShadows++;
-
-            SamplerObject shadowSampler = new SamplerObject();
+            shadowSampler = new SamplerObject();
             shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
@@ -96,34 +72,31 @@ namespace IDKEngine.Render
 
             glslPointShadow.Sampler = Result.GenTextureHandleARB();
             glslPointShadow.SamplerShadow = Result.GenTextureSamplerHandleARB(shadowSampler);
+
             glslPointShadow.NearPlane = nearPlane;
             glslPointShadow.FarPlane = farPlane;
             glslPointShadow.LightIndex = lightIndex;
 
             Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
-
-            this.lightContext = lightContext;
+            LightContext = lightContext;
         }
 
-        public unsafe void CreateDepthMap(ModelSystem modelSystem)
+        public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex)
         {
-            if (IS_VERTEX_LAYERED_RENDERING)
+            if (HAS_VERTEX_LAYERED_RENDERING)
             {
                 cullingProgram.Use();
-                cullingProgram.Upload(0, Instance);
+                cullingProgram.Upload(0, pointShadowIndex);
                 GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
             }
-
-            if (Position != lightContext.Lights[glslPointShadow.LightIndex].Position)
-                Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
 
             GL.Viewport(0, 0, Result.Width, Result.Height);
             framebuffer.Bind();
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
-            renderProgram.Upload(0, Instance);
+            renderProgram.Upload(0, pointShadowIndex);
 
-            if (IS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array2
+            if (HAS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array2
             {
                 GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
                 renderProgram.Use();
@@ -137,7 +110,7 @@ namespace IDKEngine.Render
                     for (int i = 0; i < 6; i++)
                     {
                         Matrix4 projView = *(ptr + i);
-                        modelSystem.FrustumCull(ref projView);
+                        modelSystem.FrustumCull(projView);
 
                         framebuffer.SetTextureLayer(FramebufferAttachment.DepthAttachment, Result, i);
 
@@ -151,13 +124,31 @@ namespace IDKEngine.Render
             }
         }
 
-        private static unsafe BufferObject InitShadowBuffer()
+        public ref readonly GLSLPointShadow GetGLSLData()
         {
-            BufferObject bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), (System.IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            bufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
+            return ref glslPointShadow;
+        }
 
-            return bufferObject;
+        public bool AttachedLightMoved()
+        {
+            return Position != LightContext.Lights[glslPointShadow.LightIndex].Position;
+        }
+
+        public void MoveToAttachedLight()
+        {
+            Position = LightContext.Lights[glslPointShadow.LightIndex].Position;
+        }
+
+        public void Dispose()
+        {
+            framebuffer.Dispose();
+
+            // unmake texture handle resident for deletion
+            Texture.UnmakeTextureHandleResidentARB(glslPointShadow.Sampler);
+            Texture.UnmakeTextureHandleResidentARB(glslPointShadow.SamplerShadow);
+
+            Result.Dispose();
+            shadowSampler.Dispose();
         }
     }
 }

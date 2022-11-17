@@ -1,10 +1,11 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class SSAO
+    class SSAO : IDisposable
     {
         private int _samples;
         public int Samples
@@ -43,9 +44,8 @@ namespace IDKEngine.Render
         }
 
 
-        private readonly ShaderProgram shaderProgram;
-
         public Texture Result;
+        private readonly ShaderProgram shaderProgram;
         public SSAO(int width, int height, int samples, float radius, float strength)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/SSAO/compute.glsl")));
@@ -75,6 +75,12 @@ namespace IDKEngine.Render
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.R8);
+        }
+
+        public void Dispose()
+        {
+            Result.Dispose();
+            shaderProgram.Dispose();
         }
     }
 }

@@ -23,7 +23,7 @@ namespace IDKEngine.Render.Objects
         public int Width { get; private set; } = 1;
         public int Height { get; private set; } = 1;
         public int Depth { get; private set; } = 1;
-        public SizedInternalFormat PixelInternalFormat { get; private set; }
+        public SizedInternalFormat SizedInternalFormat { get; private set; }
 
         private static readonly int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
         private static int GetDummyTexture(TextureTarget textureTarget)
@@ -160,6 +160,13 @@ namespace IDKEngine.Render.Objects
         {
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, heigth, depth, pixelFormat, pixelType, pixels);
         }
+        public unsafe void SubTexture3D<T>(int width, int heigth, int depth, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : unmanaged
+        {
+            fixed (void* ptr = &pixels)
+            {
+                GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, heigth, depth, pixelFormat, pixelType, (IntPtr)ptr);
+            }
+        }
         public void SubTexture3D(int width, int heigth, int depth, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
         {
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, heigth, depth, pixelFormat, pixelType, pixels);
@@ -169,6 +176,13 @@ namespace IDKEngine.Render.Objects
         {
             GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, heigth, pixelFormat, pixelType, pixels);
         }
+        public unsafe void SubTexture2D<T>(int width, int heigth, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
+        {
+            fixed (void* ptr = &pixels)
+            {
+                GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, heigth, pixelFormat, pixelType, (IntPtr)ptr);
+            }
+        }
         public void SubTexture2D(int width, int heigth, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0, int yOffset = 0)
         {
             GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, heigth, pixelFormat, pixelType, pixels);
@@ -177,6 +191,13 @@ namespace IDKEngine.Render.Objects
         public void SubTexture1D<T>(int width, PixelFormat pixelFormat, PixelType pixelType, T[] pixels, int level = 0, int xOffset = 0) where T : unmanaged
         {
             GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
+        }
+        public unsafe void SubTexture1D<T>(int width, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0) where T : unmanaged
+        {
+            fixed (void* ptr = &pixels)
+            {
+                GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, (IntPtr)ptr);
+            }
         }
         public void SubTexture1D(int width, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0)
         {
@@ -188,9 +209,12 @@ namespace IDKEngine.Render.Objects
             GL.GetTextureImage(ID, level, pixelFormat, pixelType, bufSize, pixels);
         }
 
-        public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, ref T value, int level = 0) where T : unmanaged
+        public unsafe void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, in T value, int level = 0) where T : unmanaged
         {
-            GL.ClearTexImage(ID, level, pixelFormat, pixelType, ref value);
+            fixed (void* ptr = &value)
+            {
+                GL.ClearTexImage(ID, level, pixelFormat, pixelType, (IntPtr)ptr);
+            }
         }
         public void Clear(PixelFormat pixelFormat, PixelType pixelType, IntPtr value, int level = 0)
         {
@@ -234,7 +258,7 @@ namespace IDKEngine.Render.Objects
                 default:
                     return;
             }
-            PixelInternalFormat = sizedInternalFormat;
+            SizedInternalFormat = sizedInternalFormat;
         }
 
         /// <summary>

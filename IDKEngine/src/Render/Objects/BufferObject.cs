@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL4;
 
 namespace IDKEngine.Render.Objects
@@ -24,22 +23,28 @@ namespace IDKEngine.Render.Objects
             GL.BindBuffer(bufferTarget, ID);
         }
 
-        public void SubData<T>(int offset, int size, T data) where T : unmanaged
+        public unsafe void SubData<T>(int offset, int size, in T data) where T : unmanaged
         {
-            GL.NamedBufferSubData(ID, (IntPtr)offset, size, ref data);
+            fixed (void* ptr = &data)
+            {
+                GL.NamedBufferSubData(ID, offset, size, (IntPtr)ptr);
+            }
         }
         public void SubData<T>(int offset, int size, T[] data) where T : unmanaged
         {
-            GL.NamedBufferSubData(ID, (IntPtr)offset, size, data);
+            GL.NamedBufferSubData(ID, offset, size, data);
         }
         public void SubData(int offset, int size, IntPtr data)
         {
-            GL.NamedBufferSubData(ID, (IntPtr)offset, size, data);
+            GL.NamedBufferSubData(ID, offset, size, data);
         }
 
-        public void MutableAllocate<T>(int size, T data) where T : unmanaged
+        public unsafe void MutableAllocate<T>(int size, in T data) where T : unmanaged
         {
-            GL.NamedBufferData(ID, size, ref data, BufferUsageHint.StaticDraw);
+            fixed (void* ptr = &data)
+            {
+                GL.NamedBufferData(ID, size, (IntPtr)ptr, BufferUsageHint.StaticDraw);
+            }
             Size = size;
         }
         public void MutableAllocate<T>(int size, T[] data) where T : unmanaged
@@ -53,9 +58,12 @@ namespace IDKEngine.Render.Objects
             Size = size;
         }
 
-        public void ImmutableAllocate<T>(int size, T data, BufferStorageFlags bufferStorageFlags) where T : unmanaged
+        public unsafe void ImmutableAllocate<T>(int size, in T data, BufferStorageFlags bufferStorageFlags) where T : unmanaged
         {
-            GL.NamedBufferStorage(ID, size, ref data, bufferStorageFlags);
+            fixed (void* ptr = &data)
+            {
+                GL.NamedBufferStorage(ID, size, (IntPtr)ptr, bufferStorageFlags);
+            }
             Size = size;
         }
         public void ImmutableAllocate<T>(int size, T[] data, BufferStorageFlags bufferStorageFlags) where T : unmanaged
@@ -72,15 +80,15 @@ namespace IDKEngine.Render.Objects
         public void GetSubData<T>(int offset, int size, out T data) where T : unmanaged
         {
             data = new T();
-            GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, ref data);
+            GL.GetNamedBufferSubData(ID, offset, size, ref data);
         }
         public void GetSubData<T>(int offset, int size, T[] data) where T : unmanaged
         {
-            GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, data);
+            GL.GetNamedBufferSubData(ID, offset, size, data);
         }
         public void GetSubData(int offset, int size, IntPtr data)
         {
-            GL.GetNamedBufferSubData(ID, (IntPtr)offset, size, data);
+            GL.GetNamedBufferSubData(ID, offset, size, data);
         }
 
         public void Dispose()

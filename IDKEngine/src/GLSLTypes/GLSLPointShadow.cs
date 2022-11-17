@@ -20,5 +20,9 @@ namespace IDKEngine
         public float FarPlane;
         public int LightIndex;
         private readonly float _pad0;
+
+        public GLSLPointShadow()
+        {
+        }
     }
 }

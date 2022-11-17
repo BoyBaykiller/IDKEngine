@@ -12,7 +12,7 @@ namespace IDKEngine
         public Vector3 Velocity;
         public float Speed;
         public float Sensitivity;
-        public Matrix4 ViewMatrix;
+        public Matrix4 ViewMatrix { get; private set; }
         public Camera(Vector3 position, Vector3 up, float lookX = -90.0f, float lookY = 0.0f, float mouseSensitivity = 0.1f, float speed = 1.0f)
         {
             LookX = lookX;

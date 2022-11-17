@@ -243,11 +243,11 @@ RenderSceneInstanced(count: 6);
 #extension GL_ARB_shader_viewport_layer_array : enable
 #extension GL_AMD_vertex_shader_layer : enable
 #extension GL_NV_viewport_array2 : enable
-#define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_ARB_viewport_array || GL_NV_viewport_array2 || GL_AMD_vertex_shader_layer)
+#define HAS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_ARB_viewport_array || GL_NV_viewport_array2 || GL_AMD_vertex_shader_layer)
 
 void main()
 {
-#if IS_VERTEX_LAYERED_RENDERING
+#if HAS_VERTEX_LAYERED_RENDERING
     gl_Layer = gl_InstanceID;
     gl_Position = PointShadow.FaceMatrices[gl_Layer] * Positon;
 #else

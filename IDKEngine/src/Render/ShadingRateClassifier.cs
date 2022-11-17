@@ -4,12 +4,12 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class VariableRateShading
+    class ShadingRateClassifier : IDisposable
     {
         // Defined by spec
         public const int TILE_SIZE = 16;
 
-        public static readonly bool NV_SHADING_RATE_IMAGE = Helper.IsExtensionsAvailable("GL_NV_shading_rate_image");
+        public static readonly bool HAS_VARIABLE_RATE_SHADING = Helper.IsExtensionsAvailable("GL_NV_shading_rate_image");
 
         // used in shader and client code - keep in sync!
         public enum DebugMode
@@ -32,7 +32,7 @@ namespace IDKEngine.Render
 
             set
             {
-                if (NV_SHADING_RATE_IMAGE)
+                if (HAS_VARIABLE_RATE_SHADING)
                 {
                     _isEnabled = value;
                     if (_isEnabled)
@@ -86,7 +86,7 @@ namespace IDKEngine.Render
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        public VariableRateShading(Shader classificationComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.25f)
+        public ShadingRateClassifier(Shader classificationComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.2f)
         {
             shaderProgram = new ShaderProgram(classificationComputeShader);
 
@@ -103,7 +103,7 @@ namespace IDKEngine.Render
         /// <param name="viewport"></param>
         public static void SetShadingRatePaletteNV(Span<NvShadingRateImage> shadingRates, int viewport = 0)
         {
-            if (NV_SHADING_RATE_IMAGE)
+            if (HAS_VARIABLE_RATE_SHADING)
             {
                 GL.NV.ShadingRateImagePalette(viewport, 0, shadingRates.Length, ref shadingRates[0]);
             }
@@ -119,7 +119,7 @@ namespace IDKEngine.Render
             shaderProgram.Use();
             GL.DispatchCompute((shaded.Width + TILE_SIZE - 1) / TILE_SIZE, (shaded.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
 
-            if (NV_SHADING_RATE_IMAGE)
+            if (HAS_VARIABLE_RATE_SHADING)
                 GL.NV.ShadingRateImageBarrier(true);
         }
 
@@ -138,13 +138,19 @@ namespace IDKEngine.Render
             }
         }
 
+        public void Dispose()
+        {
+            Result.Dispose();
+            shaderProgram.Dispose();
+        }
+
         private static int currentlyBound = -1;
         /// <summary>
         /// NV_shading_rate_image must be available for this to take effect
         /// </summary>
-        public static void BindVRSNV(VariableRateShading variableRateShading)
+        public static void BindVRSNV(ShadingRateClassifier variableRateShading)
         {
-            if (NV_SHADING_RATE_IMAGE)
+            if (HAS_VARIABLE_RATE_SHADING)
             {
                 GL.NV.BindShadingRateImage(variableRateShading.Result.ID);
                 currentlyBound = variableRateShading.Result.ID;

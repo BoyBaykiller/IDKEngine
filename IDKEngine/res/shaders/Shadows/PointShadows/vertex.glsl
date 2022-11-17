@@ -5,7 +5,7 @@
 #extension GL_NV_viewport_array2 : enable
 #extension GL_AMD_vertex_shader_layer : enable
 
-#define IS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_ARB_viewport_array || GL_NV_viewport_array2 || GL_AMD_vertex_shader_layer)
+#define HAS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_ARB_viewport_array || GL_NV_viewport_array2 || GL_AMD_vertex_shader_layer)
 
 layout(location = 0) in vec3 Position;
 
@@ -63,7 +63,7 @@ layout(location = 1) uniform int Layer;
 
 void main()
 {
-#if IS_VERTEX_LAYERED_RENDERING
+#if HAS_VERTEX_LAYERED_RENDERING
 
     // visibleCubemapFacesInfo is a specific manipulated value from the culling shadowCompute shader
     // It contains 3 bit values, six at maximum, which represent the faces each instance of a mesh is visible on
