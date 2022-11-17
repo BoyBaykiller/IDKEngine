@@ -22,7 +22,6 @@ namespace IDKEngine.Render
                 bufferObject.SubData(0, sizeof(GLSLVXGIData), glslVxgiData);
             }
         }
-
         public unsafe Vector3 GridMax
         {
             get => glslVxgiData.GridMax;
@@ -44,7 +43,8 @@ namespace IDKEngine.Render
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax)
         {
             string geoShaderSrc = File.ReadAllText("res/shaders/Voxelize/geometry.glsl");
-            geoShaderSrc.Replace("__hasConservativeRaster__", $"{((HAS_INTEL_CONSERVATIVE_RASTER || HAS_NV_CONSERVATIVE_RASTER) ? 1 : 0)}");
+            bool HAS_CONSERVATIVE_RASTER = HAS_INTEL_CONSERVATIVE_RASTER || HAS_NV_CONSERVATIVE_RASTER;
+            geoShaderSrc = geoShaderSrc.Replace("__hasConservativeRaster__", $"{(HAS_CONSERVATIVE_RASTER ? 1 : 0)}");
 
             voxelizeProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Voxelize/vertex.glsl")),
@@ -62,18 +62,20 @@ namespace IDKEngine.Render
             GridMax = gridMax;
         }
 
-        public void Render(ModelSystem modelSystem)
+        public void Render(ModelSystem modelSystem, Vector2i viewportSize)
         {
             if (HAS_NV_CONSERVATIVE_RASTER) GL.Enable((EnableCap)All.ConservativeRasterizationNv);
             else if (HAS_INTEL_CONSERVATIVE_RASTER) GL.Enable((EnableCap)All.ConservativeRasterizationIntel);
+            // Upload texel size for Conservative Rasterization emulation
+            else voxelizeProgram.Upload(0, new Vector2(1.0f) / viewportSize);
 
-            Result.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(0.0f));
-
+            GL.Viewport(0, 0, viewportSize.X, viewportSize.Y);
             GL.ColorMask(false, false, false, false);
             GL.DepthMask(false);
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
 
+            Result.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(0.0f));
             Result.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
 
             voxelizeProgram.Use();
@@ -90,10 +92,10 @@ namespace IDKEngine.Render
             else if (HAS_INTEL_CONSERVATIVE_RASTER) GL.Disable((EnableCap)All.ConservativeRasterizationIntel);
         }
 
-        public void DebugRender(Texture debugResult, int level = 0)
+        public void DebugRender(Texture debugResult)
         {
             debugResult.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
-            Result.BindToImageUnit(1, level, true, 0, TextureAccess.ReadOnly, SizedInternalFormat.Rgba16f);
+            Result.BindToImageUnit(1, 0, true, 0, TextureAccess.ReadOnly, SizedInternalFormat.Rgba16f);
             debugProgram.Use();
             GL.DispatchCompute((debugResult.Width + 8 - 1) / 8, (debugResult.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);

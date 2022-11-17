@@ -110,7 +110,7 @@ namespace IDKEngine
             }
             else if (GetRenderMode() == RenderMode.VXGI_WIP)
             {
-                voxelizer.Render(ModelSystem);
+                voxelizer.Render(ModelSystem, ViewportResolution);
                 voxelizer.DebugRender(PostProcessor.Result);
 
                 if (IsBloom)
@@ -214,6 +214,12 @@ namespace IDKEngine
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
             Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
 
+            if (Helper.APIVersion < 4.6)
+            {
+                Console.WriteLine("Your system does not support OpenGL 4.6. Press Enter to exit");
+                Console.ReadLine();
+                Environment.Exit(1);
+            }
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
             {
                 Console.WriteLine("Your system does not support GL_ARB_bindless_texture. Press Enter to exit");
@@ -305,7 +311,7 @@ namespace IDKEngine
             lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             LightManager.Add(CollectionsMarshal.AsSpan(lights));
 
-            SetRenderMode(RenderMode.PathTracer);
+            SetRenderMode(RenderMode.Rasterizer);
 
             FrameRecorder = new FrameStateRecorder<RecordableState>();
             gui = new Gui(WindowSize.X, WindowSize.Y);

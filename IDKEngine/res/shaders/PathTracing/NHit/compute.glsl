@@ -16,7 +16,7 @@
 #define HF_SAMPLER_2D sampler2D
 #endif
 
-// Inserted by application.
+// Inserted by application. Positive integral expression
 #define MAX_BLAS_TREE_DEPTH __maxBlasTreeDepth__
 
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;

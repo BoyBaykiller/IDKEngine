@@ -99,5 +99,5 @@ void main()
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;
 
-    gl_Position = basicDataUBO.PrevProjView * model * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0);
+    gl_Position = basicDataUBO.ProjView * model * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0);
 }
