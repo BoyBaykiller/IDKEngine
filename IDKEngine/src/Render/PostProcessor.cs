@@ -32,6 +32,7 @@ namespace IDKEngine.Render
             }
         }
 
+
         private bool _isDithering;
         public bool IsDithering
         {
@@ -41,6 +42,18 @@ namespace IDKEngine.Render
             {
                 _isDithering = value;
                 combineProgram.Upload("IsDithering", _isDithering);
+            }
+        }
+
+        private float _gamma;
+        public float Gamma
+        {
+            get => _gamma;
+
+            set
+            {
+                _gamma = value;
+                combineProgram.Upload("Gamma", _gamma);
             }
         }
 
@@ -65,7 +78,7 @@ namespace IDKEngine.Render
         private readonly BufferObject taaBuffer;
         private readonly GLSLTaaData* taaData;
         private bool isPing;
-        public PostProcessor(int width, int height, int taaSamples = 6)
+        public PostProcessor(int width, int height, float gamma = 2.2f, int taaSamples = 6)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 
@@ -85,13 +98,14 @@ namespace IDKEngine.Render
 
             SetSize(width, height);
             IsDithering = true;
+            Gamma = gamma;
             IsTaaArtifactMitigation = true;
         }
 
         public void Compute(Texture v0, Texture v1, Texture v2, Texture v3, Texture velocityTexture, Texture depthTexture)
         {
             isPing = !isPing;
-            (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
+            (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, taaPing.SizedInternalFormat);
 
             if (v0 != null) v0.BindToUnit(0);
             else Texture.UnbindFromUnit(0);
@@ -111,7 +125,7 @@ namespace IDKEngine.Render
 
             if (taaData->IsEnabled == 1 && velocityTexture != null && depthTexture != null)
             {
-                (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+                (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, taaPing.SizedInternalFormat);
                 (isPing ? taaPong : taaPing).BindToUnit(0);
                 velocityTexture.BindToUnit(1);
                 depthTexture.BindToUnit(2);

@@ -82,11 +82,6 @@ namespace IDKEngine
             if (id != 2000 && id != 131185)
             {
                 Console.WriteLine($"\nType: {type},\nSeverity: {severity},\nMessage: {Marshal.PtrToStringAnsi(message, length)}");
-                if (severity == DebugSeverity.DebugSeverityHigh)
-                {
-                    Console.WriteLine($"Critical error detected, press enter to continue");
-                    Console.ReadLine();
-                }
                 Console.WriteLine();
             }
         }
@@ -310,7 +305,7 @@ namespace IDKEngine
             StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
 
             byte* pixels = Malloc<byte>(texture.Width * texture.Height * 3);
-            texture.GetTextureImage(PixelFormat.Rgb, PixelType.UnsignedByte, (IntPtr)pixels, texture.Width * texture.Height * 3 * sizeof(byte));
+            texture.GetImageData(PixelFormat.Rgb, PixelType.UnsignedByte, (IntPtr)pixels, texture.Width * texture.Height * 3 * sizeof(byte));
 
             ImageWriter imageWriter = new ImageWriter();
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");

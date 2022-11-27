@@ -88,7 +88,7 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            Result.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba32f);
+            Result.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Width + 8 - 1) / 8, 6);

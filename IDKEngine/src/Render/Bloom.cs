@@ -78,7 +78,7 @@ namespace IDKEngine.Render
 
             Vector3i size = Texture.GetMipMapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, 0);
             shaderProgram.Upload(3, 0);
-            downscaleTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
+            downscaleTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, downscaleTexture.SizedInternalFormat);
             GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
 
             downscaleTexture.BindToUnit(0);
@@ -87,7 +87,7 @@ namespace IDKEngine.Render
                 size = Texture.GetMipMapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, i);
 
                 shaderProgram.Upload(3, i - 1);
-                downscaleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
+                downscaleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, downscaleTexture.SizedInternalFormat);
 
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
                 GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
@@ -100,7 +100,7 @@ namespace IDKEngine.Render
 
             size = Texture.GetMipMapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, lodCount - 2);
             shaderProgram.Upload(3, lodCount - 1);
-            upsampleTexture.BindToImageUnit(0, lodCount - 2, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
+            upsampleTexture.BindToImageUnit(0, lodCount - 2, false, 0, TextureAccess.WriteOnly, upsampleTexture.SizedInternalFormat);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);
 
@@ -110,7 +110,7 @@ namespace IDKEngine.Render
                 size = Texture.GetMipMapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, i);
 
                 shaderProgram.Upload(3, i + 1);
-                upsampleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
+                upsampleTexture.BindToImageUnit(0, i, false, 0, TextureAccess.WriteOnly, upsampleTexture.SizedInternalFormat);
 
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
                 GL.DispatchCompute((size.X + 8 - 1) / 8, (size.Y + 8 - 1) / 8, 1);

@@ -5,7 +5,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
-layout(binding = 1, rgba16f) restrict readonly uniform image3D ImgVoxels;
+layout(binding = 0) uniform usampler3D SamplerVoxels;
 
 struct Ray
 {
@@ -39,9 +39,11 @@ layout(std140, binding = 5) uniform VXGIDataUBO
     float _pad1;
 } vxgiDataUBO;
 
-vec4 DDATraversal(ivec3 start, ivec3 end);
 bool RayCuboidIntersect(Ray ray, vec3 min, vec3 max, out float t1, out float t2);
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
+
+layout(location = 0) uniform int Steps;
+layout(location = 1) uniform int Lod;
 
 void main()
 {
@@ -68,31 +70,23 @@ void main()
         gridRayStart = worldRay.Origin + worldRay.Direction * t1;
     gridRayEnd = (worldRay.Origin + worldRay.Direction * t2);
 
-    vec3 gridExtents = vxgiDataUBO.GridMax - vxgiDataUBO.GridMin;
-    ivec3 start = ivec3((gridRayStart - vxgiDataUBO.GridMin) / gridExtents * imageSize(ImgVoxels));
-    ivec3 end = ivec3((gridRayEnd - vxgiDataUBO.GridMin) / gridExtents * imageSize(ImgVoxels));
-
-    vec4 color = DDATraversal(start, end);
-    imageStore(ImgResult, imgCoord, color);
-}
-
-// Couldnt get passing an image into the function compile
-vec4 DDATraversal(ivec3 start, ivec3 end)
-{
-    ivec3 line = end - start;
-    ivec3 absLine = abs(line);
-    int numSteps = max(absLine.x, max(absLine.y, absLine.z));
-    vec3 deltaStep = vec3(line) / float(numSteps);
-
-    vec3 currentPos = start;
+    vec3 uvtStart = (vxgiDataUBO.OrthoProjection * vec4(gridRayStart, 1.0)).xyz * 0.5 + 0.5;
+    vec3 uvtEnd = (vxgiDataUBO.OrthoProjection * vec4(gridRayEnd, 1.0)).xyz * 0.5 + 0.5;
+    vec3 deltaStep = (uvtEnd - uvtStart) / Steps;
+    vec3 currentPos = uvtStart;
     vec4 color = vec4(0.0);
-    for (int i = 0; i <= numSteps && color.a < 0.99; i++)
+    for (int i = 0; i < Steps; i++)
     {
-        vec4 voxelColor = imageLoad(ImgVoxels, ivec3(round(currentPos)));
-        color += (1.0 - color.a) * voxelColor;
+        uint packedAlbedo = textureLod(SamplerVoxels, currentPos, Lod).r;
+        vec4 uncompressedRgba = uvec4((packedAlbedo >> 0), (packedAlbedo >> 8), (packedAlbedo >> 16), (packedAlbedo >> 24)) & ((1u << 8) - 1);
+        uncompressedRgba /= 255.0;
+
+        color += (1.0 - color.a) * uncompressedRgba;
         currentPos += deltaStep;
     }
-    return color;
+
+    color.rgb = pow(color.rgb, vec3(2.2));
+    imageStore(ImgResult, imgCoord, color);
 }
 
 // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525

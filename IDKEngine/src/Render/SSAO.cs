@@ -59,7 +59,7 @@ namespace IDKEngine.Render
 
         public void Compute(Texture depth, Texture normal)
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R8);
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             depth.BindToUnit(0);
             normal.BindToUnit(1);
 

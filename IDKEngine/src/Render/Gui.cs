@@ -2,8 +2,9 @@
 using System.IO;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using IDKEngine.GUI;
 using ImGuiNET;
+using IDKEngine.GUI;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
@@ -173,6 +174,12 @@ namespace IDKEngine.Render
                     ImGui.EndCombo();
                 }
 
+                float tempFloat = app.PostProcessor.Gamma;
+                if (ImGui.SliderFloat("Gamma", ref tempFloat, 0.1f, 3.0f))
+                {
+                    app.PostProcessor.Gamma = tempFloat;
+                }
+
                 bool tempBool = app.PostProcessor.IsDithering;
                 if (ImGui.Checkbox("IsDithering", ref tempBool))
                 {
@@ -232,7 +239,7 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        float tempFloat = app.ShadingRateClassifier.SpeedFactor;
+                        tempFloat = app.ShadingRateClassifier.SpeedFactor;
                         if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
                             app.ShadingRateClassifier.SpeedFactor = tempFloat;
@@ -256,7 +263,7 @@ namespace IDKEngine.Render
                                 app.VolumetricLight.Samples = tempInt;
                             }
 
-                            float tempFloat = app.VolumetricLight.Scattering;
+                            tempFloat = app.VolumetricLight.Scattering;
                             if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
                             {
                                 app.VolumetricLight.Scattering = tempFloat;
@@ -302,7 +309,7 @@ namespace IDKEngine.Render
                                 app.SSAO.Samples = tempInt;
                             }
 
-                            float tempFloat = app.SSAO.Radius;
+                            tempFloat = app.SSAO.Radius;
                             if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 0.5f))
                             {
                                 app.SSAO.Radius = tempFloat;
@@ -333,7 +340,7 @@ namespace IDKEngine.Render
                                 app.SSR.BinarySearchSamples = tempInt;
                             }
 
-                            float tempFloat = app.SSR.MaxDist;
+                            tempFloat = app.SSR.MaxDist;
                             if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1, 100))
                             {
                                 app.SSR.MaxDist = tempFloat;
@@ -411,7 +418,7 @@ namespace IDKEngine.Render
                             app.PathTracer.IsTraceLights = tempBool;
                         }
 
-                        float tempFloat = app.PathTracer.RayCoherency;
+                        tempFloat = app.PathTracer.RayCoherency;
                         if (ImGui.SliderFloat("RayCoherency", ref tempFloat, 0.0f, 1.0f))
                         {
                             app.PathTracer.RayCoherency = tempFloat;
@@ -442,13 +449,51 @@ namespace IDKEngine.Render
                         }
                     }
                 }
+                else if (app.GetRenderMode() == RenderMode.VXGI_WIP)
+                {
+                    string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
+                    ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision problems");
+
+                    current = app.Voxelizer.ResultVoxelAlbedo.Width.ToString();
+                    if (ImGui.BeginCombo("Resolution", current))
+                    {
+                        for (int i = 0; i < resolutions.Length; i++)
+                        {
+                            bool isSelected = current == resolutions[i];
+                            if (ImGui.Selectable(resolutions[i], isSelected))
+                            {
+                                current = resolutions[i];
+                                int size = Convert.ToInt32(current);
+                                app.Voxelizer.SetSize(size, size, size);
+                            }
+
+                            if (isSelected)
+                            {
+                                ImGui.SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui.EndCombo();
+                    }
+
+                    int tempInt = app.Voxelizer.DebugLod;
+                    //if (ImGui.SliderInt("DebugLod", ref tempInt, 0, Texture.GetMaxMipmapLevel(app.Voxelizer.ResultVoxelAlbedo.Width, app.Voxelizer.ResultVoxelAlbedo.Height, app.Voxelizer.ResultVoxelAlbedo.Depth) - 1))
+                    //{
+                    //    app.Voxelizer.DebugLod = tempInt;
+                    //}
+
+                    tempInt = app.Voxelizer.DebugSteps;
+                    if (ImGui.SliderInt("DebugSteps", ref tempInt, 0, 3000))
+                    {
+                        app.Voxelizer.DebugSteps = tempInt;
+                    }
+                }
 
                 if (ImGui.CollapsingHeader("Bloom"))
                 {
                     ImGui.Checkbox("IsBloom", ref app.IsBloom);
                     if (app.IsBloom)
                     {
-                        float tempFloat = app.Bloom.Threshold;
+                        tempFloat = app.Bloom.Threshold;
                         if (ImGui.SliderFloat("Threshold", ref tempFloat, 0.0f, 10.0f))
                         {
                             app.Bloom.Threshold = tempFloat;
@@ -495,7 +540,7 @@ namespace IDKEngine.Render
                             shouldUpdateSkyBox = true;
                         }
 
-                        float tempFloat = SkyBoxManager.AtmosphericScatterer.Time;
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.Time;
                         if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
                         {
                             SkyBoxManager.AtmosphericScatterer.Time = tempFloat;

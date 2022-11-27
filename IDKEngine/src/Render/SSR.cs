@@ -57,7 +57,7 @@ namespace IDKEngine.Render
 
         public unsafe void Compute(Texture colorTexture, Texture normalTexture, Texture depthTexture)
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba16f);
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
 
             int* textures = stackalloc int[] { colorTexture.ID, normalTexture.ID, depthTexture.ID };
             Texture.MultiBindToUnit(0, 3, textures);

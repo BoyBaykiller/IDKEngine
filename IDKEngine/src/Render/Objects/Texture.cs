@@ -204,7 +204,7 @@ namespace IDKEngine.Render.Objects
             GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
         }
 
-        public void GetTextureImage(PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int bufSize, int level = 0)
+        public void GetImageData(PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int bufSize, int level = 0)
         {
             GL.GetTextureImage(ID, level, pixelFormat, pixelType, bufSize, pixels);
         }
@@ -228,7 +228,7 @@ namespace IDKEngine.Render.Objects
 
         public static int GetMaxMipmapLevel(int width, int height, int depth)
         {
-            return (int)MathF.Ceiling(MathF.Log2(Math.Max(width, Math.Max(height, depth))));
+            return MathF.ILogB(Math.Max(width, Math.Max(height, depth)));
         }
 
         public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)

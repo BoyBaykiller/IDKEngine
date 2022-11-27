@@ -111,8 +111,8 @@ namespace IDKEngine.Render
 
         public unsafe void Compute(Texture shaded, Texture velocity)
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R8ui);
-            shaded.BindToImageUnit(1, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+            shaded.BindToImageUnit(1, 0, false, 0, TextureAccess.ReadWrite, shaded.SizedInternalFormat);
             
             velocity.BindToUnit(0);
 
