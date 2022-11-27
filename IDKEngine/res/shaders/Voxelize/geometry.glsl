@@ -1,12 +1,7 @@
 #version 460 core
 
-// Inserted by application. 0 if not supported
-#define HAS_CONSERVATIVE_RASTER __hasConservativeRaster__
-
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 3) out;
-
-layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxels;
 
 layout(std140, binding = 5) uniform VXGIDataUBO
 {
@@ -44,31 +39,26 @@ void main()
     int dominantAxis = normalWeights.y > normalWeights.x ? 1 : 0;
     dominantAxis = normalWeights.z > normalWeights[dominantAxis] ? 2 : dominantAxis;
 
-    vec3 outClipPositions[3];
+    vec3 outNormDeviceCoords[3];
     for (int i = 0; i < 3; i++)
     {
-        vec3 clipPosition = (vxgiDataUBO.OrthoProjection * gl_in[i].gl_Position).xyz;
+        vec3 ndc = (vxgiDataUBO.OrthoProjection * gl_in[i].gl_Position).xyz;
 
         // Select the projection plane that yields the biggest projection area 
-        if (dominantAxis == 0) clipPosition = clipPosition.zyx;
-        else if (dominantAxis == 1) clipPosition = clipPosition.xzy;
+        if (dominantAxis == 0) ndc = ndc.zyx;
+        else if (dominantAxis == 1) ndc = ndc.xzy;
 
-        outClipPositions[i] = clipPosition;
+        outNormDeviceCoords[i] = ndc;
     }
 
-#if !HAS_CONSERVATIVE_RASTER
-    // Emulate Conservative Rasterization
-    // Has false positives. See "Extra Voxels GeneratedExtra Voxels Generated" here https://developer.nvidia.com/content/basics-gpu-voxelization
-    
     // Source: https://wickedengine.net/2017/08/30/voxel-based-global-illumination/
-    vec2 side0N = normalize(outClipPositions[1].xy - outClipPositions[0].xy);
-    vec2 side1N = normalize(outClipPositions[2].xy - outClipPositions[1].xy);
-    vec2 side2N = normalize(outClipPositions[0].xy - outClipPositions[2].xy);
+    vec2 side0N = normalize(outNormDeviceCoords[1].xy - outNormDeviceCoords[0].xy);
+    vec2 side1N = normalize(outNormDeviceCoords[2].xy - outNormDeviceCoords[1].xy);
+    vec2 side2N = normalize(outNormDeviceCoords[0].xy - outNormDeviceCoords[2].xy);
 
-    outClipPositions[0].xy += normalize(side2N - side0N) * ViewportTexelSize;
-    outClipPositions[1].xy += normalize(side0N - side1N) * ViewportTexelSize;
-    outClipPositions[2].xy += normalize(side1N - side2N) * ViewportTexelSize;
-#endif
+    outNormDeviceCoords[0].xy += normalize(side2N - side0N) * ViewportTexelSize;
+    outNormDeviceCoords[1].xy += normalize(side0N - side1N) * ViewportTexelSize;
+    outNormDeviceCoords[2].xy += normalize(side1N - side2N) * ViewportTexelSize;
 
     for (int i = 0; i < 3; i++)
     {
@@ -76,7 +66,7 @@ void main()
         outData.TexCoord = inData[i].TexCoord;
         outData.FragPos = gl_in[i].gl_Position.xyz;
     
-        gl_Position = vec4(outClipPositions[i], 1.0);
+        gl_Position = vec4(outNormDeviceCoords[i], 1.0);
 
         EmitVertex();
     }

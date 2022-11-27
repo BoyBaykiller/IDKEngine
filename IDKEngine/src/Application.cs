@@ -37,7 +37,6 @@ namespace IDKEngine
 
         public bool RenderGui { get; private set; }
         private int fps;
-
         protected override unsafe void OnRender(float dT)
         {
             GLSLBasicData.DeltaUpdate = dT;
@@ -110,8 +109,8 @@ namespace IDKEngine
             }
             else if (GetRenderMode() == RenderMode.VXGI_WIP)
             {
-                voxelizer.Render(ModelSystem, ViewportResolution);
-                voxelizer.DebugRender(PostProcessor.Result);
+                Voxelizer.Render(ModelSystem);
+                Voxelizer.DebugRender(PostProcessor.Result);
 
                 if (IsBloom)
                     Bloom.Compute(PostProcessor.Result);
@@ -206,7 +205,7 @@ namespace IDKEngine
         public ShadingRateClassifier ShadingRateClassifier;
         public PostProcessor PostProcessor;
         public PathTracer PathTracer;
-        private Voxelizer voxelizer;
+        public Voxelizer Voxelizer;
         public LightManager LightManager;
         public MeshOutlineRenderer MeshOutlineRenderer;
         protected override unsafe void OnStart()
@@ -243,6 +242,7 @@ namespace IDKEngine
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.DebugCallback, 0);
 #endif
+
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), ViewportResolution.X / (float)ViewportResolution.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
@@ -255,7 +255,6 @@ namespace IDKEngine
             FinalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
-
             Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
 
@@ -272,6 +271,7 @@ namespace IDKEngine
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
                 sponza.ModelMatrices[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
+
 
             // fix transparency
             sponza.Meshes[0].RoughnessBias = -1.0f;
@@ -414,10 +414,15 @@ namespace IDKEngine
                 }
             }
 
-            if (voxelizer != null) { voxelizer.Dispose(); voxelizer = null; }
+            if (Voxelizer != null) { Voxelizer.Dispose(); Voxelizer = null; }
             if (renderMode == RenderMode.VXGI_WIP)
             {
-                voxelizer = new Voxelizer(512, 512, 512, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
+                int i = 0;
+                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                {
+                    cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
+                });
+                Voxelizer = new Voxelizer(384, 384, 384, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
             }
 
             if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }

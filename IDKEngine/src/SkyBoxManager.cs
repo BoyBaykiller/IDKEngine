@@ -32,7 +32,7 @@ namespace IDKEngine
 
                     externalSkyBox = new Texture(TextureTarget2d.TextureCubeMap);
                     externalSkyBox.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-                    Helper.ParallelLoadCubemap(externalSkyBox, Paths, (SizedInternalFormat)PixelInternalFormat.CompressedSrgbAlphaBptcUnorm);
+                    Helper.ParallelLoadCubemap(externalSkyBox, Paths, (SizedInternalFormat)PixelInternalFormat.SrgbAlpha);
                 }
                 else
                 {

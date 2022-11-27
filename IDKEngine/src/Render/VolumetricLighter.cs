@@ -98,7 +98,7 @@ namespace IDKEngine.Render
 
         public void Compute(Texture depth)
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba16f);
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, Result.SizedInternalFormat);
             depth.BindToUnit(1);
 
             shaderProgram.Use();

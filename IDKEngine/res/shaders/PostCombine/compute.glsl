@@ -25,6 +25,7 @@ const float BayerMatrix8[8][8] =
 };
 
 uniform bool IsDithering;
+uniform float Gamma;
 
 void main()
 {
@@ -37,7 +38,7 @@ void main()
     color += texture(Sampler3, uv).rgb;
 
     color = ACESFilm(color);
-    color = LinearToInverseGamma(color, 2.2);
+    color = LinearToInverseGamma(color, Gamma);
 
     if (IsDithering)
         color += ((BayerMatrix8[int(imgCoord.x) % BayerMatrix8.length()][int(imgCoord.y) % BayerMatrix8.length()]) - 0.5) * 0.015625;
@@ -45,6 +46,7 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 
+// Source: https://blog.demofox.org/2020/06/06/casual-shadertoy-path-tracing-2-image-improvement-and-glossy-reflections/
 vec3 LinearToInverseGamma(vec3 rgb, float gamma)
 {
     return pow(rgb, vec3(1.0 / gamma));
@@ -53,10 +55,10 @@ vec3 LinearToInverseGamma(vec3 rgb, float gamma)
 // Source: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 vec3 ACESFilm(vec3 x)
 {
-    float a = 2.51;
-    float b = 0.03;
-    float c = 2.43;
-    float d = 0.59;
-    float e = 0.14;
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
     return (x * (a * x + b)) / (x * (c * x + d) + e);
 }
