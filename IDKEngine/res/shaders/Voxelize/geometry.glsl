@@ -26,9 +26,7 @@ out InOutVars
     flat uint MaterialIndex;
 } outData;
 
-#if !HAS_CONSERVATIVE_RASTER
 layout(location = 0) uniform vec2 ViewportTexelSize;
-#endif
 
 void main()
 {

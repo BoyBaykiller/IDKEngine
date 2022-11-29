@@ -105,7 +105,7 @@ namespace IDKEngine
         /// <summary>
         /// Creates a window with OpenGL context
         /// </summary>
-        public GameWindowBase(int width, int heigth, string title, int openglMajor, int openglMinor)
+        public GameWindowBase(int width, int height, string title, int openglMajor, int openglMinor)
         {
             if (!glfwInitialized)
             {
@@ -122,7 +122,7 @@ namespace IDKEngine
             GLFW.WindowHint(WindowHintInt.ContextVersionMinor, openglMinor);
             _title = title;
             _size.X = width;
-            _size.Y = heigth;
+            _size.Y = height;
 
             window = GLFW.CreateWindow(_size.X, _size.Y, _title, null, null);
             GLFW.SwapBuffers(window);

@@ -5,7 +5,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
-layout(binding = 0) uniform usampler3D SamplerVoxels;
+layout(binding = 0) uniform sampler3D SamplerVoxels;
 
 struct Ray
 {
@@ -77,11 +77,8 @@ void main()
     vec4 color = vec4(0.0);
     for (int i = 0; i < Steps; i++)
     {
-        uint packedAlbedo = textureLod(SamplerVoxels, currentPos, Lod).r;
-        vec4 uncompressedRgba = uvec4((packedAlbedo >> 0), (packedAlbedo >> 8), (packedAlbedo >> 16), (packedAlbedo >> 24)) & ((1u << 8) - 1);
-        uncompressedRgba /= 255.0;
-
-        color += (1.0 - color.a) * uncompressedRgba;
+        vec4 currSample = textureLod(SamplerVoxels, currentPos, Lod);
+        color += (1.0 - color.a) * currSample;
         currentPos += deltaStep;
     }
 

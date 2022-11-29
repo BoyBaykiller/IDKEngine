@@ -32,7 +32,7 @@ namespace IDKEngine
 
                     externalSkyBox = new Texture(TextureTarget2d.TextureCubeMap);
                     externalSkyBox.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-                    Helper.ParallelLoadCubemap(externalSkyBox, Paths, (SizedInternalFormat)PixelInternalFormat.SrgbAlpha);
+                    Helper.ParallelLoadCubemap(externalSkyBox, Paths, SizedInternalFormat.Srgb8);
                 }
                 else
                 {
@@ -46,6 +46,7 @@ namespace IDKEngine
                     AtmosphericScatterer.Compute();
                 }
 
+                // Fixed since 22.7.1
                 /// Info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
                 SkyBoxTexture.SetSeamlessCubeMapPerTextureARB_AMD(true);
                 skyBoxTextureUBO.SubData(0, sizeof(ulong), SkyBoxTexture.GenTextureHandleARB());
