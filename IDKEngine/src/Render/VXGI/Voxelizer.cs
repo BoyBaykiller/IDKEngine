@@ -8,6 +8,8 @@ namespace IDKEngine.Render
 {
     class Voxelizer : IDisposable
     {
+        public static readonly bool HAS_ATOMIC_FP16_VECTOR = Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector");
+
         public unsafe Vector3 GridMin
         {
             get => glslVxgiData.GridMin;
@@ -39,7 +41,7 @@ namespace IDKEngine.Render
             set
             {
                 _debugSteps = value;
-                debugProgram.Upload(0, _debugSteps);
+                visualizeDebugProgram.Upload(0, _debugSteps);
             }
         }
 
@@ -51,29 +53,26 @@ namespace IDKEngine.Render
             set
             {
                 _debugLod = value;
-                debugProgram.Upload(1, _debugLod);
+                visualizeDebugProgram.Upload(1, _debugLod);
             }
         }
 
-
         public Texture ResultVoxelAlbedo;
         private readonly ShaderProgram voxelizeProgram;
-        private readonly ShaderProgram debugProgram;
-        private readonly ShaderProgram clearFragCounterProgram;
+        private readonly ShaderProgram visualizeDebugProgram;
+        private readonly ShaderProgram resetTexturesProgram;
         private readonly BufferObject bufferObject;
         private Texture fragCounterTexture;
         private GLSLVXGIData glslVxgiData;
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, int debugLod = 0, int debugSteps = 1000)
         {
-            string geoShaderSrc = File.ReadAllText("res/shaders/Voxelize/geometry.glsl");
-
             voxelizeProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Voxelize/vertex.glsl")),
-                new Shader(ShaderType.GeometryShader, geoShaderSrc),
+                new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/Voxelize/geometry.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Voxelize/fragment.glsl")));
 
-            debugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Visualization/compute.glsl")));
-            clearFragCounterProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Clear/compute.glsl")));
+            visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Visualization/compute.glsl")));
+            resetTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Clear/compute.glsl")));
 
             bufferObject = new BufferObject();
             bufferObject.ImmutableAllocate(sizeof(GLSLVXGIData), glslVxgiData, BufferStorageFlags.DynamicStorageBit);
@@ -91,7 +90,7 @@ namespace IDKEngine.Render
         {
             Vector2i viewportSize = new Vector2i(ResultVoxelAlbedo.Width, ResultVoxelAlbedo.Height);
 
-            ClearTextures();
+            ResetTextures();
 
             GL.Viewport(0, 0, viewportSize.X, viewportSize.Y);
             GL.ColorMask(false, false, false, false);
@@ -99,30 +98,23 @@ namespace IDKEngine.Render
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
 
-            ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelAlbedo.SizedInternalFormat);
+            ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.R32ui);
             fragCounterTexture.BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, fragCounterTexture.SizedInternalFormat);
 
             voxelizeProgram.Upload(0, new Vector2(1.0f) / viewportSize);
             voxelizeProgram.Use();
+
             //timerQuery.Begin();
             modelSystem.Draw();
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             //timerQuery.End();
-            //Console.WriteLine(timerQuery.MeasuredMilliseconds);
+            //Console.WriteLine("Rendered into voxel grid " + timerQuery.MeasuredMilliseconds);
 
-            //Result.GenerateMipmap(); // 3d mipmap genertion is done on cpu on nvidia. add compute bases mipmap
-
-            //unsafe
-            //{
-            //    uint* pixels = Helper.Malloc<uint>(ResultVoxelAlbedo.Width * ResultVoxelAlbedo.Height * ResultVoxelAlbedo.Depth);
-            //    fragCounterTexture.GetImageData(PixelFormat.RedInteger, PixelType.UnsignedInt, (nint)pixels, ResultVoxelAlbedo.Width * ResultVoxelAlbedo.Height * ResultVoxelAlbedo.Depth * sizeof(uint));
-            //    uint max = 0u;
-            //    for (int i = 0; i < ResultVoxelAlbedo.Width * ResultVoxelAlbedo.Height * ResultVoxelAlbedo.Depth; i++)
-            //    {
-            //        max = Math.Max(max, pixels[i] & ((1 << 16) - 1));
-            //    }
-            //    Helper.Free(pixels);
-            //    Console.WriteLine(max);
-            //}
+            //timerQuery.Begin();
+            //ResultVoxelAlbedo.GenerateMipmap();
+            //timerQuery.End();
+            //Console.WriteLine("Generated mipmap " + timerQuery.MeasuredMilliseconds);
+            //Console.WriteLine("====================");
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
@@ -130,23 +122,23 @@ namespace IDKEngine.Render
             GL.DepthMask(true);
         }
  
-        private void ClearTextures()
+        private void ResetTextures()
         {
-            ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, ResultVoxelAlbedo.SizedInternalFormat);
+            ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.R32ui);
             fragCounterTexture.BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, fragCounterTexture.SizedInternalFormat);
 
-            clearFragCounterProgram.Use();
+            resetTexturesProgram.Use();
             GL.DispatchCompute((fragCounterTexture.Width + 4 - 1) / 4, (fragCounterTexture.Height + 4 - 1) / 4, (fragCounterTexture.Depth + 4 - 1) / 4);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderImageAccessBarrierBit);
         }
 
         public void DebugRender(Texture debugResult)
         {
             debugResult.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, debugResult.SizedInternalFormat);
             ResultVoxelAlbedo.BindToUnit(0);
-            debugProgram.Use();
+            visualizeDebugProgram.Use();
             GL.DispatchCompute((debugResult.Width + 8 - 1) / 8, (debugResult.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
         }
 
         public void SetSize(int width, int height, int depth)
@@ -156,7 +148,14 @@ namespace IDKEngine.Render
             ResultVoxelAlbedo.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
             ResultVoxelAlbedo.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             ResultVoxelAlbedo.SetAnisotropy(4.0f);
-            ResultVoxelAlbedo.ImmutableAllocate(width, height, depth, SizedInternalFormat.R32ui, 1); // Texture.GetMaxMipmapLevel(width, height, depth)
+            if (HAS_ATOMIC_FP16_VECTOR)
+            {
+                ResultVoxelAlbedo.ImmutableAllocate(width, height, depth, SizedInternalFormat.Rgba16f, 1); // Texture.GetMaxMipmapLevel(width, height, depth)
+            }
+            else
+            {
+                ResultVoxelAlbedo.ImmutableAllocate(width, height, depth, SizedInternalFormat.Rgba8, 1); // Texture.GetMaxMipmapLevel(width, height, depth)
+            }
 
             if (fragCounterTexture != null) fragCounterTexture.Dispose();
             fragCounterTexture = new Texture(TextureTarget3d.Texture3D);
@@ -167,11 +166,13 @@ namespace IDKEngine.Render
         public void Dispose()
         {
             ResultVoxelAlbedo.Dispose();
-            voxelizeProgram.Dispose();
-            debugProgram.Dispose();
-            bufferObject.Dispose();
-
             fragCounterTexture.Dispose();
+
+            voxelizeProgram.Dispose();
+            visualizeDebugProgram.Dispose();
+            resetTexturesProgram.Dispose();
+
+            bufferObject.Dispose();
         }
     }
 }

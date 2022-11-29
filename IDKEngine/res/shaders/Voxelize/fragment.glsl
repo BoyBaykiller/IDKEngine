@@ -1,7 +1,15 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
+#extension GL_NV_shader_atomic_fp16_vector : enable
+#ifdef GL_NV_shader_atomic_fp16_vector
+#extension GL_NV_gpu_shader5 : require
+#endif
 
+#ifdef GL_NV_shader_atomic_fp16_vector
+layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxelsAlbedo;
+#else
 layout(binding = 0, r32ui) restrict uniform uimage3D ImgVoxelsAlbedo;
+#endif
 layout(binding = 1, r32ui) restrict uniform uimage3D ImgFragCounter;
 
 struct Material
@@ -44,14 +52,18 @@ void main()
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
 
     uint fragCounterData = imageLoad(ImgFragCounter, voxelPos).x;
-    uint prevFragCount = fragCounterData >> 16;
+    uint prevFragCount = fragCounterData >> 16u;
     float avgMultiplier = 1.0 / float(prevFragCount);
 
-    ivec4 quantizedAlbedoRgba = ivec4(albedo * avgMultiplier * 255.0);
-
+    vec4 normalizedAlbedo = albedo * avgMultiplier;
+    #ifdef GL_NV_shader_atomic_fp16_vector
+    imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
+    #else
+    ivec4 quantizedAlbedoRgba = ivec4(normalizedAlbedo * 255.0);
     uint packedAlbedo = (quantizedAlbedoRgba.a << 24) | (quantizedAlbedoRgba.b << 16) | (quantizedAlbedoRgba.g << 8) | (quantizedAlbedoRgba.r << 0);
     imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
-    imageAtomicAdd(ImgFragCounter, voxelPos, 1);
+    #endif
+    imageAtomicAdd(ImgFragCounter, voxelPos, 1u);
 }
 
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos)

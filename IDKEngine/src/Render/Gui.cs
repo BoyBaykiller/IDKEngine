@@ -56,6 +56,8 @@ namespace IDKEngine.Render
             ImGuiBackend.Update(app, frameTime);
             ImGui.DockSpaceOverViewport();
 
+            bool tempBool;
+
             bool shouldResetPT = false;
             ImGui.Begin("Frame Recorder");
             {
@@ -155,6 +157,13 @@ namespace IDKEngine.Render
                     ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
                 }
 
+                float tempFloat = app.PostProcessor.Gamma;
+                if (ImGui.SliderFloat("Gamma", ref tempFloat, 0.1f, 3.0f))
+                {
+                    app.PostProcessor.Gamma = tempFloat;
+                }
+                ImGui.Separator();
+
                 string[] renderModes = (string[])Enum.GetNames(typeof(RenderMode));
                 string current = app.GetRenderMode().ToString();
                 if (ImGui.BeginCombo("Render Mode", current))
@@ -174,24 +183,19 @@ namespace IDKEngine.Render
                     ImGui.EndCombo();
                 }
 
-                float tempFloat = app.PostProcessor.Gamma;
-                if (ImGui.SliderFloat("Gamma", ref tempFloat, 0.1f, 3.0f))
-                {
-                    app.PostProcessor.Gamma = tempFloat;
-                }
-
-                bool tempBool = app.PostProcessor.IsDithering;
-                if (ImGui.Checkbox("IsDithering", ref tempBool))
-                {
-                    app.PostProcessor.IsDithering = tempBool;
-                }
-
                 if (app.GetRenderMode() == RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.IsWireframe);
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
+                        ImGui.Text($"NV_shading_rate_image: {ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING}");
+                        ImGui.SameLine();
+                        InfoMark(
+                            "This hardware feature allows the engine to choose a unique shading rate " +
+                            "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
+                            "shader invocations in regions where less detail may be required."
+                        );
                         if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING)
                         {
                             ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f);
@@ -203,13 +207,6 @@ namespace IDKEngine.Render
                             ImGui.EndDisabled();
                             ImGui.PopStyleVar();
                         }
-                        ImGui.SameLine();
-                        InfoMark(
-                            "Requires support for NV_shading_rate_image. " +
-                            "This feature allows the engine to choose a unique shading rate " +
-                            "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
-                            "shader invocations in regions where less detail may be required."
-                        );
 
 
                         string[] debugModes = new string[]
@@ -352,23 +349,11 @@ namespace IDKEngine.Render
                     {
                         ImGui.Checkbox("IsShadows", ref app.IsShadows);
                         ImGui.SameLine();
-                        string appendText;
-                        if (PointShadow.HAS_VERTEX_LAYERED_RENDERING)
-                        {
-                            appendText =
-                                "This system supports vertex layered rendering. " +
-                                "Each pointshadow will be generated in only 1 draw call instead of 6.";
-                        }
-                        else
-                        {
-                            appendText =
-                                "This system does not support vertex layered rendering. " +
-                                "Each pointshadow will be generated in 6 draw calls instead of 1.";
-                        }
-                        InfoMark(
-                            "Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps. " +
-                            appendText
-                        );
+                        InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
+
+                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
+                        ImGui.SameLine();
+                        InfoMark("This hardware feature allows the engine to genereate point shadows in only 1 draw call instead of 6.");
                     }
 
                     if (ImGui.CollapsingHeader("TAA"))
@@ -452,8 +437,6 @@ namespace IDKEngine.Render
                 else if (app.GetRenderMode() == RenderMode.VXGI_WIP)
                 {
                     string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                    ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision problems");
-
                     current = app.Voxelizer.ResultVoxelAlbedo.Width.ToString();
                     if (ImGui.BeginCombo("Resolution", current))
                     {
@@ -474,18 +457,23 @@ namespace IDKEngine.Render
                         }
                         ImGui.EndCombo();
                     }
+                    ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision issues and a performance hit.");
 
                     int tempInt = app.Voxelizer.DebugLod;
-                    //if (ImGui.SliderInt("DebugLod", ref tempInt, 0, Texture.GetMaxMipmapLevel(app.Voxelizer.ResultVoxelAlbedo.Width, app.Voxelizer.ResultVoxelAlbedo.Height, app.Voxelizer.ResultVoxelAlbedo.Depth) - 1))
-                    //{
-                    //    app.Voxelizer.DebugLod = tempInt;
-                    //}
+                    if (ImGui.SliderInt("DebugLod", ref tempInt, 0, Texture.GetMaxMipmapLevel(app.Voxelizer.ResultVoxelAlbedo.Width, app.Voxelizer.ResultVoxelAlbedo.Height, app.Voxelizer.ResultVoxelAlbedo.Depth) - 1))
+                    {
+                        app.Voxelizer.DebugLod = tempInt;
+                    }
 
                     tempInt = app.Voxelizer.DebugSteps;
-                    if (ImGui.SliderInt("DebugSteps", ref tempInt, 0, 3000))
+                    if (ImGui.SliderInt("DebugSteps", ref tempInt, 0, 1500))
                     {
                         app.Voxelizer.DebugSteps = tempInt;
                     }
+
+                    ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
+                    ImGui.SameLine();
+                    InfoMark("This hardware feature allows the engine to accumulate floating-point values during voxelization without having to pack them into an integer first");
                 }
 
                 if (ImGui.CollapsingHeader("Bloom"))
@@ -651,7 +639,7 @@ namespace IDKEngine.Render
                 else if (selectedEntityType == EntityType.Light)
                 {
                     bool shouldUpdateLight = false;
-                    ref GLSLLight light = ref app.ForwardRenderer.LightingContext.Lights[selectedEntityIndex];
+                    ref GLSLLight light = ref app.LightManager.Lights[selectedEntityIndex];
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToSystemVec();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
@@ -676,7 +664,7 @@ namespace IDKEngine.Render
                     if (shouldUpdateLight)
                     {
                         shouldResetPT = true;
-                        app.ForwardRenderer.LightingContext.UpdateLightBuffer(selectedEntityIndex, selectedEntityIndex + 1);
+                        app.LightManager.UpdateLightBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                     }
                 }
                 else
