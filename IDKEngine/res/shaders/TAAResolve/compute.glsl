@@ -5,7 +5,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) restrict uniform image2D ImgResult;
-layout(binding = 0) uniform sampler2D SamplerLastForwardPass;
+layout(binding = 0) uniform sampler2D SamplerHistory;
 layout(binding = 1) uniform sampler2D SamplerVelocity;
 layout(binding = 2) uniform sampler2D SamplerDepth;
 
@@ -19,7 +19,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     float VelScale;
 } taaDataUBO;
 
-void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 currentColor, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
+void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocityPixel, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
 vec4 SampleTextureCatmullRom(sampler2D src, vec2 uv);
 
 uniform bool IsTaaArtifactMitigation;
@@ -32,10 +32,10 @@ void main()
     if (!IsTaaArtifactMitigation)
     {
         vec2 velocity = texelFetch(SamplerVelocity, imgCoord, 0).rg / taaDataUBO.VelScale;
-        vec2 oldUV = uv - velocity;
+        vec2 historyUV = uv - velocity;
 
         vec3 currentColor = imageLoad(ImgResult, imgCoord).rgb;
-        vec3 historyColor = texture(SamplerLastForwardPass, oldUV).rgb;
+        vec3 historyColor = texture(SamplerHistory, historyUV).rgb;
 
         float blend = 1.0 / taaDataUBO.Samples;
 
@@ -47,17 +47,17 @@ void main()
     ivec2 bestVelocityPixel;
     vec3 neighborhoodMin, neighborhoodMax;
     vec3 currentColor;
-    GetResolveData(imgCoord, bestVelocityPixel, currentColor, neighborhoodMin, neighborhoodMax);
+    GetResolveData(imgCoord, currentColor, bestVelocityPixel, neighborhoodMin, neighborhoodMax);
 
     vec2 velocity = texelFetch(SamplerVelocity, bestVelocityPixel, 0).rg / taaDataUBO.VelScale;
-    vec2 oldUV = uv - velocity;
-    if (any(greaterThan(oldUV, vec2(1.0))) || any(lessThan(oldUV, vec2(0.0))))
+    vec2 historyUV = uv - velocity;
+    if (any(greaterThan(historyUV, vec2(1.0))) || any(lessThan(historyUV, vec2(0.0))))
     {
         imageStore(ImgResult, imgCoord, vec4(currentColor, 1.0));
         return;
     }
 
-    vec3 historyColor = SampleTextureCatmullRom(SamplerLastForwardPass, oldUV).rgb;
+    vec3 historyColor = SampleTextureCatmullRom(SamplerHistory, historyUV).rgb;
     historyColor = clamp(historyColor, neighborhoodMin, neighborhoodMax);
 
     float blend = 1.0 / taaDataUBO.Samples;
@@ -72,11 +72,11 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 
-// 1. Return best velocity pixel in a 3x3 radius
-// 2. Return min/max colors in a 3x3 radius
-// 3. Return color of the current coords 
+// 1. Return color of the current coords 
+// 2. Return best velocity pixel in a 3x3 radius
+// 3. Return min/max colors in a 3x3 radius
 // Source: https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
-void GetResolveData(ivec2 imgCoord, out ivec2 bestVelocityPixel, out vec3 currentColor, out vec3 neighborhoodMin, out vec3 neighborhoodMax)
+void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocityPixel, out vec3 neighborhoodMin, out vec3 neighborhoodMax)
 {
     float minDepth = 1.0;
     neighborhoodMin = vec3(FLOAT_MAX);

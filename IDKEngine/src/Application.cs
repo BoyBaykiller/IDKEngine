@@ -184,6 +184,11 @@ namespace IDKEngine
             if (KeyboardState[Keys.F11] == InputState.Touched)
                 WindowFullscreen = !WindowFullscreen;
 
+            //Vector3 pos = ModelSystem.ModelMatrices[25][0].ExtractTranslation();
+            //pos += new Vector3(0.0f, MathF.Sin(WindowTime * 1.1f) * 0.005f, 0.0f);
+            //ModelSystem.ModelMatrices[25][0] = ModelSystem.ModelMatrices[25][0].ClearTranslation() * Matrix4.CreateTranslation(pos);
+            //ModelSystem.UpdateModelMatricesBuffer(25, 26);
+
             gui.Update(this, dT);
         }
 
@@ -234,8 +239,8 @@ namespace IDKEngine
             GL.PointSize(1.3f);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
-            GL.Enable(EnableCap.Blend);
             GL.Enable(EnableCap.ScissorTest);
+            GL.Enable(EnableCap.Blend);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
 #if DEBUG

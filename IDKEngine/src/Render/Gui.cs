@@ -351,7 +351,10 @@ namespace IDKEngine.Render
                         ImGui.SameLine();
                         InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
 
-                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
+                        ImGui.Text("ARB_shader_viewport_layer_array or\n" +
+                            "ARB_viewport_array or\n" +
+                            "NV_viewport_array2 or\n" +
+                            $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
                         ImGui.SameLine();
                         InfoMark("This hardware feature allows the engine to genereate point shadows in only 1 draw call instead of 6.");
                     }

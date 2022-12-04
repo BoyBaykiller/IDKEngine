@@ -329,7 +329,7 @@ bool TraceRay(inout TransportRay transportRay)
             roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
             normal = texture(material.Normal, texCoord).rgb;        
             normal = TBN * normalize(normal * 2.0 - 1.0);
-            normal = normalize(mix(geoNormal, normal, mesh.NormalMapStrength)); // TODO: geoNormal should be transformed to world space here, thinking of dropping this feature
+            normal = normalize(mix(mat3(transpose(inverse(model))) * geoNormal, normal, mesh.NormalMapStrength));
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;
         }
