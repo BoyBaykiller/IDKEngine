@@ -316,7 +316,7 @@ public void Draw()
     vao.Bind(); // contains big vertex and indices array + vertex format
     drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer); // contains DrawCommand[Meshes.Length]
 
-    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
+    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
 }
 ```
 While this renders all geometry just fine you might be wondering how to access the entirety of materials to compute proper shading. After all scenes like Sponza come with a lot of textures and the usual method of manually declaring `sampler2D` in glsl quickly becomes insufficient as we can't do state changes between draw calls anymore (which is good) to swap out materials. This is where Bindless Textures comes in.
@@ -418,7 +418,7 @@ void Render()
     drawingProgram.Use();
     vao.Bind(); 
     drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, (IntPtr)0, Meshes.Length, 0);
+    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
 }
 ```
 A compute shader is dispatched which does the culling and accordingly adjusts the content of `drawCommandBuffer`.

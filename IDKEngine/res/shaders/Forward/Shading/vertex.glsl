@@ -66,10 +66,10 @@ out InOutVars
     vec3 Normal;
     mat3 TangentToWorld;
     flat uint MaterialIndex;
-    flat float EmissiveBias;
-    flat float NormalMapStrength;
-    flat float SpecularBias;
-    flat float RoughnessBias;
+    float EmissiveBias;
+    float NormalMapStrength;
+    float SpecularBias;
+    float RoughnessBias;
 } outData;
 
 vec3 DecompressSNorm32Fast(uint v);
@@ -92,7 +92,7 @@ void main()
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    outData.Normal = normal; // TODO: Should be transformed to world space, thinking of dropping this feature
+    outData.Normal = mat3(transpose(inverse(model))) * normal;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;

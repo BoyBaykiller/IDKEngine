@@ -69,7 +69,7 @@ namespace IDKEngine
 
             if (triangles.Length > 0)
             {
-                BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+                BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
                 BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
                 int nodesUploaded = 0;
                 for (int i = 0; i < blases.Length; i++)

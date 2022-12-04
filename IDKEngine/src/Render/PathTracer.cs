@@ -107,7 +107,7 @@ namespace IDKEngine.Render
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
             dispatchCommandBuffer = new BufferObject();
-            dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GLSLDispatchCommand), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GLSLDispatchCommand), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             SetSize(width, height);
@@ -165,12 +165,12 @@ namespace IDKEngine.Render
 
             if (transportRayBuffer != null) transportRayBuffer.Dispose();
             transportRayBuffer = new BufferObject();
-            transportRayBuffer.ImmutableAllocate(width * height * sizeof(GLSLTransportRay), (IntPtr)0, BufferStorageFlags.None);
+            transportRayBuffer.ImmutableAllocate(width * height * sizeof(GLSLTransportRay), IntPtr.Zero, BufferStorageFlags.None);
             transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
 
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
             rayIndicesBuffer = new BufferObject();
-            rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0));
             rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
         }

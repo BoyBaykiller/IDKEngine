@@ -17,7 +17,7 @@ namespace IDKEngine.Render
             set
             {
                 taaData->IsEnabled = value ? 1 : 0;
-                taaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + sizeof(int), sizeof(int), taaData->IsEnabled);
+                taaDataBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + sizeof(int), sizeof(int), taaData->IsEnabled);
             }
         }
         public int TaaSamples
@@ -28,7 +28,7 @@ namespace IDKEngine.Render
             {
                 Debug.Assert(value <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
                 taaData->Samples = value;
-                taaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT, sizeof(int), taaData->Samples);
+                taaDataBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT, sizeof(int), taaData->Samples);
             }
         }
 
@@ -75,7 +75,7 @@ namespace IDKEngine.Render
         private Texture taaPong;
         private readonly ShaderProgram taaResolveProgram;
         private readonly ShaderProgram combineProgram;
-        private readonly BufferObject taaBuffer;
+        private readonly BufferObject taaDataBuffer;
         private readonly GLSLTaaData* taaData;
         private bool isPing;
         public PostProcessor(int width, int height, float gamma = 2.2f, int taaSamples = 6)
@@ -85,16 +85,16 @@ namespace IDKEngine.Render
             combineProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PostCombine/compute.glsl")));
             taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TAAResolve/compute.glsl")));
 
-            taaBuffer = new BufferObject();
-            taaBuffer.ImmutableAllocate(sizeof(GLSLTaaData), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
-            taaBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
+            taaDataBuffer = new BufferObject();
+            taaDataBuffer.ImmutableAllocate(sizeof(GLSLTaaData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             taaData = Helper.Malloc<GLSLTaaData>();
             taaData->Samples = taaSamples;
             taaData->IsEnabled = 1;
             taaData->Scale = 5.0f;
             taaData->Frame = 0;
-            taaBuffer.SubData(0, sizeof(GLSLTaaData), (IntPtr)taaData);
+            taaDataBuffer.SubData(0, sizeof(GLSLTaaData), (IntPtr)taaData);
 
             SetSize(width, height);
             IsDithering = true;
@@ -134,7 +134,7 @@ namespace IDKEngine.Render
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
 
                 taaData->Frame++;
-                taaBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + 2 * sizeof(uint), sizeof(uint), taaData->Frame);
+                taaDataBuffer.SubData(Vector2.SizeInBytes * GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT + 2 * sizeof(uint), sizeof(uint), taaData->Frame);
             }
         }
 
@@ -157,7 +157,7 @@ namespace IDKEngine.Render
             MyMath.MapHaltonSequence(jitterData, width, height);
             fixed (void* ptr = jitterData)
             {
-                taaBuffer.SubData(0, sizeof(float) * jitterData.Length, (IntPtr)ptr);
+                taaDataBuffer.SubData(0, sizeof(float) * jitterData.Length, (IntPtr)ptr);
             }
         }
 
@@ -167,7 +167,7 @@ namespace IDKEngine.Render
             taaPong.Dispose();
             taaResolveProgram.Dispose();
             combineProgram.Dispose();
-            taaBuffer.Dispose();
+            taaDataBuffer.Dispose();
             Marshal.FreeHGlobal((nint)taaData);
         }
 

@@ -29,7 +29,7 @@ namespace IDKEngine.Render
         public unsafe PointShadowManager()
         {
             pointShadowsBuffer = new BufferObject();
-            pointShadowsBuffer.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            pointShadowsBuffer.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
             pointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];

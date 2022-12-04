@@ -78,9 +78,9 @@ namespace IDKEngine.GUI
         private unsafe void CreateDeviceResources()
         {
             vbo = new BufferObject();
-            vbo.MutableAllocate(10000, (IntPtr)0);
+            vbo.MutableAllocate(10000, IntPtr.Zero);
             ebo = new BufferObject();
-            ebo.MutableAllocate(2000, (IntPtr)0);
+            ebo.MutableAllocate(2000, IntPtr.Zero);
 
             ImGuiIOPtr io = ImGui.GetIO();
             io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int width, out int height, out _);
@@ -228,14 +228,14 @@ namespace IDKEngine.GUI
                 if (vertexSize > vbo.Size)
                 {
                     int newSize = (int)Math.Max(vbo.Size * 1.5f, vertexSize);
-                    vbo.MutableAllocate(newSize, (IntPtr)0);
+                    vbo.MutableAllocate(newSize, IntPtr.Zero);
                 }
 
                 int indexSize = cmdList.IdxBuffer.Size * sizeof(ushort);
                 if (indexSize > ebo.Size)
                 {
                     int newSize = (int)Math.Max(ebo.Size * 1.5f, indexSize);
-                    ebo.MutableAllocate(newSize, (IntPtr)0);
+                    ebo.MutableAllocate(newSize, IntPtr.Zero);
                 }
             }
 
@@ -261,7 +261,7 @@ namespace IDKEngine.GUI
                 for (int cmd_i = 0; cmd_i < cmd_list.CmdBuffer.Size; cmd_i++)
                 {
                     ImDrawCmdPtr pcmd = cmd_list.CmdBuffer[cmd_i];
-                    if (pcmd.UserCallback != (IntPtr)0)
+                    if (pcmd.UserCallback != IntPtr.Zero)
                     {
                         throw new NotImplementedException();
                     }

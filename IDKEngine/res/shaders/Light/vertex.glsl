@@ -49,8 +49,8 @@ out InOutVars
     vec3 FragPos;
     vec4 ClipPos;
     vec4 PrevClipPos;
-    flat vec3 Position;
-    flat float Radius;
+    vec3 Position;
+    float Radius;
 } outData;
 
 void main()

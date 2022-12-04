@@ -42,7 +42,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
 
             bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), (IntPtr)0, BufferStorageFlags.DynamicStorageBit);
+            bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             bufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
 
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
@@ -72,7 +72,7 @@ namespace IDKEngine.Render
         {
             shaderProgram.Use();
             vao.Bind();
-            GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, (IntPtr)0, Count);
+            GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
         }
 
         public unsafe void Add(Span<GLSLLight> lights)

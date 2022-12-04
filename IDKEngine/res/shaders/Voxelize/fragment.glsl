@@ -10,6 +10,7 @@ layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxelsAlbedo;
 #else
 layout(binding = 0, r32ui) restrict uniform uimage3D ImgVoxelsAlbedo;
 #endif
+
 layout(binding = 1, r32ui) restrict uniform uimage3D ImgFragCounter;
 
 struct Material
@@ -37,8 +38,9 @@ layout(std140, binding = 5) uniform VXGIDataUBO
 
 in InOutVars
 {
-    vec2 TexCoord;
-    vec3 FragPos;
+    centroid vec3 FragPos;
+    centroid vec2 TexCoord;
+    centroid vec3 Normal;
     flat uint MaterialIndex;
 } inData;
 
@@ -46,24 +48,23 @@ ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos);
 
 void main()
 {
+    ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
+
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     vec4 albedo = texture(material.Albedo, inData.TexCoord);
 
-    ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
-
-    uint fragCounterData = imageLoad(ImgFragCounter, voxelPos).x;
-    uint prevFragCount = fragCounterData >> 16u;
-    float avgMultiplier = 1.0 / float(prevFragCount);
+    uint fragCounter = imageLoad(ImgFragCounter, voxelPos).x;
+    float avgMultiplier = 1.0 / float(fragCounter);
 
     vec4 normalizedAlbedo = albedo * avgMultiplier;
-    #ifdef GL_NV_shader_atomic_fp16_vector
+#ifdef GL_NV_shader_atomic_fp16_vector
     imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
-    #else
+#else
     ivec4 quantizedAlbedoRgba = ivec4(normalizedAlbedo * 255.0);
     uint packedAlbedo = (quantizedAlbedoRgba.a << 24) | (quantizedAlbedoRgba.b << 16) | (quantizedAlbedoRgba.g << 8) | (quantizedAlbedoRgba.r << 0);
     imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
-    #endif
-    imageAtomicAdd(ImgFragCounter, voxelPos, 1u);
+#endif
+
 }
 
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos)

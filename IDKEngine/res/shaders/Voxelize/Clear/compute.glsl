@@ -17,17 +17,11 @@ void main()
 {
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
 
-    uint data = imageLoad(ImgFragCounter, imgCoord).x;
-    uint prevCount = data & ((1u << 16u) - 1u);
-    const uint thisCount = 0u; // clear
-    imageStore(ImgFragCounter, imgCoord, uvec4((prevCount << 16) | thisCount));
+    imageStore(ImgFragCounter, imgCoord, uvec4(0u));
 
-    if (prevCount > 0u)
-    {
-        #ifdef GL_NV_shader_atomic_fp16_vector
-        imageStore(ImgVoxelsAlbedo, imgCoord, f16vec4(0.0));
-        #else
-        imageStore(ImgVoxelsAlbedo, imgCoord, uvec4(0u));
-        #endif
-    }
+#ifdef GL_NV_shader_atomic_fp16_vector
+    imageStore(ImgVoxelsAlbedo, imgCoord, f16vec4(0.0));
+#else
+    imageStore(ImgVoxelsAlbedo, imgCoord, uvec4(0u));
+#endif
 }

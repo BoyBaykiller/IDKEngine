@@ -10,6 +10,5 @@ in InOutVars
 
 void main()
 {
-    vec3 color = texture(Sampler0, inData.TexCoord).rgb;
-    FragColor = vec4(color, 1.0);
+    FragColor = texture(Sampler0, inData.TexCoord);
 }

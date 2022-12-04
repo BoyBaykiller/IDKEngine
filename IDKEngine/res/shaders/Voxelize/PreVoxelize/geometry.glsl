@@ -12,19 +12,9 @@ layout(std140, binding = 5) uniform VXGIDataUBO
     float _pad1;
 } vxgiDataUBO;
 
-in InOutVars
-{
-    vec2 TexCoord;
-    vec3 Normal;
-    flat uint MaterialIndex;
-} inData[];
-
 out InOutVars
 {
     vec3 FragPos;
-    vec2 TexCoord;
-    vec3 Normal;
-    flat uint MaterialIndex;
 } outData;
 
 layout(location = 0) uniform vec2 ViewportTexelSize;
@@ -34,7 +24,6 @@ void main()
     vec3 p1 = gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz;
     vec3 p2 = gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz;
     vec3 normalWeights = abs(cross(p1, p2));
-    // vec3 normalWeights = abs(inData[0].Normal + inData[1].Normal + inData[2].Normal);
 
     int dominantAxis = normalWeights.y > normalWeights.x ? 1 : 0;
     dominantAxis = normalWeights.z > normalWeights[dominantAxis] ? 2 : dominantAxis;
@@ -64,10 +53,6 @@ void main()
     for (int i = 0; i < 3; i++)
     {
         outData.FragPos = gl_in[i].gl_Position.xyz;
-        outData.TexCoord = inData[i].TexCoord;
-        outData.Normal = inData[i].Normal;
-        outData.MaterialIndex = inData[i].MaterialIndex;
-    
         gl_Position = vec4(outNormDeviceCoords[i], 1.0);
 
         EmitVertex();

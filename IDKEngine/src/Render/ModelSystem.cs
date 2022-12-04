@@ -5,7 +5,6 @@ using System.Diagnostics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
-using System.Runtime.InteropServices;
 
 namespace IDKEngine.Render
 {
