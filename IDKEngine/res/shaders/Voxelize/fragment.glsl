@@ -59,10 +59,12 @@ void main()
     vec4 normalizedAlbedo = albedo * avgMultiplier;
 #ifdef GL_NV_shader_atomic_fp16_vector
     imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
+    // imageAtomicMax(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
 #else
     ivec4 quantizedAlbedoRgba = ivec4(normalizedAlbedo * 255.0);
     uint packedAlbedo = (quantizedAlbedoRgba.a << 24) | (quantizedAlbedoRgba.b << 16) | (quantizedAlbedoRgba.g << 8) | (quantizedAlbedoRgba.r << 0);
     imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
+    // imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
 #endif
 
 }
