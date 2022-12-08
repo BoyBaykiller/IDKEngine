@@ -77,7 +77,7 @@ void main()
     vec4 color = vec4(0.0);
     for (int i = 0; i < Steps; i++)
     {
-        vec4 currSample = texelFetch(SamplerVoxels, ivec3(round(currentPos  * textureSize(SamplerVoxels, Lod))), Lod);
+        vec4 currSample = texelFetch(SamplerVoxels, ivec3(round(currentPos * textureSize(SamplerVoxels, Lod))), Lod);
         color += (1.0 - color.a) * currSample;
         currentPos += deltaStep;
     }
