@@ -2,8 +2,6 @@
 #extension GL_ARB_bindless_texture : require
 
 layout(location = 0) in vec3 Position;
-layout(location = 1) in vec2 TexCoord;
-layout(location = 3) in uint Normal;
 
 struct Mesh
 {

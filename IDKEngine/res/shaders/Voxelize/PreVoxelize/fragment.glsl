@@ -1,6 +1,6 @@
 #version 460 core
 
-layout(binding = 0, r32ui) restrict readonly writeonly uniform uimage3D ImgVoxelsAlbedo;
+layout(binding = 0) restrict readonly writeonly uniform uimage3D ImgVoxelsAlbedo;
 layout(binding = 1, r32ui) restrict uniform uimage3D ImgFragCounter;
 
 layout(std140, binding = 5) uniform VXGIDataUBO
@@ -22,7 +22,7 @@ ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos);
 void main()
 {
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
-    uint fragCounterData = imageAtomicAdd(ImgFragCounter, voxelPos, 1u);
+    imageAtomicAdd(ImgFragCounter, voxelPos, 1u);
 }
 
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos)

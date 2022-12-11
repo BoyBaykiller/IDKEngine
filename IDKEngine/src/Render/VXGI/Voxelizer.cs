@@ -104,12 +104,17 @@ namespace IDKEngine.Render
 
         private void ResetTextures()
         {
+            //debugTimerQuery.Begin();
+
             ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, ResultVoxelAlbedo.SizedInternalFormat);
-            fragCounterTexture.BindToImageUnit(1, 0, true, 0, TextureAccess.WriteOnly, fragCounterTexture.SizedInternalFormat);
-            
+            fragCounterTexture.BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, fragCounterTexture.SizedInternalFormat);
+
             resetTexturesProgram.Use();
             GL.DispatchCompute((fragCounterTexture.Width + 4 - 1) / 4, (fragCounterTexture.Height + 4 - 1) / 4, (fragCounterTexture.Depth + 4 - 1) / 4);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+
+            //debugTimerQuery.End();
+            //Console.WriteLine("Rendered into voxel grid " + debugTimerQuery.MeasuredMilliseconds);
         }
 
         TimerQuery debugTimerQuery = new TimerQuery();
@@ -123,10 +128,8 @@ namespace IDKEngine.Render
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
 
-            ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.R32ui);
+            ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelAlbedo.SizedInternalFormat);
             fragCounterTexture.BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, fragCounterTexture.SizedInternalFormat);
-
-            //debugTimerQuery.Begin();
 
             preVoxelizeProgram.Upload(0, new Vector2(1.0f) / viewportSize);
             preVoxelizeProgram.Use();
@@ -137,9 +140,6 @@ namespace IDKEngine.Render
             voxelizeProgram.Use();
             modelSystem.Draw();
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-
-            //debugTimerQuery.End();
-            //Console.WriteLine("Rendered into voxel grid " + timerQuery.MeasuredMilliseconds);
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);

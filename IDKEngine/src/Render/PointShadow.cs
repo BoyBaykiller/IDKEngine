@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
-using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
@@ -9,10 +9,10 @@ namespace IDKEngine.Render
     class PointShadow : IDisposable
     {
         public static readonly bool HAS_VERTEX_LAYERED_RENDERING =
-            Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
+            (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
             Helper.IsExtensionsAvailable("GL_ARB_viewport_array") ||
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
-            Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer");
+            Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
 
         private static readonly ShaderProgram renderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),

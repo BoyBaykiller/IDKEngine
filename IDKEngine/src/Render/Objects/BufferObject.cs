@@ -91,6 +91,11 @@ namespace IDKEngine.Render.Objects
             GL.GetNamedBufferSubData(ID, offset, size, data);
         }
 
+        public unsafe void Clear(int offset, int size, uint value)
+        {
+            GL.ClearNamedBufferSubData(ID, PixelInternalFormat.R32ui, offset, size, PixelFormat.RedInteger, PixelType.UnsignedInt, (nint)(&value));
+        }
+
         public void Dispose()
         {
             GL.DeleteBuffer(ID);
