@@ -185,7 +185,7 @@ namespace IDKEngine.Render
 
                 if (app.GetRenderMode() == RenderMode.Rasterizer)
                 {
-                    ImGui.Checkbox("IsWireframe", ref app.IsWireframe);
+                    ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
@@ -201,7 +201,7 @@ namespace IDKEngine.Render
                             ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f);
                             ImGui.BeginDisabled();
                         }
-                        ImGui.Checkbox("IsVRS", ref app.IsVRSForwardRender);
+                        ImGui.Checkbox("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading);
                         if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING)
                         {
                             ImGui.EndDisabled();
@@ -218,7 +218,7 @@ namespace IDKEngine.Render
                             nameof(ShadingRateClassifier.DebugMode.LuminanceVariance),
                         };
 
-                        current = app.ShadingRateClassifier.DebugValue.ToString();
+                        current = app.RasterizerPipeline.ShadingRateClassifier.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
                             for (int i = 0; i < debugModes.Length; i++)
@@ -227,7 +227,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(debugModes[i], isSelected))
                                 {
                                     current = debugModes[i];
-                                    app.ShadingRateClassifier.DebugValue = ShadingRateClassifier.DebugMode.NoDebug + i;
+                                    app.RasterizerPipeline.ShadingRateClassifier.DebugValue = ShadingRateClassifier.DebugMode.NoDebug + i;
                                 }
 
                                 if (isSelected)
@@ -236,55 +236,55 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        tempFloat = app.ShadingRateClassifier.SpeedFactor;
+                        tempFloat = app.RasterizerPipeline.ShadingRateClassifier.SpeedFactor;
                         if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
-                            app.ShadingRateClassifier.SpeedFactor = tempFloat;
+                            app.RasterizerPipeline.ShadingRateClassifier.SpeedFactor = tempFloat;
                         }
 
-                        tempFloat = app.ShadingRateClassifier.LumVarianceFactor;
+                        tempFloat = app.RasterizerPipeline.ShadingRateClassifier.LumVarianceFactor;
                         if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
                         {
-                            app.ShadingRateClassifier.LumVarianceFactor = tempFloat;
+                            app.RasterizerPipeline.ShadingRateClassifier.LumVarianceFactor = tempFloat;
                         }
                     }
 
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
                     {
-                        ImGui.Checkbox("IsVolumetricLighting", ref app.IsVolumetricLighting);
-                        if (app.IsVolumetricLighting)
+                        ImGui.Checkbox("IsVolumetricLighting", ref app.RasterizerPipeline.IsVolumetricLighting);
+                        if (app.RasterizerPipeline.IsVolumetricLighting)
                         {
-                            int tempInt = app.VolumetricLight.Samples;
+                            int tempInt = app.RasterizerPipeline.VolumetricLight.Samples;
                             if (ImGui.SliderInt("Samples", ref tempInt, 1, 100))
                             {
-                                app.VolumetricLight.Samples = tempInt;
+                                app.RasterizerPipeline.VolumetricLight.Samples = tempInt;
                             }
 
-                            tempFloat = app.VolumetricLight.Scattering;
+                            tempFloat = app.RasterizerPipeline.VolumetricLight.Scattering;
                             if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
                             {
-                                app.VolumetricLight.Scattering = tempFloat;
+                                app.RasterizerPipeline.VolumetricLight.Scattering = tempFloat;
                             }
 
-                            tempFloat = app.VolumetricLight.Strength;
+                            tempFloat = app.RasterizerPipeline.VolumetricLight.Strength;
                             if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 500.0f))
                             {
-                                app.VolumetricLight.Strength = tempFloat;
+                                app.RasterizerPipeline.VolumetricLight.Strength = tempFloat;
                             }
 
-                            System.Numerics.Vector3 tempVec = app.VolumetricLight.Absorbance.ToSystemVec();
+                            System.Numerics.Vector3 tempVec = app.RasterizerPipeline.VolumetricLight.Absorbance.ToSystemVec();
                             if (ImGui.InputFloat3("Absorbance", ref tempVec))
                             {
                                 Vector3 temp = tempVec.ToOpenTKVec();
                                 temp = Vector3.ComponentMax(temp, Vector3.Zero);
-                                app.VolumetricLight.Absorbance = temp;
+                                app.RasterizerPipeline.VolumetricLight.Absorbance = temp;
                             }
 
-                            tempBool = app.VolumetricLight.IsTemporalAccumulation;
+                            tempBool = app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation;
                             if (!app.PostProcessor.TaaEnabled) ImGui.BeginDisabled();
                             if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
                             {
-                                app.VolumetricLight.IsTemporalAccumulation = tempBool;
+                                app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation = tempBool;
                             }
                             ImGui.SameLine();
                             InfoMark(
@@ -297,50 +297,50 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("SSAO"))
                     {
-                        ImGui.Checkbox("IsSSAO", ref app.IsSSAO);
-                        if (app.IsSSAO)
+                        ImGui.Checkbox("IsSSAO", ref app.RasterizerPipeline.IsSSAO);
+                        if (app.RasterizerPipeline.IsSSAO)
                         {
-                            int tempInt = app.SSAO.Samples;
+                            int tempInt = app.RasterizerPipeline.SSAO.Samples;
                             if (ImGui.SliderInt("Samples  ", ref tempInt, 1, 50))
                             {
-                                app.SSAO.Samples = tempInt;
+                                app.RasterizerPipeline.SSAO.Samples = tempInt;
                             }
 
-                            tempFloat = app.SSAO.Radius;
+                            tempFloat = app.RasterizerPipeline.SSAO.Radius;
                             if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 0.5f))
                             {
-                                app.SSAO.Radius = tempFloat;
+                                app.RasterizerPipeline.SSAO.Radius = tempFloat;
                             }
 
-                            tempFloat = app.SSAO.Strength;
+                            tempFloat = app.RasterizerPipeline.SSAO.Strength;
                             if (ImGui.SliderFloat("Strength ", ref tempFloat, 0.0f, 20.0f))
                             {
-                                app.SSAO.Strength = tempFloat;
+                                app.RasterizerPipeline.SSAO.Strength = tempFloat;
                             }
                         }
                     }
 
                     if (ImGui.CollapsingHeader("SSR"))
                     {
-                        ImGui.Checkbox("IsSSR", ref app.IsSSR);
-                        if (app.IsSSR)
+                        ImGui.Checkbox("IsSSR", ref app.RasterizerPipeline.IsSSR);
+                        if (app.RasterizerPipeline.IsSSR)
                         {
-                            int tempInt = app.SSR.Samples;
+                            int tempInt = app.RasterizerPipeline.SSR.Samples;
                             if (ImGui.SliderInt("Samples ", ref tempInt, 1, 100))
                             {
-                                app.SSR.Samples = tempInt;
+                                app.RasterizerPipeline.SSR.Samples = tempInt;
                             }
 
-                            tempInt = app.SSR.BinarySearchSamples;
+                            tempInt = app.RasterizerPipeline.SSR.BinarySearchSamples;
                             if (ImGui.SliderInt("BinarySearchSamples", ref tempInt, 0, 40))
                             {
-                                app.SSR.BinarySearchSamples = tempInt;
+                                app.RasterizerPipeline.SSR.BinarySearchSamples = tempInt;
                             }
 
-                            tempFloat = app.SSR.MaxDist;
+                            tempFloat = app.RasterizerPipeline.SSR.MaxDist;
                             if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1, 100))
                             {
-                                app.SSR.MaxDist = tempFloat;
+                                app.RasterizerPipeline.SSR.MaxDist = tempFloat;
                             }
                         }
                     }
@@ -476,7 +476,8 @@ namespace IDKEngine.Render
 
                     ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
                     ImGui.SameLine();
-                    InfoMark("This hardware feature allows the engine to accumulate floating-point values during voxelization without having to pack them into an integer first");
+                    InfoMark("This hardware feature allows the engine to accumulate floating-point values during voxelization without having to pack them into an integer first. " +
+                             "It also improves precision over the 8-Bit channel fallback path");
                 }
 
                 if (ImGui.CollapsingHeader("Bloom"))

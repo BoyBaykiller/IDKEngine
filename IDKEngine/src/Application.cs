@@ -3,8 +3,8 @@ using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
@@ -26,11 +26,10 @@ namespace IDKEngine
 
         }
 
-
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsVolumetricLighting = true, IsSSAO = true, IsSSR = false, IsBloom = true, IsShadows = true, IsVRSForwardRender = false, IsWireframe = false;
+        public bool IsBloom = true, IsShadows = true;
         public int FPS;
 
         public Vector2i ViewportResolution { get; private set; }
@@ -55,57 +54,20 @@ namespace IDKEngine
 
             if (GetRenderMode() == RenderMode.Rasterizer)
             {
-                if (IsWireframe)
-                {
-                    GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
-                }
-
-                // Last frames SSAO
-                if (IsSSAO)
-                    SSAO.Compute(ForwardRenderer.DepthTexture, ForwardRenderer.NormalSpecTexture);
-
                 if (IsShadows)
                 {
                     pointShadowManager.UpdateShadowMaps(ModelSystem);
                     GL.ColorMask(true, true, true, true);
                 }
-
                 ModelSystem.FrustumCull(GLSLBasicData.ProjView);
 
-                GL.Viewport(0, 0, ForwardRenderer.Result.Width, ForwardRenderer.Result.Height);
-
-                if (IsVRSForwardRender)
-                    ShadingRateClassifier.IsEnabled = true;
-
-                ForwardRenderer.Render(ModelSystem, IsSSAO ? SSAO.Result : null);
-                ShadingRateClassifier.IsEnabled = false;
+                RasterizerPipeline.VariableRateShading(PostProcessor.Result, ForwardRenderer.VelocityTexture);
+                RasterizerPipeline.Render(ModelSystem, ForwardRenderer, Bloom);
 
                 if (IsBloom)
                     Bloom.Compute(ForwardRenderer.Result);
 
-                if (IsVolumetricLighting)
-                    VolumetricLight.Compute(ForwardRenderer.DepthTexture);
-
-                if (IsSSR)
-                    SSR.Compute(ForwardRenderer.Result, ForwardRenderer.NormalSpecTexture, ForwardRenderer.DepthTexture);
-
-                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null, IsSSR ? SSR.Result : null, ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
-
-                if (ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING)
-                {
-                    if (IsVRSForwardRender)
-                        ShadingRateClassifier.Compute(PostProcessor.Result, ForwardRenderer.VelocityTexture);
-                }
-                // Small "hack" to enable VRS debug image on systems that don't support the extension
-                else if (ShadingRateClassifier.DebugValue != ShadingRateClassifier.DebugMode.NoDebug)
-                {
-                    ShadingRateClassifier.Compute(PostProcessor.Result, ForwardRenderer.VelocityTexture);
-                }
-
-                if (IsWireframe)
-                {
-                    GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
-                }
+                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, RasterizerPipeline.IsVolumetricLighting ? RasterizerPipeline.VolumetricLight.Result : null, RasterizerPipeline.IsSSR ? RasterizerPipeline.SSR.Result : null, ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
             }
             else if (GetRenderMode() == RenderMode.VXGI_WIP)
             {
@@ -202,17 +164,15 @@ namespace IDKEngine
         public GLSLBasicData GLSLBasicData;
         public FrameStateRecorder<RecordableState> FrameRecorder;
 
-        public ForwardRenderer ForwardRenderer;
-        public VolumetricLighter VolumetricLight;
-        public SSR SSR;
-        public SSAO SSAO;
+        public Renderer ForwardRenderer;
         public Bloom Bloom;
-        public ShadingRateClassifier ShadingRateClassifier;
         public PostProcessor PostProcessor;
-        public PathTracer PathTracer;
-        public Voxelizer Voxelizer;
         public LightManager LightManager;
         public MeshOutlineRenderer MeshOutlineRenderer;
+
+        public RasterizerPipeline RasterizerPipeline;
+        public Voxelizer Voxelizer;
+        public PathTracer PathTracer;
         protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
@@ -237,6 +197,7 @@ namespace IDKEngine
             MouseState.CursorMode = CursorModeValue.CursorNormal;
 
             GL.PointSize(1.3f);
+            GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.ScissorTest);
@@ -347,17 +308,17 @@ namespace IDKEngine
 
             if (GetRenderMode() == RenderMode.Rasterizer)
             {
-                ForwardRenderer.SetSize(width, height);
-                VolumetricLight.SetSize(width, height);
-                ShadingRateClassifier.SetSize(width, height);
-                ForwardRenderer.SetSize(width, height);
-                SSR.SetSize(width, height);
-                SSAO.SetSize(width, height);
+                RasterizerPipeline.SetSize(width, height);
             }
 
             if (GetRenderMode() == RenderMode.PathTracer)
             {
                 PathTracer.SetSize(width, height);
+            }
+
+            if (GetRenderMode() == RenderMode.Rasterizer || GetRenderMode() == RenderMode.VXGI_WIP)
+            {
+                ForwardRenderer.SetSize(width, height);
             }
 
             if (GetRenderMode() == RenderMode.Rasterizer || GetRenderMode() == RenderMode.VXGI_WIP || GetRenderMode() == RenderMode.PathTracer)
@@ -386,37 +347,17 @@ namespace IDKEngine
 
         public void SetRenderMode(RenderMode renderMode)
         {
-            if (ShadingRateClassifier != null) { ShadingRateClassifier.Dispose(); ShadingRateClassifier = null; }
-            if (SSAO != null) { SSAO.Dispose(); SSAO = null; }
-            if (SSR != null) { SSR.Dispose(); SSR = null; }
-            if (VolumetricLight != null) { VolumetricLight.Dispose(); VolumetricLight = null; }
-            if (ForwardRenderer != null) { ForwardRenderer.Dispose(); ForwardRenderer = null; }
             if (pointShadowManager != null) { pointShadowManager.Dispose(); pointShadowManager = null; }
             if (renderMode == RenderMode.Rasterizer)
             {
-                ShadingRateClassifier = new ShadingRateClassifier(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")), ViewportResolution.X, ViewportResolution.Y);
-                Span<NvShadingRateImage> shadingRates = stackalloc NvShadingRateImage[]
-                {
-                    NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
-                    NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
-                };
-                ShadingRateClassifier.SetShadingRatePaletteNV(shadingRates);
-                ShadingRateClassifier.BindVRSNV(ShadingRateClassifier);
-
-                SSAO = new SSAO(ViewportResolution.X, ViewportResolution.Y, 10, 0.1f, 2.0f);
-                SSR = new SSR(ViewportResolution.X, ViewportResolution.Y, 30, 8, 50.0f);
-                VolumetricLight = new VolumetricLighter(ViewportResolution.X, ViewportResolution.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
-                ForwardRenderer = new ForwardRenderer(LightManager, ViewportResolution.X, ViewportResolution.Y, 6);
-
                 pointShadowManager = new PointShadowManager();
                 for (int j = 0; j < 3; j++)
                 {
                     PointShadow pointShadow = new PointShadow(LightManager, j, 512, 0.5f, 60.0f);
                     pointShadowManager.Add(pointShadow);
                 }
+
+                RasterizerPipeline = new RasterizerPipeline(ViewportResolution.X, ViewportResolution.Y);
             }
 
             if (Voxelizer != null) { Voxelizer.Dispose(); Voxelizer = null; }
@@ -434,6 +375,12 @@ namespace IDKEngine
             if (renderMode == RenderMode.PathTracer)
             {
                 PathTracer = new PathTracer(BVH, ModelSystem, ViewportResolution.X, ViewportResolution.Y);
+            }
+
+            if (ForwardRenderer != null) { ForwardRenderer.Dispose(); ForwardRenderer = null; }
+            if (renderMode == RenderMode.Rasterizer || renderMode == RenderMode.VXGI_WIP)
+            {
+                ForwardRenderer = new Renderer(LightManager, ViewportResolution.X, ViewportResolution.Y, 6);
             }
 
             _renderMode = renderMode;

@@ -35,7 +35,7 @@ namespace IDKEngine.Render
             pointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
         }
 
-        public unsafe void Add(PointShadow pointShadow)
+        public void Add(PointShadow pointShadow)
         {
             Debug.Assert(Count < GLSL_MAX_UBO_POINT_SHADOW_COUNT);
 
@@ -44,7 +44,7 @@ namespace IDKEngine.Render
             Count++;
         }
 
-        public unsafe void UpdateShadowMaps(ModelSystem modelSystem)
+        public void UpdateShadowMaps(ModelSystem modelSystem)
         {
             GL.ColorMask(false, false, false, false);
             for (int i = 0; i < Count; i++)
