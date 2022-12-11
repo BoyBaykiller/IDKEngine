@@ -1,7 +1,10 @@
 #version 460 core
+#extension GL_ARB_bindless_texture : require // somehow required to be here on nvidia
 
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 3) out;
+
+layout(binding = 1, r32ui) restrict uniform uimage3D ImgFragCounter;
 
 layout(std140, binding = 5) uniform VXGIDataUBO
 {
@@ -27,7 +30,6 @@ out InOutVars
     flat uint MaterialIndex;
 } outData;
 
-layout(location = 0) uniform vec2 ViewportTexelSize;
 
 void main()
 {
@@ -53,13 +55,14 @@ void main()
 
     // Expand Triangle
     // Source: https://wickedengine.net/2017/08/30/voxel-based-global-illumination/
+    vec2 viewportPixelSize = 1.0 / imageSize(ImgFragCounter).xy;
     vec2 side0N = normalize(outNormDeviceCoords[1].xy - outNormDeviceCoords[0].xy);
     vec2 side1N = normalize(outNormDeviceCoords[2].xy - outNormDeviceCoords[1].xy);
     vec2 side2N = normalize(outNormDeviceCoords[0].xy - outNormDeviceCoords[2].xy);
 
-    outNormDeviceCoords[0].xy += normalize(side2N - side0N) * ViewportTexelSize;
-    outNormDeviceCoords[1].xy += normalize(side0N - side1N) * ViewportTexelSize;
-    outNormDeviceCoords[2].xy += normalize(side1N - side2N) * ViewportTexelSize;
+    outNormDeviceCoords[0].xy += normalize(side2N - side0N) * viewportPixelSize;
+    outNormDeviceCoords[1].xy += normalize(side0N - side1N) * viewportPixelSize;
+    outNormDeviceCoords[2].xy += normalize(side1N - side2N) * viewportPixelSize;
 
     for (int i = 0; i < 3; i++)
     {

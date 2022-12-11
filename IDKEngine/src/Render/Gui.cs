@@ -162,7 +162,6 @@ namespace IDKEngine.Render
                 {
                     app.PostProcessor.Gamma = tempFloat;
                 }
-                ImGui.Separator();
 
                 string[] renderModes = (string[])Enum.GetNames(typeof(RenderMode));
                 string current = app.GetRenderMode().ToString();
@@ -182,6 +181,25 @@ namespace IDKEngine.Render
                     }
                     ImGui.EndCombo();
                 }
+                ImGui.Separator();
+
+
+                void GuiShadows()
+                {
+                    if (ImGui.CollapsingHeader("Shadows"))
+                    {
+                        ImGui.Checkbox("IsShadows", ref app.IsShadows);
+                        ImGui.SameLine();
+                        InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
+
+                        ImGui.Text("ARB_shader_viewport_layer_array or\n" +
+                            "ARB_viewport_array or\n" +
+                            "NV_viewport_array2 or\n" +
+                            $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
+                        ImGui.SameLine();
+                        InfoMark("This hardware feature allows the engine to genereate point shadows in only 1 draw call instead of 6.");
+                    }
+                }
 
                 if (app.GetRenderMode() == RenderMode.Rasterizer)
                 {
@@ -196,17 +214,9 @@ namespace IDKEngine.Render
                             "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
                             "shader invocations in regions where less detail may be required."
                         );
-                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING)
-                        {
-                            ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f);
-                            ImGui.BeginDisabled();
-                        }
+                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
                         ImGui.Checkbox("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading);
-                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING)
-                        {
-                            ImGui.EndDisabled();
-                            ImGui.PopStyleVar();
-                        }
+                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
 
                         string[] debugModes = new string[]
@@ -345,19 +355,7 @@ namespace IDKEngine.Render
                         }
                     }
 
-                    if (ImGui.CollapsingHeader("Shadows"))
-                    {
-                        ImGui.Checkbox("IsShadows", ref app.IsShadows);
-                        ImGui.SameLine();
-                        InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
-
-                        ImGui.Text("ARB_shader_viewport_layer_array or\n" +
-                            "ARB_viewport_array or\n" +
-                            "NV_viewport_array2 or\n" +
-                            $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
-                        ImGui.SameLine();
-                        InfoMark("This hardware feature allows the engine to genereate point shadows in only 1 draw call instead of 6.");
-                    }
+                    GuiShadows();
 
                     if (ImGui.CollapsingHeader("TAA"))
                     {
@@ -439,45 +437,62 @@ namespace IDKEngine.Render
                 }
                 else if (app.GetRenderMode() == RenderMode.VXGI_WIP)
                 {
-                    string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                    current = app.Voxelizer.ResultVoxelAlbedo.Width.ToString();
-                    if (ImGui.BeginCombo("Resolution", current))
+                    if (ImGui.CollapsingHeader("Voxelization"))
                     {
-                        for (int i = 0; i < resolutions.Length; i++)
+                        string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
+                        current = app.Voxelizer.ResultVoxelAlbedo.Width.ToString();
+                        if (ImGui.BeginCombo("Resolution", current))
                         {
-                            bool isSelected = current == resolutions[i];
-                            if (ImGui.Selectable(resolutions[i], isSelected))
+                            for (int i = 0; i < resolutions.Length; i++)
                             {
-                                current = resolutions[i];
-                                int size = Convert.ToInt32(current);
-                                app.Voxelizer.SetSize(size, size, size);
-                            }
+                                bool isSelected = current == resolutions[i];
+                                if (ImGui.Selectable(resolutions[i], isSelected))
+                                {
+                                    current = resolutions[i];
+                                    int size = Convert.ToInt32(current);
+                                    app.Voxelizer.SetSize(size, size, size);
+                                }
 
-                            if (isSelected)
-                            {
-                                ImGui.SetItemDefaultFocus();
+                                if (isSelected)
+                                {
+                                    ImGui.SetItemDefaultFocus();
+                                }
                             }
+                            ImGui.EndCombo();
                         }
-                        ImGui.EndCombo();
-                    }
-                    ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision issues and a performance hit.");
+                        ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision issues and a performance hit.");
 
-                    int tempInt = app.Voxelizer.DebugLod;
-                    if (ImGui.SliderInt("DebugLod", ref tempInt, 0, Texture.GetMaxMipmapLevel(app.Voxelizer.ResultVoxelAlbedo.Width, app.Voxelizer.ResultVoxelAlbedo.Height, app.Voxelizer.ResultVoxelAlbedo.Depth) - 1))
-                    {
-                        app.Voxelizer.DebugLod = tempInt;
+                        ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
+                        ImGui.SameLine();
+                        InfoMark(
+                            "This hardware feature allows the engine to accumulate floating-point values without having to pack them into an integer first. " +
+                            "It also fixed various numerical precision issues which otherwise occur on the 8-Bit channel fallback path"
+                        );
+
+                        ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
+                        ImGui.SameLine();
+                        InfoMark(
+                            "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
+                            "This fixes some cracks in the voxelization, potentially with a performance penalty"
+                        );
+                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
+                        ImGui.Checkbox("DoConservativeRasterization", ref app.Voxelizer.IsConservativeRasterization);
+                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
+
+                        int tempInt = app.Voxelizer.DebugLod;
+                        if (ImGui.SliderInt("DebugLod", ref tempInt, 0, Texture.GetMaxMipmapLevel(app.Voxelizer.ResultVoxelAlbedo.Width, app.Voxelizer.ResultVoxelAlbedo.Height, app.Voxelizer.ResultVoxelAlbedo.Depth) - 1))
+                        {
+                            app.Voxelizer.DebugLod = tempInt;
+                        }
+
+                        tempInt = app.Voxelizer.DebugSteps;
+                        if (ImGui.SliderInt("DebugSteps", ref tempInt, 0, 1500))
+                        {
+                            app.Voxelizer.DebugSteps = tempInt;
+                        }
                     }
 
-                    tempInt = app.Voxelizer.DebugSteps;
-                    if (ImGui.SliderInt("DebugSteps", ref tempInt, 0, 1500))
-                    {
-                        app.Voxelizer.DebugSteps = tempInt;
-                    }
-
-                    ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
-                    ImGui.SameLine();
-                    InfoMark("This hardware feature allows the engine to accumulate floating-point values during voxelization without having to pack them into an integer first. " +
-                             "It also improves precision over the 8-Bit channel fallback path");
+                    GuiShadows();
                 }
 
                 if (ImGui.CollapsingHeader("Bloom"))

@@ -120,6 +120,7 @@ namespace IDKEngine
             GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Compat);
             GLFW.WindowHint(WindowHintInt.ContextVersionMajor, openglMajor);
             GLFW.WindowHint(WindowHintInt.ContextVersionMinor, openglMinor);
+            GLFW.WindowHint(WindowHintInt.Samples, 1);
             _title = title;
             _size.X = width;
             _size.Y = height;

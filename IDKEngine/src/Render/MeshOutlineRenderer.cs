@@ -34,6 +34,7 @@ namespace IDKEngine.Render
             if (_meshIndex == -1)
                 return;
 
+            GL.Viewport(0, 0, result.Width, result.Height);
             result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, result.SizedInternalFormat);
 
             GL.ColorMask(false, false, false, false);

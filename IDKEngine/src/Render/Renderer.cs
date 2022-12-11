@@ -5,7 +5,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class Renderer : IDisposable
+    class ForwardRenderer : IDisposable
     {
         public readonly Framebuffer Framebuffer;
         public Texture Result;
@@ -14,7 +14,7 @@ namespace IDKEngine.Render
         public Texture DepthTexture;
         public readonly LightManager LightingContext;
 
-        public Renderer(LightManager lighter, int width, int height, int taaSamples)
+        public ForwardRenderer(LightManager lighter, int width, int height, int taaSamples)
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 

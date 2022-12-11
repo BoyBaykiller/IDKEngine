@@ -82,7 +82,6 @@ void main()
         currentPos += deltaStep;
     }
 
-    color.rgb = pow(color.rgb, vec3(2.2));
     imageStore(ImgResult, imgCoord, color);
 }
 
