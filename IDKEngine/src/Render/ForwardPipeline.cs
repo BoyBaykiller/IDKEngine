@@ -61,7 +61,7 @@ namespace IDKEngine.Render
             SetSize(width, height);
         }
 
-        public void Render(ModelSystem modelSystem, Renderer renderer, Bloom bloom)
+        public void Render(ModelSystem modelSystem, ForwardRenderer renderer)
         {
             // Last frames SSAO
             if (IsSSAO)

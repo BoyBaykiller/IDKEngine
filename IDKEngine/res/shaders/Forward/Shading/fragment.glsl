@@ -102,8 +102,8 @@ in InOutVars
     flat float RoughnessBias;
 } inData;
 
-vec3 BlinnPhong(Light light);
-float Visibility(PointShadow pointShadow);
+vec3 GetBlinnPhongLighting(Light light, vec3 sampleToLight);
+float Visibility(PointShadow pointShadow, vec3 lightToSample);
 
 vec4 Albedo;
 vec3 Normal;
@@ -131,28 +131,32 @@ void main()
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
     {
         PointShadow pointShadow = shadowDataUBO.PointShadows[i];
-        irradiance += BlinnPhong(lightsUBO.Lights[i]) * Visibility(pointShadow);
+        Light light = lightsUBO.Lights[i];
+        vec3 sampleToLight = light.Position - inData.FragPos;
+        irradiance += GetBlinnPhongLighting(light, sampleToLight) * Visibility(pointShadow, -sampleToLight);
     }
 
     for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
     {
-        irradiance += BlinnPhong(lightsUBO.Lights[i]);
+        Light light = lightsUBO.Lights[i];
+        vec3 sampleToLight = light.Position - inData.FragPos;
+        irradiance += GetBlinnPhongLighting(light, sampleToLight);
     }
 
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * Albedo.rgb;
-    FragColor = vec4(irradiance + emissive + Albedo.rgb * 0.03 * (1.0 - AO), 1.0);
+    const float ambient = 0.03;
+    FragColor = vec4(irradiance + emissive + Albedo.rgb * ambient * (1.0 - AO), 1.0);
     NormalSpecColor = vec4(Normal, Specular);
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
     VelocityColor = (uv - prevUV) * taaDataUBO.VelScale;
 }
 
-vec3 BlinnPhong(Light light)
+vec3 GetBlinnPhongLighting(Light light, vec3 sampleToLight)
 {
-    vec3 fragToLight = light.Position - inData.FragPos;
-    float fragToLightLength = length(fragToLight);
+    float fragToLightLength = length(sampleToLight);
 
-    vec3 lightDir = fragToLight / fragToLightLength;
+    vec3 lightDir = sampleToLight / fragToLightLength;
     float cosTerm = dot(Normal, lightDir);
     if (cosTerm > 0.0)
     {
@@ -184,10 +188,9 @@ const vec3 SHADOW_SAMPLE_OFFSETS[20] =
    vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
 };
 
-float Visibility(PointShadow pointShadow)
+float Visibility(PointShadow pointShadow, vec3 lightToSample)
 {
-    vec3 lightToFrag = vec3(inData.FragPos - lightsUBO.Lights[pointShadow.LightIndex].Position);
-    float lightToFragLength = length(lightToFrag);
+    float lightToFragLength = length(lightToSample);
 
     float twoDist = lightToFragLength * lightToFragLength;
     float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
@@ -195,16 +198,16 @@ float Visibility(PointShadow pointShadow)
     
     const float MIN_BIAS = EPSILON;
     const float MAX_BIAS = 1.5;
-    float twoBias = mix(MAX_BIAS * MAX_BIAS, MIN_BIAS * MIN_BIAS, max(dot(Normal, lightToFrag / lightToFragLength), 0.0));
+    float twoBias = mix(MAX_BIAS * MAX_BIAS, MIN_BIAS * MIN_BIAS, max(dot(Normal, lightToSample / lightToFragLength), 0.0));
 
     // Map from [nearPlane, farPlane] to [0.0, 1.0]
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
     
     const float DISK_RADIUS = 0.08;
-    float shadowFactor = texture(pointShadow.SamplerShadow, vec4(lightToFrag, mapedDepth));
+    float shadowFactor = texture(pointShadow.SamplerShadow, vec4(lightToSample, mapedDepth));
     for (int i = 0; i < SHADOW_SAMPLE_OFFSETS.length(); i++)
     {
-        shadowFactor += texture(pointShadow.SamplerShadow, vec4(lightToFrag + SHADOW_SAMPLE_OFFSETS[i] * DISK_RADIUS, mapedDepth));
+        shadowFactor += texture(pointShadow.SamplerShadow, vec4(lightToSample + SHADOW_SAMPLE_OFFSETS[i] * DISK_RADIUS, mapedDepth));
     }
 
     return shadowFactor / 21.0;

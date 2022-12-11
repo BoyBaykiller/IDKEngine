@@ -9,6 +9,7 @@ namespace IDKEngine.Render
     class Voxelizer : IDisposable
     {
         public static readonly bool HAS_ATOMIC_FP16_VECTOR = Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector");
+        public static readonly bool HAS_CONSERVATIVE_RASTER = Helper.IsExtensionsAvailable("GL_NV_conservative_raster");
 
         public unsafe Vector3 GridMin
         {
@@ -57,6 +58,11 @@ namespace IDKEngine.Render
             }
         }
 
+        /// <summary>
+        /// GL_NV_conservative_raster must be available for this to have an effect
+        /// </summary>
+        public bool IsConservativeRasterization;
+
         public Texture ResultVoxelAlbedo;
         private Texture fragCounterTexture;
         private readonly ShaderProgram resetTexturesProgram;
@@ -85,7 +91,7 @@ namespace IDKEngine.Render
             visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Visualization/compute.glsl")));
 
             vxgiDataBuffer = new BufferObject();
-            vxgiDataBuffer.ImmutableAllocate(sizeof(GLSLVXGIData), glslVxgiData, BufferStorageFlags.DynamicStorageBit);
+            vxgiDataBuffer.ImmutableAllocate(sizeof(GLSLVXGIData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             vxgiDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
 
             SetSize(width, height, depth);
@@ -120,9 +126,12 @@ namespace IDKEngine.Render
         TimerQuery debugTimerQuery = new TimerQuery();
         private void Voxelize(ModelSystem modelSystem)
         {
-            Vector2i viewportSize = new Vector2i(ResultVoxelAlbedo.Width, ResultVoxelAlbedo.Height);
+            if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
+            {
+                GL.Enable((EnableCap)All.ConservativeRasterizationNv);
+            }
 
-            GL.Viewport(0, 0, viewportSize.X, viewportSize.Y);
+            GL.Viewport(0, 0, ResultVoxelAlbedo.Width, ResultVoxelAlbedo.Height);
             GL.ColorMask(false, false, false, false);
             GL.DepthMask(false);
             GL.Disable(EnableCap.DepthTest);
@@ -131,12 +140,12 @@ namespace IDKEngine.Render
             ResultVoxelAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelAlbedo.SizedInternalFormat);
             fragCounterTexture.BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, fragCounterTexture.SizedInternalFormat);
 
-            preVoxelizeProgram.Upload(0, new Vector2(1.0f) / viewportSize);
+            //debugTimerQuery.Begin();
+
             preVoxelizeProgram.Use();
             modelSystem.Draw();
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
 
-            voxelizeProgram.Upload(0, new Vector2(1.0f) / viewportSize);
             voxelizeProgram.Use();
             modelSystem.Draw();
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
@@ -145,6 +154,14 @@ namespace IDKEngine.Render
             GL.Enable(EnableCap.DepthTest);
             GL.ColorMask(true, true, true, true);
             GL.DepthMask(true);
+
+            if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
+            {
+                GL.Disable((EnableCap)All.ConservativeRasterizationNv);
+            }
+
+            //debugTimerQuery.End();
+            //Console.WriteLine("Generated mipmap " + debugTimerQuery.MeasuredMilliseconds);
         }
 
         private void Mipmap()
@@ -189,8 +206,7 @@ namespace IDKEngine.Render
             ResultVoxelAlbedo.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
             ResultVoxelAlbedo.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             ResultVoxelAlbedo.SetAnisotropy(4.0f);
-
-            ResultVoxelAlbedo.ImmutableAllocate(width, height, depth, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.Rgba8, Texture.GetMaxMipmapLevel(width, height, depth)); // Texture.GetMaxMipmapLevel(width, height, depth)
+            ResultVoxelAlbedo.ImmutableAllocate(width, height, depth, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.Rgba8, Texture.GetMaxMipmapLevel(width, height, depth));
 
             if (fragCounterTexture != null) fragCounterTexture.Dispose();
             fragCounterTexture = new Texture(TextureTarget3d.Texture3D);

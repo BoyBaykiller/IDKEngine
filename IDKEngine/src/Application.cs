@@ -62,7 +62,7 @@ namespace IDKEngine
                 ModelSystem.FrustumCull(GLSLBasicData.ProjView);
 
                 RasterizerPipeline.VariableRateShading(PostProcessor.Result, ForwardRenderer.VelocityTexture);
-                RasterizerPipeline.Render(ModelSystem, ForwardRenderer, Bloom);
+                RasterizerPipeline.Render(ModelSystem, ForwardRenderer);
 
                 if (IsBloom)
                     Bloom.Compute(ForwardRenderer.Result);
@@ -71,6 +71,18 @@ namespace IDKEngine
             }
             else if (GetRenderMode() == RenderMode.VXGI_WIP)
             {
+                if (IsShadows)
+                {
+                    pointShadowManager.UpdateShadowMaps(ModelSystem);
+                }
+
+                // Shadows cull command buffer. Make sure to restore default instance count for voxelization
+                int i = 0;
+                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                {
+                    cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
+                });
+
                 Voxelizer.Render(ModelSystem);
                 Voxelizer.DebugRender(PostProcessor.Result);
 
@@ -89,7 +101,8 @@ namespace IDKEngine
                 PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null, null, null);
             }
 
-            GL.Viewport(0, 0, PostProcessor.Result.Width, PostProcessor.Result.Height);
+            Framebuffer.Bind(0);
+
             MeshOutlineRenderer.Render(PostProcessor.Result);
 
             GL.Disable(EnableCap.DepthTest);
@@ -97,7 +110,6 @@ namespace IDKEngine
             GL.Enable(EnableCap.Blend);
 
             GL.Viewport(0, 0, WindowSize.X, WindowSize.Y);
-            Framebuffer.Bind(0);
 
             if (RenderGui)
             {
@@ -164,7 +176,7 @@ namespace IDKEngine
         public GLSLBasicData GLSLBasicData;
         public FrameStateRecorder<RecordableState> FrameRecorder;
 
-        public Renderer ForwardRenderer;
+        public ForwardRenderer ForwardRenderer;
         public Bloom Bloom;
         public PostProcessor PostProcessor;
         public LightManager LightManager;
@@ -347,16 +359,8 @@ namespace IDKEngine
 
         public void SetRenderMode(RenderMode renderMode)
         {
-            if (pointShadowManager != null) { pointShadowManager.Dispose(); pointShadowManager = null; }
             if (renderMode == RenderMode.Rasterizer)
             {
-                pointShadowManager = new PointShadowManager();
-                for (int j = 0; j < 3; j++)
-                {
-                    PointShadow pointShadow = new PointShadow(LightManager, j, 512, 0.5f, 60.0f);
-                    pointShadowManager.Add(pointShadow);
-                }
-
                 RasterizerPipeline = new RasterizerPipeline(ViewportResolution.X, ViewportResolution.Y);
             }
 
@@ -377,10 +381,17 @@ namespace IDKEngine
                 PathTracer = new PathTracer(BVH, ModelSystem, ViewportResolution.X, ViewportResolution.Y);
             }
 
+            if (pointShadowManager != null) { pointShadowManager.Dispose(); pointShadowManager = null; }
             if (ForwardRenderer != null) { ForwardRenderer.Dispose(); ForwardRenderer = null; }
             if (renderMode == RenderMode.Rasterizer || renderMode == RenderMode.VXGI_WIP)
             {
-                ForwardRenderer = new Renderer(LightManager, ViewportResolution.X, ViewportResolution.Y, 6);
+                pointShadowManager = new PointShadowManager();
+                for (int j = 0; j < 3; j++)
+                {
+                    PointShadow pointShadow = new PointShadow(LightManager, j, 512, 0.5f, 60.0f);
+                    pointShadowManager.Add(pointShadow);
+                }
+                ForwardRenderer = new ForwardRenderer(LightManager, ViewportResolution.X, ViewportResolution.Y, 6);
             }
 
             _renderMode = renderMode;
