@@ -10,7 +10,6 @@ namespace IDKEngine.Render
     {
         public static readonly bool HAS_VERTEX_LAYERED_RENDERING =
             (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
-            Helper.IsExtensionsAvailable("GL_ARB_viewport_array") ||
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
             Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
 
