@@ -34,27 +34,27 @@ namespace IDKEngine.Render
             }
         }
 
-        private int _debugSteps;
-        public int DebugSteps
+        private float _debugStepMultiplier;
+        public float DebugStepMultiplier
         {
-            get => _debugSteps;
+            get => _debugStepMultiplier;
 
             set
             {
-                _debugSteps = value;
-                visualizeDebugProgram.Upload(0, _debugSteps);
+                _debugStepMultiplier = value;
+                visualizeDebugProgram.Upload(0, _debugStepMultiplier);
             }
         }
 
-        private int _debugLod;
-        public int DebugLod
+        private float _debugConeAngle;
+        public float DebugConeAngle
         {
-            get => _debugLod;
+            get => _debugConeAngle;
 
             set
             {
-                _debugLod = value;
-                visualizeDebugProgram.Upload(1, _debugLod);
+                _debugConeAngle = value;
+                visualizeDebugProgram.Upload(1, _debugConeAngle);
             }
         }
 
@@ -72,7 +72,9 @@ namespace IDKEngine.Render
         private readonly ShaderProgram visualizeDebugProgram;
         private readonly BufferObject vxgiDataBuffer;
         private GLSLVXGIData glslVxgiData;
-        public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, int debugLod = 0, int debugSteps = 750)
+
+        private readonly Framebuffer fboNoAttachments;
+        public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.3f)
         {
             resetTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Clear/compute.glsl")));
 
@@ -94,11 +96,13 @@ namespace IDKEngine.Render
             vxgiDataBuffer.ImmutableAllocate(sizeof(GLSLVXGIData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             vxgiDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
 
+            fboNoAttachments = new Framebuffer();
+
             SetSize(width, height, depth);
             GridMin = gridMin;
             GridMax = gridMax;
-            DebugSteps = debugSteps;
-            DebugLod = debugLod;
+            DebugConeAngle = debugConeAngle;
+            DebugStepMultiplier = debugStepMultiplier;
         }
 
         public void Render(ModelSystem modelSystem)
@@ -117,7 +121,7 @@ namespace IDKEngine.Render
 
             resetTexturesProgram.Use();
             GL.DispatchCompute((fragCounterTexture.Width + 4 - 1) / 4, (fragCounterTexture.Height + 4 - 1) / 4, (fragCounterTexture.Depth + 4 - 1) / 4);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
 
             //debugTimerQuery.End();
             //Console.WriteLine("Rendered into voxel grid " + debugTimerQuery.MeasuredMilliseconds);
@@ -126,6 +130,8 @@ namespace IDKEngine.Render
         TimerQuery debugTimerQuery = new TimerQuery();
         private void Voxelize(ModelSystem modelSystem)
         {
+            fboNoAttachments.Bind();
+
             if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
             {
                 GL.Enable((EnableCap)All.ConservativeRasterizationNv);
@@ -204,14 +210,19 @@ namespace IDKEngine.Render
             if (ResultVoxelAlbedo != null) ResultVoxelAlbedo.Dispose();
             ResultVoxelAlbedo = new Texture(TextureTarget3d.Texture3D);
             ResultVoxelAlbedo.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
-            ResultVoxelAlbedo.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            ResultVoxelAlbedo.SetAnisotropy(4.0f);
+            ResultVoxelAlbedo.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            //ResultVoxelAlbedo.SetWrapMode(TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder);
+            //ResultVoxelAlbedo.SetBorderColor(new Vector4(0.0f, 0.0f, 0.0f, 1.0f));
+            //ResultVoxelAlbedo.SetAnisotropy(4.0f);
             ResultVoxelAlbedo.ImmutableAllocate(width, height, depth, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.Rgba8, Texture.GetMaxMipmapLevel(width, height, depth));
 
             if (fragCounterTexture != null) fragCounterTexture.Dispose();
             fragCounterTexture = new Texture(TextureTarget3d.Texture3D);
             fragCounterTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             fragCounterTexture.ImmutableAllocate(width, height, depth, SizedInternalFormat.R32ui);
+
+            fboNoAttachments.SetParamater(FramebufferDefaultParameter.FramebufferDefaultWidth, width);
+            fboNoAttachments.SetParamater(FramebufferDefaultParameter.FramebufferDefaultHeight, height);
         }
 
         public void Dispose()

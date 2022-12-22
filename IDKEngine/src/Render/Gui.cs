@@ -4,7 +4,6 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
-using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
@@ -183,27 +182,68 @@ namespace IDKEngine.Render
                 }
                 ImGui.Separator();
 
-
-                void GuiShadows()
-                {
-                    if (ImGui.CollapsingHeader("Shadows"))
-                    {
-                        ImGui.Checkbox("IsShadows", ref app.IsShadows);
-                        ImGui.SameLine();
-                        InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
-
-                        ImGui.Text("ARB_shader_viewport_layer_array or\n" +
-                            "ARB_viewport_array or\n" +
-                            "NV_viewport_array2 or\n" +
-                            $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
-                        ImGui.SameLine();
-                        InfoMark("This hardware feature allows the engine to genereate point shadows in only 1 draw call instead of 6.");
-                    }
-                }
-
                 if (app.GetRenderMode() == RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
+
+                    if (ImGui.CollapsingHeader("Voxel Global Illumination (WIP)"))
+                    {
+                        ImGui.Checkbox("IsDebugRender", ref app.IsDebugRenderVXGIGrid);
+
+                        string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
+                        current = app.RasterizerPipeline.Voxelizer.ResultVoxelAlbedo.Width.ToString();
+                        if (ImGui.BeginCombo("Resolution", current))
+                        {
+                            for (int i = 0; i < resolutions.Length; i++)
+                            {
+                                bool isSelected = current == resolutions[i];
+                                if (ImGui.Selectable(resolutions[i], isSelected))
+                                {
+                                    current = resolutions[i];
+                                    int size = Convert.ToInt32(current);
+                                    app.RasterizerPipeline.Voxelizer.SetSize(size, size, size);
+                                }
+
+                                if (isSelected)
+                                {
+                                    ImGui.SetItemDefaultFocus();
+                                }
+                            }
+                            ImGui.EndCombo();
+                        }
+                        ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision issues and a performance hit.");
+
+                        ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
+                        ImGui.SameLine();
+                        InfoMark(
+                            "This hardware feature allows the engine to accumulate floating-point values without having to pack them into an integer first. " +
+                            "It also fixed various numerical precision issues which otherwise occur on the 8-Bit channel fallback path"
+                        );
+
+                        ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
+                        ImGui.SameLine();
+                        InfoMark(
+                            "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
+                            "This fixes some cracks in the voxelization, potentially with a performance penalty"
+                        );
+                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
+                        ImGui.Checkbox("DoConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
+                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
+
+                        tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
+                        const float min = 0.05f;
+                        if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, min, 1.0f))
+                        {
+                            tempFloat = MathF.Max(tempFloat, min);
+                            app.RasterizerPipeline.Voxelizer.DebugStepMultiplier = tempFloat;
+                        }
+
+                        tempFloat = app.RasterizerPipeline.Voxelizer.DebugConeAngle;
+                        if (ImGui.SliderFloat("DebugConeAngle", ref tempFloat, 0, 0.5f))
+                        {
+                            app.RasterizerPipeline.Voxelizer.DebugConeAngle = tempFloat;
+                        }
+                    }
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
@@ -305,6 +345,35 @@ namespace IDKEngine.Render
                         }
                     }
 
+                    if (ImGui.CollapsingHeader("TAA"))
+                    {
+                        tempBool = app.PostProcessor.TaaEnabled;
+                        if (ImGui.Checkbox("IsTAA", ref tempBool))
+                        {
+                            app.PostProcessor.TaaEnabled = tempBool;
+                        }
+
+                        if (app.PostProcessor.TaaEnabled)
+                        {
+                            tempBool = app.PostProcessor.IsTaaArtifactMitigation;
+                            if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
+                            {
+                                app.PostProcessor.IsTaaArtifactMitigation = tempBool;
+                            }
+                            ImGui.SameLine();
+                            InfoMark(
+                                "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass. " +
+                                "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
+                            );
+
+                            int tempInt = app.PostProcessor.TaaSamples;
+                            if (ImGui.SliderInt("Samples   ", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
+                            {
+                                app.PostProcessor.TaaSamples = tempInt;
+                            }
+                        }
+                    }
+
                     if (ImGui.CollapsingHeader("SSAO"))
                     {
                         ImGui.Checkbox("IsSSAO", ref app.RasterizerPipeline.IsSSAO);
@@ -355,35 +424,18 @@ namespace IDKEngine.Render
                         }
                     }
 
-                    GuiShadows();
-
-                    if (ImGui.CollapsingHeader("TAA"))
+                    if (ImGui.CollapsingHeader("Shadows"))
                     {
-                        tempBool = app.PostProcessor.TaaEnabled;
-                        if (ImGui.Checkbox("IsTAA", ref tempBool))
-                        {
-                            app.PostProcessor.TaaEnabled = tempBool;
-                        }
+                        ImGui.Checkbox("IsShadows", ref app.IsShadows);
+                        ImGui.SameLine();
+                        InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
 
-                        if (app.PostProcessor.TaaEnabled)
-                        {
-                            tempBool = app.PostProcessor.IsTaaArtifactMitigation;
-                            if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
-                            {
-                                app.PostProcessor.IsTaaArtifactMitigation = tempBool;
-                            }
-                            ImGui.SameLine();
-                            InfoMark(
-                                "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass. " +
-                                "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
-                            );
-
-                            int tempInt = app.PostProcessor.TaaSamples;
-                            if (ImGui.SliderInt("Samples   ", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
-                            {
-                                app.PostProcessor.TaaSamples = tempInt;
-                            }
-                        }
+                        ImGui.Text("ARB_shader_viewport_layer_array or\n" +
+                            "ARB_viewport_array or\n" +
+                            "NV_viewport_array2 or\n" +
+                            $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
+                        ImGui.SameLine();
+                        InfoMark("This hardware feature allows the engine to genereate point shadows in only 1 draw call instead of 6.");
                     }
                 }
                 else if (app.GetRenderMode() == RenderMode.PathTracer)
@@ -434,65 +486,6 @@ namespace IDKEngine.Render
                             }
                         }
                     }
-                }
-                else if (app.GetRenderMode() == RenderMode.VXGI_WIP)
-                {
-                    if (ImGui.CollapsingHeader("Voxelization"))
-                    {
-                        string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                        current = app.Voxelizer.ResultVoxelAlbedo.Width.ToString();
-                        if (ImGui.BeginCombo("Resolution", current))
-                        {
-                            for (int i = 0; i < resolutions.Length; i++)
-                            {
-                                bool isSelected = current == resolutions[i];
-                                if (ImGui.Selectable(resolutions[i], isSelected))
-                                {
-                                    current = resolutions[i];
-                                    int size = Convert.ToInt32(current);
-                                    app.Voxelizer.SetSize(size, size, size);
-                                }
-
-                                if (isSelected)
-                                {
-                                    ImGui.SetItemDefaultFocus();
-                                }
-                            }
-                            ImGui.EndCombo();
-                        }
-                        ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision issues and a performance hit.");
-
-                        ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
-                        ImGui.SameLine();
-                        InfoMark(
-                            "This hardware feature allows the engine to accumulate floating-point values without having to pack them into an integer first. " +
-                            "It also fixed various numerical precision issues which otherwise occur on the 8-Bit channel fallback path"
-                        );
-
-                        ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
-                        ImGui.SameLine();
-                        InfoMark(
-                            "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
-                            "This fixes some cracks in the voxelization, potentially with a performance penalty"
-                        );
-                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
-                        ImGui.Checkbox("DoConservativeRasterization", ref app.Voxelizer.IsConservativeRasterization);
-                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
-
-                        int tempInt = app.Voxelizer.DebugLod;
-                        if (ImGui.SliderInt("DebugLod", ref tempInt, 0, Texture.GetMaxMipmapLevel(app.Voxelizer.ResultVoxelAlbedo.Width, app.Voxelizer.ResultVoxelAlbedo.Height, app.Voxelizer.ResultVoxelAlbedo.Depth) - 1))
-                        {
-                            app.Voxelizer.DebugLod = tempInt;
-                        }
-
-                        tempInt = app.Voxelizer.DebugSteps;
-                        if (ImGui.SliderInt("DebugSteps", ref tempInt, 0, 1500))
-                        {
-                            app.Voxelizer.DebugSteps = tempInt;
-                        }
-                    }
-
-                    GuiShadows();
                 }
 
                 if (ImGui.CollapsingHeader("Bloom"))
@@ -920,5 +913,4 @@ namespace IDKEngine.Render
             ImGuiBackend.Dispose();
         }
     }
-
 }

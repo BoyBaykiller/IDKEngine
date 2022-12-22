@@ -20,6 +20,7 @@ in InOutVars
     vec2 TexCoord;
     vec3 Normal;
     flat uint MaterialIndex;
+    flat float EmissiveBias;
 } inData[];
 
 out InOutVars
@@ -28,8 +29,8 @@ out InOutVars
     vec2 TexCoord;
     vec3 Normal;
     flat uint MaterialIndex;
+    flat float EmissiveBias;
 } outData;
-
 
 void main()
 {
@@ -53,7 +54,7 @@ void main()
         outNormDeviceCoords[i] = ndc;
     }
 
-    // Expand Triangle
+    // Dilate Triangle
     // Source: https://wickedengine.net/2017/08/30/voxel-based-global-illumination/
     vec2 viewportPixelSize = 1.0 / imageSize(ImgFragCounter).xy;
     vec2 side0N = normalize(outNormDeviceCoords[1].xy - outNormDeviceCoords[0].xy);
@@ -70,6 +71,7 @@ void main()
         outData.TexCoord = inData[i].TexCoord;
         outData.Normal = inData[i].Normal;
         outData.MaterialIndex = inData[i].MaterialIndex;
+        outData.EmissiveBias = inData[i].EmissiveBias;
     
         gl_Position = vec4(outNormDeviceCoords[i], 1.0);
 
