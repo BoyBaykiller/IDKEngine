@@ -50,6 +50,7 @@ out InOutVars
     vec2 TexCoord;
     vec3 Normal;
     flat uint MaterialIndex;
+    flat float EmissiveBias;
 } outData;
 
 vec3 DecompressSNorm32Fast(uint data);
@@ -63,6 +64,7 @@ void main()
 
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     outData.MaterialIndex = mesh.MaterialIndex;
+    outData.EmissiveBias = mesh.EmissiveBias;
 
     gl_Position = model * vec4(Position, 1.0);
 }

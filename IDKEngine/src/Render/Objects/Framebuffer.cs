@@ -58,6 +58,11 @@ namespace IDKEngine.Render.Objects
             GL.NamedFramebufferReadBuffer(ID, readBufferMode);
         }
 
+        public void SetParamater(FramebufferDefaultParameter framebufferDefaultParameter, int param)
+        {
+            GL.NamedFramebufferParameter(ID, framebufferDefaultParameter, param);
+        }
+
         public void Bind(FramebufferTarget framebufferTarget = FramebufferTarget.Framebuffer)
         {
             GL.BindFramebuffer(framebufferTarget, ID);

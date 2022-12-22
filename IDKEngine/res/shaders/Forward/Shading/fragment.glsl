@@ -127,25 +127,25 @@ void main()
 
     ViewDir = normalize(inData.FragPos - basicDataUBO.ViewPos);
 
-    vec3 irradiance = vec3(0.0);
+    vec3 directLighting = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
     {
         PointShadow pointShadow = shadowDataUBO.PointShadows[i];
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        irradiance += GetBlinnPhongLighting(light, sampleToLight) * Visibility(pointShadow, -sampleToLight);
+        directLighting += GetBlinnPhongLighting(light, sampleToLight) * Visibility(pointShadow, -sampleToLight);
     }
 
     for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        irradiance += GetBlinnPhongLighting(light, sampleToLight);
+        directLighting += GetBlinnPhongLighting(light, sampleToLight);
     }
 
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * Albedo.rgb;
     const float ambient = 0.03;
-    FragColor = vec4(irradiance + emissive + Albedo.rgb * ambient * (1.0 - AO), 1.0);
+    FragColor = vec4((directLighting + emissive + Albedo.rgb * ambient) * (1.0 - AO), 1.0);
     NormalSpecColor = vec4(Normal, Specular);
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;

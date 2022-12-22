@@ -1,4 +1,5 @@
 #version 460 core
+#define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define PI 3.14159265
 #define EPSILON 0.001
 #extension GL_ARB_bindless_texture : require
@@ -79,9 +80,10 @@ in InOutVars
     centroid vec2 TexCoord;
     centroid vec3 Normal;
     flat uint MaterialIndex;
+    flat float EmissiveBias;
 } inData;
 
-vec3 GetDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight);
+vec3 GetdirectLightingLighting(Light light, vec3 albedo, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 lightToSample);
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos);
 
@@ -91,46 +93,50 @@ void main()
 
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     vec4 albedo = texture(material.Albedo, inData.TexCoord);
+    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedo.rgb;
 
     uint fragCounter = imageLoad(ImgFragCounter, voxelPos).x;
     float avgMultiplier = 1.0 / float(fragCounter);
 
-    vec3 diffuse = vec3(0.0);
+    vec3 outRadiance = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
     {
         PointShadow pointShadow = shadowDataUBO.PointShadows[i];
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        diffuse += GetDiffuseLighting(light, albedo.rgb, sampleToLight) * Visibility(pointShadow, -sampleToLight);
+        outRadiance += GetdirectLightingLighting(light, albedo.rgb, sampleToLight) * Visibility(pointShadow, -sampleToLight);
     }
 
     for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        diffuse += GetDiffuseLighting(light, albedo.rgb, sampleToLight);
+        outRadiance += GetdirectLightingLighting(light, albedo.rgb, sampleToLight);
     }
+    const float ambient = 0.03;
+    outRadiance += albedo.rgb * ambient;
+    outRadiance += emissive;
 
 #ifdef GL_NV_shader_atomic_fp16_vector
 
-    vec4 normalizedAlbedo = vec4(diffuse, albedo.a) * avgMultiplier;
+    vec4 normalizedAlbedo = vec4(outRadiance, albedo.a) * avgMultiplier;
     imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
     // imageAtomicMax(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
 
 #else
 
-    diffuse = clamp(diffuse, 0.0, 1.0); // prevent some overflow because of limited precision
-    vec4 normalizedAlbedo = vec4(diffuse, albedo.a) * avgMultiplier;
+    outRadiance = clamp(outRadiance, 0.0, 1.0); // prevent some overflow because of limited precision
+    vec4 normalizedAlbedo = vec4(outRadiance, albedo.a);
     uvec4 quantizedAlbedoRgba = uvec4(normalizedAlbedo * 255.0);
     uint packedAlbedo = (quantizedAlbedoRgba.a << 24) | (quantizedAlbedoRgba.b << 16) | (quantizedAlbedoRgba.g << 8) | (quantizedAlbedoRgba.r << 0);
-    imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
-    // imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
+    // imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
+    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
 
 #endif
 
 }
 
-vec3 GetDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight)
+vec3 GetdirectLightingLighting(Light light, vec3 albedo, vec3 sampleToLight)
 {
     float sampleToLightLength = length(sampleToLight);
 
@@ -139,8 +145,6 @@ vec3 GetDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight)
     if (cosTerm > 0.0)
     {
         vec3 diffuse = light.Color * cosTerm * albedo;
-        
-        // hack: dont do "4.0 * PI" because causes precision issues on the Rgba8 fallback path -_-
         vec3 attenuation = light.Color / (PI * sampleToLightLength * sampleToLightLength);
 
         return diffuse * attenuation;

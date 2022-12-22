@@ -14,7 +14,6 @@ namespace IDKEngine
     public enum RenderMode
     {
         Rasterizer,
-        VXGI_WIP,
         PathTracer
     }
 
@@ -29,7 +28,7 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsBloom = true, IsShadows = true;
+        public bool IsBloom = true, IsShadows = true, IsDebugRenderVXGIGrid;
         public int FPS;
 
         public Vector2i ViewportResolution { get; private set; }
@@ -59,37 +58,33 @@ namespace IDKEngine
                     pointShadowManager.UpdateShadowMaps(ModelSystem);
                     GL.ColorMask(true, true, true, true);
                 }
-                ModelSystem.FrustumCull(GLSLBasicData.ProjView);
 
-                RasterizerPipeline.VariableRateShading(PostProcessor.Result, ForwardRenderer.VelocityTexture);
-                RasterizerPipeline.Render(ModelSystem, ForwardRenderer);
-
-                if (IsBloom)
-                    Bloom.Compute(ForwardRenderer.Result);
-
-                PostProcessor.Compute(ForwardRenderer.Result, IsBloom ? Bloom.Result : null, RasterizerPipeline.IsVolumetricLighting ? RasterizerPipeline.VolumetricLight.Result : null, RasterizerPipeline.IsSSR ? RasterizerPipeline.SSR.Result : null, ForwardRenderer.VelocityTexture, ForwardRenderer.DepthTexture);
-            }
-            else if (GetRenderMode() == RenderMode.VXGI_WIP)
-            {
-                if (IsShadows)
+                if (IsDebugRenderVXGIGrid)
                 {
-                    pointShadowManager.UpdateShadowMaps(ModelSystem);
+                    // Shadows cull command buffer. Make sure to restore default instance count for voxelization
+                    int i = 0;
+                    ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                    {
+                        cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
+                    });
+
+                    RasterizerPipeline.Voxelize(ModelSystem);
+                    RasterizerPipeline.Voxelizer.DebugRender(RasterizerPipeline.Result);
+                    PostProcessor.Compute(RasterizerPipeline.Result, null, null, null, null, null);
+                }
+                else
+                {
+                    ModelSystem.FrustumCull(GLSLBasicData.ProjView);
+
+                    RasterizerPipeline.Render(ModelSystem, ForwardRenderer);
+
+                    if (IsBloom)
+                        Bloom.Compute(RasterizerPipeline.Result);
+
+                    PostProcessor.Compute(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, RasterizerPipeline.IsVolumetricLighting ? RasterizerPipeline.VolumetricLight.Result : null, RasterizerPipeline.IsSSR ? RasterizerPipeline.SSR.Result : null, RasterizerPipeline.VelocityTexture, RasterizerPipeline.DepthTexture);
+                    RasterizerPipeline.ComputeShadingRateImage(PostProcessor.Result);
                 }
 
-                // Shadows cull command buffer. Make sure to restore default instance count for voxelization
-                int i = 0;
-                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
-                {
-                    cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
-                });
-
-                Voxelizer.Render(ModelSystem);
-                Voxelizer.DebugRender(PostProcessor.Result);
-
-                if (IsBloom)
-                    Bloom.Compute(PostProcessor.Result);
-
-                PostProcessor.Compute(PostProcessor.Result, IsBloom ? Bloom.Result : null, null, null, null, null);
             }
             else if (GetRenderMode() == RenderMode.PathTracer)
             {
@@ -176,14 +171,13 @@ namespace IDKEngine
         public GLSLBasicData GLSLBasicData;
         public FrameStateRecorder<RecordableState> FrameRecorder;
 
-        public ForwardRenderer ForwardRenderer;
         public Bloom Bloom;
         public PostProcessor PostProcessor;
         public LightManager LightManager;
+        public ForwardRenderer ForwardRenderer;
         public MeshOutlineRenderer MeshOutlineRenderer;
 
-        public RasterizerPipeline RasterizerPipeline;
-        public Voxelizer Voxelizer;
+        public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
         protected override unsafe void OnStart()
         {
@@ -238,12 +232,12 @@ namespace IDKEngine
 
             SkyBoxManager.Init(new string[]
             {
-                "res/Textures/EnvironmentMap/posx.jpg",
-                "res/Textures/EnvironmentMap/negx.jpg",
-                "res/Textures/EnvironmentMap/posy.jpg",
-                "res/Textures/EnvironmentMap/negy.jpg",
-                "res/Textures/EnvironmentMap/posz.jpg",
-                "res/Textures/EnvironmentMap/negz.jpg"
+                "res/textures/environmentMap/posx.jpg",
+                "res/textures/environmentMap/negx.jpg",
+                "res/textures/environmentMap/posy.jpg",
+                "res/textures/environmentMap/negy.jpg",
+                "res/textures/environmentMap/posz.jpg",
+                "res/textures/environmentMap/negz.jpg"
             });
 
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
@@ -289,6 +283,7 @@ namespace IDKEngine
             lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             LightManager.Add(CollectionsMarshal.AsSpan(lights));
 
+            ForwardRenderer = new ForwardRenderer(LightManager, 6);
             SetRenderMode(RenderMode.Rasterizer);
 
             FrameRecorder = new FrameStateRecorder<RecordableState>();
@@ -328,12 +323,7 @@ namespace IDKEngine
                 PathTracer.SetSize(width, height);
             }
 
-            if (GetRenderMode() == RenderMode.Rasterizer || GetRenderMode() == RenderMode.VXGI_WIP)
-            {
-                ForwardRenderer.SetSize(width, height);
-            }
-
-            if (GetRenderMode() == RenderMode.Rasterizer || GetRenderMode() == RenderMode.VXGI_WIP || GetRenderMode() == RenderMode.PathTracer)
+            if (GetRenderMode() == RenderMode.Rasterizer || GetRenderMode() == RenderMode.PathTracer)
             {
                 Bloom.SetSize(width, height);
                 PostProcessor.SetSize(width, height);
@@ -361,18 +351,7 @@ namespace IDKEngine
         {
             if (renderMode == RenderMode.Rasterizer)
             {
-                RasterizerPipeline = new RasterizerPipeline(ViewportResolution.X, ViewportResolution.Y);
-            }
-
-            if (Voxelizer != null) { Voxelizer.Dispose(); Voxelizer = null; }
-            if (renderMode == RenderMode.VXGI_WIP)
-            {
-                int i = 0;
-                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
-                {
-                    cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
-                });
-                Voxelizer = new Voxelizer(384, 384, 384, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
+                RasterizerPipeline = new RasterPipeline(ViewportResolution.X, ViewportResolution.Y);
             }
 
             if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
@@ -382,8 +361,7 @@ namespace IDKEngine
             }
 
             if (pointShadowManager != null) { pointShadowManager.Dispose(); pointShadowManager = null; }
-            if (ForwardRenderer != null) { ForwardRenderer.Dispose(); ForwardRenderer = null; }
-            if (renderMode == RenderMode.Rasterizer || renderMode == RenderMode.VXGI_WIP)
+            if (renderMode == RenderMode.Rasterizer)
             {
                 pointShadowManager = new PointShadowManager();
                 for (int j = 0; j < 3; j++)
@@ -391,7 +369,6 @@ namespace IDKEngine
                     PointShadow pointShadow = new PointShadow(LightManager, j, 512, 0.5f, 60.0f);
                     pointShadowManager.Add(pointShadow);
                 }
-                ForwardRenderer = new ForwardRenderer(LightManager, ViewportResolution.X, ViewportResolution.Y, 6);
             }
 
             _renderMode = renderMode;

@@ -39,11 +39,12 @@ layout(std140, binding = 5) uniform VXGIDataUBO
     float _pad1;
 } vxgiDataUBO;
 
+vec4 TraceCone(vec3 uvtStart, vec3 direction, float coneAngle, float stepMultiplier);
 bool RayCuboidIntersect(Ray ray, vec3 min, vec3 max, out float t1, out float t2);
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 
-layout(location = 0) uniform int Steps;
-layout(location = 1) uniform int Lod;
+layout(location = 0) uniform float StepMultiplier;
+layout(location = 1) uniform float ConeAngle;
 
 void main()
 {
@@ -70,19 +71,51 @@ void main()
         gridRayStart = worldRay.Origin + worldRay.Direction * t1;
     gridRayEnd = (worldRay.Origin + worldRay.Direction * t2);
 
-    vec3 uvtStart = (vxgiDataUBO.OrthoProjection * vec4(gridRayStart, 1.0)).xyz * 0.5 + 0.5;
-    vec3 uvtEnd = (vxgiDataUBO.OrthoProjection * vec4(gridRayEnd, 1.0)).xyz * 0.5 + 0.5;
-    vec3 deltaStep = (uvtEnd - uvtStart) / Steps;
-    vec3 currentPos = uvtStart;
-    vec4 color = vec4(0.0);
-    for (int i = 0; i < Steps; i++)
-    {
-        vec4 currSample = texelFetch(SamplerVoxels, ivec3(round(currentPos * textureSize(SamplerVoxels, Lod))), Lod);
-        color += (1.0 - color.a) * currSample;
-        currentPos += deltaStep;
-    }
+    // vec3 uvtStart = (vxgiDataUBO.OrthoProjection * vec4(gridRayStart, 1.0)).xyz * 0.5 + 0.5;
+    // vec3 uvtEnd = (vxgiDataUBO.OrthoProjection * vec4(gridRayEnd, 1.0)).xyz * 0.5 + 0.5;
+    // const int steps = 750;
+    // vec3 deltaStep = (uvtEnd - uvtStart) / steps;
+    // vec3 currentPos = uvtStart;
+    // vec4 color = vec4(0.0);
+    // for (int i = 0; i < steps; i++)
+    // {
+    //     vec4 currSample = texelFetch(SamplerVoxels, ivec3(round(currentPos * textureSize(SamplerVoxels, 0))), 0);
+    //     color += (1.0 - color.a) * currSample;
+    //     currentPos += deltaStep;
+    // }
+
+    vec3 dirThroughGrid = normalize(gridRayEnd - gridRayStart);
+    vec4 color = TraceCone(gridRayStart, dirThroughGrid, ConeAngle, StepMultiplier);
 
     imageStore(ImgResult, imgCoord, color);
+}
+
+vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier)
+{
+    vec3 worldGridDimensions = vxgiDataUBO.GridMax - vxgiDataUBO.GridMin;
+    vec3 voxelTexelSize = worldGridDimensions / textureSize(SamplerVoxels, 0);
+    float voxelMaxLength = min(voxelTexelSize.x, min(voxelTexelSize.y, voxelTexelSize.z));
+	vec4 accumlatedColor = vec4(0.0);
+
+    float distFromStart = voxelMaxLength; // start with one voxel offset to avoid self collision
+    vec3 worldPos = start + direction * distFromStart;
+    while (accumlatedColor.a < 1.0 && all(lessThan(worldPos, vxgiDataUBO.GridMax)) && all(greaterThan(worldPos, vxgiDataUBO.GridMin)))
+    {
+        float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
+        float sampleDiameter = max(voxelMaxLength, coneDiameter);
+		float sampleLod = log2(sampleDiameter / voxelMaxLength);
+		sampleLod = min(sampleLod, textureQueryLevels(SamplerVoxels) - 1);
+        
+		worldPos = start + direction * distFromStart;
+        vec3 sampleUVT = (vxgiDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz * 0.5 + 0.5;
+		vec4 sampleColor = texture(SamplerVoxels, sampleUVT, sampleLod);
+
+		accumlatedColor += (1.0 - accumlatedColor.a) * sampleColor;
+
+        distFromStart += sampleDiameter * stepMultiplier;
+    }
+
+    return accumlatedColor;
 }
 
 // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
