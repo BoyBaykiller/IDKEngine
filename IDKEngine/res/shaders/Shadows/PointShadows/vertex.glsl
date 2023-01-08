@@ -32,7 +32,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -64,12 +64,11 @@ void main()
 {
 #if HAS_VERTEX_LAYERED_RENDERING
 
-    // visibleCubemapFacesInfo is a specific manipulated value from the culling shadowCompute shader
+    // CubemapShadowCullInfo is a specific manipulated value from the culling compute shader
     // It contains 3 bit values, six at maximum, which represent the faces each instance of a mesh is visible on
-    int visibleCubemapFacesInfo = meshSSBO.Meshes[gl_DrawID].VisibleCubemapFacesInfo;
+    uint cubemapShadowCullInfo = meshSSBO.Meshes[gl_DrawID].CubemapShadowCullInfo;
 
-    const int MAX = 2 * 2 * 2 - 1;
-    gl_Layer = bitfieldExtract(visibleCubemapFacesInfo, 3 * gl_InstanceID, 3) & MAX;
+    gl_Layer = int(bitfieldExtract(cubemapShadowCullInfo, 3 * gl_InstanceID, 3));
     
     const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
     mat4 model = matrixSSBO.Models[gl_BaseInstance + glInstanceID];

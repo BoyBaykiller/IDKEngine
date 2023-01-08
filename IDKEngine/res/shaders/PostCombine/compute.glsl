@@ -41,12 +41,15 @@ void main()
     color = LinearToInverseGamma(color, Gamma);
 
     if (IsDithering)
-        color += ((BayerMatrix8[int(imgCoord.x) % BayerMatrix8.length()][int(imgCoord.y) % BayerMatrix8.length()]) - 0.5) * 0.015625;
+    {
+        int x = int(imgCoord.x) % BayerMatrix8.length();
+        int y = int(imgCoord.y) % BayerMatrix8.length();
+        color += (BayerMatrix8[x][y] - 0.5) * 0.015625;
+    }
 
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 
-// Source: https://blog.demofox.org/2020/06/06/casual-shadertoy-path-tracing-2-image-improvement-and-glossy-reflections/
 vec3 LinearToInverseGamma(vec3 rgb, float gamma)
 {
     return pow(rgb, vec3(1.0 / gamma));

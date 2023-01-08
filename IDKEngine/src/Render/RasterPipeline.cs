@@ -71,7 +71,6 @@ namespace IDKEngine.Render
         public void Voxelize(ModelSystem modelSystem)
         {
             Voxelizer.Render(modelSystem);
-            //Voxelizer.DebugRender(PostProcessor.Result);
         }
 
         public void Render(ModelSystem modelSystem, ForwardRenderer renderer)
@@ -92,7 +91,7 @@ namespace IDKEngine.Render
                 ShadingRateClassifier.IsEnabled = true;
             }
             SSAO.Result.BindToUnit(0);
-            Voxelizer.ResultVoxelAlbedo.BindToUnit(1);
+            Voxelizer.ResultVoxelsAlbedo.BindToUnit(1);
 
             renderer.Draw(modelSystem, depthOnlyProgram, shadingProgram, skyBoxProgram, IsSSAO ? SSAO.Result : null);
             ShadingRateClassifier.IsEnabled = false;

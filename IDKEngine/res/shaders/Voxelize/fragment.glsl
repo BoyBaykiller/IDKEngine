@@ -14,8 +14,6 @@ layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxelsAlbedo;
 layout(binding = 0, r32ui) restrict uniform uimage3D ImgVoxelsAlbedo;
 #endif
 
-layout(binding = 1, r32ui) restrict uniform uimage3D ImgFragCounter;
-
 struct Material
 {
     sampler2D Albedo;
@@ -95,9 +93,6 @@ void main()
     vec4 albedo = texture(material.Albedo, inData.TexCoord);
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedo.rgb;
 
-    uint fragCounter = imageLoad(ImgFragCounter, voxelPos).x;
-    float avgMultiplier = 1.0 / float(fragCounter);
-
     vec3 outRadiance = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
     {
@@ -119,9 +114,8 @@ void main()
 
 #ifdef GL_NV_shader_atomic_fp16_vector
 
-    vec4 normalizedAlbedo = vec4(outRadiance, albedo.a) * avgMultiplier;
-    imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
-    // imageAtomicMax(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
+    vec4 normalizedAlbedo = vec4(outRadiance, albedo.a);
+    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
 
 #else
 
@@ -129,7 +123,6 @@ void main()
     vec4 normalizedAlbedo = vec4(outRadiance, albedo.a);
     uvec4 quantizedAlbedoRgba = uvec4(normalizedAlbedo * 255.0);
     uint packedAlbedo = (quantizedAlbedoRgba.a << 24) | (quantizedAlbedoRgba.b << 16) | (quantizedAlbedoRgba.g << 8) | (quantizedAlbedoRgba.r << 0);
-    // imageAtomicAdd(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
     imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
 
 #endif
@@ -145,7 +138,7 @@ vec3 GetdirectLightingLighting(Light light, vec3 albedo, vec3 sampleToLight)
     if (cosTerm > 0.0)
     {
         vec3 diffuse = light.Color * cosTerm * albedo;
-        vec3 attenuation = light.Color / (PI * sampleToLightLength * sampleToLightLength);
+        vec3 attenuation = light.Color / (4.0 * PI * sampleToLightLength * sampleToLightLength);
 
         return diffuse * attenuation;
     }

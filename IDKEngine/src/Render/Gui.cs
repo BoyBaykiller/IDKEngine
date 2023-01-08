@@ -191,7 +191,7 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsDebugRender", ref app.IsDebugRenderVXGIGrid);
 
                         string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                        current = app.RasterizerPipeline.Voxelizer.ResultVoxelAlbedo.Width.ToString();
+                        current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
                         if (ImGui.BeginCombo("Resolution", current))
                         {
                             for (int i = 0; i < resolutions.Length; i++)
@@ -431,7 +431,6 @@ namespace IDKEngine.Render
                         InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
 
                         ImGui.Text("ARB_shader_viewport_layer_array or\n" +
-                            "ARB_viewport_array or\n" +
                             "NV_viewport_array2 or\n" +
                             $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
                         ImGui.SameLine();
@@ -475,14 +474,14 @@ namespace IDKEngine.Render
                             if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                             {
                                 shouldResetPT = true;
-                                app.PathTracer.FocalLength = MathF.Max(floatTemp, 0);
+                                app.PathTracer.FocalLength = floatTemp;
                             }
 
-                            floatTemp = app.PathTracer.ApertureDiameter;
-                            if (ImGui.InputFloat("ApertureDiameter", ref floatTemp, 0.002f))
+                            floatTemp = app.PathTracer.LenseRadius;
+                            if (ImGui.InputFloat("LenseRadius", ref floatTemp, 0.002f))
                             {
                                 shouldResetPT = true;
-                                app.PathTracer.ApertureDiameter = MathF.Max(floatTemp, 0);
+                                app.PathTracer.LenseRadius = floatTemp;
                             }
                         }
                     }

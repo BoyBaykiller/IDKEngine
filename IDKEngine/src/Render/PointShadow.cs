@@ -13,13 +13,6 @@ namespace IDKEngine.Render
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
             Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
 
-        private static readonly ShaderProgram renderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
-
-        private static readonly ShaderProgram cullingProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/shadowCompute.glsl")));
-
         private Vector3 _position;
         public unsafe Vector3 Position
         {
@@ -37,7 +30,6 @@ namespace IDKEngine.Render
                 glslPointShadow.NegZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
             }
         }
-
 
         public Texture Result;
         private readonly Framebuffer framebuffer;
@@ -80,7 +72,7 @@ namespace IDKEngine.Render
             LightContext = lightContext;
         }
 
-        public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex)
+        public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex, ShaderProgram renderProgram, ShaderProgram cullingProgram)
         {
             if (HAS_VERTEX_LAYERED_RENDERING)
             {

@@ -49,7 +49,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 struct Vertex
@@ -298,7 +298,8 @@ bool TraceRay(inout TransportRay transportRay)
             roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
             normal = texture(material.Normal, texCoord).rgb;
             normal = TBN * normalize(normal * 2.0 - 1.0);
-            normal = normalize(mix(mat3(transpose(inverse(model))) * geoNormal, normal, mesh.NormalMapStrength));
+            mat3 localToWorld = mat3(transpose(inverse(model)));
+            normal = normalize(mix(normalize(localToWorld * geoNormal), normal, mesh.NormalMapStrength));
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;
         }

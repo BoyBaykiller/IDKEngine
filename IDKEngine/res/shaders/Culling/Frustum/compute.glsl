@@ -35,7 +35,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 layout(std430, binding = 0) restrict buffer DrawCommandsSSBO

@@ -1,5 +1,6 @@
 #version 460 core
 #define EPSILON 0.001
+#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -24,6 +25,11 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
     float Time;
 } basicDataUBO;
+
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
 
 vec3 SSR(vec3 normal, vec3 fragPos);
 void CustomBinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample);
@@ -67,7 +73,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
         samplePoint += deltaStep;
 
         vec3 projectedSample = ViewToNDC(samplePoint) * 0.5 + 0.5;
-        if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))))
+        if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))) || projectedSample.z > 1.0)
         {
             // TODO: Parallax corrected cubemap reflections as fallback? 
             return vec3(0.0);
@@ -79,9 +85,11 @@ vec3 SSR(vec3 normal, vec3 fragPos)
             CustomBinarySearch(samplePoint, deltaStep, projectedSample);
             return texture(SamplerSrc, projectedSample.xy).rgb; 
         }
+
     }
 
-    return vec3(0.0);
+    vec3 worldSpaceReflectDir = (basicDataUBO.InvView * vec4(reflectDir, 0.0)).xyz;
+    return texture(skyBoxUBO.Albedo, worldSpaceReflectDir).rgb;
 }
 
 void CustomBinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)

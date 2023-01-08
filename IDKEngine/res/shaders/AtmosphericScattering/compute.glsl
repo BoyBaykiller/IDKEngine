@@ -22,10 +22,8 @@ uniform mat4 InvProjection;
 
 void main()
 {
-    ivec2 imgResultSize = imageSize(ImgResult);
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
-    
-    vec2 ndc = vec2(imgCoord.xy) / imgResultSize * 2.0 - 1.0;
+    vec2 ndc = vec2(imgCoord.xy) / imageSize(ImgResult) * 2.0 - 1.0;
     
     vec3 toCubemap = GetWorldSpaceRay(InvProjection, InvViews[imgCoord.z], ndc);
 

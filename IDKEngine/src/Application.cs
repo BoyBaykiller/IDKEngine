@@ -61,14 +61,14 @@ namespace IDKEngine
 
                 if (IsDebugRenderVXGIGrid)
                 {
-                    // Shadows cull command buffer. Make sure to restore default instance count for voxelization
+                    // Shadows cull the command buffer. Make sure to restore default instance count for voxelization
                     int i = 0;
                     ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
                     {
                         cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
                     });
-
                     RasterizerPipeline.Voxelize(ModelSystem);
+
                     RasterizerPipeline.Voxelizer.DebugRender(RasterizerPipeline.Result);
                     PostProcessor.Compute(RasterizerPipeline.Result, null, null, null, null, null);
                 }
@@ -202,6 +202,10 @@ namespace IDKEngine
             ViewportResolution = WindowSize;
             MouseState.CursorMode = CursorModeValue.CursorNormal;
 
+#if DEBUG
+            GL.Enable(EnableCap.DebugOutputSynchronous);
+            GL.DebugMessageCallback(Helper.DebugCallback, 0);
+#endif
             GL.PointSize(1.3f);
             GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
@@ -210,10 +214,6 @@ namespace IDKEngine
             GL.Enable(EnableCap.Blend);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
-#if DEBUG
-            GL.Enable(EnableCap.DebugOutputSynchronous);
-            GL.DebugMessageCallback(Helper.DebugCallback, 0);
-#endif
 
             GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), ViewportResolution.X / (float)ViewportResolution.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
@@ -244,7 +244,6 @@ namespace IDKEngine
             for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
                 sponza.ModelMatrices[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
 
-
             // fix transparency
             sponza.Meshes[0].RoughnessBias = -1.0f;
             sponza.Meshes[19].RoughnessBias = -1.0f;
@@ -268,7 +267,7 @@ namespace IDKEngine
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });
-
+            
             BVH = new BVH(ModelSystem);
 
             LightManager  = new LightManager(12, 12);

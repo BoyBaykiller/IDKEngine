@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Diagnostics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
@@ -26,6 +27,8 @@ namespace IDKEngine.Render
 
         private readonly BufferObject pointShadowsBuffer;
         private readonly PointShadow[] pointShadows;
+        private readonly ShaderProgram renderProgram;
+        private readonly ShaderProgram cullingProgram;
         public unsafe PointShadowManager()
         {
             pointShadowsBuffer = new BufferObject();
@@ -33,6 +36,13 @@ namespace IDKEngine.Render
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
             pointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+           
+            renderProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
+
+            cullingProgram = new ShaderProgram(
+                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/shadowCompute.glsl")));
         }
 
         public void Add(PointShadow pointShadow)
@@ -57,7 +67,7 @@ namespace IDKEngine.Render
                     UploadPointShadow(i);
                 }
 
-                pointShadow.Render(modelSystem, i);
+                pointShadow.Render(modelSystem, i, renderProgram, cullingProgram);
             }
         }
 
@@ -73,6 +83,9 @@ namespace IDKEngine.Render
             {
                 pointShadows[i].Dispose();
             }
+
+            renderProgram.Dispose();
+            cullingProgram.Dispose();
         }
     }
 }

@@ -81,9 +81,9 @@ void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocit
     float minDepth = 1.0;
     neighborhoodMin = vec3(FLOAT_MAX);
     neighborhoodMax = vec3(FLOAT_MIN);
-    for (int x = -1; x <= 1; x++)
+    for (int y = -1; y <= 1; y++)
     {
-        for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++)
         {
             ivec2 curPixel = imgCoord + ivec2(x, y);
     

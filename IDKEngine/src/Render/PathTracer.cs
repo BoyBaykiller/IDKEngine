@@ -29,7 +29,7 @@ namespace IDKEngine.Render
                 }
                 else
                 {
-                    ApertureDiameter = _apertureDiameter;
+                    LenseRadius = _lenseRadius;
                     RayDepth = cachedRayDepth;
                 }
             }
@@ -60,15 +60,15 @@ namespace IDKEngine.Render
             }
         }
 
-        private float _apertureDiameter;
-        public float ApertureDiameter
+        private float _lenseRadius;
+        public float LenseRadius
         {
-            get => _apertureDiameter;
+            get => _lenseRadius;
 
             set
             {
-                _apertureDiameter = value;
-                firstHitProgram.Upload("ApertureDiameter", value);
+                _lenseRadius = value;
+                firstHitProgram.Upload("LenseRadius", value);
             }
         }
 
@@ -116,7 +116,7 @@ namespace IDKEngine.Render
 
             RayDepth = 7;
             FocalLength = 8.0f;
-            ApertureDiameter = 0.02f;
+            LenseRadius = 0.01f;
             RayCoherency = 0.2f;
         }
 
