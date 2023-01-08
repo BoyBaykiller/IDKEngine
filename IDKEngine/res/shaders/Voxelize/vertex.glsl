@@ -15,7 +15,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -49,18 +49,20 @@ out InOutVars
 {
     vec2 TexCoord;
     vec3 Normal;
-    flat uint MaterialIndex;
-    flat float EmissiveBias;
+    uint MaterialIndex;
+    float EmissiveBias;
 } outData;
 
 vec3 DecompressSNorm32Fast(uint data);
 
 void main()
 {
+    vec3 normal = DecompressSNorm32Fast(Normal);
     mat4 model = matrixSSBO.Models[gl_InstanceID + gl_BaseInstance];
 
+    mat3 localToWorld = mat3(transpose(inverse(model)));
+    outData.Normal = normalize(localToWorld * normal);
     outData.TexCoord = TexCoord;
-    outData.Normal = mat3(transpose(inverse(model))) * DecompressSNorm32Fast(Normal);
 
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     outData.MaterialIndex = mesh.MaterialIndex;

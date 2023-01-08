@@ -10,6 +10,7 @@ layout(location = 1) out vec4 NormalSpecColor;
 layout(location = 2) out vec2 VelocityColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
+layout(binding = 1) uniform sampler3D SamplerVoxelsAlbedo;
 
 struct Material
 {
@@ -87,6 +88,20 @@ layout(std140, binding = 3) uniform TaaDataUBO
     float VelScale;
 } taaDataUBO;
 
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
+
+layout(std140, binding = 5) uniform VXGIDataUBO
+{
+    mat4 OrthoProjection;
+    vec3 GridMin;
+    float _pad0;
+    vec3 GridMax;
+    float _pad1;
+} vxgiDataUBO;
+
 in InOutVars
 {
     vec2 TexCoord;
@@ -104,6 +119,40 @@ in InOutVars
 
 vec3 GetBlinnPhongLighting(Light light, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 lightToSample);
+
+vec4 TraceCone(vec3 start, vec3 normal, vec3 direction, float coneAngle, float stepMultiplier)
+{
+    vec3 voxelGridWorlSpaceSize = vxgiDataUBO.GridMax - vxgiDataUBO.GridMin;
+    vec3 voxelWorldSpaceSize = voxelGridWorlSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
+    float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
+    uint maxLevel = textureQueryLevels(SamplerVoxelsAlbedo) - 1;
+	vec4 accumlatedColor = vec4(0.0);
+
+    start += normal * voxelMaxLength;
+
+    float distFromStart = 0.0; // start with one voxel offset to avoid self collision
+    while (accumlatedColor.a < 0.99)
+    {
+        float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
+        float sampleDiameter = max(voxelMaxLength, coneDiameter);
+		float sampleLod = log2(sampleDiameter / voxelMaxLength);
+		sampleLod = min(sampleLod, maxLevel);
+        
+		vec3 worldPos = start + direction * distFromStart;
+        vec3 sampleUVT = (vxgiDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz * 0.5 + 0.5;
+        if (any(lessThan(sampleUVT, vec3(0.0))) || any(greaterThan(sampleUVT, vec3(1.0)))) //  || sampleLod > maxLevel
+        {
+            accumlatedColor = texture(skyBoxUBO.Albedo, direction);
+            break;
+        }
+		vec4 sampleColor = textureLod(SamplerVoxelsAlbedo, sampleUVT, sampleLod);
+
+		accumlatedColor += (1.0 - accumlatedColor.a) * sampleColor;
+        distFromStart += sampleDiameter * stepMultiplier;
+    }
+
+    return accumlatedColor;
+}
 
 vec4 Albedo;
 vec3 Normal;
@@ -126,6 +175,9 @@ void main()
     Normal = normalize(mix(normalize(inData.Normal), Normal, inData.NormalMapStrength));
 
     ViewDir = normalize(inData.FragPos - basicDataUBO.ViewPos);
+    vec3 reflectDir = reflect(ViewDir, Normal);
+    // vec4 indirectLighting = TraceCone(inData.FragPos, Normal, reflectDir, 0.0, 0.35) * Specular;
+    vec4 indirectLighting = vec4(0.0);
 
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
@@ -143,9 +195,13 @@ void main()
         directLighting += GetBlinnPhongLighting(light, sampleToLight);
     }
 
+    vec3 ambientColor = Albedo.rgb * 0.03;
+    float ambientOcclusion = 1.0 - AO;
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * Albedo.rgb;
-    const float ambient = 0.03;
-    FragColor = vec4((directLighting + emissive + Albedo.rgb * ambient) * (1.0 - AO), 1.0);
+    vec3 irradiance = (directLighting.rgb + indirectLighting.rgb + ambientColor) * ambientOcclusion + emissive;
+
+    FragColor = vec4(irradiance, 1.0);
+    // FragColor = indirectLighting;
     NormalSpecColor = vec4(Normal, Specular);
 
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;

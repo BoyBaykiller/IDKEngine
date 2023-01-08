@@ -17,7 +17,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -65,7 +65,7 @@ out InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TangentToWorld;
-    flat uint MaterialIndex;
+    uint MaterialIndex;
     float EmissiveBias;
     float NormalMapStrength;
     float SpecularBias;
@@ -92,7 +92,9 @@ void main()
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    outData.Normal = mat3(transpose(inverse(model))) * normal;
+    
+    mat3 localToWorld = mat3(transpose(inverse(model)));
+    outData.Normal = normalize(localToWorld * normal);
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;

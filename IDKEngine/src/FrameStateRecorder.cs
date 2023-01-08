@@ -15,10 +15,6 @@ namespace IDKEngine
             }
         }
 
-        public bool IsFramesLoaded => FrameCount > 0;
-
-        public int FrameCount { get; private set; }
-
         private int _replayFrame;
         public int ReplayFrameIndex
         {
@@ -33,6 +29,10 @@ namespace IDKEngine
                 _replayFrame = value % FrameCount;
             }
         }
+
+        public bool IsFramesLoaded => FrameCount > 0;
+
+        public int FrameCount { get; private set; }
 
         private T[] recordedFrames;
         public FrameStateRecorder()

@@ -14,7 +14,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
@@ -57,7 +57,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 out InOutVars
 {
     vec2 TexCoord;
-    flat int MaterialIndex;
+    int MaterialIndex;
 } outData;
 
 void main()

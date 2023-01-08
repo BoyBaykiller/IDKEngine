@@ -51,7 +51,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 struct Vertex
@@ -222,7 +222,7 @@ ivec2 ReorderInvocations(uint n);
 uniform bool IsDebugBVHTraversal;
 uniform bool IsTraceLights;
 uniform float FocalLength;
-uniform float ApertureDiameter;
+uniform float LenseRadius;
 uniform float RayCoherency;
 
 shared uint SharedStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
@@ -244,12 +244,12 @@ void main()
 
     vec3 camDir = GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc);
     vec3 focalPoint = basicDataUBO.ViewPos + camDir * FocalLength;
-    vec3 aperturePoint = (basicDataUBO.InvView * vec4(ApertureDiameter * 0.5 * UniformSampleDisk(), 0.0, 1.0)).xyz;
+    vec3 pointOnLense = (basicDataUBO.InvView * vec4(LenseRadius * UniformSampleDisk(), 0.0, 1.0)).xyz;
 
-    camDir = normalize(focalPoint - aperturePoint);
+    camDir = normalize(focalPoint - pointOnLense);
 
     TransportRay transportRay;
-    transportRay.Origin = aperturePoint;
+    transportRay.Origin = pointOnLense;
     transportRay.Direction = camDir;
 
     transportRay.Throughput = vec3(1.0);
@@ -328,7 +328,8 @@ bool TraceRay(inout TransportRay transportRay)
             roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
             normal = texture(material.Normal, texCoord).rgb;        
             normal = TBN * normalize(normal * 2.0 - 1.0);
-            normal = normalize(mix(mat3(transpose(inverse(model))) * geoNormal, normal, mesh.NormalMapStrength));
+            mat3 localToWorld = mat3(transpose(inverse(model)));
+            normal = normalize(mix(normalize(localToWorld * geoNormal), normal, mesh.NormalMapStrength));
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;
         }

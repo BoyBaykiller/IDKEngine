@@ -25,6 +25,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
+float SSAO(vec3 fragPos, vec3 normal);
 vec3 ViewToNDC(vec3 ndc);
 vec3 NDCToViewSpace(vec3 ndc);
 vec3 CosineSampleHemisphere(float u, float v, vec3 normal);
@@ -39,19 +40,30 @@ uint rngSeed;
 
 void main()
 {
-    ivec2 imgResultSize = imageSize(ImgResult);
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    if (any(greaterThanEqual(imgCoord, imgResultSize)))
+    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
+
+    float depth = texture(SamplerDepth, uv).r;
+    if (depth == 1.0)
+    {
+        imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
-
+    }
     rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277;
-    
-    vec2 uv = (imgCoord + 0.5) / imgResultSize;
 
+    vec3 normal = texture(SamplerNormalSpec, uv).rgb;
+
+    vec3 fragPos = NDCToViewSpace(vec3(uv, depth) * 2.0 - 1.0);
     mat3 worldToView = mat3(transpose(basicDataUBO.InvView));
-    vec3 normal = worldToView * texture(SamplerNormalSpec, uv).rgb;
-    vec3 fragPos = NDCToViewSpace(vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0);
+    vec3 viewSpaceNormal = normalize(worldToView * normal);
 
+    float occlusion = SSAO(fragPos, viewSpaceNormal);
+
+    imageStore(ImgResult, imgCoord, vec4(vec3(occlusion), 1.0));
+}
+
+float SSAO(vec3 fragPos, vec3 normal)
+{
     float occlusion = 0.0;
     float samples = Samples;
     for (int i = 0; i < Samples; i++)
@@ -60,22 +72,15 @@ void main()
         vec3 samplePos = fragPos + CosineSampleHemisphere(GetRandomFloat01(), progress, normal) * Radius * mix(0.1, 1.0, progress * progress);
         
         vec3 projectedSample = ViewToNDC(samplePos) * 0.5 + 0.5;
-        if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))))
-        {
-            samples--;
-        }
-        else
-        {
-            float depth = texture(SamplerDepth, projectedSample.xy).r;
-        
-            float weight = length(fragPos - samplePos) / Radius;
-            occlusion += int(projectedSample.z >= depth) * weight;
-        }
+        float depth = texture(SamplerDepth, projectedSample.xy).r;
+    
+        float weight = length(fragPos - samplePos) / Radius;
+        occlusion += int(projectedSample.z >= depth) * weight;
     }
     occlusion /= samples;
     occlusion *= Strength;
 
-    imageStore(ImgResult, imgCoord, vec4(vec3(occlusion), 1.0));
+   return occlusion;
 }
 
 vec3 ViewToNDC(vec3 viewPos)

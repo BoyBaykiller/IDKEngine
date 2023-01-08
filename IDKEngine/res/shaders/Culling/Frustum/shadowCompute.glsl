@@ -36,7 +36,7 @@ struct Mesh
     float RefractionChance;
     float IOR;
     vec3 Absorbance;
-    int VisibleCubemapFacesInfo;
+    uint CubemapShadowCullInfo;
 };
 
 struct PointShadow
@@ -112,7 +112,7 @@ void main()
         }
     }
     drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = instances;
-    meshSSBO.Meshes[meshIndex].VisibleCubemapFacesInfo = packedValue;
+    meshSSBO.Meshes[meshIndex].CubemapShadowCullInfo = packedValue;
 }
 
 Frustum ExtractFrustum(mat4 projViewModel)
