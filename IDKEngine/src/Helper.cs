@@ -18,6 +18,8 @@ namespace IDKEngine
     static class Helper
     {
         public static readonly double APIVersion = Convert.ToDouble($"{GL.GetInteger(GetPName.MajorVersion)}{GL.GetInteger(GetPName.MinorVersion)}") / 10.0;
+        public static readonly string API = GL.GetString(StringName.Version);
+        public static readonly string GPU = GL.GetString(StringName.Renderer);
 
         public static System.Numerics.Vector3 ToSystemVec(this Vector3 vector3)
         {

@@ -96,10 +96,9 @@ namespace IDKEngine.Render
             IsTemporalAccumulation = isTemporalAccumulation;
         }
 
-        public void Compute(Texture depth)
+        public void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, Result.SizedInternalFormat);
-            depth.BindToUnit(1);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

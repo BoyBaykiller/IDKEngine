@@ -5,7 +5,6 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) restrict uniform image2D ImgResult;
-layout(binding = 1) uniform sampler2D SamplerDepth;
 
 struct Light
 {
@@ -17,8 +16,8 @@ struct Light
 
 struct PointShadow
 {
-    samplerCube Sampler;
-    samplerCubeShadow SamplerShadow;
+    samplerCube Texture;
+    samplerCubeShadow ShadowTexture;
     
     mat4 ProjViewMatrices[6];
 
@@ -27,20 +26,6 @@ struct PointShadow
     int LightIndex;
     float _pad0;
 };
-
-layout(std140, binding = 2) uniform LightsUBO
-{
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
-    int Count;
-} lightsUBO;
-
-layout(std140, binding = 1) uniform ShadowDataUBO
-{
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
-    int Count;
-} shadowDataUBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -59,6 +44,20 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
+layout(std140, binding = 1) uniform ShadowDataUBO
+{
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
+    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+    int Count;
+} shadowDataUBO;
+
+layout(std140, binding = 2) uniform LightsUBO
+{
+    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
+    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
+    int Count;
+} lightsUBO;
+
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
@@ -68,6 +67,15 @@ layout(std140, binding = 3) uniform TaaDataUBO
     uint Frame;
     float VelScale;
 } taaDataUBO;
+
+layout(std140, binding = 6) uniform GBufferDataUBO
+{
+    sampler2D AlbedoAlpha;
+    sampler2D NormalSpecular;
+    sampler2D EmissiveRoughness;
+    sampler2D Velocity;
+    sampler2D Depth;
+} gBufferDataUBO;
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);
 bool Shadow(PointShadow pointShadow, vec3 lightToSample);
@@ -87,7 +95,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec3 ndc = vec3(uv, texture(SamplerDepth, uv).r) * 2.0 - 1.0;
+    vec3 ndc = vec3(uv, texture(gBufferDataUBO.Depth, uv).r) * 2.0 - 1.0;
     vec3 viewToFrag = NDCToWorldSpace(ndc) - basicDataUBO.ViewPos;
     float viewToFragLen = length(viewToFrag);
     vec3 viewDir = viewToFrag / viewToFragLen;
@@ -148,7 +156,7 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample)
 
     // Map from [nearPlane; farPlane] to [0.0; 1.0]
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
-    float closestDepth = texture(pointShadow.Sampler, lightToSample).r;
+    float closestDepth = texture(pointShadow.Texture, lightToSample).r;
 
     return mapedDepth > closestDepth;
 }

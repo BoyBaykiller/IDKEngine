@@ -13,24 +13,24 @@ namespace IDKEngine.Render
 
         public unsafe Vector3 GridMin
         {
-            get => glslVxgiData.GridMin;
+            get => glslVoxelizerData.GridMin;
 
             set
             {
-                glslVxgiData.GridMin = value;
-                glslVxgiData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVxgiData.GridMin.X, glslVxgiData.GridMax.X, glslVxgiData.GridMin.Y, glslVxgiData.GridMax.Y, glslVxgiData.GridMax.Z, glslVxgiData.GridMin.Z);
-                vxgiDataBuffer.SubData(0, sizeof(GLSLVXGIData), glslVxgiData);
+                glslVoxelizerData.GridMin = value;
+                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
+                voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
         }
         public unsafe Vector3 GridMax
         {
-            get => glslVxgiData.GridMax;
+            get => glslVoxelizerData.GridMax;
 
             set
             {
-                glslVxgiData.GridMax = value;
-                glslVxgiData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVxgiData.GridMin.X, glslVxgiData.GridMax.X, glslVxgiData.GridMin.Y, glslVxgiData.GridMax.Y, glslVxgiData.GridMax.Z, glslVxgiData.GridMin.Z);
-                vxgiDataBuffer.SubData(0, sizeof(GLSLVXGIData), glslVxgiData);
+                glslVoxelizerData.GridMax = value;
+                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
+                voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
         }
 
@@ -58,6 +58,7 @@ namespace IDKEngine.Render
             }
         }
 
+
         /// <summary>
         /// GL_NV_conservative_raster must be available for this to have an effect
         /// </summary>
@@ -68,8 +69,8 @@ namespace IDKEngine.Render
         private readonly ShaderProgram voxelizeProgram;
         private readonly ShaderProgram mipmapProgram;
         private readonly ShaderProgram visualizeDebugProgram;
-        private readonly BufferObject vxgiDataBuffer;
-        private GLSLVXGIData glslVxgiData;
+        private readonly BufferObject voxelizerDataBuffer;
+        private GLSLVoxelizerData glslVoxelizerData;
 
         private readonly Framebuffer fboNoAttachments;
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.2f)
@@ -85,9 +86,9 @@ namespace IDKEngine.Render
 
             visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Visualization/compute.glsl")));
 
-            vxgiDataBuffer = new BufferObject();
-            vxgiDataBuffer.ImmutableAllocate(sizeof(GLSLVXGIData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            vxgiDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
+            voxelizerDataBuffer = new BufferObject();
+            voxelizerDataBuffer.ImmutableAllocate(sizeof(GLSLVoxelizerData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
 
             fboNoAttachments = new Framebuffer();
 
@@ -187,7 +188,7 @@ namespace IDKEngine.Render
             ResultVoxelsAlbedo.BindToUnit(0);
             visualizeDebugProgram.Use();
             GL.DispatchCompute((debugResult.Width + 8 - 1) / 8, (debugResult.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
         public void SetSize(int width, int height, int depth)
@@ -197,8 +198,8 @@ namespace IDKEngine.Render
             ResultVoxelsAlbedo.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
             ResultVoxelsAlbedo.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             //ResultVoxelsAlbedo.SetWrapMode(TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder); // causes driver crash
-            //ResultVoxelsAlbedo.SetBorderColor(new Vector4(0.0f, 1.0f, 0.0f, 1.0f));
-            //ResultVoxelsAlbedo.SetAnisotropy(4.0f);
+            //ResultVoxelsAlbedo.SetBorderColor(new Vector4(0.0f, 0.0f, 0.0f, 1.0f));
+            ResultVoxelsAlbedo.SetAnisotropy(16.0f);
             ResultVoxelsAlbedo.ImmutableAllocate(width, height, depth, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.Rgba8, Texture.GetMaxMipmapLevel(width, height, depth));
 
             fboNoAttachments.SetParamater(FramebufferDefaultParameter.FramebufferDefaultWidth, width);
@@ -214,7 +215,7 @@ namespace IDKEngine.Render
             mipmapProgram.Dispose();
             visualizeDebugProgram.Dispose();
 
-            vxgiDataBuffer.Dispose();
+            voxelizerDataBuffer.Dispose();
         }
     }
 }

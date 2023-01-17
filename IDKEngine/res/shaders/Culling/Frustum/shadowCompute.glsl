@@ -41,8 +41,8 @@ struct Mesh
 
 struct PointShadow
 {
-    samplerCube Sampler;
-    samplerCubeShadow SamplerShadow;
+    samplerCube Texture;
+    samplerCubeShadow ShadowTexture;
     
     mat4 ProjViewMatrices[6];
 

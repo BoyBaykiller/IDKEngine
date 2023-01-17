@@ -59,30 +59,30 @@ namespace IDKEngine
                     GL.ColorMask(true, true, true, true);
                 }
 
+                // Shadows cull the command buffer. Make sure to restore default instance count for voxelization
+                int i = 0;
+                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                {
+                    cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
+                });
+                RasterizerPipeline.Voxelizer.Render(ModelSystem);
+
                 if (IsDebugRenderVXGIGrid)
                 {
-                    // Shadows cull the command buffer. Make sure to restore default instance count for voxelization
-                    int i = 0;
-                    ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
-                    {
-                        cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
-                    });
-                    RasterizerPipeline.Voxelize(ModelSystem);
-
                     RasterizerPipeline.Voxelizer.DebugRender(RasterizerPipeline.Result);
-                    PostProcessor.Compute(RasterizerPipeline.Result, null, null, null, null, null);
+                    PostProcessor.Compute(RasterizerPipeline.Result, null, null, null, false);
                 }
                 else
                 {
                     ModelSystem.FrustumCull(GLSLBasicData.ProjView);
 
-                    RasterizerPipeline.Render(ModelSystem, ForwardRenderer);
+                    RasterizerPipeline.Render(ModelSystem, LightManager);
 
                     if (IsBloom)
                         Bloom.Compute(RasterizerPipeline.Result);
 
-                    PostProcessor.Compute(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, RasterizerPipeline.IsVolumetricLighting ? RasterizerPipeline.VolumetricLight.Result : null, RasterizerPipeline.IsSSR ? RasterizerPipeline.SSR.Result : null, RasterizerPipeline.VelocityTexture, RasterizerPipeline.DepthTexture);
-                    RasterizerPipeline.ComputeShadingRateImage(PostProcessor.Result);
+                    PostProcessor.Compute(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, RasterizerPipeline.IsVolumetricLighting ? RasterizerPipeline.VolumetricLight.Result : null, RasterizerPipeline.IsSSR ? RasterizerPipeline.SSR.Result : null, true);
+                    RasterizerPipeline.ShadingRateClassifier.DebugRender(PostProcessor.Result);
                 }
 
             }
@@ -93,7 +93,7 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
-                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null, null, null);
+                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null, false);
             }
 
             Framebuffer.Bind(0);
@@ -174,15 +174,14 @@ namespace IDKEngine
         public Bloom Bloom;
         public PostProcessor PostProcessor;
         public LightManager LightManager;
-        public ForwardRenderer ForwardRenderer;
         public MeshOutlineRenderer MeshOutlineRenderer;
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
         protected override unsafe void OnStart()
         {
-            Console.WriteLine($"API: {GL.GetString(StringName.Version)}");
-            Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}\n\n");
+            Console.WriteLine($"API: {Helper.API}");
+            Console.WriteLine($"GPU: {Helper.GPU}\n\n");
 
             if (Helper.APIVersion < 4.6)
             {
@@ -239,7 +238,7 @@ namespace IDKEngine
                 "res/textures/environmentMap/posz.jpg",
                 "res/textures/environmentMap/negz.jpg"
             });
-
+            
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
                 sponza.ModelMatrices[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
@@ -282,7 +281,6 @@ namespace IDKEngine
             lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             LightManager.Add(CollectionsMarshal.AsSpan(lights));
 
-            ForwardRenderer = new ForwardRenderer(LightManager, 6);
             SetRenderMode(RenderMode.Rasterizer);
 
             FrameRecorder = new FrameStateRecorder<RecordableState>();
@@ -348,26 +346,24 @@ namespace IDKEngine
 
         public void SetRenderMode(RenderMode renderMode)
         {
+            if (pointShadowManager != null) { pointShadowManager.Dispose(); pointShadowManager = null; }
+            if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
             if (renderMode == RenderMode.Rasterizer)
             {
                 RasterizerPipeline = new RasterPipeline(ViewportResolution.X, ViewportResolution.Y);
-            }
 
-            if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
-            if (renderMode == RenderMode.PathTracer)
-            {
-                PathTracer = new PathTracer(BVH, ModelSystem, ViewportResolution.X, ViewportResolution.Y);
-            }
-
-            if (pointShadowManager != null) { pointShadowManager.Dispose(); pointShadowManager = null; }
-            if (renderMode == RenderMode.Rasterizer)
-            {
                 pointShadowManager = new PointShadowManager();
                 for (int j = 0; j < 3; j++)
                 {
                     PointShadow pointShadow = new PointShadow(LightManager, j, 512, 0.5f, 60.0f);
                     pointShadowManager.Add(pointShadow);
                 }
+            }
+
+            if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
+            if (renderMode == RenderMode.PathTracer)
+            {
+                PathTracer = new PathTracer(BVH, ViewportResolution.X, ViewportResolution.Y);
             }
 
             _renderMode = renderMode;

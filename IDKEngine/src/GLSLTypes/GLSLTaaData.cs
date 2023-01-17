@@ -9,6 +9,6 @@
         public int Samples;
         public int IsEnabled;
         public uint Frame;
-        public float Scale;
+        public float VelScale;
     }
 }

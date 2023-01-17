@@ -10,8 +10,8 @@ layout(location = 0) in vec3 Position;
 
 struct PointShadow
 {
-    samplerCube Sampler;
-    samplerCubeShadow SamplerShadow;
+    samplerCube Texture;
+    samplerCubeShadow ShadowTexture;
     
     mat4 ProjViewMatrices[6];
 

@@ -10,14 +10,14 @@ layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxelsAlbedo;
 layout(binding = 0, r32ui) restrict uniform uimage3D ImgVoxelsAlbedo;
 #endif
 
-layout(std140, binding = 5) uniform VXGIDataUBO
+layout(std140, binding = 5) uniform VoxelizerDataUBO
 {
     mat4 OrthoProjection;
     vec3 GridMin;
     float _pad0;
     vec3 GridMax;
     float _pad1;
-} vxgiDataUBO;
+} voxelizerDataUBO;
 
 in InOutVars
 {
@@ -49,7 +49,7 @@ void main()
     vec3 outNormDeviceCoords[3];
     for (int i = 0; i < 3; i++)
     {
-        vec3 ndc = (vxgiDataUBO.OrthoProjection * gl_in[i].gl_Position).xyz;
+        vec3 ndc = (voxelizerDataUBO.OrthoProjection * gl_in[i].gl_Position).xyz;
 
         // Select the projection plane that yields the biggest projection area 
         if (dominantAxis == 0) ndc = ndc.zyx;

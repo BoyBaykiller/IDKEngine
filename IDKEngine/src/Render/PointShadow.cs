@@ -61,8 +61,8 @@ namespace IDKEngine.Render
 
             projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, nearPlane, farPlane);
 
-            glslPointShadow.Sampler = Result.GenTextureHandleARB();
-            glslPointShadow.SamplerShadow = Result.GenTextureSamplerHandleARB(shadowSampler);
+            glslPointShadow.Texture = Result.GenTextureHandleARB();
+            glslPointShadow.ShadowTexture = Result.GenTextureSamplerHandleARB(shadowSampler);
 
             glslPointShadow.NearPlane = nearPlane;
             glslPointShadow.FarPlane = farPlane;
@@ -135,8 +135,8 @@ namespace IDKEngine.Render
             framebuffer.Dispose();
 
             // unmake texture handle resident for deletion
-            Texture.UnmakeTextureHandleResidentARB(glslPointShadow.Sampler);
-            Texture.UnmakeTextureHandleResidentARB(glslPointShadow.SamplerShadow);
+            Texture.UnmakeTextureHandleResidentARB(glslPointShadow.Texture);
+            Texture.UnmakeTextureHandleResidentARB(glslPointShadow.ShadowTexture);
 
             Result.Dispose();
             shadowSampler.Dispose();

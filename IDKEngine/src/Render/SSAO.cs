@@ -57,11 +57,9 @@ namespace IDKEngine.Render
             Strength = strength;
         }
 
-        public void Compute(Texture depth, Texture normal)
+        public void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
-            depth.BindToUnit(0);
-            normal.BindToUnit(1);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

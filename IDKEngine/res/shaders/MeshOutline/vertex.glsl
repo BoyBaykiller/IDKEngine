@@ -1,6 +1,6 @@
 #version 460 core
 
-const vec3 positions[24] =
+const vec3 positions[] =
 {
     // Back
     vec3(-0.5,  0.5, -0.5 ),

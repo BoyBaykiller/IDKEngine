@@ -33,8 +33,8 @@ struct Light
 
 struct PointShadow
 {
-    samplerCube Sampler;
-    samplerCubeShadow SamplerShadow;
+    samplerCube Texture;
+    samplerCubeShadow ShadowTexture;
     
     mat4 ProjViewMatrices[6];
 
@@ -63,14 +63,14 @@ layout(std140, binding = 2) uniform LightsUBO
     int Count;
 } lightsUBO;
 
-layout(std140, binding = 5) uniform VXGIDataUBO
+layout(std140, binding = 5) uniform VoxelizerDataUBO
 {
     mat4 OrthoProjection;
     vec3 GridMin;
     float _pad0;
     vec3 GridMax;
     float _pad1;
-} vxgiDataUBO;
+} voxelizerDataUBO;
 
 in InOutVars
 {
@@ -81,7 +81,7 @@ in InOutVars
     flat float EmissiveBias;
 } inData;
 
-vec3 GetdirectLightingLighting(Light light, vec3 albedo, vec3 sampleToLight);
+vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 lightToSample);
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos);
 
@@ -93,43 +93,41 @@ void main()
     vec4 albedo = texture(material.Albedo, inData.TexCoord);
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedo.rgb;
 
-    vec3 outRadiance = vec3(0.0);
+    vec3 directLighting = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
     {
         PointShadow pointShadow = shadowDataUBO.PointShadows[i];
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        outRadiance += GetdirectLightingLighting(light, albedo.rgb, sampleToLight) * Visibility(pointShadow, -sampleToLight);
+        directLighting += GetDirectLighting(light, albedo.rgb, sampleToLight) * Visibility(pointShadow, -sampleToLight);
     }
 
     for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        outRadiance += GetdirectLightingLighting(light, albedo.rgb, sampleToLight);
+        directLighting += GetDirectLighting(light, albedo.rgb, sampleToLight);
     }
     const float ambient = 0.03;
-    outRadiance += albedo.rgb * ambient;
-    outRadiance += emissive;
+    directLighting += albedo.rgb * ambient;
+    directLighting += emissive;
 
 #ifdef GL_NV_shader_atomic_fp16_vector
 
-    vec4 normalizedAlbedo = vec4(outRadiance, albedo.a);
-    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, f16vec4(normalizedAlbedo));
+    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, f16vec4(directLighting, 1.0));
 
 #else
 
-    outRadiance = clamp(outRadiance, 0.0, 1.0); // prevent some overflow because of limited precision
-    vec4 normalizedAlbedo = vec4(outRadiance, albedo.a);
-    uvec4 quantizedAlbedoRgba = uvec4(normalizedAlbedo * 255.0);
-    uint packedAlbedo = (quantizedAlbedoRgba.a << 24) | (quantizedAlbedoRgba.b << 16) | (quantizedAlbedoRgba.g << 8) | (quantizedAlbedoRgba.r << 0);
+    directLighting = clamp(directLighting, 0.0, 1.0);
+    uvec4 quantizedLighting = uvec4(vec4(directLighting, 1.0) * 255.0);
+    uint packedAlbedo = (quantizedLighting.a << 24) | (quantizedLighting.b << 16) | (quantizedLighting.g << 8) | (quantizedLighting.r << 0);
     imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
 
 #endif
 
 }
 
-vec3 GetdirectLightingLighting(Light light, vec3 albedo, vec3 sampleToLight)
+vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight)
 {
     float sampleToLightLength = length(sampleToLight);
 
@@ -161,13 +159,13 @@ float Visibility(PointShadow pointShadow, vec3 lightToSample)
     // Map from [nearPlane, farPlane] to [0.0, 1.0]
     float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
     
-    float shadowFactor = texture(pointShadow.SamplerShadow, vec4(lightToSample, mapedDepth));
+    float shadowFactor = texture(pointShadow.ShadowTexture, vec4(lightToSample, mapedDepth));
     return shadowFactor;
 }
 
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos)
 {
-    vec3 ndc = (vxgiDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz;
+    vec3 ndc = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz;
     ivec3 voxelPos = ivec3((ndc * 0.5 + 0.5) * imageSize(ImgVoxelsAlbedo));
     return voxelPos;
 }   
