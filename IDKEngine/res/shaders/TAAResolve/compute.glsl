@@ -1,13 +1,12 @@
 #version 460 core
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX
+#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) restrict uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerHistory;
-layout(binding = 1) uniform sampler2D SamplerVelocity;
-layout(binding = 2) uniform sampler2D SamplerDepth;
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
@@ -18,6 +17,15 @@ layout(std140, binding = 3) uniform TaaDataUBO
     uint Frame;
     float VelScale;
 } taaDataUBO;
+
+layout(std140, binding = 6) uniform GBufferDataUBO
+{
+    sampler2D AlbedoAlpha;
+    sampler2D NormalSpecular;
+    sampler2D EmissiveRoughness;
+    sampler2D Velocity;
+    sampler2D Depth;
+} gBufferDataUBO;
 
 void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocityPixel, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
 vec4 SampleTextureCatmullRom(sampler2D src, vec2 uv);
@@ -31,7 +39,7 @@ void main()
 
     if (!IsTaaArtifactMitigation)
     {
-        vec2 velocity = texelFetch(SamplerVelocity, imgCoord, 0).rg / taaDataUBO.VelScale;
+        vec2 velocity = texelFetch(gBufferDataUBO.Velocity, imgCoord, 0).rg / taaDataUBO.VelScale;
         vec2 historyUV = uv - velocity;
 
         vec3 currentColor = imageLoad(ImgResult, imgCoord).rgb;
@@ -49,7 +57,7 @@ void main()
     vec3 currentColor;
     GetResolveData(imgCoord, currentColor, bestVelocityPixel, neighborhoodMin, neighborhoodMax);
 
-    vec2 velocity = texelFetch(SamplerVelocity, bestVelocityPixel, 0).rg / taaDataUBO.VelScale;
+    vec2 velocity = texelFetch(gBufferDataUBO.Velocity, bestVelocityPixel, 0).rg / taaDataUBO.VelScale;
     vec2 historyUV = uv - velocity;
     if (any(greaterThan(historyUV, vec2(1.0))) || any(lessThan(historyUV, vec2(0.0))))
     {
@@ -96,7 +104,7 @@ void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocit
                 currentColor = neighbor;
             }
     
-            float currentDepth = texelFetch(SamplerDepth, curPixel, 0).r;
+            float currentDepth = texelFetch(gBufferDataUBO.Depth, curPixel, 0).r;
             if (currentDepth < minDepth)
             {
                 minDepth = currentDepth;

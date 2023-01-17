@@ -4,6 +4,7 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
+using System.Net.Security;
 
 namespace IDKEngine.Render
 {
@@ -48,7 +49,6 @@ namespace IDKEngine.Render
             Directory.CreateDirectory(FRAME_OUTPUT_DIR);
         }
 
-        private bool isHoveredViewport = true;
         private System.Numerics.Vector2 viewportHeaderSize;
         public void Draw(Application app, float frameTime)
         {
@@ -150,6 +150,8 @@ namespace IDKEngine.Render
             {
                 ImGui.Text($"FPS: {app.FPS}");
                 ImGui.Text($"Viewport size: {app.ViewportResolution.X}x{app.ViewportResolution.Y}");
+                ImGui.Text($"{Helper.API}");
+                ImGui.Text($"{Helper.GPU}");
 
                 if (app.GetRenderMode() == RenderMode.PathTracer)
                 {
@@ -188,8 +190,6 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Voxel Global Illumination (WIP)"))
                     {
-                        ImGui.Checkbox("IsDebugRender", ref app.IsDebugRenderVXGIGrid);
-
                         string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
                         current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
                         if (ImGui.BeginCombo("Resolution", current))
@@ -213,6 +213,42 @@ namespace IDKEngine.Render
                         }
                         ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision issues and a performance hit.");
 
+                        tempBool = app.RasterizerPipeline.IsVXGI;
+                        if (ImGui.Checkbox("IsVXGI", ref tempBool))
+                        {
+                            app.RasterizerPipeline.IsVXGI = tempBool;
+                        }
+
+                        tempFloat = app.RasterizerPipeline.NormalRayOffset;
+                        if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
+                        {
+                            app.RasterizerPipeline.NormalRayOffset = tempFloat;
+                        }
+
+                        int tempInt = app.RasterizerPipeline.MaxSamples;
+                        if (ImGui.SliderInt("MaxSamples", ref tempInt, 1, 24))
+                        {
+                            app.RasterizerPipeline.MaxSamples = tempInt;
+                        }
+
+                        tempFloat = app.RasterizerPipeline.GIBoost;
+                        if (ImGui.SliderFloat("GIBoost", ref tempFloat, 0.0f, 5.0f))
+                        {
+                            app.RasterizerPipeline.GIBoost = tempFloat;
+                        }
+
+                        tempFloat = app.RasterizerPipeline.GISkyBoxBoost;
+                        if (ImGui.SliderFloat("GISkyBoxBoost", ref tempFloat, 0.0f, 5.0f))
+                        {
+                            app.RasterizerPipeline.GISkyBoxBoost = tempFloat;
+                        }
+
+                        tempFloat = app.RasterizerPipeline.StepMultiplier;
+                        if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, 0.01f, 1.0f))
+                        {
+                            app.RasterizerPipeline.StepMultiplier = tempFloat;
+                        }
+
                         ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
                         ImGui.SameLine();
                         InfoMark(
@@ -230,18 +266,22 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("DoConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
                         if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
-                        tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
-                        const float min = 0.05f;
-                        if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, min, 1.0f))
+                        ImGui.Checkbox("IsDebugRender", ref app.IsDebugRenderVXGIGrid);
+                        if (app.IsDebugRenderVXGIGrid)
                         {
-                            tempFloat = MathF.Max(tempFloat, min);
-                            app.RasterizerPipeline.Voxelizer.DebugStepMultiplier = tempFloat;
-                        }
+                            tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
+                            const float min = 0.05f;
+                            if (ImGui.SliderFloat("DebugStepMultiplier", ref tempFloat, min, 1.0f))
+                            {
+                                tempFloat = MathF.Max(tempFloat, min);
+                                app.RasterizerPipeline.Voxelizer.DebugStepMultiplier = tempFloat;
+                            }
 
-                        tempFloat = app.RasterizerPipeline.Voxelizer.DebugConeAngle;
-                        if (ImGui.SliderFloat("DebugConeAngle", ref tempFloat, 0, 0.5f))
-                        {
-                            app.RasterizerPipeline.Voxelizer.DebugConeAngle = tempFloat;
+                            tempFloat = app.RasterizerPipeline.Voxelizer.DebugConeAngle;
+                            if (ImGui.SliderFloat("DebugConeAngle", ref tempFloat, 0, 0.5f))
+                            {
+                                app.RasterizerPipeline.Voxelizer.DebugConeAngle = tempFloat;
+                            }
                         }
                     }
 
@@ -700,7 +740,6 @@ namespace IDKEngine.Render
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
                 ImGui.Image(app.PostProcessor.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
-                isHoveredViewport = ImGui.IsItemHovered();
 
                 ImGui.End();
                 ImGui.PopStyleVar();
@@ -857,7 +896,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && isHoveredViewport && app.MouseState[MouseButton.Left] == InputState.Touched)
+            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && app.MouseState[MouseButton.Left] == InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)app.MouseState.Position.X, (int)app.MouseState.Position.Y);
                 if (app.RenderGui)
@@ -867,6 +906,10 @@ namespace IDKEngine.Render
                 point.Y = app.PostProcessor.Result.Height - point.Y;
 
                 Vector2 ndc = new Vector2((float)point.X / app.PostProcessor.Result.Width, (float)point.Y / app.PostProcessor.Result.Height) * 2.0f - new Vector2(1.0f);
+                if (ndc.X > 1.0f || ndc.Y > 1.0f || ndc.X < -1.0f || ndc.Y < -1.0f)
+                {
+                    return;
+                }
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
                 bool hitMesh = app.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);

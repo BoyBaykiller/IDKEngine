@@ -16,6 +16,7 @@ Feature list:
  - Temporal Anti Aliasing
  - CoD-Modern-Warfare Bloom
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
+ - Real-Time Voxel Global Illumination (WIP) 
  - Wavefront Path Tracer
 
 Required OpenGL: 4.6 + `ARB_bindless_texture`
@@ -272,12 +273,12 @@ GL.TextureParameter(texture, TextureParameterName.TextureCompareFunc, (int)All.L
 ```
 And sample it in glsl like that:
 ```glsl
-layout(binding = 0) uniform samplerCubeShadow SamplerShadow;
+layout(binding = 0) uniform samplerCubeShadow ShadowTexture;
 
 void main()
 {
     float fragDepth = GetDepthRange0_1(); 
-    float visibility = texture(SamplerShadow, vec3(coords, fragDepth));
+    float visibility = texture(ShadowTexture, vec3(coords, fragDepth));
 }
 ```
 

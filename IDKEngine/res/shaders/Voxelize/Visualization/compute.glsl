@@ -30,14 +30,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
-layout(std140, binding = 5) uniform VXGIDataUBO
+layout(std140, binding = 5) uniform VoxelizerDataUBO
 {
     mat4 OrthoProjection;
     vec3 GridMin;
     float _pad0;
     vec3 GridMax;
     float _pad1;
-} vxgiDataUBO;
+} voxelizerDataUBO;
 
 vec4 TraceCone(vec3 uvtStart, vec3 direction, float coneAngle, float stepMultiplier);
 bool RayCuboidIntersect(Ray ray, vec3 min, vec3 max, out float t1, out float t2);
@@ -56,7 +56,7 @@ void main()
     worldRay.Direction = GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc);
 
     float t1, t2;
-    if (!(RayCuboidIntersect(worldRay, vxgiDataUBO.GridMin, vxgiDataUBO.GridMax, t1, t2) && t2 > 0.0))
+    if (!(RayCuboidIntersect(worldRay, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax, t1, t2) && t2 > 0.0))
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
@@ -82,29 +82,29 @@ void main()
 
 vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier)
 {
-    vec3 voxelGridWorlSpaceSize = vxgiDataUBO.GridMax - vxgiDataUBO.GridMin;
+    vec3 voxelGridWorlSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
     vec3 voxelWorldSpaceSize = voxelGridWorlSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
     float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
+    float voxelMinLength = min(voxelWorldSpaceSize.x, min(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
     uint maxLevel = textureQueryLevels(SamplerVoxelsAlbedo) - 1;
-	vec4 accumlatedColor = vec4(0.0);
+    vec4 accumlatedColor = vec4(0.0);
 
-    float distFromStart = voxelMaxLength; // start with one voxel offset to avoid self collision
+    float distFromStart = voxelMaxLength;
     while (accumlatedColor.a < 0.99)
     {
         float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
-        float sampleDiameter = max(voxelMaxLength, coneDiameter);
-		float sampleLod = log2(sampleDiameter / voxelMaxLength);
-		sampleLod = min(sampleLod, maxLevel);
+        float sampleDiameter = max(voxelMinLength, coneDiameter);
+        float sampleLod = log2(sampleDiameter / voxelMinLength);
         
-		vec3 worldPos = start + direction * distFromStart;
-        vec3 sampleUVT = (vxgiDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz * 0.5 + 0.5;
-        if (any(lessThan(sampleUVT, vec3(0.0))) || any(greaterThan(sampleUVT, vec3(1.0)))) //  || sampleLod > maxLevel
+        vec3 worldPos = start + direction * distFromStart;
+        vec3 sampleUVT = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz * 0.5 + 0.5;
+        if (any(lessThan(sampleUVT, vec3(0.0))) || any(greaterThanEqual(sampleUVT, vec3(1.0))) || sampleLod > maxLevel)
         {
             break;
         }
-		vec4 sampleColor = textureLod(SamplerVoxelsAlbedo, sampleUVT, sampleLod);
+        vec4 sampleColor = textureLod(SamplerVoxelsAlbedo, sampleUVT, sampleLod);
 
-		accumlatedColor += (1.0 - accumlatedColor.a) * sampleColor;
+        accumlatedColor += (1.0 - accumlatedColor.a) * sampleColor;
         distFromStart += sampleDiameter * stepMultiplier;
     }
 

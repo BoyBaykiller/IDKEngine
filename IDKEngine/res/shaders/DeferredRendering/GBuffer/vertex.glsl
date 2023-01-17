@@ -60,7 +60,6 @@ layout(std140, binding = 3) uniform TaaDataUBO
 out InOutVars
 {
     vec2 TexCoord;
-    vec3 FragPos;
     vec4 ClipPos;
     vec4 PrevClipPos;
     vec3 Normal;
@@ -87,9 +86,9 @@ void main()
 
     outData.TangentToWorld = mat3(T, B, N);
     outData.TexCoord = TexCoord;
-    outData.FragPos = (model * vec4(Position, 1.0)).xyz;
-    outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
-    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
+    vec3 worldPos = (model * vec4(Position, 1.0)).xyz;
+    outData.ClipPos = basicDataUBO.ProjView * vec4(worldPos, 1.0);
+    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(worldPos, 1.0);
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     

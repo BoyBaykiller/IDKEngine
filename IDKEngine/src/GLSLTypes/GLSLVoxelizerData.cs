@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    struct GLSLVXGIData
+    struct GLSLVoxelizerData
     {
         public Matrix4 OrthoProjection;
         public Vector3 GridMin;

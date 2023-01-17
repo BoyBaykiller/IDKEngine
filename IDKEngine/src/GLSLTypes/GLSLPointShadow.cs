@@ -4,8 +4,8 @@ namespace IDKEngine
 {
     struct GLSLPointShadow
     {
-        public ulong Sampler;
-        public ulong SamplerShadow;
+        public ulong Texture;
+        public ulong ShadowTexture;
 
         // Can't store array of non primitive types as value type in C# (or can u?),
         // so here I am hardcoding each matrix..

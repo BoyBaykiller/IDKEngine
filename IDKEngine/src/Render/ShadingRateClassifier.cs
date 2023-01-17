@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using Assimp;
 
 namespace IDKEngine.Render
 {
@@ -48,15 +49,16 @@ namespace IDKEngine.Render
         }
 
 
-        private DebugMode _debug;
+        private DebugMode _debugValue;
         public DebugMode DebugValue
         {
-            get => _debug;
+            get => _debugValue;
 
             set
             {
-                _debug = value;
-                shaderProgram.Upload("DebugMode", (int)DebugValue);
+                _debugValue = value;
+                shaderProgram.Upload("DebugMode", (int)_debugValue);
+                debugProgram.Upload("DebugMode", (int)_debugValue);
             }
         }
 
@@ -85,11 +87,14 @@ namespace IDKEngine.Render
         }
 
         public Texture Result;
+        private Texture debugTexture; // luminance, variance and velocity
         public NvShadingRateImage[] ShadingRates;
         private readonly ShaderProgram shaderProgram;
-        public ShadingRateClassifier(NvShadingRateImage[] shadingRates, Shader classificationComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.2f)
+        private readonly ShaderProgram debugProgram;
+        public ShadingRateClassifier(NvShadingRateImage[] shadingRates, Shader classificationComputeShader,Shader debugComputeShader, int width, int height, float lumVarianceFactor = 0.025f, float speedFactor = 0.2f)
         {
             shaderProgram = new ShaderProgram(classificationComputeShader);
+            debugProgram = new ShaderProgram(debugComputeShader);
 
             SetSize(width, height);
             
@@ -98,7 +103,7 @@ namespace IDKEngine.Render
             ShadingRates = shadingRates;
         }
 
-        public void Compute(Texture shaded, Texture velocity)
+        public void Compute(Texture shaded)
         {
             if (HAS_VARIABLE_RATE_SHADING)
             {
@@ -107,9 +112,8 @@ namespace IDKEngine.Render
             }
 
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
-            shaded.BindToImageUnit(1, 0, false, 0, TextureAccess.ReadWrite, shaded.SizedInternalFormat);
-            
-            velocity.BindToUnit(0);
+            debugTexture.BindToImageUnit(1, 0, false, 0, TextureAccess.WriteOnly, debugTexture.SizedInternalFormat);
+            shaded.BindToUnit(0);
 
             shaderProgram.Use();
             GL.DispatchCompute((shaded.Width + TILE_SIZE - 1) / TILE_SIZE, (shaded.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
@@ -120,18 +124,46 @@ namespace IDKEngine.Render
             }
         }
 
+        public void DebugRender(Texture dest)
+        {
+            if (DebugValue == DebugMode.NoDebug)
+            {
+                return;
+            }
+
+            dest.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, dest.SizedInternalFormat);
+            if (DebugValue != DebugMode.ShadingRate)
+            {
+                debugTexture.BindToUnit(0);
+            }
+            else
+            {
+                Result.BindToUnit(0);
+            }
+
+            debugProgram.Use();
+            GL.DispatchCompute((dest.Width + TILE_SIZE - 1) / TILE_SIZE, (dest.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+        }
+
         public void SetSize(int width, int height)
         {
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R8ui);
+
+            if (debugTexture != null) debugTexture.Dispose(); debugTexture = null;
+            debugTexture = new Texture(TextureTarget2d.Texture2D);
+            debugTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            debugTexture.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R16f);
         }
 
         public void Dispose()
         {
             Result.Dispose();
+            debugTexture.Dispose();
             shaderProgram.Dispose();
+            debugProgram.Dispose();
         }
     }
 }

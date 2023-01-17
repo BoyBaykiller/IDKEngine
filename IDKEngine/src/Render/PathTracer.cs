@@ -86,7 +86,6 @@ namespace IDKEngine.Render
 
         public uint AccumulatedSamples { get; private set; }
 
-        public ModelSystem ModelSystem;
         public Texture Result;
         private readonly ShaderProgram firstHitProgram;
         private readonly ShaderProgram nHitProgram;
@@ -94,7 +93,7 @@ namespace IDKEngine.Render
         private readonly BufferObject dispatchCommandBuffer;
         private BufferObject transportRayBuffer;
         private BufferObject rayIndicesBuffer;
-        public unsafe PathTracer(BVH bvh, ModelSystem modelSystem, int width, int height)
+        public unsafe PathTracer(BVH bvh, int width, int height)
         {
             string firstHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl");
             firstHitProgramSrc = firstHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
@@ -111,8 +110,6 @@ namespace IDKEngine.Render
             dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             SetSize(width, height);
-
-            ModelSystem = modelSystem;
 
             RayDepth = 7;
             FocalLength = 8.0f;
@@ -178,9 +175,11 @@ namespace IDKEngine.Render
         public void Dispose()
         {
             Result.Dispose();
+            
             firstHitProgram.Dispose();
             nHitProgram.Dispose();
             finalDrawProgram.Dispose();
+            
             dispatchCommandBuffer.Dispose();
             transportRayBuffer.Dispose();
             rayIndicesBuffer.Dispose();

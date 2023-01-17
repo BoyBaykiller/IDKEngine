@@ -1,12 +1,11 @@
 #version 460 core
 #define PI 3.14159265
 #define EPSILON 0.001
+#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
-layout(binding = 0) uniform sampler2D SamplerDepth;
-layout(binding = 1) uniform sampler2D SamplerNormalSpec;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -24,6 +23,15 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float DeltaUpdate;
     float Time;
 } basicDataUBO;
+
+layout(std140, binding = 6) uniform GBufferDataUBO
+{
+    sampler2D AlbedoAlpha;
+    sampler2D NormalSpecular;
+    sampler2D EmissiveRoughness;
+    sampler2D Velocity;
+    sampler2D Depth;
+} gBufferDataUBO;
 
 float SSAO(vec3 fragPos, vec3 normal);
 vec3 ViewToNDC(vec3 ndc);
@@ -43,7 +51,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    float depth = texture(SamplerDepth, uv).r;
+    float depth = texture(gBufferDataUBO.Depth, uv).r;
     if (depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
@@ -51,7 +59,7 @@ void main()
     }
     rngSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277;
 
-    vec3 normal = texture(SamplerNormalSpec, uv).rgb;
+    vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
 
     vec3 fragPos = NDCToViewSpace(vec3(uv, depth) * 2.0 - 1.0);
     mat3 worldToView = mat3(transpose(basicDataUBO.InvView));
@@ -72,7 +80,7 @@ float SSAO(vec3 fragPos, vec3 normal)
         vec3 samplePos = fragPos + CosineSampleHemisphere(GetRandomFloat01(), progress, normal) * Radius * mix(0.1, 1.0, progress * progress);
         
         vec3 projectedSample = ViewToNDC(samplePos) * 0.5 + 0.5;
-        float depth = texture(SamplerDepth, projectedSample.xy).r;
+        float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
     
         float weight = length(fragPos - samplePos) / Radius;
         occlusion += int(projectedSample.z >= depth) * weight;

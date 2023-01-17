@@ -45,7 +45,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 
 out InOutVars
 {
-    vec3 FragColor;
+    vec3 LightColor;
     vec3 FragPos;
     vec4 ClipPos;
     vec4 PrevClipPos;
@@ -65,7 +65,7 @@ void main()
     );
 
 
-    outData.FragColor = light.Color;
+    outData.LightColor = light.Color;
     outData.FragPos = (model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
     outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
