@@ -97,7 +97,7 @@ vec3 Upsample(sampler2D src, vec2 uv, float lod)
     result     += textureLodOffset(src, uv, lod, ivec2( 0.0, -1.0)).rgb * 2.0;
     result     += textureLodOffset(src, uv, lod, ivec2( 1.0, -1.0)).rgb * 1.0;
 
-    return result * (1.0 / 16.0);
+    return result / 16.0;
 }
 
 vec3 Prefilter(vec3 color)

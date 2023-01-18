@@ -87,6 +87,7 @@ namespace IDKEngine.Render
         public bool IsSSR;
         public bool IsVolumetricLighting;
         public bool IsVariableRateShading;
+        public bool IsDebugRenderVXGIGrid;
 
         public readonly SSAO SSAO;
         public readonly SSR SSR;
@@ -108,7 +109,8 @@ namespace IDKEngine.Render
 
         private readonly BufferObject gBufferData;
         private GLSLGBufferData glslGBufferData;
-        private readonly Framebuffer framebuffer;
+        private readonly Framebuffer gBufferFBO;
+        private readonly Framebuffer deferredLightingFBO;
         public unsafe RasterPipeline(int width, int height)
         {
             NvShadingRateImage[] shadingRates = new NvShadingRateImage[]
@@ -133,7 +135,8 @@ namespace IDKEngine.Render
                     new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/fragment.glsl")));
 
             lightingProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/DeferredRendering/Lighting/compute.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/Lighting/fragment.glsl")));
 
             skyBoxProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/SkyBox/vertex.glsl")),
@@ -143,7 +146,8 @@ namespace IDKEngine.Render
             gBufferData.ImmutableAllocate(sizeof(GLSLGBufferData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
 
-            framebuffer = new Framebuffer();
+            gBufferFBO = new Framebuffer();
+            deferredLightingFBO = new Framebuffer();
 
             IsWireframe = false;
             IsSSAO = true;
@@ -161,26 +165,41 @@ namespace IDKEngine.Render
             SetSize(width, height);
         }
 
-        public void Render(ModelSystem modelSystem, LightManager lightManager)
+        public void Render(ModelSystem modelSystem, in Matrix4 cullProjViewMatrix, LightManager lightManager = null)
         {
-            GL.Viewport(0, 0, Result.Width, Result.Height);
-
-            if (IsVariableRateShading)
+            if (IsVXGI || IsDebugRenderVXGIGrid)
             {
-                ShadingRateClassifier.IsEnabled = true;
+                // when voxelizing make sure every mesh is rendered
+                int i = 0;
+                modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                {
+                    cmd.InstanceCount = modelSystem.Meshes[i++].InstanceCount;
+                });
+
+                Voxelizer.Render(modelSystem);
+                Voxelizer.ResultVoxelsAlbedo.BindToUnit(1);
             }
 
-            Voxelizer.ResultVoxelsAlbedo.BindToUnit(1);
-
+            if (IsDebugRenderVXGIGrid)
             {
-                framebuffer.Bind();
-                framebuffer.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+                Voxelizer.DebugRender(Result);
+            }
+            else
+            {
 
                 if (IsWireframe)
                 {
                     GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
                 }
                 
+                GL.Viewport(0, 0, Result.Width, Result.Height);
+                if (IsVariableRateShading) ShadingRateClassifier.IsEnabled = true;
+                
+                gBufferFBO.Bind();
+                gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+                modelSystem.FrustumCull(cullProjViewMatrix);
+
                 gBufferProgram.Use();
                 modelSystem.Draw();
                 GL.Flush();
@@ -195,16 +214,27 @@ namespace IDKEngine.Render
                     SSAO.Compute();
                 }
 
-                Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
                 if (IsSSAO) SSAO.Result.BindToUnit(0); else Texture.UnbindFromUnit(0);
 
+                deferredLightingFBO.Bind();
+                deferredLightingFBO.Clear(ClearBufferMask.ColorBufferBit);
                 lightingProgram.Use();
-                GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+                GL.DepthMask(false);
+                GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
+                GL.DepthMask(true);
+
+                ShadingRateClassifier.IsEnabled = false;
 
                 if (IsVariableRateShading || ShadingRateClassifier.DebugValue != ShadingRateClassifier.DebugMode.NoDebug)
                 {
                     ShadingRateClassifier.Compute(Result);
+                }
+
+                gBufferFBO.Bind();
+
+                if (lightManager != null)
+                {
+                    lightManager.Draw();
                 }
 
                 GL.Disable(EnableCap.CullFace);
@@ -215,11 +245,7 @@ namespace IDKEngine.Render
 
                 GL.Enable(EnableCap.CullFace);
                 GL.DepthFunc(DepthFunction.Less);
-                GL.DepthMask(true);
-
-                lightManager.Draw();
             }
-            ShadingRateClassifier.IsEnabled = false;
 
             if (IsVolumetricLighting)
                 VolumetricLight.Compute();
@@ -284,14 +310,15 @@ namespace IDKEngine.Render
 
             gBufferData.SubData(0, sizeof(GLSLGBufferData), glslGBufferData);
 
-            framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
-            framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment1, albedoAlphaTexture);
-            framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment2, normalSpecularTexture);
-            framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment3, emissiveRoughnessTexture);
-            framebuffer.SetRenderTarget(FramebufferAttachment.ColorAttachment4, velocityTexture);
-            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, depthTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment1, albedoAlphaTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment2, normalSpecularTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment3, emissiveRoughnessTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment4, velocityTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.DepthAttachment, depthTexture);
+            gBufferFBO.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3, DrawBuffersEnum.ColorAttachment4 });
 
-            framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3, DrawBuffersEnum.ColorAttachment4 });
+            deferredLightingFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
         }
 
         public void Dispose()
@@ -310,7 +337,7 @@ namespace IDKEngine.Render
             skyBoxProgram.Dispose();
 
             gBufferData.Dispose();
-            framebuffer.Dispose();
+            gBufferFBO.Dispose();
         }
     }
 }

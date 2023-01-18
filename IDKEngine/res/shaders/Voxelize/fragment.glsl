@@ -120,8 +120,8 @@ void main()
 
     directLighting = clamp(directLighting, 0.0, 1.0);
     uvec4 quantizedLighting = uvec4(vec4(directLighting, 1.0) * 255.0);
-    uint packedAlbedo = (quantizedLighting.a << 24) | (quantizedLighting.b << 16) | (quantizedLighting.g << 8) | (quantizedLighting.r << 0);
-    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedAlbedo);
+    uint packedLighting = (quantizedLighting.a << 24) | (quantizedLighting.b << 16) | (quantizedLighting.g << 8) | (quantizedLighting.r << 0);
+    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedLighting);
 
 #endif
 

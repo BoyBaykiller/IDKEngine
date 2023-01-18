@@ -24,7 +24,7 @@ void main()
     result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3( 0,  0, -1));
     result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3( 0,  0,  1));
 
-    result *= (1.0 / 7.0);
+    result /= 7.0;
 
     imageStore(ImgResult, imgCoord, result);
 }

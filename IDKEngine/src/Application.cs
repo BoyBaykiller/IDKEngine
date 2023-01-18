@@ -28,7 +28,7 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsBloom = true, IsShadows = true, IsDebugRenderVXGIGrid;
+        public bool IsBloom = true, IsShadows = true;
         public int FPS;
 
         public Vector2i ViewportResolution { get; private set; }
@@ -59,24 +59,14 @@ namespace IDKEngine
                     GL.ColorMask(true, true, true, true);
                 }
 
-                // Shadows cull the command buffer. Make sure to restore default instance count for voxelization
-                int i = 0;
-                ModelSystem.UpdateDrawCommandBuffer(0, ModelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                if (RasterizerPipeline.IsDebugRenderVXGIGrid)
                 {
-                    cmd.InstanceCount = ModelSystem.Meshes[i++].InstanceCount;
-                });
-                RasterizerPipeline.Voxelizer.Render(ModelSystem);
-
-                if (IsDebugRenderVXGIGrid)
-                {
-                    RasterizerPipeline.Voxelizer.DebugRender(RasterizerPipeline.Result);
+                    RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
                     PostProcessor.Compute(RasterizerPipeline.Result, null, null, null, false);
                 }
                 else
                 {
-                    ModelSystem.FrustumCull(GLSLBasicData.ProjView);
-
-                    RasterizerPipeline.Render(ModelSystem, LightManager);
+                    RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView, LightManager);
 
                     if (IsBloom)
                         Bloom.Compute(RasterizerPipeline.Result);

@@ -266,14 +266,13 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("DoConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
                         if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
-                        ImGui.Checkbox("IsDebugRender", ref app.IsDebugRenderVXGIGrid);
-                        if (app.IsDebugRenderVXGIGrid)
+                        ImGui.Checkbox("IsDebugRender", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
+                        if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
                         {
                             tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
-                            const float min = 0.05f;
-                            if (ImGui.SliderFloat("DebugStepMultiplier", ref tempFloat, min, 1.0f))
+                            if (ImGui.SliderFloat("DebugStepMultiplier", ref tempFloat, 0.05f, 1.0f))
                             {
-                                tempFloat = MathF.Max(tempFloat, min);
+                                tempFloat = MathF.Max(tempFloat, 0.05f);
                                 app.RasterizerPipeline.Voxelizer.DebugStepMultiplier = tempFloat;
                             }
 

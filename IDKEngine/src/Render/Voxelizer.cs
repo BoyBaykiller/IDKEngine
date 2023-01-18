@@ -108,19 +108,13 @@ namespace IDKEngine.Render
 
         private void ClearTextures()
         {
-            //debugTimerQuery.Begin();
-
             ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, ResultVoxelsAlbedo.SizedInternalFormat);
 
             resetTexturesProgram.Use();
             GL.DispatchCompute((ResultVoxelsAlbedo.Width + 4 - 1) / 4, (ResultVoxelsAlbedo.Height + 4 - 1) / 4, (ResultVoxelsAlbedo.Depth + 4 - 1) / 4);
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
-
-            //debugTimerQuery.End();
-            //Console.WriteLine("Cleared voxel grid " + debugTimerQuery.MeasuredMilliseconds);
         }
 
-        TimerQuery debugTimerQuery = new TimerQuery();
         private void Voxelize(ModelSystem modelSystem)
         {
             fboNoAttachments.Bind();
@@ -160,8 +154,6 @@ namespace IDKEngine.Render
 
         private void Mipmap()
         {
-            //debugTimerQuery.Begin();
-
             ResultVoxelsAlbedo.BindToUnit(0);
             mipmapProgram.Use();
 
@@ -176,10 +168,6 @@ namespace IDKEngine.Render
                 GL.DispatchCompute((size.X + 4 - 1) / 4, (size.Y + 4 - 1) / 4, (size.Z + 4 - 1) / 4);
                 GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             }
-
-            //debugTimerQuery.End();
-            //Console.WriteLine("Generated mipmap " + debugTimerQuery.MeasuredMilliseconds);
-            //Console.WriteLine("====================");
         }
 
         public void DebugRender(Texture debugResult)
@@ -197,8 +185,6 @@ namespace IDKEngine.Render
             ResultVoxelsAlbedo = new Texture(TextureTarget3d.Texture3D);
             ResultVoxelsAlbedo.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
             ResultVoxelsAlbedo.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            //ResultVoxelsAlbedo.SetWrapMode(TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder, TextureWrapMode.ClampToBorder); // causes driver crash
-            //ResultVoxelsAlbedo.SetBorderColor(new Vector4(0.0f, 0.0f, 0.0f, 1.0f));
             ResultVoxelsAlbedo.SetAnisotropy(16.0f);
             ResultVoxelsAlbedo.ImmutableAllocate(width, height, depth, HAS_ATOMIC_FP16_VECTOR ? SizedInternalFormat.Rgba16f : SizedInternalFormat.Rgba8, Texture.GetMaxMipmapLevel(width, height, depth));
 
