@@ -2,7 +2,6 @@
 #extension GL_ARB_bindless_texture : require
 
 layout(location = 0) out vec4 FragColor;
-layout(location = 4) out vec2 VelocityColor;
 
 layout(std140, binding = 4) uniform SkyBoxUBO
 {
@@ -18,5 +17,4 @@ void main()
 {
     FragColor = texture(skyBoxUBO.Albedo, inData.TexCoord);
     // TODO: Implement velocity?
-    VelocityColor = vec2(0.0);
 }

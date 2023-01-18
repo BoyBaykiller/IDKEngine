@@ -3,9 +3,7 @@
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-
-layout(binding = 0) restrict writeonly uniform image2D ImgResult;
+layout(location = 0) out vec4 FragColor;
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler3D SamplerVoxelsAlbedo;
 
@@ -94,8 +92,6 @@ layout(std140, binding = 6) uniform GBufferDataUBO
     sampler2D Depth;
 } gBufferDataUBO;
 
-// Faster and much more random than Wang Hash
-// Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
 vec4 TraceCone(vec3 start, vec3 normal, vec3 direction, float coneAngle, float stepMultiplier);
 vec3 IndirectLight(vec3 start, vec3 normal, vec3 debug);
 uint GetPCGHash(inout uint seed);
@@ -116,20 +112,24 @@ uniform bool IsVXGI;
 
 uint rngSeed;
 
+in InOutVars
+{
+    vec2 TexCoord;
+} inData;
 
 void main()
 {
-    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
+    ivec2 imgCoord = ivec2(gl_FragCoord.xy);
+    vec2 uv = inData.TexCoord;
     
-    uint rawIndex = taaDataUBO.Frame;
-    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 * rawIndex;
-
     float depth = texture(gBufferDataUBO.Depth, uv).r;
     if (depth == 1.0)
     {
         return;
     }
+
+    uint rawIndex = taaDataUBO.Frame;
+    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 * rawIndex;
 
     float ambientOcclusion = 1.0 - texture(SamplerAO, uv).r;
     vec4 albedoAlpha = texture(gBufferDataUBO.AlbedoAlpha, uv);
@@ -174,7 +174,7 @@ void main()
 
     vec3 finalColor = (directLighting + indirectLight * albedo) * ambientOcclusion + emissive;
 
-    imageStore(ImgResult, imgCoord, vec4(finalColor, albedoAlpha.a));
+    FragColor = vec4(finalColor, albedoAlpha.a);
 }
 
 vec4 TraceCone(vec3 start, vec3 normal, vec3 direction, float coneAngle, float stepMultiplier)

@@ -56,7 +56,7 @@ namespace IDKEngine.Render.Objects
             GL.CreateTextures(Target, 1, out ID);
         }
 
-        public Texture(TextureBufferTarget textureBufferTarget, BufferObject bufferObject, SizedInternalFormat sizedInternalFormat = SizedInternalFormat.Rgba32f)
+        public Texture(TextureBufferTarget textureBufferTarget, BufferObject bufferObject, SizedInternalFormat sizedInternalFormat)
         {
             Target = (TextureTarget)textureBufferTarget;
             Dimension = TextureDimension.Undefined;
