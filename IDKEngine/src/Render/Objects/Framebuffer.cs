@@ -41,11 +41,6 @@ namespace IDKEngine.Render.Objects
             GL.NamedFramebufferTextureLayer(ID, framebufferAttachment, texture.ID, level, layer);
         }
 
-        public void SetRenderBuffer(Renderbuffer renderbuffer, FramebufferAttachment framebufferAttachment)
-        {
-            GL.NamedFramebufferRenderbuffer(ID, framebufferAttachment, RenderbufferTarget.Renderbuffer, renderbuffer.ID);
-        }
-
         public unsafe void SetDrawBuffers(Span<DrawBuffersEnum> drawBuffersEnums)
         {
             fixed (DrawBuffersEnum* ptr = drawBuffersEnums)

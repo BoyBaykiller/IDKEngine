@@ -8,15 +8,17 @@
 #extension GL_NV_gpu_shader5 : require
 #endif
 
-#ifdef GL_NV_shader_atomic_fp16_vector
-layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxelsAlbedo;
-#else
-layout(binding = 0, r32ui) restrict uniform uimage3D ImgVoxelsAlbedo;
+layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
+
+#ifndef GL_NV_shader_atomic_fp16_vector
+layout(binding = 1, r32ui) restrict uniform uimage3D ImgResultR;
+layout(binding = 2, r32ui) restrict uniform uimage3D ImgResultG;
+layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
 #endif
 
 struct Material
 {
-    sampler2D Albedo;
+    sampler2D AlbedoAlpha;
     sampler2D Normal;
     sampler2D Roughness;
     sampler2D Specular;
@@ -90,8 +92,8 @@ void main()
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
 
     Material material = materialSSBO.Materials[inData.MaterialIndex];
-    vec4 albedo = texture(material.Albedo, inData.TexCoord);
-    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedo.rgb;
+    vec4 albedoAlpha = texture(material.AlbedoAlpha, inData.TexCoord);
+    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedoAlpha.rgb;
 
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < shadowDataUBO.PointCount; i++)
@@ -99,29 +101,29 @@ void main()
         PointShadow pointShadow = shadowDataUBO.PointShadows[i];
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        directLighting += GetDirectLighting(light, albedo.rgb, sampleToLight) * Visibility(pointShadow, -sampleToLight);
+        directLighting += GetDirectLighting(light, albedoAlpha.rgb, sampleToLight) * Visibility(pointShadow, -sampleToLight);
     }
 
     for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - inData.FragPos;
-        directLighting += GetDirectLighting(light, albedo.rgb, sampleToLight);
+        directLighting += GetDirectLighting(light, albedoAlpha.rgb, sampleToLight);
     }
     const float ambient = 0.03;
-    directLighting += albedo.rgb * ambient;
+    directLighting += albedoAlpha.rgb * ambient;
     directLighting += emissive;
 
 #ifdef GL_NV_shader_atomic_fp16_vector
 
-    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, f16vec4(directLighting, 1.0));
+    imageAtomicMax(ImgResult, voxelPos, f16vec4(directLighting, 1.0));
 
 #else
 
-    directLighting = clamp(directLighting, 0.0, 1.0);
-    uvec4 quantizedLighting = uvec4(vec4(directLighting, 1.0) * 255.0);
-    uint packedLighting = (quantizedLighting.a << 24) | (quantizedLighting.b << 16) | (quantizedLighting.g << 8) | (quantizedLighting.r << 0);
-    imageAtomicMax(ImgVoxelsAlbedo, voxelPos, packedLighting);
+    imageAtomicMax(ImgResultR, voxelPos, floatBitsToUint(directLighting.r));
+    imageAtomicMax(ImgResultG, voxelPos, floatBitsToUint(directLighting.g));
+    imageAtomicMax(ImgResultB, voxelPos, floatBitsToUint(directLighting.b));
+    imageStore(ImgResult, voxelPos, uvec4(0.0, 0.0, 0.0, 1.0));
 
 #endif
 
@@ -166,6 +168,6 @@ float Visibility(PointShadow pointShadow, vec3 lightToSample)
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos)
 {
     vec3 ndc = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz;
-    ivec3 voxelPos = ivec3((ndc * 0.5 + 0.5) * imageSize(ImgVoxelsAlbedo));
+    ivec3 voxelPos = ivec3((ndc * 0.5 + 0.5) * imageSize(ImgResult));
     return voxelPos;
 }   

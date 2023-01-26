@@ -11,7 +11,7 @@ layout(location = 4) out vec2 Velocity;
 
 struct Material
 {
-    sampler2D Albedo;
+    sampler2D AlbedoAlpha;
     sampler2D Normal;
     sampler2D Roughness;
     sampler2D Specular;
@@ -73,8 +73,8 @@ void main()
 {
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     
-    vec4 albedo = texture(material.Albedo, inData.TexCoord);
-    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedo.rgb;
+    vec4 albedoAlpha = texture(material.AlbedoAlpha, inData.TexCoord);
+    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = inData.TangentToWorld * normalize(normal * 2.0 - 1.0);
     normal = normalize(mix(normalize(inData.Normal), normal, inData.NormalMapStrength));
@@ -82,7 +82,7 @@ void main()
     float roughness = clamp(texture(material.Roughness, inData.TexCoord).r + inData.RoughnessBias, 0.0, 1.0);
     float specular = clamp(texture(material.Specular, inData.TexCoord).r + inData.SpecularBias, 0.0, 1.0);
 
-    AlbedoAlpha = albedo;
+    AlbedoAlpha = albedoAlpha;
     NormalSpecular = vec4(normal, specular);
     EmissiveRoughness = vec4(emissive, roughness); 
 

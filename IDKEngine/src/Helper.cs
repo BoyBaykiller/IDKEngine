@@ -21,29 +21,29 @@ namespace IDKEngine
         public static readonly string API = GL.GetString(StringName.Version);
         public static readonly string GPU = GL.GetString(StringName.Renderer);
 
-        public static System.Numerics.Vector3 ToSystemVec(this Vector3 vector3)
+        public static System.Numerics.Vector3 ToNumerics(this Vector3 vector3)
         {
             return Unsafe.As<Vector3, System.Numerics.Vector3>(ref vector3);
         }
 
-        public static System.Numerics.Vector2 ToSystemVec(this Vector2 vector2)
+        public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
         {
             return Unsafe.As<Vector2, System.Numerics.Vector2>(ref vector2);
         }
 
-        public static Vector3 ToOpenTKVec(this System.Numerics.Vector3 vector3)
+        public static Vector3 ToOpenTK(this System.Numerics.Vector3 vector3)
         {
             return Unsafe.As<System.Numerics.Vector3, Vector3>(ref vector3);
         }
 
-        public static Vector2 ToOpenTKVec(this System.Numerics.Vector2 vector2)
+        public static Vector2 ToOpenTK(this System.Numerics.Vector2 vector2)
         {
             return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
         }
 
-        public static Matrix4 ToOpenTKMat(this Matrix4x4 matrix4x4)
+        public static Matrix4 ToOpenTK(this Matrix4x4 matrix4x4)
         {
-            return Matrix4.Transpose(Unsafe.As<Matrix4x4, Matrix4>(ref matrix4x4));
+            return Unsafe.As<Matrix4x4, Matrix4>(ref matrix4x4);
         }
 
         private static HashSet<string> GetExtensions()
