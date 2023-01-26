@@ -4,11 +4,8 @@
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 3) out;
 
-#ifdef GL_NV_shader_atomic_fp16_vector
-layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxelsAlbedo;
-#else
-layout(binding = 0, r32ui) restrict uniform uimage3D ImgVoxelsAlbedo;
-#endif
+layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
+
 
 layout(std140, binding = 5) uniform VoxelizerDataUBO
 {
@@ -60,7 +57,7 @@ void main()
 
     // Dilate Triangle
     // Source: https://wickedengine.net/2017/08/30/voxel-based-global-illumination/
-    vec2 viewportPixelSize = 1.0 / imageSize(ImgVoxelsAlbedo).xy;
+    vec2 viewportPixelSize = 1.0 / imageSize(ImgResult).xy;
     vec2 side0N = normalize(outNormDeviceCoords[1].xy - outNormDeviceCoords[0].xy);
     vec2 side1N = normalize(outNormDeviceCoords[2].xy - outNormDeviceCoords[1].xy);
     vec2 side2N = normalize(outNormDeviceCoords[0].xy - outNormDeviceCoords[2].xy);

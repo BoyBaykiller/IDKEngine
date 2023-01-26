@@ -190,96 +190,98 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Voxel Global Illumination (WIP)"))
                     {
-                        string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                        current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
-                        if (ImGui.BeginCombo("Resolution", current))
-                        {
-                            for (int i = 0; i < resolutions.Length; i++)
-                            {
-                                bool isSelected = current == resolutions[i];
-                                if (ImGui.Selectable(resolutions[i], isSelected))
-                                {
-                                    current = resolutions[i];
-                                    int size = Convert.ToInt32(current);
-                                    app.RasterizerPipeline.Voxelizer.SetSize(size, size, size);
-                                }
-
-                                if (isSelected)
-                                {
-                                    ImGui.SetItemDefaultFocus();
-                                }
-                            }
-                            ImGui.EndCombo();
-                        }
-                        ImGui.SameLine(); InfoMark("Low resolutions lead to more threads writing into a single voxel which can cause numerical precision issues and a performance hit.");
-
                         tempBool = app.RasterizerPipeline.IsVXGI;
                         if (ImGui.Checkbox("IsVXGI", ref tempBool))
                         {
                             app.RasterizerPipeline.IsVXGI = tempBool;
                         }
 
-                        tempFloat = app.RasterizerPipeline.NormalRayOffset;
-                        if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
+                        if (app.RasterizerPipeline.IsVXGI)
                         {
-                            app.RasterizerPipeline.NormalRayOffset = tempFloat;
-                        }
-
-                        int tempInt = app.RasterizerPipeline.MaxSamples;
-                        if (ImGui.SliderInt("MaxSamples", ref tempInt, 1, 24))
-                        {
-                            app.RasterizerPipeline.MaxSamples = tempInt;
-                        }
-
-                        tempFloat = app.RasterizerPipeline.GIBoost;
-                        if (ImGui.SliderFloat("GIBoost", ref tempFloat, 0.0f, 5.0f))
-                        {
-                            app.RasterizerPipeline.GIBoost = tempFloat;
-                        }
-
-                        tempFloat = app.RasterizerPipeline.GISkyBoxBoost;
-                        if (ImGui.SliderFloat("GISkyBoxBoost", ref tempFloat, 0.0f, 5.0f))
-                        {
-                            app.RasterizerPipeline.GISkyBoxBoost = tempFloat;
-                        }
-
-                        tempFloat = app.RasterizerPipeline.StepMultiplier;
-                        if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, 0.01f, 1.0f))
-                        {
-                            app.RasterizerPipeline.StepMultiplier = tempFloat;
-                        }
-
-                        ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
-                        ImGui.SameLine();
-                        InfoMark(
-                            "This hardware feature allows the engine to accumulate floating-point values without having to pack them into an integer first. " +
-                            "It also fixed various numerical precision issues which otherwise occur on the 8-Bit channel fallback path"
-                        );
-
-                        ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
-                        ImGui.SameLine();
-                        InfoMark(
-                            "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
-                            "This fixes some cracks in the voxelization, potentially with a performance penalty"
-                        );
-                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
-                        ImGui.Checkbox("DoConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
-                        if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
-
-                        ImGui.Checkbox("IsDebugRender", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
-                        if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
-                        {
-                            tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
-                            if (ImGui.SliderFloat("DebugStepMultiplier", ref tempFloat, 0.05f, 1.0f))
+                            string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
+                            current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
+                            if (ImGui.BeginCombo("Resolution", current))
                             {
-                                tempFloat = MathF.Max(tempFloat, 0.05f);
-                                app.RasterizerPipeline.Voxelizer.DebugStepMultiplier = tempFloat;
+                                for (int i = 0; i < resolutions.Length; i++)
+                                {
+                                    bool isSelected = current == resolutions[i];
+                                    if (ImGui.Selectable(resolutions[i], isSelected))
+                                    {
+                                        current = resolutions[i];
+                                        int size = Convert.ToInt32(current);
+                                        app.RasterizerPipeline.Voxelizer.SetSize(size, size, size);
+                                    }
+
+                                    if (isSelected)
+                                    {
+                                        ImGui.SetItemDefaultFocus();
+                                    }
+                                }
+                                ImGui.EndCombo();
                             }
 
-                            tempFloat = app.RasterizerPipeline.Voxelizer.DebugConeAngle;
-                            if (ImGui.SliderFloat("DebugConeAngle", ref tempFloat, 0, 0.5f))
+                            tempFloat = app.RasterizerPipeline.NormalRayOffset;
+                            if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
                             {
-                                app.RasterizerPipeline.Voxelizer.DebugConeAngle = tempFloat;
+                                app.RasterizerPipeline.NormalRayOffset = tempFloat;
+                            }
+
+                            int tempInt = app.RasterizerPipeline.MaxSamples;
+                            if (ImGui.SliderInt("MaxSamples", ref tempInt, 1, 24))
+                            {
+                                app.RasterizerPipeline.MaxSamples = tempInt;
+                            }
+
+                            tempFloat = app.RasterizerPipeline.GIBoost;
+                            if (ImGui.SliderFloat("GIBoost", ref tempFloat, 0.0f, 5.0f))
+                            {
+                                app.RasterizerPipeline.GIBoost = tempFloat;
+                            }
+
+                            tempFloat = app.RasterizerPipeline.GISkyBoxBoost;
+                            if (ImGui.SliderFloat("GISkyBoxBoost", ref tempFloat, 0.0f, 5.0f))
+                            {
+                                app.RasterizerPipeline.GISkyBoxBoost = tempFloat;
+                            }
+
+                            tempFloat = app.RasterizerPipeline.StepMultiplier;
+                            if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, 0.01f, 1.0f))
+                            {
+                                app.RasterizerPipeline.StepMultiplier = tempFloat;
+                            }
+
+                            ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
+                            ImGui.SameLine();
+                            InfoMark(
+                                "This hardware feature allows the engine to perform atomics on fp16 images without having to emulate such behaviour. " +
+                                "Most noticeably without this extension building the voxel grid requires 2.5x times the memory"
+                            );
+
+                            ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
+                            ImGui.SameLine();
+                            InfoMark(
+                                "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
+                                "This fixes some cracks in the voxelization, potentially with a performance penalty"
+                            );
+                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
+                            ImGui.Checkbox("DoConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
+                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
+
+                            ImGui.Checkbox("IsDebugRender", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
+                            if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
+                            {
+                                tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
+                                if (ImGui.SliderFloat("DebugStepMultiplier", ref tempFloat, 0.05f, 1.0f))
+                                {
+                                    tempFloat = MathF.Max(tempFloat, 0.05f);
+                                    app.RasterizerPipeline.Voxelizer.DebugStepMultiplier = tempFloat;
+                                }
+
+                                tempFloat = app.RasterizerPipeline.Voxelizer.DebugConeAngle;
+                                if (ImGui.SliderFloat("DebugConeAngle", ref tempFloat, 0, 0.5f))
+                                {
+                                    app.RasterizerPipeline.Voxelizer.DebugConeAngle = tempFloat;
+                                }
                             }
                         }
                     }
@@ -361,10 +363,10 @@ namespace IDKEngine.Render
                                 app.RasterizerPipeline.VolumetricLight.Strength = tempFloat;
                             }
 
-                            System.Numerics.Vector3 tempVec = app.RasterizerPipeline.VolumetricLight.Absorbance.ToSystemVec();
+                            System.Numerics.Vector3 tempVec = app.RasterizerPipeline.VolumetricLight.Absorbance.ToNumerics();
                             if (ImGui.InputFloat3("Absorbance", ref tempVec))
                             {
-                                Vector3 temp = tempVec.ToOpenTKVec();
+                                Vector3 temp = tempVec.ToOpenTK();
                                 temp = Vector3.ComponentMax(temp, Vector3.Zero);
                                 app.RasterizerPipeline.VolumetricLight.Absorbance = temp;
                             }
@@ -624,18 +626,18 @@ namespace IDKEngine.Render
                         shouldUpdateMesh = true;
                     }
                     
-                    System.Numerics.Vector3 systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToSystemVec();
+                    System.Numerics.Vector3 systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToNumerics();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
                         shouldUpdateMesh = true;
-                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTKVec());
+                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTK());
                     }
 
-                    systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractScale().ToSystemVec();
+                    systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractScale().ToNumerics();
                     if (ImGui.DragFloat3("Scale", ref systemVec3, 0.005f))
                     {
                         shouldUpdateMesh = true;
-                        Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTKVec(), new Vector3(0.001f));
+                        Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTK(), new Vector3(0.001f));
                         app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = Matrix4.CreateScale(temp) * app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearScale();
                     }
 
@@ -669,10 +671,10 @@ namespace IDKEngine.Render
                         shouldUpdateMesh = true;
                     }
 
-                    systemVec3 = mesh.Absorbance.ToSystemVec();
+                    systemVec3 = mesh.Absorbance.ToNumerics();
                     if (ImGui.InputFloat3("Absorbance", ref systemVec3))
                     {
-                        Vector3 temp = systemVec3.ToOpenTKVec();
+                        Vector3 temp = systemVec3.ToOpenTK();
                         temp = Vector3.ComponentMax(temp, Vector3.Zero);
 
                         mesh.Absorbance = temp;
@@ -691,18 +693,18 @@ namespace IDKEngine.Render
                     bool shouldUpdateLight = false;
                     ref GLSLLight light = ref app.LightManager.Lights[selectedEntityIndex];
 
-                    System.Numerics.Vector3 systemVec3 = light.Position.ToSystemVec();
+                    System.Numerics.Vector3 systemVec3 = light.Position.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
                         shouldUpdateLight = true;
-                        light.Position = systemVec3.ToOpenTKVec();
+                        light.Position = systemVec3.ToOpenTK();
                     }
 
-                    systemVec3 = light.Color.ToSystemVec();
+                    systemVec3 = light.Color.ToNumerics();
                     if (ImGui.DragFloat3("Color", ref systemVec3, 0.1f, 0.0f))
                     {
                         shouldUpdateLight = true;
-                        light.Color = systemVec3.ToOpenTKVec();
+                        light.Color = systemVec3.ToOpenTK();
                     }
 
                     if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f))
@@ -900,7 +902,7 @@ namespace IDKEngine.Render
                 Vector2i point = new Vector2i((int)app.MouseState.Position.X, (int)app.MouseState.Position.Y);
                 if (app.RenderGui)
                 {
-                    point -= (Vector2i)viewportHeaderSize.ToOpenTKVec();
+                    point -= (Vector2i)viewportHeaderSize.ToOpenTK();
                 }
                 point.Y = app.PostProcessor.Result.Height - point.Y;
 

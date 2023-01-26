@@ -167,7 +167,7 @@ namespace IDKEngine.Render
 
         public void Render(ModelSystem modelSystem, in Matrix4 cullProjViewMatrix, LightManager lightManager = null)
         {
-            if (IsVXGI || IsDebugRenderVXGIGrid)
+            if (IsVXGI)
             {
                 // when voxelizing make sure every mesh is rendered
                 int i = 0;
@@ -208,13 +208,16 @@ namespace IDKEngine.Render
                 {
                     GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
                 }
-                
+
                 if (IsSSAO)
                 {
                     SSAO.Compute();
+                    SSAO.Result.BindToUnit(0);
                 }
-
-                if (IsSSAO) SSAO.Result.BindToUnit(0); else Texture.UnbindFromUnit(0);
+                else
+                {
+                    Texture.UnbindFromUnit(0);
+                }
 
                 deferredLightingFBO.Bind();
                 deferredLightingFBO.Clear(ClearBufferMask.ColorBufferBit);

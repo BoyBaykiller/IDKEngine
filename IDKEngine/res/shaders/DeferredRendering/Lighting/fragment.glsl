@@ -125,7 +125,7 @@ void main()
     float depth = texture(gBufferDataUBO.Depth, uv).r;
     if (depth == 1.0)
     {
-        return;
+        discard;
     }
 
     uint rawIndex = taaDataUBO.Frame;
@@ -165,14 +165,14 @@ void main()
     vec3 indirectLight = vec3(0.0);
     if (IsVXGI)
     {
-        indirectLight = IndirectLight(fragPos, normal, reflect(viewDir, normal)) * GIBoost;
+        indirectLight = IndirectLight(fragPos, normal, reflect(viewDir, normal)) * GIBoost * albedo;
     }
     else
     {
-        indirectLight = vec3(0.03);
+        indirectLight = vec3(0.03) * albedo;
     }
 
-    vec3 finalColor = (directLighting + indirectLight * albedo) * ambientOcclusion + emissive;
+    vec3 finalColor = (directLighting + indirectLight) * ambientOcclusion + emissive;
 
     FragColor = vec4(finalColor, albedoAlpha.a);
 }

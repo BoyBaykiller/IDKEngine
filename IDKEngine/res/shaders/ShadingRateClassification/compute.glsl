@@ -7,6 +7,7 @@
 #define TILE_SIZE 16 // used in shader and client code - keep in sync!
 #extension GL_ARB_bindless_texture : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_NV_gpu_shader5 : enable
 #extension GL_AMD_gcn_shader : enable
 
 // used in shader and client code - keep in sync!

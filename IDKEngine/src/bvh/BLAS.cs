@@ -171,8 +171,8 @@ namespace IDKEngine
                     nodeMax = Sse.Max(nodeMax, v2);
                 }
 
-                node.Min = nodeMin.AsVector3().ToOpenTKVec();
-                node.Max = nodeMax.AsVector3().ToOpenTKVec();
+                node.Min = nodeMin.AsVector3().ToOpenTK();
+                node.Max = nodeMax.AsVector3().ToOpenTK();
             }
         }
 

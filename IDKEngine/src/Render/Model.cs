@@ -185,7 +185,7 @@ namespace IDKEngine.Render.Objects
                     ulong textureHandle = texture.GenTextureHandleARB();
 
                     /// Yes I prefer this pointer trickery over a long switch statement
-                    fixed (ulong* ptr = &Materials[i].Albedo)
+                    fixed (ulong* ptr = &Materials[i].AlbedoAlpha)
                     {
                         *(ptr + j) = textureHandle;
                     }

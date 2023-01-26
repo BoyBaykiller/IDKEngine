@@ -35,8 +35,8 @@ namespace IDKEngine
             Vector128<float> min = Vector128.Create(Min.X, Min.Y, Min.Z, 0.0f);
             Vector128<float> max = Vector128.Create(Max.X, Max.Y, Max.Z, 0.0f);
 
-            Min = Sse.Min(min, p).AsVector3().ToOpenTKVec();
-            Max = Sse.Max(max, p).AsVector3().ToOpenTKVec();
+            Min = Sse.Min(min, p).AsVector3().ToOpenTK();
+            Max = Sse.Max(max, p).AsVector3().ToOpenTK();
         }
 
         public void Shrink(in AABB aaab)
