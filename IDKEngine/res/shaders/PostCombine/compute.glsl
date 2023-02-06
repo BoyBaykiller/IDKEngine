@@ -5,10 +5,8 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(binding = 0) writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D Sampler0;
 layout(binding = 1) uniform sampler2D Sampler1;
-layout(binding = 2) uniform sampler2D Sampler2;
-layout(binding = 3) uniform sampler2D Sampler3;
 
-vec3 LinearToInverseGamma(vec3 rgb, float gamma);
+vec3 LinearToSrgb(vec3 rgb, float gamma);
 vec3 ACESFilm(vec3 x);
 
 // Source: https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/shaders/globals.hlsli#L824
@@ -34,11 +32,9 @@ void main()
 
     vec3 color = texture(Sampler0, uv).rgb;
     color += texture(Sampler1, uv).rgb;
-    color += texture(Sampler2, uv).rgb;
-    color += texture(Sampler3, uv).rgb;
 
     color = ACESFilm(color);
-    color = LinearToInverseGamma(color, Gamma);
+    color = LinearToSrgb(color, Gamma);
 
     if (IsDithering)
     {
@@ -50,7 +46,7 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 
-vec3 LinearToInverseGamma(vec3 rgb, float gamma)
+vec3 LinearToSrgb(vec3 rgb, float gamma)
 {
     return pow(rgb, vec3(1.0 / gamma));
 }

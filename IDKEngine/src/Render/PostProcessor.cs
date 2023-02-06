@@ -112,7 +112,7 @@ namespace IDKEngine.Render
             IsTaaArtifactMitigation = true;
         }
 
-        public void Compute(Texture v0, Texture v1, Texture v2, Texture v3, bool resolveTAA)
+        public void Compute(bool resolveTAA, Texture v0 = null, Texture v1 = null)
         {
             isPing = !isPing;
             (isPing ? taaPing : taaPong).BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, taaPing.SizedInternalFormat);
@@ -122,12 +122,6 @@ namespace IDKEngine.Render
 
             if (v1 != null) v1.BindToUnit(1);
             else Texture.UnbindFromUnit(1);
-
-            if (v2 != null) v2.BindToUnit(2);
-            else Texture.UnbindFromUnit(2);
-
-            if (v3 != null) v3.BindToUnit(3);
-            else Texture.UnbindFromUnit(3);
 
             combineProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

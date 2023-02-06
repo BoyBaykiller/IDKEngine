@@ -92,8 +92,8 @@ void main()
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     
-    mat3 localToWorld = mat3(transpose(inverse(model)));
-    outData.Normal = normalize(localToWorld * normal);
+    mat3 normalToWorld = mat3(transpose(inverse(model)));
+    outData.Normal = normalize(normalToWorld * normal);
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;

@@ -36,7 +36,7 @@ namespace IDKEngine.Render.Objects
             GL.NamedFramebufferTexture(ID, framebufferAttachment, texture.ID, level);
         }
 
-        public void SetTextureLayer(FramebufferAttachment framebufferAttachment, Texture texture, int layer, int level = 0)
+        public void SetRenderTargetLayer(FramebufferAttachment framebufferAttachment, Texture texture, int layer, int level = 0)
         {
             GL.NamedFramebufferTextureLayer(ID, framebufferAttachment, texture.ID, level, layer);
         }

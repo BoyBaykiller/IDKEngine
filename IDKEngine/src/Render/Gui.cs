@@ -4,7 +4,6 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
-using System.Net.Security;
 
 namespace IDKEngine.Render
 {
@@ -220,34 +219,34 @@ namespace IDKEngine.Render
                                 ImGui.EndCombo();
                             }
 
-                            tempFloat = app.RasterizerPipeline.NormalRayOffset;
+                            tempFloat = app.RasterizerPipeline.ConeTracer.NormalRayOffset;
                             if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
                             {
-                                app.RasterizerPipeline.NormalRayOffset = tempFloat;
+                                app.RasterizerPipeline.ConeTracer.NormalRayOffset = tempFloat;
                             }
 
-                            int tempInt = app.RasterizerPipeline.MaxSamples;
+                            int tempInt = app.RasterizerPipeline.ConeTracer.MaxSamples;
                             if (ImGui.SliderInt("MaxSamples", ref tempInt, 1, 24))
                             {
-                                app.RasterizerPipeline.MaxSamples = tempInt;
+                                app.RasterizerPipeline.ConeTracer.MaxSamples = tempInt;
                             }
 
-                            tempFloat = app.RasterizerPipeline.GIBoost;
+                            tempFloat = app.RasterizerPipeline.ConeTracer.GIBoost;
                             if (ImGui.SliderFloat("GIBoost", ref tempFloat, 0.0f, 5.0f))
                             {
-                                app.RasterizerPipeline.GIBoost = tempFloat;
+                                app.RasterizerPipeline.ConeTracer.GIBoost = tempFloat;
                             }
 
-                            tempFloat = app.RasterizerPipeline.GISkyBoxBoost;
+                            tempFloat = app.RasterizerPipeline.ConeTracer.GISkyBoxBoost;
                             if (ImGui.SliderFloat("GISkyBoxBoost", ref tempFloat, 0.0f, 5.0f))
                             {
-                                app.RasterizerPipeline.GISkyBoxBoost = tempFloat;
+                                app.RasterizerPipeline.ConeTracer.GISkyBoxBoost = tempFloat;
                             }
 
-                            tempFloat = app.RasterizerPipeline.StepMultiplier;
+                            tempFloat = app.RasterizerPipeline.ConeTracer.StepMultiplier;
                             if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, 0.01f, 1.0f))
                             {
-                                app.RasterizerPipeline.StepMultiplier = tempFloat;
+                                app.RasterizerPipeline.ConeTracer.StepMultiplier = tempFloat;
                             }
 
                             ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");

@@ -56,13 +56,12 @@ namespace IDKEngine
                 if (IsShadows)
                 {
                     pointShadowManager.UpdateShadowMaps(ModelSystem);
-                    GL.ColorMask(true, true, true, true);
                 }
 
                 if (RasterizerPipeline.IsDebugRenderVXGIGrid)
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
-                    PostProcessor.Compute(RasterizerPipeline.Result, null, null, null, false);
+                    PostProcessor.Compute(false, RasterizerPipeline.Result, null);
                 }
                 else
                 {
@@ -71,7 +70,7 @@ namespace IDKEngine
                     if (IsBloom)
                         Bloom.Compute(RasterizerPipeline.Result);
 
-                    PostProcessor.Compute(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, RasterizerPipeline.IsVolumetricLighting ? RasterizerPipeline.VolumetricLight.Result : null, RasterizerPipeline.IsSSR ? RasterizerPipeline.SSR.Result : null, true);
+                    PostProcessor.Compute(true, RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
                     RasterizerPipeline.ShadingRateClassifier.DebugRender(PostProcessor.Result);
                 }
 
@@ -83,7 +82,7 @@ namespace IDKEngine
                 if (IsBloom)
                     Bloom.Compute(PathTracer.Result);
 
-                PostProcessor.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null, null, null, false);
+                PostProcessor.Compute(false, PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
             Framebuffer.Bind(0);
@@ -276,6 +275,10 @@ namespace IDKEngine
             FrameRecorder = new FrameStateRecorder<RecordableState>();
             gui = new Gui(WindowSize.X, WindowSize.Y);
         }
+        protected override void OnEnd()
+        {
+
+        }
 
         protected override void OnResize()
         {
@@ -286,6 +289,11 @@ namespace IDKEngine
             {
                 SetViewportResolution(WindowSize.X, WindowSize.Y);
             }
+        }
+
+        protected override void OnKeyPress(char key)
+        {
+            gui.ImGuiBackend.PressChar(key);
         }
 
         public void SetViewportResolution(int width, int height)
@@ -316,17 +324,6 @@ namespace IDKEngine
                 PostProcessor.SetSize(width, height);
             }
         }
-
-        protected override void OnEnd()
-        {
-
-        }
-
-        protected override void OnKeyPress(char key)
-        {
-            gui.ImGuiBackend.PressChar(key);
-        }
-
 
         private RenderMode _renderMode;
         public RenderMode GetRenderMode()

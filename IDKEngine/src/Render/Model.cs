@@ -8,8 +8,9 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using Assimp;
 using StbImageSharp;
+using IDKEngine.Render.Objects;
 
-namespace IDKEngine.Render.Objects
+namespace IDKEngine.Render
 {
     class Model
     {
@@ -182,7 +183,7 @@ namespace IDKEngine.Render.Objects
                             texture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
                         }
                     }
-                    ulong textureHandle = texture.GenTextureHandleARB();
+                    ulong textureHandle = texture.MakeTextureHandleARB();
 
                     /// Yes I prefer this pointer trickery over a long switch statement
                     fixed (ulong* ptr = &Materials[i].AlbedoAlpha)

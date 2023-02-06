@@ -164,9 +164,8 @@ namespace IDKEngine.GUI
             else
                 io.MousePos = new System.Numerics.Vector2(wnd.MouseState.Position.X, wnd.MouseState.Position.Y);
 
-            // TODO: Implement
-            //io.MouseWheel = wnd.MouseState.Scroll.X;
-            //io.MouseWheelH = wnd.MouseState.Scroll.Y;
+            io.MouseWheel = (float)wnd.MouseState.ScrollX;
+            io.MouseWheelH = (float)wnd.MouseState.ScrollY;
 
             for (int i = 0; i < Keyboard.KeyValues.Length; i++)
             {
@@ -177,7 +176,9 @@ namespace IDKEngine.GUI
             }
 
             for (int i = 0; i < pressedChars.Count; i++)
+            {
                 io.AddInputCharacter(pressedChars[i]);
+            }
 
             pressedChars.Clear();
 

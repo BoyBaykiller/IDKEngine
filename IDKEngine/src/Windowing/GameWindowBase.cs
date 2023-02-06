@@ -146,13 +146,12 @@ namespace IDKEngine
 
             windowCharDelegate = WindowCharCallback;
             GLFW.SetCharCallback(window, windowCharDelegate);
-            
+
             monitor = GLFW.GetPrimaryMonitor();
             videoMode = GLFW.GetVideoMode(monitor);
             KeyboardState = new Keyboard(window);
             MouseState = new Mouse(window);
             WindowPosition = new Vector2i(videoMode->Width / 2 - _size.X / 2, videoMode->Height / 2 - _size.Y / 2);
-            updateTimer = new Stopwatch();
 
             GLFW.MakeContextCurrent(window);
             OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
@@ -169,8 +168,6 @@ namespace IDKEngine
                 double runTime = currentTime - lastTime;
                 
                 GLFW.PollEvents();
-                //DispatchUpdateFrame();
-                // TODO: Fix seperate update and render again without breaking camera, vrs or taa
                 KeyboardState.Update();
                 MouseState.Update();
                 OnUpdate((float)runTime);
@@ -184,38 +181,6 @@ namespace IDKEngine
             OnEnd();
         }
 
-        private readonly Stopwatch updateTimer;
-        private double updateEpsilon;
-        private bool isRunningSlowly;
-        // Source: https://github.com/opentk/opentk/blob/558132bd2cc41eed704f6e6acd1e3fe5830df5ad/src/OpenTK.Windowing.Desktop/GameWindow.cs#L258
-        private void DispatchUpdateFrame()
-        {
-            double updatePeriod = 1.0 / WindowRefreshRate;
-
-            double isRunningSlowlyRetries = 4;
-            double elapsed = updateTimer.Elapsed.TotalSeconds;
-
-            while (elapsed > 0.0 && elapsed + updateEpsilon >= updatePeriod)
-            {
-                updateTimer.Restart();
-                KeyboardState.Update();
-                MouseState.Update();
-                OnUpdate((float)elapsed);
-
-                updateEpsilon += elapsed - updatePeriod;
-
-                isRunningSlowly = updateEpsilon >= updatePeriod;
-
-                if (isRunningSlowly && --isRunningSlowlyRetries == 0)
-                    break;
-
-                elapsed = updateTimer.Elapsed.TotalSeconds;
-            }
-        }
-
-        /// <summary>
-        /// Initiates the first step of SetWindowShouldClose -> OnEnd
-        /// </summary>
         public void ShouldClose()
         {
             GLFW.SetWindowShouldClose(window, true);
@@ -228,6 +193,7 @@ namespace IDKEngine
         protected abstract void OnResize();
         protected abstract void OnKeyPress(char key);
 
+        
         private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeDelegate;
         private void FramebufferSizeCallback(Window* window, int width, int height)
         {

@@ -55,7 +55,7 @@ namespace IDKEngine.Render
             MaxDist = maxDist;
         }
 
-        public unsafe void Compute(Texture colorTexture)
+        public void Compute(Texture colorTexture)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             colorTexture.BindToUnit(0);
