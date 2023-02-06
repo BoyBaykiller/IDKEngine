@@ -8,68 +8,6 @@ namespace IDKEngine.Render
 {
     class RasterPipeline : IDisposable
     {
-        // provisionally make seperate class that does cone tracing using g buffer data
-
-        private float _normalRayOffset;
-        public float NormalRayOffset
-        { 
-            get => _normalRayOffset;
-
-            set
-            {
-                _normalRayOffset = value;
-                lightingProgram.Upload("NormalRayOffset", _normalRayOffset);
-            }
-        }
-
-        private int _maxSamples;
-        public int MaxSamples
-        {
-            get => _maxSamples;
-
-            set
-            {
-                _maxSamples = value;
-                lightingProgram.Upload("MaxSamples", _maxSamples);
-            }
-        }
-
-        private float _giBoost;
-        public float GIBoost
-        {
-            get => _giBoost;
-
-            set
-            {
-                _giBoost = value;
-                lightingProgram.Upload("GIBoost", _giBoost);
-            }
-        }
-
-        private float _giSkyBoxBoost;
-        public float GISkyBoxBoost
-        {
-            get => _giSkyBoxBoost;
-
-            set
-            {
-                _giSkyBoxBoost = value;
-                lightingProgram.Upload("GISkyBoxBoost", _giSkyBoxBoost);
-            }
-        }
-
-        private float _stepMultiplier;
-        public float StepMultiplier
-        {
-            get => _stepMultiplier;
-
-            set
-            {
-                _stepMultiplier = value;
-                lightingProgram.Upload("StepMultiplier", _stepMultiplier);
-            }
-        }
-
         private bool _isVXGI;
         public bool IsVXGI
         {
@@ -94,6 +32,7 @@ namespace IDKEngine.Render
         public readonly VolumetricLighter VolumetricLight;
         public readonly ShadingRateClassifier ShadingRateClassifier;
         public readonly Voxelizer Voxelizer;
+        public readonly ConeTracer ConeTracer;
 
         public Texture Result;
 
@@ -106,11 +45,13 @@ namespace IDKEngine.Render
         private readonly ShaderProgram gBufferProgram;
         private readonly ShaderProgram lightingProgram;
         private readonly ShaderProgram skyBoxProgram;
+        private readonly ShaderProgram mergeLightingProgram;
 
         private readonly BufferObject gBufferData;
-        private GLSLGBufferData glslGBufferData;
         private readonly Framebuffer gBufferFBO;
         private readonly Framebuffer deferredLightingFBO;
+
+        private GLSLGBufferData glslGBufferData;
         public unsafe RasterPipeline(int width, int height)
         {
             NvShadingRateImage[] shadingRates = new NvShadingRateImage[]
@@ -129,6 +70,7 @@ namespace IDKEngine.Render
             SSR = new SSR(width, height, 30, 8, 50.0f);
             VolumetricLight = new VolumetricLighter(width, height, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
+            ConeTracer = new ConeTracer(width, height);
 
             gBufferProgram = new ShaderProgram(
                     new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/vertex.glsl")),
@@ -142,6 +84,8 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/SkyBox/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/SkyBox/fragment.glsl")));
 
+            mergeLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MergeLighting/compute.glsl")));
+
             gBufferData = new BufferObject();
             gBufferData.ImmutableAllocate(sizeof(GLSLGBufferData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
@@ -154,12 +98,6 @@ namespace IDKEngine.Render
             IsSSR = false;
             IsVolumetricLighting = true;
             IsVariableRateShading = false;
-
-            NormalRayOffset = 1.0f;
-            MaxSamples = 8;
-            GIBoost = 2.0f;
-            GISkyBoxBoost = 1.0f / GIBoost;
-            StepMultiplier = 0.15f;
             IsVXGI = false;
 
             SetSize(width, height);
@@ -186,7 +124,6 @@ namespace IDKEngine.Render
             }
             else
             {
-
                 if (IsWireframe)
                 {
                     GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
@@ -212,15 +149,14 @@ namespace IDKEngine.Render
                 if (IsSSAO)
                 {
                     SSAO.Compute();
-                    SSAO.Result.BindToUnit(0);
                 }
-                else
+
+                if (IsVXGI)
                 {
-                    Texture.UnbindFromUnit(0);
+                    ConeTracer.Compute(Voxelizer.ResultVoxelsAlbedo);
                 }
 
                 deferredLightingFBO.Bind();
-                deferredLightingFBO.Clear(ClearBufferMask.ColorBufferBit);
                 lightingProgram.Use();
                 GL.DepthMask(false);
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
@@ -248,22 +184,41 @@ namespace IDKEngine.Render
 
                 GL.Enable(EnableCap.CullFace);
                 GL.DepthFunc(DepthFunction.Less);
+
+                if (IsVolumetricLighting)
+                    VolumetricLight.Compute();
+
+                if (IsSSR)
+                    SSR.Compute(Result);
+
+                Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+                Result.BindToUnit(0);
+                if (IsVXGI) ConeTracer.Result.BindToUnit(1);
+                else Texture.UnbindFromUnit(1);            
+
+                if (IsSSAO) SSAO.Result.BindToUnit(2);
+                else Texture.UnbindFromUnit(2);
+
+                if (IsSSR) SSR.Result.BindToUnit(3);
+                else Texture.UnbindFromUnit(3);
+
+                if (IsVolumetricLighting) VolumetricLight.Result.BindToUnit(4);
+                else Texture.UnbindFromUnit(4);
+
+                mergeLightingProgram.Use();
+                GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
             }
 
-            if (IsVolumetricLighting)
-                VolumetricLight.Compute();
-
-            if (IsSSR)
-                SSR.Compute(Result);
         }
 
         private void DisposeBindlessTextures()
         {
-            if (albedoAlphaTexture != null) { Texture.UnmakeTextureHandleResidentARB(glslGBufferData.AlbedoAlpha); albedoAlphaTexture.Dispose(); }
-            if (normalSpecularTexture != null) { Texture.UnmakeTextureHandleResidentARB(glslGBufferData.NormalSpecular); normalSpecularTexture.Dispose(); }
-            if (emissiveRoughnessTexture != null) { Texture.UnmakeTextureHandleResidentARB(glslGBufferData.EmissiveRoughness); emissiveRoughnessTexture.Dispose(); }
-            if (velocityTexture != null) { Texture.UnmakeTextureHandleResidentARB(glslGBufferData.Velocity); velocityTexture.Dispose(); }
-            if (depthTexture != null) { Texture.UnmakeTextureHandleResidentARB(glslGBufferData.Depth); depthTexture.Dispose(); }
+            if (albedoAlphaTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.AlbedoAlpha); albedoAlphaTexture.Dispose(); }
+            if (normalSpecularTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.NormalSpecular); normalSpecularTexture.Dispose(); }
+            if (emissiveRoughnessTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.EmissiveRoughness); emissiveRoughnessTexture.Dispose(); }
+            if (velocityTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.Velocity); velocityTexture.Dispose(); }
+            if (depthTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.Depth); depthTexture.Dispose(); }
         }
 
         public unsafe void SetSize(int width, int height)
@@ -272,6 +227,7 @@ namespace IDKEngine.Render
             SSR.SetSize(width, height);
             VolumetricLight.SetSize(width, height);
             ShadingRateClassifier.SetSize(width, height);
+            ConeTracer.SetSize(width, height);
 
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
@@ -285,31 +241,31 @@ namespace IDKEngine.Render
             albedoAlphaTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             albedoAlphaTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             albedoAlphaTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
-            glslGBufferData.AlbedoAlpha = albedoAlphaTexture.GenTextureHandleARB();
+            glslGBufferData.AlbedoAlpha = albedoAlphaTexture.MakeTextureHandleARB();
 
             normalSpecularTexture = new Texture(TextureTarget2d.Texture2D);
             normalSpecularTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             normalSpecularTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             normalSpecularTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8Snorm);
-            glslGBufferData.NormalSpecular = normalSpecularTexture.GenTextureHandleARB();
+            glslGBufferData.NormalSpecular = normalSpecularTexture.MakeTextureHandleARB();
 
             emissiveRoughnessTexture = new Texture(TextureTarget2d.Texture2D);
             emissiveRoughnessTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             emissiveRoughnessTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             emissiveRoughnessTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
-            glslGBufferData.EmissiveRoughness = emissiveRoughnessTexture.GenTextureHandleARB();
+            glslGBufferData.EmissiveRoughness = emissiveRoughnessTexture.MakeTextureHandleARB();
 
             velocityTexture = new Texture(TextureTarget2d.Texture2D);
             velocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             velocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             velocityTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rg16f);
-            glslGBufferData.Velocity = velocityTexture.GenTextureHandleARB();
+            glslGBufferData.Velocity = velocityTexture.MakeTextureHandleARB();
 
             depthTexture = new Texture(TextureTarget2d.Texture2D);
             depthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             depthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             depthTexture.ImmutableAllocate(width, height, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent24);
-            glslGBufferData.Depth = depthTexture.GenTextureHandleARB();
+            glslGBufferData.Depth = depthTexture.MakeTextureHandleARB();
 
             gBufferData.SubData(0, sizeof(GLSLGBufferData), glslGBufferData);
 
@@ -331,6 +287,7 @@ namespace IDKEngine.Render
             VolumetricLight.Dispose();
             ShadingRateClassifier.Dispose();
             Voxelizer.Dispose();
+            ConeTracer.Dispose();
 
             Result.Dispose();
             DisposeBindlessTextures();
@@ -338,9 +295,12 @@ namespace IDKEngine.Render
             gBufferProgram.Dispose();
             lightingProgram.Dispose();
             skyBoxProgram.Dispose();
+            mergeLightingProgram.Dispose();
 
             gBufferData.Dispose();
+
             gBufferFBO.Dispose();
+            deferredLightingFBO.Dispose();
         }
     }
 }

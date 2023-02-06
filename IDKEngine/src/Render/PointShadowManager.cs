@@ -57,6 +57,7 @@ namespace IDKEngine.Render
         public void UpdateShadowMaps(ModelSystem modelSystem)
         {
             GL.ColorMask(false, false, false, false);
+            GL.Disable(EnableCap.CullFace);
             for (int i = 0; i < Count; i++)
             {
                 PointShadow pointShadow = pointShadows[i];
@@ -69,6 +70,8 @@ namespace IDKEngine.Render
 
                 pointShadow.Render(modelSystem, i, renderProgram, cullingProgram);
             }
+            GL.Enable(EnableCap.CullFace);
+            GL.ColorMask(true, true, true, true);
         }
 
         private unsafe void UploadPointShadow(int index)

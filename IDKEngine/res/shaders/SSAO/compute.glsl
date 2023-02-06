@@ -35,7 +35,7 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 
 float SSAO(vec3 fragPos, vec3 normal);
 vec3 ViewToNDC(vec3 ndc);
-vec3 NDCToViewSpace(vec3 ndc);
+vec3 NDCToView(vec3 ndc);
 vec3 CosineSampleHemisphere(float u, float v, vec3 normal);
 float GetRandomFloat01();
 uint GetPCGHash(inout uint seed);
@@ -61,11 +61,11 @@ void main()
 
     vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
 
-    vec3 fragPos = NDCToViewSpace(vec3(uv, depth) * 2.0 - 1.0);
-    mat3 worldToView = mat3(transpose(basicDataUBO.InvView));
-    vec3 viewSpaceNormal = normalize(worldToView * normal);
+    vec3 fragPos = NDCToView(vec3(uv, depth) * 2.0 - 1.0);
+    mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
+    normal = normalize(normalToView * normal);
 
-    float occlusion = SSAO(fragPos, viewSpaceNormal);
+    float occlusion = SSAO(fragPos, normal);
 
     imageStore(ImgResult, imgCoord, vec4(vec3(occlusion), 1.0));
 }
@@ -97,7 +97,7 @@ vec3 ViewToNDC(vec3 viewPos)
     return clipPos.xyz / clipPos.w;
 }
 
-vec3 NDCToViewSpace(vec3 ndc)
+vec3 NDCToView(vec3 ndc)
 {
     vec4 viewPos = basicDataUBO.InvProjection * vec4(ndc, 1.0);
     return viewPos.xyz / viewPos.w;

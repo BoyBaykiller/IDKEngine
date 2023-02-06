@@ -16,5 +16,8 @@ in InOutVars
 void main()
 {
     FragColor = texture(skyBoxUBO.Albedo, inData.TexCoord);
+    // unfortunately simply doing gl_Position.xyww is not sufficient (on nvidia)
+    gl_FragDepth = 1.0;
+    
     // TODO: Implement velocity?
 }

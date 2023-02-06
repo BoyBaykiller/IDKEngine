@@ -59,7 +59,7 @@ void main()
 
     vec2 velocity = texelFetch(gBufferDataUBO.Velocity, bestVelocityPixel, 0).rg / taaDataUBO.VelScale;
     vec2 historyUV = uv - velocity;
-    if (any(greaterThan(historyUV, vec2(1.0))) || any(lessThan(historyUV, vec2(0.0))))
+    if (any(greaterThanEqual(historyUV, vec2(1.0))) || any(lessThan(historyUV, vec2(0.0))))
     {
         imageStore(ImgResult, imgCoord, vec4(currentColor, 1.0));
         return;

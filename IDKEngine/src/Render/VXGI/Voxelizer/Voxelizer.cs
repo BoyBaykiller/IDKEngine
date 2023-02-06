@@ -58,7 +58,6 @@ namespace IDKEngine.Render
             }
         }
 
-
         /// <summary>
         /// GL_NV_conservative_raster must be available for this to have an effect
         /// </summary>
@@ -77,19 +76,19 @@ namespace IDKEngine.Render
         private readonly Framebuffer fboNoAttachments;
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.2f)
         {
-            resetTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Clear/compute.glsl")));
+            resetTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 
             voxelizeProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Voxelize/vertex.glsl")),
-                new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/Voxelize/geometry.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Voxelize/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/vertex.glsl")),
+                new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/geometry.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/fragment.glsl")));
 
-            mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Mipmap/compute.glsl")));
-            visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/Visualization/compute.glsl")));
+            mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Mipmap/compute.glsl")));
+            visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Visualization/compute.glsl")));
             if (!HAS_ATOMIC_FP16_VECTOR)
             {
                 intermediateRbg = new Texture[3];
-                mergeIntermediatesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Voxelize/MergeIntermediates/compute.glsl")));
+                mergeIntermediatesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/MergeIntermediates/compute.glsl")));
             }
 
             voxelizerDataBuffer = new BufferObject();
@@ -251,6 +250,8 @@ namespace IDKEngine.Render
             visualizeDebugProgram.Dispose();
 
             voxelizerDataBuffer.Dispose();
+
+            fboNoAttachments.Dispose();
         }
     }
 }

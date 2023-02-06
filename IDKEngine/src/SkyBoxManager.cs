@@ -19,7 +19,7 @@ namespace IDKEngine
                 if (SkyBoxTexture != null)
                 {
                     skyBoxTextureUBO.GetSubData(0, sizeof(ulong), out ulong currentTextureHandle);
-                    Texture.UnmakeTextureHandleResidentARB(currentTextureHandle); // unmake handle resident to properly delete texture
+                    Texture.UnmakeTextureHandleARB(currentTextureHandle); // unmake handle resident to properly delete texture
                 }
 
                 if (_isExternalSkyBox)
@@ -49,7 +49,7 @@ namespace IDKEngine
                 // Fixed since 22.7.1
                 /// Info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
                 SkyBoxTexture.SetSeamlessCubeMapPerTextureARB_AMD(true);
-                skyBoxTextureUBO.SubData(0, sizeof(ulong), SkyBoxTexture.GenTextureHandleARB());
+                skyBoxTextureUBO.SubData(0, sizeof(ulong), SkyBoxTexture.MakeTextureHandleARB());
             }
         }
 

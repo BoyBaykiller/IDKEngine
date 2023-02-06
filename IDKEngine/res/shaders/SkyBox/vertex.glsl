@@ -65,5 +65,5 @@ void main()
 {
     outData.TexCoord = positions[gl_VertexID];
     mat4 viewNoTranslation = mat4(basicDataUBO.View[0], basicDataUBO.View[1], basicDataUBO.View[2], vec4(0.0, 0.0, 0.0, 1.0));
-    gl_Position = (basicDataUBO.Projection * viewNoTranslation * vec4(outData.TexCoord, 1.0)).xyww;
+    gl_Position = (basicDataUBO.Projection * viewNoTranslation * vec4(outData.TexCoord, 1.0));
 }

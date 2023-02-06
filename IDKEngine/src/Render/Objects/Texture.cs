@@ -265,7 +265,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong GenTextureHandleARB()
+        public ulong MakeTextureHandleARB()
         {
             ulong textureHandle = (ulong)GL.Arb.GetTextureHandle(ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
@@ -276,7 +276,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong GenTextureSamplerHandleARB(SamplerObject samplerObject)
+        public ulong MakeTextureSamplerHandleARB(SamplerObject samplerObject)
         {
             ulong textureHandle = (ulong)GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
@@ -287,7 +287,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public static void UnmakeTextureHandleResidentARB(ulong textureHandle)
+        public static void UnmakeTextureHandleARB(ulong textureHandle)
         {
             GL.Arb.MakeTextureHandleNonResident(textureHandle);
         }
@@ -296,7 +296,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong GetImageHandleARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
+        public ulong MakeImageHandleARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
         {
             ulong imageHandle = (ulong)GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
             GL.Arb.MakeImageHandleResident(imageHandle, (All)textureAccess);
@@ -307,7 +307,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public static void UnmakeImageHandleResidentARB(ulong imageHandle)
+        public static void UnmakeImageHandleARB(ulong imageHandle)
         {
             GL.Arb.MakeImageHandleNonResident(imageHandle);
         }

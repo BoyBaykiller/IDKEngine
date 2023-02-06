@@ -5,6 +5,12 @@ namespace IDKEngine
 {
     unsafe class Mouse
     {
+        private enum ScrollUpdateState
+        {
+            Unchanged = 0,
+            Changed = 1,
+        }
+
         private CursorModeValue _cursorMode;
         public CursorModeValue CursorMode
         {
@@ -30,25 +36,32 @@ namespace IDKEngine
                 GLFW.SetCursorPos(window, _position.X, _position.Y);
             }
         }
+        
         public Vector2 LastPosition { get; private set; }
+
+        public double ScrollX { get; private set; }
+        public double ScrollY { get; private set; }
 
         public InputState this[MouseButton button]
         {
             get => buttonStates[(int)button];
         }
 
-        private readonly InputState[] buttonStates;
-
         private readonly Window* window;
+        private readonly InputState[] buttonStates;
         public Mouse(Window* window)
         {
             this.window = window;
             buttonStates = new InputState[8];
 
+            windowScrollDelegate = WindowScrollCallback;
+            GLFW.SetScrollCallback(window, windowScrollDelegate);
+            
             GLFW.GetCursorPos(window, out double x, out double y);
             Position = new Vector2((float)x, (float)y);
         }
 
+        private ScrollUpdateState scrollUpdateState = ScrollUpdateState.Unchanged;
         public unsafe void Update()
         {
             for (int i = 0; i < buttonStates.Length; i++)
@@ -64,8 +77,26 @@ namespace IDKEngine
                 }
             }
             GLFW.GetCursorPos(window, out double x, out double y);
-
             Position = new Vector2((float)x, (float)y);
+
+            if (scrollUpdateState == ScrollUpdateState.Unchanged)
+            {
+                ScrollX = 0.0;
+                ScrollY = 0.0;
+            }
+
+            if (scrollUpdateState == ScrollUpdateState.Changed)
+            {
+                scrollUpdateState = ScrollUpdateState.Unchanged;
+            }
+        }
+
+        private readonly GLFWCallbacks.ScrollCallback windowScrollDelegate;
+        private void WindowScrollCallback(Window* window, double x, double y)
+        {
+            ScrollX += x;
+            ScrollX += y;
+            scrollUpdateState = ScrollUpdateState.Changed;
         }
     }
 }
