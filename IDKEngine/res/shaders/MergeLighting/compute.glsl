@@ -36,4 +36,3 @@ void main()
     color += volumetricLighting;
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
-

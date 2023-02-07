@@ -30,7 +30,7 @@ namespace IDKEngine.Render
         public readonly SSAO SSAO;
         public readonly SSR SSR;
         public readonly VolumetricLighter VolumetricLight;
-        public readonly ShadingRateClassifier ShadingRateClassifier;
+        public readonly ShadingRateClassifier lightingVRS;
         public readonly Voxelizer Voxelizer;
         public readonly ConeTracer ConeTracer;
 
@@ -62,7 +62,7 @@ namespace IDKEngine.Render
                 NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
                 NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
             };
-            ShadingRateClassifier = new ShadingRateClassifier(shadingRates, 
+            lightingVRS = new ShadingRateClassifier(shadingRates, 
                 new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")),
                 new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/debugCompute.glsl")), width, height);
 
@@ -124,13 +124,12 @@ namespace IDKEngine.Render
             }
             else
             {
+                GL.Viewport(0, 0, Result.Width, Result.Height);
+
                 if (IsWireframe)
                 {
                     GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
                 }
-                
-                GL.Viewport(0, 0, Result.Width, Result.Height);
-                if (IsVariableRateShading) ShadingRateClassifier.IsEnabled = true;
                 
                 gBufferFBO.Bind();
                 gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
@@ -155,18 +154,19 @@ namespace IDKEngine.Render
                 {
                     ConeTracer.Compute(Voxelizer.ResultVoxelsAlbedo);
                 }
+                GL.Viewport(0, 0, Result.Width, Result.Height);
 
+                if (IsVariableRateShading) ShadingRateClassifier.IsEnabled = true;
                 deferredLightingFBO.Bind();
                 lightingProgram.Use();
                 GL.DepthMask(false);
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
                 GL.DepthMask(true);
-
                 ShadingRateClassifier.IsEnabled = false;
 
-                if (IsVariableRateShading || ShadingRateClassifier.DebugValue != ShadingRateClassifier.DebugMode.NoDebug)
+                if (IsVariableRateShading || lightingVRS.DebugValue != ShadingRateClassifier.DebugMode.NoDebug)
                 {
-                    ShadingRateClassifier.Compute(Result);
+                    lightingVRS.Compute(Result);
                 }
 
                 gBufferFBO.Bind();
@@ -186,10 +186,14 @@ namespace IDKEngine.Render
                 GL.DepthFunc(DepthFunction.Less);
 
                 if (IsVolumetricLighting)
+                {
                     VolumetricLight.Compute();
+                }
 
                 if (IsSSR)
+                {
                     SSR.Compute(Result);
+                }
 
                 Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
                 Result.BindToUnit(0);
@@ -226,7 +230,7 @@ namespace IDKEngine.Render
             SSAO.SetSize(width, height);
             SSR.SetSize(width, height);
             VolumetricLight.SetSize(width, height);
-            ShadingRateClassifier.SetSize(width, height);
+            lightingVRS.SetSize(width, height);
             ConeTracer.SetSize(width, height);
 
             if (Result != null) Result.Dispose();
@@ -285,7 +289,7 @@ namespace IDKEngine.Render
             SSAO.Dispose();
             SSR.Dispose();
             VolumetricLight.Dispose();
-            ShadingRateClassifier.Dispose();
+            lightingVRS.Dispose();
             Voxelizer.Dispose();
             ConeTracer.Dispose();
 

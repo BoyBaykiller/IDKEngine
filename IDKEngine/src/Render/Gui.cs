@@ -246,25 +246,19 @@ namespace IDKEngine.Render
                             tempFloat = app.RasterizerPipeline.ConeTracer.StepMultiplier;
                             if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, 0.01f, 1.0f))
                             {
-                                app.RasterizerPipeline.ConeTracer.StepMultiplier = tempFloat;
+                                app.RasterizerPipeline.ConeTracer.StepMultiplier = MathF.Max(tempFloat, 0.01f);
                             }
 
-                            ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
+                            tempBool = app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation;
+                            if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
+                            {
+                                app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
+                            }
                             ImGui.SameLine();
                             InfoMark(
-                                "This hardware feature allows the engine to perform atomics on fp16 images without having to emulate such behaviour. " +
-                                "Most noticeably without this extension building the voxel grid requires 2.5x times the memory"
+                                $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)." +
+                                "If TAA is disabled this has no effect."
                             );
-
-                            ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
-                            ImGui.SameLine();
-                            InfoMark(
-                                "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
-                                "This fixes some cracks in the voxelization, potentially with a performance penalty"
-                            );
-                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
-                            ImGui.Checkbox("DoConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
-                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
                             ImGui.Checkbox("IsDebugRender", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
                             if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
@@ -282,6 +276,25 @@ namespace IDKEngine.Render
                                     app.RasterizerPipeline.Voxelizer.DebugConeAngle = tempFloat;
                                 }
                             }
+
+                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
+                            ImGui.Checkbox("IsConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
+                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
+
+                            ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
+                            ImGui.SameLine();
+                            InfoMark(
+                                "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
+                                "This fixes missing voxels with very small triangles at a small performance penalty"
+                            );
+
+                            ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
+                            ImGui.SameLine();
+                            InfoMark(
+                                "This hardware feature allows the engine to perform atomics on fp16 images without having to emulate such behaviour. " +
+                                "Most noticeably without this extension building the voxel grid requires 2.5x times the memory"
+                            );
+
                         }
                     }
 
@@ -308,7 +321,7 @@ namespace IDKEngine.Render
                             nameof(ShadingRateClassifier.DebugMode.LuminanceVariance),
                         };
 
-                        current = app.RasterizerPipeline.ShadingRateClassifier.DebugValue.ToString();
+                        current = app.RasterizerPipeline.lightingVRS.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
                             for (int i = 0; i < debugModes.Length; i++)
@@ -317,7 +330,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(debugModes[i], isSelected))
                                 {
                                     current = debugModes[i];
-                                    app.RasterizerPipeline.ShadingRateClassifier.DebugValue = ShadingRateClassifier.DebugMode.NoDebug + i;
+                                    app.RasterizerPipeline.lightingVRS.DebugValue = ShadingRateClassifier.DebugMode.NoDebug + i;
                                 }
 
                                 if (isSelected)
@@ -326,16 +339,16 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        tempFloat = app.RasterizerPipeline.ShadingRateClassifier.SpeedFactor;
+                        tempFloat = app.RasterizerPipeline.lightingVRS.SpeedFactor;
                         if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
-                            app.RasterizerPipeline.ShadingRateClassifier.SpeedFactor = tempFloat;
+                            app.RasterizerPipeline.lightingVRS.SpeedFactor = tempFloat;
                         }
 
-                        tempFloat = app.RasterizerPipeline.ShadingRateClassifier.LumVarianceFactor;
+                        tempFloat = app.RasterizerPipeline.lightingVRS.LumVarianceFactor;
                         if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
                         {
-                            app.RasterizerPipeline.ShadingRateClassifier.LumVarianceFactor = tempFloat;
+                            app.RasterizerPipeline.lightingVRS.LumVarianceFactor = tempFloat;
                         }
                     }
 
@@ -371,17 +384,15 @@ namespace IDKEngine.Render
                             }
 
                             tempBool = app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation;
-                            if (!app.PostProcessor.TaaEnabled) ImGui.BeginDisabled();
                             if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
                             {
                                 app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation = tempBool;
                             }
                             ImGui.SameLine();
                             InfoMark(
-                                "Requires TAA to be enabled. " +
-                                $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)."
+                                $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)." +
+                                "If TAA is disabled this has no effect."
                             );
-                            if (!app.PostProcessor.TaaEnabled) ImGui.EndDisabled();
                         }
                     }
 

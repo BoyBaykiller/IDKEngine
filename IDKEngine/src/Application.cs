@@ -68,10 +68,12 @@ namespace IDKEngine
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView, LightManager);
 
                     if (IsBloom)
+                    {
                         Bloom.Compute(RasterizerPipeline.Result);
+                    }
 
                     PostProcessor.Compute(true, RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
-                    RasterizerPipeline.ShadingRateClassifier.DebugRender(PostProcessor.Result);
+                    RasterizerPipeline.lightingVRS.DebugRender(PostProcessor.Result);
                 }
 
             }
@@ -80,7 +82,9 @@ namespace IDKEngine
                 PathTracer.Compute();
 
                 if (IsBloom)
+                {
                     Bloom.Compute(PathTracer.Result);
+                }
 
                 PostProcessor.Compute(false, PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
@@ -125,10 +129,14 @@ namespace IDKEngine
             }
 
             if (KeyboardState[Keys.Escape] == InputState.Pressed)
+            {
                 ShouldClose();
+            }
 
             if (KeyboardState[Keys.V] == InputState.Touched)
+            {
                 WindowVSync = !WindowVSync;
+            }
             
             if (KeyboardState[Keys.G] == InputState.Touched)
             {
@@ -140,7 +148,9 @@ namespace IDKEngine
             }
 
             if (KeyboardState[Keys.F11] == InputState.Touched)
+            {
                 WindowFullscreen = !WindowFullscreen;
+            }
 
             //Vector3 pos = ModelSystem.ModelMatrices[25][0].ExtractTranslation();
             //pos += new Vector3(0.0f, MathF.Sin(WindowTime * 1.1f) * 0.005f, 0.0f);
@@ -238,8 +248,8 @@ namespace IDKEngine
             sponza.Meshes[2].RoughnessBias = -1.0f;
 
             sponza.Meshes[10].EmissiveBias = 11.0f;
-            sponza.Meshes[8].SpecularBias = 1.0f;
-            sponza.Meshes[8].RoughnessBias = -1.0f;
+            sponza.Meshes[8].SpecularBias = 0.541f;
+            sponza.Meshes[8].RoughnessBias = -0.35f;
             sponza.Meshes[3].EmissiveBias = 2.67f;
             sponza.Meshes[17].RefractionChance = 1.0f;
             sponza.Meshes[17].RoughnessBias = -0.7f;
@@ -275,6 +285,7 @@ namespace IDKEngine
             FrameRecorder = new FrameStateRecorder<RecordableState>();
             gui = new Gui(WindowSize.X, WindowSize.Y);
         }
+
         protected override void OnEnd()
         {
 
