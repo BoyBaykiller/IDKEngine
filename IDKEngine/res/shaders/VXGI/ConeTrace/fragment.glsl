@@ -104,7 +104,7 @@ vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance
 
     vec3 diffuse = vec3(0.0);
     float materialVariance = GetMaterialVariance(specularChance, roughness);
-    uint samples = int(mix(1.0, MaxSamples, materialVariance));
+    uint samples = int(mix(1.0, float(MaxSamples), materialVariance));
 
     uint noiseIndex = IsTemporalAccumulation ? (taaDataUBO.Frame % taaDataUBO.Samples) * MaxSamples * 3 : 0u;
     for (uint i = 0; i < samples; i++)
