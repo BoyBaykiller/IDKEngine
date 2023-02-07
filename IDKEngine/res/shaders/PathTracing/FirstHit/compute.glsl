@@ -381,6 +381,8 @@ bool TraceRay(inout TransportRay transportRay)
 
 vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out float newIor, out bool isRefractive, out bool fromInside)
 {
+    roughness *= roughness;
+
     float cosTheta = dot(-incomming, normal);
     fromInside = cosTheta < 0.0;
     if (fromInside)
@@ -400,7 +402,7 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
     if (specularChance > raySelectRoll)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);
-        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, roughness * roughness));
+        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, roughness));
         outgoing = reflectionRayDir;
         rayProbability = specularChance;
         newIor = fromInside ? ior : 1.0;
@@ -412,9 +414,9 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
         if (!isRefractive) // Total Internal Reflection
         {
             refractionRayDir = reflect(incomming, normal);
-            refractionRayDir = normalize(mix(refractionRayDir, diffuseRayDir, roughness * roughness));
+            refractionRayDir = normalize(mix(refractionRayDir, diffuseRayDir, roughness));
         }
-        refractionRayDir = normalize(mix(refractionRayDir, isRefractive ? -diffuseRayDir : diffuseRayDir, roughness * roughness));
+        refractionRayDir = normalize(mix(refractionRayDir, isRefractive ? -diffuseRayDir : diffuseRayDir, roughness));
         outgoing = refractionRayDir;
         rayProbability = refractionChance;
 

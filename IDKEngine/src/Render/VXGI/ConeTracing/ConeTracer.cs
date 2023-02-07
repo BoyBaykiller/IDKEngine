@@ -67,6 +67,19 @@ namespace IDKEngine.Render
             }
         }
 
+
+        private bool _isTemporalAccumulation;
+        public bool IsTemporalAccumulation
+        {
+            get => _isTemporalAccumulation;
+
+            set
+            {
+                _isTemporalAccumulation = value;
+                shaderProgram.Upload("IsTemporalAccumulation", _isTemporalAccumulation);
+            }
+        }
+
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
         private readonly Framebuffer fbo;
@@ -81,16 +94,18 @@ namespace IDKEngine.Render
             SetSize(width, height);
 
             NormalRayOffset = 1.0f;
-            MaxSamples = 8;
+            MaxSamples = 4;
             GIBoost = 2.0f;
             GISkyBoxBoost = 1.0f / GIBoost;
-            StepMultiplier = 0.15f;
+            StepMultiplier = 0.16f;
+            IsTemporalAccumulation = true;
         }
 
         public void Compute(Texture voxelsAlbedo)
         {
-            voxelsAlbedo.BindToUnit(0);
+            GL.Viewport(0, 0, Result.Width, Result.Height);
 
+            voxelsAlbedo.BindToUnit(0);
             fbo.Bind();
             shaderProgram.Use();
 
@@ -104,7 +119,6 @@ namespace IDKEngine.Render
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgb16f);
 
             fbo.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);

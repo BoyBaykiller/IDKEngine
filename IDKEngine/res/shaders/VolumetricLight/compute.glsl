@@ -81,7 +81,7 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
 bool Shadow(PointShadow pointShadow, vec3 lightToSample);
 vec3 NDCToWorld(vec3 ndc);
 float ComputeScattering(float lightDotView);
-float InterleavedGradientNoise(vec2 imgCoord, uint frame);
+float InterleavedGradientNoise(vec2 imgCoord, uint index);
 
 uniform int Samples;
 uniform float Scattering;
@@ -175,8 +175,8 @@ float ComputeScattering(float lightDotView)
 }
 
 // Source: https://www.shadertoy.com/view/WsfBDf
-float InterleavedGradientNoise(vec2 imgCoord, uint frame) 
+float InterleavedGradientNoise(vec2 imgCoord, uint index) 
 {
-    imgCoord += float(frame) * 5.588238;
+    imgCoord += float(index) * 5.588238;
     return fract(52.9829189 * fract(0.06711056 * imgCoord.x + 0.00583715 * imgCoord.y));
 }

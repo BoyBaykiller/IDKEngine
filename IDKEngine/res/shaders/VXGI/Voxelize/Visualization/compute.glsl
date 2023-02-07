@@ -39,7 +39,7 @@ layout(std140, binding = 5) uniform VoxelizerDataUBO
     float _pad1;
 } voxelizerDataUBO;
 
-vec4 TraceCone(vec3 uvtStart, vec3 direction, float coneAngle, float stepMultiplier);
+vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier);
 bool RayCuboidIntersect(Ray ray, vec3 min, vec3 max, out float t1, out float t2);
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 
