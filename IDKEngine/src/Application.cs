@@ -37,20 +37,6 @@ namespace IDKEngine
         private int fps;
         protected override unsafe void OnRender(float dT)
         {
-            GLSLBasicData.DeltaUpdate = dT;
-            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
-            GLSLBasicData.View = Camera.ViewMatrix;
-            GLSLBasicData.InvView = GLSLBasicData.View.Inverted();
-            GLSLBasicData.ProjView = GLSLBasicData.View * GLSLBasicData.Projection;
-            GLSLBasicData.InvProjView = GLSLBasicData.ProjView.Inverted();
-            GLSLBasicData.CameraPos = Camera.Position;
-            GLSLBasicData.Time = WindowTime;
-            if (GetRenderMode() == RenderMode.PathTracer && GLSLBasicData.PrevProjView != GLSLBasicData.ProjView)
-            {
-                PathTracer.ResetRender();
-            }
-            basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
-
             if (GetRenderMode() == RenderMode.Rasterizer)
             {
                 if (IsShadows)
@@ -61,7 +47,7 @@ namespace IDKEngine
                 if (RasterizerPipeline.IsDebugRenderVXGIGrid)
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
-                    PostProcessor.Compute(false, RasterizerPipeline.Result, null);
+                    PostProcessor.Compute(false, RasterizerPipeline.Result);
                 }
                 else
                 {
@@ -114,12 +100,40 @@ namespace IDKEngine
             GL.Enable(EnableCap.DepthTest);
             GL.Disable(EnableCap.Blend);
 
+
+            // TODO: Observe performance and potentially optimize
+            ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
+
             fps++;
         }
 
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        protected override void OnUpdate(float dT)
+        protected override unsafe void OnUpdate(float dT)
         {
+            GLSLBasicData.DeltaUpdate = dT;
+            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
+            GLSLBasicData.View = Camera.ViewMatrix;
+            GLSLBasicData.InvView = GLSLBasicData.View.Inverted();
+            GLSLBasicData.ProjView = GLSLBasicData.View * GLSLBasicData.Projection;
+            GLSLBasicData.InvProjView = GLSLBasicData.ProjView.Inverted();
+            GLSLBasicData.CameraPos = Camera.Position;
+            GLSLBasicData.Time = WindowTime;
+            basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
+
+            bool meshModelChanged = false;
+            for (int i = 0; i < ModelSystem.MeshInstances.Length; i++)
+            {
+                if (ModelSystem.MeshInstances[i].ResetPrevModelMatrixToCurrent())
+                {
+                    meshModelChanged = true;
+                }
+            }
+
+            if (GetRenderMode() == RenderMode.PathTracer && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || meshModelChanged))
+            {
+                PathTracer.ResetRender();
+            }
+
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
                 FPS = fps;
@@ -152,10 +166,9 @@ namespace IDKEngine
                 WindowFullscreen = !WindowFullscreen;
             }
 
-            //Vector3 pos = ModelSystem.ModelMatrices[25][0].ExtractTranslation();
-            //pos += new Vector3(0.0f, MathF.Sin(WindowTime * 1.1f) * 0.005f, 0.0f);
-            //ModelSystem.ModelMatrices[25][0] = ModelSystem.ModelMatrices[25][0].ClearTranslation() * Matrix4.CreateTranslation(pos);
-            //ModelSystem.UpdateModelMatricesBuffer(25, 26);
+            //Vector3 pos = ModelSystem.MeshInstances[17].ModelMatrix.ExtractTranslation();
+            //pos += new Vsector3(0.0f, MathF.Sin(WindowTime * 30.0f) * 0.1f, 0.0f);
+            //ModelSystem.MeshInstances[17].ModelMatrix = ModelSystem.MeshInstances[17].ModelMatrix.ClearTranslation() * Matrix4.CreateTranslation(pos);
 
             gui.Update(this, dT);
         }
@@ -239,8 +252,8 @@ namespace IDKEngine
             });
             
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
-            for (int i = 0; i < sponza.ModelMatrices.Length; i++) // 0.0145f
-                sponza.ModelMatrices[i][0] = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
+            for (int i = 0; i < sponza.MeshInstances.Length; i++) // 0.0145f
+                sponza.MeshInstances[i].ModelMatrix = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
 
             // fix transparency
             sponza.Meshes[0].RoughnessBias = -1.0f;
@@ -248,14 +261,14 @@ namespace IDKEngine
             sponza.Meshes[2].RoughnessBias = -1.0f;
 
             sponza.Meshes[10].EmissiveBias = 11.0f;
-            sponza.Meshes[8].SpecularBias = 0.541f;
-            sponza.Meshes[8].RoughnessBias = -0.35f;
+            sponza.Meshes[8].SpecularBias = 0.4f;
+            sponza.Meshes[8].RoughnessBias = -0.4f;
             sponza.Meshes[3].EmissiveBias = 2.67f;
             sponza.Meshes[17].RefractionChance = 1.0f;
             sponza.Meshes[17].RoughnessBias = -0.7f;
 
             Model lucy = new Model("res/models/Lucy/Lucy.gltf");
-            lucy.ModelMatrices[0][0] = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f);
+            lucy.MeshInstances[0].ModelMatrix = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f);
             lucy.Meshes[0].RefractionChance = 0.9f;
             lucy.Meshes[0].IOR = 1.174f;
             lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);

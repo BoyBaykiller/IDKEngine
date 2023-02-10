@@ -58,20 +58,11 @@ namespace IDKEngine
         private static readonly HashSet<string> glExtensions = GetExtensions();
 
 
-        /// <summary>
-        /// </summary>
-        /// <param name="extension">The extension to check against. Examples: GL_ARB_bindless_texture or WGL_EXT_swap_control</param>
-        /// <returns>True if the extension is available</returns>
         public static bool IsExtensionsAvailable(string extension)
         {
             return glExtensions.Contains(extension);
         }
 
-        /// <summary>
-        /// </summary>
-        /// <param name="extension">Extension to check against. Examples: GL_ARB_direct_state_access or GL_ARB_compute_shader</param>
-        /// <param name="first">API version the extension became part of the core profile</param>
-        /// <returns>True if this GL version >=<paramref name="first"/> or the extension is otherwise available</returns>
         public static bool IsCoreExtensionAvailable(string extension, double first)
         {
             return (APIVersion >= first) || IsExtensionsAvailable(extension);

@@ -420,7 +420,7 @@ namespace IDKEngine.Render
                             int tempInt = app.PostProcessor.TaaSamples;
                             if (ImGui.SliderInt("Samples   ", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
                             {
-                                app.PostProcessor.TaaSamples = tempInt;
+                                app.PostProcessor.TaaSamples = Math.Min(tempInt, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
                             }
                         }
                     }
@@ -495,14 +495,12 @@ namespace IDKEngine.Render
                         tempBool = app.PathTracer.IsDebugBVHTraversal;
                         if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
                         {
-                            shouldResetPT = true;
                             app.PathTracer.IsDebugBVHTraversal = tempBool;
                         }
 
                         tempBool = app.PathTracer.IsTraceLights;
                         if (ImGui.Checkbox("IsTraceLights", ref tempBool))
                         {
-                            shouldResetPT = true;
                             app.PathTracer.IsTraceLights = tempBool;
                         }
 
@@ -517,21 +515,18 @@ namespace IDKEngine.Render
                             int tempInt = app.PathTracer.RayDepth;
                             if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                             {
-                                shouldResetPT = true;
                                 app.PathTracer.RayDepth = tempInt;
                             }
 
                             float floatTemp = app.PathTracer.FocalLength;
                             if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                             {
-                                shouldResetPT = true;
                                 app.PathTracer.FocalLength = floatTemp;
                             }
 
                             floatTemp = app.PathTracer.LenseRadius;
                             if (ImGui.InputFloat("LenseRadius", ref floatTemp, 0.002f))
                             {
-                                shouldResetPT = true;
                                 app.PathTracer.LenseRadius = floatTemp;
                             }
                         }
@@ -625,30 +620,31 @@ namespace IDKEngine.Render
                 if (selectedEntityType == EntityType.Mesh)
                 {
                     bool shouldUpdateMesh = false;
-                    ref GLSLMesh mesh = ref app.ModelSystem.Meshes[selectedEntityIndex];
                     ref readonly GLSLDrawCommand cmd = ref app.ModelSystem.DrawCommands[selectedEntityIndex];
+                    ref GLSLMesh mesh = ref app.ModelSystem.Meshes[selectedEntityIndex];
+                    ref GLSLMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");
                     ImGui.SameLine(); if (ImGui.Button("Teleport to camera"))
                     {
-                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(app.Camera.Position);
+                        meshInstance.ModelMatrix = meshInstance.ModelMatrix.ClearTranslation() * Matrix4.CreateTranslation(app.Camera.Position);
                         shouldUpdateMesh = true;
                     }
                     
-                    System.Numerics.Vector3 systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractTranslation().ToNumerics();
+                    System.Numerics.Vector3 systemVec3 = meshInstance.ModelMatrix.ExtractTranslation().ToNumerics();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
                     {
                         shouldUpdateMesh = true;
-                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTK());
+                        meshInstance.ModelMatrix = meshInstance.ModelMatrix.ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTK());
                     }
 
-                    systemVec3 = app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ExtractScale().ToNumerics();
+                    systemVec3 = meshInstance.ModelMatrix.ExtractScale().ToNumerics();
                     if (ImGui.DragFloat3("Scale", ref systemVec3, 0.005f))
                     {
                         shouldUpdateMesh = true;
                         Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTK(), new Vector3(0.001f));
-                        app.ModelSystem.ModelMatrices[selectedEntityIndex][0] = Matrix4.CreateScale(temp) * app.ModelSystem.ModelMatrices[selectedEntityIndex][0].ClearScale();
+                        meshInstance.ModelMatrix = Matrix4.CreateScale(temp) * meshInstance.ModelMatrix.ClearScale();
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
@@ -695,7 +691,6 @@ namespace IDKEngine.Render
                     {
                         shouldResetPT = true;
                         app.ModelSystem.UpdateMeshBuffer(selectedEntityIndex, selectedEntityIndex + 1);
-                        app.ModelSystem.UpdateModelMatricesBuffer(selectedEntityIndex, selectedEntityIndex + 1);
                     }
                 }
                 else if (selectedEntityType == EntityType.Light)

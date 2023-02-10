@@ -39,6 +39,13 @@ struct Mesh
     uint CubemapShadowCullInfo;
 };
 
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
 struct PointShadow
 {
     samplerCube Texture;
@@ -69,8 +76,8 @@ layout(std430, binding = 2) restrict writeonly buffer MeshSSBO
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
-    mat4 Models[];
-} matrixSSBO;
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
@@ -101,7 +108,7 @@ void main()
 
     int instances = 0;
     int packedValue = 0;
-    mat4 model = matrixSSBO.Models[meshCMD.BaseInstance];
+    mat4 model = meshInstanceSSBO.MeshInstances[meshCMD.BaseInstance].ModelMatrix;
 
     for (int i = 0; i < 6; i++)
     {

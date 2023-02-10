@@ -107,12 +107,12 @@ namespace IDKEngine.Render
         {
             if (IsVXGI)
             {
-                // when voxelizing make sure every mesh is rendered
-                int i = 0;
-                modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length, (ref GLSLDrawCommand cmd) =>
+                // when voxelizing make sure every mesh is rendered and nothing culled
+                for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
                 {
-                    cmd.InstanceCount = modelSystem.Meshes[i++].InstanceCount;
-                });
+                    modelSystem.DrawCommands[i].InstanceCount = modelSystem.Meshes[i].InstanceCount;
+                }
+                modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
 
                 Voxelizer.Render(modelSystem);
                 Voxelizer.ResultVoxelsAlbedo.BindToUnit(1);

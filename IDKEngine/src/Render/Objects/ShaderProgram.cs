@@ -22,7 +22,9 @@ namespace IDKEngine.Render.Objects
 
             string infoLog = GL.GetShaderInfoLog(ID);
             if (infoLog != string.Empty)
+            {
                 Console.WriteLine(infoLog);
+            }
         }
 
         public void Dispose()
@@ -53,7 +55,11 @@ namespace IDKEngine.Render.Objects
             GL.LinkProgram(ID);
             string infoLog = GL.GetProgramInfoLog(ID);
             if (infoLog != string.Empty)
+            {
                 Console.WriteLine(infoLog);
+                Console.WriteLine("Press Enter to continue");
+                Console.ReadLine();
+            }
 
             for (int i = 0; i < shaders.Length; i++)
             {

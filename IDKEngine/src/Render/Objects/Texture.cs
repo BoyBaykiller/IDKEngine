@@ -106,10 +106,10 @@ namespace IDKEngine.Render.Objects
         }
 
         /// <summary>
-        /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture be available for this to take effect
+        /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture must be available for this to take effect
         /// </summary>
         /// <param name="state"></param>
-        public void SetSeamlessCubeMapPerTextureARB_AMD(bool state)
+        public void EnableSeamlessCubemapARB_AMD(bool state)
         {
             if (Helper.IsExtensionsAvailable("GL_AMD_seamless_cubemap_per_texture") || Helper.IsExtensionsAvailable("GL_ARB_seamless_cubemap_per_texture"))
             {

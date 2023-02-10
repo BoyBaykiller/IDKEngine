@@ -9,7 +9,17 @@ namespace IDKEngine.Render
     class PathTracer : IDisposable
     {
         private int cachedRayDepth;
-        public int RayDepth;
+        
+        public int _rayDepth;
+        public int RayDepth
+        {
+            get { return _rayDepth; }
+            set
+            {
+                _rayDepth = value;
+                ResetRender();
+            }
+        }
 
         private bool _isDebugBVHTraversal;
         public bool IsDebugBVHTraversal
@@ -32,6 +42,7 @@ namespace IDKEngine.Render
                     LenseRadius = _lenseRadius;
                     RayDepth = cachedRayDepth;
                 }
+                ResetRender();
             }
         }
 
@@ -45,6 +56,7 @@ namespace IDKEngine.Render
                 _isTraceLights = value;
                 firstHitProgram.Upload("IsTraceLights", _isTraceLights);
                 nHitProgram.Upload("IsTraceLights", _isTraceLights);
+                ResetRender();
             }
         }
 
@@ -57,6 +69,7 @@ namespace IDKEngine.Render
             {
                 _focalLength = value;
                 firstHitProgram.Upload("FocalLength", value);
+                ResetRender();
             }
         }
 
@@ -69,6 +82,7 @@ namespace IDKEngine.Render
             {
                 _lenseRadius = value;
                 firstHitProgram.Upload("LenseRadius", value);
+                ResetRender();
             }
         }
 

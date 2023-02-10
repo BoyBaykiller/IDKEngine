@@ -35,6 +35,13 @@ struct Mesh
     uint CubemapShadowCullInfo;
 };
 
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
@@ -42,8 +49,8 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
-    mat4 Models[];
-} matrixSSBO;
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
@@ -71,7 +78,7 @@ void main()
     gl_Layer = int(bitfieldExtract(cubemapShadowCullInfo, 3 * gl_InstanceID, 3));
     
     const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
-    mat4 model = matrixSSBO.Models[gl_BaseInstance + glInstanceID];
+    mat4 model = meshInstanceSSBO.MeshInstances[gl_BaseInstance + glInstanceID].ModelMatrix;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
 
@@ -79,7 +86,7 @@ void main()
 
     // In multi pass shadows the layer is simply passed as a uniform before each pass
 
-    mat4 model = matrixSSBO.Models[gl_InstanceID + gl_BaseInstance];
+    mat4 model = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance].ModelMatrix;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
 

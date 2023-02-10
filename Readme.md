@@ -16,7 +16,7 @@ Feature list:
  - Temporal Anti Aliasing
  - CoD-Modern-Warfare Bloom
  - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
- - Real-Time Voxel Global Illumination (WIP) 
+ - Real-Time Voxel Global Illumination
  - Wavefront Path Tracer
 
 Required OpenGL: 4.6 + `ARB_bindless_texture`

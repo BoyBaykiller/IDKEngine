@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 using System.Diagnostics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
@@ -8,7 +7,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class ModelSystem
+    class ModelSystem : IDisposable
     {
         public GLSLDrawCommand[] DrawCommands;
         private readonly BufferObject drawCommandBuffer;
@@ -25,10 +24,12 @@ namespace IDKEngine.Render
         public uint[] Indices;
         private readonly BufferObject elementBuffer;
 
-        public Matrix4[][] ModelMatrices;
-        private readonly BufferObject modelMatricesBuffer;
+        public GLSLMeshInstance[] MeshInstances;
+        private readonly BufferObject meshInstanceBuffer;
 
         private readonly VAO vao;
+
+        private readonly ShaderProgram frustumCullingProgram;
         public unsafe ModelSystem()
         {
             DrawCommands = Array.Empty<GLSLDrawCommand>();
@@ -49,9 +50,9 @@ namespace IDKEngine.Render
             Indices = Array.Empty<uint>();
             elementBuffer = new BufferObject();
 
-            ModelMatrices = Array.Empty<Matrix4[]>();
-            modelMatricesBuffer = new BufferObject();
-            modelMatricesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
+            MeshInstances = Array.Empty<GLSLMeshInstance>();
+            meshInstanceBuffer = new BufferObject();
+            meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
             vao = new VAO();
             vao.SetElementBuffer(elementBuffer);
@@ -60,6 +61,8 @@ namespace IDKEngine.Render
             vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
             vao.SetAttribFormatI(0, 2, 1, VertexAttribType.UnsignedInt, sizeof(float) * 6); // Tangent
             vao.SetAttribFormatI(0, 3, 1, VertexAttribType.UnsignedInt, sizeof(float) * 7); // Normal
+
+            frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/compute.glsl")));
         }
 
         public unsafe void Add(Model[] models)
@@ -78,7 +81,7 @@ namespace IDKEngine.Render
                 LoadMaterials(models[i].Materials);
 
                 LoadIndices(models[i].Indices);
-                LoadModelMatrices(models[i].ModelMatrices);
+                LoadModelMatrices(models[i].MeshInstances);
             }
 
             drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawCommand), DrawCommands);
@@ -86,9 +89,9 @@ namespace IDKEngine.Render
             materialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
             vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLDrawVertex), Vertices);
             elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
-            modelMatricesBuffer.MutableAllocate(ModelMatrices.Sum(arr => arr.Length) * sizeof(Matrix4), (IntPtr)0);
+            meshInstanceBuffer.MutableAllocate(MeshInstances.Length * sizeof(GLSLMeshInstance), (IntPtr)0);
 
-            UpdateModelMatricesBuffer(0, ModelMatrices.Length);
+            UpdateMeshInstanceBuffer(0, MeshInstances.Length);
         }
 
         public unsafe void Draw()
@@ -98,8 +101,6 @@ namespace IDKEngine.Render
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GLSLDrawCommand));
         }
 
-        private static readonly ShaderProgram frustumCullingProgram = new ShaderProgram(
-            new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/compute.glsl")));
         public void FrustumCull(in Matrix4 projView)
         {
             frustumCullingProgram.Use();
@@ -109,22 +110,11 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
         }
 
+        
         public delegate void FuncUploadMesh(ref GLSLMesh glslMesh);
-        /// <summary>
-        /// Synchronizes buffer with local <see cref="Meshes"/> and conditionally applies function over all elements
-        /// </summary>
-        /// <param name="start"></param>
-        /// <param name="end"></param>
-        /// <param name="func"></param>
-        public unsafe void UpdateMeshBuffer(int start, int end, FuncUploadMesh func = null)
+        public unsafe void UpdateMeshBuffer(int start, int end)
         {
             Debug.Assert(start >= 0 && end <= Meshes.Length);
-
-            if (func != null)
-            {
-                for (int i = start; i < end; i++)
-                    func(ref Meshes[i]);
-            }
 
             fixed (void* ptr = &Meshes[start])
             {
@@ -132,23 +122,10 @@ namespace IDKEngine.Render
             }
         }
 
-
         public delegate void FuncUploadDrawCommand(ref GLSLDrawCommand drawCommand);
-        /// <summary>
-        /// Synchronizes buffer with local <see cref="DrawCommands"/> and conditionally applies function over all elements
-        /// </summary>
-        /// <param name="start"></param>
-        /// <param name="end"></param>
-        /// <param name="func"></param>
-        public unsafe void UpdateDrawCommandBuffer(int start, int end, FuncUploadDrawCommand func = null)
+        public unsafe void UpdateDrawCommandBuffer(int start, int end)
         {
             Debug.Assert(start >= 0 && end <= DrawCommands.Length);
-
-            if (func != null)
-            {
-                for (int i = start; i < end; i++)
-                    func(ref DrawCommands[i]);
-            }
 
             fixed (void* ptr = &DrawCommands[start])
             {
@@ -156,26 +133,15 @@ namespace IDKEngine.Render
             }
         }
 
-
-        /// <summary>
-        /// Synchronizes buffer with local <see cref="ModelMatrices"/>
-        /// </summary>
-        /// <param name="start"></param>
-        /// <param name="end"></param>
-        /// <param name="func"></param>
-        public unsafe void UpdateModelMatricesBuffer(int start, int end)
+        public delegate void FuncUploadMeshInstance(ref GLSLMeshInstance modelMatrix);
+        public unsafe void UpdateMeshInstanceBuffer(int start, int end)
         {
-            Debug.Assert(start >= 0 && end <= ModelMatrices.Length);
+            Debug.Assert(start >= 0 && end <= MeshInstances.Length);
 
-            for (int i = start; i < end; i++)
+            fixed (void* ptr = &MeshInstances[start])
             {
-                modelMatricesBuffer.SubData(DrawCommands[i].BaseInstance * sizeof(Matrix4), ModelMatrices[i].Length * sizeof(Matrix4), ModelMatrices[i]);
+                meshInstanceBuffer.SubData(start * sizeof(GLSLMeshInstance), (end - start) * sizeof(GLSLMeshInstance), (IntPtr)ptr);
             }
-        }
-
-        public int GetMeshVertexCount(int meshIndex)
-        {
-            return ((meshIndex + 1 > DrawCommands.Length - 1) ? Vertices.Length : DrawCommands[meshIndex + 1].BaseVertex) - DrawCommands[meshIndex].BaseVertex;
         }
 
         private void LoadDrawCommands(GLSLDrawCommand[] drawCommands)
@@ -195,7 +161,6 @@ namespace IDKEngine.Render
                 DrawCommands[prevCmdLength + i].FirstIndex += prevIndicesLength;
             }
         }
-
         private void LoadMeshes(GLSLMesh[] meshes)
         {
             int prevMeshesLength = Meshes.Length;
@@ -208,18 +173,12 @@ namespace IDKEngine.Render
                 Meshes[prevMeshesLength + i].MaterialIndex += prevMaterialsLength;
             }
         }
-
-        private void LoadModelMatrices(Matrix4[][] matrices)
+        private void LoadModelMatrices(GLSLMeshInstance[] matrices)
         {
-            int prevMatricesLength = ModelMatrices.Length;
-            Array.Resize(ref ModelMatrices, prevMatricesLength + matrices.Length);
-            for (int i = 0; i < matrices.Length; i++)
-            {
-                ModelMatrices[prevMatricesLength + i] = new Matrix4[matrices[i].Length];
-                Array.Copy(matrices[i], 0, ModelMatrices[prevMatricesLength + i], 0, matrices[i].Length);
-            }
+            int prevMatricesLength = MeshInstances.Length;
+            Array.Resize(ref MeshInstances, prevMatricesLength + matrices.Length);
+            Array.Copy(matrices, 0, MeshInstances, prevMatricesLength, matrices.Length);
         }
-
         private void LoadMaterials(GLSLMaterial[] materials)
         {
             int prevMaterialsLength = Materials.Length;
@@ -237,6 +196,25 @@ namespace IDKEngine.Render
             int prevVerticesLength = Vertices.Length;
             Array.Resize(ref Vertices, prevVerticesLength + vertices.Length);
             Array.Copy(vertices, 0, Vertices, prevVerticesLength, vertices.Length);
+        }
+
+        public int GetMeshVertexCount(int meshIndex)
+        {
+            return ((meshIndex + 1 > DrawCommands.Length - 1) ? Vertices.Length : DrawCommands[meshIndex + 1].BaseVertex) - DrawCommands[meshIndex].BaseVertex;
+        }
+
+        public void Dispose()
+        {
+            drawCommandBuffer.Dispose();
+            meshBuffer.Dispose();
+            materialBuffer.Dispose();
+            vertexBuffer.Dispose();
+            elementBuffer.Dispose();
+            meshInstanceBuffer.Dispose();
+
+            vao.Dispose();
+
+            frustumCullingProgram.Dispose();
         }
     }
 }
