@@ -19,20 +19,20 @@ namespace IDKEngine.Render
         // If made changes also adjust the GLSLMaterial struct
         private static readonly TextureType[] perMaterialTextures = new TextureType[]
         {
-            TextureType.Diffuse /* Albedo */,
+            TextureType.Diffuse, // Albedo
             TextureType.Normals,
-            TextureType.Shininess /* Roughness */,
+            TextureType.Shininess, // Roughness 
             TextureType.Specular,
             TextureType.Emissive,
         };
 
         public readonly GLSLDrawCommand[] DrawCommands;
         public readonly GLSLMesh[] Meshes;
+        public readonly GLSLMeshInstance[] MeshInstances;
         public readonly GLSLMaterial[] Materials;
         public readonly GLSLDrawVertex[] Vertices;
         public readonly uint[] Indices;
 
-        public readonly Matrix4[][] ModelMatrices;
 
         public unsafe Model(string path)
         {
@@ -48,7 +48,7 @@ namespace IDKEngine.Render
             Meshes = new GLSLMesh[scene.MeshCount];
             Materials = new GLSLMaterial[scene.MaterialCount];
             Vertices = new GLSLDrawVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];
-            ModelMatrices = new Matrix4[scene.MeshCount][];
+            MeshInstances = new GLSLMeshInstance[scene.MeshCount];
             ImageResult[] images = new ImageResult[scene.MaterialCount * perMaterialTextures.Length];
             Thread verticesLoadResult = Helper.InParallel(0, scene.MeshCount, i =>
             {
@@ -56,8 +56,9 @@ namespace IDKEngine.Render
 
                 int baseVertex = 0;
                 for (int j = 0; j < i; j++)
+                {
                     baseVertex += scene.Meshes[j].VertexCount;
-
+                }
                 DrawCommands[i].BaseVertex = baseVertex;
 
                 for (int j = 0; j < mesh.VertexCount; j++)
@@ -81,9 +82,9 @@ namespace IDKEngine.Render
                     Vertices[baseVertex + j].Tangent = Helper.CompressSNorm32Fast(tangent);
                 }
 
-                ModelMatrices[i] = new Matrix4[1] { Matrix4.Identity };
+                MeshInstances[i].ModelMatrix = Matrix4.Identity;
 
-                Meshes[i].InstanceCount = ModelMatrices[i].Length;
+                Meshes[i].InstanceCount = 1;
                 Meshes[i].MaterialIndex = mesh.MaterialIndex;
                 Meshes[i].NormalMapStrength = scene.Materials[mesh.MaterialIndex].HasTextureNormal ? 1.0f : 0.0f;
                 Meshes[i].IOR = 1.0f;

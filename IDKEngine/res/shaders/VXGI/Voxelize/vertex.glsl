@@ -18,6 +18,13 @@ struct Mesh
     uint CubemapShadowCullInfo;
 };
 
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
@@ -25,8 +32,8 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
-    mat4 Models[];
-} matrixSSBO;
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -57,10 +64,11 @@ vec3 DecompressSNorm32Fast(uint data);
 
 void main()
 {
-    vec3 normal = DecompressSNorm32Fast(Normal);
-    mat4 model = matrixSSBO.Models[gl_InstanceID + gl_BaseInstance];
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
 
-    mat3 localToWorld = mat3(transpose(inverse(model)));
+    vec3 normal = DecompressSNorm32Fast(Normal);
+
+    mat3 localToWorld = mat3(transpose(meshInstance.InvModelMatrix));
     outData.Normal = normalize(localToWorld * normal);
     outData.TexCoord = TexCoord;
 
@@ -68,7 +76,7 @@ void main()
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
 
-    gl_Position = model * vec4(Position, 1.0);
+    gl_Position = meshInstance.ModelMatrix * vec4(Position, 1.0);
 }
 
 vec3 DecompressSNorm32Fast(uint data)

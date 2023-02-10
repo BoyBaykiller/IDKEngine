@@ -18,9 +18,8 @@ namespace IDKEngine
             return Origin + Direction * t;
         }
 
-        public Ray Transformed(Matrix4 model)
+        public Ray Transformed(Matrix4 invModel)
         {
-            Matrix4 invModel = Matrix4.Invert(model);
             Ray ray = new Ray();
             ray.Origin = (new Vector4(Origin, 1.0f) * invModel).Xyz;
             ray.Direction = (new Vector4(Direction, 0.0f) * invModel).Xyz;

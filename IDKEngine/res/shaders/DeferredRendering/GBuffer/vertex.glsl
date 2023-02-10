@@ -20,6 +20,13 @@ struct Mesh
     uint CubemapShadowCullInfo;
 };
 
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
@@ -27,8 +34,8 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
-    mat4 Models[];
-} matrixSSBO;
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -75,24 +82,25 @@ vec3 DecompressSNorm32Fast(uint v);
 
 void main()
 {
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
+    
     vec3 normal = DecompressSNorm32Fast(Normal);
     vec3 tangent = DecompressSNorm32Fast(Tangent);
-
-    mat4 model = matrixSSBO.Models[gl_InstanceID + gl_BaseInstance];
-    vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
-    vec3 N = normalize((model * vec4(normal, 0.0)).xyz);
+    
+    vec3 T = normalize((meshInstance.ModelMatrix * vec4(tangent, 0.0)).xyz);
+    vec3 N = normalize((meshInstance.ModelMatrix * vec4(normal, 0.0)).xyz);
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
 
     outData.TangentToWorld = mat3(T, B, N);
     outData.TexCoord = TexCoord;
-    vec3 worldPos = (model * vec4(Position, 1.0)).xyz;
+    vec3 worldPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(worldPos, 1.0);
-    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(worldPos, 1.0);
+    outData.PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(Position, 1.0);
     
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     
-    mat3 normalToWorld = mat3(transpose(inverse(model)));
+    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
     outData.Normal = normalize(normalToWorld * normal);
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;

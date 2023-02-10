@@ -108,21 +108,9 @@ namespace IDKEngine.Render
         }
 
         public delegate void FuncUploadLight(ref GLSLLight light);
-        /// <summary>
-        /// Synchronizes buffer with local <see cref="Lights"/> and conditionally applies function over all elements
-        /// </summary>
-        /// <param name="start"></param>
-        /// <param name="end"></param>
-        /// <param name="func"></param>
-        public unsafe void UpdateLightBuffer(int start, int end, FuncUploadLight func = null)
+        public unsafe void UpdateLightBuffer(int start, int end)
         {
             Debug.Assert(start >= 0 && end <= Count);
-
-            if (func != null)
-            {
-                for (int i = start; i < end; i++)
-                    func(ref Lights[i]);
-            }
 
             fixed (void* ptr = &Lights[start])
             {

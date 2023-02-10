@@ -93,8 +93,10 @@ namespace IDKEngine
             uint* stack = stackalloc uint[MaxBlasTreeDepth];
             for (int i = 0; i < ModelSystem.Meshes.Length; i++)
             {
+                ref readonly GLSLDrawCommand cmd = ref ModelSystem.DrawCommands[i];
+
                 const uint glInstanceID = 0; // TODO: Work out actual instanceID value
-                Ray localRay = ray.Transformed(ModelSystem.ModelMatrices[i][glInstanceID]);
+                Ray localRay = ray.Transformed(ModelSystem.MeshInstances[cmd.BaseInstance + glInstanceID].InvModelMatrix);
 
                 uint stackPtr = 0;
                 uint stackTop = 0;
@@ -144,9 +146,10 @@ namespace IDKEngine
             
             for (int i = 0; i < ModelSystem.Meshes.Length; i++)
             {
+                ref readonly GLSLDrawCommand cmd = ref ModelSystem.DrawCommands[i];
+
                 const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
-                
-                Matrix4 invModel = Matrix4.Invert(ModelSystem.ModelMatrices[i][glInstanceID]);
+                Matrix4 invModel = ModelSystem.MeshInstances[cmd.BaseInstance + glInstanceID].InvModelMatrix;
                 
                 Vector3 localCenter = (new Vector4(boxCenter, 1.0f) * invModel).Xyz;
                 AABB localAabb = worldSpaceAabb;
@@ -155,7 +158,6 @@ namespace IDKEngine
                 ref readonly GLSLBlasNode topNode = ref blases[i].Nodes[0];
                 if (MyMath.AabbAabbIntersect(localAabb, topNode.Min, topNode.Max))
                 {
-                    ref readonly GLSLDrawCommand cmd = ref ModelSystem.DrawCommands[i];
                     for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j += 3)
                     {
                         hitInfo.Triangle = triangles[j / 3];

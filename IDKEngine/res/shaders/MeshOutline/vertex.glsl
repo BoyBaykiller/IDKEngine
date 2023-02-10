@@ -56,6 +56,13 @@ struct Node
     uint TriCount;
 };
 
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
 layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
@@ -68,8 +75,8 @@ layout(std430, binding = 1) restrict readonly buffer BlasSSBO
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
-    mat4 Models[];
-} matrixSSBO;
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -94,7 +101,7 @@ void main()
 {
     DrawCommand meshCMD = drawCommandSSBO.DrawCommands[MeshIndex];
     Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
-    mat4 model = matrixSSBO.Models[gl_InstanceID + meshCMD.BaseInstance];
+    mat4 model = meshInstanceSSBO.MeshInstances[gl_InstanceID + meshCMD.BaseInstance].ModelMatrix;
 
     vec3 aabbPos = (node.Min + node.Max) * 0.5;
     vec3 aabbSize = node.Max - node.Min;

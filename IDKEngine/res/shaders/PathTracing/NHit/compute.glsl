@@ -52,6 +52,13 @@ struct Mesh
     uint CubemapShadowCullInfo;
 };
 
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
 struct Vertex
 {
     vec3 Position;
@@ -144,8 +151,8 @@ layout(std430, binding = 3) restrict readonly buffer TriangleSSBO
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
-    mat4 Models[];
-} matrixSSBO;
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
 
 layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
 {
@@ -278,9 +285,9 @@ bool TraceRay(inout TransportRay transportRay)
             vec3 geoNormal = normalize(Interpolate(DecompressSNorm32Fast(v0.Normal), DecompressSNorm32Fast(v1.Normal), DecompressSNorm32Fast(v2.Normal), hitInfo.Bary));
             vec3 tangent = normalize(Interpolate(DecompressSNorm32Fast(v0.Tangent), DecompressSNorm32Fast(v1.Tangent), DecompressSNorm32Fast(v2.Tangent), hitInfo.Bary));
 
-            mat4 model = matrixSSBO.Models[hitInfo.InstanceID];
-            vec3 T = normalize((model * vec4(tangent, 0.0)).xyz);
-            vec3 N = normalize((model * vec4(geoNormal, 0.0)).xyz);
+            MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
+            vec3 T = normalize((meshInstance.ModelMatrix * vec4(tangent, 0.0)).xyz);
+            vec3 N = normalize((meshInstance.ModelMatrix * vec4(geoNormal, 0.0)).xyz);
             T = normalize(T - dot(T, N) * N);
             vec3 B = cross(N, T);
             mat3 TBN = mat3(T, B, N);
@@ -298,8 +305,8 @@ bool TraceRay(inout TransportRay transportRay)
             roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
             normal = texture(material.Normal, texCoord).rgb;
             normal = TBN * normalize(normal * 2.0 - 1.0);
-            mat3 localToWorld = mat3(transpose(inverse(model)));
-            normal = normalize(mix(normalize(localToWorld * geoNormal), normal, mesh.NormalMapStrength));
+            mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+            normal = normalize(mix(normalize(normalToWorld * geoNormal), normal, mesh.NormalMapStrength));
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;
         }
@@ -450,7 +457,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
         uint baseNode = 2 * (cmd.FirstIndex / 3);
 
         const uint glInstanceID = 0; // TODO: Work out actual instanceID value
-        Ray localRay = WorldSpaceRayToLocal(ray, inverse(matrixSSBO.Models[cmd.BaseInstance + glInstanceID]));
+        Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[cmd.BaseInstance + glInstanceID].InvModelMatrix);
 
         uint stackPtr = 0;
         uint stackTop = 0;

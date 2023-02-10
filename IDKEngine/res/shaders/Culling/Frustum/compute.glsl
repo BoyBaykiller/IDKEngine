@@ -38,6 +38,13 @@ struct Mesh
     uint CubemapShadowCullInfo;
 };
 
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
 layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
 {
     DrawCommand DrawCommands[];
@@ -55,8 +62,8 @@ layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 
 layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
-    mat4 Models[];
-} matrixSSBO;
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
 
 vec3 NegativeVertex(Node node, vec3 normal);
 bool FrustumAABBIntersect(Frustum frustum, Node node);
@@ -74,7 +81,7 @@ void main()
     Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     
     const uint glInstanceID = 0;  // TODO: Derive from built in variables
-    mat4 model = matrixSSBO.Models[meshCMD.BaseInstance + glInstanceID];
+    mat4 model = meshInstanceSSBO.MeshInstances[meshCMD.BaseInstance + glInstanceID].ModelMatrix;
     
     Frustum frustum = ExtractFrustum(ProjView * model);
     drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumAABBIntersect(frustum, node));
