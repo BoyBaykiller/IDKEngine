@@ -36,7 +36,9 @@ void main()
     {
         result = Downsample(SamplerDownsample, uv, Lod);
         if (Lod == 0)
+        {
             result = Prefilter(result);
+        }
     }
     else if (Stage == UPSAMPLE_STAGE)
     {

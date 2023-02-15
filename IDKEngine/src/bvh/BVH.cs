@@ -21,7 +21,7 @@ namespace IDKEngine
         public struct AABBHitInfo
         {
             public int HitID;
-            public uint InstanceID;
+            public int InstanceID;
             public GLSLTriangle Triangle;
         }
 
@@ -95,8 +95,8 @@ namespace IDKEngine
             {
                 ref readonly GLSLDrawCommand cmd = ref ModelSystem.DrawCommands[i];
 
-                const uint glInstanceID = 0; // TODO: Work out actual instanceID value
-                Ray localRay = ray.Transformed(ModelSystem.MeshInstances[cmd.BaseInstance + glInstanceID].InvModelMatrix);
+                int glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
+                Ray localRay = ray.Transformed(ModelSystem.MeshInstances[glInstanceID].InvModelMatrix);
 
                 uint stackPtr = 0;
                 uint stackTop = 0;
@@ -120,7 +120,7 @@ namespace IDKEngine
                                 hitInfo.Bary = baryT.Xyz;
                                 hitInfo.T = baryT.W;
                                 hitInfo.MeshIndex = i;
-                                hitInfo.InstanceID = k;
+                                hitInfo.InstanceID = glInstanceID;
                             }
                         }
                         if (stackPtr == 0) break;
@@ -148,8 +148,8 @@ namespace IDKEngine
             {
                 ref readonly GLSLDrawCommand cmd = ref ModelSystem.DrawCommands[i];
 
-                const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
-                Matrix4 invModel = ModelSystem.MeshInstances[cmd.BaseInstance + glInstanceID].InvModelMatrix;
+                int glInstanceID = cmd.BaseInstance + 0;  // TODO: Work out actual instanceID value
+                Matrix4 invModel = ModelSystem.MeshInstances[glInstanceID].InvModelMatrix;
                 
                 Vector3 localCenter = (new Vector4(boxCenter, 1.0f) * invModel).Xyz;
                 AABB localAabb = worldSpaceAabb;

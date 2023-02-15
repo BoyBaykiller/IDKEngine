@@ -61,7 +61,10 @@ void main()
     }
 
     vec3 fragPos = NDCToView(vec3(uv, depth) * 2.0 - 1.0);
-    vec3 color = SSR(normalize((basicDataUBO.View * vec4(normalSpec.rgb, 0.0)).xyz), fragPos);
+    mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
+    normalSpec.xyz = normalize(normalToView * normalSpec.xyz);
+
+    vec3 color = SSR(normalSpec.xyz, fragPos);
 
     imageStore(ImgResult, imgCoord, vec4(color * normalSpec.a, 1.0));
 }

@@ -57,8 +57,6 @@ namespace IDKEngine.Render.Objects
             if (infoLog != string.Empty)
             {
                 Console.WriteLine(infoLog);
-                Console.WriteLine("Press Enter to continue");
-                Console.ReadLine();
             }
 
             for (int i = 0; i < shaders.Length; i++)

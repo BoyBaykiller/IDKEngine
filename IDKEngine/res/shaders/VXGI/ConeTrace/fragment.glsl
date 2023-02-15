@@ -94,7 +94,7 @@ void main()
     float specular = texture(gBufferDataUBO.NormalSpecular, uv).a;
     float roughness = texture(gBufferDataUBO.EmissiveRoughness, uv).a;
 
-    vec3 viewDir = fragPos - basicDataUBO.ViewPos; 
+    vec3 viewDir = fragPos - basicDataUBO.ViewPos;
     vec3 indirectLight = IndirectLight(fragPos, viewDir, normal, specular, roughness) * GIBoost;
 
     FragColor = vec4(indirectLight, 1.0);
@@ -162,8 +162,8 @@ float GetMaterialVariance(float specularChance, float roughness)
 
 vec4 TraceCone(vec3 start, vec3 direction, vec3 normal, float coneAngle, float stepMultiplier)
 {
-    vec3 voxelGridWorlSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
-    vec3 voxelWorldSpaceSize = voxelGridWorlSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
+    vec3 voxelGridWorldSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
+    vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
     float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
     float voxelMinLength = min(voxelWorldSpaceSize.x, min(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
     uint maxLevel = textureQueryLevels(SamplerVoxelsAlbedo) - 1;

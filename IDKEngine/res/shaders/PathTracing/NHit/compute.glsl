@@ -273,8 +273,9 @@ bool TraceRay(inout TransportRay transportRay)
         float roughness;
         float ior;
         vec3 absorbance;
-        // This if statement somehow improves performance even if the condition is always true on RX 5700 XT
-        if (hitInfo.TriangleIndex != -1)
+
+        bool hitLight = hitInfo.TriangleIndex == -1;
+        if (!hitLight)
         {
             Triangle triangle = triangleSSBO.Triangles[hitInfo.TriangleIndex];
             Vertex v0 = triangle.Vertex0;
@@ -456,8 +457,8 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
         DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
         uint baseNode = 2 * (cmd.FirstIndex / 3);
 
-        const uint glInstanceID = 0; // TODO: Work out actual instanceID value
-        Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[cmd.BaseInstance + glInstanceID].InvModelMatrix);
+        uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
+        Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
         uint stackPtr = 0;
         uint stackTop = 0;
@@ -482,7 +483,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
                         hitInfo.T = baryT.w;
                         hitInfo.MeshIndex = i;
                         hitInfo.TriangleIndex = int(j);
-                        hitInfo.InstanceID = cmd.BaseInstance + glInstanceID;
+                        hitInfo.InstanceID = glInstanceID;
                     }
                 }
             }
