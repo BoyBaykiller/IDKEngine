@@ -230,7 +230,6 @@ uniform bool IsDebugBVHTraversal;
 uniform bool IsTraceLights;
 uniform float FocalLength;
 uniform float LenseRadius;
-uniform float RayCoherency;
 
 shared uint SharedStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
 
@@ -243,8 +242,6 @@ void main()
         return;
 
     rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + rayIndicesSSBO.AccumulatedSamples * 2699;
-    if (GetRandomFloat01() < RayCoherency)
-        rngSeed = rayIndicesSSBO.AccumulatedSamples * 2699;
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -303,8 +300,9 @@ bool TraceRay(inout TransportRay transportRay)
         float roughness;
         float ior;
         vec3 absorbance;
-        // This if statement somehow improves performance even if the condition is always true on RX 5700 XT
-        if (hitInfo.TriangleIndex != -1)
+        
+        bool hitLight = hitInfo.TriangleIndex == -1;
+        if (!hitLight)
         {
             Triangle triangle = triangleSSBO.Triangles[hitInfo.TriangleIndex];
             Vertex v0 = triangle.Vertex0;
@@ -486,8 +484,8 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
         DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
         uint baseNode = 2 * (cmd.FirstIndex / 3);
 
-        const uint glInstanceID = 0; // TODO: Work out actual instanceID value
-        Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[cmd.BaseInstance + glInstanceID].InvModelMatrix);
+        uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
+        Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
         uint stackPtr = 0;
         uint stackTop = 0;
@@ -512,7 +510,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
                         hitInfo.T = baryT.w;
                         hitInfo.MeshIndex = i;
                         hitInfo.TriangleIndex = int(j);
-                        hitInfo.InstanceID = cmd.BaseInstance + glInstanceID;
+                        hitInfo.InstanceID = glInstanceID;
                     }
                 }
             }

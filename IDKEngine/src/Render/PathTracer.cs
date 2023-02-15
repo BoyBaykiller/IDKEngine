@@ -13,7 +13,7 @@ namespace IDKEngine.Render
         public int _rayDepth;
         public int RayDepth
         {
-            get { return _rayDepth; }
+            get => _rayDepth;
             set
             {
                 _rayDepth = value;
@@ -86,18 +86,6 @@ namespace IDKEngine.Render
             }
         }
 
-        private float _rayCoherency;
-        public float RayCoherency
-        {
-            get => _rayCoherency;
-
-            set
-            {
-                _rayCoherency = value;
-                firstHitProgram.Upload("RayCoherency", _rayCoherency);
-            }
-        }
-
         public uint AccumulatedSamples { get; private set; }
 
         public Texture Result;
@@ -128,7 +116,6 @@ namespace IDKEngine.Render
             RayDepth = 7;
             FocalLength = 8.0f;
             LenseRadius = 0.01f;
-            RayCoherency = 0.2f;
         }
 
         public unsafe void Compute()

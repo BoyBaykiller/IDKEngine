@@ -187,7 +187,7 @@ namespace IDKEngine.Render
                 {
                     ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
 
-                    if (ImGui.CollapsingHeader("Voxel Global Illumination (WIP)"))
+                    if (ImGui.CollapsingHeader("Voxel Global Illumination"))
                     {
                         tempBool = app.RasterizerPipeline.IsVXGI;
                         if (ImGui.Checkbox("IsVXGI", ref tempBool))
@@ -502,12 +502,6 @@ namespace IDKEngine.Render
                         if (ImGui.Checkbox("IsTraceLights", ref tempBool))
                         {
                             app.PathTracer.IsTraceLights = tempBool;
-                        }
-
-                        tempFloat = app.PathTracer.RayCoherency;
-                        if (ImGui.SliderFloat("RayCoherency", ref tempFloat, 0.0f, 1.0f))
-                        {
-                            app.PathTracer.RayCoherency = tempFloat;
                         }
 
                         if (!app.PathTracer.IsDebugBVHTraversal)
