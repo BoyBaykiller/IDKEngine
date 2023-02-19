@@ -3,6 +3,7 @@ using System.IO;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using System.Collections.Generic;
 
 namespace IDKEngine.Render
 {
@@ -66,7 +67,7 @@ namespace IDKEngine.Render
         public Texture ResultVoxelsAlbedo;
         private readonly Texture[] intermediateRbg; // only used if no support for GL_NV_shader_atomic_fp16_vector
         private readonly ShaderProgram mergeIntermediatesProgram; // only used if no support for GL_NV_shader_atomic_fp16_vector
-        private readonly ShaderProgram resetTexturesProgram;
+        private readonly ShaderProgram clearTexturesProgram;
         private readonly ShaderProgram voxelizeProgram;
         private readonly ShaderProgram mipmapProgram;
         private readonly ShaderProgram visualizeDebugProgram;
@@ -76,15 +77,14 @@ namespace IDKEngine.Render
         private readonly Framebuffer fboNoAttachments;
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.2f)
         {
-            resetTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
+            clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 
             voxelizeProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/vertex.glsl")),
-                new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/geometry.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/fragment.glsl")));
 
             mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Mipmap/compute.glsl")));
-            visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Visualization/compute.glsl")));
+            visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/DebugVisualization/compute.glsl")));
             if (!HAS_ATOMIC_FP16_VECTOR)
             {
                 intermediateRbg = new Texture[3];
@@ -104,10 +104,14 @@ namespace IDKEngine.Render
             DebugStepMultiplier = debugStepMultiplier;
         }
 
+        TimerQuery abc = new TimerQuery();
         public void Render(ModelSystem modelSystem)
         {
             ClearTextures();
+            //abc.Begin();
             Voxelize(modelSystem);
+            //abc.End();
+            //Console.WriteLine(abc.MeasuredMilliseconds);
             if (!HAS_ATOMIC_FP16_VECTOR)
             {
                 MergeIntermediateTextures();
@@ -125,7 +129,7 @@ namespace IDKEngine.Render
                 intermediateRbg[2].BindToImageUnit(3, 0, true, 0, TextureAccess.ReadWrite, intermediateRbg[2].SizedInternalFormat);
             }
 
-            resetTexturesProgram.Use();
+            clearTexturesProgram.Use();
             GL.DispatchCompute((ResultVoxelsAlbedo.Width + 4 - 1) / 4, (ResultVoxelsAlbedo.Height + 4 - 1) / 4, (ResultVoxelsAlbedo.Depth + 4 - 1) / 4);
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
         }
@@ -154,9 +158,9 @@ namespace IDKEngine.Render
             }
 
             voxelizeProgram.Use();
-            modelSystem.Draw();
+            modelSystem.VertexPullingDraw();
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit | MemoryBarrierFlags.TextureFetchBarrierBit);
-
+            
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
             GL.ColorMask(true, true, true, true);
@@ -244,7 +248,7 @@ namespace IDKEngine.Render
                 mergeIntermediatesProgram.Dispose();
             }
 
-            resetTexturesProgram.Dispose();
+            clearTexturesProgram.Dispose();
             voxelizeProgram.Dispose();
             mipmapProgram.Dispose();
             visualizeDebugProgram.Dispose();

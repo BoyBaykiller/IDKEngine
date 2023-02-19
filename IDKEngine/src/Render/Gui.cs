@@ -614,7 +614,7 @@ namespace IDKEngine.Render
                 if (selectedEntityType == EntityType.Mesh)
                 {
                     bool shouldUpdateMesh = false;
-                    ref readonly GLSLDrawCommand cmd = ref app.ModelSystem.DrawCommands[selectedEntityIndex];
+                    ref readonly GLSLDrawElementsCommand cmd = ref app.ModelSystem.DrawCommands[selectedEntityIndex];
                     ref GLSLMesh mesh = ref app.ModelSystem.Meshes[selectedEntityIndex];
                     ref GLSLMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance];
 

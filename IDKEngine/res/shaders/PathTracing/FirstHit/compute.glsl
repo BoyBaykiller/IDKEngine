@@ -9,7 +9,7 @@
 #extension GL_AMD_gpu_shader_half_float : enable
 #extension GL_AMD_gpu_shader_half_float_fetch : enable // requires GL_AMD_gpu_shader_half_float
 
-#ifdef GL_AMD_gpu_shader_half_float_fetch
+#if defined GL_AMD_gpu_shader_half_float_fetch
 #define HF_SAMPLER_2D f16sampler2D
 #else
 #define HF_SAMPLER_2D sampler2D

@@ -18,7 +18,7 @@ namespace IDKEngine
         private int nodesUsed;
         public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
         {
-            treeDepth = (int)MathF.Ceiling(MathF.Log2(count)) + 1;
+            treeDepth = (int)Math.Ceiling(MathF.Log2(count));
             
             Nodes = new GLSLBlasNode[2 * count];
             ref GLSLBlasNode root = ref Nodes[nodesUsed++];
@@ -61,19 +61,14 @@ namespace IDKEngine
                     }
                 }
 
-                if (mid == start || mid == end)
-                {
-                    mid = start + (end - start) / 2;
-                }
-
                 int leftChildID = nodesUsed++;
                 int rightChildID = nodesUsed++;
 
                 Nodes[leftChildID].TriStartOrLeftChild = start;
-                Nodes[leftChildID].TriCount |= mid - start;
+                Nodes[leftChildID].TriCount = mid - start;
 
                 Nodes[rightChildID].TriStartOrLeftChild = mid;
-                Nodes[rightChildID].TriCount |= end - mid;
+                Nodes[rightChildID].TriCount = end - mid;
 
                 parentNode.TriStartOrLeftChild = (uint)leftChildID;
                 parentNode.TriCount = 0;
