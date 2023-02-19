@@ -4,13 +4,13 @@
 #define EPSILON 0.001
 #extension GL_ARB_bindless_texture : require
 #extension GL_NV_shader_atomic_fp16_vector : enable
-#ifdef GL_NV_shader_atomic_fp16_vector
+#if defined GL_NV_shader_atomic_fp16_vector
 #extension GL_NV_gpu_shader5 : require
 #endif
 
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
-#ifndef GL_NV_shader_atomic_fp16_vector
+#if !defined GL_NV_shader_atomic_fp16_vector
 layout(binding = 1, r32ui) restrict uniform uimage3D ImgResultR;
 layout(binding = 2, r32ui) restrict uniform uimage3D ImgResultG;
 layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
@@ -114,7 +114,7 @@ void main()
     directLighting += albedoAlpha.rgb * ambient;
     directLighting += emissive;
 
-#ifdef GL_NV_shader_atomic_fp16_vector
+#if defined GL_NV_shader_atomic_fp16_vector
 
     imageAtomicMax(ImgResult, voxelPos, f16vec4(directLighting, 1.0));
 

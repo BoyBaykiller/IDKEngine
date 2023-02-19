@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine
 {
-    public struct GLSLDrawCommand
+    public struct GLSLDrawElementsCommand
     {
         public int Count;
         public int InstanceCount;

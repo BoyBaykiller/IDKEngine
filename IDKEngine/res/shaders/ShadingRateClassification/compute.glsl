@@ -64,7 +64,7 @@ uniform float SpeedFactor;
 uniform float LumVarianceFactor;
 uniform int DebugMode;
 
-#ifndef GL_KHR_shader_subgroup_arithmetic
+#if !defined GL_KHR_shader_subgroup_arithmetic
 #define MIN_EFFECTIVE_SUBGROUP_SIZE 1 // effectively 1 if we can't use subgroup arithmetic
 #elif GL_NV_gpu_shader5
 #define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // NVIDIA device (fixed subgroup size)
@@ -135,14 +135,14 @@ void main()
 
 void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanLuminance, out float luminanceVariance)
 {
-    #ifdef GL_KHR_shader_subgroup_arithmetic
+    #if defined GL_KHR_shader_subgroup_arithmetic
     uint effectiveSubgroupSize = gl_SubgroupSize;
     #else
     uint effectiveSubgroupSize = 1; // effectively 1 if we can't use subgroup arithmetic
     #endif
     float luminance = GetLuminance(color);
 
-    #ifdef GL_KHR_shader_subgroup_arithmetic
+    #if defined GL_KHR_shader_subgroup_arithmetic
     float subgroupAddedSpeed = subgroupAdd(length(velocity) * AVG_MULTIPLIER);
     float subgroupAddedLum = subgroupAdd(luminance * AVG_MULTIPLIER);
 
@@ -172,7 +172,7 @@ void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanL
     meanLuminance = SharedMeanLum[0];
 
     float deltaLumMean = luminance - meanLuminance;
-    #ifdef GL_KHR_shader_subgroup_arithmetic
+    #if defined GL_KHR_shader_subgroup_arithmetic
     float subgroupAddedDeltaLumMean = subgroupAdd(pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER);
     if (subgroupElect())
     {

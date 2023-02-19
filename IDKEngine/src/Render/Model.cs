@@ -26,7 +26,7 @@ namespace IDKEngine.Render
             TextureType.Emissive,
         };
 
-        public readonly GLSLDrawCommand[] DrawCommands;
+        public readonly GLSLDrawElementsCommand[] DrawCommands;
         public readonly GLSLMesh[] Meshes;
         public readonly GLSLMeshInstance[] MeshInstances;
         public readonly GLSLMaterial[] Materials;
@@ -44,7 +44,7 @@ namespace IDKEngine.Render
             
             Debug.Assert(scene != null);
 
-            DrawCommands = new GLSLDrawCommand[scene.MeshCount];
+            DrawCommands = new GLSLDrawElementsCommand[scene.MeshCount];
             Meshes = new GLSLMesh[scene.MeshCount];
             Materials = new GLSLMaterial[scene.MaterialCount];
             Vertices = new GLSLDrawVertex[scene.Meshes.Sum(mesh => mesh.VertexCount)];

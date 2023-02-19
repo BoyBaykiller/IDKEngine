@@ -82,6 +82,7 @@ vec3 DecompressSNorm32Fast(uint v);
 
 void main()
 {
+    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
     
     vec3 normal = DecompressSNorm32Fast(Normal);
@@ -97,8 +98,6 @@ void main()
     vec3 worldPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(worldPos, 1.0);
     outData.PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(Position, 1.0);
-    
-    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     
     mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
     outData.Normal = normalize(normalToWorld * normal);
