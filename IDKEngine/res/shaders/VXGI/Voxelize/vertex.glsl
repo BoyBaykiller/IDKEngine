@@ -1,4 +1,5 @@
 #version 460 core
+#extension GL_ARB_bindless_texture : require
 
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
