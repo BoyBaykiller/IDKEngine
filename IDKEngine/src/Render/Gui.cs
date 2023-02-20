@@ -284,14 +284,21 @@ namespace IDKEngine.Render
                             ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
                             ImGui.SameLine();
                             InfoMark(
-                                "This hardware feature makes the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
-                                "This fixes missing voxels with very small triangles at a small performance penalty"
+                                "Uses NV_conservative_raster to make the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
+                                "Currently there is some bug with this which causes overly bright voxels."
+                            );
+
+                            ImGui.Text($"TAKE_FAST_GEOMETRY_SHADER_PATH: {Voxelizer.TAKE_FAST_GEOMETRY_SHADER_PATH}");
+                            ImGui.SameLine();
+                            InfoMark(
+                                "Uses NV_geometry_shader_passthrough and NV_viewport_swizzle to take advantage of a \"passthrough geometry\" shader instead of emulating a geometry shader in the vertex shader. " +
+                                "The reason this emulation is done in the first place is because actual geometry shaders turned out to be slower (without suprise)."
                             );
 
                             ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
                             ImGui.SameLine();
                             InfoMark(
-                                "This hardware feature allows the engine to perform atomics on fp16 images without having to emulate such behaviour. " +
+                                "Uses NV_shader_atomic_fp16_vector to perform atomics on fp16 images without having to emulate such behaviour. " +
                                 "Most noticeably without this extension building the voxel grid requires 2.5x times the memory"
                             );
 
@@ -303,7 +310,7 @@ namespace IDKEngine.Render
                         ImGui.Text($"NV_shading_rate_image: {ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING}");
                         ImGui.SameLine();
                         InfoMark(
-                            "This hardware feature allows the engine to choose a unique shading rate " +
+                            "Uses NV_shading_rate_image to choose a unique shading rate " +
                             "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
                             "shader invocations in regions where less detail may be required."
                         );
@@ -485,7 +492,7 @@ namespace IDKEngine.Render
                             "NV_viewport_array2 or\n" +
                             $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
                         ImGui.SameLine();
-                        InfoMark("This hardware feature allows the engine to genereate point shadows in only 1 draw call instead of 6.");
+                        InfoMark("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
                     }
                 }
                 else if (app.GetRenderMode() == RenderMode.PathTracer)

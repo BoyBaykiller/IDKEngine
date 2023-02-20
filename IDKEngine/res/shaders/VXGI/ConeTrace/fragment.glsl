@@ -74,7 +74,6 @@ in InOutVars
 {
     vec2 TexCoord;
 } inData;
-uint rngSeed;
 
 void main()
 {
@@ -87,7 +86,6 @@ void main()
         FragColor = vec4(0.0);
         return;
     }
-    rngSeed = imgCoord.x * 1973 + imgCoord.y * 9277 + (taaDataUBO.Frame % taaDataUBO.Samples) * 836;
 
     vec3 fragPos = NDCToWorld(vec3(uv, depth) * 2.0 - 1.0);
     vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
@@ -98,20 +96,6 @@ void main()
     vec3 indirectLight = IndirectLight(fragPos, viewDir, normal, specular, roughness) * GIBoost;
 
     FragColor = vec4(indirectLight, 1.0);
-}
-
-// Faster and much more random than Wang Hash
-// See: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
-uint GetPCGHash(inout uint seed)
-{
-    seed = seed * 747796405u + 2891336453u;
-    uint word = ((seed >> ((seed >> 28u) + 4u)) ^ seed) * 277803737u;
-    return (word >> 22u) ^ word;
-}
-
-float GetRandomFloat01()
-{
-    return float(GetPCGHash(rngSeed)) / 4294967296.0;
 }
 
 vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance, float roughness)

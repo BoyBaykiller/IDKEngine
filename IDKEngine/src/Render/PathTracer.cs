@@ -98,11 +98,11 @@ namespace IDKEngine.Render
         public unsafe PathTracer(BVH bvh, int width, int height)
         {
             string firstHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl");
-            firstHitProgramSrc = firstHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
+            firstHitProgramSrc = firstHitProgramSrc.Replace("__MAX_BLAS_TREE_DEPTH__", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
             firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, firstHitProgramSrc));
 
             string nHitProgramSrc = File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl");
-            nHitProgramSrc = nHitProgramSrc.Replace("__maxBlasTreeDepth__", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
+            nHitProgramSrc = nHitProgramSrc.Replace("__MAX_BLAS_TREE_DEPTH__", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
             nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, nHitProgramSrc));
 
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
