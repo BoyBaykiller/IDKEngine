@@ -3,13 +3,15 @@ using System.IO;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using System.Collections.Generic;
 
 namespace IDKEngine.Render
 {
     class Voxelizer : IDisposable
     {
-        public static readonly bool HAS_ATOMIC_FP16_VECTOR = Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector");
-        public static readonly bool HAS_CONSERVATIVE_RASTER = Helper.IsExtensionsAvailable("GL_NV_conservative_raster");
+        public static readonly bool HAS_ATOMIC_FP16_VECTOR = (Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector"));
+        public static readonly bool HAS_CONSERVATIVE_RASTER = (Helper.IsExtensionsAvailable("GL_NV_conservative_raster"));
+        public static readonly bool TAKE_FAST_GEOMETRY_SHADER_PATH = (Helper.IsExtensionsAvailable("GL_NV_geometry_shader_passthrough") && Helper.IsExtensionsAvailable("GL_NV_viewport_swizzle"));
 
         public unsafe Vector3 GridMin
         {
@@ -64,7 +66,7 @@ namespace IDKEngine.Render
         public bool IsConservativeRasterization;
 
         public Texture ResultVoxelsAlbedo;
-        private readonly Texture[] intermediateRbg; // only used if no support for GL_NV_shader_atomic_fp16_vector
+        private readonly Texture[] intermediateResultRbg; // only used if no support for GL_NV_shader_atomic_fp16_vector
         private readonly ShaderProgram mergeIntermediatesProgram; // only used if no support for GL_NV_shader_atomic_fp16_vector
         private readonly ShaderProgram clearTexturesProgram;
         private readonly ShaderProgram voxelizeProgram;
@@ -78,15 +80,24 @@ namespace IDKEngine.Render
         {
             clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 
-            voxelizeProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/fragment.glsl")));
+            string vertexSrcCode = File.ReadAllText("res/shaders/VXGI/Voxelize/vertex.glsl");
+            vertexSrcCode = vertexSrcCode.Replace("__TAKE_FAST_GEOMETRY_SHADER_PATH__", $"{(TAKE_FAST_GEOMETRY_SHADER_PATH ? 1 : 0)}");
+            List<Shader> voxelizeProgramShaders = new List<Shader>()
+            {
+                new Shader(ShaderType.VertexShader, vertexSrcCode),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/fragment.glsl"))
+            };
+            if (TAKE_FAST_GEOMETRY_SHADER_PATH)
+            {
+                voxelizeProgramShaders.Add(new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/geometry.glsl")));
+            }
+            voxelizeProgram = new ShaderProgram(voxelizeProgramShaders.ToArray());
 
             mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Mipmap/compute.glsl")));
             visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/DebugVisualization/compute.glsl")));
             if (!HAS_ATOMIC_FP16_VECTOR)
             {
-                intermediateRbg = new Texture[3];
+                intermediateResultRbg = new Texture[3];
                 mergeIntermediatesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/MergeIntermediates/compute.glsl")));
             }
 
@@ -123,9 +134,9 @@ namespace IDKEngine.Render
             ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
             if (!HAS_ATOMIC_FP16_VECTOR)
             {
-                intermediateRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, intermediateRbg[0].SizedInternalFormat);
-                intermediateRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, intermediateRbg[1].SizedInternalFormat);
-                intermediateRbg[2].BindToImageUnit(3, 0, true, 0, TextureAccess.ReadWrite, intermediateRbg[2].SizedInternalFormat);
+                intermediateResultRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[0].SizedInternalFormat);
+                intermediateResultRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[1].SizedInternalFormat);
+                intermediateResultRbg[2].BindToImageUnit(3, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[2].SizedInternalFormat);
             }
 
             clearTexturesProgram.Use();
@@ -142,6 +153,18 @@ namespace IDKEngine.Render
                 GL.Enable((EnableCap)All.ConservativeRasterizationNv);
             }
 
+            if (TAKE_FAST_GEOMETRY_SHADER_PATH)
+            {
+                Vector4[] viewports = new Vector4[3];
+                viewports[0] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
+                viewports[1] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
+                viewports[2] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
+                GL.ViewportArray(0, viewports.Length, ref viewports[0].X);
+
+                GL.NV.ViewportSwizzle(1, All.ViewportSwizzlePositiveXNv, All.ViewportSwizzlePositiveZNv, All.ViewportSwizzlePositiveYNv, All.ViewportSwizzlePositiveWNv); // xyzw -> xzyw
+                GL.NV.ViewportSwizzle(2, All.ViewportSwizzlePositiveZNv, All.ViewportSwizzlePositiveYNv, All.ViewportSwizzlePositiveXNv, All.ViewportSwizzlePositiveWNv); // xyzw -> zyxw
+            }
+
             GL.Viewport(0, 0, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
             GL.ColorMask(false, false, false, false);
             GL.DepthMask(false);
@@ -151,9 +174,9 @@ namespace IDKEngine.Render
             ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
             if (!HAS_ATOMIC_FP16_VECTOR)
             {
-                intermediateRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
-                intermediateRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
-                intermediateRbg[2].BindToImageUnit(3, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
+                intermediateResultRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
+                intermediateResultRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
+                intermediateResultRbg[2].BindToImageUnit(3, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
             }
 
             voxelizeProgram.Use();
@@ -175,9 +198,9 @@ namespace IDKEngine.Render
         {
             ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
 
-            intermediateRbg[0].BindToUnit(0);
-            intermediateRbg[1].BindToUnit(1);
-            intermediateRbg[2].BindToUnit(2);
+            intermediateResultRbg[0].BindToUnit(0);
+            intermediateResultRbg[1].BindToUnit(1);
+            intermediateResultRbg[2].BindToUnit(2);
 
             mergeIntermediatesProgram.Use();
             GL.DispatchCompute((ResultVoxelsAlbedo.Width + 4 - 1) / 4, (ResultVoxelsAlbedo.Height + 4 - 1) / 4, (ResultVoxelsAlbedo.Depth + 4 - 1) / 4);
@@ -224,10 +247,10 @@ namespace IDKEngine.Render
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    if (intermediateRbg[i] != null) intermediateRbg[i].Dispose();
-                    intermediateRbg[i] = new Texture(TextureTarget3d.Texture3D);
-                    intermediateRbg[i].SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-                    intermediateRbg[i].ImmutableAllocate(width, height, depth, SizedInternalFormat.R32f);
+                    if (intermediateResultRbg[i] != null) intermediateResultRbg[i].Dispose();
+                    intermediateResultRbg[i] = new Texture(TextureTarget3d.Texture3D);
+                    intermediateResultRbg[i].SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, SizedInternalFormat.R32f);
                 }
             }
 
@@ -242,7 +265,7 @@ namespace IDKEngine.Render
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    intermediateRbg[i].Dispose();
+                    intermediateResultRbg[i].Dispose();
                 }
                 mergeIntermediatesProgram.Dispose();
             }

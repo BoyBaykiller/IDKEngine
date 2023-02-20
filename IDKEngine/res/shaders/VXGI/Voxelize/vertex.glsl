@@ -106,6 +106,9 @@ out InOutVars
 vec3[3] Voxelize(vec3 v0, vec3 v1, vec3 v2);
 vec3 DecompressSNorm32Fast(uint data);
 
+// Inserted by application. 0 if false, else 1
+#define TAKE_FAST_GEOMETRY_SHADER_PATH __TAKE_FAST_GEOMETRY_SHADER_PATH__
+
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
@@ -116,6 +119,18 @@ void main()
 
     outData.FragPos = (meshInstance.ModelMatrix * vec4(vertex.Position, 1.0)).xyz;
 
+    vec3 normal = DecompressSNorm32Fast(vertex.Normal);
+
+    mat3 localToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+    outData.Normal = normalize(localToWorld * normal);
+    outData.TexCoord = vertex.TexCoord;
+
+    outData.MaterialIndex = mesh.MaterialIndex;
+    outData.EmissiveBias = mesh.EmissiveBias;
+
+#if TAKE_FAST_GEOMETRY_SHADER_PATH
+    gl_Position = voxelizerDataUBO.OrthoProjection * vec4(outData.FragPos, 1.0);
+#else
     uint triLocalVertexID = gl_VertexID % 3;
     uint triID = gl_VertexID / 3;
     vec3 triNdc[3];
@@ -131,17 +146,9 @@ void main()
     triNdc[1] = (voxelizerDataUBO.OrthoProjection * vec4(triNdc[1], 1.0)).xyz;
     triNdc[2] = (voxelizerDataUBO.OrthoProjection * vec4(triNdc[2], 1.0)).xyz;
     triNdc = Voxelize(triNdc[0], triNdc[1], triNdc[2]);
-
-    vec3 normal = DecompressSNorm32Fast(vertex.Normal);
-
-    mat3 localToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-    outData.Normal = normalize(localToWorld * normal);
-    outData.TexCoord = vertex.TexCoord;
-
-    outData.MaterialIndex = mesh.MaterialIndex;
-    outData.EmissiveBias = mesh.EmissiveBias;
-
+    
     gl_Position = vec4(triNdc[triLocalVertexID], 1.0);
+#endif
 }
 
 vec3[3] Voxelize(vec3 v0, vec3 v1, vec3 v2)
