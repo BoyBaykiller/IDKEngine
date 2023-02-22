@@ -10,15 +10,6 @@ layout(passthrough) in gl_PerVertex {
     vec4 gl_Position;
 } gl_in[];
 
-layout(std140, binding = 5) uniform VoxelizerDataUBO
-{
-    mat4 OrthoProjection;
-    vec3 GridMin;
-    float _pad0;
-    vec3 GridMax;
-    float _pad1;
-} voxelizerDataUBO;
-
 layout(passthrough) in InOutVars {
     vec3 FragPos;
     vec2 TexCoord;

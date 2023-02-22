@@ -30,7 +30,7 @@ namespace IDKEngine.Render
         public readonly SSAO SSAO;
         public readonly SSR SSR;
         public readonly VolumetricLighter VolumetricLight;
-        public readonly ShadingRateClassifier lightingVRS;
+        public readonly LightingShadingRateClassifier LightingVRS;
         public readonly Voxelizer Voxelizer;
         public readonly ConeTracer ConeTracer;
 
@@ -54,17 +54,7 @@ namespace IDKEngine.Render
         private GLSLGBufferData glslGBufferData;
         public unsafe RasterPipeline(int width, int height)
         {
-            NvShadingRateImage[] shadingRates = new NvShadingRateImage[]
-            {
-                NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
-                NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
-            };
-            lightingVRS = new ShadingRateClassifier(shadingRates, 
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")),
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/debugCompute.glsl")), width, height);
+            LightingVRS = new LightingShadingRateClassifier(width, height, 0.025f, 0.2f);
 
             SSAO = new SSAO(width, height, 10, 0.1f, 2.0f);
             SSR = new SSR(width, height, 30, 8, 50.0f);
@@ -156,17 +146,17 @@ namespace IDKEngine.Render
                 }
                 GL.Viewport(0, 0, Result.Width, Result.Height);
 
-                if (IsVariableRateShading) ShadingRateClassifier.IsEnabled = true;
+                if (IsVariableRateShading) VariableRateShading.Activate(LightingVRS);
                 deferredLightingFBO.Bind();
                 lightingProgram.Use();
                 GL.DepthMask(false);
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
                 GL.DepthMask(true);
-                ShadingRateClassifier.IsEnabled = false;
+                VariableRateShading.Deactivate();
 
-                if (IsVariableRateShading || lightingVRS.DebugValue != ShadingRateClassifier.DebugMode.NoDebug)
+                if (IsVariableRateShading || LightingVRS.DebugValue != LightingShadingRateClassifier.DebugMode.NoDebug)
                 {
-                    lightingVRS.Compute(Result);
+                    LightingVRS.Compute(Result);
                 }
 
                 gBufferFBO.Bind();
@@ -230,7 +220,7 @@ namespace IDKEngine.Render
             SSAO.SetSize(width, height);
             SSR.SetSize(width, height);
             VolumetricLight.SetSize(width, height);
-            lightingVRS.SetSize(width, height);
+            LightingVRS.SetSize(width, height);
             ConeTracer.SetSize(width, height);
 
             if (Result != null) Result.Dispose();
@@ -289,7 +279,7 @@ namespace IDKEngine.Render
             SSAO.Dispose();
             SSR.Dispose();
             VolumetricLight.Dispose();
-            lightingVRS.Dispose();
+            LightingVRS.Dispose();
             Voxelizer.Dispose();
             ConeTracer.Dispose();
 
