@@ -121,8 +121,8 @@ void main()
 
     vec3 normal = DecompressSNorm32Fast(vertex.Normal);
 
-    mat3 localToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-    outData.Normal = normalize(localToWorld * normal);
+    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+    outData.Normal = normalize(normalToWorld * normal);
     outData.TexCoord = vertex.TexCoord;
 
     outData.MaterialIndex = mesh.MaterialIndex;

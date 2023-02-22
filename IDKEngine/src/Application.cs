@@ -59,7 +59,7 @@ namespace IDKEngine
                     }
 
                     PostProcessor.Compute(true, RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
-                    RasterizerPipeline.lightingVRS.DebugRender(PostProcessor.Result);
+                    RasterizerPipeline.LightingVRS.DebugRender(PostProcessor.Result);
                 }
 
             }
@@ -100,8 +100,6 @@ namespace IDKEngine
             GL.Enable(EnableCap.DepthTest);
             GL.Disable(EnableCap.Blend);
 
-
-            // TODO: Observe performance and potentially optimize
             ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
 
             fps++;

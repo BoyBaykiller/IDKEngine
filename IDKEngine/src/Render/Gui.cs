@@ -307,28 +307,27 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
-                        ImGui.Text($"NV_shading_rate_image: {ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING}");
+                        ImGui.Text($"NV_shading_rate_image: {VariableRateShading.HAS_VARIABLE_RATE_SHADING}");
                         ImGui.SameLine();
                         InfoMark(
                             "Uses NV_shading_rate_image to choose a unique shading rate " +
                             "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
                             "shader invocations in regions where less detail may be required."
                         );
-                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
+                        if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
                         ImGui.Checkbox("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading);
-                        if (!ShadingRateClassifier.HAS_VARIABLE_RATE_SHADING) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
-
+                        if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
                         string[] debugModes = new string[]
                         {
-                            nameof(ShadingRateClassifier.DebugMode.NoDebug),
-                            nameof(ShadingRateClassifier.DebugMode.ShadingRate),
-                            nameof(ShadingRateClassifier.DebugMode.Speed),
-                            nameof(ShadingRateClassifier.DebugMode.Luminance),
-                            nameof(ShadingRateClassifier.DebugMode.LuminanceVariance),
+                            nameof(LightingShadingRateClassifier.DebugMode.NoDebug),
+                            nameof(LightingShadingRateClassifier.DebugMode.ShadingRate),
+                            nameof(LightingShadingRateClassifier.DebugMode.Speed),
+                            nameof(LightingShadingRateClassifier.DebugMode.Luminance),
+                            nameof(LightingShadingRateClassifier.DebugMode.LuminanceVariance),
                         };
 
-                        current = app.RasterizerPipeline.lightingVRS.DebugValue.ToString();
+                        current = app.RasterizerPipeline.LightingVRS.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
                             for (int i = 0; i < debugModes.Length; i++)
@@ -337,7 +336,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(debugModes[i], isSelected))
                                 {
                                     current = debugModes[i];
-                                    app.RasterizerPipeline.lightingVRS.DebugValue = ShadingRateClassifier.DebugMode.NoDebug + i;
+                                    app.RasterizerPipeline.LightingVRS.DebugValue = LightingShadingRateClassifier.DebugMode.NoDebug + i;
                                 }
 
                                 if (isSelected)
@@ -346,16 +345,16 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        tempFloat = app.RasterizerPipeline.lightingVRS.SpeedFactor;
+                        tempFloat = app.RasterizerPipeline.LightingVRS.SpeedFactor;
                         if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
-                            app.RasterizerPipeline.lightingVRS.SpeedFactor = tempFloat;
+                            app.RasterizerPipeline.LightingVRS.SpeedFactor = tempFloat;
                         }
 
-                        tempFloat = app.RasterizerPipeline.lightingVRS.LumVarianceFactor;
+                        tempFloat = app.RasterizerPipeline.LightingVRS.LumVarianceFactor;
                         if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
                         {
-                            app.RasterizerPipeline.lightingVRS.LumVarianceFactor = tempFloat;
+                            app.RasterizerPipeline.LightingVRS.LumVarianceFactor = tempFloat;
                         }
                     }
 
@@ -736,7 +735,6 @@ namespace IDKEngine.Render
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(0.0f));
             ImGui.Begin($"Viewport");
             {
-
                 System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
                 if (content.X != app.ViewportResolution.X || content.Y != app.ViewportResolution.Y)
                 {
