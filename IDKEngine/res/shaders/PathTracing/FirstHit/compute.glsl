@@ -210,7 +210,7 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 bool TraceRay(inout TransportRay transportRay);
 vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, out float rayProbability, out float newIor, out bool isRefractive, out bool fromInside);
 float FresnelSchlick(float cosTheta, float n1, float n2);
-bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter);
+bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
 bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
 bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
@@ -281,12 +281,12 @@ void main()
 bool TraceRay(inout TransportRay transportRay)
 {
     HitInfo hitInfo;
-    uint nodeCounter = 0;
-    if (ClosestHit(Ray(transportRay.Origin, transportRay.Direction), hitInfo, nodeCounter))
+    uint debugNodeCounter = 0;
+    if (ClosestHit(Ray(transportRay.Origin, transportRay.Direction), hitInfo, debugNodeCounter))
     {
         if (IsDebugBVHTraversal)
         {
-            transportRay.PrevIOROrDebugNodeCounter = nodeCounter;
+            transportRay.PrevIOROrDebugNodeCounter = debugNodeCounter;
             return false;
         }
 
@@ -459,7 +459,7 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }
 
-bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
+bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
 {
     hitInfo.T = FLOAT_MAX;
     hitInfo.TriangleIndex = -1;
@@ -488,20 +488,23 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
         Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
         uint stackPtr = 0;
-        uint stackTop = 0;
+        uint stackTop = 1;
         while (true)
         {
-            Node node = blasSSBO.Nodes[baseNode + stackTop];
-            if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T))
-            {
-                if (stackPtr == 0) break;
-                stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];
-                continue;
-            }
+            debugNodeCounter++;
+            Node left = blasSSBO.Nodes[baseNode + stackTop];
+            Node right = blasSSBO.Nodes[baseNode + stackTop + 1];
 
-            if (node.TriCount > 0)
+            float tMinLeft;
+            float tMinRight;
+            bool leftChildHit = RayCuboidIntersect(localRay, left, tMinLeft, rayTMax) && rayTMax > 0.0 && tMinLeft < hitInfo.T;
+            bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
+
+            uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
+            if (triCount > 0)
             {
-                for (uint j = node.TriStartOrLeftChild; j < node.TriStartOrLeftChild + node.TriCount; j++)
+                uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
+                for (uint j = first; j < first + triCount; j++)
                 {
                     Triangle triangle = triangleSSBO.Triangles[j];
                     if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
@@ -513,30 +516,26 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint interiorNodeCounter)
                         hitInfo.InstanceID = glInstanceID;
                     }
                 }
+
+                leftChildHit = leftChildHit && (left.TriCount == 0);
+                rightChildHit = rightChildHit && (right.TriCount == 0);
             }
-            else
+            
+            if (leftChildHit || rightChildHit)
             {
-                interiorNodeCounter++;
-                float tMinLeft;
-                float tMinRight;
-
-                bool leftChildHit = RayCuboidIntersect(localRay, blasSSBO.Nodes[baseNode + node.TriStartOrLeftChild], tMinLeft, rayTMax) && rayTMax > 0.0 && tMinLeft < hitInfo.T;
-                bool rightChildHit = RayCuboidIntersect(localRay, blasSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
-
-                if (leftChildHit || rightChildHit)
+                if (leftChildHit && rightChildHit)
                 {
-                    if (leftChildHit && rightChildHit)
-                    {
-                        stackTop = node.TriStartOrLeftChild + (1 - int(tMinLeft < tMinRight));
-                        SharedStack[gl_LocalInvocationIndex][stackPtr++] = node.TriStartOrLeftChild + int(tMinLeft < tMinRight);
-                    }
-                    else
-                    {
-                        stackTop = node.TriStartOrLeftChild + int(rightChildHit && !leftChildHit);
-                    }
-                    continue;
+                    bool leftCloser = tMinLeft < tMinRight;
+                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftCloser);
+                    SharedStack[gl_LocalInvocationIndex][stackPtr++] = mix(left.TriStartOrLeftChild, right.TriStartOrLeftChild, leftCloser);
                 }
-            }
+                else
+                {
+                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftChildHit);
+                }
+                continue;
+            }   
+
             // Here: On a leaf node or didn't hit any children which means we should traverse up
             if (stackPtr == 0) break;
             stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];

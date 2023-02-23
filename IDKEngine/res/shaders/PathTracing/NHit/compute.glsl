@@ -461,20 +461,22 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
         Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
         uint stackPtr = 0;
-        uint stackTop = 0;
+        uint stackTop = 1;
         while (true)
         {
-            Node node = blasSSBO.Nodes[baseNode + stackTop];
-            if (!(RayCuboidIntersect(localRay, node, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T))
-            {
-                if (stackPtr == 0) break;
-                stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];
-                continue;
-            }
+            Node left = blasSSBO.Nodes[baseNode + stackTop];
+            Node right = blasSSBO.Nodes[baseNode + stackTop + 1];
 
-            if (node.TriCount > 0)
+            float tMinLeft;
+            float tMinRight;
+            bool leftChildHit = RayCuboidIntersect(localRay, left, tMinLeft, rayTMax) && rayTMax > 0.0 && tMinLeft < hitInfo.T;
+            bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
+
+            uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
+            if (triCount > 0)
             {
-                for (uint j = node.TriStartOrLeftChild; j < node.TriStartOrLeftChild + node.TriCount; j++)
+                uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
+                for (uint j = first; j < first + triCount; j++)
                 {
                     Triangle triangle = triangleSSBO.Triangles[j];
                     if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
@@ -486,29 +488,26 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
                         hitInfo.InstanceID = glInstanceID;
                     }
                 }
+
+                leftChildHit = leftChildHit && (left.TriCount == 0);
+                rightChildHit = rightChildHit && (right.TriCount == 0);
             }
-            else
+            
+            if (leftChildHit || rightChildHit)
             {
-                float tMinLeft;
-                float tMinRight;
-
-                bool leftChildHit = RayCuboidIntersect(localRay, blasSSBO.Nodes[baseNode + node.TriStartOrLeftChild], tMinLeft, rayTMax) && rayTMax > 0.0 && tMinLeft < hitInfo.T;
-                bool rightChildHit = RayCuboidIntersect(localRay, blasSSBO.Nodes[baseNode + node.TriStartOrLeftChild + 1], tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
-
-                if (leftChildHit || rightChildHit)
+                if (leftChildHit && rightChildHit)
                 {
-                    if (leftChildHit && rightChildHit)
-                    {
-                        stackTop = node.TriStartOrLeftChild + (1 - int(tMinLeft < tMinRight));
-                        SharedStack[gl_LocalInvocationIndex][stackPtr++] = node.TriStartOrLeftChild + int(tMinLeft < tMinRight);
-                    }
-                    else
-                    {
-                        stackTop = node.TriStartOrLeftChild + int(rightChildHit && !leftChildHit);
-                    }
-                    continue;
+                    bool leftCloser = tMinLeft < tMinRight;
+                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftCloser);
+                    SharedStack[gl_LocalInvocationIndex][stackPtr++] = mix(left.TriStartOrLeftChild, right.TriStartOrLeftChild, leftCloser);
                 }
+                else
+                {
+                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftChildHit);
+                }
+                continue;
             }
+
             // Here: On a leaf node or didn't hit any children which means we should traverse up
             if (stackPtr == 0) break;
             stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];

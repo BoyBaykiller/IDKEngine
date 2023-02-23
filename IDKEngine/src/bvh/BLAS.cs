@@ -8,7 +8,7 @@ namespace IDKEngine
 {
     class BLAS
     {
-        public const int MIN_TRIANGLES_PER_LEAF_COUNT = 3;
+        public const int MIN_TRIANGLES_PER_LEAF_COUNT = 2;
 #if USE_SAH
         public const int SAH_SAMPLES = 8;
 #endif
@@ -23,8 +23,6 @@ namespace IDKEngine
             Nodes = new GLSLBlasNode[2 * count];
             ref GLSLBlasNode root = ref Nodes[nodesUsed++];
             root.TriCount = (uint)count;
-
-            nodesUsed++; // one empty node to align following childs in single 64 cache line (in theory)
 
             UpdateNodeBounds(ref root);
             Subdivide();
@@ -149,9 +147,9 @@ namespace IDKEngine
                 Vector128<float> nodeMin = Vector128.Create(float.MaxValue);
                 Vector128<float> nodeMax = Vector128.Create(float.MinValue);
 
-                for (int i = 0; i < node.TriCount; i++)
+                for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
                 {
-                    ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
+                    ref readonly GLSLTriangle tri = ref triangles[i];
 
                     Vector128<float> v0 = Vector128.Create(tri.Vertex0.Position.X, tri.Vertex0.Position.Y, tri.Vertex0.Position.Z, 0.0f);
                     Vector128<float> v1 = Vector128.Create(tri.Vertex1.Position.X, tri.Vertex1.Position.Y, tri.Vertex1.Position.Z, 0.0f);

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
-using IDKEngine.Render.Objects;
 using OpenTK.Graphics.OpenGL4;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
