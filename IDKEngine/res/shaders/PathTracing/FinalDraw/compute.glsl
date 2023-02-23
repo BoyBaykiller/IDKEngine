@@ -90,7 +90,7 @@ void main()
     if (IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
-        float waveLength = min(transportRay.PrevIOROrDebugNodeCounter * 2.5 + 400.0, 700.0);
+        float waveLength = min(transportRay.PrevIOROrDebugNodeCounter * 2.0 + 400.0, 700.0);
         vec3 col = SpectralJet(waveLength);
         irradiance = col;
     }

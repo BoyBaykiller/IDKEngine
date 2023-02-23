@@ -131,7 +131,7 @@ namespace IDKEngine.Render
             {
                 int pingPongIndex = 1 - (j % 2);
                 nHitProgram.Upload(0, pingPongIndex);
-                rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // set count
+                rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // reset ray counter
 
                 GL.DispatchComputeIndirect(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex));
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);

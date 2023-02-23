@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
