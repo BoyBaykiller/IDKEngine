@@ -77,6 +77,11 @@ namespace IDKEngine
             try
             {
                 using FileStream fileStream = File.OpenRead(path);
+                if (fileStream.Length == 0 && fileStream.Length % sizeof(T) != 0)
+                {
+                    Console.WriteLine($"Error when loading {Path.GetFileName(path)}. File is expected to have a size multiple of {sizeof(T)}");
+                    return;
+                }
                 recordedFrames = new T[fileStream.Length / sizeof(T)];
                 fixed (void* ptr = recordedFrames)
                 {
@@ -94,7 +99,15 @@ namespace IDKEngine
 
         public unsafe void SaveToFile(string path)
         {
-            if (File.Exists(path)) File.Delete(path);
+            if (recordedFrames == null || recordedFrames.Length == 0)
+            {
+                return;
+            }
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
             using FileStream file = File.OpenWrite(path);
             fixed (void* ptr = recordedFrames)
             {

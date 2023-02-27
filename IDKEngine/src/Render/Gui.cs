@@ -9,7 +9,7 @@ namespace IDKEngine.Render
 {
     class Gui : IDisposable
     {
-        enum EntityType
+        public enum EntityType
         {
             None = 0,
             Mesh = 1,
@@ -29,8 +29,8 @@ namespace IDKEngine.Render
         private int pathTracerRenderSampleGoal;
 
         private FrameRecorderState frameRecState;
-        private EntityType selectedEntityType;
-        private int selectedEntityIndex;
+        public EntityType SelectedEntityType;
+        public int SelectedEntityIndex;
         private float selectedEntityDist;
         private int recordingFPS;
 
@@ -260,7 +260,7 @@ namespace IDKEngine.Render
                                 "If TAA is disabled this has no effect."
                             );
 
-                            ImGui.Checkbox("IsDebugRender", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
+                            ImGui.Checkbox("IsDebugRenderGrid", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
                             if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
                             {
                                 tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
@@ -487,9 +487,7 @@ namespace IDKEngine.Render
                         ImGui.SameLine();
                         InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
 
-                        ImGui.Text("ARB_shader_viewport_layer_array or\n" +
-                            "NV_viewport_array2 or\n" +
-                            $"AMD_vertex_shader_layer: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
+                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
                         ImGui.SameLine();
                         InfoMark("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
                     }
@@ -612,16 +610,16 @@ namespace IDKEngine.Render
 
             ImGui.Begin("Entity properties");
             {
-                if (selectedEntityType != EntityType.None)
+                if (SelectedEntityType != EntityType.None)
                 {
-                    ImGui.Text($"{selectedEntityType}ID: {selectedEntityIndex}");
+                    ImGui.Text($"{SelectedEntityType}ID: {SelectedEntityIndex}");
                     ImGui.Text($"Distance: {MathF.Round(selectedEntityDist, 3)}");
                 }
-                if (selectedEntityType == EntityType.Mesh)
+                if (SelectedEntityType == EntityType.Mesh)
                 {
                     bool shouldUpdateMesh = false;
-                    ref readonly GLSLDrawElementsCommand cmd = ref app.ModelSystem.DrawCommands[selectedEntityIndex];
-                    ref GLSLMesh mesh = ref app.ModelSystem.Meshes[selectedEntityIndex];
+                    ref readonly GLSLDrawElementsCommand cmd = ref app.ModelSystem.DrawCommands[SelectedEntityIndex];
+                    ref GLSLMesh mesh = ref app.ModelSystem.Meshes[SelectedEntityIndex];
                     ref GLSLMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
@@ -690,13 +688,13 @@ namespace IDKEngine.Render
                     if (shouldUpdateMesh)
                     {
                         shouldResetPT = true;
-                        app.ModelSystem.UpdateMeshBuffer(selectedEntityIndex, selectedEntityIndex + 1);
+                        app.ModelSystem.UpdateMeshBuffer(SelectedEntityIndex, SelectedEntityIndex + 1);
                     }
                 }
-                else if (selectedEntityType == EntityType.Light)
+                else if (SelectedEntityType == EntityType.Light)
                 {
                     bool shouldUpdateLight = false;
-                    ref GLSLLight light = ref app.LightManager.Lights[selectedEntityIndex];
+                    ref GLSLLight light = ref app.LightManager.Lights[SelectedEntityIndex];
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
@@ -721,7 +719,7 @@ namespace IDKEngine.Render
                     if (shouldUpdateLight)
                     {
                         shouldResetPT = true;
-                        app.LightManager.UpdateLightBuffer(selectedEntityIndex, selectedEntityIndex + 1);
+                        app.LightManager.UpdateLightBuffer(SelectedEntityIndex, SelectedEntityIndex + 1);
                     }
                 }
                 else
@@ -916,41 +914,43 @@ namespace IDKEngine.Render
                     return;
                 }
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
-                bool hitMesh = app.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
+                bool hitMesh = app.BVH.Intersect(worldSpaceRay, out BVH.HitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);
                 if (app.GetRenderMode() == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
 
                 if (!hitMesh && !hitLight)
                 {
-                    app.MeshOutlineRenderer.MeshIndex = -1;
-                    selectedEntityType = EntityType.None;
+                    SelectedEntityType = EntityType.None;
                     return;
                 }
 
                 if (!hitLight) lightHitInfo.T = float.MaxValue;
                 if (!hitMesh) meshHitInfo.T = float.MaxValue;
 
+                int hitEntityID;
+                EntityType hitEntityType;
                 if (meshHitInfo.T < lightHitInfo.T)
                 {
-                    selectedEntityType = EntityType.Mesh;
                     selectedEntityDist = meshHitInfo.T;
-                    if (meshHitInfo.MeshIndex == app.MeshOutlineRenderer.MeshIndex)
-                    {
-                        app.MeshOutlineRenderer.MeshIndex = -1;
-                        selectedEntityType = EntityType.None;
-                    }
-                    else
-                    {
-                        app.MeshOutlineRenderer.MeshIndex = meshHitInfo.MeshIndex;
-                    }
-                    selectedEntityIndex = meshHitInfo.MeshIndex;
+                    hitEntityType = EntityType.Mesh;
+                    hitEntityID = meshHitInfo.MeshID;
                 }
                 else
                 {
-                    selectedEntityType = EntityType.Light;
                     selectedEntityDist = lightHitInfo.T;
-                    selectedEntityIndex = lightHitInfo.HitID;
-                    app.MeshOutlineRenderer.MeshIndex = -1;
+                    hitEntityType = EntityType.Light;
+                    hitEntityID = lightHitInfo.LightID;
+                }
+
+                if ((hitEntityID == SelectedEntityIndex) && (hitEntityType == SelectedEntityType))
+                {
+                    SelectedEntityType = EntityType.None;
+                    SelectedEntityIndex = -1;
+                }
+                else
+                {
+                    SelectedEntityIndex = hitEntityID;
+                    SelectedEntityType = hitEntityType;
                 }
             }
         }

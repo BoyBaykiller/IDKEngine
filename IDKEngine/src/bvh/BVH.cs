@@ -9,27 +9,21 @@ namespace IDKEngine
 {
     class BVH
     {
-        public struct RayHitInfo
+        public struct HitInfo
         {
             public float T;
-            public int MeshIndex;
+            public int MeshID;
             public int InstanceID;
             public Vector3 Bary;
             public GLSLTriangle Triangle;
         }
 
-        public struct AABBHitInfo
-        {
-            public int HitID;
-            public int InstanceID;
-            public GLSLTriangle Triangle;
-        }
-
         public readonly int MaxBlasTreeDepth;
+        public readonly BLAS[] Blases;
+
         private readonly ModelSystem ModelSystem;
         private readonly BufferObject BlasBuffer;
         private readonly BufferObject TriangleBuffer;
-        private readonly BLAS[] blases;
         private readonly GLSLTriangle[] triangles;
         public unsafe BVH(ModelSystem modelSystem)
         {
@@ -48,19 +42,19 @@ namespace IDKEngine
             }
 
             int maxTreeDepth = 0;
-            blases = new BLAS[modelSystem.Meshes.Length];
+            Blases = new BLAS[modelSystem.Meshes.Length];
             System.Threading.Tasks.Parallel.For(0, modelSystem.Meshes.Length, i =>
             {
                 ref readonly GLSLDrawElementsCommand cmd = ref modelSystem.DrawCommands[i];
                 int baseTriangleCount = cmd.FirstIndex / 3;
                 fixed (GLSLTriangle* ptr = triangles)
                 {
-                    blases[i] = new BLAS(ptr + baseTriangleCount, cmd.Count / 3, out int treeDepth);
+                    Blases[i] = new BLAS(ptr + baseTriangleCount, cmd.Count / 3, out int treeDepth);
                     Helper.InterlockedMax(ref maxTreeDepth, treeDepth);
                 }
-                for (int j = 0; j < blases[i].Nodes.Length; j++)
-                    if (blases[i].Nodes[j].TriCount > 0)
-                        blases[i].Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
+                for (int j = 0; j < Blases[i].Nodes.Length; j++)
+                    if (Blases[i].Nodes[j].TriCount > 0)
+                        Blases[i].Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
             });
             MaxBlasTreeDepth = maxTreeDepth;
 
@@ -69,13 +63,13 @@ namespace IDKEngine
 
             if (triangles.Length > 0)
             {
-                BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * blases.Sum(blas => blas.Nodes.Length), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+                BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * Blases.Sum(blas => blas.Nodes.Length), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
                 BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
                 int nodesUploaded = 0;
-                for (int i = 0; i < blases.Length; i++)
+                for (int i = 0; i < Blases.Length; i++)
                 {
-                    BlasBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), blases[i].Nodes.Length * sizeof(GLSLBlasNode), blases[i].Nodes);
-                    nodesUploaded += blases[i].Nodes.Length;
+                    BlasBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), Blases[i].Nodes.Length * sizeof(GLSLBlasNode), Blases[i].Nodes);
+                    nodesUploaded += Blases[i].Nodes.Length;
                 }
 
                 TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.None);
@@ -83,10 +77,10 @@ namespace IDKEngine
             }
         }
 
-        public unsafe bool Intersect(in Ray ray, out RayHitInfo hitInfo, float maxT = float.MaxValue)
+        public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo)
         {
-            hitInfo = new RayHitInfo();
-            hitInfo.T = maxT;
+            hitInfo = new HitInfo();
+            hitInfo.T = float.MaxValue;
 
             float rayTMin = 0.0f;
             float rayTMax = 0.0f;
@@ -102,7 +96,7 @@ namespace IDKEngine
                 uint stackTop = 0;
                 while (true)
                 {
-                    ref readonly GLSLBlasNode node = ref blases[i].Nodes[stackTop];
+                    ref readonly GLSLBlasNode node = ref Blases[i].Nodes[stackTop];
                     if (!(MyMath.RayCuboidIntersect(localRay, node.Min, node.Max, out rayTMin, out rayTMax) && rayTMax > 0.0f && rayTMin < hitInfo.T))
                     {
                         if (stackPtr == 0) break;
@@ -119,7 +113,7 @@ namespace IDKEngine
                             {
                                 hitInfo.Bary = baryT.Xyz;
                                 hitInfo.T = baryT.W;
-                                hitInfo.MeshIndex = i;
+                                hitInfo.MeshID = i;
                                 hitInfo.InstanceID = glInstanceID;
                             }
                         }
@@ -134,45 +128,7 @@ namespace IDKEngine
                 }
             }
 
-            return hitInfo.T != maxT;
-        }
-
-        public unsafe bool Intersect(in AABB worldSpaceAabb, out AABBHitInfo hitInfo)
-        {
-            hitInfo = new AABBHitInfo();
-
-            Vector3 boxCenter = worldSpaceAabb.Center;
-            Vector3 halfSize = worldSpaceAabb.HalfSize;
-            
-            for (int i = 0; i < ModelSystem.Meshes.Length; i++)
-            {
-                ref readonly GLSLDrawElementsCommand cmd = ref ModelSystem.DrawCommands[i];
-
-                int glInstanceID = cmd.BaseInstance + 0;  // TODO: Work out actual instanceID value
-                Matrix4 invModel = ModelSystem.MeshInstances[glInstanceID].InvModelMatrix;
-                
-                Vector3 localCenter = (new Vector4(boxCenter, 1.0f) * invModel).Xyz;
-                AABB localAabb = worldSpaceAabb;
-                localAabb.Transform(invModel);
-
-                ref readonly GLSLBlasNode topNode = ref blases[i].Nodes[0];
-                if (MyMath.AabbAabbIntersect(localAabb, topNode.Min, topNode.Max))
-                {
-                    for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j += 3)
-                    {
-                        hitInfo.Triangle = triangles[j / 3];
-                        if (MyMath.TriangleBoxIntersect(hitInfo.Triangle.Vertex0.Position, hitInfo.Triangle.Vertex1.Position, hitInfo.Triangle.Vertex2.Position, localCenter, halfSize))
-                        {
-                            hitInfo.HitID = i;
-                            hitInfo.InstanceID = glInstanceID;
-                            return true;
-                        }
-                    }
-
-                }
-            }
-
-            return false;
+            return hitInfo.T != float.MaxValue;
         }
     }
 }

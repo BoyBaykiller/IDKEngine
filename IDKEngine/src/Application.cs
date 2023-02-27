@@ -48,6 +48,8 @@ namespace IDKEngine
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
                     PostProcessor.Compute(false, RasterizerPipeline.Result);
+
+                    MeshOutlineRenderer.Render(PostProcessor.Result, new AABB(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
                 {
@@ -77,7 +79,27 @@ namespace IDKEngine
 
             Framebuffer.Bind(0);
 
-            MeshOutlineRenderer.Render(PostProcessor.Result);
+            if (gui.SelectedEntityType != Gui.EntityType.None)
+            {
+                AABB aabb = new AABB();
+                if (gui.SelectedEntityType == Gui.EntityType.Mesh)
+                {
+                    GLSLBlasNode node = BVH.Blases[gui.SelectedEntityIndex].Nodes[0];
+                    aabb.Min = node.Min;
+                    aabb.Max = node.Max;
+
+                    GLSLDrawElementsCommand cmd = ModelSystem.DrawCommands[gui.SelectedEntityIndex];
+                    aabb.Transform(ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix);
+                }
+                else
+                {
+                    GLSLLight light = LightManager.Lights[gui.SelectedEntityIndex];
+                    aabb.Min = new Vector3(light.Position) - new Vector3(light.Radius);
+                    aabb.Max = new Vector3(light.Position) + new Vector3(light.Radius);
+                }
+
+                MeshOutlineRenderer.Render(PostProcessor.Result, aabb);
+            }
 
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
@@ -184,7 +206,7 @@ namespace IDKEngine
         public Bloom Bloom;
         public PostProcessor PostProcessor;
         public LightManager LightManager;
-        public MeshOutlineRenderer MeshOutlineRenderer;
+        public AABBRender MeshOutlineRenderer;
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
@@ -249,7 +271,7 @@ namespace IDKEngine
                 "res/textures/environmentMap/negz.jpg"
             });
             
-            Model sponza = new Model("res/models/OBJSponza/sponza.obj");
+            Model sponza = new Model(@"res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.MeshInstances.Length; i++) // 0.0145f
                 sponza.MeshInstances[i].ModelMatrix = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
 
@@ -280,7 +302,7 @@ namespace IDKEngine
             BVH = new BVH(ModelSystem);
 
             LightManager  = new LightManager(12, 12);
-            MeshOutlineRenderer = new MeshOutlineRenderer();
+            MeshOutlineRenderer = new AABBRender();
             Bloom = new Bloom(ViewportResolution.X, ViewportResolution.Y, 1.0f, 3.0f);
             PostProcessor = new PostProcessor(ViewportResolution.X, ViewportResolution.Y);
 

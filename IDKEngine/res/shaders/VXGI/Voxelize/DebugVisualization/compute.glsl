@@ -1,6 +1,7 @@
 #version 460 core
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX
+#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -30,6 +31,11 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
+
 layout(std140, binding = 5) uniform VoxelizerDataUBO
 {
     mat4 OrthoProjection;
@@ -58,7 +64,8 @@ void main()
     float t1, t2;
     if (!(RayCuboidIntersect(worldRay, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax, t1, t2) && t2 > 0.0))
     {
-        imageStore(ImgResult, imgCoord, vec4(0.0));
+        vec4 skyColor = texture(skyBoxUBO.Albedo, worldRay.Direction);
+        imageStore(ImgResult, imgCoord, skyColor);
         return;
     }
 
@@ -74,23 +81,23 @@ void main()
     }
     gridRayEnd = (worldRay.Origin + worldRay.Direction * t2);
 
-    vec3 dirThroughGrid = normalize(gridRayEnd - gridRayStart);
-    vec4 color = TraceCone(gridRayStart, dirThroughGrid, ConeAngle, StepMultiplier);
+    vec4 color = TraceCone(gridRayStart, worldRay.Direction, ConeAngle, StepMultiplier);
+    color += (1.0 - color.a) * (texture(skyBoxUBO.Albedo, worldRay.Direction));
 
     imageStore(ImgResult, imgCoord, color);
 }
 
 vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier)
 {
-    vec3 voxelGridWorlSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
-    vec3 voxelWorldSpaceSize = voxelGridWorlSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
+    vec3 voxelGridWorldSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
+    vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
     float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
     float voxelMinLength = min(voxelWorldSpaceSize.x, min(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
     uint maxLevel = textureQueryLevels(SamplerVoxelsAlbedo) - 1;
     vec4 accumlatedColor = vec4(0.0);
 
     float distFromStart = voxelMaxLength;
-    while (accumlatedColor.a < 0.99)
+    while (accumlatedColor.a < 1.0)
     {
         float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
         float sampleDiameter = max(voxelMinLength, coneDiameter);

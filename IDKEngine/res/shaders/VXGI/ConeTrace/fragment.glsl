@@ -100,7 +100,7 @@ void main()
 
 vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance, float roughness)
 {
-    vec3 diffuse = vec3(0.0);
+    vec3 irradiance = vec3(0.0);
     float materialVariance = GetMaterialVariance(specularChance, roughness);
     uint samples = int(mix(1.0, float(MaxSamples), materialVariance));
 
@@ -130,11 +130,14 @@ vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance
             coneAngle = maxConeAngle;
         }
 
-        diffuse += TraceCone(point, dir, normal, coneAngle, StepMultiplier).rgb;
+        vec4 coneTrace = TraceCone(point, dir, normal, coneAngle, StepMultiplier);
+        coneTrace += (1.0 - coneTrace.a) * (texture(skyBoxUBO.Albedo, dir) * GISkyBoxBoost);
+        
+        irradiance += coneTrace.rgb;
     }
-    diffuse /= float(samples);
+    irradiance /= float(samples);
 
-    return diffuse;
+    return irradiance;
 }
 
 float GetMaterialVariance(float specularChance, float roughness)
@@ -166,7 +169,6 @@ vec4 TraceCone(vec3 start, vec3 direction, vec3 normal, float coneAngle, float s
         vec3 sampleUVT = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz * 0.5 + 0.5;
         if (any(lessThan(sampleUVT, vec3(0.0))) || any(greaterThanEqual(sampleUVT, vec3(1.0))) || sampleLod > maxLevel)
         {
-            accumlatedColor += (1.0 - accumlatedColor.a) * (texture(skyBoxUBO.Albedo, direction) * GISkyBoxBoost);
             break;
         }
         vec4 sampleColor = textureLod(SamplerVoxelsAlbedo, sampleUVT, sampleLod);
