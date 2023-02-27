@@ -32,7 +32,6 @@ namespace IDKEngine.Render
 
         private readonly VAO vao;
         private readonly VAO dummyVao;
-
         private readonly ShaderProgram frustumCullingProgram;
         public unsafe ModelSystem()
         {

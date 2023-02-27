@@ -60,10 +60,12 @@ namespace IDKEngine
 
         public void Transform(Matrix4 model)
         {
+            AABB transformed = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (uint i = 0; i < 8; i++)
             {
-                Shrink((new Vector4(this[i], 1.0f) * model).Xyz);
+                transformed.Shrink((new Vector4(this[i], 1.0f) * model).Xyz);
             }
+            this = transformed;
         }
     }
 }

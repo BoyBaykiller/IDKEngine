@@ -13,7 +13,7 @@ namespace IDKEngine.Render
         public struct HitInfo
         {
             public float T;
-            public int HitID;
+            public int LightID;
         }
 
         private int _count;
@@ -129,7 +129,7 @@ namespace IDKEngine.Render
                 if (MyMath.RaySphereIntersect(ray, light, out float min, out float max) && min > 0.0f && max < hitInfo.T)
                 {
                     hitInfo.T = min;
-                    hitInfo.HitID = i;
+                    hitInfo.LightID = i;
                 }
             }
 

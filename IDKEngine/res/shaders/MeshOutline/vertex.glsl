@@ -39,45 +39,6 @@ const vec3 positions[] =
     vec3( 0.5, -0.5, -0.5 )
 };
 
-struct DrawCommand
-{
-    uint Count;
-    uint InstanceCount;
-    uint FirstIndex;
-    uint BaseVertex;
-    uint BaseInstance;
-};
-
-struct Node
-{
-    vec3 Min;
-    uint TriStartOrLeftChild;
-    vec3 Max;
-    uint TriCount;
-};
-
-struct MeshInstance
-{
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
-};
-
-layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
-{
-    DrawCommand DrawCommands[];
-} drawCommandSSBO;
-
-layout(std430, binding = 1) restrict readonly buffer BlasSSBO
-{
-    Node Nodes[];
-} blasSSBO;
-
-layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
 layout(std140, binding = 0) uniform BasicDataUBO
 {
     mat4 ProjView;
@@ -95,16 +56,13 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
-layout(location = 0) uniform int MeshIndex;
+layout(location = 0) uniform vec3 Min;
+layout(location = 1) uniform vec3 Max;
 
 void main()
 {
-    DrawCommand meshCMD = drawCommandSSBO.DrawCommands[MeshIndex];
-    Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
-    mat4 model = meshInstanceSSBO.MeshInstances[gl_InstanceID + meshCMD.BaseInstance].ModelMatrix;
+    vec3 aabbPos = (Min + Max) * 0.5;
+    vec3 aabbSize = Max - Min;
 
-    vec3 aabbPos = (node.Min + node.Max) * 0.5;
-    vec3 aabbSize = node.Max - node.Min;
-
-    gl_Position = basicDataUBO.ProjView * model * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0);
+    gl_Position = basicDataUBO.ProjView * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0);
 }
