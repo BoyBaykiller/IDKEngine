@@ -147,7 +147,7 @@ vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, 
         vec3 specularContrib = vec3(0.0);
         vec3 halfwayDir = normalize(lightDir + -viewDir);
         float temp = dot(normal, halfwayDir);
-        // TODO: Implement enery presevering lighting system so we can have specular highlights in VXGI too
+        // TODO: Implement not shit lighting that doesnt break under some conditions
         if (!IsVXGI && temp > 0.0)
         {
             float spec = pow(temp, 256.0 * (1.0 - roughness));

@@ -148,20 +148,16 @@ namespace IDKEngine.Render
                 GL.Viewport(0, 0, Result.Width, Result.Height);
 
                 if (IsVariableRateShading) VariableRateShading.Activate(LightingVRS);
+               
                 deferredLightingFBO.Bind();
                 lightingProgram.Use();
                 GL.DepthMask(false);
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
                 GL.DepthMask(true);
+                
                 VariableRateShading.Deactivate();
 
-                if (IsVariableRateShading || LightingVRS.DebugValue != LightingShadingRateClassifier.DebugMode.NoDebug)
-                {
-                    LightingVRS.Compute(Result);
-                }
-
                 gBufferFBO.Bind();
-
                 if (lightManager != null)
                 {
                     lightManager.Draw();
@@ -175,6 +171,11 @@ namespace IDKEngine.Render
 
                 GL.Enable(EnableCap.CullFace);
                 GL.DepthFunc(DepthFunction.Less);
+
+                if (IsVariableRateShading || LightingVRS.DebugValue != LightingShadingRateClassifier.DebugMode.NoDebug)
+                {
+                    LightingVRS.Compute(Result);
+                }
 
                 if (IsVolumetricLighting)
                 {

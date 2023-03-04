@@ -271,7 +271,7 @@ namespace IDKEngine
                 "res/textures/environmentMap/negz.jpg"
             });
             
-            Model sponza = new Model(@"res/models/OBJSponza/sponza.obj");
+            Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.MeshInstances.Length; i++) // 0.0145f
                 sponza.MeshInstances[i].ModelMatrix = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
 

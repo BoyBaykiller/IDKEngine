@@ -2,7 +2,9 @@
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 
-layout(location = 0) out vec4 FragColor;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;\
+
+layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler3D SamplerVoxelsAlbedo;
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -70,20 +72,15 @@ uniform float GISkyBoxBoost;
 uniform float StepMultiplier;
 uniform bool IsTemporalAccumulation;
 
-in InOutVars
-{
-    vec2 TexCoord;
-} inData;
-
 void main()
 {
-    ivec2 imgCoord = ivec2(gl_FragCoord.xy);
-    vec2 uv = inData.TexCoord;
+    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
+    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
     float depth = texture(gBufferDataUBO.Depth, uv).r;
     if (depth == 1.0)
     {
-        FragColor = vec4(0.0);
+        imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
     }
 
@@ -95,21 +92,21 @@ void main()
     vec3 viewDir = fragPos - basicDataUBO.ViewPos;
     vec3 indirectLight = IndirectLight(fragPos, viewDir, normal, specular, roughness) * GIBoost;
 
-    FragColor = vec4(indirectLight, 1.0);
+    imageStore(ImgResult, imgCoord, vec4(indirectLight, 1.0));
 }
 
 vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance, float roughness)
 {
     vec3 irradiance = vec3(0.0);
     float materialVariance = GetMaterialVariance(specularChance, roughness);
-    uint samples = int(mix(1.0, float(MaxSamples), materialVariance));
+    uint samples = uint(mix(1.0, float(MaxSamples), materialVariance));
 
     uint noiseIndex = IsTemporalAccumulation ? (taaDataUBO.Frame % taaDataUBO.Samples) * MaxSamples * 3 : 0u;
     for (uint i = 0; i < samples; i++)
     {
-        float rnd0 = InterleavedGradientNoise(vec2(gl_FragCoord.xy), noiseIndex + 0);
-        float rnd1 = InterleavedGradientNoise(vec2(gl_FragCoord.xy), noiseIndex + 1);
-        float raySelectRoll = InterleavedGradientNoise(vec2(gl_FragCoord.xy), noiseIndex + 2);
+        float rnd0 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 0);
+        float rnd1 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 1);
+        float raySelectRoll = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 2);
         noiseIndex += 3;
         
         vec3 dir = CosineSampleHemisphere(normal, rnd0, rnd1);

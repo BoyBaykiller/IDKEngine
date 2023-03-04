@@ -19,7 +19,7 @@ namespace IDKEngine.Render
 
             set
             {
-                glslVoxelizerData.GridMin = value;
+                glslVoxelizerData.GridMin = Vector3.ComponentMin(value, glslVoxelizerData.GridMax - new Vector3(0.1f));
                 glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
                 voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
@@ -30,7 +30,7 @@ namespace IDKEngine.Render
 
             set
             {
-                glslVoxelizerData.GridMax = value;
+                glslVoxelizerData.GridMax = Vector3.ComponentMax(value, glslVoxelizerData.GridMin + new Vector3(0.1f));
                 glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
                 voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
@@ -114,14 +114,10 @@ namespace IDKEngine.Render
             DebugStepMultiplier = debugStepMultiplier;
         }
 
-        TimerQuery abc = new TimerQuery();
         public void Render(ModelSystem modelSystem)
         {
             ClearTextures();
-            //abc.Begin();
             Voxelize(modelSystem);
-            //abc.End();
-            //Console.WriteLine(abc.MeasuredMilliseconds);
             if (!HAS_ATOMIC_FP16_VECTOR)
             {
                 MergeIntermediateTextures();

@@ -522,30 +522,18 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
             }
 
             // Push closest hit child to the stack at last
-            if (leftChildHit)
+            if (leftChildHit || rightChildHit)
             {
-                if (rightChildHit)
+                if (leftChildHit && rightChildHit)
                 {
-                    uint firstChild = left.TriStartOrLeftChild;
-                    uint secondChild = right.TriStartOrLeftChild;
-                    if (tMinLeft > tMinRight)
-                    {
-                        uint tmp = firstChild;
-                        firstChild = secondChild;
-                        secondChild = tmp;
-                    }
-                    SharedStack[gl_LocalInvocationIndex][stackPtr++] = secondChild;
-                    stackTop = firstChild;
+                    bool leftCloser = tMinLeft < tMinRight;
+                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftCloser);
+                    SharedStack[gl_LocalInvocationIndex][stackPtr++] = mix(left.TriStartOrLeftChild, right.TriStartOrLeftChild, leftCloser);
                 }
                 else
                 {
-                    stackTop = left.TriStartOrLeftChild;
+                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftChildHit);
                 }
-                continue;
-            }
-            else if (rightChildHit)
-            {
-                stackTop = right.TriStartOrLeftChild;
                 continue;
             }
 

@@ -67,7 +67,6 @@ namespace IDKEngine.Render
             }
         }
 
-
         private bool _isTemporalAccumulation;
         public bool IsTemporalAccumulation
         {
@@ -82,14 +81,9 @@ namespace IDKEngine.Render
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        private readonly Framebuffer fbo;
         public ConeTracer(int width, int height)
         {
-            shaderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/ConeTrace/fragment.glsl")));
-
-            fbo = new Framebuffer();
+            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/ConeTrace/compute.glsl")));
 
             SetSize(width, height);
 
@@ -103,15 +97,12 @@ namespace IDKEngine.Render
 
         public void Compute(Texture voxelsAlbedo)
         {
-            GL.Viewport(0, 0, Result.Width, Result.Height);
-
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             voxelsAlbedo.BindToUnit(0);
-            fbo.Bind();
-            shaderProgram.Use();
 
-            GL.DepthMask(false);
-            GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
-            GL.DepthMask(true);
+            shaderProgram.Use();
+            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
         public void SetSize(int width, int height)
@@ -119,16 +110,13 @@ namespace IDKEngine.Render
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgb16f);
-
-            fbo.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
         }
 
         public void Dispose()
         {
             Result.Dispose();
             shaderProgram.Dispose();
-            fbo.Dispose();
         }
     }
 }
