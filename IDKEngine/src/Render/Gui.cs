@@ -197,72 +197,21 @@ namespace IDKEngine.Render
 
                         if (app.RasterizerPipeline.IsVXGI)
                         {
-                            string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                            current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
-                            if (ImGui.BeginCombo("Resolution", current))
-                            {
-                                for (int i = 0; i < resolutions.Length; i++)
-                                {
-                                    bool isSelected = current == resolutions[i];
-                                    if (ImGui.Selectable(resolutions[i], isSelected))
-                                    {
-                                        current = resolutions[i];
-                                        int size = Convert.ToInt32(current);
-                                        app.RasterizerPipeline.Voxelizer.SetSize(size, size, size);
-                                    }
-
-                                    if (isSelected)
-                                    {
-                                        ImGui.SetItemDefaultFocus();
-                                    }
-                                }
-                                ImGui.EndCombo();
-                            }
-
-                            tempFloat = app.RasterizerPipeline.ConeTracer.NormalRayOffset;
-                            if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
-                            {
-                                app.RasterizerPipeline.ConeTracer.NormalRayOffset = tempFloat;
-                            }
-
-                            int tempInt = app.RasterizerPipeline.ConeTracer.MaxSamples;
-                            if (ImGui.SliderInt("MaxSamples", ref tempInt, 1, 24))
-                            {
-                                app.RasterizerPipeline.ConeTracer.MaxSamples = tempInt;
-                            }
-
-                            tempFloat = app.RasterizerPipeline.ConeTracer.GIBoost;
-                            if (ImGui.SliderFloat("GIBoost", ref tempFloat, 0.0f, 5.0f))
-                            {
-                                app.RasterizerPipeline.ConeTracer.GIBoost = tempFloat;
-                            }
-
-                            tempFloat = app.RasterizerPipeline.ConeTracer.GISkyBoxBoost;
-                            if (ImGui.SliderFloat("GISkyBoxBoost", ref tempFloat, 0.0f, 5.0f))
-                            {
-                                app.RasterizerPipeline.ConeTracer.GISkyBoxBoost = tempFloat;
-                            }
-
-                            tempFloat = app.RasterizerPipeline.ConeTracer.StepMultiplier;
-                            if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, 0.01f, 1.0f))
-                            {
-                                app.RasterizerPipeline.ConeTracer.StepMultiplier = MathF.Max(tempFloat, 0.01f);
-                            }
-
-                            tempBool = app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation;
-                            if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
-                            {
-                                app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
-                            }
-                            ImGui.SameLine();
-                            InfoMark(
-                                $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)." +
-                                "If TAA is disabled this has no effect."
-                            );
-
                             ImGui.Checkbox("IsDebugRenderGrid", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
                             if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
                             {
+                                System.Numerics.Vector3 tempSysVec3 = app.RasterizerPipeline.Voxelizer.GridMin.ToNumerics();
+                                if (ImGui.DragFloat3("Grid Min", ref tempSysVec3, 0.1f))
+                                {
+                                    app.RasterizerPipeline.Voxelizer.GridMin = tempSysVec3.ToOpenTK();
+                                }
+
+                                tempSysVec3 = app.RasterizerPipeline.Voxelizer.GridMax.ToNumerics();
+                                if (ImGui.DragFloat3("Grid Max", ref tempSysVec3, 0.1f))
+                                {
+                                    app.RasterizerPipeline.Voxelizer.GridMax = tempSysVec3.ToOpenTK();
+                                }
+
                                 tempFloat = app.RasterizerPipeline.Voxelizer.DebugStepMultiplier;
                                 if (ImGui.SliderFloat("DebugStepMultiplier", ref tempFloat, 0.05f, 1.0f))
                                 {
@@ -275,6 +224,71 @@ namespace IDKEngine.Render
                                 {
                                     app.RasterizerPipeline.Voxelizer.DebugConeAngle = tempFloat;
                                 }
+                            }
+                            else
+                            {
+                                string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
+                                current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
+                                if (ImGui.BeginCombo("Resolution", current))
+                                {
+                                    for (int i = 0; i < resolutions.Length; i++)
+                                    {
+                                        bool isSelected = current == resolutions[i];
+                                        if (ImGui.Selectable(resolutions[i], isSelected))
+                                        {
+                                            current = resolutions[i];
+                                            int size = Convert.ToInt32(current);
+                                            app.RasterizerPipeline.Voxelizer.SetSize(size, size, size);
+                                        }
+
+                                        if (isSelected)
+                                        {
+                                            ImGui.SetItemDefaultFocus();
+                                        }
+                                    }
+                                    ImGui.EndCombo();
+                                }
+
+                                tempFloat = app.RasterizerPipeline.ConeTracer.NormalRayOffset;
+                                if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
+                                {
+                                    app.RasterizerPipeline.ConeTracer.NormalRayOffset = tempFloat;
+                                }
+
+                                int tempInt = app.RasterizerPipeline.ConeTracer.MaxSamples;
+                                if (ImGui.SliderInt("MaxSamples", ref tempInt, 1, 24))
+                                {
+                                    app.RasterizerPipeline.ConeTracer.MaxSamples = tempInt;
+                                }
+
+                                tempFloat = app.RasterizerPipeline.ConeTracer.GIBoost;
+                                if (ImGui.SliderFloat("GIBoost", ref tempFloat, 0.0f, 5.0f))
+                                {
+                                    app.RasterizerPipeline.ConeTracer.GIBoost = tempFloat;
+                                }
+
+                                tempFloat = app.RasterizerPipeline.ConeTracer.GISkyBoxBoost;
+                                if (ImGui.SliderFloat("GISkyBoxBoost", ref tempFloat, 0.0f, 5.0f))
+                                {
+                                    app.RasterizerPipeline.ConeTracer.GISkyBoxBoost = tempFloat;
+                                }
+
+                                tempFloat = app.RasterizerPipeline.ConeTracer.StepMultiplier;
+                                if (ImGui.SliderFloat("StepMultiplier", ref tempFloat, 0.01f, 1.0f))
+                                {
+                                    app.RasterizerPipeline.ConeTracer.StepMultiplier = MathF.Max(tempFloat, 0.01f);
+                                }
+
+                                tempBool = app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation;
+                                if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
+                                {
+                                    app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
+                                }
+                                ImGui.SameLine();
+                                InfoMark(
+                                    $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)." +
+                                    "If TAA is disabled this has no effect."
+                                );
                             }
 
                             if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
@@ -301,7 +315,6 @@ namespace IDKEngine.Render
                                 "Uses NV_shader_atomic_fp16_vector to perform atomics on fp16 images without having to emulate such behaviour. " +
                                 "Most noticeably without this extension building the voxel grid requires 2.5x times the memory"
                             );
-
                         }
                     }
 
