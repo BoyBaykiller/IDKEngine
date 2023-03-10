@@ -2,7 +2,7 @@
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;\
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler3D SamplerVoxelsAlbedo;
@@ -12,6 +12,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 ProjView;
     mat4 View;
     mat4 InvView;
+    mat4 PrevView;
     vec3 ViewPos;
     float _pad0;
     mat4 Projection;

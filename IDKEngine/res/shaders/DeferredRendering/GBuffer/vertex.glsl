@@ -42,6 +42,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 ProjView;
     mat4 View;
     mat4 InvView;
+    mat4 PrevView;
     vec3 ViewPos;
     float _pad0;
     mat4 Projection;
@@ -107,10 +108,10 @@ void main()
     outData.SpecularBias = mesh.SpecularBias;
     outData.RoughnessBias = mesh.RoughnessBias;
     
-    uint rawIndex = taaDataUBO.Frame % taaDataUBO.Samples;
+    uint index = taaDataUBO.Frame % taaDataUBO.Samples;
     vec2 offset = vec2(
-        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 0],
-        taaDataUBO.Jitters[rawIndex / 2][(rawIndex % 2) * 2 + 1]
+        taaDataUBO.Jitters[index / 2][(index % 2) * 2 + 0],
+        taaDataUBO.Jitters[index / 2][(index % 2) * 2 + 1]
     );
 
     vec4 jitteredClipPos = outData.ClipPos;

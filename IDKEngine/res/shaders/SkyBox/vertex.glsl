@@ -44,6 +44,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 ProjView;
     mat4 View;
     mat4 InvView;
+    mat4 PrevView;
     vec3 ViewPos;
     float _pad0;
     mat4 Projection;
@@ -59,11 +60,19 @@ layout(std140, binding = 0) uniform BasicDataUBO
 out InOutVars
 {
     vec3 TexCoord;
+    vec4 ClipPos;
+    vec4 PrevClipPos;
 } outData;
 
 void main()
 {
-    outData.TexCoord = positions[gl_VertexID];
     mat4 viewNoTranslation = mat4(basicDataUBO.View[0], basicDataUBO.View[1], basicDataUBO.View[2], vec4(0.0, 0.0, 0.0, 1.0));
-    gl_Position = (basicDataUBO.Projection * viewNoTranslation * vec4(outData.TexCoord, 1.0));
+    mat4 prevViewNoTranslation = mat4(basicDataUBO.PrevView[0], basicDataUBO.PrevView[1], basicDataUBO.PrevView[2], vec4(0.0, 0.0, 0.0, 1.0));
+    outData.TexCoord = positions[gl_VertexID];
+
+    outData.ClipPos = (basicDataUBO.Projection * viewNoTranslation * vec4(outData.TexCoord, 1.0));
+    outData.PrevClipPos = (basicDataUBO.Projection * prevViewNoTranslation * vec4(outData.TexCoord, 1.0));
+    
+    gl_Position = outData.ClipPos;
+    gl_Position.w = gl_Position.z;
 }

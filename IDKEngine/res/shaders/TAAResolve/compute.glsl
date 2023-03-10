@@ -87,6 +87,7 @@ void main()
 void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocityPixel, out vec3 neighborhoodMin, out vec3 neighborhoodMax)
 {
     float minDepth = 1.0;
+    bestVelocityPixel = ivec2(imgCoord);
     neighborhoodMin = vec3(FLOAT_MAX);
     neighborhoodMax = vec3(FLOAT_MIN);
     for (int y = -1; y <= 1; y++)
