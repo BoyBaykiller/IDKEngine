@@ -101,7 +101,7 @@ namespace IDKEngine
                 throw new ArgumentException($"Cubemap images must be squares and every texture must be of the same size");
             int size = images[0].Width;
 
-            const bool AMD_DRIVER_BAD = true; // since 22.7.1
+            const bool AMD_DRIVER_BAD = true; // since 22.7.1, fixed in 23.2.2
             if (AMD_DRIVER_BAD)
             {
                 // use old style non dsa mutable for buggy driver

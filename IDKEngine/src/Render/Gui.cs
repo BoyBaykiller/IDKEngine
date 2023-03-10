@@ -198,6 +198,29 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsVXGI)
                         {
                             ImGui.Checkbox("IsDebugRenderGrid", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
+
+                            string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
+                            current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
+                            if (ImGui.BeginCombo("Resolution", current))
+                            {
+                                for (int i = 0; i < resolutions.Length; i++)
+                                {
+                                    bool isSelected = current == resolutions[i];
+                                    if (ImGui.Selectable(resolutions[i], isSelected))
+                                    {
+                                        current = resolutions[i];
+                                        int size = Convert.ToInt32(current);
+                                        app.RasterizerPipeline.Voxelizer.SetSize(size, size, size);
+                                    }
+
+                                    if (isSelected)
+                                    {
+                                        ImGui.SetItemDefaultFocus();
+                                    }
+                                }
+                                ImGui.EndCombo();
+                            }
+
                             if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
                             {
                                 System.Numerics.Vector3 tempSysVec3 = app.RasterizerPipeline.Voxelizer.GridMin.ToNumerics();
@@ -227,28 +250,6 @@ namespace IDKEngine.Render
                             }
                             else
                             {
-                                string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                                current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
-                                if (ImGui.BeginCombo("Resolution", current))
-                                {
-                                    for (int i = 0; i < resolutions.Length; i++)
-                                    {
-                                        bool isSelected = current == resolutions[i];
-                                        if (ImGui.Selectable(resolutions[i], isSelected))
-                                        {
-                                            current = resolutions[i];
-                                            int size = Convert.ToInt32(current);
-                                            app.RasterizerPipeline.Voxelizer.SetSize(size, size, size);
-                                        }
-
-                                        if (isSelected)
-                                        {
-                                            ImGui.SetItemDefaultFocus();
-                                        }
-                                    }
-                                    ImGui.EndCombo();
-                                }
-
                                 tempFloat = app.RasterizerPipeline.ConeTracer.NormalRayOffset;
                                 if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
                                 {

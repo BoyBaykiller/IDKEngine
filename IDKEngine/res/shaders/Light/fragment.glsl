@@ -29,9 +29,9 @@ in InOutVars
 void main()
 {
     FragColor = vec4(inData.LightColor, 1.0);
-    AlbedoAlpha = FragColor;
-    NormalSpecular = vec4((inData.FragPos - inData.Position) / inData.Radius, 1.0);
-    EmissiveRoughness = vec4(FragColor.rgb, 0.0);
+    AlbedoAlpha = vec4(0.0, 0.0, 0.0, 1.0);
+    NormalSpecular = vec4((inData.FragPos - inData.Position) / inData.Radius, 0.0);
+    EmissiveRoughness = vec4(FragColor.rgb, 1.0);
 
     vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
     vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;

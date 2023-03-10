@@ -181,6 +181,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 ProjView;
     mat4 View;
     mat4 InvView;
+    mat4 PrevView;
     vec3 ViewPos;
     float _pad0;
     mat4 Projection;
@@ -319,7 +320,7 @@ bool TraceRay(inout TransportRay transportRay)
             normal = (transportRay.Origin - light.Position) / light.Radius;
 
             refractionChance = 0.0;
-            specularChance = 0.0;
+            specularChance = 1.0;
             roughness = 0.0;
             ior = 1.0;
             absorbance = vec3(0.0);

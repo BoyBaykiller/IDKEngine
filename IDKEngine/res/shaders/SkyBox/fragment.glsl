@@ -2,6 +2,20 @@
 #extension GL_ARB_bindless_texture : require
 
 layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec4 AlbedoAlpha;
+layout(location = 2) out vec4 NormalSpecular;
+layout(location = 3) out vec4 EmissiveRoughness;
+layout(location = 4) out vec2 Velocity;
+
+layout(std140, binding = 3) uniform TaaDataUBO
+{
+    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
+    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
+    int Samples;
+    int Enabled;
+    uint Frame;
+    float VelScale;
+} taaDataUBO;
 
 layout(std140, binding = 4) uniform SkyBoxUBO
 {
@@ -11,13 +25,19 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 in InOutVars
 {
     vec3 TexCoord;
+    vec4 ClipPos;
+    vec4 PrevClipPos;
 } inData;
 
 void main()
 {
     FragColor = texture(skyBoxUBO.Albedo, inData.TexCoord);
-    // unfortunately simply doing gl_Position.xyww is not sufficient (on nvidia)
-    gl_FragDepth = 1.0;
     
-    // TODO: Implement velocity?
+    AlbedoAlpha = vec4(0.0);
+    NormalSpecular = vec4(0.0);
+    EmissiveRoughness = vec4(FragColor.rgb, 1.0);
+
+    vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
+    vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
+    Velocity = (uv - prevUV) * taaDataUBO.VelScale;
 }

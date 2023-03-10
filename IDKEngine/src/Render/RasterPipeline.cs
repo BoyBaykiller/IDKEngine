@@ -120,7 +120,7 @@ namespace IDKEngine.Render
                 {
                     GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
                 }
-                
+
                 gBufferFBO.Bind();
                 gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -145,17 +145,19 @@ namespace IDKEngine.Render
                 {
                     ConeTracer.Compute(Voxelizer.ResultVoxelsAlbedo);
                 }
-                GL.Viewport(0, 0, Result.Width, Result.Height);
 
-                if (IsVariableRateShading) VariableRateShading.Activate(LightingVRS);
-               
+                GL.Viewport(0, 0, Result.Width, Result.Height);
+                
+                if (IsVariableRateShading)
+                {
+                    VariableRateShading.Activate(LightingVRS);
+                }
+
                 deferredLightingFBO.Bind();
                 lightingProgram.Use();
                 GL.DepthMask(false);
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
                 GL.DepthMask(true);
-                
-                VariableRateShading.Deactivate();
 
                 gBufferFBO.Bind();
                 if (lightManager != null)
@@ -171,6 +173,8 @@ namespace IDKEngine.Render
 
                 GL.Enable(EnableCap.CullFace);
                 GL.DepthFunc(DepthFunction.Less);
+
+                VariableRateShading.Deactivate();
 
                 if (IsVariableRateShading || LightingVRS.DebugValue != LightingShadingRateClassifier.DebugMode.NoDebug)
                 {

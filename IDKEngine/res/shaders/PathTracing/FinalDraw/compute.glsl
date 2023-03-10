@@ -49,6 +49,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 ProjView;
     mat4 View;
     mat4 InvView;
+    mat4 PrevView;
     vec3 ViewPos;
     float _pad0;
     mat4 Projection;

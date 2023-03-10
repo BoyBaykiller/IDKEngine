@@ -132,6 +132,7 @@ namespace IDKEngine
         {
             GLSLBasicData.DeltaUpdate = dT;
             GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
+            GLSLBasicData.PrevView = GLSLBasicData.View;
             GLSLBasicData.View = Camera.ViewMatrix;
             GLSLBasicData.InvView = GLSLBasicData.View.Inverted();
             GLSLBasicData.ProjView = GLSLBasicData.View * GLSLBasicData.Projection;
@@ -219,15 +220,15 @@ namespace IDKEngine
             {
                 Console.WriteLine("Your system does not support OpenGL 4.6. Press Enter to exit");
                 Console.ReadLine();
-                Environment.Exit(1);
+                Environment.Exit(0);
             }
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
             {
                 Console.WriteLine("Your system does not support GL_ARB_bindless_texture. Press Enter to exit");
                 Console.ReadLine();
-                Environment.Exit(1);
+                Environment.Exit(0);
             }
-
+            
             RenderGui = true;
             WindowVSync = true;
             ViewportResolution = WindowSize;
