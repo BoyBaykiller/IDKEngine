@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Diagnostics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
@@ -130,37 +129,34 @@ namespace IDKEngine.Render
 
         
         public delegate void FuncUploadMesh(ref GLSLMesh glslMesh);
-        public unsafe void UpdateMeshBuffer(int start, int end)
+        public unsafe void UpdateMeshBuffer(int start, int count)
         {
-            Debug.Assert(start >= 0 && end <= Meshes.Length);
-
+            if (count == 0) return;
             fixed (void* ptr = &Meshes[start])
             {
-                meshBuffer.SubData(start * sizeof(GLSLMesh), (end - start) * sizeof(GLSLMesh), (IntPtr)ptr);
+                meshBuffer.SubData(start * sizeof(GLSLMesh), count * sizeof(GLSLMesh), (IntPtr)ptr);
             }
         }
 
         public delegate void FuncUploadDrawCommand(ref GLSLDrawElementsCommand drawCommand);
-        public unsafe void UpdateDrawCommandBuffer(int start, int end)
+        public unsafe void UpdateDrawCommandBuffer(int start, int count)
         {
-            Debug.Assert(start >= 0 && end <= DrawCommands.Length);
-
+            if (count == 0) return;
             fixed (void* ptr = &DrawCommands[start])
             {
-                drawCommandBuffer.SubData(start * sizeof(GLSLDrawElementsCommand), (end - start) * sizeof(GLSLDrawElementsCommand), (IntPtr)ptr);
+                drawCommandBuffer.SubData(start * sizeof(GLSLDrawElementsCommand), count * sizeof(GLSLDrawElementsCommand), (IntPtr)ptr);
             }
 
             UpdateVertexPullingDrawCommands();
-            UpdateVertexPullingDrawCommandBuffer(start, end);
+            UpdateVertexPullingDrawCommandBuffer(start, count);
         }
 
-        private unsafe void UpdateVertexPullingDrawCommandBuffer(int start, int end)
+        private unsafe void UpdateVertexPullingDrawCommandBuffer(int start, int count)
         {
-            Debug.Assert(start >= 0 && end <= vertexPullingDrawCommands.Length);
-            
+            if (count == 0) return;
             fixed (void* ptr = &vertexPullingDrawCommands[start])
             {
-                vertexPullingDrawCommandBuffer.SubData(start * sizeof(GLSLDrawArraysIndirectCommand), (end - start) * sizeof(GLSLDrawArraysIndirectCommand), (IntPtr)ptr);
+                vertexPullingDrawCommandBuffer.SubData(start * sizeof(GLSLDrawArraysIndirectCommand), count * sizeof(GLSLDrawArraysIndirectCommand), (IntPtr)ptr);
             }
         }
         private void UpdateVertexPullingDrawCommands()
@@ -175,13 +171,12 @@ namespace IDKEngine.Render
         }
 
         public delegate void FuncUploadMeshInstance(ref GLSLMeshInstance modelMatrix);
-        public unsafe void UpdateMeshInstanceBuffer(int start, int end)
+        public unsafe void UpdateMeshInstanceBuffer(int start, int count)
         {
-            Debug.Assert(start >= 0 && end <= MeshInstances.Length);
-
+            if (count == 0) return;
             fixed (void* ptr = &MeshInstances[start])
             {
-                meshInstanceBuffer.SubData(start * sizeof(GLSLMeshInstance), (end - start) * sizeof(GLSLMeshInstance), (IntPtr)ptr);
+                meshInstanceBuffer.SubData(start * sizeof(GLSLMeshInstance), count * sizeof(GLSLMeshInstance), (IntPtr)ptr);
             }
         }
 

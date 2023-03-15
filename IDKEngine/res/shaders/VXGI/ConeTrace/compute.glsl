@@ -102,20 +102,20 @@ vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance
     float materialVariance = GetMaterialVariance(specularChance, roughness);
     uint samples = uint(mix(1.0, float(MaxSamples), materialVariance));
 
-    uint noiseIndex = IsTemporalAccumulation ? (taaDataUBO.Frame % taaDataUBO.Samples) * MaxSamples * 3 : 0u;
+    uint noiseIndex = IsTemporalAccumulation ? (taaDataUBO.Frame % taaDataUBO.Samples) * MaxSamples : 0u;
     for (uint i = 0; i < samples; i++)
     {
         float rnd0 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 0);
         float rnd1 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 1);
-        float raySelectRoll = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 2);
-        noiseIndex += 3;
+        float rnd2 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 2);
+        noiseIndex++;
         
         vec3 dir = CosineSampleHemisphere(normal, rnd0, rnd1);
 
         const float maxConeAngle = 0.32;
         const float minConeAngle = 0.005;
         float coneAngle;
-        if (specularChance > raySelectRoll)
+        if (specularChance > rnd2)
         {
             vec3 reflectionDir = reflect(incomming, normal);
             reflectionDir = normalize(mix(reflectionDir, dir, roughness));

@@ -108,13 +108,12 @@ namespace IDKEngine.Render
         }
 
         public delegate void FuncUploadLight(ref GLSLLight light);
-        public unsafe void UpdateLightBuffer(int start, int end)
+        public unsafe void UpdateLightBuffer(int start, int count)
         {
-            Debug.Assert(start >= 0 && end <= Count);
-
+            if (count == 0) return;
             fixed (void* ptr = &Lights[start])
             {
-                bufferObject.SubData(start * sizeof(GLSLLight), (end - start) * sizeof(GLSLLight), (IntPtr)ptr);
+                bufferObject.SubData(start * sizeof(GLSLLight), count * sizeof(GLSLLight), (IntPtr)ptr);
             }
         }
 

@@ -107,7 +107,7 @@ out InOutVars
 vec3[3] Voxelize(vec3 v0, vec3 v1, vec3 v2);
 vec3 DecompressSNorm32Fast(uint data);
 
-// Inserted by application. 0 if false, else 1
+// Inserted by application. 1 if NV_geometry_shader_passthrough and NV_viewport_swizzle are supported else 0
 #define TAKE_FAST_GEOMETRY_SHADER_PATH __TAKE_FAST_GEOMETRY_SHADER_PATH__
 
 void main()

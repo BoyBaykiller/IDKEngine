@@ -242,13 +242,6 @@ namespace IDKEngine
             return new Vector3(r, g, b);
         }
 
-        public static void Swap<T>(ref T first, ref T other) where T : struct
-        {
-            T temp = first;
-            first = other;
-            other = temp;
-        }
-
         public delegate void FuncRunParallel(int i);
         public static Thread InParallel(int start, int endExclusive, FuncRunParallel func)
         {
