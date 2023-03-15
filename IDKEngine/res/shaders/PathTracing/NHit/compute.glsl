@@ -375,10 +375,10 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
         refractionChance = 1.0 - specularChance - diffuseChance;
     }
 
-    float raySelectRoll = GetRandomFloat01();
+    float rnd = GetRandomFloat01();
     vec3 diffuseRayDir = CosineSampleHemisphere(normal);
     vec3 outgoing;
-    if (specularChance > raySelectRoll)
+    if (specularChance > rnd)
     {
         vec3 reflectionRayDir = reflect(incomming, normal);
         reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, roughness));
@@ -386,7 +386,7 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
         rayProbability = specularChance;
         newIor = fromInside ? ior : 1.0;
     }
-    else if (specularChance + refractionChance > raySelectRoll)
+    else if (specularChance + refractionChance > rnd)
     {
         vec3 refractionRayDir = refract(incomming, normal, fromInside ? (ior / prevIor) : (prevIor / ior));
         isRefractive = refractionRayDir != vec3(0.0);
@@ -474,7 +474,8 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
             bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
 
             uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
-            if (triCount > 0)
+            // avoiding divergence with anyInvocation yields slightly better perf on RTX 3050 Ti
+            if (anyInvocation(triCount > 0))
             {
                 uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
                 for (uint j = first; j < first + triCount; j++)

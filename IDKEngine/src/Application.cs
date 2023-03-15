@@ -114,7 +114,7 @@ namespace IDKEngine
             else
             {
                 PostProcessor.Result.BindToUnit(0);
-                FinalProgram.Use();
+                finalProgram.Use();
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             }
 
@@ -195,12 +195,8 @@ namespace IDKEngine
         }
 
         public Camera Camera;
-        private BufferObject basicDataUBO;
-        private PointShadowManager pointShadowManager;
-        public ShaderProgram FinalProgram;
         public ModelSystem ModelSystem;
         public BVH BVH;
-        private Gui gui;
         public GLSLBasicData GLSLBasicData;
         public FrameStateRecorder<RecordableState> FrameRecorder;
 
@@ -211,6 +207,11 @@ namespace IDKEngine
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
+
+        private Gui gui;
+        private BufferObject basicDataUBO;
+        private PointShadowManager pointShadowManager;
+        private ShaderProgram finalProgram;
         protected override unsafe void OnStart()
         {
             Console.WriteLine($"API: {Helper.API}");
@@ -256,7 +257,7 @@ namespace IDKEngine
             basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), GLSLBasicData, BufferStorageFlags.DynamicStorageBit);
             basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
-            FinalProgram = new ShaderProgram(
+            finalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
             Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f, 0.1f, 0.25f);

@@ -53,9 +53,9 @@ namespace IDKEngine
                 for (uint i = start; i < end; i++)
                 {
                     ref GLSLTriangle tri = ref triangles[i];
-                    if ((tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) * (1.0f / 3.0f) < splitPos)
+                    if ((tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f < splitPos)
                     {
-                        Helper.Swap(ref tri, ref triangles[mid++]);
+                        MathHelper.Swap(ref tri, ref triangles[mid++]);
                     }
                 }
 
@@ -88,7 +88,7 @@ namespace IDKEngine
                 for (int i = 0; i < node.TriCount; i++)
                 {
                     ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
-                    Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) * (1.0f / 3.0f);
+                    Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) / 3.0f;
                     uniformDivideArea.Shrink(centroid);
                 }
 
@@ -124,7 +124,7 @@ namespace IDKEngine
                 for (uint i = 0; i < node.TriCount; i++)
                 {
                     ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
-                    float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) * (1.0f / 3.0f);
+                    float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f;
                     if (triSplitPos < splitPos)
                     {
                         leftCount++;

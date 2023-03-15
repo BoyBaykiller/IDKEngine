@@ -76,9 +76,9 @@ layout(std140, binding = 5) uniform VoxelizerDataUBO
 
 in InOutVars
 {
-    centroid vec3 FragPos;
-    centroid vec2 TexCoord;
-    centroid vec3 Normal;
+    vec3 FragPos;
+    vec2 TexCoord;
+    vec3 Normal;
     flat uint MaterialIndex;
     flat float EmissiveBias;
 } inData;

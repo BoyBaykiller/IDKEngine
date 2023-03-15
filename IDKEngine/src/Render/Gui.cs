@@ -702,7 +702,7 @@ namespace IDKEngine.Render
                     if (shouldUpdateMesh)
                     {
                         shouldResetPT = true;
-                        app.ModelSystem.UpdateMeshBuffer(SelectedEntityIndex, SelectedEntityIndex + 1);
+                        app.ModelSystem.UpdateMeshBuffer(SelectedEntityIndex, 1);
                     }
                 }
                 else if (SelectedEntityType == EntityType.Light)
@@ -733,7 +733,7 @@ namespace IDKEngine.Render
                     if (shouldUpdateLight)
                     {
                         shouldResetPT = true;
-                        app.LightManager.UpdateLightBuffer(SelectedEntityIndex, SelectedEntityIndex + 1);
+                        app.LightManager.UpdateLightBuffer(SelectedEntityIndex, 1);
                     }
                 }
                 else
