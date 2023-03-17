@@ -37,17 +37,15 @@ Required OpenGL: 4.6 + `ARB_bindless_texture`
 
 # Path Traced Render Samples
 
-![PTTempleDark](Screenshots/PTTemple.png?raw=true)
+![PTTemple](Screenshots/PTTemple.png?raw=true)
 ![PTSponza](Screenshots/PTSponza.png?raw=true)
 ![PTHorse](Screenshots/PTHorse.png?raw=true)
-
-# Random things
 
 ## Variable Rate Shading
 
 ### 1.0 Overview
 
-Variable Rate Shading is when you render different regions of the framebuffer at different resolutions. This feature is exposed in OpenGL through `NV_shading_rate_image`. The implementation expects a `R8ui` texture where each pixel covers
+Variable Rate Shading is when you render different regions of the framebuffer at different resolutions. This feature is exposed in OpenGL through the `NV_shading_rate_image` extension. The implementation expects a `R8ui` texture where each pixel covers
 a 16x16 tile of the framebuffer. The hardware then fetches this texture looks up the value in a user defined shading rate palette and applies that shading rate to the block of fragments saving us processing power. So all we have to do is generate the shading rate image.
 
 Here is a generated shading image while the camera was moving:
