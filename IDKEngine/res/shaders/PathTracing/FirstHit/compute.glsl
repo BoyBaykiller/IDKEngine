@@ -502,8 +502,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
             bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
 
             uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
-            // avoiding divergence with anyInvocation yields slightly better perf on RTX 3050 Ti
-            if (anyInvocation(triCount > 0))
+            if (triCount > 0)
             {
                 uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
                 for (uint j = first; j < first + triCount; j++)
