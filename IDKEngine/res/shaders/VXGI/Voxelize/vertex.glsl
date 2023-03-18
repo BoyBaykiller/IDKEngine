@@ -1,6 +1,13 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
+// Inserted by application. 1 if NV_geometry_shader_passthrough and NV_viewport_swizzle are supported else 0
+#define TAKE_FAST_GEOMETRY_SHADER_PATH __TAKE_FAST_GEOMETRY_SHADER_PATH__
+
+layout(location = 0) in vec3 Position;
+layout(location = 1) in vec2 TexCoord;
+layout(location = 3) in uint Normal;
+
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
 struct DrawCommand
@@ -106,26 +113,34 @@ out InOutVars
 
 vec3 DecompressSNorm32Fast(uint data);
 
+#if !TAKE_FAST_GEOMETRY_SHADER_PATH
+layout(location = 0) uniform int SwizzleAxis;
+#endif
+
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    DrawCommand cmd = drawCommandSSBO.DrawCommands[gl_DrawID];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
 
-    Vertex vertex = vertexSSBO.Vertices[indicesSSBO.Indices[gl_VertexID + cmd.FirstIndex] + cmd.BaseVertex];
+    outData.FragPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
 
-    outData.FragPos = (meshInstance.ModelMatrix * vec4(vertex.Position, 1.0)).xyz;
-
-    vec3 normal = DecompressSNorm32Fast(vertex.Normal);
+    vec3 normal = DecompressSNorm32Fast(Normal);
 
     mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
     outData.Normal = normalize(normalToWorld * normal);
-    outData.TexCoord = vertex.TexCoord;
+    outData.TexCoord = TexCoord;
 
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
 
     gl_Position = voxelizerDataUBO.OrthoProjection * vec4(outData.FragPos, 1.0);
+    
+#if !TAKE_FAST_GEOMETRY_SHADER_PATH
+    // Instead of doing a single draw call with a standard geometry shader to select the swizzle
+    // we render the scene 3 times, each time with a different swizzle. I have observed this to be slightly faster
+    if (SwizzleAxis == 1) gl_Position = gl_Position.zyxw;
+    else if (SwizzleAxis == 2) gl_Position = gl_Position.xzyw;
+#endif
 }
 
 vec3 DecompressSNorm32Fast(uint data)

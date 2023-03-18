@@ -80,14 +80,17 @@ namespace IDKEngine.Render
         {
             clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 
-            string geometrySrcCode = File.ReadAllText("res/shaders/VXGI/Voxelize/geometry.glsl");
-            geometrySrcCode = geometrySrcCode.Replace("__TAKE_FAST_GEOMETRY_SHADER_PATH__", $"{(TAKE_FAST_GEOMETRY_SHADER_PATH ? 1 : 0)}");
+            string vertexSrcCode = File.ReadAllText("res/shaders/VXGI/Voxelize/vertex.glsl");
+            vertexSrcCode = vertexSrcCode.Replace("__TAKE_FAST_GEOMETRY_SHADER_PATH__", $"{(TAKE_FAST_GEOMETRY_SHADER_PATH ? 1 : 0)}");
             List<Shader> voxelizeProgramShaders = new List<Shader>()
             {
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/vertex.glsl")),
-                new Shader(ShaderType.GeometryShader, geometrySrcCode),
+                new Shader(ShaderType.VertexShader, vertexSrcCode),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/fragment.glsl"))
             };
+            if (TAKE_FAST_GEOMETRY_SHADER_PATH)
+            {
+                voxelizeProgramShaders.Add(new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/geometry.glsl")));
+            }
             voxelizeProgram = new ShaderProgram(voxelizeProgramShaders.ToArray());
 
             mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Mipmap/compute.glsl")));
@@ -173,7 +176,20 @@ namespace IDKEngine.Render
             }
 
             voxelizeProgram.Use();
-            modelSystem.VertexPullingDraw();
+            if (TAKE_FAST_GEOMETRY_SHADER_PATH)
+            {
+                modelSystem.Draw();
+            }
+            else
+            {
+                // Instead of doing a single draw call with a standard geometry shader to select the swizzle
+                // we render the scene 3 times, each time with a different swizzle. I have observed this to be slightly faster
+                for (int i = 0; i < 3; i++)
+                {
+                    voxelizeProgram.Upload(0, i);
+                    modelSystem.Draw();
+                }
+            }
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit | MemoryBarrierFlags.TextureFetchBarrierBit);
             
             GL.Enable(EnableCap.CullFace);
