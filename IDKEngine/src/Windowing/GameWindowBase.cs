@@ -169,7 +169,6 @@ namespace IDKEngine
                 GLFW.PollEvents();
                 KeyboardState.Update();
                 MouseState.Update();
-                OnUpdate((float)runTime);
                 OnRender((float)runTime);
                 GLFW.SwapBuffers(window);
 
@@ -186,7 +185,6 @@ namespace IDKEngine
         }
 
         protected abstract void OnRender(float dT);
-        protected abstract void OnUpdate(float dT);
         protected abstract void OnStart();
         protected abstract void OnEnd();
         protected abstract void OnResize();

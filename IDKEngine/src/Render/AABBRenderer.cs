@@ -11,8 +11,8 @@ namespace IDKEngine.Render
         public AABBRender()
         {
             shaderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/MeshOutline/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/MeshOutline/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/AABBRender/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/AABBRender/fragment.glsl")));
         }
 
         public void Render(Texture result, AABB aabb)

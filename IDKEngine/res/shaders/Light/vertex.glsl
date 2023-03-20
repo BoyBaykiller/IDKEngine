@@ -6,7 +6,7 @@ struct Light
     vec3 Position;
     float Radius;
     vec3 Color;
-    float _pad0;
+    int PointShadowIndex;
 };
 
 layout(std140, binding = 2) uniform LightsUBO

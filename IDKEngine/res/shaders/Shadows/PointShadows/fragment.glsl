@@ -6,7 +6,7 @@ struct Light
     vec3 Position;
     float Radius;
     vec3 Color;
-    float _pad0;
+    int PointShadowIndex;
 };
 
 struct PointShadow
@@ -16,10 +16,11 @@ struct PointShadow
     
     mat4 ProjViewMatrices[6];
 
+    vec3 Position;
     float NearPlane;
+
+    vec3 _pad0;
     float FarPlane;
-    int LightIndex;
-    float _pad0;
 };
 
 layout(std140, binding = 1) uniform ShadowDataUBO
@@ -46,9 +47,8 @@ layout(location = 0) uniform int ShadowIndex;
 void main()
 {
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
-    vec3 position = lightsUBO.Lights[pointShadow.LightIndex].Position;
 
-    float twoDist = dot(inData.FragPos - position, inData.FragPos - position);
+    float twoDist = dot(inData.FragPos - pointShadow.Position, inData.FragPos - pointShadow.Position);
     float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
     float twoFarPlane = pointShadow.FarPlane * pointShadow.FarPlane;
 

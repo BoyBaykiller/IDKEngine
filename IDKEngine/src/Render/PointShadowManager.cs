@@ -25,8 +25,9 @@ namespace IDKEngine.Render
             }
         }
 
+        public readonly PointShadow[] PointShadows;
+
         private readonly BufferObject pointShadowsBuffer;
-        private readonly PointShadow[] pointShadows;
         private readonly ShaderProgram renderProgram;
         private readonly ShaderProgram cullingProgram;
         public unsafe PointShadowManager()
@@ -35,7 +36,7 @@ namespace IDKEngine.Render
             pointShadowsBuffer.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
-            pointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+            PointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
            
             renderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
@@ -45,28 +46,26 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/shadowCompute.glsl")));
         }
 
-        public void Add(PointShadow pointShadow)
+        public bool Add(PointShadow pointShadow)
         {
-            Debug.Assert(Count < GLSL_MAX_UBO_POINT_SHADOW_COUNT);
+            if (Count == GLSL_MAX_UBO_POINT_SHADOW_COUNT)
+            {
+                return false;
+            }
 
-            pointShadows[Count] = pointShadow;
-            UploadPointShadow(Count);
-            Count++;
+            PointShadows[Count++] = pointShadow;
+            UploadPointShadow(Count - 1);
+
+            return true;
         }
 
-        public void UpdateShadowMaps(ModelSystem modelSystem)
+        public void RenderShadowMaps(ModelSystem modelSystem)
         {
             GL.ColorMask(false, false, false, false);
             GL.Disable(EnableCap.CullFace);
             for (int i = 0; i < Count; i++)
             {
-                PointShadow pointShadow = pointShadows[i];
-
-                if (pointShadow.AttachedLightMoved())
-                {
-                    pointShadow.MoveToAttachedLight();
-                    UploadPointShadow(i);
-                }
+                PointShadow pointShadow = PointShadows[i];
 
                 pointShadow.Render(modelSystem, i, renderProgram, cullingProgram);
             }
@@ -74,9 +73,9 @@ namespace IDKEngine.Render
             GL.ColorMask(true, true, true, true);
         }
 
-        private unsafe void UploadPointShadow(int index)
+        public unsafe void UploadPointShadow(int index)
         {
-            pointShadowsBuffer.SubData(index * sizeof(GLSLPointShadow), sizeof(GLSLPointShadow), pointShadows[index].GetGLSLData());
+            pointShadowsBuffer.SubData(index * sizeof(GLSLPointShadow), sizeof(GLSLPointShadow), PointShadows[index].GetGLSLData());
         }
 
         public void Dispose()
@@ -84,7 +83,7 @@ namespace IDKEngine.Render
             pointShadowsBuffer.Dispose();
             for (int i = 0; i < Count; i++)
             {
-                pointShadows[i].Dispose();
+                PointShadows[i].Dispose();
             }
 
             renderProgram.Dispose();

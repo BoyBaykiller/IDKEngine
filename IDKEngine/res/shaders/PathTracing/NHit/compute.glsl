@@ -126,7 +126,7 @@ struct Light
     vec3 Position;
     float Radius;
     vec3 Color;
-    float _pad0;
+    int PointShadowIndex;
 };
 
 layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO

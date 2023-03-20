@@ -1,6 +1,5 @@
 ﻿using OpenTK.Mathematics;
 
-
 namespace IDKEngine
 {
     struct GLSLLight
@@ -8,13 +7,18 @@ namespace IDKEngine
         public Vector3 Position;
         public float Radius;
         public Vector3 Color;
-        private readonly float _pad0;
-        public GLSLLight(Vector3 position, Vector3 color, float radius)
+        public int PointShadowIndex;
+        public GLSLLight(Vector3 position, Vector3 color, float radius, int pointShadowIndex = -1)
         {
             Position = position;
             Color = color;
             Radius = radius;
-            _pad0 = 0;
+            PointShadowIndex = pointShadowIndex;
+        }
+
+        public bool HasPointShadow()
+        {
+            return PointShadowIndex >= 0;
         }
     }
 }

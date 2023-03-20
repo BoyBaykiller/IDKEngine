@@ -11,7 +11,7 @@ struct Light
     vec3 Position;
     float Radius;
     vec3 Color;
-    float _pad0;
+    int PointShadowIndex;
 };
 
 struct PointShadow
@@ -21,10 +21,11 @@ struct PointShadow
     
     mat4 ProjViewMatrices[6];
 
+    vec3 Position;
     float NearPlane;
+
+    vec3 _pad0;
     float FarPlane;
-    int LightIndex;
-    float _pad0;
 };
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -109,12 +110,15 @@ void main()
     vec3 origin = basicDataUBO.ViewPos + deltaStep * offset;
 
     vec3 scattered = vec3(0.0);
-    for (int i = 0; i < shadowDataUBO.Count; i++)
+    for (int i = 0; i < lightsUBO.Count; i++)
     {
-        PointShadow pointShadow = shadowDataUBO.PointShadows[i];
-        Light light = lightsUBO.Lights[pointShadow.LightIndex];
+        Light light = lightsUBO.Lights[i];
 
-        scattered += UniformScatter(light, pointShadow, origin, viewDir, deltaStep);
+        if (light.PointShadowIndex >= 0)
+        {
+            PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
+            scattered += UniformScatter(light, pointShadow, origin, viewDir, deltaStep);
+        }
     }
 
     imageStore(ImgResult, imgCoord, vec4(scattered * Strength, 1.0));
@@ -153,10 +157,9 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample)
     float twoDist = dot(lightToSample, lightToSample);
     float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
     float twoFarPlane = pointShadow.FarPlane * pointShadow.FarPlane;
-    float twoBias = -1.0;
 
     // Map from [nearPlane; farPlane] to [0.0; 1.0]
-    float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
+    float mapedDepth = (twoDist - twoNearPlane) / (twoFarPlane - twoNearPlane);
     float closestDepth = texture(pointShadow.Texture, lightToSample).r;
 
     return mapedDepth > closestDepth;
