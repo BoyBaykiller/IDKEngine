@@ -34,14 +34,27 @@ namespace IDKEngine
         public Vector2i ViewportResolution { get; private set; }
 
         public bool RenderGui { get; private set; }
+        
         private int fps;
+        private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
         protected override unsafe void OnRender(float dT)
         {
+            Update(dT);
+
             if (GetRenderMode() == RenderMode.Rasterizer)
             {
                 if (IsShadows)
                 {
-                    pointShadowManager.UpdateShadowMaps(ModelSystem);
+                    for (int i = 0; i < LightManager.Count; i++)
+                    {
+                        ref readonly GLSLLight light = ref LightManager.Lights[i];
+                        if (light.HasPointShadow() && (light.Position != PointShadowManager.PointShadows[i].Position))
+                        {
+                            PointShadowManager.PointShadows[light.PointShadowIndex].Position = light.Position;
+                            PointShadowManager.UploadPointShadow(light.PointShadowIndex);
+                        }
+                    }
+                    PointShadowManager.RenderShadowMaps(ModelSystem);
                 }
 
                 if (RasterizerPipeline.IsDebugRenderVXGIGrid)
@@ -77,8 +90,6 @@ namespace IDKEngine
                 PostProcessor.Compute(false, PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
-            Framebuffer.Bind(0);
-
             if (gui.SelectedEntityType != Gui.EntityType.None)
             {
                 AABB aabb = new AABB();
@@ -101,12 +112,26 @@ namespace IDKEngine
                 MeshOutlineRenderer.Render(PostProcessor.Result, aabb);
             }
 
+            ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
+            bool modelMoved = false;
+            for (int i = 0; i < ModelSystem.MeshInstances.Length; i++)
+            {
+                if (ModelSystem.MeshInstances[i].ResetPrevModelMatrixToCurrent())
+                {
+                    modelMoved = true;
+                }
+            }
+
+            if (GetRenderMode() == RenderMode.PathTracer && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || modelMoved))
+            {
+                PathTracer.ResetRender();
+            }
+
+            Framebuffer.Bind(0);
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
             GL.Enable(EnableCap.Blend);
-
             GL.Viewport(0, 0, WindowSize.X, WindowSize.Y);
-
             if (RenderGui)
             {
                 gui.Draw(this, (float)dT);
@@ -117,19 +142,45 @@ namespace IDKEngine
                 finalProgram.Use();
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             }
-
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
             GL.Disable(EnableCap.Blend);
 
-            ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
-
             fps++;
         }
 
-        private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        protected override unsafe void OnUpdate(float dT)
+        private unsafe void Update(float dT)
         {
+            if (fpsTimer.ElapsedMilliseconds >= 1000)
+            {
+                FPS = fps;
+                WindowTitle = $"FPS: {FPS}; Position {Camera.Position};";
+                fps = 0;
+                fpsTimer.Restart();
+            }
+            if (KeyboardState[Keys.Escape] == InputState.Pressed)
+            {
+                ShouldClose();
+            }
+            if (KeyboardState[Keys.V] == InputState.Touched)
+            {
+                WindowVSync = !WindowVSync;
+            }
+            if (KeyboardState[Keys.G] == InputState.Touched)
+            {
+                RenderGui = !RenderGui;
+                if (!RenderGui)
+                {
+                    SetViewportResolution(WindowSize.X, WindowSize.Y);
+                }
+            }
+            if (KeyboardState[Keys.F11] == InputState.Touched)
+            {
+                WindowFullscreen = !WindowFullscreen;
+            }
+
+            gui.Update(this, dT);
+
             GLSLBasicData.DeltaUpdate = dT;
             GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
             GLSLBasicData.PrevView = GLSLBasicData.View;
@@ -140,58 +191,6 @@ namespace IDKEngine
             GLSLBasicData.CameraPos = Camera.Position;
             GLSLBasicData.Time = WindowTime;
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
-
-            bool meshModelChanged = false;
-            for (int i = 0; i < ModelSystem.MeshInstances.Length; i++)
-            {
-                if (ModelSystem.MeshInstances[i].ResetPrevModelMatrixToCurrent())
-                {
-                    meshModelChanged = true;
-                }
-            }
-
-            if (GetRenderMode() == RenderMode.PathTracer && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || meshModelChanged))
-            {
-                PathTracer.ResetRender();
-            }
-
-            if (fpsTimer.ElapsedMilliseconds >= 1000)
-            {
-                FPS = fps;
-                WindowTitle = $"FPS: {FPS}; Position {Camera.Position};";
-                fps = 0;
-                fpsTimer.Restart();
-            }
-
-            if (KeyboardState[Keys.Escape] == InputState.Pressed)
-            {
-                ShouldClose();
-            }
-
-            if (KeyboardState[Keys.V] == InputState.Touched)
-            {
-                WindowVSync = !WindowVSync;
-            }
-            
-            if (KeyboardState[Keys.G] == InputState.Touched)
-            {
-                RenderGui = !RenderGui;
-                if (!RenderGui)
-                {
-                    SetViewportResolution(WindowSize.X, WindowSize.Y);
-                }
-            }
-
-            if (KeyboardState[Keys.F11] == InputState.Touched)
-            {
-                WindowFullscreen = !WindowFullscreen;
-            }
-
-            //Vector3 pos = ModelSystem.MeshInstances[17].ModelMatrix.ExtractTranslation();
-            //pos += new Vsector3(0.0f, MathF.Sin(WindowTime * 30.0f) * 0.1f, 0.0f);
-            //ModelSystem.MeshInstances[17].ModelMatrix = ModelSystem.MeshInstances[17].ModelMatrix.ClearTranslation() * Matrix4.CreateTranslation(pos);
-
-            gui.Update(this, dT);
         }
 
         public Camera Camera;
@@ -207,10 +206,10 @@ namespace IDKEngine
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
+        public PointShadowManager PointShadowManager;
 
         private Gui gui;
         private BufferObject basicDataUBO;
-        private PointShadowManager pointShadowManager;
         private ShaderProgram finalProgram;
         protected override unsafe void OnStart()
         {
@@ -272,7 +271,7 @@ namespace IDKEngine
                 "res/textures/environmentMap/posz.jpg",
                 "res/textures/environmentMap/negz.jpg"
             });
-            
+
             Model sponza = new Model("res/models/OBJSponza/sponza.obj");
             for (int i = 0; i < sponza.MeshInstances.Length; i++) // 0.0145f
                 sponza.MeshInstances[i].ModelMatrix = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
@@ -309,11 +308,10 @@ namespace IDKEngine
             PostProcessor = new PostProcessor(ViewportResolution.X, ViewportResolution.Y);
 
             List<GLSLLight> lights = new List<GLSLLight>();
-            //lights.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
-            lights.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-            lights.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
-            LightManager.Add(CollectionsMarshal.AsSpan(lights));
+            //LightManager.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
+            LightManager.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f, 0));
+            LightManager.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f, 1));
+            LightManager.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f, 2));
 
             SetRenderMode(RenderMode.Rasterizer);
 
@@ -379,17 +377,17 @@ namespace IDKEngine
 
         public void SetRenderMode(RenderMode renderMode)
         {
-            if (pointShadowManager != null) { pointShadowManager.Dispose(); pointShadowManager = null; }
+            if (PointShadowManager != null) { PointShadowManager.Dispose(); PointShadowManager = null; }
             if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
             if (renderMode == RenderMode.Rasterizer)
             {
                 RasterizerPipeline = new RasterPipeline(ViewportResolution.X, ViewportResolution.Y);
 
-                pointShadowManager = new PointShadowManager();
+                PointShadowManager = new PointShadowManager();
                 for (int j = 0; j < 3; j++)
                 {
-                    PointShadow pointShadow = new PointShadow(LightManager, j, 512, 0.5f, 60.0f);
-                    pointShadowManager.Add(pointShadow);
+                    PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
+                    PointShadowManager.Add(pointShadow);
                 }
             }
 

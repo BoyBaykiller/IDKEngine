@@ -30,7 +30,7 @@ struct Light
     vec3 Position;
     float Radius;
     vec3 Color;
-    float _pad0;
+    int PointShadowIndex;
 };
 
 struct PointShadow
@@ -40,10 +40,11 @@ struct PointShadow
     
     mat4 ProjViewMatrices[6];
 
+    vec3 Position;
     float NearPlane;
+
+    vec3 _pad0;
     float FarPlane;
-    int LightIndex;
-    float _pad0;
 };
 
 layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
@@ -96,20 +97,21 @@ void main()
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedoAlpha.rgb;
 
     vec3 directLighting = vec3(0.0);
-    for (int i = 0; i < shadowDataUBO.PointCount; i++)
+    for (int i = 0; i < lightsUBO.Count; i++)
     {
-        PointShadow pointShadow = shadowDataUBO.PointShadows[i];
         Light light = lightsUBO.Lights[i];
+
         vec3 sampleToLight = light.Position - inData.FragPos;
-        directLighting += GetDirectLighting(light, albedoAlpha.rgb, sampleToLight) * Visibility(pointShadow, -sampleToLight);
+        vec3 contrib = GetDirectLighting(light, albedoAlpha.rgb, sampleToLight);
+        if (light.PointShadowIndex >= 0)
+        {
+            PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
+            contrib *= Visibility(pointShadow, -sampleToLight);
+        }
+
+        directLighting += contrib;
     }
 
-    for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
-    {
-        Light light = lightsUBO.Lights[i];
-        vec3 sampleToLight = light.Position - inData.FragPos;
-        directLighting += GetDirectLighting(light, albedoAlpha.rgb, sampleToLight);
-    }
     const float ambient = 0.03;
     directLighting += albedoAlpha.rgb * ambient;
     directLighting += emissive;
@@ -170,4 +172,4 @@ ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos)
     vec3 ndc = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz;
     ivec3 voxelPos = ivec3((ndc * 0.5 + 0.5) * imageSize(ImgResult));
     return voxelPos;
-}   
+}

@@ -16,9 +16,10 @@ namespace IDKEngine
         public Matrix4 PosZ;
         public Matrix4 NegZ;
 
+        public Vector3 Position;
         public float NearPlane;
+
+        private readonly Vector3 _pad0;
         public float FarPlane;
-        public int LightIndex;
-        private readonly float _pad0;
     }
 }

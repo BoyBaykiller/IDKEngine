@@ -5,12 +5,14 @@
 
 layout(location = 0) out vec4 FragColor;
 
+layout(binding = 1) uniform sampler2D SamplerAO;
+
 struct Light
 {
     vec3 Position;
     float Radius;
     vec3 Color;
-    float _pad0;
+    int PointShadowIndex;
 };
 
 struct PointShadow
@@ -20,10 +22,11 @@ struct PointShadow
     
     mat4 ProjViewMatrices[6];
 
+    vec3 Position;
     float NearPlane;
+
+    vec3 _pad0;
     float FarPlane;
-    int LightIndex;
-    float _pad0;
 };
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -111,19 +114,18 @@ void main()
     vec3 viewDir = normalize(fragPos - basicDataUBO.ViewPos);
 
     vec3 directLighting = vec3(0.0);
-    for (int i = 0; i < shadowDataUBO.PointCount; i++)
+    for (int i = 0; i < lightsUBO.Count; i++)
     {
-        PointShadow pointShadow = shadowDataUBO.PointShadows[i];
         Light light = lightsUBO.Lights[i];
-        vec3 sampleToLight = light.Position - fragPos;
-        directLighting += GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight) * Visibility(pointShadow, normal, -sampleToLight);
-    }
 
-    for (int i = shadowDataUBO.PointCount; i < lightsUBO.Count; i++)
-    {
-        Light light = lightsUBO.Lights[i];
         vec3 sampleToLight = light.Position - fragPos;
-        directLighting += GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight);
+        vec3 contrib = GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight);
+        if (light.PointShadowIndex >= 0)
+        {
+            PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
+            contrib *= Visibility(pointShadow, normal, -sampleToLight);
+        }
+        directLighting += contrib;
     }
 
     vec3 indirectLight = vec3(0.0);
@@ -131,8 +133,9 @@ void main()
     {
         indirectLight = vec3(0.03) * albedo;
     }
+    float ambientOcclusion = 1.0 - texture(SamplerAO, uv).r;
 
-    FragColor = vec4(directLighting + indirectLight + emissive, albedoAlpha.a);
+    FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, albedoAlpha.a);
 }
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight)

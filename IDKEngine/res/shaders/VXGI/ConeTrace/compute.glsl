@@ -6,6 +6,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler3D SamplerVoxelsAlbedo;
+layout(binding = 1) uniform sampler2D SamplerAO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -92,6 +93,9 @@ void main()
 
     vec3 viewDir = fragPos - basicDataUBO.ViewPos;
     vec3 indirectLight = IndirectLight(fragPos, viewDir, normal, specular, roughness) * GIBoost;
+
+    float ambientOcclusion = 1.0 - texture(SamplerAO, uv).r;
+    indirectLight *= ambientOcclusion;
 
     imageStore(ImgResult, imgCoord, vec4(indirectLight, 1.0));
 }

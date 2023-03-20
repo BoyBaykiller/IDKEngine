@@ -128,7 +128,6 @@ namespace IDKEngine.Render
         }
 
         
-        public delegate void FuncUploadMesh(ref GLSLMesh glslMesh);
         public unsafe void UpdateMeshBuffer(int start, int count)
         {
             if (count == 0) return;
@@ -138,7 +137,6 @@ namespace IDKEngine.Render
             }
         }
 
-        public delegate void FuncUploadDrawCommand(ref GLSLDrawElementsCommand drawCommand);
         public unsafe void UpdateDrawCommandBuffer(int start, int count)
         {
             if (count == 0) return;
@@ -170,7 +168,6 @@ namespace IDKEngine.Render
             }
         }
 
-        public delegate void FuncUploadMeshInstance(ref GLSLMeshInstance modelMatrix);
         public unsafe void UpdateMeshInstanceBuffer(int start, int count)
         {
             if (count == 0) return;

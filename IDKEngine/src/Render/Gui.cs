@@ -281,7 +281,7 @@ namespace IDKEngine.Render
                                 }
 
                                 tempBool = app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation;
-                                if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
+                                if (ImGui.Checkbox("IsTemporalAccumulation##0", ref tempBool))
                                 {
                                     app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
                                 }
@@ -378,7 +378,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsVolumetricLighting)
                         {
                             int tempInt = app.RasterizerPipeline.VolumetricLight.Samples;
-                            if (ImGui.SliderInt("Samples", ref tempInt, 1, 100))
+                            if (ImGui.SliderInt("Samples##0", ref tempInt, 1, 100))
                             {
                                 app.RasterizerPipeline.VolumetricLight.Samples = tempInt;
                             }
@@ -390,7 +390,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = app.RasterizerPipeline.VolumetricLight.Strength;
-                            if (ImGui.SliderFloat("Strength", ref tempFloat, 0.0f, 500.0f))
+                            if (ImGui.SliderFloat("Strength##0", ref tempFloat, 0.0f, 500.0f))
                             {
                                 app.RasterizerPipeline.VolumetricLight.Strength = tempFloat;
                             }
@@ -438,7 +438,7 @@ namespace IDKEngine.Render
                             );
 
                             int tempInt = app.PostProcessor.TaaSamples;
-                            if (ImGui.SliderInt("Samples   ", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
+                            if (ImGui.SliderInt("Samples##1", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
                             {
                                 app.PostProcessor.TaaSamples = Math.Min(tempInt, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
                             }
@@ -451,7 +451,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsSSAO)
                         {
                             int tempInt = app.RasterizerPipeline.SSAO.Samples;
-                            if (ImGui.SliderInt("Samples  ", ref tempInt, 1, 50))
+                            if (ImGui.SliderInt("Samples##2", ref tempInt, 1, 50))
                             {
                                 app.RasterizerPipeline.SSAO.Samples = tempInt;
                             }
@@ -463,7 +463,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = app.RasterizerPipeline.SSAO.Strength;
-                            if (ImGui.SliderFloat("Strength ", ref tempFloat, 0.0f, 20.0f))
+                            if (ImGui.SliderFloat("Strength##1", ref tempFloat, 0.0f, 20.0f))
                             {
                                 app.RasterizerPipeline.SSAO.Strength = tempFloat;
                             }
@@ -476,7 +476,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsSSR)
                         {
                             int tempInt = app.RasterizerPipeline.SSR.Samples;
-                            if (ImGui.SliderInt("Samples ", ref tempInt, 1, 100))
+                            if (ImGui.SliderInt("Samples##3", ref tempInt, 1, 100))
                             {
                                 app.RasterizerPipeline.SSR.Samples = tempInt;
                             }
@@ -622,7 +622,24 @@ namespace IDKEngine.Render
                 ImGui.End();
             }
 
-            ImGui.Begin("Entity properties");
+            ImGui.Begin("Entity Add");
+            {
+                if (ImGui.Button("Add light"))
+                {
+                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, new Vector2(0.0f));
+                    Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
+
+                    GLSLLight light = new GLSLLight(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
+                    if (app.LightManager.Add(light))
+                    {
+                        SelectedEntityType = EntityType.Light;
+                        SelectedEntityIndex = app.LightManager.Count - 1;
+                        shouldResetPT = true;
+                    }
+                }
+            }
+
+            ImGui.Begin("Entity Properties");
             {
                 if (SelectedEntityType != EntityType.None)
                 {
@@ -707,6 +724,9 @@ namespace IDKEngine.Render
                 }
                 else if (SelectedEntityType == EntityType.Light)
                 {
+                    ImGui.Text("TODO: Assign shadow map to light");
+
+
                     bool shouldUpdateLight = false;
                     ref GLSLLight light = ref app.LightManager.Lights[SelectedEntityIndex];
 
@@ -762,9 +782,9 @@ namespace IDKEngine.Render
                 ImGui.PopStyleVar();
             }
 
-            if (shouldResetPT)
+            if (shouldResetPT && app.PathTracer != null)
             {
-                if (app.PathTracer != null) app.PathTracer.ResetRender();
+                app.PathTracer.ResetRender();
             }
             ImGuiBackend.Render();
         }
@@ -799,17 +819,18 @@ namespace IDKEngine.Render
             ImGui.Text(text);
         }
 
-        private bool takeScreenshotNextFrame = false;
         private long lastMilliseconds = 0;
+        private bool takeScreenshotNextFrame = false;
         public unsafe void Update(Application app, float dT)
         {
+            bool shouldResetPT = false;
+
             void TakeScreenshot()
             {
                 int frameIndex = app.FrameRecorder.ReplayFrameIndex;
                 if (frameIndex == 0) frameIndex = app.FrameRecorder.FrameCount;
-                
+
                 Helper.TextureToDisk(app.PostProcessor.Result, $"{FRAME_OUTPUT_DIR}/{frameIndex}");
-                takeScreenshotNextFrame = false;
             }
 
             if (takeScreenshotNextFrame)
@@ -824,15 +845,12 @@ namespace IDKEngine.Render
                 {
                     if (app.PathTracer.AccumulatedSamples >= pathTracerRenderSampleGoal)
                     {
-                        if (isVideoRender)
-                            TakeScreenshot();
-
                         RecordableState state = app.FrameRecorder.Replay();
                         app.Camera.SetState(state);
-
-                        if (!isInfiniteReplay && app.FrameRecorder.ReplayFrameIndex == 0)
+                        
+                        if (isVideoRender)
                         {
-                            frameRecState = FrameRecorderState.Nothing;
+                            TakeScreenshot();
                         }
                     }
                 }
@@ -841,13 +859,11 @@ namespace IDKEngine.Render
                     RecordableState state = app.FrameRecorder.Replay();
                     app.Camera.SetState(state);
                     takeScreenshotNextFrame = isVideoRender;
-
-                    if (!isInfiniteReplay && app.FrameRecorder.ReplayFrameIndex == 0)
-                    {
-                        frameRecState = FrameRecorderState.Nothing;
-                    }
                 }
-
+                if (!isInfiniteReplay && app.FrameRecorder.ReplayFrameIndex == 0)
+                {
+                    frameRecState = FrameRecorderState.Nothing;
+                }
             }
             else
             {
@@ -966,6 +982,21 @@ namespace IDKEngine.Render
                     SelectedEntityIndex = hitEntityID;
                     SelectedEntityType = hitEntityType;
                 }
+            }
+
+            if (app.KeyboardState[Keys.Delete] == InputState.Touched && SelectedEntityType != EntityType.None)
+            {
+                if (SelectedEntityType == EntityType.Light)
+                {
+                    app.LightManager.RemoveAt(SelectedEntityIndex);
+                    SelectedEntityType = EntityType.None;
+                    shouldResetPT = true;
+                }
+            }
+
+            if (shouldResetPT && app.PathTracer != null)
+            {
+                app.PathTracer.ResetRender();
             }
         }
 

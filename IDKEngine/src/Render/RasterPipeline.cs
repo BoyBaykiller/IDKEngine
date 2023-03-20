@@ -139,6 +139,11 @@ namespace IDKEngine.Render
                 if (IsSSAO)
                 {
                     SSAO.Compute();
+                    SSAO.Result.BindToUnit(1);
+                }
+                else
+                {
+                    Texture.UnbindFromUnit(1);
                 }
 
                 if (IsVXGI)
@@ -194,16 +199,13 @@ namespace IDKEngine.Render
                 Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
                 Result.BindToUnit(0);
                 if (IsVXGI) ConeTracer.Result.BindToUnit(1);
-                else Texture.UnbindFromUnit(1);            
+                else Texture.UnbindFromUnit(1);
 
-                if (IsSSAO) SSAO.Result.BindToUnit(2);
+                if (IsSSR) SSR.Result.BindToUnit(2);
                 else Texture.UnbindFromUnit(2);
 
-                if (IsSSR) SSR.Result.BindToUnit(3);
+                if (IsVolumetricLighting) VolumetricLight.Result.BindToUnit(3);
                 else Texture.UnbindFromUnit(3);
-
-                if (IsVolumetricLighting) VolumetricLight.Result.BindToUnit(4);
-                else Texture.UnbindFromUnit(4);
 
                 mergeLightingProgram.Use();
                 GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

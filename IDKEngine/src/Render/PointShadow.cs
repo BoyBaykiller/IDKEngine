@@ -27,6 +27,7 @@ namespace IDKEngine.Render
                 glslPointShadow.NegY = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
                 glslPointShadow.PosZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
                 glslPointShadow.NegZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+                glslPointShadow.Position = _position;
             }
         }
 
@@ -36,8 +37,7 @@ namespace IDKEngine.Render
 
         private GLSLPointShadow glslPointShadow;
         private readonly Matrix4 projection;
-        public LightManager LightContext;
-        public PointShadow(LightManager lightContext, int lightIndex, int size, float nearPlane, float farPlane)
+        public PointShadow(int size, float nearPlane, float farPlane)
         {
             shadowSampler = new SamplerObject();
             shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -65,10 +65,6 @@ namespace IDKEngine.Render
 
             glslPointShadow.NearPlane = nearPlane;
             glslPointShadow.FarPlane = farPlane;
-            glslPointShadow.LightIndex = lightIndex;
-
-            Position = lightContext.Lights[glslPointShadow.LightIndex].Position;
-            LightContext = lightContext;
         }
 
         public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex, ShaderProgram renderProgram, ShaderProgram cullingProgram)
@@ -86,7 +82,7 @@ namespace IDKEngine.Render
 
             renderProgram.Upload(0, pointShadowIndex);
 
-            if (HAS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_AMD_vertex_shader_layer or GL_NV_viewport_array2
+            if (HAS_VERTEX_LAYERED_RENDERING) // GL_ARB_shader_viewport_layer_array or GL_NV_viewport_array2 or GL_AMD_vertex_shader_layer
             {
                 GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
                 renderProgram.Use();
@@ -117,16 +113,6 @@ namespace IDKEngine.Render
         public ref readonly GLSLPointShadow GetGLSLData()
         {
             return ref glslPointShadow;
-        }
-
-        public bool AttachedLightMoved()
-        {
-            return Position != LightContext.Lights[glslPointShadow.LightIndex].Position;
-        }
-
-        public void MoveToAttachedLight()
-        {
-            Position = LightContext.Lights[glslPointShadow.LightIndex].Position;
         }
 
         public void Dispose()

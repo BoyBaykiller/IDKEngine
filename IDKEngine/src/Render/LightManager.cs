@@ -75,39 +75,33 @@ namespace IDKEngine.Render
             GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
         }
 
-        public unsafe void Add(Span<GLSLLight> lights)
+        public bool Add(in GLSLLight light)
         {
-            if (lights.Length == 0)
-                return;
-
-            Debug.Assert(Count + lights.Length <= GLSL_MAX_UBO_LIGHT_COUNT);
-
-            fixed (void* src = &lights[0], dest = Lights)
+            if (Count == GLSL_MAX_UBO_LIGHT_COUNT)
             {
-                bufferObject.SubData(Count * sizeof(GLSLLight), lights.Length * sizeof(GLSLLight), (IntPtr)src);
-                Helper.MemCpy(src, (GLSLLight*)dest + Count, sizeof(GLSLLight) * lights.Length);
+                return false;
             }
-            
-            Count += lights.Length;
+
+            Lights[Count++] = light;
+            UpdateLightBuffer(Count - 1, 1);
+
+            return true;
         }
 
         public unsafe void RemoveAt(int index)
         {
             Debug.Assert(index >= 0 && index < Count);
-            Debug.Assert(Count - 1 >= 0);
             
-            if (index == Count - 1)
+            Count--;
+            if (Count == 0)
             {
-                Count--;
                 return;
             }
 
-            Array.Copy(Lights, index + 1, Lights, index, Count - index);
-            bufferObject.SubData(index * sizeof(GLSLLight), (Count - index) * sizeof(GLSLLight), Lights);
-            Count--;
+            Lights[index] = Lights[Count];
+            UpdateLightBuffer(index, 1);
         }
 
-        public delegate void FuncUploadLight(ref GLSLLight light);
         public unsafe void UpdateLightBuffer(int start, int count)
         {
             if (count == 0) return;
@@ -122,7 +116,7 @@ namespace IDKEngine.Render
             hitInfo = new HitInfo();
             hitInfo.T = float.MaxValue;
 
-            for (int i = 0; i < Lights.Length; i++)
+            for (int i = 0; i < Count; i++)
             {
                 ref readonly GLSLLight light = ref Lights[i];
                 if (MyMath.RaySphereIntersect(ray, light, out float min, out float max) && min > 0.0f && max < hitInfo.T)

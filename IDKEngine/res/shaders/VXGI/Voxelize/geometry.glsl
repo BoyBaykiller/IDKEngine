@@ -1,5 +1,4 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 #extension GL_NV_geometry_shader_passthrough : enable
 #if !defined GL_NV_geometry_shader_passthrough
 #error "You should only compile this shader if GL_NV_geometry_shader_passthrough is supported. Otherwise use the fallback path"

@@ -10,15 +10,6 @@ layout(location = 3) in uint Normal;
 
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
-struct DrawCommand
-{
-    uint Count;
-    uint InstanceCount;
-    uint FirstIndex;
-    uint BaseVertex;
-    uint BaseInstance;
-};
-
 struct Mesh
 {
     int InstanceCount;
@@ -33,27 +24,12 @@ struct Mesh
     uint CubemapShadowCullInfo;
 };
 
-struct Vertex
-{
-    vec3 Position;
-    float _pad0;
-
-    vec2 TexCoord;
-    uint Tangent;
-    uint Normal;
-};
-
 struct MeshInstance
 {
     mat4 ModelMatrix;
     mat4 InvModelMatrix;
     mat4 PrevModelMatrix;
 };
-
-layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
-{
-    DrawCommand DrawCommands[];
-} drawCommandSSBO;
 
 layout(std430, binding = 2) restrict readonly buffer MeshSSBO
 {
@@ -64,16 +40,6 @@ layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
-
-layout(std430, binding = 9) restrict readonly buffer VertexSSBO
-{
-    Vertex Vertices[];
-} vertexSSBO;
-
-layout(std430, binding = 10) restrict readonly buffer IndicesSSBO
-{
-    uint Indices[];
-} indicesSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -138,8 +104,8 @@ void main()
 #if !TAKE_FAST_GEOMETRY_SHADER_PATH
     // Instead of doing a single draw call with a standard geometry shader to select the swizzle
     // we render the scene 3 times, each time with a different swizzle. I have observed this to be slightly faster
-    if (SwizzleAxis == 1) gl_Position = gl_Position.zyxw;
-    else if (SwizzleAxis == 2) gl_Position = gl_Position.xzyw;
+    if (SwizzleAxis == 0) gl_Position = gl_Position.zyxw;
+    else if (SwizzleAxis == 1) gl_Position = gl_Position.xzyw;
 #endif
 }
 
