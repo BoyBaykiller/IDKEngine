@@ -12,59 +12,61 @@ namespace IDKEngine.Render
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
             Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
 
-        private Vector3 _position;
         public unsafe Vector3 Position
         {
-            get => _position;
+            get => glslPointShadow.Position;
 
             set
             {
-                _position = value;
+                glslPointShadow.Position = value;
 
-                glslPointShadow.PosX = Camera.GenerateViewMatrix(_position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.NegX = Camera.GenerateViewMatrix(_position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.PosY = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
-                glslPointShadow.NegY = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
-                glslPointShadow.PosZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.NegZ = Camera.GenerateViewMatrix(_position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-                glslPointShadow.Position = _position;
+                UpdateViewMatrices();
+            }
+        }
+
+        public Vector2 ClippingPlanes
+        {
+            get => new Vector2(glslPointShadow.NearPlane, glslPointShadow.FarPlane);
+
+            set
+            {
+                glslPointShadow.NearPlane = value.X;
+                glslPointShadow.FarPlane = value.Y;
+
+                glslPointShadow.NearPlane = MathF.Max(glslPointShadow.NearPlane, 0.1f);
+                glslPointShadow.FarPlane = MathF.Max(glslPointShadow.FarPlane, 0.1f);
+
+                glslPointShadow.NearPlane = MathF.Min(glslPointShadow.NearPlane, glslPointShadow.FarPlane - 0.01f);
+                glslPointShadow.FarPlane = MathF.Max(glslPointShadow.FarPlane, glslPointShadow.NearPlane + 0.01f);
+
+                projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, glslPointShadow.NearPlane, glslPointShadow.FarPlane);
+            }
+        }
+
+        private Matrix4 _projection;
+        private Matrix4 projection
+        {
+            get => _projection;
+
+            set
+            {
+                _projection = value;
+                UpdateViewMatrices();
             }
         }
 
         public Texture Result;
+        
         private readonly Framebuffer framebuffer;
-        private readonly SamplerObject shadowSampler;
-
+        private SamplerObject shadowSampler;
         private GLSLPointShadow glslPointShadow;
-        private readonly Matrix4 projection;
         public PointShadow(int size, float nearPlane, float farPlane)
         {
-            shadowSampler = new SamplerObject();
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareFunc, (int)All.Less);
-
-            Result = new Texture(TextureTarget2d.TextureCubeMap);
-            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
-
             framebuffer = new Framebuffer();
-            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
             framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.None });
-            framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
 
-            projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, nearPlane, farPlane);
-
-            glslPointShadow.Texture = Result.MakeTextureHandleARB();
-            glslPointShadow.ShadowTexture = Result.MakeTextureSamplerHandleARB(shadowSampler);
-
-            glslPointShadow.NearPlane = nearPlane;
-            glslPointShadow.FarPlane = farPlane;
+            ClippingPlanes = new Vector2(nearPlane, farPlane);
+            SetSize(size);
         }
 
         public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex, ShaderProgram renderProgram, ShaderProgram cullingProgram)
@@ -110,21 +112,58 @@ namespace IDKEngine.Render
             }
         }
 
+        private void UpdateViewMatrices()
+        {
+            glslPointShadow.PosX = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            glslPointShadow.NegX = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            glslPointShadow.PosY = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
+            glslPointShadow.NegY = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
+            glslPointShadow.PosZ = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            glslPointShadow.NegZ = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+        }
+
         public ref readonly GLSLPointShadow GetGLSLData()
         {
             return ref glslPointShadow;
         }
 
+        public void SetSize(int size)
+        {
+            size = Math.Max(size, 1);
+
+            DisposeBindlessTextures();
+
+            shadowSampler = new SamplerObject();
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
+            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareFunc, (int)All.Less);
+
+            Result = new Texture(TextureTarget2d.TextureCubeMap);
+            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
+
+            glslPointShadow.Texture = Result.MakeTextureHandleARB();
+            glslPointShadow.ShadowTexture = Result.MakeTextureSamplerHandleARB(shadowSampler);
+
+            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
+            framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
+        }
+
+        private void DisposeBindlessTextures()
+        {
+            if (shadowSampler != null) { Texture.UnmakeTextureHandleARB(glslPointShadow.ShadowTexture); shadowSampler.Dispose(); }
+            if (Result != null) { Texture.UnmakeTextureHandleARB(glslPointShadow.Texture); Result.Dispose(); }
+        }
+
         public void Dispose()
         {
             framebuffer.Dispose();
-
-            // unmake texture handle resident for deletion
-            Texture.UnmakeTextureHandleARB(glslPointShadow.Texture);
-            Texture.UnmakeTextureHandleARB(glslPointShadow.ShadowTexture);
-
-            Result.Dispose();
-            shadowSampler.Dispose();
+            DisposeBindlessTextures();
         }
     }
 }

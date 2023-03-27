@@ -111,7 +111,7 @@ namespace IDKEngine.Render
         {
             base.SetSize(width, height);
 
-            if (debugTexture != null) debugTexture.Dispose(); debugTexture = null;
+            if (debugTexture != null) debugTexture.Dispose();
             debugTexture = new Texture(TextureTarget2d.Texture2D);
             debugTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             debugTexture.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R16f);

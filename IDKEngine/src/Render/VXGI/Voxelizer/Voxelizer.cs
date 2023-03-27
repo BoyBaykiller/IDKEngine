@@ -162,9 +162,6 @@ namespace IDKEngine.Render
             }
 
             GL.Viewport(0, 0, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
-            GL.ColorMask(false, false, false, false);
-            GL.DepthMask(false);
-            GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
 
             ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
@@ -193,9 +190,6 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit | MemoryBarrierFlags.TextureFetchBarrierBit);
             
             GL.Enable(EnableCap.CullFace);
-            GL.Enable(EnableCap.DepthTest);
-            GL.ColorMask(true, true, true, true);
-            GL.DepthMask(true);
 
             if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
             {

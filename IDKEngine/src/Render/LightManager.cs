@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Diagnostics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -29,13 +28,15 @@ namespace IDKEngine.Render
         }
 
         public readonly int IndicisCount;
-        public readonly GLSLLight[] Lights;
+        public readonly Light[] Lights;
+        
         private readonly BufferObject bufferObject;
         private readonly ShaderProgram shaderProgram;
         private readonly VAO vao;
+        private readonly PointShadowManager pointShadowManager;
         public unsafe LightManager(int latitudes, int longitudes)
         {
-            Lights = new GLSLLight[GLSL_MAX_UBO_LIGHT_COUNT];
+            Lights = new Light[GLSL_MAX_UBO_LIGHT_COUNT];
 
             shaderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
@@ -47,17 +48,11 @@ namespace IDKEngine.Render
 
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
             BufferObject vbo = new BufferObject();
-            fixed (ObjectFactory.Vertex* ptr = &vertecis[0])
-            {
-                vbo.ImmutableAllocate(vertecis.Length * sizeof(ObjectFactory.Vertex), (IntPtr)ptr, BufferStorageFlags.None);
-            }
+            vbo.ImmutableAllocate(vertecis.Length * sizeof(ObjectFactory.Vertex), vertecis[0], BufferStorageFlags.None);
 
             Span<uint> indicis = ObjectFactory.GenerateSmoothSphereIndicis((uint)latitudes, (uint)longitudes);
             BufferObject ebo = new BufferObject();
-            fixed (uint* ptr = &indicis[0])
-            {
-                ebo.ImmutableAllocate(indicis.Length * sizeof(uint), (IntPtr)ptr, BufferStorageFlags.None);
-            }
+            ebo.ImmutableAllocate(indicis.Length * sizeof(uint), indicis[0], BufferStorageFlags.None);
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);
@@ -66,6 +61,8 @@ namespace IDKEngine.Render
             //vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 3 * sizeof(float)); // TexCoord
 
             IndicisCount = indicis.Length;
+
+            pointShadowManager = new PointShadowManager();
         }
 
         public void Draw()
@@ -75,51 +72,78 @@ namespace IDKEngine.Render
             GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
         }
 
-        public bool Add(in GLSLLight light)
+        public void RenderShadowMaps(ModelSystem modelSystem)
+        {
+            for (int i = 0; i < Count; i++)
+            {
+                Light light = Lights[i];
+                if (light.HasPointShadow())
+                {
+                    pointShadowManager.PointShadows[light.GLSLLight.PointShadowIndex].Position = light.GLSLLight.Position;
+                }
+            }
+            pointShadowManager.RenderShadowMaps(modelSystem);
+        }
+
+        public int Add(Light light)
         {
             if (Count == GLSL_MAX_UBO_LIGHT_COUNT)
             {
-                return false;
+                return -1;
             }
 
             Lights[Count++] = light;
-            UpdateLightBuffer(Count - 1, 1);
+            UpdateLightBuffer(Count - 1);
 
-            return true;
+            return Count - 1;
         }
 
-        public unsafe void RemoveAt(int index)
+        public void RemoveAt(int index)
         {
-            Debug.Assert(index >= 0 && index < Count);
-            
             Count--;
             if (Count == 0)
             {
                 return;
             }
 
-            Lights[index] = Lights[Count];
-            UpdateLightBuffer(index, 1);
-        }
-
-        public unsafe void UpdateLightBuffer(int start, int count)
-        {
-            if (count == 0) return;
-            fixed (void* ptr = &Lights[start])
+            Light light = Lights[index];
+            if (light.HasPointShadow())
             {
-                bufferObject.SubData(start * sizeof(GLSLLight), count * sizeof(GLSLLight), (IntPtr)ptr);
+                pointShadowManager.RemoveAt(light.GLSLLight.PointShadowIndex);
             }
+
+            Lights[index] = Lights[Count];
+
+            UpdateLightBuffer(index);
         }
 
-        public bool Intersect(Ray ray, out HitInfo hitInfo)
+        public void SetPointLight(PointShadow pointShadow, int lightIndex)
+        {
+            Light light = Lights[lightIndex];
+            if (light.HasPointShadow())
+            {
+                Console.WriteLine("");
+                return;
+            }
+            int pointShadowIndex = pointShadowManager.Add(pointShadow);
+            Lights[lightIndex].GLSLLight.PointShadowIndex = pointShadowIndex;
+            UpdateLightBuffer(lightIndex);
+        }
+
+        public unsafe void UpdateLightBuffer(int start)
+        {
+            bufferObject.SubData(start * sizeof(GLSLLight), sizeof(GLSLLight), Lights[start].GLSLLight);
+        }
+
+        public bool Intersect(in Ray ray, out HitInfo hitInfo)
         {
             hitInfo = new HitInfo();
             hitInfo.T = float.MaxValue;
 
             for (int i = 0; i < Count; i++)
             {
-                ref readonly GLSLLight light = ref Lights[i];
-                if (MyMath.RaySphereIntersect(ray, light, out float min, out float max) && min > 0.0f && max < hitInfo.T)
+                Light light = Lights[i];
+                if (MyMath.RaySphereIntersect(ray, light.GLSLLight, out float min, out float max) && min > 0.0f && max < hitInfo.T)
                 {
                     hitInfo.T = min;
                     hitInfo.LightID = i;
@@ -131,6 +155,7 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
+            pointShadowManager.Dispose();
             bufferObject.Dispose();
             shaderProgram.Dispose();
             vao.Dispose();

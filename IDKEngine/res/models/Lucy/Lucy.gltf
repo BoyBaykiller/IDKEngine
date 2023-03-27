@@ -233,12 +233,12 @@
         {
             "mimeType" : "image/png",
             "name" : "M_Statue_Inst_0_Normal",
-            "uri" : "Texture/M_Statue_Inst_0_Normal.png"
+            "uri" : "Textures/M_Statue_Inst_0_Normal.png"
         },
         {
             "mimeType" : "image/png",
             "name" : "M_Statue_Inst_0_BaseColor",
-            "uri" : "Texture/M_Statue_Inst_0_BaseColor.png"
+            "uri" : "Textures/M_Statue_Inst_0_BaseColor.png"
         }
     ],
     "accessors" : [

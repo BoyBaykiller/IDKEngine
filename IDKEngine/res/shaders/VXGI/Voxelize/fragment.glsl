@@ -56,7 +56,6 @@ layout(std140, binding = 1) uniform ShadowDataUBO
 {
     #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
-    int PointCount;
 } shadowDataUBO;
 
 layout(std140, binding = 2) uniform LightsUBO
@@ -125,7 +124,7 @@ void main()
     imageAtomicMax(ImgResultR, voxelPos, floatBitsToUint(directLighting.r));
     imageAtomicMax(ImgResultG, voxelPos, floatBitsToUint(directLighting.g));
     imageAtomicMax(ImgResultB, voxelPos, floatBitsToUint(directLighting.b));
-    imageStore(ImgResult, voxelPos, uvec4(0.0, 0.0, 0.0, 1.0));
+    imageStore(ImgResult, voxelPos, vec4(0.0, 0.0, 0.0, 1.0));
 
 #endif
 
