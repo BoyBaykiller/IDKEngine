@@ -11,9 +11,6 @@ namespace IDKEngine.Render
         public GLSLDrawElementsCommand[] DrawCommands;
         private readonly BufferObject drawCommandBuffer;
 
-        private GLSLDrawArraysIndirectCommand[] vertexPullingDrawCommands;
-        private readonly BufferObject vertexPullingDrawCommandBuffer;
-
         public GLSLMesh[] Meshes;
         private readonly BufferObject meshBuffer;
 
@@ -37,9 +34,6 @@ namespace IDKEngine.Render
             DrawCommands = Array.Empty<GLSLDrawElementsCommand>();
             drawCommandBuffer = new BufferObject();
             drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
-
-            vertexPullingDrawCommands = Array.Empty<GLSLDrawArraysIndirectCommand>();
-            vertexPullingDrawCommandBuffer = new BufferObject();
 
             Meshes = Array.Empty<GLSLMesh>();
             meshBuffer = new BufferObject();
@@ -94,7 +88,6 @@ namespace IDKEngine.Render
             }
 
             drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawElementsCommand), DrawCommands);
-            vertexPullingDrawCommandBuffer.MutableAllocate(vertexPullingDrawCommands.Length * sizeof(GLSLDrawArraysIndirectCommand), vertexPullingDrawCommands);
             meshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes);
             materialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
             vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLDrawVertex), Vertices);
@@ -111,13 +104,6 @@ namespace IDKEngine.Render
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GLSLDrawElementsCommand));
         }
 
-        public unsafe void VertexPullingDraw()
-        {
-            dummyVao.Bind();
-            vertexPullingDrawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.MultiDrawArraysIndirect(PrimitiveType.Triangles, 0, Meshes.Length, sizeof(GLSLDrawArraysIndirectCommand));
-        }
-
         public void FrustumCull(in Matrix4 projView)
         {
             frustumCullingProgram.Use();
@@ -131,50 +117,19 @@ namespace IDKEngine.Render
         public unsafe void UpdateMeshBuffer(int start, int count)
         {
             if (count == 0) return;
-            fixed (void* ptr = &Meshes[start])
-            {
-                meshBuffer.SubData(start * sizeof(GLSLMesh), count * sizeof(GLSLMesh), (IntPtr)ptr);
-            }
+            meshBuffer.SubData(start * sizeof(GLSLMesh), count * sizeof(GLSLMesh), Meshes[start]);
         }
 
         public unsafe void UpdateDrawCommandBuffer(int start, int count)
         {
             if (count == 0) return;
-            fixed (void* ptr = &DrawCommands[start])
-            {
-                drawCommandBuffer.SubData(start * sizeof(GLSLDrawElementsCommand), count * sizeof(GLSLDrawElementsCommand), (IntPtr)ptr);
-            }
-
-            UpdateVertexPullingDrawCommands();
-            UpdateVertexPullingDrawCommandBuffer(start, count);
-        }
-
-        private unsafe void UpdateVertexPullingDrawCommandBuffer(int start, int count)
-        {
-            if (count == 0) return;
-            fixed (void* ptr = &vertexPullingDrawCommands[start])
-            {
-                vertexPullingDrawCommandBuffer.SubData(start * sizeof(GLSLDrawArraysIndirectCommand), count * sizeof(GLSLDrawArraysIndirectCommand), (IntPtr)ptr);
-            }
-        }
-        private void UpdateVertexPullingDrawCommands()
-        {
-            for (int i = 0; i < DrawCommands.Length; i++)
-            {
-                vertexPullingDrawCommands[i].Count = DrawCommands[i].Count;
-                vertexPullingDrawCommands[i].InstanceCount = DrawCommands[i].InstanceCount;
-                vertexPullingDrawCommands[i].First = 0;
-                vertexPullingDrawCommands[i].BaseInstance = DrawCommands[i].BaseInstance;
-            }
+            drawCommandBuffer.SubData(start * sizeof(GLSLDrawElementsCommand), count * sizeof(GLSLDrawElementsCommand), DrawCommands[start]);
         }
 
         public unsafe void UpdateMeshInstanceBuffer(int start, int count)
         {
             if (count == 0) return;
-            fixed (void* ptr = &MeshInstances[start])
-            {
-                meshInstanceBuffer.SubData(start * sizeof(GLSLMeshInstance), count * sizeof(GLSLMeshInstance), (IntPtr)ptr);
-            }
+            meshInstanceBuffer.SubData(start * sizeof(GLSLMeshInstance), count * sizeof(GLSLMeshInstance), MeshInstances[start]);
         }
 
         private void LoadDrawCommands(GLSLDrawElementsCommand[] drawCommands)
@@ -184,7 +139,6 @@ namespace IDKEngine.Render
             int prevBaseVertex = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].BaseVertex + GetMeshVertexCount(prevCmdLength - 1);
 
             Array.Resize(ref DrawCommands, prevCmdLength + drawCommands.Length);
-            Array.Resize(ref vertexPullingDrawCommands, prevCmdLength + drawCommands.Length);
 
             Array.Copy(drawCommands, 0, DrawCommands, prevCmdLength, drawCommands.Length);
 
@@ -195,8 +149,6 @@ namespace IDKEngine.Render
                 DrawCommands[prevCmdLength + i].BaseVertex += prevBaseVertex;
                 DrawCommands[prevCmdLength + i].FirstIndex += prevIndicesLength;
             }
-
-            UpdateVertexPullingDrawCommands();
         }
         private void LoadMeshes(GLSLMesh[] meshes)
         {
@@ -243,7 +195,6 @@ namespace IDKEngine.Render
         public void Dispose()
         {
             drawCommandBuffer.Dispose();
-            vertexPullingDrawCommandBuffer.Dispose();
             meshBuffer.Dispose();
             materialBuffer.Dispose();
             vertexBuffer.Dispose();

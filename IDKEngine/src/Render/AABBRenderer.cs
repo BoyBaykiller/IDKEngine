@@ -15,7 +15,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/AABBRender/fragment.glsl")));
         }
 
-        public void Render(Texture result, AABB aabb)
+        public void Render(Texture result, in AABB aabb)
         {
             Framebuffer.Bind(0);
 

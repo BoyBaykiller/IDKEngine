@@ -55,6 +55,7 @@ namespace IDKEngine.Render
             ImGui.DockSpaceOverViewport();
 
             bool tempBool;
+            int tempInt;
 
             bool shouldResetPT = false;
             ImGui.Begin("Frame Recorder");
@@ -118,7 +119,7 @@ namespace IDKEngine.Render
 
                     if (app.GetRenderMode() == RenderMode.PathTracer)
                     {
-                        int tempInt = pathTracerRenderSampleGoal;
+                        tempInt = pathTracerRenderSampleGoal;
                         if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
                         {
                             pathTracerRenderSampleGoal = Math.Max(1, tempInt);
@@ -177,7 +178,9 @@ namespace IDKEngine.Render
                         }
 
                         if (isSelected)
+                        {
                             ImGui.SetItemDefaultFocus();
+                        }
                     }
                     ImGui.EndCombo();
                 }
@@ -256,7 +259,7 @@ namespace IDKEngine.Render
                                     app.RasterizerPipeline.ConeTracer.NormalRayOffset = tempFloat;
                                 }
 
-                                int tempInt = app.RasterizerPipeline.ConeTracer.MaxSamples;
+                                tempInt = app.RasterizerPipeline.ConeTracer.MaxSamples;
                                 if (ImGui.SliderInt("MaxSamples", ref tempInt, 1, 24))
                                 {
                                     app.RasterizerPipeline.ConeTracer.MaxSamples = tempInt;
@@ -377,7 +380,7 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsVolumetricLighting", ref app.RasterizerPipeline.IsVolumetricLighting);
                         if (app.RasterizerPipeline.IsVolumetricLighting)
                         {
-                            int tempInt = app.RasterizerPipeline.VolumetricLight.Samples;
+                            tempInt = app.RasterizerPipeline.VolumetricLight.Samples;
                             if (ImGui.SliderInt("Samples##0", ref tempInt, 1, 100))
                             {
                                 app.RasterizerPipeline.VolumetricLight.Samples = tempInt;
@@ -437,7 +440,7 @@ namespace IDKEngine.Render
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
                             );
 
-                            int tempInt = app.PostProcessor.TaaSamples;
+                            tempInt = app.PostProcessor.TaaSamples;
                             if (ImGui.SliderInt("Samples##1", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
                             {
                                 app.PostProcessor.TaaSamples = Math.Min(tempInt, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
@@ -450,7 +453,7 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsSSAO", ref app.RasterizerPipeline.IsSSAO);
                         if (app.RasterizerPipeline.IsSSAO)
                         {
-                            int tempInt = app.RasterizerPipeline.SSAO.Samples;
+                            tempInt = app.RasterizerPipeline.SSAO.Samples;
                             if (ImGui.SliderInt("Samples##2", ref tempInt, 1, 50))
                             {
                                 app.RasterizerPipeline.SSAO.Samples = tempInt;
@@ -475,7 +478,7 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsSSR", ref app.RasterizerPipeline.IsSSR);
                         if (app.RasterizerPipeline.IsSSR)
                         {
-                            int tempInt = app.RasterizerPipeline.SSR.Samples;
+                            tempInt = app.RasterizerPipeline.SSR.Samples;
                             if (ImGui.SliderInt("Samples##3", ref tempInt, 1, 100))
                             {
                                 app.RasterizerPipeline.SSR.Samples = tempInt;
@@ -500,10 +503,33 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsShadows", ref app.IsShadows);
                         ImGui.SameLine();
                         InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
-
+                        
                         ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
                         ImGui.SameLine();
                         InfoMark("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
+
+                        //for (int i = 0; i < app.PointShadowManager.Count; i++)
+                        //{
+                        //    ImGui.Separator();
+
+                        //    ImGui.PushID(i);
+                            
+                        //    PointShadow pointShadow = app.PointShadowManager.PointShadows[i];
+
+                        //    tempInt = pointShadow.Result.Width;
+                        //    if (ImGui.InputInt("Resolution", ref tempInt))
+                        //    {
+                        //        pointShadow.SetSize(tempInt);
+                        //    }
+
+                        //    System.Numerics.Vector2 tempVec2 = pointShadow.ClippingPlanes.ToNumerics();
+                        //    if (ImGui.SliderFloat2($"Clipping Planes", ref tempVec2, 1.0f, 200.0f))
+                        //    {
+                        //        pointShadow.ClippingPlanes = tempVec2.ToOpenTK();
+                        //    }
+
+                        //    ImGui.PopID();
+                        //}
                     }
                 }
                 else if (app.GetRenderMode() == RenderMode.PathTracer)
@@ -524,7 +550,7 @@ namespace IDKEngine.Render
 
                         if (!app.PathTracer.IsDebugBVHTraversal)
                         {
-                            int tempInt = app.PathTracer.RayDepth;
+                            tempInt = app.PathTracer.RayDepth;
                             if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                             {
                                 app.PathTracer.RayDepth = tempInt;
@@ -562,7 +588,7 @@ namespace IDKEngine.Render
                             app.Bloom.Clamp = tempFloat;
                         }
 
-                        int tempInt = app.Bloom.MinusLods;
+                        tempInt = app.Bloom.MinusLods;
                         if (ImGui.SliderInt("MinusLods", ref tempInt, 0, 10))
                         {
                             app.Bloom.MinusLods = tempInt;
@@ -583,7 +609,7 @@ namespace IDKEngine.Render
 
                     if (!SkyBoxManager.IsExternalSkyBox)
                     {
-                        int tempInt = SkyBoxManager.AtmosphericScatterer.ISteps;
+                        tempInt = SkyBoxManager.AtmosphericScatterer.ISteps;
                         if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                         {
                             SkyBoxManager.AtmosphericScatterer.ISteps = tempInt;
@@ -629,8 +655,8 @@ namespace IDKEngine.Render
                     Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, new Vector2(0.0f));
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    GLSLLight light = new GLSLLight(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
-                    if (app.LightManager.Add(light))
+                    Light light = new Light(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
+                    if (app.LightManager.Add(light) != -1)
                     {
                         SelectedEntityType = EntityType.Light;
                         SelectedEntityIndex = app.LightManager.Count - 1;
@@ -724,11 +750,12 @@ namespace IDKEngine.Render
                 }
                 else if (SelectedEntityType == EntityType.Light)
                 {
-                    ImGui.Text("TODO: Assign shadow map to light");
+                    // Fix: The possibility of having multiple lights be assigned to a single shadow map
+                    ImGui.Text("TODO: Assign unique shadow map to light");
 
 
                     bool shouldUpdateLight = false;
-                    ref GLSLLight light = ref app.LightManager.Lights[SelectedEntityIndex];
+                    ref GLSLLight light = ref app.LightManager.Lights[SelectedEntityIndex].GLSLLight;
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
@@ -753,7 +780,7 @@ namespace IDKEngine.Render
                     if (shouldUpdateLight)
                     {
                         shouldResetPT = true;
-                        app.LightManager.UpdateLightBuffer(SelectedEntityIndex, 1);
+                        app.LightManager.UpdateLightBuffer(SelectedEntityIndex);
                     }
                 }
                 else

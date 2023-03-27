@@ -2,7 +2,6 @@
 using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -45,16 +44,7 @@ namespace IDKEngine
             {
                 if (IsShadows)
                 {
-                    for (int i = 0; i < LightManager.Count; i++)
-                    {
-                        ref readonly GLSLLight light = ref LightManager.Lights[i];
-                        if (light.HasPointShadow() && (light.Position != PointShadowManager.PointShadows[i].Position))
-                        {
-                            PointShadowManager.PointShadows[light.PointShadowIndex].Position = light.Position;
-                            PointShadowManager.UploadPointShadow(light.PointShadowIndex);
-                        }
-                    }
-                    PointShadowManager.RenderShadowMaps(ModelSystem);
+                    LightManager.RenderShadowMaps(ModelSystem);
                 }
 
                 if (RasterizerPipeline.IsDebugRenderVXGIGrid)
@@ -104,7 +94,7 @@ namespace IDKEngine
                 }
                 else
                 {
-                    GLSLLight light = LightManager.Lights[gui.SelectedEntityIndex];
+                    ref GLSLLight light = ref LightManager.Lights[gui.SelectedEntityIndex].GLSLLight;
                     aabb.Min = new Vector3(light.Position) - new Vector3(light.Radius);
                     aabb.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
@@ -206,7 +196,6 @@ namespace IDKEngine
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
-        public PointShadowManager PointShadowManager;
 
         private Gui gui;
         private BufferObject basicDataUBO;
@@ -297,9 +286,13 @@ namespace IDKEngine
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
             helmet.Meshes[0].SpecularBias = 1.0f;
 
+            //Model a = new Model(@"C:\Users\Julian\Downloads\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
+            //Model b = new Model(@"C:\Users\Julian\Downloads\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
+            //Model c = new Model(@"C:\Users\Julian\Downloads\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza, lucy, helmet });
-            
+            ModelSystem.Add(new Model[] { sponza, helmet, lucy });
+
             BVH = new BVH(ModelSystem);
 
             LightManager  = new LightManager(12, 12);
@@ -309,9 +302,15 @@ namespace IDKEngine
 
             List<GLSLLight> lights = new List<GLSLLight>();
             //LightManager.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
-            LightManager.Add(new GLSLLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f, 0));
-            LightManager.Add(new GLSLLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f, 1));
-            LightManager.Add(new GLSLLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f, 2));
+            LightManager.Add(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+            LightManager.Add(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+            LightManager.Add(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+
+            for (int j = 0; j < 3; j++)
+            {
+                PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
+                LightManager.SetPointLight(pointShadow, j);
+            }
 
             SetRenderMode(RenderMode.Rasterizer);
 
@@ -377,18 +376,10 @@ namespace IDKEngine
 
         public void SetRenderMode(RenderMode renderMode)
         {
-            if (PointShadowManager != null) { PointShadowManager.Dispose(); PointShadowManager = null; }
             if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
             if (renderMode == RenderMode.Rasterizer)
             {
                 RasterizerPipeline = new RasterPipeline(ViewportResolution.X, ViewportResolution.Y);
-
-                PointShadowManager = new PointShadowManager();
-                for (int j = 0; j < 3; j++)
-                {
-                    PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
-                    PointShadowManager.Add(pointShadow);
-                }
             }
 
             if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
