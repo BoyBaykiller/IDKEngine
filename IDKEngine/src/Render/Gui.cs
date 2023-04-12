@@ -4,6 +4,7 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
+using System.Diagnostics;
 
 namespace IDKEngine.Render
 {
@@ -44,6 +45,7 @@ namespace IDKEngine.Render
             isInfiniteReplay = false;
             pathTracerRenderSampleGoal = 1;
             recordingFPS = 48;
+            recordingTimer = Stopwatch.StartNew();
 
             Directory.CreateDirectory(FRAME_OUTPUT_DIR);
         }
@@ -200,7 +202,7 @@ namespace IDKEngine.Render
 
                         if (app.RasterizerPipeline.IsVXGI)
                         {
-                            ImGui.Checkbox("IsDebugRenderGrid", ref app.RasterizerPipeline.IsDebugRenderVXGIGrid);
+                            ImGui.Checkbox("IsConfigureGrid", ref app.RasterizerPipeline.IsConfigureGrid);
 
                             string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
                             current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
@@ -224,7 +226,7 @@ namespace IDKEngine.Render
                                 ImGui.EndCombo();
                             }
 
-                            if (app.RasterizerPipeline.IsDebugRenderVXGIGrid)
+                            if (app.RasterizerPipeline.IsConfigureGrid)
                             {
                                 System.Numerics.Vector3 tempSysVec3 = app.RasterizerPipeline.Voxelizer.GridMin.ToNumerics();
                                 if (ImGui.DragFloat3("Grid Min", ref tempSysVec3, 0.1f))
@@ -846,7 +848,7 @@ namespace IDKEngine.Render
             ImGui.Text(text);
         }
 
-        private long lastMilliseconds = 0;
+        private readonly Stopwatch recordingTimer;
         private bool takeScreenshotNextFrame = false;
         public unsafe void Update(Application app, float dT)
         {
@@ -915,8 +917,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            long nowMilliseconds = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-            if (frameRecState == FrameRecorderState.Recording && (nowMilliseconds - lastMilliseconds) >= (1.0f / recordingFPS))
+            if (frameRecState == FrameRecorderState.Recording && recordingTimer.Elapsed.TotalMilliseconds >= (1000.0f / recordingFPS))
             {
                 RecordableState recordableState;
                 recordableState.CamPosition = app.Camera.Position;
@@ -924,7 +925,7 @@ namespace IDKEngine.Render
                 recordableState.LookX = app.Camera.LookX;
                 recordableState.LookY = app.Camera.LookY;
                 app.FrameRecorder.Record(recordableState);
-                lastMilliseconds = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                recordingTimer.Restart();
             }
 
             if (frameRecState != FrameRecorderState.Replaying && app.KeyboardState[Keys.R] == InputState.Touched)

@@ -53,8 +53,12 @@ namespace IDKEngine
                     Helper.InterlockedMax(ref maxTreeDepth, treeDepth);
                 }
                 for (int j = 0; j < Blases[i].Nodes.Length; j++)
+                {
                     if (Blases[i].Nodes[j].TriCount > 0)
+                    {
                         Blases[i].Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
+                    }
+                }
             });
             MaxBlasTreeDepth = maxTreeDepth;
 

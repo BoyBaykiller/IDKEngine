@@ -30,20 +30,20 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec3 color = texture(Sampler0, uv).rgb;
-    color += texture(Sampler1, uv).rgb;
+    vec3 hdrColor = texture(Sampler0, uv).rgb;
+    hdrColor += texture(Sampler1, uv).rgb;
 
-    color = ACESFilm(color);
-    color = LinearToSrgb(color, Gamma);
+    vec3 ldrColor = ACESFilm(hdrColor);
+    vec3 srgbColor = LinearToSrgb(ldrColor, Gamma);
 
     if (IsDithering)
     {
         int x = int(imgCoord.x) % BayerMatrix8.length();
         int y = int(imgCoord.y) % BayerMatrix8.length();
-        color += (BayerMatrix8[x][y] - 0.5) * 0.015625;
+        srgbColor += (BayerMatrix8[x][y] - 0.5) * 0.015625;
     }
 
-    imageStore(ImgResult, imgCoord, vec4(color, 1.0));
+    imageStore(ImgResult, imgCoord, vec4(srgbColor, 1.0));
 }
 
 vec3 LinearToSrgb(vec3 rgb, float gamma)

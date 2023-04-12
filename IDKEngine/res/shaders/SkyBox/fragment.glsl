@@ -31,7 +31,7 @@ in InOutVars
 
 void main()
 {
-    FragColor = texture(skyBoxUBO.Albedo, inData.TexCoord);
+    FragColor = textureLod(skyBoxUBO.Albedo, inData.TexCoord, 0.0);
     
     AlbedoAlpha = vec4(0.0);
     NormalSpecular = vec4(0.0);

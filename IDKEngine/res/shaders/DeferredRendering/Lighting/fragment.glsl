@@ -90,16 +90,16 @@ void main()
     ivec2 imgCoord = ivec2(gl_FragCoord.xy);
     vec2 uv = inData.TexCoord;
     
-    float depth = texture(gBufferDataUBO.Depth, uv).r;
+    float depth = textureLod(gBufferDataUBO.Depth, uv, 0.0).r;
     if (depth == 1.0)
     {
         FragColor = vec4(0.0);
         return;
     }
 
-    vec4 albedoAlpha = texture(gBufferDataUBO.AlbedoAlpha, uv);
-    vec4 normalSpecular = texture(gBufferDataUBO.NormalSpecular, uv);
-    vec4 emissiveRoughness = texture(gBufferDataUBO.EmissiveRoughness, uv);
+    vec4 albedoAlpha = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0);
+    vec4 normalSpecular = textureLod(gBufferDataUBO.NormalSpecular, uv, 0.0);
+    vec4 emissiveRoughness = textureLod(gBufferDataUBO.EmissiveRoughness, uv, 0.0);
 
     vec3 ndc = vec3(uv, depth) * 2.0 - 1.0;
     vec3 fragPos = NDCToWorld(ndc);

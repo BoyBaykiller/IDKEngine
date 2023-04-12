@@ -25,7 +25,7 @@ namespace IDKEngine.Render
         public bool IsSSR;
         public bool IsVolumetricLighting;
         public bool IsVariableRateShading;
-        public bool IsDebugRenderVXGIGrid;
+        public bool IsConfigureGrid;
 
         public readonly SSAO SSAO;
         public readonly SSR SSR;
@@ -108,7 +108,7 @@ namespace IDKEngine.Render
                 Voxelizer.ResultVoxelsAlbedo.BindToUnit(1);
             }
 
-            if (IsDebugRenderVXGIGrid)
+            if (IsConfigureGrid)
             {
                 Voxelizer.DebugRender(Result);
             }
@@ -243,31 +243,31 @@ namespace IDKEngine.Render
             albedoAlphaTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             albedoAlphaTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             albedoAlphaTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
-            glslGBufferData.AlbedoAlpha = albedoAlphaTexture.MakeTextureHandleARB();
+            glslGBufferData.AlbedoAlpha = albedoAlphaTexture.GetTextureHandleARB();
 
             normalSpecularTexture = new Texture(TextureTarget2d.Texture2D);
             normalSpecularTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             normalSpecularTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             normalSpecularTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8Snorm);
-            glslGBufferData.NormalSpecular = normalSpecularTexture.MakeTextureHandleARB();
+            glslGBufferData.NormalSpecular = normalSpecularTexture.GetTextureHandleARB();
 
             emissiveRoughnessTexture = new Texture(TextureTarget2d.Texture2D);
             emissiveRoughnessTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             emissiveRoughnessTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             emissiveRoughnessTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
-            glslGBufferData.EmissiveRoughness = emissiveRoughnessTexture.MakeTextureHandleARB();
+            glslGBufferData.EmissiveRoughness = emissiveRoughnessTexture.GetTextureHandleARB();
 
             velocityTexture = new Texture(TextureTarget2d.Texture2D);
             velocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             velocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             velocityTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rg16f);
-            glslGBufferData.Velocity = velocityTexture.MakeTextureHandleARB();
+            glslGBufferData.Velocity = velocityTexture.GetTextureHandleARB();
 
             depthTexture = new Texture(TextureTarget2d.Texture2D);
             depthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             depthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             depthTexture.ImmutableAllocate(width, height, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent24);
-            glslGBufferData.Depth = depthTexture.MakeTextureHandleARB();
+            glslGBufferData.Depth = depthTexture.GetTextureHandleARB();
 
             gBufferData.SubData(0, sizeof(GLSLGBufferData), glslGBufferData);
 

@@ -147,8 +147,8 @@ namespace IDKEngine.Render
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
 
-            glslPointShadow.Texture = Result.MakeTextureHandleARB();
-            glslPointShadow.ShadowTexture = Result.MakeTextureSamplerHandleARB(shadowSampler);
+            glslPointShadow.Texture = Result.GetTextureHandleARB();
+            glslPointShadow.ShadowTexture = Result.GetTextureSamplerHandleARB(shadowSampler);
 
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
             framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);

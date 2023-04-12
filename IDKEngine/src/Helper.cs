@@ -46,11 +46,18 @@ namespace IDKEngine
             return Unsafe.As<Matrix4x4, Matrix4>(ref matrix4x4);
         }
 
+        public static Vector4 ToOpenTK(this Color4D vector4)
+        {
+            return Unsafe.As<Color4D, Vector4>(ref vector4);
+        }
+
         private static HashSet<string> GetExtensions()
         {
             HashSet<string> extensions = new HashSet<string>(GL.GetInteger(GetPName.NumExtensions));
             for (int i = 0; i < GL.GetInteger(GetPName.NumExtensions); i++)
+            {
                 extensions.Add(GL.GetString(StringNameIndexed.Extensions, i));
+            }
 
             return extensions;
         }
@@ -62,7 +69,6 @@ namespace IDKEngine
         {
             return glExtensions.Contains(extension);
         }
-
         public static bool IsCoreExtensionAvailable(string extension, double first)
         {
             return (APIVersion >= first) || IsExtensionsAvailable(extension);
@@ -71,24 +77,48 @@ namespace IDKEngine
         public static DebugProc DebugCallback = Debug;
         private static void Debug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
         {
-            // Filter shader compile error and "... will use bla bla ..."
-            if (id != 2000 && id != 131185)
+            string text = Marshal.PtrToStringAnsi(message, length - 1);
+            switch (severity)
             {
-                Console.WriteLine($"\nType: {type},\nSeverity: {severity},\nMessage: {Marshal.PtrToStringAnsi(message, length)}");
-                Console.WriteLine();
+                case DebugSeverity.DebugSeverityLow:
+                    Logger.Log(Logger.LogLevel.Info, text);
+                    break;
+
+                case DebugSeverity.DebugSeverityMedium:
+                    Logger.Log(Logger.LogLevel.Warn, text);
+                    break;
+
+                case DebugSeverity.DebugSeverityHigh:
+                    if (id == 2000) return; // Shader compile error, AMD
+
+                    Logger.Log(Logger.LogLevel.Error, text);
+                    break;
+
+                default:
+                    if (id == 131185) return; // Buffer detailed info, NVIDIA
+
+                    Logger.Log(Logger.LogLevel.Info, text);
+                    break;
             }
         }
 
         public static unsafe void ParallelLoadCubemap(Texture texture, string[] paths, SizedInternalFormat sizedInternalFormat)
         {
             if (texture.Target != TextureTarget.TextureCubeMap)
-                throw new ArgumentException($"texture must be {TextureTarget.TextureCubeMap}");
-
+            {
+                Logger.Log(Logger.LogLevel.Error, $"Texture must be of type {TextureTarget.TextureCubeMap}");
+                return;
+            }
             if (paths.Length != 6)
-                throw new ArgumentException($"Number of images must be equal to six");
-
+            {
+                Logger.Log(Logger.LogLevel.Error, "Number of cubemap images must be equal to six");
+                return;
+            }
             if (!paths.All(p => File.Exists(p)))
-                throw new FileNotFoundException($"At least on of the specified paths is invalid");
+            {
+                Logger.Log(Logger.LogLevel.Error, "At least one of the specified cubemap image paths is not found");
+                return;
+            }
 
             ImageResult[] images = new ImageResult[6];
             Parallel.For(0, images.Length, i =>
@@ -98,7 +128,10 @@ namespace IDKEngine
             });
             
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
-                throw new ArgumentException($"Cubemap images must be squares and every texture must be of the same size");
+            {
+                Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and every texture must be of the same size");
+                return;
+            }
             int size = images[0].Width;
 
             const bool AMD_DRIVER_BAD = true; // since 22.7.1, fixed in 23.2.2
@@ -142,58 +175,14 @@ namespace IDKEngine
             System.Buffer.MemoryCopy(src, dest, long.MaxValue, len);
         }
 
-        // Source: https://www.shadertoy.com/view/llfcRl
-        public static uint CompressSNorm32Good(Vector3 data)
-        {
-            static Vector2 Sign(Vector2 v)
-            {
-                return new Vector2((v.X >= 0.0f) ? 1.0f : -1.0f, (v.Y >= 0.0f) ? 1.0f : -1.0f);
-            }
-
-            data.Xy /= (MathF.Abs(data.X) + MathF.Abs(data.Y) + MathF.Abs(data.Z));
-            data.Xy = (data.Z >= 0.0) ? data.Xy : (new Vector2(1.0f) - new Vector2(MathF.Abs(data.Y), MathF.Abs(data.X))) * Sign(data.Xy);
-
-            uint x = (uint)MathF.Round(32767.5f + data.X * 32767.5f);
-            uint y = (uint)MathF.Round(32767.5f + data.Y * 32767.5f);
-            return x | (y << 16);
-        }
-        public static Vector3 DecompressSNorm32Good(uint data)
-        {
-            uint x = data & 65535u;
-            uint y = (data >> 16) & 65535u;
-            Vector2 v = new Vector2(x / 32767.5f - 1.0f, y / 32767.5f - 1.0f);
-
-            Vector3 normal = new Vector3(v.X, v.Y, 1.0f - MathF.Abs(v.X) - MathF.Abs(v.Y)); // Rune Stubbe's version,
-            float t = MathF.Max(-normal.Z, 0.0f);                                           // much faster than original
-            normal.X += (normal.X > 0.0f) ? -t : t;                                         // implementation of this
-            normal.Y += (normal.Y > 0.0f) ? -t : t;                                         // technique
-
-            return Vector3.Normalize(normal);
-        }
-
         public static uint CompressSNorm32Fast(Vector3 data)
         {
             data = data * 0.5f + new Vector3(0.5f);
-
-            uint r = (uint)MathF.Round(data.X * ((1u << 11) - 1));
-            uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
-            uint b = (uint)MathF.Round(data.Z * ((1u << 10) - 1));
-
-            uint packed = (r << 0) | (g << 11) | (b << 22);
-
-            return packed;
+            return CompressUNorm32Fast(data);
         }
         public static Vector3 DecompressSNorm32Fast(uint data)
         {
-            float r = (data >> 0) & ((1u << 11) - 1);
-            float g = (data >> 11) & ((1u << 11) - 1);
-            float b = (data >> 22) & ((1u << 10) - 1);
-
-            r *= (1.0f / ((1u << 11) - 1));
-            g *= (1.0f / ((1u << 11) - 1));
-            b *= (1.0f / ((1u << 10) - 1));
-
-            return new Vector3(r, g, b) * 2.0f - new Vector3(1.0f);
+            return DecompressUNorm32Fast(data) * 2.0f - new Vector3(1.0f);
         }
 
         public static uint CompressUNorm32Fast(Vector3 data)

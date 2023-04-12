@@ -1,25 +1,25 @@
 # IDKEngine
 
 Feature list:
- - HDR + Gamma correction
- - ImGui
- - Multithreaded model loader
- - (Copied) Atmospheric Scattering, ported to Compute Shader and precomputed
- - Shadow Samplers for hardware filtering + PCF
- - Recording and loading camera movment with user interface
- - Screen Space Reflections
- - Screen Space Ambient Occlusion
- - Single pass Vertex Layered Rendering for point shadows
- - GPU accelerated Frustum Culling for shadows and camera
- - Ray marched Volumetric Lighting
- - Variable Rate Shading
+ - Wavefront Path Tracer
+ - Real-Time Voxel Global Illumination
+ - Multi Draw Indirect & Bindless Textures + other extensions
  - Temporal Anti Aliasing
  - CoD-Modern-Warfare Bloom
- - Multi Draw Indirect + Bindless Texture system that draws every loaded model in one draw call
- - Real-Time Voxel Global Illumination
- - Wavefront Path Tracer
+ - Variable Rate Shading
+ - Ray marched Volumetric Lighting
+ - GPU accelerated Frustum Culling for shadows and camera
+ - Screen Space Reflections
+ - Screen Space Ambient Occlusion
+ - Atmospheric Scattering
+ - Recording Video
 
 Required OpenGL: 4.6 + `ARB_bindless_texture`
+
+Known Issues:
+
+- VXGI (voxelization) doesn't work due to AMD driver bug since version 22.7.1
+- Path Tracer BVH traversal missing geometry on GTX 1660 Super (likely affects whole architecture)
 
 # Controls
 | Key         | Action               | 

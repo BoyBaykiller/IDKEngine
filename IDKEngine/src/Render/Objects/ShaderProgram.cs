@@ -23,7 +23,7 @@ namespace IDKEngine.Render.Objects
             string infoLog = GL.GetShaderInfoLog(ID);
             if (infoLog != string.Empty)
             {
-                Console.WriteLine(infoLog);
+                Logger.Log(Logger.LogLevel.Warn, infoLog);
             }
         }
 
@@ -53,12 +53,7 @@ namespace IDKEngine.Render.Objects
                 GL.AttachShader(ID, shaders[i].ID);
 
             GL.LinkProgram(ID);
-            string infoLog = GL.GetProgramInfoLog(ID);
-            if (infoLog != string.Empty)
-            {
-                Console.WriteLine(infoLog);
-            }
-
+            
             for (int i = 0; i < shaders.Length; i++)
             {
                 GL.DetachShader(ID, shaders[i].ID);

@@ -1,17 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace IDKEngine
 {
-    // TODO: Implement
     static class Logger
     {
-        public enum Type
+        public enum LogLevel
         {
             Info = 0,
             Warn = 1,
@@ -20,32 +14,38 @@ namespace IDKEngine
         }
 
         private const string PATH = "log.txt";
-        private const string DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss.fff";
+        private const string DATE_TIME_FORMAT = "HH:mm:ss.f";
         private static StreamWriter outText;
 
         private static bool lazyLoaded = false;
-        public static void Log(Type type, string text)
+        public static void Log(LogLevel level, string text)
         {
-            if (!lazyLoaded && !File.Exists(PATH))
+            if (!lazyLoaded)
             {
                 outText = new StreamWriter(File.Create(PATH));
-
                 lazyLoaded = true;
             }
 
-            string preText;
-            switch (type)
+            string preText = $"{DateTime.Now.ToString(DATE_TIME_FORMAT)} [{level.ToString().ToUpper()}] ";
+            text = Indent(text, preText.Length);
+            string formated = $"{preText}{text}";
+            
+            Console.WriteLine(formated);
+            outText.WriteLine(formated);
+            outText.Flush();
+        }
+
+        private static string Indent(string text, int spaces)
+        {
+            for (int i = 0; i < text.Length; i++)
             {
-                case Type.Info:
-                    preText = $"{DateTime.Now.ToString(DATE_TIME_FORMAT)} [DEBUG]  {text}";
-                    break;
-
-                case Type.Warn:
-                    break;
-
-                case Type.Error:
-                    break;
+                if (text[i] == '\n')
+                {
+                    text = text.Insert(i + 1, new string(' ', spaces));
+                    i += spaces;
+                }
             }
+            return text;
         }
     }
 }

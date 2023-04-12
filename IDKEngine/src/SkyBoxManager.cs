@@ -49,7 +49,7 @@ namespace IDKEngine
                 // Fixed since 22.7.1
                 /// Info: https://stackoverflow.com/questions/68735879/opengl-using-bindless-textures-on-sampler2d-disables-texturecubemapseamless
                 SkyBoxTexture.EnableSeamlessCubemapARB_AMD(true);
-                skyBoxTextureUBO.SubData(0, sizeof(ulong), SkyBoxTexture.MakeTextureHandleARB());
+                skyBoxTextureUBO.SubData(0, sizeof(ulong), SkyBoxTexture.GetTextureHandleARB());
             }
         }
 

@@ -4,9 +4,6 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine
 {
-    /// <summary>
-    /// Represents window with OpenGL context and helpul functionality
-    /// </summary>
     abstract unsafe class GameWindowBase : IDisposable
     {
         private string _title;
@@ -111,11 +108,8 @@ namespace IDKEngine
                 GLFW.Init();
                 glfwInitialized = true;
             }
-#if DEBUG
+
             GLFW.WindowHint(WindowHintBool.OpenGLDebugContext, true);
-#else
-            GLFW.WindowHint(WindowHintBool.ContextNoError, true);
-#endif
             GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Compat);
             GLFW.WindowHint(WindowHintInt.ContextVersionMajor, openglMajor);
             GLFW.WindowHint(WindowHintInt.ContextVersionMinor, openglMinor);
@@ -125,14 +119,14 @@ namespace IDKEngine
             _size.Y = height;
 
             window = GLFW.CreateWindow(_size.X, _size.Y, _title, null, null);
-            GLFW.SwapBuffers(window);
-
             if (window == null)
             {
-                Console.WriteLine($"Window creation failed. Make sure you have support for OpenGL {openglMajor}.{openglMinor}. Press Enter to exit");
+                Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed. Make sure you have support for OpenGL {openglMajor}.{openglMinor}. Press Enter to exit");
                 Console.ReadLine();
                 Environment.Exit(1);
             }
+
+            GLFW.SwapBuffers(window);
 
             framebufferSizeDelegate = FramebufferSizeCallback;
             GLFW.SetFramebufferSizeCallback(window, framebufferSizeDelegate);

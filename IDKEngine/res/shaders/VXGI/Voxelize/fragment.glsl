@@ -18,10 +18,12 @@ layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
 
 struct Material
 {
+    vec4 BaseColorFactor;
+
     sampler2D AlbedoAlpha;
+    sampler2D MetallicRoughness;
+
     sampler2D Normal;
-    sampler2D Roughness;
-    sampler2D Specular;
     sampler2D Emissive;
 };
 
@@ -92,7 +94,7 @@ void main()
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
 
     Material material = materialSSBO.Materials[inData.MaterialIndex];
-    vec4 albedoAlpha = texture(material.AlbedoAlpha, inData.TexCoord);
+    vec4 albedoAlpha = texture(material.AlbedoAlpha, inData.TexCoord)  * material.BaseColorFactor;
     vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedoAlpha.rgb;
 
     vec3 directLighting = vec3(0.0);
