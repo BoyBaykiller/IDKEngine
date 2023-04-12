@@ -1,5 +1,4 @@
-﻿#define USE_SAH
-using System;
+﻿using System;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
@@ -9,9 +8,7 @@ namespace IDKEngine
     class BLAS
     {
         public const int MIN_TRIANGLES_PER_LEAF_COUNT = 2;
-#if USE_SAH
         public const int SAH_SAMPLES = 8;
-#endif
 
         public readonly GLSLBlasNode[] Nodes;
 
@@ -23,28 +20,27 @@ namespace IDKEngine
             Nodes = new GLSLBlasNode[2 * count];
             ref GLSLBlasNode root = ref Nodes[nodesUsed++];
             root.TriCount = (uint)count;
-
             UpdateNodeBounds(ref root);
-            Subdivide();
 
-            void Subdivide(int nodeID = 0)
+            Subdivide(ref root);
+
+            // Artificially create child node and copy root node into it.
+            // This is done because BVH traversal skips root node under the assumation there will always be at least one child
+            if (nodesUsed == 1)
             {
-                ref GLSLBlasNode parentNode = ref Nodes[nodeID];
+                Nodes[nodesUsed++] = root;
+                return;
+            }
+
+            void Subdivide(ref GLSLBlasNode parentNode)
+            {
                 if (parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
                     return;
-#if USE_SAH
-                float splitSAH = FindBestSplitAxis(ref parentNode, out int splitAxis, out float splitPos);
+
+                float splitSAH = FindBestSplitAxis(parentNode, out int splitAxis, out float splitPos);
                 float parentSAH = CalculateSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
                 if (splitSAH >= parentSAH)
                     return;
-#else
-                Vector3 extent = parentNode.Max - parentNode.Min;
-                int splitAxis = 0;
-                if (extent.Y > extent.X) splitAxis = 1;
-                if (extent.Z > extent[splitAxis]) splitAxis = 2;
-
-                float splitPos = parentNode.Min[splitAxis] + extent[splitAxis] * 0.5f;
-#endif
 
                 uint start = parentNode.TriStartOrLeftChild;
                 uint end = start + parentNode.TriCount;
@@ -62,11 +58,13 @@ namespace IDKEngine
                 int leftChildID = nodesUsed++;
                 int rightChildID = nodesUsed++;
 
-                Nodes[leftChildID].TriStartOrLeftChild = start;
-                Nodes[leftChildID].TriCount = mid - start;
+                ref GLSLBlasNode leftChild = ref Nodes[leftChildID];
+                leftChild.TriStartOrLeftChild = start;
+                leftChild.TriCount = mid - start;
 
-                Nodes[rightChildID].TriStartOrLeftChild = mid;
-                Nodes[rightChildID].TriCount = end - mid;
+                ref GLSLBlasNode rightChild = ref Nodes[rightChildID];
+                rightChild.TriStartOrLeftChild = mid;
+                rightChild.TriCount = end - mid;
 
                 parentNode.TriStartOrLeftChild = (uint)leftChildID;
                 parentNode.TriCount = 0;
@@ -74,12 +72,11 @@ namespace IDKEngine
                 UpdateNodeBounds(ref Nodes[leftChildID]);
                 UpdateNodeBounds(ref Nodes[rightChildID]);
 
-                Subdivide(leftChildID);
-                Subdivide(rightChildID);
+                Subdivide(ref leftChild);
+                Subdivide(ref rightChild);
             }
 
-#if USE_SAH
-            float FindBestSplitAxis(ref GLSLBlasNode node, out int splitAxis, out float splitPos)
+            float FindBestSplitAxis(in GLSLBlasNode node, out int splitAxis, out float splitPos)
             {
                 splitAxis = -1;
                 splitPos = 0;
@@ -140,7 +137,6 @@ namespace IDKEngine
                 float sah = CalculateSAH(leftBox.Area(), leftCount, rightBox.Area(), rightCount);
                 return sah;
             }
-#endif
 
             void UpdateNodeBounds(ref GLSLBlasNode node)
             {

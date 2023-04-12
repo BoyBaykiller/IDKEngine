@@ -228,7 +228,7 @@ namespace IDKEngine.Render.Objects
 
         public static int GetMaxMipmapLevel(int width, int height, int depth)
         {
-            return MathF.ILogB(Math.Max(width, Math.Max(height, depth)));
+            return MathF.ILogB(Math.Max(width, Math.Max(height, depth))) + 1;
         }
 
         public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)
@@ -265,7 +265,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong MakeTextureHandleARB()
+        public ulong GetTextureHandleARB()
         {
             ulong textureHandle = (ulong)GL.Arb.GetTextureHandle(ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
@@ -276,7 +276,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong MakeTextureSamplerHandleARB(SamplerObject samplerObject)
+        public ulong GetTextureSamplerHandleARB(SamplerObject samplerObject)
         {
             ulong textureHandle = (ulong)GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
@@ -296,7 +296,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong MakeImageHandleARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
+        public ulong GetImageHandleARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
         {
             ulong imageHandle = (ulong)GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
             GL.Arb.MakeImageHandleResident(imageHandle, (All)textureAccess);

@@ -62,7 +62,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
-vec3 SpectralJet(float w);
+vec3 SpectralJet(float a);
 
 uniform bool IsDebugBVHTraversal;
 
@@ -91,8 +91,8 @@ void main()
     if (IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
-        float waveLength = min(transportRay.PrevIOROrDebugNodeCounter * 2.0 + 400.0, 700.0);
-        vec3 col = SpectralJet(waveLength);
+        float a = min(transportRay.PrevIOROrDebugNodeCounter / 300.0, 1.0);
+        vec3 col = SpectralJet(a);
         irradiance = col;
     }
 
@@ -102,19 +102,17 @@ void main()
 }
 
 // Source: https://www.shadertoy.com/view/ls2Bz1
-vec3 SpectralJet(float w)
+vec3 SpectralJet(float a)
 {
-	float x = clamp((w - 400.0) / 300.0, 0.0, 1.0);
 	vec3 c;
-
-	if (x < 0.25)
-		c = vec3(0.0, 4.0 * x, 1.0);
-	else if (x < 0.5)
-		c = vec3(0.0, 1.0, 1.0 + 4.0 * (0.25 - x));
-	else if (x < 0.75)
-		c = vec3(4.0 * (x - 0.5), 1.0, 0.0);
+	if (a < 0.25)
+		c = vec3(0.0, 4.0 * a, 1.0);
+	else if (a < 0.5)
+		c = vec3(0.0, 1.0, 1.0 + 4.0 * (0.25 - a));
+	else if (a < 0.75)
+		c = vec3(4.0 * (a - 0.5), 1.0, 0.0);
 	else
-		c = vec3(1.0, 1.0 + 4.0 * (0.75 - x), 0.0);
+		c = vec3(1.0, 1.0 + 4.0 * (0.75 - a), 0.0);
 
 	return clamp(c, vec3(0.0), vec3(1.0));
 }

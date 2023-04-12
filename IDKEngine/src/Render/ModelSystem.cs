@@ -3,6 +3,7 @@ using System.IO;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
+using static IDKEngine.Model;
 
 namespace IDKEngine.Render
 {
@@ -27,7 +28,6 @@ namespace IDKEngine.Render
         private readonly BufferObject meshInstanceBuffer;
 
         private readonly VAO vao;
-        private readonly VAO dummyVao;
         private readonly ShaderProgram frustumCullingProgram;
         public unsafe ModelSystem()
         {
@@ -62,8 +62,6 @@ namespace IDKEngine.Render
             vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
             vao.SetAttribFormatI(0, 2, 1, VertexAttribType.UnsignedInt, sizeof(float) * 6); // Tangent
             vao.SetAttribFormatI(0, 3, 1, VertexAttribType.UnsignedInt, sizeof(float) * 7); // Normal
-
-            dummyVao = new VAO();
 
             frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/compute.glsl")));
         }

@@ -122,7 +122,6 @@ namespace IDKEngine.Render
             Light light = Lights[lightIndex];
             if (light.HasPointShadow())
             {
-                Console.WriteLine("");
                 return;
             }
             int pointShadowIndex = pointShadowManager.Add(pointShadow);

@@ -22,10 +22,12 @@ layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z
 
 struct Material
 {
-    HF_SAMPLER_2D Albedo;
+    vec4 BaseColorFactor;
+
+    HF_SAMPLER_2D AlbedoAlpha;
+    HF_SAMPLER_2D MetallicRoughness;
+
     HF_SAMPLER_2D Normal;
-    HF_SAMPLER_2D Roughness;
-    HF_SAMPLER_2D Specular;
     HF_SAMPLER_2D Emissive;
 };
 
@@ -149,7 +151,7 @@ layout(std430, binding = 3) restrict readonly buffer TriangleSSBO
     Triangle Triangles[];
 } triangleSSBO;
 
-layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+layout(std430, binding = 4) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
@@ -299,12 +301,12 @@ bool TraceRay(inout TransportRay transportRay)
             // Can't use GL_EXT_nonuniform_qualifier because only modern amd drivers get the implementation right without compile errors
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
 
-            vec4 albedoAlpha = texture(material.Albedo, texCoord);
+            vec4 albedoAlpha = texture(material.AlbedoAlpha, texCoord) * material.BaseColorFactor;
             albedo = albedoAlpha.rgb;
             refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
             emissive = (texture(material.Emissive, texCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + mesh.EmissiveBias) * albedo;
-            specularChance = clamp(texture(material.Specular, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
-            roughness = clamp(texture(material.Roughness, texCoord).r + mesh.RoughnessBias, 0.0, 1.0);
+            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+            roughness = clamp(texture(material.MetallicRoughness, texCoord).g + mesh.RoughnessBias, 0.0, 1.0);
             normal = texture(material.Normal, texCoord).rgb;
             normal = TBN * normalize(normal * 2.0 - 1.0);
             mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
@@ -330,7 +332,7 @@ bool TraceRay(inout TransportRay transportRay)
         float rayProbability, newIor;
         transportRay.Direction = BSDF(transportRay.Direction, specularChance, roughness, refractionChance, ior, transportRay.PrevIOROrDebugNodeCounter, normal, rayProbability, newIor, transportRay.IsRefractive, fromInside);
         transportRay.Origin += transportRay.Direction * EPSILON;
-        transportRay.PrevIOROrDebugNodeCounter = newIor; // ior of the object we are currently in
+        transportRay.PrevIOROrDebugNodeCounter = newIor;
 
         if (fromInside)
         {
@@ -365,14 +367,18 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
     float cosTheta = dot(-incomming, normal);
     fromInside = cosTheta < 0.0;
     if (fromInside)
+    {
         normal *= -1.0;
+        cosTheta = dot(-incomming, normal);
+    }
 
     isRefractive = false;
     if (specularChance > 0.0) // adjust specular chance based on view angle
     {
-        specularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, fromInside ? ior : prevIor, fromInside ? prevIor : ior));
-        float diffuseChance = 1.0 - specularChance - refractionChance;
-        refractionChance = 1.0 - specularChance - diffuseChance;
+        float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, prevIor, ior));
+        float chanceMultiplier = (1.0 - newSpecularChance) / (1.0 - specularChance);
+        refractionChance *= chanceMultiplier;
+        specularChance = newSpecularChance;
     }
 
     float rnd = GetRandomFloat01();
@@ -384,31 +390,35 @@ vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractio
         reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, roughness));
         outgoing = reflectionRayDir;
         rayProbability = specularChance;
-        newIor = fromInside ? ior : 1.0;
+        newIor = prevIor;
     }
     else if (specularChance + refractionChance > rnd)
     {
-        vec3 refractionRayDir = refract(incomming, normal, fromInside ? (ior / prevIor) : (prevIor / ior));
+        if (fromInside)
+        {
+            // we don't actually know wheter the next mesh we hit has ior 1.0
+            newIor = 1.0;
+        }
+        else
+        {
+            newIor = ior;
+        }
+        vec3 refractionRayDir = refract(incomming, normal, prevIor / newIor);
         isRefractive = refractionRayDir != vec3(0.0);
         if (!isRefractive) // Total Internal Reflection
         {
             refractionRayDir = reflect(incomming, normal);
-            refractionRayDir = normalize(mix(refractionRayDir, diffuseRayDir, roughness));
+            newIor = prevIor;
         }
         refractionRayDir = normalize(mix(refractionRayDir, isRefractive ? -diffuseRayDir : diffuseRayDir, roughness));
         outgoing = refractionRayDir;
         rayProbability = refractionChance;
-
-        if (fromInside)
-            newIor = isRefractive ? 1.0 : ior;
-        else
-            newIor = ior;
     }
     else
     {
         outgoing = diffuseRayDir;
         rayProbability = 1.0 - specularChance - refractionChance;
-        newIor = fromInside ? ior : 1.0;
+        newIor = prevIor;
     }
     rayProbability = max(rayProbability, EPSILON);
 
@@ -419,16 +429,6 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
 {
     float r0 = (n1 - n2) / (n1 + n2);
     r0 *= r0;
-
-    if (n1 > n2)
-    {
-        float n = n1 / n2;
-        float sinT2 = n * n * (1.0 - cosTheta * cosTheta);
-
-        if (sinT2 > 1.0)
-            return 1.0;
-        cosTheta = sqrt(1.0 - sinT2);
-    }
 
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }

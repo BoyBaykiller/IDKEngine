@@ -75,7 +75,7 @@ layout(std430, binding = 2) restrict writeonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 4) restrict readonly buffer MatrixSSBO
+layout(std430, binding = 4) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;

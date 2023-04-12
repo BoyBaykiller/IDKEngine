@@ -60,7 +60,7 @@ namespace IDKEngine
         {
             if (FrameCount == 0)
             {
-                Console.WriteLine("Error: Can't replay state. Nothing is loaded");
+                Logger.Log(Logger.LogLevel.Warn, "Can not replay anything, because there is no frame data loaded");
                 return new T();
             }
             return recordedFrames[ReplayFrameIndex++];
@@ -74,27 +74,31 @@ namespace IDKEngine
 
         public unsafe void Load(string path)
         {
-            try
+            if (!File.Exists(path))
             {
-                using FileStream fileStream = File.OpenRead(path);
-                if (fileStream.Length == 0 && fileStream.Length % sizeof(T) != 0)
-                {
-                    Console.WriteLine($"Error when loading {Path.GetFileName(path)}. File is expected to have a size multiple of {sizeof(T)}");
-                    return;
-                }
-                recordedFrames = new T[fileStream.Length / sizeof(T)];
-                fixed (void* ptr = recordedFrames)
-                {
-                    Span<byte> data = new Span<byte>(ptr, recordedFrames.Length * sizeof(T));
-                    fileStream.Read(data);
-                }
-                FrameCount = recordedFrames.Length;
-                ReplayFrameIndex = 0;
+                Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
             }
-            catch (Exception ex)
+
+            using FileStream fileStream = File.OpenRead(path);
+            if (fileStream.Length % sizeof(T) != 0)
             {
-                Console.WriteLine(ex);
+                Logger.Log(Logger.LogLevel.Error, $"Can not load \"{path}\", because file size is not a multiple of {sizeof(T)} bytes");
+                return;
             }
+            if (fileStream.Length == 0)
+            {
+                Logger.Log(Logger.LogLevel.Info, $"\"{path}\" is an empty file");
+                return;
+            }
+
+            recordedFrames = new T[fileStream.Length / sizeof(T)];
+            fixed (void* ptr = recordedFrames)
+            {
+                Span<byte> data = new Span<byte>(ptr, recordedFrames.Length * sizeof(T));
+                fileStream.Read(data);
+            }
+            FrameCount = recordedFrames.Length;
+            ReplayFrameIndex = 0;
         }
 
         public unsafe void SaveToFile(string path)
@@ -111,7 +115,7 @@ namespace IDKEngine
             using FileStream file = File.OpenWrite(path);
             fixed (void* ptr = recordedFrames)
             {
-                ReadOnlySpan<byte> data = new ReadOnlySpan<byte>(ptr, FrameCount * sizeof(RecordableState));
+                ReadOnlySpan<byte> data = new ReadOnlySpan<byte>(ptr, FrameCount * sizeof(T));
                 file.Write(data);
             }
         }

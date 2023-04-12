@@ -1,12 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
+using Newtonsoft.Json;
+using System.Globalization;
 
 namespace IDKEngine
 {
@@ -47,7 +48,7 @@ namespace IDKEngine
                     LightManager.RenderShadowMaps(ModelSystem);
                 }
 
-                if (RasterizerPipeline.IsDebugRenderVXGIGrid)
+                if (RasterizerPipeline.IsConfigureGrid)
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
                     PostProcessor.Compute(false, RasterizerPipeline.Result);
@@ -202,37 +203,35 @@ namespace IDKEngine
         private ShaderProgram finalProgram;
         protected override unsafe void OnStart()
         {
-            Console.WriteLine($"API: {Helper.API}");
-            Console.WriteLine($"GPU: {Helper.GPU}\n\n");
+            Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
+            Logger.Log(Logger.LogLevel.Info, $"GPU: {Helper.GPU}");
 
             if (Helper.APIVersion < 4.6)
             {
-                Console.WriteLine("Your system does not support OpenGL 4.6. Press Enter to exit");
+                Logger.Log(Logger.LogLevel.Fatal, "Your system does not support OpenGL 4.6. Press Enter to exit");
                 Console.ReadLine();
                 Environment.Exit(0);
             }
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
             {
-                Console.WriteLine("Your system does not support GL_ARB_bindless_texture. Press Enter to exit");
+                Logger.Log(Logger.LogLevel.Fatal, "Your system does not support GL_ARB_bindless_texture. Press Enter to exit");
                 Console.ReadLine();
                 Environment.Exit(0);
             }
-            
+
             RenderGui = true;
             WindowVSync = true;
             ViewportResolution = WindowSize;
             MouseState.CursorMode = CursorModeValue.CursorNormal;
 
-#if DEBUG
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.DebugCallback, 0);
-#endif
+
             GL.PointSize(1.3f);
             GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.ScissorTest);
-            GL.Enable(EnableCap.Blend);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
 
@@ -261,50 +260,46 @@ namespace IDKEngine
                 "res/textures/environmentMap/negz.jpg"
             });
 
-            Model sponza = new Model("res/models/OBJSponza/sponza.obj");
-            for (int i = 0; i < sponza.MeshInstances.Length; i++) // 0.0145f
-                sponza.MeshInstances[i].ModelMatrix = Matrix4.CreateScale(5.0f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f);
+            Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
 
-            // fix transparency
-            sponza.Meshes[0].RoughnessBias = -1.0f;
-            sponza.Meshes[19].RoughnessBias = -1.0f;
-            sponza.Meshes[2].RoughnessBias = -1.0f;
+            //// fix transparency
+            //sponza.Meshes[0].RoughnessBias = -1.0f;
+            //sponza.Meshes[1].RoughnessBias = -1.0f;
+            //sponza.Meshes[20].RoughnessBias = -1.0f;
 
-            sponza.Meshes[10].EmissiveBias = 11.0f;
-            sponza.Meshes[8].SpecularBias = 0.4f;
-            sponza.Meshes[8].RoughnessBias = -0.4f;
-            sponza.Meshes[3].EmissiveBias = 2.67f;
-            sponza.Meshes[17].RefractionChance = 1.0f;
-            sponza.Meshes[17].RoughnessBias = -0.7f;
+            //sponza.Meshes[38].EmissiveBias = 11.0f;
+            //sponza.Meshes[42].EmissiveBias = 11.0f;
+            //sponza.Meshes[99].EmissiveBias = 2.67f;
+            //sponza.Meshes[97].EmissiveBias = 2.67f;
+            //sponza.Meshes[46].SpecularBias = 0.4f;
+            //sponza.Meshes[46].RoughnessBias = -0.4f;
+            //sponza.Meshes[71].RefractionChance = 1.0f;
+            //sponza.Meshes[71].RoughnessBias = -0.7f;
 
-            Model lucy = new Model("res/models/Lucy/Lucy.gltf");
-            lucy.MeshInstances[0].ModelMatrix = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f);
-            lucy.Meshes[0].RefractionChance = 0.9f;
-            lucy.Meshes[0].IOR = 1.174f;
-            lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
+            //Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
+            //lucy.Meshes[0].RefractionChance = 0.9f;
+            //lucy.Meshes[0].IOR = 1.174f;
+            //lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
 
-            Model helmet = new Model("res/models/Helmet/Helmet.gltf");
-            helmet.Meshes[0].SpecularBias = 1.0f;
+            //Model helmet = new Model("res/models/Helmet/Helmet.gltf");
+            //helmet.Meshes[0].SpecularBias = 1.0f;
 
-            //Model a = new Model(@"C:\Users\Julian\Downloads\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
-            //Model b = new Model(@"C:\Users\Julian\Downloads\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-            //Model c = new Model(@"C:\Users\Julian\Downloads\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+            Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
 
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza, helmet, lucy });
+            ModelSystem.Add(new Model[] { giPlayground, sponza });
 
             BVH = new BVH(ModelSystem);
 
-            LightManager  = new LightManager(12, 12);
+            LightManager = new LightManager(12, 12);
             MeshOutlineRenderer = new AABBRender();
             Bloom = new Bloom(ViewportResolution.X, ViewportResolution.Y, 1.0f, 3.0f);
             PostProcessor = new PostProcessor(ViewportResolution.X, ViewportResolution.Y);
 
-            List<GLSLLight> lights = new List<GLSLLight>();
-            //LightManager.Add(new GLSLLight(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
             LightManager.Add(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.Add(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.Add(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+            //LightManager.Add(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
 
             for (int j = 0; j < 3; j++)
             {
@@ -316,6 +311,8 @@ namespace IDKEngine
 
             FrameRecorder = new FrameStateRecorder<RecordableState>();
             gui = new Gui(WindowSize.X, WindowSize.Y);
+
+            GC.Collect();
         }
 
         protected override void OnEnd()
