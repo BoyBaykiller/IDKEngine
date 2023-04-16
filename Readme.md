@@ -18,7 +18,8 @@ Required OpenGL: 4.6 + `ARB_bindless_texture`
 
 Known Issues:
 
-- VXGI (voxelization) doesn't work due to AMD driver bug since version 22.7.1
+- VXGI (voxelization) doesn't work on AMD due to driver bug since version 22.7.1
+- Certain shaders using `ARB_bindless_texture` dont compile on Intel due to driver bug
 - Path Tracer BVH traversal missing geometry on GTX 1660 Super (likely affects whole architecture)
 
 # Controls

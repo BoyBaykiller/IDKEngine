@@ -16,7 +16,7 @@ namespace IDKEngine
         public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
         {
             treeDepth = (int)Math.Ceiling(MathF.Log2(count));
-            
+
             Nodes = new GLSLBlasNode[2 * count];
             ref GLSLBlasNode root = ref Nodes[nodesUsed++];
             root.TriCount = (uint)count;

@@ -1,5 +1,4 @@
 #version 460 core
-#define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #extension GL_ARB_bindless_texture : require
 layout(early_fragment_tests) in;
 
@@ -11,9 +10,14 @@ layout(location = 4) out vec2 Velocity;
 
 struct Material
 {
-    vec4 BaseColorFactor;
+    vec3 EmissiveFactor;
+    uint BaseColorFactor;
 
-    sampler2D AlbedoAlpha;
+    float RoughnessFactor;
+    float MetallicFactor;
+    vec2 _pad0;
+
+    sampler2D BaseColor;
     sampler2D MetallicRoughness;
 
     sampler2D Normal;
@@ -76,14 +80,14 @@ void main()
 {
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     
-    vec4 albedoAlpha = texture(material.AlbedoAlpha, inData.TexCoord) * material.BaseColorFactor;
-    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedoAlpha.rgb;
+    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * unpackUnorm4x8(material.BaseColorFactor);
+    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = inData.TangentToWorld * normalize(normal * 2.0 - 1.0);
     normal = normalize(mix(normalize(inData.Normal), normal, inData.NormalMapStrength));
 
-    float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g + inData.RoughnessBias, 0.0, 1.0);
-    float specular = clamp(inData.SpecularBias, 0.0, 1.0);
+    float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + inData.SpecularBias, 0.0, 1.0);
+    float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + inData.RoughnessBias, 0.0, 1.0);
 
     AlbedoAlpha = albedoAlpha;
     NormalSpecular = vec4(normal, specular);

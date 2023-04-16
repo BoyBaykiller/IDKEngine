@@ -3,7 +3,6 @@ using System.IO;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
-using static IDKEngine.Model;
 
 namespace IDKEngine.Render
 {

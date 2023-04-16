@@ -1,14 +1,6 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
-struct Light
-{
-    vec3 Position;
-    float Radius;
-    vec3 Color;
-    int PointShadowIndex;
-};
-
 struct PointShadow
 {
     samplerCube Texture;
@@ -29,13 +21,6 @@ layout(std140, binding = 1) uniform ShadowDataUBO
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
-
-layout(std140, binding = 2) uniform LightsUBO
-{
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
-    int Count;
-} lightsUBO;
 
 in InOutVars
 {

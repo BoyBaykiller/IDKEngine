@@ -143,45 +143,55 @@ namespace IDKEngine
 
                 Material material = model.Materials[i];
 
-                glslMaterial.BaseColorFactor = new Vector4(
+                glslMaterial.BaseColorFactor = Helper.CompressUNorm32Fast(new Vector4(
                     material.PbrMetallicRoughness.BaseColorFactor[0],
                     material.PbrMetallicRoughness.BaseColorFactor[1],
                     material.PbrMetallicRoughness.BaseColorFactor[2],
-                    material.PbrMetallicRoughness.BaseColorFactor[3]);
+                    material.PbrMetallicRoughness.BaseColorFactor[3]));
+
+                glslMaterial.EmissiveFactor = new Vector3(
+                        material.EmissiveFactor[0],
+                        material.EmissiveFactor[1],
+                        material.EmissiveFactor[2]);
+
+                glslMaterial.RoughnessFactor = material.PbrMetallicRoughness.RoughnessFactor;
+                glslMaterial.MetallicFactor = material.PbrMetallicRoughness.MetallicFactor;
 
                 {
                     MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 0];
-                    if (data.Image != null)
-                    {
-                        glslMaterial.AlbedoAlphaTextureHandle = GetTextureHandle(data, SizedInternalFormat.Srgb8Alpha8);
-                    }
+                    SizedInternalFormat internalFormat = SizedInternalFormat.Srgb8Alpha8;
+                    glslMaterial.BaseColorTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
                 }
                 {
                     MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 1];
-                    if (data.Image != null)
-                    {
-                        glslMaterial.MetallicRoughnessTextureHandle = GetTextureHandle(data, SizedInternalFormat.Rg8);
-                    }
+                    SizedInternalFormat internalFormat = SizedInternalFormat.Rg8;
+                    glslMaterial.MetallicRoughnessTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
                 }
                 {
                     MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 2];
-                    if (data.Image != null)
-                    {
-                        glslMaterial.NormalTextureHandle = GetTextureHandle(data, SizedInternalFormat.R11fG11fB10f);
-                    }
+                    SizedInternalFormat internalFormat = SizedInternalFormat.R11fG11fB10f;
+                    glslMaterial.NormalTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
                 }
                 {
                     MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 3];
-                    if (data.Image != null)
-                    {
-                        glslMaterial.EmissiveTextureHandle = GetTextureHandle(data, SizedInternalFormat.Srgb8);
-                    }
+                    SizedInternalFormat internalFormat = SizedInternalFormat.Srgb8Alpha8;
+                    glslMaterial.EmissiveTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
                 }
 
-                static ulong GetTextureHandle(MaterialData data, SizedInternalFormat sizedInternalFormat)
+                static ulong GetTextureHandle(MaterialData data, SizedInternalFormat internalFormat)
                 {
-                    Texture glTexture = CreateTexture(data.Image, sizedInternalFormat);
-                    SamplerObject glSampler = CreateSampler(data.Sampler);
+                    SamplerObject glSampler = new SamplerObject();
+                    glSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)data.Sampler.MinFilter);
+                    glSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)data.Sampler.MagFilter);
+                    glSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)data.Sampler.WrapS);
+                    glSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)data.Sampler.WrapT);
+                    glSampler.SetSamplerParamter(SamplerParameterName.TextureMaxAnisotropyExt, 4.0f);
+
+                    Texture glTexture = new Texture(TextureTarget2d.Texture2D);
+                    glTexture.ImmutableAllocate(data.Image.Width, data.Image.Height, 1, internalFormat, Math.Max(Texture.GetMaxMipmapLevel(data.Image.Width, data.Image.Height, 1), 1));
+                    glTexture.SubTexture2D(data.Image.Width, data.Image.Height, PixelFormat.Rgba, PixelType.UnsignedByte, data.Image.Data);
+                    glTexture.GenerateMipmap();
+
                     return glTexture.GetTextureSamplerHandleARB(glSampler);
                 }
             }
@@ -388,25 +398,15 @@ namespace IDKEngine
             return indices;
         }
 
-        private static Texture CreateTexture(ImageResult image, SizedInternalFormat format)
+        private static ulong GetFallbackTextureHandle(SizedInternalFormat internalFormat)
         {
-            Texture texture = new Texture(TextureTarget2d.Texture2D);
-            texture.ImmutableAllocate(image.Width, image.Height, 1, format, Math.Max(Texture.GetMaxMipmapLevel(image.Width, image.Height, 1), 1));
-            texture.SubTexture2D(image.Width, image.Height, PixelFormat.Rgba, PixelType.UnsignedByte, image.Data);
-            texture.GenerateMipmap();
-
-            return texture;
-        }
-        private static SamplerObject CreateSampler(Sampler sampler)
-        {
-            SamplerObject samplerObject = new SamplerObject();
-            samplerObject.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)sampler.MinFilter);
-            samplerObject.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)sampler.MagFilter);
-            samplerObject.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)sampler.WrapS);
-            samplerObject.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)sampler.WrapT);
-            samplerObject.SetSamplerParamter(SamplerParameterName.TextureMaxAnisotropyExt, 4.0f);
-
-            return samplerObject;
+            Texture glTexture = new Texture(TextureTarget2d.Texture2D);
+            glTexture.ImmutableAllocate(1, 1, 1, internalFormat);
+            glTexture.Clear(PixelFormat.Red, PixelType.Float, 1.0f);
+            glTexture.SetSwizzle(All.Red, All.Red, All.Red, All.Red);
+            glTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            glTexture.SetWrapMode(TextureWrapMode.Repeat, TextureWrapMode.Repeat);
+            return glTexture.GetTextureHandleARB();
         }
 
         private static int ComponentTypeToSizeInBits(Accessor.ComponentTypeEnum componentType)

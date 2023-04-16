@@ -1,6 +1,5 @@
 #version 460 core
 #define N_HIT_PROGRAM_LOCAL_SIZE_X 64 // used in shader and client code - keep in sync!
-#define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX
 #define EPSILON 0.001
@@ -24,9 +23,14 @@ layout(binding = 0) restrict readonly writeonly uniform image2D ImgResult;
 
 struct Material
 {
-    vec4 BaseColorFactor;
+    vec3 EmissiveFactor;
+    uint BaseColorFactor;
 
-    HF_SAMPLER_2D AlbedoAlpha;
+    float RoughnessFactor;
+    float MetallicFactor;
+    vec2 _pad0;
+
+    HF_SAMPLER_2D BaseColor;
     HF_SAMPLER_2D MetallicRoughness;
 
     HF_SAMPLER_2D Normal;
@@ -106,16 +110,16 @@ struct Triangle
 struct TransportRay
 {
     vec3 Origin;
-    float _pad0;
+    uint DebugNodeCounter;
 
     vec3 Direction;
-    float _pad1;
+    float PreviousIOR;
 
     vec3 Throughput;
-    float PrevIOROrDebugNodeCounter;
+    bool IsRefractive;
 
     vec3 Radiance;
-    bool IsRefractive;
+    float _pad0;
 };
 
 struct DispatchCommand
@@ -211,10 +215,10 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 } skyBoxUBO;
 
 bool TraceRay(inout TransportRay transportRay);
-vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, vec3 normal, out float rayProbability, out float newIor, out bool isRefractive, out bool fromInside);
+vec3 ReflectOfMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
-bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter);
-bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT);
+bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter);
+bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t);
 bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
 bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary);
@@ -288,7 +292,7 @@ bool TraceRay(inout TransportRay transportRay)
     {
         if (IsDebugBVHTraversal)
         {
-            transportRay.PrevIOROrDebugNodeCounter = debugNodeCounter;
+            transportRay.DebugNodeCounter = debugNodeCounter;
             return false;
         }
 
@@ -327,13 +331,13 @@ bool TraceRay(inout TransportRay transportRay)
             // Can't use GL_EXT_nonuniform_qualifier because only modern amd drivers get the implementation right without compile errors
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
 
-            vec4 albedoAlpha = texture(material.AlbedoAlpha, texCoord) * material.BaseColorFactor;
+            vec4 albedoAlpha = texture(material.BaseColor, texCoord) * unpackUnorm4x8(material.BaseColorFactor);
             albedo = albedoAlpha.rgb;
             refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
-            emissive = (texture(material.Emissive, texCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + mesh.EmissiveBias) * albedo;
-            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
-            roughness = clamp(texture(material.MetallicRoughness, texCoord).g + mesh.RoughnessBias, 0.0, 1.0);
-            normal = texture(material.Normal, texCoord).rgb;        
+            emissive = (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
+            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+            roughness = clamp(texture(material.MetallicRoughness, texCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
+            normal = texture(material.Normal, texCoord).rgb;
             normal = TBN * normalize(normal * 2.0 - 1.0);
             mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             normal = normalize(mix(normalize(normalToWorld * geoNormal), normal, mesh.NormalMapStrength));
@@ -354,11 +358,34 @@ bool TraceRay(inout TransportRay transportRay)
             absorbance = vec3(0.0);
         }
 
-        bool fromInside;
+
+        float prevIor;
+        float cosTheta = dot(-transportRay.Direction, normal);
+        bool fromInside = cosTheta < 0.0;
+        // This is the first hit shader which means we determine previous IOR here
+        if (fromInside)
+        {
+            prevIor = ior;
+            normal *= -1.0;
+            cosTheta *= -1.0;
+        }
+        else
+        {
+            prevIor = 1.0;
+        }
+
+        if (specularChance > 0.0) // adjust specular chance based on view angle
+        {
+            float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, prevIor, ior));
+            float chanceMultiplier = (1.0 - newSpecularChance) / (1.0 - specularChance);
+            refractionChance *= chanceMultiplier;
+            specularChance = newSpecularChance;
+        }
+
         float rayProbability, newIor;
-        transportRay.Direction = BSDF(transportRay.Direction, specularChance, roughness, refractionChance, ior, normal, rayProbability, newIor, transportRay.IsRefractive, fromInside);
-        transportRay.Origin += transportRay.Direction * EPSILON;
-        transportRay.PrevIOROrDebugNodeCounter = newIor;
+        transportRay.Direction = ReflectOfMaterial(transportRay.Direction, specularChance, roughness, refractionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, transportRay.IsRefractive);
+        transportRay.Origin += normal * EPSILON;
+        transportRay.PreviousIOR = newIor;
 
         if (fromInside)
         {
@@ -374,7 +401,9 @@ bool TraceRay(inout TransportRay transportRay)
 
         float p = max(transportRay.Throughput.x, max(transportRay.Throughput.y, transportRay.Throughput.z));
         if (GetRandomFloat01() > p)
+        {
             return false;
+        }
         transportRay.Throughput /= p;
 
         return true;
@@ -386,33 +415,10 @@ bool TraceRay(inout TransportRay transportRay)
     }
 }
 
-vec3 BSDF(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, vec3 normal, out float rayProbability, out float newIor, out bool isRefractive, out bool fromInside)
+vec3 ReflectOfMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive)
 {
-    roughness *= roughness;
-
-    float prevIor;
-    float cosTheta = dot(-incomming, normal);
-    fromInside = cosTheta < 0.0;
-    // This is the first hit shader which means we determine previous IOR here
-    if (fromInside)
-    {
-        prevIor = ior;
-        normal *= -1.0;
-        cosTheta = dot(-incomming, normal);
-    }
-    else
-    {
-        prevIor = 1.0;
-    }
-
     isRefractive = false;
-    if (specularChance > 0.0) // adjust specular chance based on view angle
-    {
-        float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, prevIor, ior));
-        float chanceMultiplier = (1.0 - newSpecularChance) / (1.0 - specularChance);
-        refractionChance *= chanceMultiplier;
-        specularChance = newSpecularChance;
-    }
+    roughness *= roughness;
 
     float rnd = GetRandomFloat01();
     vec3 diffuseRayDir = CosineSampleHemisphere(normal);
@@ -466,7 +472,7 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }
 
-bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
+bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
 {
     hitInfo.T = FLOAT_MAX;
     hitInfo.TriangleIndex = -1;
@@ -477,7 +483,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
         for (int i = 0; i < lightsUBO.Count; i++)
         {
             Light light = lightsUBO.Lights[i];
-            if (RaySphereIntersect(ray, light, rayTMin, rayTMax) && rayTMax > 0.0 && rayTMin < hitInfo.T)
+            if (RaySphereIntersect(ray, light, rayTMin, rayTMax) && rayTMin < hitInfo.T)
             {
                 hitInfo.T = rayTMin;
                 hitInfo.MeshIndex = i;
@@ -485,7 +491,6 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
         }
     }
 
-    vec4 baryT;
     for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
@@ -504,8 +509,8 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
 
             float tMinLeft;
             float tMinRight;
-            bool leftChildHit = RayCuboidIntersect(localRay, left, tMinLeft, rayTMax) && rayTMax > 0.0 && tMinLeft < hitInfo.T;
-            bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, rayTMax) && rayTMax > 0.0 && tMinRight < hitInfo.T;
+            bool leftChildHit = RayCuboidIntersect(localRay, left, tMinLeft, rayTMax) && tMinLeft < hitInfo.T;
+            bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, rayTMax) && tMinRight < hitInfo.T;
 
             uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
             if (triCount > 0)
@@ -513,11 +518,13 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
                 uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
                 for (uint j = first; j < first + triCount; j++)
                 {
+                    vec3 bary;
+                    float hitT;
                     Triangle triangle = triangleSSBO.Triangles[j];
-                    if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, baryT) && baryT.w > 0.0 && baryT.w < hitInfo.T)
+                    if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, bary, hitT) && hitT < hitInfo.T)
                     {
-                        hitInfo.Bary = baryT.xyz;
-                        hitInfo.T = baryT.w;
+                        hitInfo.Bary = bary;
+                        hitInfo.T = hitT;
                         hitInfo.MeshIndex = i;
                         hitInfo.TriangleIndex = int(j);
                         hitInfo.InstanceID = glInstanceID;
@@ -554,7 +561,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, inout uint debugNodeCounter)
 }
 
 // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
-bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT)
+bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t)
 {
     vec3 v1v0 = v1 - v0;
     vec3 v2v0 = v2 - v0;
@@ -562,12 +569,13 @@ bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec4 baryT)
     vec3 normal = cross(v1v0, v2v0);
     vec3 q = cross(rov0, ray.Direction);
 
-    // baryT = <u, v, w, t>
+    float x = dot(ray.Direction, normal);
+    bary.yz = vec2(dot(-q, v2v0), dot(q, v1v0)) / x;
+    bary.x = 1.0 - bary.y - bary.z;
 
-    baryT.xyw = vec3(dot(-q, v2v0), dot(q, v1v0), dot(-normal, rov0)) / dot(ray.Direction, normal);
-    baryT.z = 1.0 - baryT.x - baryT.y;
+    t = dot(-normal, rov0) / x;
 
-    return all(greaterThanEqual(baryT.xyz, vec3(0.0)));
+    return all(greaterThanEqual(vec4(bary, t), vec4(0.0)));
 }
 
 // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
@@ -585,7 +593,7 @@ bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2)
     t1 = max(t1, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
     t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
 
-    return t1 <= t2;
+    return t1 <= t2 && t2 > 0.0;
 }
 
 // Source: https://antongerdelan.net/opengl/raycasting.html
@@ -605,17 +613,17 @@ bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2)
     t1 = -b - squareRoot;
     t2 = -b + squareRoot;
 
-    return t1 <= t2;
+    return t1 <= t2 && t2 > 0.0;
 }
 
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary)
 {
-    return v0 * bary.z + v1 * bary.x + v2 * bary.y;
+    return v0 * bary.x + v1 * bary.y + v2 * bary.z;
 }
 
 vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary)
 {
-    return v0 * bary.z + v1 * bary.x + v2 * bary.y;
+    return v0 * bary.x + v1 * bary.y + v2 * bary.z;
 }
 
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel)

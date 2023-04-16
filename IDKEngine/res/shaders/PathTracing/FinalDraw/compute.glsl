@@ -8,16 +8,16 @@ layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 struct TransportRay
 {
     vec3 Origin;
-    float _pad0;
+    uint DebugNodeCounter;
 
     vec3 Direction;
-    float _pad1;
+    float PreviousIOR;
 
     vec3 Throughput;
-    float PrevIOROrDebugNodeCounter;
+    bool IsRefractive;
 
     vec3 Radiance;
-    bool IsRefractive;
+    float _pad0;
 };
 
 struct DispatchCommand
@@ -91,7 +91,7 @@ void main()
     if (IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
-        float a = min(transportRay.PrevIOROrDebugNodeCounter / 300.0, 1.0);
+        float a = min(transportRay.DebugNodeCounter / 300.0, 1.0);
         vec3 col = SpectralJet(a);
         irradiance = col;
     }

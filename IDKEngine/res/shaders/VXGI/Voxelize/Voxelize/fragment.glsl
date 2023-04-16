@@ -1,5 +1,4 @@
 #version 460 core
-#define EMISSIVE_MATERIAL_MULTIPLIER 5.0
 #define PI 3.14159265
 #define EPSILON 0.001
 #extension GL_ARB_bindless_texture : require
@@ -18,9 +17,14 @@ layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
 
 struct Material
 {
-    vec4 BaseColorFactor;
+    vec3 EmissiveFactor;
+    uint BaseColorFactor;
 
-    sampler2D AlbedoAlpha;
+    float RoughnessFactor;
+    float MetallicFactor;
+    vec2 _pad0;
+
+    sampler2D BaseColor;
     sampler2D MetallicRoughness;
 
     sampler2D Normal;
@@ -94,8 +98,8 @@ void main()
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
 
     Material material = materialSSBO.Materials[inData.MaterialIndex];
-    vec4 albedoAlpha = texture(material.AlbedoAlpha, inData.TexCoord)  * material.BaseColorFactor;
-    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * EMISSIVE_MATERIAL_MULTIPLIER + inData.EmissiveBias) * albedoAlpha.rgb;
+    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * unpackUnorm4x8(material.BaseColorFactor);
+    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
 
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)

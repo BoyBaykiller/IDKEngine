@@ -80,16 +80,16 @@ namespace IDKEngine.Render
         {
             clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 
-            string vertexSrcCode = File.ReadAllText("res/shaders/VXGI/Voxelize/vertex.glsl");
+            string vertexSrcCode = File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/vertex.glsl");
             vertexSrcCode = vertexSrcCode.Replace("__TAKE_FAST_GEOMETRY_SHADER_PATH__", $"{(TAKE_FAST_GEOMETRY_SHADER_PATH ? 1 : 0)}");
             List<Shader> voxelizeProgramShaders = new List<Shader>()
             {
                 new Shader(ShaderType.VertexShader, vertexSrcCode),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/fragment.glsl"))
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/fragment.glsl"))
             };
             if (TAKE_FAST_GEOMETRY_SHADER_PATH)
             {
-                voxelizeProgramShaders.Add(new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/geometry.glsl")));
+                voxelizeProgramShaders.Add(new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/geometry.glsl")));
             }
             voxelizeProgram = new ShaderProgram(voxelizeProgramShaders.ToArray());
 

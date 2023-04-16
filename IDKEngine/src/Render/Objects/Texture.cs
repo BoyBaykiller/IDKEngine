@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using PixelFormat = OpenTK.Graphics.OpenGL4.PixelFormat;
+using System.Collections.Generic;
 
 namespace IDKEngine.Render.Objects
 {
@@ -24,6 +24,8 @@ namespace IDKEngine.Render.Objects
         public int Height { get; private set; } = 1;
         public int Depth { get; private set; } = 1;
         public SizedInternalFormat SizedInternalFormat { get; private set; }
+
+        private readonly List<ulong> associatedTextureHandles = new List<ulong>();
 
         private static readonly int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
         private static int GetDummyTexture(TextureTarget textureTarget)
@@ -88,6 +90,11 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureWrapS, (int)wrapS);
             GL.TextureParameter(ID, TextureParameterName.TextureWrapT, (int)wrapT);
             GL.TextureParameter(ID, TextureParameterName.TextureWrapR, (int)wrapR);
+        }
+
+        public void SetSwizzle(All swizzleR, All swizzleG, All swizzleB, All swizzleA)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureSwizzleRgba, new int[] { (int)swizzleR, (int)swizzleG, (int)swizzleB, (int)swizzleA });
         }
 
         public void SetAnisotropy(float value)
@@ -158,13 +165,13 @@ namespace IDKEngine.Render.Objects
 
         public void SubTexture3D<T>(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, T[] pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : unmanaged
         {
-            GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, pixelFormat, pixelType, pixels);
+            SubTexture3D(width, height, depth, pixelFormat, pixelType, pixels[0], level, xOffset, yOffset, zOffset);
         }
         public unsafe void SubTexture3D<T>(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : unmanaged
         {
             fixed (void* ptr = &pixels)
             {
-                GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, pixelFormat, pixelType, (IntPtr)ptr);
+                SubTexture3D(width, height, depth, pixelFormat, pixelType, (IntPtr)ptr, level, xOffset, yOffset, zOffset);
             }
         }
         public void SubTexture3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
@@ -174,13 +181,13 @@ namespace IDKEngine.Render.Objects
 
         public void SubTexture2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, T[] pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
         {
-            GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, pixelFormat, pixelType, pixels);
+            SubTexture2D(width, height, pixelFormat, pixelType, pixels[0], level, xOffset, yOffset);
         }
         public unsafe void SubTexture2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
         {
             fixed (void* ptr = &pixels)
             {
-                GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, pixelFormat, pixelType, (IntPtr)ptr);
+                SubTexture2D(width, height, pixelFormat, pixelType, (IntPtr)ptr, level, xOffset, yOffset);
             }
         }
         public void SubTexture2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0, int yOffset = 0)
@@ -190,13 +197,13 @@ namespace IDKEngine.Render.Objects
 
         public void SubTexture1D<T>(int width, PixelFormat pixelFormat, PixelType pixelType, T[] pixels, int level = 0, int xOffset = 0) where T : unmanaged
         {
-            GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
+            SubTexture1D(width, pixelFormat, pixelType, pixels[0], level, xOffset);
         }
         public unsafe void SubTexture1D<T>(int width, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0) where T : unmanaged
         {
             fixed (void* ptr = &pixels)
             {
-                GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, (IntPtr)ptr);
+                SubTexture1D(width, pixelFormat, pixelType, (IntPtr)ptr, level, xOffset);
             }
         }
         public void SubTexture1D(int width, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0)
@@ -213,7 +220,7 @@ namespace IDKEngine.Render.Objects
         {
             fixed (void* ptr = &value)
             {
-                GL.ClearTexImage(ID, level, pixelFormat, pixelType, (IntPtr)ptr);
+                Clear(pixelFormat, pixelType, (IntPtr)ptr, level);
             }
         }
         public void Clear(PixelFormat pixelFormat, PixelType pixelType, IntPtr value, int level = 0)
@@ -269,6 +276,7 @@ namespace IDKEngine.Render.Objects
         {
             ulong textureHandle = (ulong)GL.Arb.GetTextureHandle(ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
+            associatedTextureHandles.Add(textureHandle);
             return textureHandle;
         }
 
@@ -280,6 +288,7 @@ namespace IDKEngine.Render.Objects
         {
             ulong textureHandle = (ulong)GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
+            associatedTextureHandles.Add(textureHandle);
             return textureHandle;
         }
 
@@ -287,29 +296,9 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public static void UnmakeTextureHandleARB(ulong textureHandle)
+        private static void UnmakeTextureHandleARB(ulong textureHandle)
         {
             GL.Arb.MakeTextureHandleNonResident(textureHandle);
-        }
-
-        /// <summary>
-        /// GL_ARB_bindless_texture must be available
-        /// </summary>
-        /// <returns></returns>
-        public ulong GetImageHandleARB(int level, bool layered, int layer, SizedInternalFormat sizedInternalFormat, TextureAccess textureAccess)
-        {
-            ulong imageHandle = (ulong)GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
-            GL.Arb.MakeImageHandleResident(imageHandle, (All)textureAccess);
-            return imageHandle;
-        }
-
-        /// <summary>
-        /// GL_ARB_bindless_texture must be available
-        /// </summary>
-        /// <returns></returns>
-        public static void UnmakeImageHandleARB(ulong imageHandle)
-        {
-            GL.Arb.MakeImageHandleNonResident(imageHandle);
         }
 
         public void GetSizeMipmap(out int width, out int height, out int depth, int level = 0)
@@ -321,6 +310,10 @@ namespace IDKEngine.Render.Objects
 
         public void Dispose()
         {
+            for (int i = 0; i < associatedTextureHandles.Count; i++)
+            {
+                UnmakeTextureHandleARB(associatedTextureHandles[i]);
+            }
             GL.DeleteTexture(ID);
         }
     }
