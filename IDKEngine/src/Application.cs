@@ -262,32 +262,34 @@ namespace IDKEngine
 
             Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
 
-            //// fix transparency
-            //sponza.Meshes[0].RoughnessBias = -1.0f;
-            //sponza.Meshes[1].RoughnessBias = -1.0f;
-            //sponza.Meshes[20].RoughnessBias = -1.0f;
+            // fix transparency
+            sponza.Meshes[0].RoughnessBias = -1.0f;
+            sponza.Meshes[1].RoughnessBias = -1.0f;
+            sponza.Meshes[20].RoughnessBias = -1.0f;
 
-            //sponza.Meshes[38].EmissiveBias = 11.0f;
-            //sponza.Meshes[42].EmissiveBias = 11.0f;
-            //sponza.Meshes[99].EmissiveBias = 2.67f;
-            //sponza.Meshes[97].EmissiveBias = 2.67f;
-            //sponza.Meshes[46].SpecularBias = 0.4f;
-            //sponza.Meshes[46].RoughnessBias = -0.4f;
-            //sponza.Meshes[71].RefractionChance = 1.0f;
-            //sponza.Meshes[71].RoughnessBias = -0.7f;
+            sponza.Meshes[38].EmissiveBias = 20.0f;
+            sponza.Meshes[42].EmissiveBias = 20.0f;
+            sponza.Meshes[3].EmissiveBias = 10.0f;
+            sponza.Meshes[99].EmissiveBias = 10.0f;
+            sponza.Meshes[97].EmissiveBias = 20.0f;
+            sponza.Meshes[46].SpecularBias = 0.4f;
+            sponza.Meshes[46].RoughnessBias = -0.4f;
+            sponza.Meshes[71].RefractionChance = 1.0f;
+            sponza.Meshes[71].RoughnessBias = -0.7f;
 
-            //Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
-            //lucy.Meshes[0].RefractionChance = 0.9f;
-            //lucy.Meshes[0].IOR = 1.174f;
-            //lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
+            Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
+            lucy.Meshes[0].RefractionChance = 0.9f;
+            lucy.Meshes[0].IOR = 1.174f;
+            lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
+            lucy.Meshes[0].RoughnessBias = -1.0f;
 
-            //Model helmet = new Model("res/models/Helmet/Helmet.gltf");
-            //helmet.Meshes[0].SpecularBias = 1.0f;
+            Model helmet = new Model("res/models/Helmet/Helmet.gltf");
+            helmet.Meshes[0].SpecularBias = 1.0f;
 
-            Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
+            //Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
 
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { giPlayground, sponza });
+            ModelSystem.Add(new Model[] { sponza, helmet, lucy });
 
             BVH = new BVH(ModelSystem);
 

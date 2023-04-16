@@ -208,6 +208,18 @@ namespace IDKEngine
             return new Vector3(r, g, b);
         }
 
+        public static uint CompressUNorm32Fast(Vector4 data)
+        {
+            uint r = (uint)MathF.Round(data.X * ((1u << 8) - 1));
+            uint g = (uint)MathF.Round(data.Y * ((1u << 8) - 1));
+            uint b = (uint)MathF.Round(data.Z * ((1u << 8) - 1));
+            uint a = (uint)MathF.Round(data.W * ((1u << 8) - 1));
+
+            uint packed = (r << 0) | (g << 8) | (b << 16) | (a << 24);
+
+            return packed;
+        }
+
         public static ulong CompressUNorm64Fast(Vector3 data)
         {
             ulong r = (ulong)MathF.Round(data.X * ((1u << 21) - 1));

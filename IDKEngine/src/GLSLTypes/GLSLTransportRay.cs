@@ -5,16 +5,15 @@ namespace IDKEngine
     unsafe struct GLSLTransportRay
     {
         public Vector3 Origin;
-        private float _pad0;
+        public uint DebugNodeCounter;
 
         public Vector3 Direction;
-        private float _pad1;
+        public float PreviousIOR;
 
         public Vector3 Throughput;
-        public float PrevIOROrDebugNodeCounter;
+        public bool IsRefractive;
 
         public Vector3 Radiance;
-        public bool IsRefractive;
-        private fixed bool _pad2[3];
+        private float _pad0;
     }
 }

@@ -752,9 +752,7 @@ namespace IDKEngine.Render
                 }
                 else if (SelectedEntityType == EntityType.Light)
                 {
-                    // Fix: The possibility of having multiple lights be assigned to a single shadow map
                     ImGui.Text("TODO: Assign unique shadow map to light");
-
 
                     bool shouldUpdateLight = false;
                     ref GLSLLight light = ref app.LightManager.Lights[SelectedEntityIndex].GLSLLight;

@@ -46,7 +46,6 @@ namespace IDKEngine.Render.Objects
 
         public void Link(params Shader[] shaders)
         {
-            Debug.Assert(shaders != null && shaders.All(s => s.ID != 0));
             Debug.Assert(shaders.All(s => shaders.All(s1 => s.ID == s1.ID || s1.ShaderType != s.ShaderType)));
 
             for (int i = 0; i < shaders.Length; i++)
@@ -57,7 +56,6 @@ namespace IDKEngine.Render.Objects
             for (int i = 0; i < shaders.Length; i++)
             {
                 GL.DetachShader(ID, shaders[i].ID);
-                shaders[i].Dispose();
             }
         }
 

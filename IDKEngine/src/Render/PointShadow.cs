@@ -156,8 +156,8 @@ namespace IDKEngine.Render
 
         private void DisposeBindlessTextures()
         {
-            if (shadowSampler != null) { Texture.UnmakeTextureHandleARB(glslPointShadow.ShadowTexture); shadowSampler.Dispose(); }
-            if (Result != null) { Texture.UnmakeTextureHandleARB(glslPointShadow.Texture); Result.Dispose(); }
+            if (shadowSampler != null) { shadowSampler.Dispose(); }
+            if (Result != null) { Result.Dispose(); }
         }
 
         public void Dispose()

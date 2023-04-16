@@ -16,12 +16,6 @@ namespace IDKEngine
                 if (_isExternalSkyBox == value) return;
                 _isExternalSkyBox = value;
 
-                if (SkyBoxTexture != null)
-                {
-                    skyBoxTextureUBO.GetSubData(0, sizeof(ulong), out ulong currentTextureHandle);
-                    Texture.UnmakeTextureHandleARB(currentTextureHandle); // unmake handle resident to properly delete texture
-                }
-
                 if (_isExternalSkyBox)
                 {
                     if (AtmosphericScatterer != null)

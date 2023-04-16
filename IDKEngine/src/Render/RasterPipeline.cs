@@ -216,11 +216,11 @@ namespace IDKEngine.Render
 
         private void DisposeBindlessTextures()
         {
-            if (albedoAlphaTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.AlbedoAlpha); albedoAlphaTexture.Dispose(); }
-            if (normalSpecularTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.NormalSpecular); normalSpecularTexture.Dispose(); }
-            if (emissiveRoughnessTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.EmissiveRoughness); emissiveRoughnessTexture.Dispose(); }
-            if (velocityTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.Velocity); velocityTexture.Dispose(); }
-            if (depthTexture != null) { Texture.UnmakeTextureHandleARB(glslGBufferData.Depth); depthTexture.Dispose(); }
+            if (albedoAlphaTexture != null) { albedoAlphaTexture.Dispose(); }
+            if (normalSpecularTexture != null) {  normalSpecularTexture.Dispose(); }
+            if (emissiveRoughnessTexture != null) { emissiveRoughnessTexture.Dispose(); }
+            if (velocityTexture != null) {  velocityTexture.Dispose(); }
+            if (depthTexture != null) { depthTexture.Dispose(); }
         }
 
         public unsafe void SetSize(int width, int height)
