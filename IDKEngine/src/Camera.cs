@@ -6,6 +6,14 @@ namespace IDKEngine
 {
     class Camera
     {
+        public struct State
+        {
+            public Vector3 CamPosition;
+            public Vector3 CamUp;
+            public float LookX;
+            public float LookY;
+        }
+
         public Vector3 Position { get; private set; }
         public Vector3 ViewDir { get; private set; }
         public Vector3 Up { get; private set; }
@@ -66,7 +74,7 @@ namespace IDKEngine
             ViewMatrix = GenerateViewMatrix(Position, ViewDir, Up);
         }
 
-        public void SetState(in RecordableState state)
+        public void SetState(in State state)
         {
             Position = state.CamPosition;
             Up = state.CamUp;

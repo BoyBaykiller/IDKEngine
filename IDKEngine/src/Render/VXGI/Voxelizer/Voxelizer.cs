@@ -107,6 +107,9 @@ namespace IDKEngine.Render
 
             fboNoAttachments = new Framebuffer();
 
+            glslVoxelizerData.GridMax = new Vector3( 1.0e10f);
+            glslVoxelizerData.GridMin = new Vector3(-1.0e10f);
+
             SetSize(width, height, depth);
             GridMin = gridMin;
             GridMax = gridMax;
