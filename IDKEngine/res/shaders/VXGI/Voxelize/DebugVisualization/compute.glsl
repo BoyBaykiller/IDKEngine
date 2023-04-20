@@ -70,7 +70,7 @@ void main()
         return;
     }
 
-    vec3 gridRayStart, gridRayEnd;
+    vec3 gridRayStart;
     bool isInsideGrid = t1 < 0.0 && t2 > 0.0;
     if (isInsideGrid)
     {
@@ -80,7 +80,6 @@ void main()
     {
         gridRayStart = worldRay.Origin + worldRay.Direction * t1;
     }
-    gridRayEnd = (worldRay.Origin + worldRay.Direction * t2);
 
     vec4 color = TraceCone(gridRayStart, worldRay.Direction, ConeAngle, StepMultiplier);
     color += (1.0 - color.a) * (texture(skyBoxUBO.Albedo, worldRay.Direction));

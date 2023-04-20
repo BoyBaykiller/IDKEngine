@@ -88,7 +88,7 @@ namespace IDKEngine.Render
                         ImGui.Text($"   * Recorded frames: {app.FrameRecorder.FrameCount}");
                         unsafe
                         {
-                            ImGui.Text($"   * File size: {app.FrameRecorder.FrameCount * sizeof(RecordableState) / 1000}kb");
+                            ImGui.Text($"   * File size: {app.FrameRecorder.FrameCount * sizeof(Camera.State) / 1000}kb");
                         }
                     }
                     ImGui.Separator();
@@ -103,7 +103,7 @@ namespace IDKEngine.Render
                         frameRecState = isReplaying ? FrameRecorderState.Replaying : FrameRecorderState.Nothing;
                         if (app.GetRenderMode() == RenderMode.PathTracer && frameRecState == FrameRecorderState.Replaying)
                         {
-                            RecordableState state = app.FrameRecorder.Replay();
+                            Camera.State state = app.FrameRecorder.Replay();
                             app.Camera.SetState(state);
                         }
                     }
@@ -111,7 +111,7 @@ namespace IDKEngine.Render
                     if (ImGui.SliderInt("ReplayFrame", ref replayFrame, 0, app.FrameRecorder.FrameCount - 1))
                     {
                         app.FrameRecorder.ReplayFrameIndex = replayFrame;
-                        RecordableState state = app.FrameRecorder[replayFrame];
+                        Camera.State state = app.FrameRecorder[replayFrame];
                         app.Camera.SetState(state);
                     }
                     ImGui.Separator();
@@ -752,10 +752,14 @@ namespace IDKEngine.Render
                 }
                 else if (SelectedEntityType == EntityType.Light)
                 {
-                    ImGui.Text("TODO: Assign unique shadow map to light");
-
                     bool shouldUpdateLight = false;
                     ref GLSLLight light = ref app.LightManager.Lights[SelectedEntityIndex].GLSLLight;
+
+                    if (ImGui.Button("Teleport to camera"))
+                    {
+                        light.Position = app.Camera.Position;
+                        shouldUpdateLight = true;
+                    }
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
@@ -872,7 +876,7 @@ namespace IDKEngine.Render
                 {
                     if (app.PathTracer.AccumulatedSamples >= pathTracerRenderSampleGoal)
                     {
-                        RecordableState state = app.FrameRecorder.Replay();
+                        Camera.State state = app.FrameRecorder.Replay();
                         app.Camera.SetState(state);
                         
                         if (isVideoRender)
@@ -883,7 +887,7 @@ namespace IDKEngine.Render
                 }
                 else
                 {
-                    RecordableState state = app.FrameRecorder.Replay();
+                    Camera.State state = app.FrameRecorder.Replay();
                     app.Camera.SetState(state);
                     takeScreenshotNextFrame = isVideoRender;
                 }
@@ -917,12 +921,12 @@ namespace IDKEngine.Render
 
             if (frameRecState == FrameRecorderState.Recording && recordingTimer.Elapsed.TotalMilliseconds >= (1000.0f / recordingFPS))
             {
-                RecordableState recordableState;
-                recordableState.CamPosition = app.Camera.Position;
-                recordableState.CamUp = app.Camera.Up;
-                recordableState.LookX = app.Camera.LookX;
-                recordableState.LookY = app.Camera.LookY;
-                app.FrameRecorder.Record(recordableState);
+                Camera.State state;
+                state.CamPosition = app.Camera.Position;
+                state.CamUp = app.Camera.Up;
+                state.LookX = app.Camera.LookX;
+                state.LookY = app.Camera.LookY;
+                app.FrameRecorder.Record(state);
                 recordingTimer.Restart();
             }
 
@@ -949,7 +953,7 @@ namespace IDKEngine.Render
 
                     if (app.GetRenderMode() == RenderMode.PathTracer)
                     {
-                        RecordableState state = app.FrameRecorder.Replay();
+                        Camera.State state = app.FrameRecorder.Replay();
                         app.Camera.SetState(state);
                     }
                 }

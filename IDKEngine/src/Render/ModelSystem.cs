@@ -44,11 +44,9 @@ namespace IDKEngine.Render
 
             Vertices = Array.Empty<GLSLDrawVertex>();
             vertexBuffer = new BufferObject();
-            vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
 
             Indices = Array.Empty<uint>();
             elementBuffer = new BufferObject();
-            elementBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
 
             MeshInstances = Array.Empty<GLSLMeshInstance>();
             meshInstanceBuffer = new BufferObject();

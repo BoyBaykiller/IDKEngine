@@ -165,7 +165,19 @@ namespace IDKEngine
                 {
                     MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 1];
                     SizedInternalFormat internalFormat = SizedInternalFormat.Rg8;
-                    glslMaterial.MetallicRoughnessTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
+                    if (data.Image != null)
+                    {
+                        // Move B into R channel such that metallic becomes R and roughness is G
+                        for (int j = 0; j < data.Image.Data.Length; j += 4)
+                        {
+                            data.Image.Data[j] = data.Image.Data[j + 2];
+                        }
+                        glslMaterial.MetallicRoughnessTextureHandle = GetTextureHandle(data, internalFormat);
+                    }
+                    else
+                    {
+                        glslMaterial.MetallicRoughnessTextureHandle = GetFallbackTextureHandle(internalFormat);
+                    }
                 }
                 {
                     MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 2];
@@ -201,7 +213,7 @@ namespace IDKEngine
         private MaterialData[] LoadMaterialData(string rootDir)
         {
             MaterialData[] localMaterialData = new MaterialData[model.Materials.Length * GLSLMaterial.TEXTURE_COUNT];
-            
+
             Sampler.MagFilterEnum magFilterDefault = Sampler.MagFilterEnum.LINEAR;
             Sampler.MinFilterEnum minFilterDefault = Sampler.MinFilterEnum.LINEAR_MIPMAP_LINEAR;
             Parallel.For(0, localMaterialData.Length, i =>
@@ -250,24 +262,18 @@ namespace IDKEngine
 
                 void GetImagePathAndSampler(GLTFTexture gltfTexture, out string imagePath, out Sampler sampler)
                 {
+                    imagePath = null;
+                    sampler = null;
 
                     if (gltfTexture.Source.HasValue)
                     {
                         Image image = model.Images[gltfTexture.Source.Value];
                         imagePath = Path.Combine(rootDir, image.Uri);
                     }
-                    else
-                    {
-                        imagePath = null;
-                    }
 
                     if (gltfTexture.Sampler.HasValue)
                     {
                         sampler = model.Samplers[gltfTexture.Sampler.Value];
-                    }
-                    else
-                    {
-                        sampler = null;
                     }
                 }
 
@@ -288,15 +294,13 @@ namespace IDKEngine
                     sampler = new Sampler();
                     sampler.WrapS = Sampler.WrapSEnum.REPEAT;
                     sampler.WrapT = Sampler.WrapTEnum.REPEAT;
-                    sampler.MagFilter = magFilterDefault;
-                    sampler.MinFilter = minFilterDefault;
                 }
 
-                if (sampler.MinFilter == null)
+                if (!sampler.MinFilter.HasValue)
                 {
                     sampler.MinFilter = minFilterDefault;
                 }
-                if (sampler.MagFilter == null)
+                if (!sampler.MagFilter.HasValue)
                 {
                     sampler.MagFilter = magFilterDefault;
                 }
@@ -426,7 +430,7 @@ namespace IDKEngine
                     return 32;
 
                 default:
-                    Logger.Log(Logger.LogLevel.Error, $"No conversion for {componentType} was found");
+                    Logger.Log(Logger.LogLevel.Error, $"No conversion for {componentType} into bit size is possible");
                     return 0;
             }
         }
