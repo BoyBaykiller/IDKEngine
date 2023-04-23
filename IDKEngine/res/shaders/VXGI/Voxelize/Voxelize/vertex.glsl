@@ -1,8 +1,7 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
-// Inserted by application. 1 if NV_geometry_shader_passthrough and NV_viewport_swizzle are supported else 0
-#define TAKE_FAST_GEOMETRY_SHADER_PATH __TAKE_FAST_GEOMETRY_SHADER_PATH__
+// 1 if NV_geometry_shader_passthrough and NV_viewport_swizzle are supported else 0
+#define TAKE_FAST_GEOMETRY_SHADER_PATH AppInsert(TAKE_FAST_GEOMETRY_SHADER_PATH)
 
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
@@ -10,63 +9,7 @@ layout(location = 3) in uint Normal;
 
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
-struct Mesh
-{
-    int InstanceCount;
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float RefractionChance;
-    float IOR;
-    vec3 Absorbance;
-    uint CubemapShadowCullInfo;
-};
-
-struct MeshInstance
-{
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
-};
-
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
-
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 5) uniform VoxelizerDataUBO
-{
-    mat4 OrthoProjection;
-    vec3 GridMin;
-    float _pad0;
-    vec3 GridMax;
-    float _pad1;
-} voxelizerDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 out InOutVars
 {

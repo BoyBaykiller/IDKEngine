@@ -39,23 +39,7 @@ const vec3 positions[24] =
     vec3( 0.5, -0.5, -0.5 )
 };
 
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 out InOutVars
 {

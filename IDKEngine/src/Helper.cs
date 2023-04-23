@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
-using StbImageSharp;
-using StbImageWriteSharp;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
+using StbImageSharp;
+using StbImageWriteSharp;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine
@@ -81,7 +81,7 @@ namespace IDKEngine
                     if (id == 2000) return; // Shader compile error, AMD
                     if (id == 2001) return; // Program link error, AMD
 
-                    Logger.Log(Logger.LogLevel.Error, text + $"{id}");
+                    Logger.Log(Logger.LogLevel.Error, text);
                     break;
 
                 default:

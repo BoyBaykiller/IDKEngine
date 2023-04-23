@@ -1,69 +1,11 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
 layout(location = 2) in uint Tangent;
 layout(location = 3) in uint Normal;
 
-struct Mesh
-{
-    int InstanceCount;
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float RefractionChance;
-    float IOR;
-    vec3 Absorbance;
-    uint CubemapShadowCullInfo;
-};
-
-struct MeshInstance
-{
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
-};
-
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
-
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
-    int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
-} taaDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 out InOutVars
 {

@@ -1,26 +1,6 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
-struct PointShadow
-{
-    samplerCube Texture;
-    samplerCubeShadow ShadowTexture;
-    
-    mat4 ProjViewMatrices[6];
-
-    vec3 Position;
-    float NearPlane;
-
-    vec3 _pad0;
-    float FarPlane;
-};
-
-layout(std140, binding = 1) uniform ShadowDataUBO
-{
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
-    int Count;
-} shadowDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 in InOutVars
 {
