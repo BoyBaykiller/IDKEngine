@@ -53,21 +53,22 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec4 normalSpec = texture(gBufferDataUBO.NormalSpecular, uv);
+    float specular = texture(gBufferDataUBO.NormalSpecular, uv).a;
     float depth = texture(gBufferDataUBO.Depth, uv).r;
-    if (normalSpec.a < EPSILON || depth == 1.0)
+    if (specular < EPSILON || depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
     }
 
     vec3 fragPos = NDCToView(vec3(uv, depth) * 2.0 - 1.0);
+    vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
     mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
-    normalSpec.xyz = normalize(normalToView * normalSpec.xyz);
+    normal = normalize(normalToView * normal);
 
-    vec3 color = SSR(normalSpec.xyz, fragPos);
+    vec3 color = SSR(normal, fragPos) * specular;
 
-    imageStore(ImgResult, imgCoord, vec4(color * normalSpec.a, 1.0));
+    imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 
 vec3 SSR(vec3 normal, vec3 fragPos)

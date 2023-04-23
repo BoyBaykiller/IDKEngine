@@ -27,12 +27,12 @@ struct MeshInstance
     mat4 PrevModelMatrix;
 };
 
-layout(std430, binding = 2) restrict readonly buffer MeshSSBO
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 4) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;

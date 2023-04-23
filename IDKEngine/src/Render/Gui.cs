@@ -658,7 +658,7 @@ namespace IDKEngine.Render
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
                     Light light = new Light(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
-                    if (app.LightManager.Add(light) != -1)
+                    if (app.LightManager.Add(light))
                     {
                         SelectedEntityType = EntityType.Light;
                         SelectedEntityIndex = app.LightManager.Count - 1;

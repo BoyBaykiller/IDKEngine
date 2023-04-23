@@ -17,14 +17,6 @@ struct DrawCommand
     uint BaseInstance;
 };
 
-struct Node
-{
-    vec3 Min;
-    uint TriStartOrLeftChild;
-    vec3 Max;
-    uint TriCount;
-};
-
 struct Mesh
 {
     int InstanceCount;
@@ -46,6 +38,14 @@ struct MeshInstance
     mat4 PrevModelMatrix;
 };
 
+struct Node
+{
+    vec3 Min;
+    uint TriStartOrLeftChild;
+    vec3 Max;
+    uint TriCount;
+};
+
 struct PointShadow
 {
     samplerCube Texture;
@@ -65,20 +65,20 @@ layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
     DrawCommand DrawCommands[];
 } drawCommandSSBO;
 
-layout(std430, binding = 1) restrict readonly buffer BlasSSBO
-{
-    Node Nodes[];
-} blasSSBO;
-
-layout(std430, binding = 2) restrict writeonly buffer MeshSSBO
+layout(std430, binding = 1) restrict writeonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 4) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer BlasSSBO
+{
+    Node Nodes[];
+} blasSSBO;
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {

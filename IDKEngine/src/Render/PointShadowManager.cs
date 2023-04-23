@@ -30,8 +30,9 @@ namespace IDKEngine.Render
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
         }
 
-        public int Add(PointShadow pointShadow)
+        public bool TryAdd(PointShadow pointShadow, out int index)
         {
+            index = -1;
             for (int i = 0; i < GLSL_MAX_UBO_POINT_SHADOW_COUNT; i++)
             {
                 PointShadow it = PointShadows[i];
@@ -39,17 +40,26 @@ namespace IDKEngine.Render
                 {
                     PointShadows[i] = pointShadow;
                     UploadPointShadow(i);
-                    return i;
+                    
+                    index = i;
+                    return true;
                 }
             }
 
-            return -1;
+            return false;
         }
 
         public void RemoveAt(int index)
         {
-            PointShadows[index].Dispose();
-            PointShadows[index] = null;
+            if (PointShadows[index] == null)
+            {
+                Logger.Log(Logger.LogLevel.Warn, $"Can not remove PointShadow at index {index} as it already is null");
+            }
+            else
+            {
+                PointShadows[index].Dispose();
+                PointShadows[index] = null;
+            }
         }
 
         public void RenderShadowMaps(ModelSystem modelSystem)
@@ -79,10 +89,11 @@ namespace IDKEngine.Render
             pointShadowsBuffer.Dispose();
             for (int i = 0; i < GLSL_MAX_UBO_POINT_SHADOW_COUNT; i++)
             {
-                PointShadow pointShadow = PointShadows[i];
+                ref PointShadow pointShadow = ref PointShadows[i];
                 if (pointShadow != null)
                 {
                     pointShadow.Dispose();
+                    pointShadow = null;
                 }
             }
 

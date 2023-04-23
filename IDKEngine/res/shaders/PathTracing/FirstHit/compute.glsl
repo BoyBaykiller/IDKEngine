@@ -26,9 +26,9 @@ struct Material
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
+    vec2 _pad0;
     float RoughnessFactor;
     float MetallicFactor;
-    vec2 _pad0;
 
     HF_SAMPLER_2D BaseColor;
     HF_SAMPLER_2D MetallicRoughness;
@@ -142,30 +142,30 @@ layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
     DrawCommand DrawCommands[];
 } drawCommandSSBO;
 
-layout(std430, binding = 1) restrict readonly buffer BlasSSBO
-{
-    Node Nodes[];
-} blasSSBO;
-
-layout(std430, binding = 2) restrict readonly buffer MeshSSBO
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 3) restrict readonly buffer TriangleSSBO
-{
-    Triangle Triangles[];
-} triangleSSBO;
-
-layout(std430, binding = 4) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
 
-layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
+layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
 {
     Material Materials[];
 } materialSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer BlasSSBO
+{
+    Node Nodes[];
+} blasSSBO;
+
+layout(std430, binding = 5) restrict readonly buffer BlasTriangleSSBO
+{
+    Triangle Triangles[];
+} blasTriangleSSBO;
 
 layout(std430, binding = 6) restrict writeonly buffer TransportRaySSBO
 {
@@ -215,7 +215,7 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 } skyBoxUBO;
 
 bool TraceRay(inout TransportRay transportRay);
-vec3 ReflectOfMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
+vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter);
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t);
@@ -248,7 +248,7 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rngSeed = imgCoord.x * 312 + imgCoord.y * 291 + rayIndicesSSBO.AccumulatedSamples * 2699;
+    rngSeed = (imgCoord.y * 4096 + imgCoord.x) * (rayIndicesSSBO.AccumulatedSamples + 1);
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -310,7 +310,7 @@ bool TraceRay(inout TransportRay transportRay)
         bool hitLight = hitInfo.TriangleIndex == -1;
         if (!hitLight)
         {
-            Triangle triangle = triangleSSBO.Triangles[hitInfo.TriangleIndex];
+            Triangle triangle = blasTriangleSSBO.Triangles[hitInfo.TriangleIndex];
             Vertex v0 = triangle.Vertex0;
             Vertex v1 = triangle.Vertex1;
             Vertex v2 = triangle.Vertex2;
@@ -383,7 +383,7 @@ bool TraceRay(inout TransportRay transportRay)
         }
 
         float rayProbability, newIor;
-        transportRay.Direction = ReflectOfMaterial(transportRay.Direction, specularChance, roughness, refractionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, transportRay.IsRefractive);
+        transportRay.Direction = BounceOffMaterial(transportRay.Direction, specularChance, roughness, refractionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, transportRay.IsRefractive);
         transportRay.Origin += normal * EPSILON;
         transportRay.PreviousIOR = newIor;
 
@@ -415,7 +415,7 @@ bool TraceRay(inout TransportRay transportRay)
     }
 }
 
-vec3 ReflectOfMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive)
+vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive)
 {
     isRefractive = false;
     roughness *= roughness;
@@ -476,16 +476,17 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
 {
     hitInfo.T = FLOAT_MAX;
     hitInfo.TriangleIndex = -1;
-    float rayTMin, rayTMax;
+    float tMax;
 
     if (IsTraceLights)
     {
+        float tMin;
         for (int i = 0; i < lightsUBO.Count; i++)
         {
             Light light = lightsUBO.Lights[i];
-            if (RaySphereIntersect(ray, light, rayTMin, rayTMax) && rayTMin < hitInfo.T)
+            if (RaySphereIntersect(ray, light, tMin, tMax) && tMin < hitInfo.T)
             {
-                hitInfo.T = rayTMin;
+                hitInfo.T = tMin;
                 hitInfo.MeshIndex = i;
             }
         }
@@ -499,6 +500,20 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
         uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
+
+        float tMinLeft;
+        float tMinRight;
+        Node top = blasSSBO.Nodes[baseNode];
+        if (RayCuboidIntersect(localRay, top, tMinLeft, tMax) && tMinLeft < hitInfo.T)
+        {
+            // TODO: Add tri test
+        }
+        else
+        {
+
+            continue;
+        }
+
         uint stackPtr = 0;
         uint stackTop = 1;
         while (true)
@@ -507,10 +522,8 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
             Node left = blasSSBO.Nodes[baseNode + stackTop];
             Node right = blasSSBO.Nodes[baseNode + stackTop + 1];
 
-            float tMinLeft;
-            float tMinRight;
-            bool leftChildHit = RayCuboidIntersect(localRay, left, tMinLeft, rayTMax) && tMinLeft < hitInfo.T;
-            bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, rayTMax) && tMinRight < hitInfo.T;
+            bool leftChildHit = RayCuboidIntersect(localRay, left, tMinLeft, tMax) && tMinLeft < hitInfo.T;
+            bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, tMax) && tMinRight < hitInfo.T;
 
             uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
             if (triCount > 0)
@@ -520,7 +533,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
                 {
                     vec3 bary;
                     float hitT;
-                    Triangle triangle = triangleSSBO.Triangles[j];
+                    Triangle triangle = blasTriangleSSBO.Triangles[j];
                     if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, bary, hitT) && hitT < hitInfo.T)
                     {
                         hitInfo.Bary = bary;

@@ -20,23 +20,15 @@ struct Material
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
+    vec2 _pad0;
     float RoughnessFactor;
     float MetallicFactor;
-    vec2 _pad0;
 
     sampler2D BaseColor;
     sampler2D MetallicRoughness;
 
     sampler2D Normal;
     sampler2D Emissive;
-};
-
-struct Light
-{
-    vec3 Position;
-    float Radius;
-    vec3 Color;
-    int PointShadowIndex;
 };
 
 struct PointShadow
@@ -53,7 +45,15 @@ struct PointShadow
     float FarPlane;
 };
 
-layout(std430, binding = 5) restrict readonly buffer MaterialSSBO
+struct Light
+{
+    vec3 Position;
+    float Radius;
+    vec3 Color;
+    int PointShadowIndex;
+};
+
+layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
 {
     Material Materials[];
 } materialSSBO;

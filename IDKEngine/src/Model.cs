@@ -3,11 +3,11 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using OpenTK.Mathematics;
+using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
 using glTFLoader;
 using glTFLoader.Schema;
-using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 using Texture = IDKEngine.Render.Objects.Texture;
 using GLTFTexture = glTFLoader.Schema.Texture;
@@ -42,6 +42,12 @@ namespace IDKEngine
 
         public void LoadFromFile(string path, Matrix4 rootTransform)
         {
+            if (!File.Exists(path))
+            {
+                Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
+                return;
+            }
+
             model = Interface.LoadModel(path);
 
             string rootDir = Path.GetDirectoryName(path);
@@ -68,7 +74,7 @@ namespace IDKEngine
                 Node node = tuple.Item1;
                 Matrix4 globalParentTransform = tuple.Item2;
 
-                Matrix4 localTransform = NodeToMat4(node);
+                Matrix4 localTransform = NodeGetModelMatrix(node);
                 Matrix4 globalTransform = localTransform * globalParentTransform;
 
                 if (node.Children != null)
@@ -434,7 +440,7 @@ namespace IDKEngine
                     return 0;
             }
         }
-        private static Matrix4 NodeToMat4(Node node)
+        private static Matrix4 NodeGetModelMatrix(Node node)
         {
             Matrix4 modelMatrix = new Matrix4(
                     node.Matrix[0], node.Matrix[1], node.Matrix[2], node.Matrix[3],

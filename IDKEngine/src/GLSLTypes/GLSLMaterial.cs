@@ -9,9 +9,9 @@ namespace IDKEngine
         public Vector3 EmissiveFactor;
         public uint BaseColorFactor;
 
+        private readonly Vector2 _pad0;
         public float RoughnessFactor;
         public float MetallicFactor;
-        private readonly Vector2 _pad0;
         
 
         public ulong BaseColorTextureHandle;

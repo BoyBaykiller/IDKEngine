@@ -23,8 +23,9 @@ namespace IDKEngine
 
         private readonly ModelSystem ModelSystem;
         private readonly BufferObject BlasBuffer;
-        private readonly BufferObject TriangleBuffer;
+        private readonly BufferObject BlasTriangleBuffer;
         private readonly GLSLTriangle[] triangles;
+
         public unsafe BVH(ModelSystem modelSystem)
         {
             ModelSystem = modelSystem;
@@ -47,9 +48,9 @@ namespace IDKEngine
             {
                 ref readonly GLSLDrawElementsCommand cmd = ref modelSystem.DrawCommands[i];
                 int baseTriangleCount = cmd.FirstIndex / 3;
-                fixed (GLSLTriangle* ptr = triangles)
+                fixed (GLSLTriangle* ptr = &triangles[baseTriangleCount])
                 {
-                    Blases[i] = new BLAS(ptr + baseTriangleCount, cmd.Count / 3, out int treeDepth);
+                    Blases[i] = new BLAS(ptr, cmd.Count / 3, out int treeDepth);
                     Helper.InterlockedMax(ref maxTreeDepth, treeDepth);
                 }
                 for (int j = 0; j < Blases[i].Nodes.Length; j++)
@@ -63,12 +64,12 @@ namespace IDKEngine
             MaxBlasTreeDepth = maxTreeDepth;
 
             BlasBuffer = new BufferObject();
-            TriangleBuffer = new BufferObject();
+            BlasTriangleBuffer = new BufferObject();
 
             if (triangles.Length > 0)
             {
                 BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * Blases.Sum(blas => blas.Nodes.Length), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-                BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
+                BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
                 int nodesUploaded = 0;
                 for (int i = 0; i < Blases.Length; i++)
                 {
@@ -76,8 +77,8 @@ namespace IDKEngine
                     nodesUploaded += Blases[i].Nodes.Length;
                 }
 
-                TriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.None);
-                TriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
+                BlasTriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.None);
+                BlasTriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
             }
         }
 
