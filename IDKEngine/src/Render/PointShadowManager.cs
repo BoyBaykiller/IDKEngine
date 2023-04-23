@@ -53,7 +53,7 @@ namespace IDKEngine.Render
         {
             if (PointShadows[index] == null)
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Can not remove PointShadow at index {index} as it already is null");
+                Logger.Log(Logger.LogLevel.Warn, $"Can not remove {nameof(PointShadow)} at index {index} as it already is null");
             }
             else
             {

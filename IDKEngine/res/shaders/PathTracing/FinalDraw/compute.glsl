@@ -5,62 +5,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 
-struct TransportRay
-{
-    vec3 Origin;
-    uint DebugNodeCounter;
-
-    vec3 Direction;
-    float PreviousIOR;
-
-    vec3 Throughput;
-    bool IsRefractive;
-
-    vec3 Radiance;
-    float _pad0;
-};
-
-struct DispatchCommand
-{
-    uint NumGroupsX;
-    uint NumGroupsY;
-    uint NumGroupsZ;
-};
-
-layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
-{
-    TransportRay Rays[];
-} transportRaySSBO;
-
-layout(std430, binding = 7) restrict buffer RayIndicesSSBO
-{
-    uint Counts[2];
-    uint AccumulatedSamples;
-    uint Indices[];
-} rayIndicesSSBO;
-
-layout(std430, binding = 8) restrict writeonly buffer DispatchCommandSSBO
-{
-    DispatchCommand DispatchCommands[2];
-} dispatchCommandSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 vec3 SpectralJet(float a);
 

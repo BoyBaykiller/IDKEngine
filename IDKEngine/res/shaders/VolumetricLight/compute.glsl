@@ -1,83 +1,11 @@
 #version 460 core
 #define PI 3.1415926536
-#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 
-struct Light
-{
-    vec3 Position;
-    float Radius;
-    vec3 Color;
-    int PointShadowIndex;
-};
-
-struct PointShadow
-{
-    samplerCube Texture;
-    samplerCubeShadow ShadowTexture;
-    
-    mat4 ProjViewMatrices[6];
-
-    vec3 Position;
-    float NearPlane;
-
-    vec3 _pad0;
-    float FarPlane;
-};
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 1) uniform ShadowDataUBO
-{
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
-    int Count;
-} shadowDataUBO;
-
-layout(std140, binding = 2) uniform LightsUBO
-{
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
-    int Count;
-} lightsUBO;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
-    int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
-} taaDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);
 bool Shadow(PointShadow pointShadow, vec3 lightToSample);

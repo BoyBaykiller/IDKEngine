@@ -1,31 +1,13 @@
 #version 460 core
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX
-#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) restrict uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerHistory;
 
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
-    int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
-} taaDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocityPixel, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
 vec4 SampleTextureCatmullRom(sampler2D src, vec2 uv);

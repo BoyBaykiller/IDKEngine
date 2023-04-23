@@ -5,7 +5,6 @@
 #define SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV 3u
 #define SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV 4u
 #define TILE_SIZE 16 // used in shader and client code - keep in sync!
-#extension GL_ARB_bindless_texture : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_AMD_gcn_shader : enable
@@ -21,42 +20,7 @@ layout(binding = 0) restrict writeonly uniform uimage2D ImgResult;
 layout(binding = 1) restrict writeonly uniform image2D ImgDebug;
 layout(binding = 0) uniform sampler2D SamplerShaded;
 
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
-    int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
-} taaDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanLuminance, out float luminanceVariance);
 float GetLuminance(vec3 color);

@@ -1,7 +1,6 @@
 #version 460 core
 #define PI 3.14159265
 #define EPSILON 0.001
-#extension GL_ARB_bindless_texture : require
 #extension GL_NV_shader_atomic_fp16_vector : enable
 #if defined GL_NV_shader_atomic_fp16_vector
 #extension GL_NV_gpu_shader5 : require
@@ -15,70 +14,7 @@ layout(binding = 2, r32ui) restrict uniform uimage3D ImgResultG;
 layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
 #endif
 
-struct Material
-{
-    vec3 EmissiveFactor;
-    uint BaseColorFactor;
-
-    vec2 _pad0;
-    float RoughnessFactor;
-    float MetallicFactor;
-
-    sampler2D BaseColor;
-    sampler2D MetallicRoughness;
-
-    sampler2D Normal;
-    sampler2D Emissive;
-};
-
-struct PointShadow
-{
-    samplerCube Texture;
-    samplerCubeShadow ShadowTexture;
-    
-    mat4 ProjViewMatrices[6];
-
-    vec3 Position;
-    float NearPlane;
-
-    vec3 _pad0;
-    float FarPlane;
-};
-
-struct Light
-{
-    vec3 Position;
-    float Radius;
-    vec3 Color;
-    int PointShadowIndex;
-};
-
-layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
-{
-    Material Materials[];
-} materialSSBO;
-
-layout(std140, binding = 1) uniform ShadowDataUBO
-{
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
-} shadowDataUBO;
-
-layout(std140, binding = 2) uniform LightsUBO
-{
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
-    int Count;
-} lightsUBO;
-
-layout(std140, binding = 5) uniform VoxelizerDataUBO
-{
-    mat4 OrthoProjection;
-    vec3 GridMin;
-    float _pad0;
-    vec3 GridMax;
-    float _pad1;
-} voxelizerDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 in InOutVars
 {

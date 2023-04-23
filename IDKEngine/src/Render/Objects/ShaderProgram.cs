@@ -6,33 +6,6 @@ using OpenTK.Graphics.OpenGL4;
 
 namespace IDKEngine.Render.Objects
 {
-    readonly struct Shader : IDisposable
-    {
-        public readonly int ID;
-        public readonly ShaderType ShaderType;
-
-        public Shader(ShaderType shaderType, string sourceCode)
-        {
-            ShaderType = shaderType;
-            
-            ID = GL.CreateShader(shaderType);
-
-            GL.ShaderSource(ID, sourceCode);
-            GL.CompileShader(ID);
-
-            string infoLog = GL.GetShaderInfoLog(ID);
-            if (infoLog != string.Empty)
-            {
-                Logger.Log(Logger.LogLevel.Warn, infoLog);
-            }
-        }
-
-        public void Dispose()
-        {
-            GL.DeleteShader(ID);
-        }
-    }
-
     class ShaderProgram : IDisposable
     {
         private static int lastBindedID = 0;

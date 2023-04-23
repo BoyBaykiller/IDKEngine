@@ -1,38 +1,12 @@
 #version 460 core
 #define PI 3.14159265
 #define EPSILON 0.001
-#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 float SSAO(vec3 fragPos, vec3 normal);
 vec3 ViewToNDC(vec3 ndc);
@@ -46,7 +20,6 @@ uniform float Radius;
 uniform float Strength;
 
 uint rngSeed;
-
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
@@ -104,10 +77,9 @@ vec3 NDCToView(vec3 ndc)
     return viewPos.xyz / viewPos.w;
 }
 
+// Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
 vec3 CosineSampleHemisphere(float u, float v, vec3 normal)
 {
-    // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
-
     float z = u * 2.0 - 1.0;
     float a = v * 2.0 * PI;
     float r = sqrt(1.0 - z * z);

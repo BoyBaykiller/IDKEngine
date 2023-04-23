@@ -1,78 +1,12 @@
 #version 460 core
 #define EPSILON 0.001
 #define PI 3.14159265
-#extension GL_ARB_bindless_texture : require
 
 layout(location = 0) out vec4 FragColor;
 
 layout(binding = 1) uniform sampler2D SamplerAO;
 
-struct Light
-{
-    vec3 Position;
-    float Radius;
-    vec3 Color;
-    int PointShadowIndex;
-};
-
-struct PointShadow
-{
-    samplerCube Texture;
-    samplerCubeShadow ShadowTexture;
-    
-    mat4 ProjViewMatrices[6];
-
-    vec3 Position;
-    float NearPlane;
-
-    vec3 _pad0;
-    float FarPlane;
-};
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 1) uniform ShadowDataUBO
-{
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
-} shadowDataUBO;
-
-layout(std140, binding = 2) uniform LightsUBO
-{
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
-    int Count;
-} lightsUBO;
-
-layout(std140, binding = 4) uniform SkyBoxUBO
-{
-    samplerCube Albedo;
-} skyBoxUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample);

@@ -120,10 +120,16 @@ namespace IDKEngine.Render
 
         public bool SetPointLight(PointShadow pointShadow, int lightIndex)
         {
+            if (lightIndex < 0 || lightIndex >= Count)
+            {
+                Logger.Log(Logger.LogLevel.Info, $"Can not assign {nameof(PointShadow)} to Light at index {lightIndex} as it does not exist");
+                return false;
+            }
+
             Light light = Lights[lightIndex];
             if (light.HasPointShadow())
             {
-                Logger.Log(Logger.LogLevel.Info, $"Light at index {lightIndex} already has a PointShadow assigned. To assign a new PointShadow you must remove the old one first by calling {nameof(DeletePointLight)}");
+                Logger.Log(Logger.LogLevel.Info, $"Light at index {lightIndex} already has a {nameof(PointShadow)} assigned. To assign a new {nameof(PointShadow)} you must remove the old one first by calling {nameof(DeletePointLight)}");
                 return false;
             }
 
@@ -141,7 +147,7 @@ namespace IDKEngine.Render
             Light light = Lights[lightIndex];
             if (!light.HasPointShadow())
             {
-                Logger.Log(Logger.LogLevel.Info, $"Can not delete PointShadow of Light as it has none assigned");
+                Logger.Log(Logger.LogLevel.Info, $"Can not delete {nameof(PointShadow)} of Light as it has none assigned");
                 return;
             }
 

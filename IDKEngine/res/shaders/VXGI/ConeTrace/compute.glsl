@@ -1,6 +1,5 @@
 #version 460 core
 #define PI 3.14159265
-#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -8,56 +7,7 @@ layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler3D SamplerVoxelsAlbedo;
 layout(binding = 1) uniform sampler2D SamplerAO;
 
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    float _pad0;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaUpdate;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
-    int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
-} taaDataUBO;
-
-layout(std140, binding = 4) uniform SkyBoxUBO
-{
-    samplerCube Albedo;
-} skyBoxUBO;
-
-layout(std140, binding = 5) uniform VoxelizerDataUBO
-{
-    mat4 OrthoProjection;
-    vec3 GridMin;
-    float _pad0;
-    vec3 GridMax;
-    float _pad1;
-} voxelizerDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance, float roughness);
 float GetMaterialVariance(float specularChance, float roughness);

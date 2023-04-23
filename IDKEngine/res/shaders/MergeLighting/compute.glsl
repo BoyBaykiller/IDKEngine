@@ -1,5 +1,4 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -9,14 +8,7 @@ layout(binding = 1) uniform sampler2D SamplerUnmodulatedIrradiance;
 layout(binding = 2) uniform sampler2D SamplerSSUnmodulatedIrradiance;
 layout(binding = 3) uniform sampler2D SamplerVolumetricLighting;
 
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+AppInclude(shaders/include/Buffers.glsl)
 
 void main()
 {
