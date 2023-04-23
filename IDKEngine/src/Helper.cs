@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
-using Assimp;
 using StbImageSharp;
 using StbImageWriteSharp;
 using OpenTK.Mathematics;
@@ -41,16 +40,6 @@ namespace IDKEngine
             return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
         }
 
-        public static Matrix4 ToOpenTK(this Matrix4x4 matrix4x4)
-        {
-            return Unsafe.As<Matrix4x4, Matrix4>(ref matrix4x4);
-        }
-
-        public static Vector4 ToOpenTK(this Color4D vector4)
-        {
-            return Unsafe.As<Color4D, Vector4>(ref vector4);
-        }
-
         private static HashSet<string> GetExtensions()
         {
             HashSet<string> extensions = new HashSet<string>(GL.GetInteger(GetPName.NumExtensions));
@@ -77,7 +66,7 @@ namespace IDKEngine
         public static DebugProc DebugCallback = Debug;
         private static void Debug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
         {
-            string text = Marshal.PtrToStringAnsi(message, length - 1);
+            string text = Marshal.PtrToStringAnsi(message, length);
             switch (severity)
             {
                 case DebugSeverity.DebugSeverityLow:
@@ -90,8 +79,9 @@ namespace IDKEngine
 
                 case DebugSeverity.DebugSeverityHigh:
                     if (id == 2000) return; // Shader compile error, AMD
+                    if (id == 2001) return; // Program link error, AMD
 
-                    Logger.Log(Logger.LogLevel.Error, text);
+                    Logger.Log(Logger.LogLevel.Error, text + $"{id}");
                     break;
 
                 default:
@@ -191,7 +181,7 @@ namespace IDKEngine
             uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
             uint b = (uint)MathF.Round(data.Z * ((1u << 10) - 1));
 
-            uint packed = (r << 0) | (g << 11) | (b << 22);
+            uint packed = (b << 22) | (g << 11) | (r << 0);
 
             return packed;
         }
@@ -215,7 +205,7 @@ namespace IDKEngine
             uint b = (uint)MathF.Round(data.Z * ((1u << 8) - 1));
             uint a = (uint)MathF.Round(data.W * ((1u << 8) - 1));
 
-            uint packed = (r << 0) | (g << 8) | (b << 16) | (a << 24);
+            uint packed = (a << 24) | (b << 16) | (g << 8) | (r << 0);
 
             return packed;
         }
@@ -226,7 +216,7 @@ namespace IDKEngine
             ulong g = (ulong)MathF.Round(data.Y * ((1u << 21) - 1));
             ulong b = (ulong)MathF.Round(data.Z * ((1u << 21) - 1));
 
-            ulong packed = (r << 0) | (g << 21) | (b << 42);
+            ulong packed = (b << 42) | (g << 21) | (r << 0);
             
             return packed;
         }

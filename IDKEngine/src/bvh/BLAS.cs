@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
@@ -15,13 +13,15 @@ namespace IDKEngine
         private int nodesUsed;
         public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
         {
+            // TODO: Experiemnt with taking in positions and only returning indices array
+            // The caller can then do with that whatever he like (resolve them) and it allows to split positions and vertices
+
             treeDepth = (int)Math.Ceiling(MathF.Log2(count));
 
             Nodes = new GLSLBlasNode[2 * count];
             ref GLSLBlasNode root = ref Nodes[nodesUsed++];
             root.TriCount = (uint)count;
             UpdateNodeBounds(ref root);
-
             Subdivide(ref root);
 
             // Artificially create child node and copy root node into it.
@@ -35,12 +35,16 @@ namespace IDKEngine
             void Subdivide(ref GLSLBlasNode parentNode)
             {
                 if (parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
+                {
                     return;
+                }
 
                 float splitSAH = FindBestSplitAxis(parentNode, out int splitAxis, out float splitPos);
                 float parentSAH = CalculateSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
                 if (splitSAH >= parentSAH)
+                {
                     return;
+                }
 
                 uint start = parentNode.TriStartOrLeftChild;
                 uint end = start + parentNode.TriCount;
@@ -78,13 +82,13 @@ namespace IDKEngine
 
             float FindBestSplitAxis(in GLSLBlasNode node, out int splitAxis, out float splitPos)
             {
-                splitAxis = -1;
+                splitAxis = 1;
                 splitPos = 0;
 
                 AABB uniformDivideArea = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
                 for (int i = 0; i < node.TriCount; i++)
                 {
-                    ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
+                    ref readonly GLSLTriangle tri = ref triangles[node.TriStartOrLeftChild + i];
                     Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) / 3.0f;
                     uniformDivideArea.Shrink(centroid);
                 }
@@ -120,16 +124,16 @@ namespace IDKEngine
                 uint leftCount = 0;
                 for (uint i = 0; i < node.TriCount; i++)
                 {
-                    ref readonly GLSLTriangle tri = ref triangles[(int)(node.TriStartOrLeftChild + i)];
+                    ref readonly GLSLTriangle tri = ref triangles[node.TriStartOrLeftChild + i];
                     float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f;
                     if (triSplitPos < splitPos)
                     {
                         leftCount++;
-                        leftBox.Shrink(tri);
+                        leftBox.GrowToFit(tri);
                     }
                     else
                     {
-                        rightBox.Shrink(tri);
+                        rightBox.GrowToFit(tri);
                     }
                 }
                 uint rightCount = node.TriCount - leftCount;
@@ -140,28 +144,15 @@ namespace IDKEngine
 
             void UpdateNodeBounds(ref GLSLBlasNode node)
             {
-                Vector128<float> nodeMin = Vector128.Create(float.MaxValue);
-                Vector128<float> nodeMax = Vector128.Create(float.MinValue);
+                AABB bounds = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
                 for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
                 {
-                    ref readonly GLSLTriangle tri = ref triangles[i];
-
-                    Vector128<float> v0 = Vector128.Create(tri.Vertex0.Position.X, tri.Vertex0.Position.Y, tri.Vertex0.Position.Z, 0.0f);
-                    Vector128<float> v1 = Vector128.Create(tri.Vertex1.Position.X, tri.Vertex1.Position.Y, tri.Vertex1.Position.Z, 0.0f);
-                    Vector128<float> v2 = Vector128.Create(tri.Vertex2.Position.X, tri.Vertex2.Position.Y, tri.Vertex2.Position.Z, 0.0f);
-
-                    nodeMin = Sse.Min(nodeMin, v0);
-                    nodeMin = Sse.Min(nodeMin, v1);
-                    nodeMin = Sse.Min(nodeMin, v2);
-
-                    nodeMax = Sse.Max(nodeMax, v0);
-                    nodeMax = Sse.Max(nodeMax, v1);
-                    nodeMax = Sse.Max(nodeMax, v2);
+                    bounds.GrowToFit(triangles[i]);
                 }
 
-                node.Min = nodeMin.AsVector3().ToOpenTK();
-                node.Max = nodeMax.AsVector3().ToOpenTK();
+                node.Min = bounds.Min;
+                node.Max = bounds.Max;
             }
         }
 

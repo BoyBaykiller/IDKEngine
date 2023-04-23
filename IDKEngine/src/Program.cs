@@ -1,4 +1,6 @@
-﻿namespace IDKEngine
+﻿using System;
+
+namespace IDKEngine
 {
     class Program
     {

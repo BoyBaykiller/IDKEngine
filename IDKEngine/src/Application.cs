@@ -6,8 +6,6 @@ using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
-using Newtonsoft.Json;
-using System.Globalization;
 
 namespace IDKEngine
 {
@@ -278,10 +276,11 @@ namespace IDKEngine
             sponza.Meshes[91].RoughnessBias = -1.0f;
             sponza.Meshes[93].RoughnessBias = -1.0f;
 
-            sponza.Meshes[63].EmissiveBias = 10.0f; // blue curtain
-            sponza.Meshes[70].EmissiveBias = 20.0f; // green curtain
+            sponza.Meshes[63].EmissiveBias = 10.0f;
+            sponza.Meshes[70].EmissiveBias = 20.0f;
             sponza.Meshes[3].EmissiveBias = 12.0f;
             sponza.Meshes[99].EmissiveBias = 15.0f;
+            sponza.Meshes[97].EmissiveBias = 9.0f;
             sponza.Meshes[42].EmissiveBias = 20.0f;
             sponza.Meshes[38].EmissiveBias = 20.0f;
             sponza.Meshes[40].EmissiveBias = 20.0f;
@@ -292,7 +291,7 @@ namespace IDKEngine
 
             Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
             lucy.Meshes[0].SpecularBias = -1.0f;
-            lucy.Meshes[0].RefractionChance = 0.9f;
+            lucy.Meshes[0].RefractionChance = 0.98f;
             lucy.Meshes[0].IOR = 1.174f;
             lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
             lucy.Meshes[0].RoughnessBias = -1.0f;
@@ -303,7 +302,6 @@ namespace IDKEngine
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });
-
             BVH = new BVH(ModelSystem);
 
             LightManager = new LightManager(12, 12);
@@ -316,10 +314,14 @@ namespace IDKEngine
             LightManager.Add(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
             //LightManager.Add(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 1.0f));
 
-            for (int j = 0; j < 3; j++)
+            for (int i = 0; i < 3; i++)
             {
                 PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
-                LightManager.SetPointLight(pointShadow, j);
+                LightManager.SetPointLight(pointShadow, i);
+
+                // This is an error as DeletePointLight diposes pointShadow. TODO: How can we pass ownership in C#?
+                //LightManager.DeletePointLight(LightManager.Lights[i]);
+                //LightManager.SetPointLight(pointShadow, j);
             }
 
             SetRenderMode(RenderMode.Rasterizer);

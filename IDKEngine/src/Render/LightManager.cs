@@ -85,17 +85,17 @@ namespace IDKEngine.Render
             pointShadowManager.RenderShadowMaps(modelSystem);
         }
 
-        public int Add(Light light)
+        public bool Add(Light light)
         {
             if (Count == GLSL_MAX_UBO_LIGHT_COUNT)
             {
-                return -1;
+                return false;
             }
 
             Lights[Count++] = light;
             UpdateLightBuffer(Count - 1);
 
-            return Count - 1;
+            return true;
         }
 
         public void RemoveAt(int index)
@@ -103,6 +103,7 @@ namespace IDKEngine.Render
             Count--;
             if (Count == 0)
             {
+                Logger.Log(Logger.LogLevel.Warn, $"There is no Light at index {index} to remove. Total light count is 0");
                 return;
             }
 
@@ -117,15 +118,35 @@ namespace IDKEngine.Render
             UpdateLightBuffer(index);
         }
 
-        public void SetPointLight(PointShadow pointShadow, int lightIndex)
+        public bool SetPointLight(PointShadow pointShadow, int lightIndex)
         {
             Light light = Lights[lightIndex];
             if (light.HasPointShadow())
             {
+                Logger.Log(Logger.LogLevel.Info, $"Light at index {lightIndex} already has a PointShadow assigned. To assign a new PointShadow you must remove the old one first by calling {nameof(DeletePointLight)}");
+                return false;
+            }
+
+            if (pointShadowManager.TryAdd(pointShadow, out int pointShadowIndex))
+            {
+                Lights[lightIndex].GLSLLight.PointShadowIndex = pointShadowIndex;
+                UpdateLightBuffer(lightIndex);
+                return true;
+            }
+            return false;
+        }
+
+        public void DeletePointLight(int lightIndex)
+        {
+            Light light = Lights[lightIndex];
+            if (!light.HasPointShadow())
+            {
+                Logger.Log(Logger.LogLevel.Info, $"Can not delete PointShadow of Light as it has none assigned");
                 return;
             }
-            int pointShadowIndex = pointShadowManager.Add(pointShadow);
-            Lights[lightIndex].GLSLLight.PointShadowIndex = pointShadowIndex;
+
+            pointShadowManager.RemoveAt(light.GLSLLight.PointShadowIndex);
+            light.GLSLLight.PointShadowIndex = -1;
             UpdateLightBuffer(lightIndex);
         }
 

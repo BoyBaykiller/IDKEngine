@@ -39,13 +39,13 @@ namespace IDKEngine
             Max = Sse.Max(max, p).AsVector3().ToOpenTK();
         }
 
-        public void Shrink(in AABB aaab)
+        public void GrowToFit(in AABB aaab)
         {
             Shrink(aaab.Min);
             Shrink(aaab.Max);
         }
 
-        public void Shrink(in GLSLTriangle tri)
+        public void GrowToFit(in GLSLTriangle tri)
         {
             Shrink(tri.Vertex0.Position);
             Shrink(tri.Vertex1.Position);

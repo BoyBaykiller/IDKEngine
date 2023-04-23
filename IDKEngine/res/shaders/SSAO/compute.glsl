@@ -58,7 +58,7 @@ void main()
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
     }
-    rngSeed = imgCoord.x * 1973 + imgCoord.y * 9277;
+    rngSeed = imgCoord.y * 4096 + imgCoord.x;
 
     vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
 

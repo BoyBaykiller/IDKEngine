@@ -14,6 +14,9 @@ namespace IDKEngine.Render
         public GLSLMesh[] Meshes;
         private readonly BufferObject meshBuffer;
 
+        public GLSLMeshInstance[] MeshInstances;
+        private readonly BufferObject meshInstanceBuffer;
+
         public GLSLMaterial[] Materials;
         private readonly BufferObject materialBuffer;
 
@@ -23,8 +26,6 @@ namespace IDKEngine.Render
         public uint[] Indices;
         private readonly BufferObject elementBuffer;
 
-        public GLSLMeshInstance[] MeshInstances;
-        private readonly BufferObject meshInstanceBuffer;
 
         private readonly VAO vao;
         private readonly ShaderProgram frustumCullingProgram;
@@ -36,21 +37,21 @@ namespace IDKEngine.Render
 
             Meshes = Array.Empty<GLSLMesh>();
             meshBuffer = new BufferObject();
-            meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
+            meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
+
+            MeshInstances = Array.Empty<GLSLMeshInstance>();
+            meshInstanceBuffer = new BufferObject();
+            meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
 
             Materials = Array.Empty<GLSLMaterial>();
             materialBuffer = new BufferObject();
-            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
+            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
 
             Vertices = Array.Empty<GLSLDrawVertex>();
             vertexBuffer = new BufferObject();
 
             Indices = Array.Empty<uint>();
             elementBuffer = new BufferObject();
-
-            MeshInstances = Array.Empty<GLSLMeshInstance>();
-            meshInstanceBuffer = new BufferObject();
-            meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
             vao = new VAO();
             vao.SetElementBuffer(elementBuffer);
@@ -66,7 +67,9 @@ namespace IDKEngine.Render
         public unsafe void Add(Model[] models)
         {
             if (models.Length == 0)
+            {
                 return;
+            }
 
             for (int i = 0; i < models.Length; i++)
             {

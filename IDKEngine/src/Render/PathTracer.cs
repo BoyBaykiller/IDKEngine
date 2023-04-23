@@ -86,7 +86,17 @@ namespace IDKEngine.Render
             }
         }
 
-        public uint AccumulatedSamples { get; private set; }
+        private uint _accumulatedSamples;
+        public uint AccumulatedSamples
+        {
+            get => _accumulatedSamples;
+
+            set
+            {
+                _accumulatedSamples = value;
+                rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), _accumulatedSamples);
+            }
+        }
 
         public Texture Result;
         private readonly ShaderProgram firstHitProgram;
@@ -141,13 +151,12 @@ namespace IDKEngine.Render
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
 
-            rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), AccumulatedSamples++);
+            AccumulatedSamples++;
         }
 
         public void ResetRender()
         {
             AccumulatedSamples = 0;
-            rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), AccumulatedSamples);
         }
 
         public unsafe void SetSize(int width, int height)
