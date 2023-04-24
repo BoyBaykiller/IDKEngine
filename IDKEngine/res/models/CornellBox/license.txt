@@ -1,0 +1,11 @@
+Model Information:
+* title:	Cornell Box- Original
+* source:	https://sketchfab.com/3d-models/cornell-box-original-0d18de8d108c4c9cab1a4405698cc6b6
+* author:	t-ly (https://sketchfab.com/t-ly)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Cornell Box- Original" (https://sketchfab.com/3d-models/cornell-box-original-0d18de8d108c4c9cab1a4405698cc6b6) by t-ly (https://sketchfab.com/t-ly) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

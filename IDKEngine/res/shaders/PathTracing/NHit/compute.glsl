@@ -4,6 +4,18 @@
 #define FLOAT_MIN -FLOAT_MAX
 #define EPSILON 0.001
 #define PI 3.14159265
+#extension GL_ARB_bindless_texture : require
+#extension GL_AMD_gpu_shader_half_float : enable
+#extension GL_AMD_gpu_shader_half_float_fetch : enable // requires GL_AMD_gpu_shader_half_float
+
+#if defined GL_AMD_gpu_shader_half_float_fetch
+#define HF_SAMPLER_2D f16sampler2D
+#else
+#define HF_SAMPLER_2D sampler2D
+#endif
+
+// Positive integer expression
+#define MAX_BLAS_TREE_DEPTH AppInsert(MAX_BLAS_TREE_DEPTH)
 
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
@@ -22,17 +34,190 @@ struct Ray
     vec3 Direction;
 };
 
-// Positive integer expression
-#define MAX_BLAS_TREE_DEPTH AppInsert(MAX_BLAS_TREE_DEPTH)
-AppInclude(shaders/include/Buffers.glsl)
+struct Material
+{
+    vec3 EmissiveFactor;
+    uint BaseColorFactor;
+
+    vec2 _pad0;
+    float RoughnessFactor;
+    float MetallicFactor;
+
+    HF_SAMPLER_2D BaseColor;
+    HF_SAMPLER_2D MetallicRoughness;
+
+    HF_SAMPLER_2D Normal;
+    HF_SAMPLER_2D Emissive;
+};
+
+struct DrawCommand
+{
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
+};
+
+struct Mesh
+{
+    int InstanceCount;
+    int MaterialIndex;
+    float NormalMapStrength;
+    float EmissiveBias;
+    float SpecularBias;
+    float RoughnessBias;
+    float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    uint CubemapShadowCullInfo;
+};
+
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
+struct Vertex
+{
+    vec3 Position;
+    float _pad0;
+
+    vec2 TexCoord;
+    uint Tangent;
+    uint Normal;
+};
+
+struct Node
+{
+    vec3 Min;
+    uint TriStartOrLeftChild;
+    vec3 Max;
+    uint TriCount;
+};
+
+struct Triangle
+{
+    Vertex Vertex0;
+    Vertex Vertex1;
+    Vertex Vertex2;
+};
+
+struct TransportRay
+{
+    vec3 Origin;
+    uint DebugNodeCounter;
+
+    vec3 Direction;
+    float PreviousIOR;
+
+    vec3 Throughput;
+    bool IsRefractive;
+
+    vec3 Radiance;
+    float _pad0;
+};
+
+struct DispatchCommand
+{
+    uint NumGroupsX;
+    uint NumGroupsY;
+    uint NumGroupsZ;
+};
+
+struct Light
+{
+    vec3 Position;
+    float Radius;
+    vec3 Color;
+    int PointShadowIndex;
+};
+
+layout(std430, binding = 0) restrict readonly buffer DrawCommandsSSBO
+{
+    DrawCommand DrawCommands[];
+} drawCommandSSBO;
+
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
+{
+    Mesh Meshes[];
+} meshSSBO;
+
+layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+{
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
+
+layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
+{
+    Material Materials[];
+} materialSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer BlasSSBO
+{
+    Node Nodes[];
+} blasSSBO;
+
+layout(std430, binding = 5) restrict readonly buffer BlasTriangleSSBO
+{
+    Triangle Triangles[];
+} blasTriangleSSBO;
+
+layout(std430, binding = 6) restrict buffer TransportRaySSBO
+{
+    TransportRay Rays[];
+} transportRaySSBO;
+
+layout(std430, binding = 7) restrict buffer RayIndicesSSBO
+{
+    uint Counts[2];
+    uint AccumulatedSamples;
+    uint Indices[];
+} rayIndicesSSBO;
+
+layout(std430, binding = 8) restrict buffer DispatchCommandSSBO
+{
+    DispatchCommand DispatchCommands[2];
+} dispatchCommandSSBO;
+
+layout(std140, binding = 0) uniform BasicDataUBO
+{
+    mat4 ProjView;
+    mat4 View;
+    mat4 InvView;
+    mat4 PrevView;
+    vec3 ViewPos;
+    float _pad0;
+    mat4 Projection;
+    mat4 InvProjection;
+    mat4 InvProjView;
+    mat4 PrevProjView;
+    float NearPlane;
+    float FarPlane;
+    float DeltaUpdate;
+    float Time;
+} basicDataUBO;
+
+layout(std140, binding = 2) uniform LightsUBO
+{
+    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
+    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
+    int Count;
+} lightsUBO;
+
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
+
+AppInclude(shaders/include/IntersectionRoutines.glsl)
 
 bool TraceRay(inout TransportRay transportRay);
 vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 bool ClosestHit(Ray ray, out HitInfo hitInfo);
-bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t);
-bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2);
-bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2);
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary);
 vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
@@ -263,7 +448,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
         for (int i = 0; i < lightsUBO.Count; i++)
         {
             Light light = lightsUBO.Lights[i];
-            if (RaySphereIntersect(ray, light, tMin, tMax) && tMin < hitInfo.T)
+            if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
             {
                 hitInfo.T = tMin;
                 hitInfo.MeshIndex = i;
@@ -279,18 +464,12 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
         uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
-
         float tMinLeft;
         float tMinRight;
-
-        Node top = blasSSBO.Nodes[baseNode];
-        if (RayCuboidIntersect(localRay, top, tMinLeft, tMax) && tMinLeft < hitInfo.T)
+        
+        Node rootNode = blasSSBO.Nodes[baseNode];
+        if (!(RayCuboidIntersect(localRay, rootNode.Min, rootNode.Max, tMinLeft, tMax) && tMinLeft < hitInfo.T))
         {
-            // TODO: Add tri test
-        }
-        else
-        {
-
             continue;
         }
 
@@ -301,8 +480,8 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
             Node left = blasSSBO.Nodes[baseNode + stackTop];
             Node right = blasSSBO.Nodes[baseNode + stackTop + 1];
 
-            bool leftChildHit = RayCuboidIntersect(localRay, left, tMinLeft, tMax) && tMinLeft < hitInfo.T;
-            bool rightChildHit = RayCuboidIntersect(localRay, right, tMinRight, tMax) && tMinRight < hitInfo.T;
+            bool leftChildHit = RayCuboidIntersect(localRay, left.Min, left.Max, tMinLeft, tMax) && tMinLeft < hitInfo.T;
+            bool rightChildHit = RayCuboidIntersect(localRay, right.Min, right.Max, tMinRight, tMax) && tMinRight < hitInfo.T;
 
             uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
             if (triCount > 0)
@@ -350,61 +529,6 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
     }
 
     return hitInfo.T != FLOAT_MAX;
-}
-
-// Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
-bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t)
-{
-    vec3 v1v0 = v1 - v0;
-    vec3 v2v0 = v2 - v0;
-    vec3 rov0 = ray.Origin - v0;
-    vec3 normal = cross(v1v0, v2v0);
-    vec3 q = cross(rov0, ray.Direction);
-
-    float x = dot(ray.Direction, normal);
-    bary.yz = vec2(dot(-q, v2v0), dot(q, v1v0)) / x;
-    bary.x = 1.0 - bary.y - bary.z;
-
-    t = dot(-normal, rov0) / x;
-
-    return all(greaterThanEqual(vec4(bary, t), vec4(0.0)));
-}
-
-// Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
-bool RayCuboidIntersect(Ray ray, Node node, out float t1, out float t2)
-{
-    t1 = FLOAT_MIN;
-    t2 = FLOAT_MAX;
-
-    vec3 t0s = (node.Min - ray.Origin) / ray.Direction;
-    vec3 t1s = (node.Max - ray.Origin) / ray.Direction;
-
-    vec3 tsmaller = min(t0s, t1s);
-    vec3 tbigger = max(t0s, t1s);
-
-    t1 = max(t1, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
-    t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
-
-    return t1 <= t2 && t2 > 0.0;
-}
-
-// Source: https://antongerdelan.net/opengl/raycasting.html
-bool RaySphereIntersect(Ray ray, Light light, out float t1, out float t2)
-{
-    t1 = t2 = FLOAT_MAX;
-
-    vec3 sphereToRay = ray.Origin - light.Position;
-    float b = dot(ray.Direction, sphereToRay);
-    float c = dot(sphereToRay, sphereToRay) - light.Radius * light.Radius;
-    float discriminant = b * b - c;
-    if (discriminant < 0.0)
-        return false;
-
-    float squareRoot = sqrt(discriminant);
-    t1 = -b - squareRoot;
-    t2 = -b + squareRoot;
-
-    return t1 <= t2 && t2 > 0.0;
 }
 
 vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary)
