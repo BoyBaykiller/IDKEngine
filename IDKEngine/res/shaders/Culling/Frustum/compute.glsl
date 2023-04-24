@@ -7,11 +7,67 @@ struct Frustum
     vec4 Planes[6];
 };
 
-AppInclude(shaders/include/Buffers.glsl)
+struct DrawCommand
+{
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
+};
 
-vec3 NegativeVertex(Node node, vec3 normal);
-bool FrustumAABBIntersect(Frustum frustum, Node node);
+struct Mesh
+{
+    int InstanceCount;
+    int MaterialIndex;
+    float NormalMapStrength;
+    float EmissiveBias;
+    float SpecularBias;
+    float RoughnessBias;
+    float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    uint CubemapShadowCullInfo;
+};
+
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
+struct Node
+{
+    vec3 Min;
+    uint TriStartOrLeftChild;
+    vec3 Max;
+    uint TriCount;
+};
+
+layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
+{
+    DrawCommand DrawCommands[];
+} drawCommandSSBO;
+
+layout(std430, binding = 1) restrict readonly writeonly buffer MeshSSBO
+{
+    Mesh Meshes[];
+} meshSSBO;
+
+layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+{
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer BlasSSBO
+{
+    Node Nodes[];
+} blasSSBO;
+
 Frustum ExtractFrustum(mat4 matrix);
+bool FrustumAABBIntersect(Frustum frustum, Node node);
+vec3 NegativeVertex(Node node, vec3 normal);
 
 layout(location = 0) uniform mat4 ProjView;
 
@@ -50,20 +106,15 @@ Frustum ExtractFrustum(mat4 matrix)
 
 bool FrustumAABBIntersect(Frustum frustum, Node node)
 {
-    float a = 1.0;
+	float a = 1.0;
 
-    for (int i = 0; i < 6; i++)
+	for (int i = 0; i < 6 && a >= 0.0; i++)
     {
-        vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
-        a = dot(vec4(negative, 1.0), frustum.Planes[i]);
+		vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
+		a = dot(vec4(negative, 1.0), frustum.Planes[i]);
+	}
 
-        if (a < 0.0)
-        {
-            return false;
-        }
-    }
-
-    return true;
+	return a >= 0.0;
 }
 
 vec3 NegativeVertex(Node node, vec3 normal)

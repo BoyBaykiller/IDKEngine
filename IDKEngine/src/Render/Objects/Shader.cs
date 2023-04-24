@@ -4,7 +4,6 @@ using System.Text;
 using System.Linq;
 using System.Collections.Generic;
 using OpenTK.Graphics.OpenGL4;
-using System.Diagnostics;
 
 namespace IDKEngine.Render.Objects
 {
@@ -32,14 +31,22 @@ namespace IDKEngine.Render.Objects
             GL.ShaderSource(ID, srcCode);
             GL.CompileShader(ID);
 
-            string infoLog = GL.GetShaderInfoLog(ID);
-            if (infoLog != string.Empty)
+            bool compiled = GetCompileStatus();
+            string shaderInfoLog = GL.GetShaderInfoLog(ID);
+            if (shaderInfoLog != string.Empty)
             {
-                Logger.Log(Logger.LogLevel.Warn, infoLog);
+                Logger.LogLevel level = compiled ? Logger.LogLevel.Info : Logger.LogLevel.Error;
+                Logger.Log(level, shaderInfoLog);
             }
         }
 
-        private string PreProcess(string src, Dictionary<string, string> appInsertions)
+        public bool GetCompileStatus()
+        {
+            GL.GetShader(ID, ShaderParameter.CompileStatus, out int success);
+            return success == 1;
+        }
+
+        private static string PreProcess(string src, Dictionary<string, string> appInsertions)
         {
             StringBuilder result = new StringBuilder(src.Length);
 
@@ -84,13 +91,20 @@ namespace IDKEngine.Render.Objects
                         continue;
                     }
 
-                    result.AppendLine(File.ReadAllText(path));
-                    result.AppendLine($"#line {lineCount}");
+                    string includeSrc = File.ReadAllText(path);
+                    if (includeSrc.Contains(Keyword.AppInclude.ToString()) || includeSrc.Contains(Keyword.AppInsert.ToString()))
+                    {
+                        Logger.Log(Logger.LogLevel.Error, "Recursive includes or insertions intentionally not allowed");
+                        continue;
+                    }
+
+                    result.AppendLine("#line 1");
+                    result.AppendLine(includeSrc);
+                    result.AppendLine($"#line {lineCount + 1}");
                 }
             }
             return result.ToString();
         }
-
         private static int AdvanceToNextKeyword(string srcCode, int startIndex, out Keyword keyword)
         {
             keyword = Keyword.NoKeyword;
@@ -129,7 +143,6 @@ namespace IDKEngine.Render.Objects
 
             return -1;
         }
-
         private static int CountLines(string src, int max)
         {
             int lineCount = 0;
@@ -137,7 +150,7 @@ namespace IDKEngine.Render.Objects
             int startIndex = 0;
             while (true)
             {
-                startIndex = src.IndexOf(Environment.NewLine, startIndex + 1);
+                startIndex = src.IndexOf('\n', startIndex + 1);
                 if (startIndex == -1 || startIndex > max)
                 {
                     break;

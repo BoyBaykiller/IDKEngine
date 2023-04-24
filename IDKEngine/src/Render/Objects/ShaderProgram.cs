@@ -22,20 +22,38 @@ namespace IDKEngine.Render.Objects
             Debug.Assert(shaders.All(s => shaders.All(s1 => s.ID == s1.ID || s1.ShaderType != s.ShaderType)));
 
             for (int i = 0; i < shaders.Length; i++)
-                GL.AttachShader(ID, shaders[i].ID);
+            {
+                Shader shader = shaders[i];
+                if (shader.GetCompileStatus())
+                {
+                    GL.AttachShader(ID, shaders[i].ID);
+                }
+            }
 
             GL.LinkProgram(ID);
 
+            bool linked = GetLinkStatus();
             string infoLog = GL.GetProgramInfoLog(ID);
             if (infoLog != string.Empty)
             {
-                Logger.Log(Logger.LogLevel.Warn, infoLog);
+                Logger.LogLevel level = linked ? Logger.LogLevel.Info : Logger.LogLevel.Error;
+                Logger.Log(level, infoLog);
             }
 
             for (int i = 0; i < shaders.Length; i++)
             {
-                GL.DetachShader(ID, shaders[i].ID);
+                Shader shader = shaders[i];
+                if (shader.GetCompileStatus())
+                {
+                    GL.DetachShader(ID, shaders[i].ID);
+                }
             }
+        }
+
+        public bool GetLinkStatus()
+        {
+            GL.GetProgram(ID, GetProgramParameterName.LinkStatus, out int success);
+            return success == 1;
         }
 
         public void Use()

@@ -1,4 +1,5 @@
 #version 460 core
+#extension GL_ARB_bindless_texture : require
 layout(early_fragment_tests) in;
 
 layout(location = 1) out vec4 AlbedoAlpha;
@@ -6,7 +7,59 @@ layout(location = 2) out vec4 NormalSpecular;
 layout(location = 3) out vec4 EmissiveRoughness;
 layout(location = 4) out vec2 Velocity;
 
-AppInclude(shaders/include/Buffers.glsl)
+struct Material
+{
+    vec3 EmissiveFactor;
+    uint BaseColorFactor;
+
+    vec2 _pad0;
+    float RoughnessFactor;
+    float MetallicFactor;
+
+    sampler2D BaseColor;
+    sampler2D MetallicRoughness;
+
+    sampler2D Normal;
+    sampler2D Emissive;
+};
+
+layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
+{
+    Material Materials[];
+} materialSSBO;
+
+layout(std140, binding = 0) uniform BasicDataUBO
+{
+    mat4 ProjView;
+    mat4 View;
+    mat4 InvView;
+    mat4 PrevView;
+    vec3 ViewPos;
+    float _pad0;
+    mat4 Projection;
+    mat4 InvProjection;
+    mat4 InvProjView;
+    mat4 PrevProjView;
+    float NearPlane;
+    float FarPlane;
+    float DeltaUpdate;
+    float Time;
+} basicDataUBO;
+
+layout(std140, binding = 3) uniform TaaDataUBO
+{
+    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
+    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
+    int Samples;
+    int Enabled;
+    uint Frame;
+    float VelScale;
+} taaDataUBO;
+
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
 
 in InOutVars
 {

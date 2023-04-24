@@ -1,4 +1,5 @@
 #version 460 core
+#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -7,10 +8,87 @@ struct Frustum
 	vec4 Planes[6];
 };
 
-AppInclude(shaders/include/Buffers.glsl)
+struct DrawCommand
+{
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
+};
 
-Frustum ExtractFrustum(mat4 projViewModel);
-bool AABBVsFrustum(Frustum frustum, Node node);
+struct Mesh
+{
+    int InstanceCount;
+    int MaterialIndex;
+    float NormalMapStrength;
+    float EmissiveBias;
+    float SpecularBias;
+    float RoughnessBias;
+    float RefractionChance;
+    float IOR;
+    vec3 Absorbance;
+    uint CubemapShadowCullInfo;
+};
+
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
+struct Node
+{
+    vec3 Min;
+    uint TriStartOrLeftChild;
+    vec3 Max;
+    uint TriCount;
+};
+
+struct PointShadow
+{
+    samplerCube Texture;
+    samplerCubeShadow ShadowTexture;
+
+    mat4 ProjViewMatrices[6];
+
+    vec3 Position;
+    float NearPlane;
+
+    vec3 _pad0;
+    float FarPlane;
+};
+
+layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
+{
+    DrawCommand DrawCommands[];
+} drawCommandSSBO;
+
+layout(std430, binding = 1) restrict writeonly buffer MeshSSBO
+{
+    Mesh Meshes[];
+} meshSSBO;
+
+layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+{
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
+
+layout(std430, binding = 4) restrict readonly buffer BlasSSBO
+{
+    Node Nodes[];
+} blasSSBO;
+
+layout(std140, binding = 1) uniform ShadowDataUBO
+{
+    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
+    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+    int Count;
+} shadowDataUBO;
+
+Frustum ExtractFrustum(mat4 matrix);
+bool FrustumAABBIntersect(Frustum frustum, Node node);
 vec3 NegativeVertex(Node node, vec3 normal);
 
 layout(location = 0) uniform int ShadowIndex;
@@ -36,7 +114,7 @@ void main()
     for (int i = 0; i < 6; i++)
     {
         Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * model);
-        if (AABBVsFrustum(frustum, node))
+        if (FrustumAABBIntersect(frustum, node))
         {
             packedValue = bitfieldInsert(packedValue, i, 3 * instances++, 3);
         }
@@ -62,13 +140,13 @@ Frustum ExtractFrustum(mat4 projViewModel)
 	return frustum;
 }
 
-bool AABBVsFrustum(Frustum frustum, Node node)
+bool FrustumAABBIntersect(Frustum frustum, Node node)
 {
 	float a = 1.0;
 
-	for (int i = 0; i < 6 && a >= 0.0; i++) {
+	for (int i = 0; i < 6 && a >= 0.0; i++)
+    {
 		vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
-
 		a = dot(vec4(negative, 1.0), frustum.Planes[i]);
 	}
 

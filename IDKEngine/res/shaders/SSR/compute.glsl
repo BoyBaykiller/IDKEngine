@@ -1,12 +1,43 @@
 #version 460 core
 #define EPSILON 0.001
+#extension GL_ARB_bindless_texture : require
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerSrc;
 
-AppInclude(shaders/include/Buffers.glsl)
+layout(std140, binding = 0) uniform BasicDataUBO
+{
+    mat4 ProjView;
+    mat4 View;
+    mat4 InvView;
+    mat4 PrevView;
+    vec3 ViewPos;
+    float _pad0;
+    mat4 Projection;
+    mat4 InvProjection;
+    mat4 InvProjView;
+    mat4 PrevProjView;
+    float NearPlane;
+    float FarPlane;
+    float DeltaUpdate;
+    float Time;
+} basicDataUBO;
+
+layout(std140, binding = 4) uniform SkyBoxUBO
+{
+    samplerCube Albedo;
+} skyBoxUBO;
+
+layout(std140, binding = 6) uniform GBufferDataUBO
+{
+    sampler2D AlbedoAlpha;
+    sampler2D NormalSpecular;
+    sampler2D EmissiveRoughness;
+    sampler2D Velocity;
+    sampler2D Depth;
+} gBufferDataUBO;
 
 vec3 SSR(vec3 normal, vec3 fragPos);
 void CustomBinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample);

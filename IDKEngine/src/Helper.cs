@@ -198,6 +198,11 @@ namespace IDKEngine
             return new Vector3(r, g, b);
         }
 
+        public static uint CompressSNorm32Fast(Vector4 data)
+        {
+            data = data * 0.5f + new Vector4(0.5f);
+            return CompressUNorm32Fast(data);
+        }
         public static uint CompressUNorm32Fast(Vector4 data)
         {
             uint r = (uint)MathF.Round(data.X * ((1u << 8) - 1));

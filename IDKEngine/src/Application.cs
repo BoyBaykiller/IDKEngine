@@ -299,6 +299,7 @@ namespace IDKEngine
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
 
             //Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
+            Model test = new Model("res/models/CornellBox/scene.gltf");
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });

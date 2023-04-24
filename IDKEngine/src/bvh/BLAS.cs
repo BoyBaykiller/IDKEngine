@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
@@ -13,9 +14,6 @@ namespace IDKEngine
         private int nodesUsed;
         public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
         {
-            // TODO: Experiemnt with taking in positions and only returning indices array
-            // The caller can then do with that whatever he like (resolve them) and it allows to split positions and vertices
-
             treeDepth = (int)Math.Ceiling(MathF.Log2(count));
 
             Nodes = new GLSLBlasNode[2 * count];
@@ -29,7 +27,6 @@ namespace IDKEngine
             if (nodesUsed == 1)
             {
                 Nodes[nodesUsed++] = root;
-                return;
             }
 
             void Subdivide(ref GLSLBlasNode parentNode)
