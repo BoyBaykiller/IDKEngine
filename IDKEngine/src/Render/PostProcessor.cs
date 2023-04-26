@@ -1,10 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
-using System.Runtime.InteropServices;
 
 namespace IDKEngine.Render
 {
@@ -51,7 +51,7 @@ namespace IDKEngine.Render
             set
             {
                 _isDithering = value;
-                combineProgram.Upload("IsDithering", _isDithering);
+                postCombineProgram.Upload("IsDithering", _isDithering);
             }
         }
 
@@ -63,7 +63,7 @@ namespace IDKEngine.Render
             set
             {
                 _gamma = value;
-                combineProgram.Upload("Gamma", _gamma);
+                postCombineProgram.Upload("Gamma", _gamma);
             }
         }
 
@@ -84,7 +84,7 @@ namespace IDKEngine.Render
         private Texture taaPing;
         private Texture taaPong;
         private readonly ShaderProgram taaResolveProgram;
-        private readonly ShaderProgram combineProgram;
+        private readonly ShaderProgram postCombineProgram;
         private readonly BufferObject taaDataBuffer;
         private readonly GLSLTaaData* taaData;
         private bool isPing;
@@ -92,7 +92,7 @@ namespace IDKEngine.Render
         {
             Debug.Assert(taaSamples <= GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
 
-            combineProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PostCombine/compute.glsl")));
+            postCombineProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PostCombine/compute.glsl")));
             taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TAAResolve/compute.glsl")));
 
             taaDataBuffer = new BufferObject();
@@ -123,7 +123,7 @@ namespace IDKEngine.Render
             if (v1 != null) v1.BindToUnit(1);
             else Texture.UnbindFromUnit(1);
 
-            combineProgram.Use();
+            postCombineProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
 
@@ -165,7 +165,7 @@ namespace IDKEngine.Render
             taaPing.Dispose();
             taaPong.Dispose();
             taaResolveProgram.Dispose();
-            combineProgram.Dispose();
+            postCombineProgram.Dispose();
             taaDataBuffer.Dispose();
             Marshal.FreeHGlobal((nint)taaData);
         }

@@ -3,23 +3,62 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
 using glTFLoader;
 using glTFLoader.Schema;
 using IDKEngine.Render.Objects;
-using Texture = IDKEngine.Render.Objects.Texture;
-using GLTFTexture = glTFLoader.Schema.Texture;
+using GLTexture = IDKEngine.Render.Objects.Texture;
+using Texture = glTFLoader.Schema.Texture;
 
 namespace IDKEngine
 {
     class Model
     {
-        private struct MaterialData
+        private struct GLTextureData
         {
             public ImageResult Image;
             public Sampler Sampler;
+        }
+
+        private struct GLMaterialData
+        {
+            public const int TEXTURE_COUNT = 4;
+            
+            public enum TextureType : int
+            {
+                BaseColor,
+                MetallicRoughness,
+                Normal,
+                Emissive
+            }
+
+            public ref GLTextureData this[TextureType textureType]
+            {
+                get
+                {
+                    switch (textureType)
+                    {
+                        case TextureType.BaseColor: return ref Unsafe.AsRef(BaseColorTexture);
+                        case TextureType.MetallicRoughness: return ref Unsafe.AsRef(MetallicRoughnessTexture);
+                        case TextureType.Normal: return ref Unsafe.AsRef(NormalTexture);
+                        case TextureType.Emissive: return ref Unsafe.AsRef(EmissiveTexture);
+                        default: throw new NotSupportedException($"Unsupported {nameof(TextureType)} {textureType}");
+                    }
+                }
+            }
+
+            public GLTextureData BaseColorTexture;
+            public GLTextureData MetallicRoughnessTexture;
+            public GLTextureData NormalTexture;
+            public GLTextureData EmissiveTexture;
+
+            public uint BaseColorFactor;
+            public float MetallicFactor;
+            public float RoughnessFactor;
+            public Vector3 EmissiveFactor;
         }
 
         public GLSLMesh[] Meshes;
@@ -29,7 +68,7 @@ namespace IDKEngine
         public GLSLDrawVertex[] Vertices;
         public uint[] Indices;
 
-        private Gltf model;
+        private Gltf gltfModel;
         public Model(string path, Matrix4 rootTransform)
         {
             LoadFromFile(path, rootTransform);
@@ -48,12 +87,12 @@ namespace IDKEngine
                 return;
             }
 
-            model = Interface.LoadModel(path);
+            gltfModel = Interface.LoadModel(path);
 
             string rootDir = Path.GetDirectoryName(path);
 
-            MaterialData[] materialData = LoadMaterialData(rootDir);
-            Materials = LoadMaterials(materialData);
+            GLMaterialData[] materialsData = LoadGLMaterialData(rootDir);
+            List<GLSLMaterial> materials = new List<GLSLMaterial>(LoadGLMaterials(materialsData));
 
             List<GLSLMesh> meshes = new List<GLSLMesh>();
             List<GLSLMeshInstance> meshInstances = new List<GLSLMeshInstance>();
@@ -61,19 +100,16 @@ namespace IDKEngine
             List<GLSLDrawVertex> vertices = new List<GLSLDrawVertex>();
             List<uint> indices = new List<uint>();
 
-            Stack<Tuple<Node, Matrix4>> nodeStack = new Stack<Tuple<Node, Matrix4>>();
-            for (int i = 0; i < model.Scenes[0].Nodes.Length; i++)
+            Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
+            for (int i = 0; i < gltfModel.Scenes[0].Nodes.Length; i++)
             {
-                Node node = model.Nodes[model.Scenes[0].Nodes[i]];
-                nodeStack.Push(new Tuple<Node, Matrix4>(node, rootTransform));
+                Node node = gltfModel.Nodes[gltfModel.Scenes[0].Nodes[i]];
+                nodeStack.Push((node, rootTransform));
             }
 
             while (nodeStack.Count > 0)
             {
-                Tuple<Node, Matrix4> tuple = nodeStack.Pop();
-                Node node = tuple.Item1;
-                Matrix4 globalParentTransform = tuple.Item2;
-
+                (Node node, Matrix4 globalParentTransform) = nodeStack.Pop();
                 Matrix4 localTransform = NodeGetModelMatrix(node);
                 Matrix4 globalTransform = localTransform * globalParentTransform;
 
@@ -81,24 +117,36 @@ namespace IDKEngine
                 {
                     for (int i = 0; i < node.Children.Length; i++)
                     {
-                        Node childNode = model.Nodes[node.Children[i]];
-                        nodeStack.Push(new Tuple<Node, Matrix4>(childNode, globalTransform));
+                        Node childNode = gltfModel.Nodes[node.Children[i]];
+                        nodeStack.Push(new ValueTuple<Node, Matrix4>(childNode, globalTransform));
                     }
                 }
 
                 if (node.Mesh.HasValue)
                 {
-                    Mesh gltfMesh = model.Meshes[node.Mesh.Value];
+                    Mesh gltfMesh = gltfModel.Meshes[node.Mesh.Value];
                     for (int i = 0; i < gltfMesh.Primitives.Length; i++)
                     {
                         MeshPrimitive gltfPrimitive = gltfMesh.Primitives[i];
-
+                        
                         GLSLMesh mesh = new GLSLMesh();
                         mesh.InstanceCount = 1;
-                        mesh.MaterialIndex = gltfPrimitive.Material.Value;
 
-                        bool hasNormalMap = materialData[gltfPrimitive.Material.Value * GLSLMaterial.TEXTURE_COUNT + 2].Image != null;
-                        mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
+                        if (gltfPrimitive.Material.HasValue)
+                        {
+                            mesh.MaterialIndex = gltfPrimitive.Material.Value;
+                            bool hasNormalMap = materialsData[gltfPrimitive.Material.Value].NormalTexture.Image != null;
+                            mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
+                        }
+                        else
+                        {
+                            GLMaterialData materialData = new GLMaterialData();
+                            GLSLMaterial material = LoadGLMaterials(new GLMaterialData[] { materialData })[0];
+                            materials.Add(material);
+
+                            mesh.MaterialIndex = Materials.Length - 1;
+                            mesh.NormalMapStrength = 0.0f;
+                        }
 
                         mesh.EmissiveBias = 0.0f;
                         mesh.SpecularBias = 0.0f;
@@ -134,156 +182,44 @@ namespace IDKEngine
 
             Meshes = meshes.ToArray();
             MeshInstances = meshInstances.ToArray();
+            Materials = materials.ToArray();
             DrawCommands = drawCommands.ToArray();
             Vertices = vertices.ToArray();
             Indices = indices.ToArray();
         }
 
-        private GLSLMaterial[] LoadMaterials(MaterialData[] loadData)
+        private unsafe GLMaterialData[] LoadGLMaterialData(string rootDir)
         {
-            GLSLMaterial[] materials = new GLSLMaterial[model.Materials.Length];
-
-            for (int i = 0; i < materials.Length; i++)
+            GLMaterialData[] materialsLoadData = new GLMaterialData[gltfModel.Materials.Length];         
+            
+            Parallel.For(0, materialsLoadData.Length * GLMaterialData.TEXTURE_COUNT, i =>
             {
-                ref GLSLMaterial glslMaterial = ref materials[i];
+                int materialIndex = i / GLMaterialData.TEXTURE_COUNT;
+                GLMaterialData.TextureType textureType = (GLMaterialData.TextureType)(i % GLMaterialData.TEXTURE_COUNT);
 
-                Material material = model.Materials[i];
+                Material material = gltfModel.Materials[materialIndex];
+                ref GLMaterialData materialData = ref materialsLoadData[materialIndex];
+                ref GLTextureData textureLoadData = ref materialData[textureType];
+                
+                // Let one thread load non image data
+                if (textureType == GLMaterialData.TextureType.BaseColor)
+                {
+                    materialData.BaseColorFactor = Helper.CompressUNorm32Fast(new Vector4(
+                        material.PbrMetallicRoughness.BaseColorFactor[0],
+                        material.PbrMetallicRoughness.BaseColorFactor[1],
+                        material.PbrMetallicRoughness.BaseColorFactor[2],
+                        material.PbrMetallicRoughness.BaseColorFactor[3]));
 
-                glslMaterial.BaseColorFactor = Helper.CompressUNorm32Fast(new Vector4(
-                    material.PbrMetallicRoughness.BaseColorFactor[0],
-                    material.PbrMetallicRoughness.BaseColorFactor[1],
-                    material.PbrMetallicRoughness.BaseColorFactor[2],
-                    material.PbrMetallicRoughness.BaseColorFactor[3]));
-
-                glslMaterial.EmissiveFactor = new Vector3(
+                    materialData.EmissiveFactor = new Vector3(
                         material.EmissiveFactor[0],
                         material.EmissiveFactor[1],
                         material.EmissiveFactor[2]);
 
-                glslMaterial.RoughnessFactor = material.PbrMetallicRoughness.RoughnessFactor;
-                glslMaterial.MetallicFactor = material.PbrMetallicRoughness.MetallicFactor;
-
-                {
-                    MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 0];
-                    SizedInternalFormat internalFormat = SizedInternalFormat.Srgb8Alpha8;
-                    glslMaterial.BaseColorTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
-                }
-                {
-                    MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 1];
-                    SizedInternalFormat internalFormat = SizedInternalFormat.Rg8;
-                    if (data.Image != null)
-                    {
-                        // Move B into R channel such that metallic becomes R and roughness is G
-                        for (int j = 0; j < data.Image.Data.Length; j += 4)
-                        {
-                            data.Image.Data[j] = data.Image.Data[j + 2];
-                        }
-                        glslMaterial.MetallicRoughnessTextureHandle = GetTextureHandle(data, internalFormat);
-                    }
-                    else
-                    {
-                        glslMaterial.MetallicRoughnessTextureHandle = GetFallbackTextureHandle(internalFormat);
-                    }
-                }
-                {
-                    MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 2];
-                    SizedInternalFormat internalFormat = SizedInternalFormat.R11fG11fB10f;
-                    glslMaterial.NormalTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
-                }
-                {
-                    MaterialData data = loadData[i * GLSLMaterial.TEXTURE_COUNT + 3];
-                    SizedInternalFormat internalFormat = SizedInternalFormat.Srgb8Alpha8;
-                    glslMaterial.EmissiveTextureHandle = data.Image != null ? GetTextureHandle(data, internalFormat) : GetFallbackTextureHandle(internalFormat);
+                    materialData.RoughnessFactor = material.PbrMetallicRoughness.RoughnessFactor;
+                    materialData.MetallicFactor = material.PbrMetallicRoughness.MetallicFactor;
                 }
 
-                static ulong GetTextureHandle(MaterialData data, SizedInternalFormat internalFormat)
-                {
-                    SamplerObject glSampler = new SamplerObject();
-                    glSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)data.Sampler.MinFilter);
-                    glSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)data.Sampler.MagFilter);
-                    glSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)data.Sampler.WrapS);
-                    glSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)data.Sampler.WrapT);
-                    glSampler.SetSamplerParamter(SamplerParameterName.TextureMaxAnisotropyExt, 4.0f);
-
-                    Texture glTexture = new Texture(TextureTarget2d.Texture2D);
-                    glTexture.ImmutableAllocate(data.Image.Width, data.Image.Height, 1, internalFormat, Math.Max(Texture.GetMaxMipmapLevel(data.Image.Width, data.Image.Height, 1), 1));
-                    glTexture.SubTexture2D(data.Image.Width, data.Image.Height, PixelFormat.Rgba, PixelType.UnsignedByte, data.Image.Data);
-                    glTexture.GenerateMipmap();
-
-                    return glTexture.GetTextureSamplerHandleARB(glSampler);
-                }
-            }
-
-            return materials;
-        }
-        private MaterialData[] LoadMaterialData(string rootDir)
-        {
-            MaterialData[] localMaterialData = new MaterialData[model.Materials.Length * GLSLMaterial.TEXTURE_COUNT];
-
-            Sampler.MagFilterEnum magFilterDefault = Sampler.MagFilterEnum.LINEAR;
-            Sampler.MinFilterEnum minFilterDefault = Sampler.MinFilterEnum.LINEAR_MIPMAP_LINEAR;
-            Parallel.For(0, localMaterialData.Length, i =>
-            {
-                int materialIndex = i / GLSLMaterial.TEXTURE_COUNT;
-                int imageIndex = i % GLSLMaterial.TEXTURE_COUNT;
-
-                Material material = model.Materials[materialIndex];
-
-                Sampler sampler = null;
-                string imagePath = null;
-
-                if (imageIndex == 0)
-                {
-                    TextureInfo textureInfo = material.PbrMetallicRoughness.BaseColorTexture;
-                    if (textureInfo != null)
-                    {
-                        GetImagePathAndSampler(model.Textures[textureInfo.Index], out imagePath, out sampler);
-                    }
-                }
-                else if (imageIndex == 1)
-                {
-                    TextureInfo textureInfo = material.PbrMetallicRoughness.MetallicRoughnessTexture;
-                    if (textureInfo != null)
-                    {
-                        GetImagePathAndSampler(model.Textures[textureInfo.Index], out imagePath, out sampler);
-                    }
-                }
-                else if (imageIndex == 2)
-                {
-                    MaterialNormalTextureInfo textureInfo = material.NormalTexture;
-                    if (textureInfo != null)
-                    {
-                        GetImagePathAndSampler(model.Textures[textureInfo.Index], out imagePath, out sampler);
-
-                    }
-                }
-                else if (imageIndex == 3)
-                {
-                    TextureInfo textureInfo = material.EmissiveTexture;
-                    if (textureInfo != null)
-                    {
-                        GetImagePathAndSampler(model.Textures[textureInfo.Index], out imagePath, out sampler);
-                    }
-                }
-
-                void GetImagePathAndSampler(GLTFTexture gltfTexture, out string imagePath, out Sampler sampler)
-                {
-                    imagePath = null;
-                    sampler = null;
-
-                    if (gltfTexture.Source.HasValue)
-                    {
-                        Image image = model.Images[gltfTexture.Source.Value];
-                        imagePath = Path.Combine(rootDir, image.Uri);
-                    }
-
-                    if (gltfTexture.Sampler.HasValue)
-                    {
-                        sampler = model.Samplers[gltfTexture.Sampler.Value];
-                    }
-                }
-
-                if (imagePath == null)
+                if (!GetData(material, textureType, out string imagePath, out textureLoadData.Sampler, out ColorComponents colorComponents))
                 {
                     return;
                 }
@@ -293,30 +229,65 @@ namespace IDKEngine
                     Logger.Log(Logger.LogLevel.Error, $"Image \"{imagePath}\" is not found");
                     return;
                 }
-                
-                
-                if (sampler == null)
-                {
-                    sampler = new Sampler();
-                    sampler.WrapS = Sampler.WrapSEnum.REPEAT;
-                    sampler.WrapT = Sampler.WrapTEnum.REPEAT;
-                }
-
-                if (!sampler.MinFilter.HasValue)
-                {
-                    sampler.MinFilter = minFilterDefault;
-                }
-                if (!sampler.MagFilter.HasValue)
-                {
-                    sampler.MagFilter = magFilterDefault;
-                }
 
                 using FileStream stream = File.OpenRead(imagePath);
-                localMaterialData[i].Image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
-                localMaterialData[i].Sampler = sampler;
+                textureLoadData.Image = ImageResult.FromStream(stream, colorComponents);
             });
-            return localMaterialData;
+
+            bool GetData(Material material, GLMaterialData.TextureType textureType, out string imagePath, out Sampler sampler, out ColorComponents colorComponents)
+            {
+                sampler = null;
+                imagePath = null;
+                colorComponents = ColorComponents.RedGreenBlueAlpha;
+
+                {
+                    Texture texture = null;
+
+                    if (textureType == GLMaterialData.TextureType.BaseColor)
+                    {
+                        TextureInfo textureInfo = material.PbrMetallicRoughness.BaseColorTexture;
+                        colorComponents = ColorComponents.RedGreenBlueAlpha;
+                        if (textureInfo != null) texture = gltfModel.Textures[textureInfo.Index];
+                    }
+                    else if (textureType == GLMaterialData.TextureType.MetallicRoughness)
+                    {
+                        TextureInfo textureInfo = material.PbrMetallicRoughness.MetallicRoughnessTexture;
+                        colorComponents = ColorComponents.RedGreenBlue;
+                        if (textureInfo != null) texture = gltfModel.Textures[textureInfo.Index];
+                    }
+                    else if (textureType == GLMaterialData.TextureType.Normal)
+                    {
+                        MaterialNormalTextureInfo textureInfo = material.NormalTexture;
+                        colorComponents = ColorComponents.RedGreenBlue;
+                        if (textureInfo != null) texture = gltfModel.Textures[textureInfo.Index];
+                    }
+                    else if (textureType == GLMaterialData.TextureType.Emissive)
+                    {
+                        TextureInfo textureInfo = material.EmissiveTexture;
+                        colorComponents = ColorComponents.RedGreenBlue;
+                        if (textureInfo != null) texture = gltfModel.Textures[textureInfo.Index];
+                    }
+
+                    if (texture != null)
+                    {
+                        if (texture.Source.HasValue)
+                        {
+                            Image image = gltfModel.Images[texture.Source.Value];
+                            imagePath = Path.Combine(rootDir, image.Uri);
+                        }
+                        if (texture.Sampler.HasValue)
+                        {
+                            sampler = gltfModel.Samplers[texture.Sampler.Value];
+                        }
+                    }
+                }
+
+                return imagePath != null;
+            }
+
+            return materialsLoadData;
         }
+
         private unsafe GLSLDrawVertex[] LoadVertexData(string rootDir, MeshPrimitive meshPrimitive)
         {
             const string GLTF_POSITION_ATTRIBUTE = "POSITION";
@@ -330,9 +301,9 @@ namespace IDKEngine
             {
                 KeyValuePair<string, int> item = myDict.ElementAt(j);
 
-                Accessor accessor = model.Accessors[item.Value];
-                BufferView bufferView = model.BufferViews[accessor.BufferView.Value];
-                glTFLoader.Schema.Buffer buffer = model.Buffers[bufferView.Buffer];
+                Accessor accessor = gltfModel.Accessors[item.Value];
+                BufferView bufferView = gltfModel.BufferViews[accessor.BufferView.Value];
+                glTFLoader.Schema.Buffer buffer = gltfModel.Buffers[bufferView.Buffer];
 
                 using FileStream fileStream = File.OpenRead(Path.Combine(rootDir, buffer.Uri));
                 fileStream.Position = accessor.ByteOffset + bufferView.ByteOffset;
@@ -385,21 +356,22 @@ namespace IDKEngine
 
             return vertices;
         }
+        
         private unsafe uint[] LoadIndexData(string rootDir, MeshPrimitive meshPrimitive)
         {
-            Accessor accessor = model.Accessors[meshPrimitive.Indices.Value];
-            BufferView bufferView = model.BufferViews[accessor.BufferView.Value];
-            glTFLoader.Schema.Buffer buffer = model.Buffers[bufferView.Buffer];
+            Accessor accessor = gltfModel.Accessors[meshPrimitive.Indices.Value];
+            BufferView bufferView = gltfModel.BufferViews[accessor.BufferView.Value];
+            glTFLoader.Schema.Buffer buffer = gltfModel.Buffers[bufferView.Buffer];
 
             using FileStream fileStream = File.OpenRead(Path.Combine(rootDir, buffer.Uri));
             fileStream.Position = accessor.ByteOffset + bufferView.ByteOffset;
 
             uint[] indices = new uint[accessor.Count];
-            int componentSize = ComponentTypeToSizeInBits(accessor.ComponentType);
+            int componentSize = ComponentTypeToSize(accessor.ComponentType);
             for (int j = 0; j < accessor.Count; j++)
             {
                 uint data;
-                Span<byte> span = new Span<byte>(&data, componentSize / 8);
+                Span<byte> span = new Span<byte>(&data, componentSize);
                 fileStream.Read(span);
 
                 indices[j] = data;
@@ -408,38 +380,103 @@ namespace IDKEngine
             return indices;
         }
 
-        private static ulong GetFallbackTextureHandle(SizedInternalFormat internalFormat)
+        private static GLSLMaterial[] LoadGLMaterials(GLMaterialData[] materialsLoadInfo)
         {
-            Texture glTexture = new Texture(TextureTarget2d.Texture2D);
-            glTexture.ImmutableAllocate(1, 1, 1, internalFormat);
-            glTexture.Clear(PixelFormat.Red, PixelType.Float, 1.0f);
-            glTexture.SetSwizzle(All.Red, All.Red, All.Red, All.Red);
-            glTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            glTexture.SetWrapMode(TextureWrapMode.Repeat, TextureWrapMode.Repeat);
-            return glTexture.GetTextureHandleARB();
-        }
+            GLSLMaterial[] materials = new GLSLMaterial[materialsLoadInfo.Length];
 
-        private static int ComponentTypeToSizeInBits(Accessor.ComponentTypeEnum componentType)
-        {
-            switch (componentType)
+            for (int i = 0; i < materials.Length; i++)
             {
-                case Accessor.ComponentTypeEnum.UNSIGNED_BYTE:
-                case Accessor.ComponentTypeEnum.BYTE:
-                    return 8;
+                ref GLSLMaterial glslMaterial = ref materials[i];
+                GLMaterialData materialLoadData = materialsLoadInfo[i];
 
-                case Accessor.ComponentTypeEnum.UNSIGNED_SHORT:
-                case Accessor.ComponentTypeEnum.SHORT:
-                    return 16;
+                glslMaterial.BaseColorFactor = materialLoadData.BaseColorFactor;
+                glslMaterial.RoughnessFactor = materialLoadData.RoughnessFactor;
+                glslMaterial.MetallicFactor = materialLoadData.MetallicFactor;
+                glslMaterial.EmissiveFactor = materialLoadData.EmissiveFactor;
 
-                case Accessor.ComponentTypeEnum.FLOAT:
-                case Accessor.ComponentTypeEnum.UNSIGNED_INT:
-                    return 32;
+                {
+                    GLTextureData loadData = materialLoadData.BaseColorTexture;
+                    SizedInternalFormat internalFormat = SizedInternalFormat.Srgb8Alpha8;
 
-                default:
-                    Logger.Log(Logger.LogLevel.Error, $"No conversion for {componentType} into bit size is possible");
-                    return 0;
+                    (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData, internalFormat);
+                    glslMaterial.BaseColorTextureHandle = texture.GetTextureHandleARB(sampler);
+                }
+                {
+                    GLTextureData loadData = materialLoadData.MetallicRoughnessTexture;
+                    SizedInternalFormat internalFormat = SizedInternalFormat.Rgb8;
+
+                    (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData, internalFormat);
+                    // "Move" metallic from Blue into Red channel
+                    texture.SetSwizzleR(All.Blue);
+
+                    glslMaterial.MetallicRoughnessTextureHandle = texture.GetTextureHandleARB(sampler);
+                }
+                {
+                    GLTextureData loadData = materialLoadData.NormalTexture;
+                    SizedInternalFormat internalFormat = SizedInternalFormat.R11fG11fB10f;
+
+                    (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData, internalFormat);
+                    glslMaterial.NormalTextureHandle = texture.GetTextureHandleARB(sampler);
+                }
+                {
+                    GLTextureData loadData = materialLoadData.EmissiveTexture;
+                    SizedInternalFormat internalFormat = SizedInternalFormat.Srgb8Alpha8;
+
+                    (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData, internalFormat);
+                    glslMaterial.EmissiveTextureHandle = texture.GetTextureHandleARB(sampler);
+                }
+
+                static ValueTuple<GLTexture, SamplerObject> GetGLTextureAndSampler(GLTextureData data, SizedInternalFormat internalFormat)
+                {
+                    if (data.Sampler == null)
+                    {
+                        data.Sampler = new Sampler();
+                        data.Sampler.WrapT = Sampler.WrapTEnum.REPEAT;
+                        data.Sampler.WrapS = Sampler.WrapSEnum.REPEAT;
+                        data.Sampler.MinFilter = null;
+                        data.Sampler.MagFilter = null;
+                    }
+
+                    SamplerObject sampler = new SamplerObject();
+                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
+                    if (data.Image == null)
+                    {
+                        if (data.Sampler.MinFilter == null) data.Sampler.MinFilter = Sampler.MinFilterEnum.NEAREST;
+                        if (data.Sampler.MagFilter == null) data.Sampler.MagFilter = Sampler.MagFilterEnum.NEAREST;
+
+                        texture.ImmutableAllocate(1, 1, 1, internalFormat);
+                        texture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
+                    }
+                    else
+                    {
+                        if (data.Sampler.MinFilter == null) data.Sampler.MinFilter = Sampler.MinFilterEnum.LINEAR_MIPMAP_LINEAR;
+                        if (data.Sampler.MagFilter == null) data.Sampler.MagFilter = Sampler.MagFilterEnum.LINEAR;
+
+                        bool mipmapsRequired = IsMipMapFilter(data.Sampler.MinFilter.Value);
+                        
+                        int levels = mipmapsRequired ? Math.Max(GLTexture.GetMaxMipmapLevel(data.Image.Width, data.Image.Height, 1), 1) : 1;
+                        texture.ImmutableAllocate(data.Image.Width, data.Image.Height, 1, internalFormat, levels);
+                        texture.SubTexture2D(data.Image.Width, data.Image.Height, ColorComponentsToPixelFormat(data.Image.Comp), PixelType.UnsignedByte, data.Image.Data);
+
+                        if (mipmapsRequired)
+                        {
+                            sampler.SetSamplerParamter(SamplerParameterName.TextureMaxAnisotropyExt, 4.0f);
+                            texture.GenerateMipmap();
+                        }
+                    }
+
+                    sampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)data.Sampler.MinFilter);
+                    sampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)data.Sampler.MagFilter);
+                    sampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)data.Sampler.WrapS);
+                    sampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)data.Sampler.WrapT);
+
+                    return (texture, sampler);
+                }
             }
+
+            return materials;
         }
+
         private static Matrix4 NodeGetModelMatrix(Node node)
         {
             Matrix4 modelMatrix = new Matrix4(
@@ -447,7 +484,7 @@ namespace IDKEngine
                     node.Matrix[4], node.Matrix[5], node.Matrix[6], node.Matrix[7],
                     node.Matrix[8], node.Matrix[9], node.Matrix[10], node.Matrix[11],
                     node.Matrix[12], node.Matrix[13], node.Matrix[14], node.Matrix[15]);
-            
+
             if (modelMatrix == Matrix4.Identity)
             {
                 Quaternion rotation = new Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
@@ -473,6 +510,49 @@ namespace IDKEngine
             }
 
             return modelMatrix;
+        }
+
+        private static int ComponentTypeToSize(Accessor.ComponentTypeEnum componentType)
+        {
+            switch (componentType)
+            {
+                case Accessor.ComponentTypeEnum.UNSIGNED_BYTE:
+                case Accessor.ComponentTypeEnum.BYTE:
+                    return 1;
+
+                case Accessor.ComponentTypeEnum.UNSIGNED_SHORT:
+                case Accessor.ComponentTypeEnum.SHORT:
+                    return 2;
+
+                case Accessor.ComponentTypeEnum.FLOAT:
+                case Accessor.ComponentTypeEnum.UNSIGNED_INT:
+                    return 4;
+
+                default:
+                    Logger.Log(Logger.LogLevel.Error, $"No conversion for {componentType} into bit size is possible");
+                    return 0;
+            }
+        }
+
+        private static PixelFormat ColorComponentsToPixelFormat(ColorComponents colorComponents)
+        {
+            PixelFormat pixelFormat = colorComponents switch
+            {
+                ColorComponents.Grey => PixelFormat.Red,
+                ColorComponents.GreyAlpha => PixelFormat.Rg,
+                ColorComponents.RedGreenBlue => PixelFormat.Rgb,
+                ColorComponents.RedGreenBlueAlpha => PixelFormat.Rgba,
+                _ => throw new NotSupportedException($"Unsupported {nameof(ColorComponents)} {colorComponents}"),
+            };
+            return pixelFormat;
+        }
+
+        private static bool IsMipMapFilter(Sampler.MinFilterEnum minFilterEnum)
+        {
+            return minFilterEnum == Sampler.MinFilterEnum.NEAREST_MIPMAP_NEAREST ||
+                   minFilterEnum == Sampler.MinFilterEnum.LINEAR_MIPMAP_NEAREST ||
+                   minFilterEnum == Sampler.MinFilterEnum.NEAREST_MIPMAP_LINEAR ||
+                   minFilterEnum == Sampler.MinFilterEnum.LINEAR_MIPMAP_LINEAR;
         }
     }
 }

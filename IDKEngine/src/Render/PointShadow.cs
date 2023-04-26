@@ -148,7 +148,7 @@ namespace IDKEngine.Render
             Result.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
 
             glslPointShadow.Texture = Result.GetTextureHandleARB();
-            glslPointShadow.ShadowTexture = Result.GetTextureSamplerHandleARB(shadowSampler);
+            glslPointShadow.ShadowTexture = Result.GetTextureHandleARB(shadowSampler);
 
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
             framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);

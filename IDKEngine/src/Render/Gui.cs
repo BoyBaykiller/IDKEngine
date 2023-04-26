@@ -1,27 +1,27 @@
 ﻿using System;
 using System.IO;
+using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
-using System.Diagnostics;
 
 namespace IDKEngine.Render
 {
     class Gui : IDisposable
     {
-        public enum EntityType
+        public enum EntityType : int
         {
-            None = 0,
-            Mesh = 1,
-            Light = 2,
+            None,
+            Mesh,
+            Light,
         }
 
-        public enum FrameRecorderState : uint
+        public enum FrameRecorderState : int
         {
-            Nothing = 0,
-            Recording = 1,
-            Replaying = 2,
+            Nothing,
+            Recording,
+            Replaying,
         }
 
         public ImGuiBackend ImGuiBackend { get; private set; }
@@ -29,15 +29,12 @@ namespace IDKEngine.Render
         private bool isVideoRender;
         private int pathTracerRenderSampleGoal;
 
-        private FrameRecorderState frameRecState;
         public EntityType SelectedEntityType;
         public int SelectedEntityIndex;
         private float selectedEntityDist;
-        private int recordingFPS;
 
-        // TODO: Make more dynamic maybe
-        const string FRAME_OUTPUT_DIR = "RecordedFrames";
-        const string FRAME_RECORD_DATA_PATH = "frameRecordData.frd";
+        private FrameRecorderState frameRecState;
+        private int recordingFPS;
         public Gui(int width, int height)
         {
             ImGuiBackend = new ImGuiBackend(width, height);
@@ -46,8 +43,6 @@ namespace IDKEngine.Render
             pathTracerRenderSampleGoal = 1;
             recordingFPS = 48;
             recordingTimer = Stopwatch.StartNew();
-
-            Directory.CreateDirectory(FRAME_OUTPUT_DIR);
         }
 
         private System.Numerics.Vector2 viewportHeaderSize;
@@ -132,14 +127,15 @@ namespace IDKEngine.Render
 
                 if (frameRecState == FrameRecorderState.Nothing)
                 {
+                    const string FRAME_RECORDER_FILE_PATH = "frameRecordData.frd";
                     if (ImGui.Button($"Save"))
                     {
-                        app.FrameRecorder.SaveToFile(FRAME_RECORD_DATA_PATH);
+                        app.FrameRecorder.SaveToFile(FRAME_RECORDER_FILE_PATH);
                     }
                     ImGui.SameLine();
                     if (ImGui.Button("Load"))
                     {
-                        app.FrameRecorder.Load(FRAME_RECORD_DATA_PATH);
+                        app.FrameRecorder.Load(FRAME_RECORDER_FILE_PATH);
                     }
                     ImGui.Separator();
                 }
@@ -256,7 +252,7 @@ namespace IDKEngine.Render
                             else
                             {
                                 tempFloat = app.RasterizerPipeline.ConeTracer.NormalRayOffset;
-                                if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 0.0f, 3.0f))
+                                if (ImGui.SliderFloat("NormalRayOffset", ref tempFloat, 1.0f, 3.0f))
                                 {
                                     app.RasterizerPipeline.ConeTracer.NormalRayOffset = tempFloat;
                                 }
@@ -509,29 +505,6 @@ namespace IDKEngine.Render
                         ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadow.HAS_VERTEX_LAYERED_RENDERING}");
                         ImGui.SameLine();
                         InfoMark("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
-
-                        //for (int i = 0; i < app.PointShadowManager.Count; i++)
-                        //{
-                        //    ImGui.Separator();
-
-                        //    ImGui.PushID(i);
-                            
-                        //    PointShadow pointShadow = app.PointShadowManager.PointShadows[i];
-
-                        //    tempInt = pointShadow.Result.Width;
-                        //    if (ImGui.InputInt("Resolution", ref tempInt))
-                        //    {
-                        //        pointShadow.SetSize(tempInt);
-                        //    }
-
-                        //    System.Numerics.Vector2 tempVec2 = pointShadow.ClippingPlanes.ToNumerics();
-                        //    if (ImGui.SliderFloat2($"Clipping Planes", ref tempVec2, 1.0f, 200.0f))
-                        //    {
-                        //        pointShadow.ClippingPlanes = tempVec2.ToOpenTK();
-                        //    }
-
-                        //    ImGui.PopID();
-                        //}
                     }
                 }
                 else if (app.GetRenderMode() == RenderMode.PathTracer)
@@ -658,7 +631,7 @@ namespace IDKEngine.Render
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
                     Light light = new Light(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
-                    if (app.LightManager.Add(light))
+                    if (app.LightManager.AddLight(light))
                     {
                         SelectedEntityType = EntityType.Light;
                         SelectedEntityIndex = app.LightManager.Count - 1;
@@ -753,12 +726,30 @@ namespace IDKEngine.Render
                 else if (SelectedEntityType == EntityType.Light)
                 {
                     bool shouldUpdateLight = false;
-                    ref GLSLLight light = ref app.LightManager.Lights[SelectedEntityIndex].GLSLLight;
+                    
+                    app.LightManager.TryGetLight(SelectedEntityIndex, out Light abstractLight);
+                    ref GLSLLight light = ref abstractLight.GLSLLight;
 
                     if (ImGui.Button("Teleport to camera"))
                     {
                         light.Position = app.Camera.Position;
                         shouldUpdateLight = true;
+                    }
+
+                    if (abstractLight.HasPointShadow())
+                    {
+                        if (ImGui.Button("Delete PointShadow"))
+                        {
+                            app.LightManager.DeletePointShadowOfLight(SelectedEntityIndex);
+                        }
+                    }
+                    else
+                    {
+                        if (ImGui.Button("Create PointShadow"))
+                        {
+                            PointShadow pointShadow = new PointShadow(256, 0.5f, 60.0f);
+                            app.LightManager.CreatePointShadowForLight(pointShadow, SelectedEntityIndex);
+                        }
                     }
 
                     System.Numerics.Vector3 systemVec3 = light.Position.ToNumerics();
@@ -861,7 +852,10 @@ namespace IDKEngine.Render
                 int frameIndex = app.FrameRecorder.ReplayFrameIndex;
                 if (frameIndex == 0) frameIndex = app.FrameRecorder.FrameCount;
 
-                Helper.TextureToDisk(app.PostProcessor.Result, $"{FRAME_OUTPUT_DIR}/{frameIndex}");
+                const string RECORDED_FRAME_DATA_OUT_DIR = "RecordedFrames";
+                Directory.CreateDirectory(RECORDED_FRAME_DATA_OUT_DIR);
+
+                Helper.TextureToDisk(app.PostProcessor.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
 
             if (takeScreenshotNextFrame)
@@ -1018,7 +1012,7 @@ namespace IDKEngine.Render
             {
                 if (SelectedEntityType == EntityType.Light)
                 {
-                    app.LightManager.RemoveAt(SelectedEntityIndex);
+                    app.LightManager.RemoveLight(SelectedEntityIndex);
                     SelectedEntityType = EntityType.None;
                     shouldResetPT = true;
                 }

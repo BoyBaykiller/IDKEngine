@@ -9,18 +9,18 @@ namespace IDKEngine.Render.Objects
 {
     class Shader : IDisposable
     {
-        private enum Keyword
+        private enum Keyword : int
         {
-            NoKeyword = -1,
-            AppInsert = 0,
-            AppInclude = 1,
+            NoKeyword,
+            AppInsert,
+            AppInclude,
         }
 
         public const string INCLUDE_PATH_PREFIX = "res/";
 
         public readonly int ID;
         public readonly ShaderType ShaderType;
-        public Shader(ShaderType shaderType, string srcCode, params (string, string)[] appInsertions)
+        public Shader(ShaderType shaderType, string srcCode, params ValueTuple<string, string>[] appInsertions)
         {
             ShaderType = shaderType;
 

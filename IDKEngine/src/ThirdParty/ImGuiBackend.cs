@@ -270,7 +270,7 @@ namespace IDKEngine.GUI
                     {
                         GL.BindTextureUnit(0, (int)pcmd.TextureId);
 
-                        var clip = pcmd.ClipRect;
+                        System.Numerics.Vector4 clip = pcmd.ClipRect;
                         GL.Scissor((int)clip.X, Height - (int)clip.W, (int)(clip.Z - clip.X), (int)(clip.W - clip.Y));
 
                         if ((io.BackendFlags & ImGuiBackendFlags.RendererHasVtxOffset) != 0)
@@ -285,7 +285,7 @@ namespace IDKEngine.GUI
             GL.Disable(EnableCap.ScissorTest);
         }
 
-        private unsafe void SetStyle()
+        private static unsafe void SetStyle()
         {
             ImGuiStylePtr style = ImGui.GetStyle();
             RangeAccessor<Vector4> colors = new RangeAccessor<Vector4>(style.Colors.Data, style.Colors.Count);

@@ -5,10 +5,10 @@ namespace IDKEngine
 {
     unsafe class Mouse
     {
-        private enum ScrollUpdateState
+        private enum ScrollUpdateState : int
         {
-            Unchanged = 0,
-            Changed = 1,
+            Unchanged,
+            Changed,
         }
 
         private CursorModeValue _cursorMode;

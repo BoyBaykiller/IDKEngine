@@ -4,8 +4,6 @@ namespace IDKEngine
 {
     public struct GLSLMaterial
     {
-        public const int TEXTURE_COUNT = 4;
-
         public Vector3 EmissiveFactor;
         public uint BaseColorFactor;
 

@@ -47,10 +47,9 @@ layout(std140, binding = 5) uniform VoxelizerDataUBO
 } voxelizerDataUBO;
 
 
+AppInclude(shaders/include/Transformations.glsl)
 AppInclude(shaders/include/IntersectionRoutines.glsl)
-
-vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier);
-vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
+AppInclude(shaders/include/TraceCone.glsl)
 
 layout(location = 0) uniform float StepMultiplier;
 layout(location = 1) uniform float ConeAngle;
@@ -87,42 +86,4 @@ void main()
     color += (1.0 - color.a) * (texture(skyBoxUBO.Albedo, worldRay.Direction));
 
     imageStore(ImgResult, imgCoord, color);
-}
-
-vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier)
-{
-    vec3 voxelGridWorldSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
-    vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
-    float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
-    float voxelMinLength = min(voxelWorldSpaceSize.x, min(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
-    uint maxLevel = textureQueryLevels(SamplerVoxelsAlbedo) - 1;
-    vec4 accumlatedColor = vec4(0.0);
-
-    float distFromStart = voxelMaxLength;
-    while (accumlatedColor.a < 1.0)
-    {
-        float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
-        float sampleDiameter = max(voxelMinLength, coneDiameter);
-        float sampleLod = log2(sampleDiameter / voxelMinLength);
-        
-        vec3 worldPos = start + direction * distFromStart;
-        vec3 sampleUVT = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz * 0.5 + 0.5;
-        if (any(lessThan(sampleUVT, vec3(0.0))) || any(greaterThanEqual(sampleUVT, vec3(1.0))) || sampleLod > maxLevel)
-        {
-            break;
-        }
-        vec4 sampleColor = textureLod(SamplerVoxelsAlbedo, sampleUVT, sampleLod);
-
-        accumlatedColor += (1.0 - accumlatedColor.a) * sampleColor;
-        distFromStart += sampleDiameter * stepMultiplier;
-    }
-
-    return accumlatedColor;
-}
-
-vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)
-{
-    vec4 rayEye = inverseProj * vec4(normalizedDeviceCoords, -1.0, 0.0);
-    rayEye.zw = vec2(-1.0, 0.0);
-    return normalize((inverseView * rayEye).xyz);
 }
