@@ -7,12 +7,12 @@ namespace IDKEngine.Render.Objects
 {
     class Texture : IDisposable
     {
-        public enum TextureDimension : byte
+        public enum TextureDimension : int
         {
-            Undefined = 0,
-            One = 1,
-            Two = 2,
-            Three = 3,
+            Undefined,
+            One,
+            Two,
+            Three,
         }
 
         public Vector2i Size => new Vector2i(Width, Height);
@@ -92,9 +92,21 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureWrapR, (int)wrapR);
         }
 
-        public void SetSwizzle(All swizzleR, All swizzleG, All swizzleB, All swizzleA)
+        public void SetSwizzleR(All swizzle)
         {
-            GL.TextureParameter(ID, TextureParameterName.TextureSwizzleRgba, new int[] { (int)swizzleR, (int)swizzleG, (int)swizzleB, (int)swizzleA });
+            GL.TextureParameter(ID, TextureParameterName.TextureSwizzleR, (int)swizzle);
+        }
+        public void SetSwizzleG(All swizzle)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureSwizzleG, (int)swizzle);
+        }
+        public void SetSwizzleB(All swizzle)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureSwizzleB, (int)swizzle);
+        }
+        public void SetSwizzleA(All swizzle)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureSwizzleA, (int)swizzle);
         }
 
         public void SetAnisotropy(float value)
@@ -284,7 +296,7 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong GetTextureSamplerHandleARB(SamplerObject samplerObject)
+        public ulong GetTextureHandleARB(SamplerObject samplerObject)
         {
             ulong textureHandle = (ulong)GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);

@@ -77,6 +77,7 @@ namespace IDKEngine
             if (!File.Exists(path))
             {
                 Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
+                return;
             }
 
             using FileStream fileStream = File.OpenRead(path);
@@ -85,6 +86,7 @@ namespace IDKEngine
                 Logger.Log(Logger.LogLevel.Error, $"Can not load \"{path}\", because file size is not a multiple of {sizeof(T)} bytes");
                 return;
             }
+
             if (fileStream.Length == 0)
             {
                 Logger.Log(Logger.LogLevel.Info, $"\"{path}\" is an empty file");

@@ -10,7 +10,7 @@ layout(binding = 0) restrict writeonly uniform imageCube ImgResult;
 
 vec2 Rsi(vec3 r0, vec3 rd, float sr);
 vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAtmos, vec3 kRlh, float kMie, float shRlh, float shMie, float g);
-vec3 GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
+AppInclude(shaders/include/Transformations.glsl)
 
 uniform vec3 LightPos;
 uniform float LightIntensity;
@@ -25,7 +25,7 @@ void main()
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
     vec2 ndc = vec2(imgCoord.xy) / imageSize(ImgResult) * 2.0 - 1.0;
     
-    vec3 toCubemap = GetWorldSpaceRay(InvProjection, InvViews[imgCoord.z], ndc);
+    vec3 toCubemap = GetWorldSpaceDirection(InvProjection, InvViews[imgCoord.z], ndc);
 
     vec3 color = Atmosphere(
         toCubemap,                     // normalized ray direction
@@ -147,11 +147,4 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
 
     // Calculate and return the final color.
     return iSun * (pRlh * kRlh * totalRlh + pMie * kMie * totalMie);
-}
-
-vec3 GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)
-{
-    vec4 rayEye = inverseProj * vec4(normalizedDeviceCoords, -1.0, 0.0);
-    rayEye.zw = vec2(-1.0, 0.0);
-    return normalize((inverseView * rayEye).xyz);
 }

@@ -215,6 +215,7 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 } skyBoxUBO;
 
 AppInclude(shaders/include/IntersectionRoutines.glsl)
+AppInclude(shaders/include/Transformations.glsl)
 
 bool TraceRay(inout TransportRay transportRay);
 vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
@@ -228,7 +229,6 @@ vec3 CosineSampleHemisphere(vec3 normal);
 vec2 UniformSampleDisk();
 uint GetPCGHash(inout uint seed);
 float GetRandomFloat01();
-vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords);
 vec3 DecompressSNorm32Fast(uint data);
 ivec2 ReorderInvocations(uint n);
 
@@ -476,6 +476,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
     hitInfo.T = FLOAT_MAX;
     hitInfo.TriangleIndex = -1;
     float tMax;
+    debugNodeCounter = 0;
 
     if (IsTraceLights)
     {
@@ -625,13 +626,6 @@ uint GetPCGHash(inout uint seed)
 float GetRandomFloat01()
 {
     return float(GetPCGHash(rngSeed)) / 4294967296.0;
-}
-
-vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)
-{
-    vec4 rayEye = inverseProj * vec4(normalizedDeviceCoords, -1.0, 0.0);
-    rayEye.zw = vec2(-1.0, 0.0);
-    return normalize((inverseView * rayEye).xyz);
 }
 
 vec3 DecompressSNorm32Fast(uint data)

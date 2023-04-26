@@ -5,12 +5,12 @@ namespace IDKEngine
 {
     static class Logger
     {
-        public enum LogLevel
+        public enum LogLevel : int
         {
-            Info = 0,
-            Warn = 1,
-            Error = 2,
-            Fatal = 3,
+            Info,
+            Warn,
+            Error,
+            Fatal,
         }
 
         private const string PATH = "log.txt";

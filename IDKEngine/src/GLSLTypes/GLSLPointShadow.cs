@@ -7,8 +7,7 @@ namespace IDKEngine
         public ulong Texture;
         public ulong ShadowTexture;
 
-        // Can't store array of non primitive types as value type in C# (or can u?),
-        // so here I am hardcoding each matrix..
+        // Can't have fixed size array of non primitive types in C# so here I am hardcoding each matrix..
         public Matrix4 PosX;
         public Matrix4 NegX;
         public Matrix4 PosY;

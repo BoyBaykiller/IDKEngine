@@ -21,30 +21,30 @@ namespace IDKEngine.Render
             private set
             {
                 _count = value;
-                bufferObject.SubData(bufferObject.Size - sizeof(int), sizeof(int), Count);
+                lightBufferObject.SubData(lightBufferObject.Size - sizeof(int), sizeof(int), Count);
             }
 
             get => _count;
         }
 
         public readonly int IndicisCount;
-        public readonly Light[] Lights;
+        private readonly Light[] lights;
         
-        private readonly BufferObject bufferObject;
+        private readonly BufferObject lightBufferObject;
         private readonly ShaderProgram shaderProgram;
-        private readonly VAO vao;
         private readonly PointShadowManager pointShadowManager;
+        private readonly VAO vao;
         public unsafe LightManager(int latitudes, int longitudes)
         {
-            Lights = new Light[GLSL_MAX_UBO_LIGHT_COUNT];
+            lights = new Light[GLSL_MAX_UBO_LIGHT_COUNT];
 
             shaderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
 
-            bufferObject = new BufferObject();
-            bufferObject.ImmutableAllocate(Lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            bufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
+            lightBufferObject = new BufferObject();
+            lightBufferObject.ImmutableAllocate(lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            lightBufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
 
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
             BufferObject vbo = new BufferObject();
@@ -76,89 +76,113 @@ namespace IDKEngine.Render
         {
             for (int i = 0; i < Count; i++)
             {
-                Light light = Lights[i];
+                Light light = lights[i];
                 if (light.HasPointShadow())
                 {
-                    pointShadowManager.PointShadows[light.GLSLLight.PointShadowIndex].Position = light.GLSLLight.Position;
+                    pointShadowManager.TryGetPointShadow(light.GLSLLight.PointShadowIndex, out PointShadow pointShadow);
+                    pointShadow.Position = light.GLSLLight.Position;
                 }
             }
             pointShadowManager.RenderShadowMaps(modelSystem);
         }
 
-        public bool Add(Light light)
+        public bool AddLight(Light light)
         {
             if (Count == GLSL_MAX_UBO_LIGHT_COUNT)
             {
+                Logger.Log(Logger.LogLevel.Warn, $"Can not add {nameof(Light)}. Limit of {GLSL_MAX_UBO_LIGHT_COUNT} is reached");
                 return false;
             }
 
-            Lights[Count++] = light;
+            lights[Count++] = light;
             UpdateLightBuffer(Count - 1);
 
             return true;
         }
 
-        public void RemoveAt(int index)
+        public void RemoveLight(int index)
         {
-            Count--;
-            if (Count == 0)
+            if (!TryGetLight(index, out Light light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"There is no Light at index {index} to remove. Total light count is 0");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not remove it");
                 return;
             }
 
-            Light light = Lights[index];
             if (light.HasPointShadow())
             {
-                pointShadowManager.RemoveAt(light.GLSLLight.PointShadowIndex);
+                pointShadowManager.RemovePointShadow(light.GLSLLight.PointShadowIndex);
             }
 
-            Lights[index] = Lights[Count];
+            Count--;
+            if (Count == 0)
+            {
+                return;
+            }
 
+            lights[index] = lights[Count];
             UpdateLightBuffer(index);
         }
 
-        public bool SetPointLight(PointShadow pointShadow, int lightIndex)
+        public bool CreatePointShadowForLight(PointShadow pointShadow, int index)
         {
-            if (lightIndex < 0 || lightIndex >= Count)
+            if (!TryGetLight(index, out Light light))
             {
-                Logger.Log(Logger.LogLevel.Info, $"Can not assign {nameof(PointShadow)} to Light at index {lightIndex} as it does not exist");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not attach {nameof(PointShadow)} to it");
                 return false;
             }
 
-            Light light = Lights[lightIndex];
             if (light.HasPointShadow())
             {
-                Logger.Log(Logger.LogLevel.Info, $"Light at index {lightIndex} already has a {nameof(PointShadow)} assigned. To assign a new {nameof(PointShadow)} you must remove the old one first by calling {nameof(DeletePointLight)}");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} already has a {nameof(PointShadow)} attached. First you must remove the old one by calling {nameof(DeletePointShadowOfLight)}");
                 return false;
             }
 
-            if (pointShadowManager.TryAdd(pointShadow, out int pointShadowIndex))
+            if (pointShadowManager.TryAddPointShadow(pointShadow, out int pointShadowIndex))
             {
-                Lights[lightIndex].GLSLLight.PointShadowIndex = pointShadowIndex;
-                UpdateLightBuffer(lightIndex);
+                lights[index].GLSLLight.PointShadowIndex = pointShadowIndex;
+                UpdateLightBuffer(index);
                 return true;
             }
             return false;
         }
-
-        public void DeletePointLight(int lightIndex)
+        
+        public void DeletePointShadowOfLight(int index)
         {
-            Light light = Lights[lightIndex];
-            if (!light.HasPointShadow())
+            if (!TryGetLight(index, out Light light))
             {
-                Logger.Log(Logger.LogLevel.Info, $"Can not delete {nameof(PointShadow)} of Light as it has none assigned");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not detach {nameof(PointShadow)} from it");
                 return;
             }
 
-            pointShadowManager.RemoveAt(light.GLSLLight.PointShadowIndex);
+            if (!light.HasPointShadow())
+            {
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} has no {nameof(PointShadow)} assigned which could be detached");
+                return;
+            }
+
+            pointShadowManager.RemovePointShadow(light.GLSLLight.PointShadowIndex);
             light.GLSLLight.PointShadowIndex = -1;
-            UpdateLightBuffer(lightIndex);
+            UpdateLightBuffer(index);
         }
 
-        public unsafe void UpdateLightBuffer(int start)
+        public unsafe void UpdateLightBuffer(int index)
         {
-            bufferObject.SubData(start * sizeof(GLSLLight), sizeof(GLSLLight), Lights[start].GLSLLight);
+            if (!TryGetLight(index, out Light light))
+            {
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not update it's buffer content");
+                return;
+            }
+
+            lightBufferObject.SubData(index * sizeof(GLSLLight), sizeof(GLSLLight), light.GLSLLight);
+        }
+
+        public bool TryGetLight(int index, out Light light)
+        {
+            light = null;
+            if (index < 0 || index >= Count) return false;
+
+            light = lights[index];
+            return true;
         }
 
         public bool Intersect(in Ray ray, out HitInfo hitInfo)
@@ -168,7 +192,7 @@ namespace IDKEngine.Render
 
             for (int i = 0; i < Count; i++)
             {
-                Light light = Lights[i];
+                Light light = lights[i];
                 if (MyMath.RaySphereIntersect(ray, light.GLSLLight, out float min, out float max) && min > 0.0f && max < hitInfo.T)
                 {
                     hitInfo.T = min;
@@ -181,10 +205,10 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
-            pointShadowManager.Dispose();
-            bufferObject.Dispose();
-            shaderProgram.Dispose();
             vao.Dispose();
+            pointShadowManager.Dispose();
+            shaderProgram.Dispose();
+            lightBufferObject.Dispose();
         }
     }
 }

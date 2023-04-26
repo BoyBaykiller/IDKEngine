@@ -9,7 +9,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
-    public enum RenderMode
+    public enum RenderMode : int
     {
         Rasterizer,
         PathTracer
@@ -61,7 +61,7 @@ namespace IDKEngine
                     {
                         Bloom.Compute(RasterizerPipeline.Result);
                     }
-
+                    
                     PostProcessor.Compute(true, RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
                     RasterizerPipeline.LightingVRS.DebugRender(PostProcessor.Result);
                 }
@@ -93,7 +93,9 @@ namespace IDKEngine
                 }
                 else
                 {
-                    ref GLSLLight light = ref LightManager.Lights[gui.SelectedEntityIndex].GLSLLight;
+                    LightManager.TryGetLight(gui.SelectedEntityIndex, out Light abstractLight);
+                    ref GLSLLight light = ref abstractLight.GLSLLight;
+                    
                     aabb.Min = new Vector3(light.Position) - new Vector3(light.Radius);
                     aabb.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
@@ -260,7 +262,7 @@ namespace IDKEngine
 
             Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
 
-            // fix minore transparency issue with roughness
+            // fix minor transparency issue with roughness
             sponza.Meshes[0].RoughnessBias = -1.0f;
             sponza.Meshes[1].RoughnessBias = -1.0f;
             sponza.Meshes[20].RoughnessBias = -1.0f;
@@ -285,9 +287,9 @@ namespace IDKEngine
             sponza.Meshes[38].EmissiveBias = 20.0f;
             sponza.Meshes[40].EmissiveBias = 20.0f;
             sponza.Meshes[42].EmissiveBias = 20.0f;
-
             sponza.Meshes[46].SpecularBias = 1.0f; // floor
             sponza.Meshes[46].RoughnessBias = -0.436f; // floor
+
 
             Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
             lucy.Meshes[0].SpecularBias = -1.0f;
@@ -299,10 +301,11 @@ namespace IDKEngine
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
 
             //Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
-            Model test = new Model("res/models/CornellBox/scene.gltf");
+            //Model cornellBox = new Model("res/models/CornellBox/scene.gltf");
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(new Model[] { sponza, lucy, helmet });
+            //ModelSystem.Add(new Model[] { sponza, lucy, helmet });
             BVH = new BVH(ModelSystem);
 
             LightManager = new LightManager(12, 12);
@@ -310,19 +313,16 @@ namespace IDKEngine
             Bloom = new Bloom(ViewportResolution.X, ViewportResolution.Y, 1.0f, 3.0f);
             PostProcessor = new PostProcessor(ViewportResolution.X, ViewportResolution.Y);
 
-            LightManager.Add(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-            LightManager.Add(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-            LightManager.Add(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
-            //LightManager.Add(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(4.585f, 4.725f, 2.56f) * 10.0f, 2.0f));
+            LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+            LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+            LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f));
+
 
             for (int i = 0; i < 3; i++)
             {
                 PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
-                LightManager.SetPointLight(pointShadow, i);
-
-                // This is an error as DeletePointLight diposes pointShadow. TODO: How can we pass ownership in C#?
-                //LightManager.DeletePointLight(LightManager.Lights[i]);
-                //LightManager.SetPointLight(pointShadow, j);
+                LightManager.CreatePointShadowForLight(pointShadow, i);
             }
 
             SetRenderMode(RenderMode.Rasterizer);

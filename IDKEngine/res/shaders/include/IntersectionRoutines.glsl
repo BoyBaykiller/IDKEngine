@@ -37,7 +37,8 @@ bool RayCuboidIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, out float t1, out f
 // Source: https://antongerdelan.net/opengl/raycasting.html
 bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out float t2)
 {
-    t1 = t2 = FLOAT_MAX;
+    t1 = FLOAT_MAX;
+    t2 = FLOAT_MAX;
 
     vec3 sphereToRay = ray.Origin - position;
     float b = dot(ray.Direction, sphereToRay);

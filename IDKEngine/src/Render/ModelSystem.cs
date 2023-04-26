@@ -142,7 +142,7 @@ namespace IDKEngine.Render
 
             for (int i = 0; i < drawCommands.Length; i++)
             {
-                // TODO: Fix calculation of base instance to account for more than 1 instance per model
+                // TODO: Fix calculation of base instance to account for more than 1 instance per gltfModel
                 DrawCommands[prevCmdLength + i].BaseInstance += prevCmdLength;
                 DrawCommands[prevCmdLength + i].BaseVertex += prevBaseVertex;
                 DrawCommands[prevCmdLength + i].FirstIndex += prevIndicesLength;

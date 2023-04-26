@@ -10,8 +10,8 @@ namespace IDKEngine.Render
     {
         private enum Stage : int
         {
-            Downsample = 0,
-            Upsample = 1,
+            Downsample,
+            Upsample,
         }
 
         private float _threshold;
