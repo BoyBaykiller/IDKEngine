@@ -32,7 +32,7 @@ namespace IDKEngine
                 BaseColor,
                 MetallicRoughness,
                 Normal,
-                Emissive
+                Emissive,
             }
 
             public ref GLTextureData this[TextureType textureType]
@@ -88,7 +88,7 @@ namespace IDKEngine
             }
 
             gltfModel = Interface.LoadModel(path);
-
+            
             string rootDir = Path.GetDirectoryName(path);
 
             GLMaterialData[] materialsData = LoadGLMaterialData(rootDir);
@@ -144,7 +144,7 @@ namespace IDKEngine
                             GLSLMaterial material = LoadGLMaterials(new GLMaterialData[] { materialData })[0];
                             materials.Add(material);
 
-                            mesh.MaterialIndex = Materials.Length - 1;
+                            mesh.MaterialIndex = materials.Count - 1;
                             mesh.NormalMapStrength = 0.0f;
                         }
 
@@ -190,6 +190,10 @@ namespace IDKEngine
 
         private unsafe GLMaterialData[] LoadGLMaterialData(string rootDir)
         {
+            if (gltfModel.Materials == null)
+            {
+                return Array.Empty<GLMaterialData>();
+            }
             GLMaterialData[] materialsLoadData = new GLMaterialData[gltfModel.Materials.Length];         
             
             Parallel.For(0, materialsLoadData.Length * GLMaterialData.TEXTURE_COUNT, i =>

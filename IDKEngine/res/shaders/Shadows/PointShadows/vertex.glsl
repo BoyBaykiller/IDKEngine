@@ -1,10 +1,21 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
+
+#define TAKE_VERTEX_LAYERED_RENDERING_PATH AppInsert(TAKE_VERTEX_LAYERED_RENDERING_PATH)
+
+#if TAKE_VERTEX_LAYERED_RENDERING_PATH
 #extension GL_ARB_shader_viewport_layer_array : enable
 #extension GL_NV_viewport_array2 : enable
 #extension GL_AMD_vertex_shader_layer : enable
 
-#define HAS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_NV_viewport_array2 || GL_AMD_vertex_shader_layer)
+#if !defined GL_ARB_shader_viewport_layer_array && !defined GL_NV_viewport_array2 && !defined GL_AMD_vertex_shader_layer
+#error "Cannot take the vertex layered rendering path as neither GL_ARB_shader_viewport_layer_array, GL_NV_viewport_array2 nor GL_AMD_vertex_shader_layer is supported" 
+#endif
+
+#endif
+
+
+AppInclude(include/Constants.glsl)
 
 layout(location = 0) in vec3 Position;
 
@@ -55,7 +66,6 @@ layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
@@ -70,7 +80,7 @@ layout(location = 1) uniform int Layer;
 
 void main()
 {
-#if HAS_VERTEX_LAYERED_RENDERING
+#if TAKE_VERTEX_LAYERED_RENDERING_PATH
 
     // CubemapShadowCullInfo is a specific manipulated value from the culling compute shader
     // It contains 3 bit values, six at maximum, which represent the faces each instance of a mesh is visible on

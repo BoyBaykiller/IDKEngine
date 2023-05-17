@@ -10,7 +10,6 @@ layout(binding = 0) restrict writeonly uniform imageCube ImgResult;
 
 vec2 Rsi(vec3 r0, vec3 rd, float sr);
 vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAtmos, vec3 kRlh, float kMie, float shRlh, float shMie, float g);
-AppInclude(shaders/include/Transformations.glsl)
 
 uniform vec3 LightPos;
 uniform float LightIntensity;
@@ -19,6 +18,8 @@ uniform int JSteps;
 
 uniform mat4 InvViews[6];
 uniform mat4 InvProjection;
+
+AppInclude(include/Transformations.glsl)
 
 void main()
 {

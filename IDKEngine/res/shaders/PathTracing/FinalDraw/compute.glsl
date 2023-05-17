@@ -1,5 +1,6 @@
 #version 460 core
-#define N_HIT_PROGRAM_LOCAL_SIZE_X 64 // used in shader and client code - keep in sync!
+
+AppInclude(PathTracing/include/Constants.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -27,19 +28,19 @@ struct DispatchCommand
     uint NumGroupsZ;
 };
 
-layout(std430, binding = 6) restrict readonly buffer TransportRaySSBO
+layout(std430, binding = 7) restrict readonly buffer TransportRaySSBO
 {
     TransportRay Rays[];
 } transportRaySSBO;
 
-layout(std430, binding = 7) restrict buffer RayIndicesSSBO
+layout(std430, binding = 8) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
     uint AccumulatedSamples;
     uint Indices[];
 } rayIndicesSSBO;
 
-layout(std430, binding = 8) restrict writeonly buffer DispatchCommandSSBO
+layout(std430, binding = 9) restrict writeonly buffer DispatchCommandSSBO
 {
     DispatchCommand DispatchCommands[2];
 } dispatchCommandSSBO;
@@ -106,13 +107,20 @@ vec3 SpectralJet(float a)
 {
 	vec3 c;
 	if (a < 0.25)
-		c = vec3(0.0, 4.0 * a, 1.0);
+    {
+        c = vec3(0.0, 4.0 * a, 1.0);
+    }
 	else if (a < 0.5)
+    {
 		c = vec3(0.0, 1.0, 1.0 + 4.0 * (0.25 - a));
+    }
 	else if (a < 0.75)
+    {
 		c = vec3(4.0 * (a - 0.5), 1.0, 0.0);
+    }
 	else
+    {
 		c = vec3(1.0, 1.0 + 4.0 * (0.75 - a), 0.0);
-
+    }
 	return clamp(c, vec3(0.0), vec3(1.0));
 }

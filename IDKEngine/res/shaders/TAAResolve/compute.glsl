@@ -3,6 +3,8 @@
 #define FLOAT_MIN -FLOAT_MAX
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Constants.glsl)
+
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) restrict uniform image2D ImgResult;
@@ -10,7 +12,6 @@ layout(binding = 0) uniform sampler2D SamplerHistory;
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;

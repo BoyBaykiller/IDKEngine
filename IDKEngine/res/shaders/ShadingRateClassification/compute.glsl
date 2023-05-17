@@ -1,19 +1,11 @@
 #version 460 core
-#define SHADING_RATE_1_INVOCATION_PER_PIXEL_NV 0u
-#define SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV 1u
-#define SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV 2u
-#define SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV 3u
-#define SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV 4u
-#define TILE_SIZE 16 // used in shader and client code - keep in sync!
 #extension GL_ARB_bindless_texture : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_AMD_gcn_shader : enable
 
-// used in shader and client code - keep in sync!
-#define DEBUG_MODE_SPEED 2
-#define DEBUG_MODE_LUMINANCE 3
-#define DEBUG_MODE_LUMINANCE_VARIANCE 4
+AppInclude(include/Constants.glsl)
+AppInclude(ShadingRateClassification/include/Constants.glsl)
 
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
@@ -41,7 +33,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;

@@ -48,7 +48,7 @@ namespace IDKEngine.GUI
             frameBegun = true;
         }
 
-        public void WindowResized(int width, int height)
+        public void SetSize(int width, int height)
         {
             Width = width;
             Height = height;

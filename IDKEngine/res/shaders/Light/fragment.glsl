@@ -1,5 +1,7 @@
 #version 460 core
 
+AppInclude(include/Constants.glsl)
+
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 AlbedoAlpha;
 layout(location = 2) out vec4 NormalSpecular;
@@ -8,7 +10,6 @@ layout(location = 4) out vec2 Velocity;
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;

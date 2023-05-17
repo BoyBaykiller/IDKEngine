@@ -1,6 +1,8 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Constants.glsl)
+
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
 layout(location = 2) in uint Tangent;
@@ -57,7 +59,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
@@ -79,7 +80,7 @@ out InOutVars
     float RoughnessBias;
 } outData;
 
-vec3 DecompressSNorm32Fast(uint v);
+AppInclude(include/Compression.glsl)
 
 void main()
 {
@@ -118,17 +119,4 @@ void main()
     jitteredClipPos.xy += offset * outData.ClipPos.w * taaDataUBO.Enabled;
     
     gl_Position = jitteredClipPos;
-}
-
-vec3 DecompressSNorm32Fast(uint data)
-{
-    float r = (data >> 0) & ((1u << 11) - 1);
-    float g = (data >> 11) & ((1u << 11) - 1);
-    float b = (data >> 22) & ((1u << 10) - 1);
-
-    r /= (1u << 11) - 1;
-    g /= (1u << 11) - 1;
-    b /= (1u << 10) - 1;
-
-    return vec3(r, g, b) * 2.0 - 1.0;
 }

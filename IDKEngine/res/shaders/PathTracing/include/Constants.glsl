@@ -1,0 +1,1 @@
+#define N_HIT_PROGRAM_LOCAL_SIZE_X 64

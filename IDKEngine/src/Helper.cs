@@ -24,17 +24,15 @@ namespace IDKEngine
         {
             return Unsafe.As<Vector3, System.Numerics.Vector3>(ref vector3);
         }
-
-        public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
-        {
-            return Unsafe.As<Vector2, System.Numerics.Vector2>(ref vector2);
-        }
-
         public static Vector3 ToOpenTK(this System.Numerics.Vector3 vector3)
         {
             return Unsafe.As<System.Numerics.Vector3, Vector3>(ref vector3);
         }
 
+        public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
+        {
+            return Unsafe.As<Vector2, System.Numerics.Vector2>(ref vector2);
+        }
         public static Vector2 ToOpenTK(this System.Numerics.Vector2 vector2)
         {
             return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
@@ -119,7 +117,7 @@ namespace IDKEngine
             
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
             {
-                Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and every texture must be of the same size");
+                Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and each texture must be of the same size");
                 return;
             }
             int size = images[0].Width;
@@ -159,10 +157,9 @@ namespace IDKEngine
             Unsafe.InitBlock(ptr, value, byteCount);
         }
 
-        public static unsafe void MemCpy(void* src, void* dest, int len)
+        public static unsafe void MemCpy(void* dest, void* src, uint byteCount)
         {
-            // I don't like having to specify a destination size so yeah
-            System.Buffer.MemoryCopy(src, dest, long.MaxValue, len);
+            Unsafe.CopyBlock(dest, src, byteCount);
         }
 
         public static uint CompressSNorm32Fast(Vector3 data)

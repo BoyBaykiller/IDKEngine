@@ -1,9 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
-using System.Collections.Generic;
 
 namespace IDKEngine.Render
 {
@@ -80,11 +80,12 @@ namespace IDKEngine.Render
         {
             clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 
+            Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
+            shaderInsertions.Add("TAKE_FAST_GEOMETRY_SHADER_PATH", TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0");
+            
             List<Shader> voxelizeProgramShaders = new List<Shader>()
             {
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/vertex.glsl"),
-                    ( "TAKE_FAST_GEOMETRY_SHADER_PATH", $"{(TAKE_FAST_GEOMETRY_SHADER_PATH ? 1 : 0)}" )
-                ),
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/vertex.glsl"), shaderInsertions),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/fragment.glsl"))
             };
             if (TAKE_FAST_GEOMETRY_SHADER_PATH)

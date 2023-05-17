@@ -64,7 +64,7 @@ namespace IDKEngine.Render
             frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/compute.glsl")));
         }
 
-        public unsafe void Add(Model[] models)
+        public unsafe void Add(params Model[] models)
         {
             if (models.Length == 0)
             {

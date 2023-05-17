@@ -1,4 +1,4 @@
-vec4 TraceCone(vec3 start, vec3 direction, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset)
+vec4 TraceCone(vec3 start, vec3 direction, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
 {
     vec3 voxelGridWorldSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
     vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
@@ -10,7 +10,7 @@ vec4 TraceCone(vec3 start, vec3 direction, vec3 normal, float coneAngle, float s
     start += normal * voxelMaxLength * normalRayOffset;
 
     float distFromStart = voxelMaxLength;
-    while (accumlatedColor.a < 0.99)
+    while (accumlatedColor.a < alphaThreshold)
     {
         float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
         float sampleDiameter = max(voxelMinLength, coneDiameter);
@@ -35,6 +35,6 @@ vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier
 {
     const vec3 normal = vec3(0.0);
     const float normalRayOffset = 0.0;
-    return TraceCone(start, direction, normal, coneAngle, stepMultiplier, normalRayOffset);
+    return TraceCone(start, direction, normal, coneAngle, stepMultiplier, normalRayOffset, 1.0);
 }
 

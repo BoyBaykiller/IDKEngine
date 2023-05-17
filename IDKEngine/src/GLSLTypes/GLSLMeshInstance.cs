@@ -25,11 +25,14 @@ namespace IDKEngine
         public Matrix4 InvModelMatrix { get; private set; }
         public Matrix4 PrevModelMatrix { get; private set; }
 
-        public bool ResetPrevModelMatrixToCurrent()
+        public void SetPrevToCurrentMatrix()
         {
-            bool changed = PrevModelMatrix != ModelMatrix;
             PrevModelMatrix = ModelMatrix;
-            return changed;
+        }
+
+        public bool DidMove()
+        {
+            return PrevModelMatrix != ModelMatrix;
         }
     }
 }

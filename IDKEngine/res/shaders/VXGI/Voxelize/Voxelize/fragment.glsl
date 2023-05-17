@@ -7,6 +7,8 @@
 #extension GL_NV_gpu_shader5 : require
 #endif
 
+AppInclude(include/Constants.glsl)
+
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
 #if !defined GL_NV_shader_atomic_fp16_vector
@@ -60,13 +62,11 @@ layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
 } shadowDataUBO;
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;

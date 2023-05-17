@@ -90,7 +90,7 @@ namespace IDKEngine.Render
         {
             if (Count == GLSL_MAX_UBO_LIGHT_COUNT)
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Can not add {nameof(Light)}. Limit of {GLSL_MAX_UBO_LIGHT_COUNT} is reached");
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(Light)}. Limit of {GLSL_MAX_UBO_LIGHT_COUNT} is reached");
                 return false;
             }
 
@@ -104,7 +104,7 @@ namespace IDKEngine.Render
         {
             if (!TryGetLight(index, out Light light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not remove it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Cannot remove it");
                 return;
             }
 
@@ -113,21 +113,19 @@ namespace IDKEngine.Render
                 pointShadowManager.RemovePointShadow(light.GLSLLight.PointShadowIndex);
             }
 
-            Count--;
-            if (Count == 0)
+            if (Count - 1 >= 0)
             {
-                return;
+                lights[index] = lights[Count - 1];
+                UpdateLightBuffer(index);
+                Count--;
             }
-
-            lights[index] = lights[Count];
-            UpdateLightBuffer(index);
         }
 
         public bool CreatePointShadowForLight(PointShadow pointShadow, int index)
         {
             if (!TryGetLight(index, out Light light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not attach {nameof(PointShadow)} to it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Cannot attach {nameof(PointShadow)} to it");
                 return false;
             }
 
@@ -150,7 +148,7 @@ namespace IDKEngine.Render
         {
             if (!TryGetLight(index, out Light light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not detach {nameof(PointShadow)} from it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Cannot detach {nameof(PointShadow)} from it");
                 return;
             }
 
@@ -169,7 +167,7 @@ namespace IDKEngine.Render
         {
             if (!TryGetLight(index, out Light light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Can not update it's buffer content");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Cannot update it's buffer content");
                 return;
             }
 
@@ -185,6 +183,12 @@ namespace IDKEngine.Render
             return true;
         }
 
+        public PointShadow GetPointShadow(int index)
+        {
+            pointShadowManager.TryGetPointShadow(index, out PointShadow pointShadow);
+            return pointShadow;
+        }
+
         public bool Intersect(in Ray ray, out HitInfo hitInfo)
         {
             hitInfo = new HitInfo();
@@ -193,7 +197,7 @@ namespace IDKEngine.Render
             for (int i = 0; i < Count; i++)
             {
                 Light light = lights[i];
-                if (MyMath.RaySphereIntersect(ray, light.GLSLLight, out float min, out float max) && min > 0.0f && max < hitInfo.T)
+                if (MyMath.RaySphereIntersect(ray, light.GLSLLight, out float min, out float max) && max < hitInfo.T)
                 {
                     hitInfo.T = min;
                     hitInfo.LightID = i;

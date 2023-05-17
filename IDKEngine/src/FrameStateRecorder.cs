@@ -60,7 +60,7 @@ namespace IDKEngine
         {
             if (FrameCount == 0)
             {
-                Logger.Log(Logger.LogLevel.Warn, "Can not replay anything, because there is no frame data loaded");
+                Logger.Log(Logger.LogLevel.Warn, "Cannot replay anything, because there is no frame data loaded");
                 return new T();
             }
             return recordedFrames[ReplayFrameIndex++];
@@ -83,7 +83,7 @@ namespace IDKEngine
             using FileStream fileStream = File.OpenRead(path);
             if (fileStream.Length % sizeof(T) != 0)
             {
-                Logger.Log(Logger.LogLevel.Error, $"Can not load \"{path}\", because file size is not a multiple of {sizeof(T)} bytes");
+                Logger.Log(Logger.LogLevel.Error, $"Cannot load \"{path}\", because file size is not a multiple of {sizeof(T)} bytes");
                 return;
             }
 
