@@ -37,7 +37,7 @@ struct MeshInstance
     mat4 PrevModelMatrix;
 };
 
-struct Node
+struct BlasNode
 {
     vec3 Min;
     uint TriStartOrLeftChild;
@@ -62,14 +62,12 @@ layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 
 layout(std430, binding = 4) restrict readonly buffer BlasSSBO
 {
-    Node Nodes[];
+    BlasNode Nodes[];
 } blasSSBO;
 
-Frustum ExtractFrustum(mat4 matrix);
-bool FrustumAABBIntersect(Frustum frustum, Node node);
-vec3 NegativeVertex(Node node, vec3 normal);
-
 layout(location = 0) uniform mat4 ProjView;
+
+AppInclude(Culling/Frustum/include/common.glsl)
 
 void main()
 {
@@ -78,46 +76,11 @@ void main()
         return;
 
     DrawCommand meshCMD = drawCommandSSBO.DrawCommands[meshIndex];
-    Node node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
+    BlasNode node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
     
     const uint glInstanceID = 0;  // TODO: Derive from built in variables
     mat4 model = meshInstanceSSBO.MeshInstances[meshCMD.BaseInstance + glInstanceID].ModelMatrix;
     
     Frustum frustum = ExtractFrustum(ProjView * model);
     drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumAABBIntersect(frustum, node));
-}
-
-Frustum ExtractFrustum(mat4 matrix)
-{
-    Frustum frustum;
-	for (int i = 0; i < 3; i++)
-    {
-        for (int j = 0; j < 2; j++)
-        {
-            frustum.Planes[i * 2 + j].x = matrix[0][3] + (j == 0 ? matrix[0][i] : -matrix[0][i]);
-            frustum.Planes[i * 2 + j].y = matrix[1][3] + (j == 0 ? matrix[1][i] : -matrix[1][i]);
-            frustum.Planes[i * 2 + j].z = matrix[2][3] + (j == 0 ? matrix[2][i] : -matrix[2][i]);
-            frustum.Planes[i * 2 + j].w = matrix[3][3] + (j == 0 ? matrix[3][i] : -matrix[3][i]);
-            frustum.Planes[i * 2 + j] *= length(frustum.Planes[i * 2 + j].xyz);
-        }
-    }
-	return frustum;
-}
-
-bool FrustumAABBIntersect(Frustum frustum, Node node)
-{
-	float a = 1.0;
-
-	for (int i = 0; i < 6 && a >= 0.0; i++)
-    {
-		vec3 negative = NegativeVertex(node, frustum.Planes[i].xyz);
-		a = dot(vec4(negative, 1.0), frustum.Planes[i]);
-	}
-
-	return a >= 0.0;
-}
-
-vec3 NegativeVertex(Node node, vec3 normal)
-{
-	return mix(node.Min, node.Max, greaterThan(normal, vec3(0.0)));
 }

@@ -114,6 +114,8 @@ namespace IDKEngine.Render
             }
             else
             {
+                // TODO: Try ROC
+
                 GL.Viewport(0, 0, Result.Width, Result.Height);
 
                 if (IsWireframe)
@@ -139,16 +141,21 @@ namespace IDKEngine.Render
                 if (IsSSAO)
                 {
                     SSAO.Compute();
-                    SSAO.Result.BindToUnit(1);
+                    SSAO.Result.BindToUnit(0);
                 }
                 else
                 {
-                    Texture.UnbindFromUnit(1);
+                    Texture.UnbindFromUnit(0);
                 }
 
                 if (IsVXGI)
                 {
                     ConeTracer.Compute(Voxelizer.ResultVoxelsAlbedo);
+                    ConeTracer.Result.BindToUnit(1);
+                }
+                else
+                {
+                    Texture.UnbindFromUnit(1);
                 }
 
                 GL.Viewport(0, 0, Result.Width, Result.Height);
@@ -198,14 +205,12 @@ namespace IDKEngine.Render
 
                 Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
                 Result.BindToUnit(0);
-                if (IsVXGI) ConeTracer.Result.BindToUnit(1);
+
+                if (IsSSR) SSR.Result.BindToUnit(1);
                 else Texture.UnbindFromUnit(1);
 
-                if (IsSSR) SSR.Result.BindToUnit(2);
+                if (IsVolumetricLighting) VolumetricLight.Result.BindToUnit(2);
                 else Texture.UnbindFromUnit(2);
-
-                if (IsVolumetricLighting) VolumetricLight.Result.BindToUnit(3);
-                else Texture.UnbindFromUnit(3);
 
                 mergeLightingProgram.Use();
                 GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

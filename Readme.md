@@ -8,24 +8,24 @@ Feature list:
  - CoD-Modern-Warfare Bloom
  - Variable Rate Shading
  - Ray marched Volumetric Lighting
- - GPU accelerated Frustum Culling for shadows and camera
+ - GPU accelerated Frustum Culling for Shadows and Camera
  - Screen Space Reflections
  - Screen Space Ambient Occlusion
  - Atmospheric Scattering
- - Recording Video
+ - Camera capture and playback with video output
 
 Required OpenGL: 4.6 + `ARB_bindless_texture`
 
 Known Issues:
 
 - VXGI (voxelization) doesn't work on AMD due to driver bug since version 22.7.1
-- Certain shaders using `ARB_bindless_texture` dont compile on Intel due to driver bug
+- Certain shaders using `ARB_bindless_texture` do not compile on Intel due to driver bug
 
 # Controls
 | Key         | Action               | 
 |-------------|----------------------| 
-|  W, A, S, D | Movment              |
-|  Shift      | Move Faster          |
+|  W, A, S, D | Move                 |
+|  Shift      | Move faster          |
 |  G          | Toggle GUI           |
 |  R          | Toogle Recording     |
 |  Space      | Toogle Replay        |
@@ -45,11 +45,12 @@ Known Issues:
 
 ### 1.0 Overview
 
-Variable Rate Shading is when you render different regions of the framebuffer at different resolutions. This feature is exposed in OpenGL through the `NV_shading_rate_image` extension. The implementation expects a `R8ui` texture where each pixel covers
-a 16x16 tile of the framebuffer. The hardware then fetches this texture looks up the value in a user defined shading rate palette and applies that shading rate to the block of fragments saving us processing power. So all we have to do is generate the shading rate image.
+Variable Rate Shading is when you render different regions of the framebuffer at different resolutions. This feature is exposed in OpenGL through the [`NV_shading_rate_image`](https://registry.khronos.org/OpenGL/extensions/NV/NV_shading_rate_image.txt) extension. When drawing the hardware fetches a "Shading Rate Image" looks up the value in a user defined shading rate palette and applies that shading rate to the block of fragments.
 
-Here is a generated shading image while the camera was moving:
+So all we need to do is generate this Shading Rate Image, which is really just a `r8ui` format texture where each pixel covers
+a 16x16 tile of the framebuffer. This image will control the resolution at which each tile is rendered.
 
+Example of a generated Shading Rate Image while the camera is moving taking into account velocity and variance of luminance
 ![ShadingRateImage](Screenshots/ShadingRateImageExample.png?raw=true)
 
 Red stands for 1 invocation per 4x4 pixels which means 16x less fragment shader invocations in those regions.
@@ -62,7 +63,7 @@ The ultimate goal of the algorithm should be to apply a as low as possible shadi
 * High average magnitude of velocity
 * Low variance of luminance
 
-This makes sense as you can generally see less detail in fast moving things. And if the luminance across a tile is roughly the same (this is what the variance tells you) there is not much detail to begin with.
+This makes sense as you can generally see less detail in fast moving things. And if the luminance is roughly the same across a tile (which is what the variance tells you) there is not much detail to begin with.
 
 In both cases we need the average of some value over all 256 pixels.
 
@@ -70,9 +71,9 @@ Average is defined as:
 
 $$\overline{x} = \sum_{i = 1}^{n} \frac{1}{n} \cdot x_{i}$$
 
-Where $\overline{x}$ is the mean of $x$ and $n$ the number of elements.
+Where $\overline{x}$ is the average of $x$ and $n$ the number of elements.
 
-For starters you might call `atomicAdd(SharedMem, value * (1.0 / n))` on shared memory however atomics on floats are not a core feature and as far as my testing goes the following approach wasn't any slower:
+For starters you could call `atomicAdd(SharedMem, value * (1.0 / n))` on shared memory, but atomics on floats is not a core feature, and as far as my testing goes, the following approach was no slower:
 ```glsl
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
@@ -81,7 +82,7 @@ const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
 shared float Average[TILE_SIZE * TILE_SIZE];
 void main()
 {
-    Average[gl_LocalInvocationIndex] = GetSpeed();
+    Average[gl_LocalInvocationIndex] = GetSpeed() * AVG_MULTIPLIER;
     for (int cutoff = (TILE_SIZE * TILE_SIZE) / 2; cutoff > 0; cutoff /= 2)
     {
         if (gl_LocalInvocationIndex < cutoff)
@@ -93,21 +94,21 @@ void main()
     // average is computed and stored in Average[0]
 }
 ```
-The algorithm first loads all the values of the set which we want to compute the average of into shared memory.
-Then the first half of the values are summed up with the other half. After that all the summed up values are further split into half and again added with the rest. At some point the final sum will have been collapsed into the first element.
+The algorithm first loads all the values of the set we want to average into shared memory.
+Then it adds the first half of array entries to the other half. After that, all the new values are again divided in half and added to the new rest, which is now 1/4 the size of the original array. At some point, the final sum is collapsed into the first element.
 
 That's it for the averaging part.
 
-Calculating the variance requires some more work.
+Calculating the variance requires a little more work.
 
-(Normalized) Variance is defined as:
+(Normalized) variance is defined as:
 
 $$V(x) = \sum_{i = 1}^{n}(x_{i} - \overline{x})^{2} \times \frac{1}{n - 1}$$
 <!-- fix error of second formula not rendering properly -->
 &nbsp;
 $$VN = \frac{\sqrt{V(x)}}{\overline{x}}$$
 
-Like before $\overline{x}$ is the mean of set $x$ and $n$ the number of elements. $V(x)$ tells us the variance of that set.
+As before $\overline{x}$ is the average of set $x$ and $n$ the number of elements in it. $V(x)$ tells us the variance of that set.
 However $V(x)$ is dependent on scale which is not what we want. {5, 10} should result in the same variance as {10, 20}.
 The second part solves this by [normalizing the variance](https://www.vosesoftware.com/riskwiki/Normalizedmeasuresofspread-theCofV.php).
 
@@ -136,20 +137,20 @@ void main()
 }
 ```
 
-At this point using both average speed and variance of luminance you can obtain an appropriate shading rate. This is not the most interesting part.
-I decided to scale both of these factors add them together and then use that to mix between different rates. You can find the code [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/ShadingRateClassification/compute.glsl).
+At this point, you can use both the average speed and the variance of the luminance to get an appropriate shading rate. That is not the most interesting part.
+I decided to scale both of these factors, add them together and then use that to mix between different rates. The code is [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/ShadingRateClassification/compute.glsl).
 
 ### 3.0 Subgroup optimizations
 
-While operating on shared memory is fast Subgroup Intrinsics are faster.
-They are a relatively new topic on its own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are a lot of subgroup operations. The full thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt) but vendor specific/arb extensions with `ARB_shader_group_vote` actually being part of core also exist.
-Anyway the one which is particular interesting for our case of computing a sum is `KHR_shader_subgroup_arithmetic` or more specifically the function `subgroupAdd`.
+While operating on shared memory is fast, Subgroup Intrinsics are faster.
+They are a relatively new topic on its own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are many subgroup operations. The whole thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt), but vendor specific/arb extensions with `ARB_shader_group_vote` actually being part of core also exist.
+Anyway, the one that is particularly interesting for our case of computing a sum is `KHR_shader_subgroup_arithmetic`, or more specifically the `subgroupAdd` function.
 
 On my GPU a subgroup is 32 invocations big.
-If I call `subgroupAdd(2)` the function will return 64.
-So it basically does a sum over values passed into the function in the scope of a subgroup.
+When I call `subgroupAdd(2)` the function will return 64.
+So it does a sum over all values passed to the function in the scope of a all (active) subgroup invocations.
 
-Using this knowledge my optimized version of a workgroup wide sum looks like this:
+Using this knowledge, my optimized version of a workgroup wide sum looks like this:
 ```glsl
 #define SUBGROUP_SIZE __subroupSize__
 #extension GL_KHR_shader_subgroup_arithmetic : require
@@ -182,7 +183,7 @@ void main()
     // average is computed and stored in SharedSums[0]
 }
 ```
-Note how the workgroup expands the size of a subgroup so we still have to use shared memory to obtain a workgroup wide result.
+Note how the workgroup expands the size of a subgroup, so we still have to use shared memory to obtain a workgroup wide result.
 However in the for loop it now only has to iterate through `log2(gl_NumSubgroups / 2)` values instead of `log2(gl_WorkGroupSize.x / 2)`.
 
 ## Point Shadows
@@ -231,7 +232,7 @@ There are multiple extensions which allow you to set `gl_Layer` from a vertex sh
 > with no geometry shader present.
 > This extension effectively merges ...
 
-So what I ended up doing is either use vertex layered rendering if any of the required extensions is available and else just do 6 draw calls without invoking any geometry shader since that is slower.
+So what I ended up doing is either use vertex layered rendering if any of the required extensions is available and otherwise just do 6 draw calls without invoking any geometry shader since that is slower.
 
 The way you might do vertex layered rendering looks like this:
 ```cs
@@ -259,12 +260,12 @@ Since vertex shaders can't generate vertices like geometry shader we'll use a in
 ### 2.0 Sampling
 
 Just want to mention that OpenGL provides useful shadow sampler types like `samplerCubeShadow` or `sampler2DShadow`.
-When using shadow samplers texture lookup functions accept an additional parameter with which the depth value in the texture
-is compaired. Also the returned value is no longer the depth value but instead a visibility ratio in the range of [0, 1].
-When using linear filtering the comparison is evaluted and averaged for a 2x2 block of pixels.
+When using shadow samplers, texture lookup functions accept an additional parameter with which the depth value in the texture
+is compared. The returned value is no longer the depth value, but instead a visibility ratio in the range of [0, 1].
+When using linear filtering the comparison is evaluated and averaged for a 2x2 block of pixels.
 And all that in one function!
 
-To configure a texture such that it can be sampled by a shadow sampler you can do this:
+To configure a texture such that it can be sampled by a shadow sampler, you can do this:
 ```cs
 GL.TextureParameter(texture, TextureParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
 GL.TextureParameter(texture, TextureParameterName.TextureCompareFunc, (int)All.Less);
@@ -283,16 +284,16 @@ void main()
 Here is a comparison of using shadow samplers (right) vs not using them.
 ![SamplingComparison](Screenshots/SamplingComparison.png?raw=true)
 
-Obviously you can combine this with software filtering like PCF to get even better results.
+Of course, you can combine this with software filtering like PCF to get even better results.
 
 ## GPU Driven Rendering
 
 ### 1.0 Multi Draw Indirect
 
-This "Engine" does a modern low overhead MDI approach to rendering.
-MDI stands for multi draw indirect. The most commonly used MDI function is probably `MultiDrawElementsIndirect`.
-As the name suggests it does multiple draws under the hood. In fact `MultiDrawElementsIndirect` is equivalent
-to calling `DrawElementsInstancedBaseVertexBaseInstance` in a for loop with `drawcount` iterations.
+All Multi Draw Indirects internally just call another non multi draw command `drawcount` times.
+In the case of `MultiDrawElementsIndirect` this underyling draw call is `DrawElementsInstancedBaseVertexBaseInstance`.
+This effectively allows multiple meshes to be drawn with one API call, reducing driver overhead.
+
 Arguments for these underlying draw calls are provided by us and expected to have the following format:
 ```cs
 struct DrawCommand
@@ -301,12 +302,12 @@ struct DrawCommand
     int InstanceCount; // number of instances
     int FirstIndex; // offset in indices array
     int BaseVertex; // offset in vertex array
-    int BaseInstance; // unimportant unless you're doing old school instancing - can be useful for own purposes
+    int BaseInstance; // sets the value of `gl_BaseInstance`. Only used by the API when doing old school instancing
 }
 ```
-The way you supply the draw commands to the API is with a buffer - that's what the "indirect" suffix says.
-So to render 5 meshes you'd need to put all of their vertices and indices into two single big arrays and
-configure 5 `DrawCommand` structs and upload them to a buffer.
+The `DrawCommand`s are not supplied through the draw function itself as usual, but have to be put into a buffer (hence "Indirect" suffix) which is then bound
+to `GL_DRAW_INDIRECT_BUFFER` before drawing.
+So to render 5 meshes you'd have to configure 5 `DrawCommand` and load them into the said buffer.
 
 The final draw could then be as simple as:
 ```cs
@@ -318,15 +319,15 @@ public void Draw()
     GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
 }
 ```
-While this renders all geometry just fine you might be wondering how to access the entirety of materials to compute proper shading. After all scenes like Sponza come with a lot of textures and the usual method of manually declaring `sampler2D` in glsl quickly becomes insufficient as we can't do state changes between draw calls anymore (which is good) to swap out materials. This is where Bindless Textures comes in.
+While this renders all geometry just fine, you may be wondering how to access the entirety of materials to compute proper shading. After all scenes like Sponza come with a lot of textures and the usual method of manually declaring `sampler2D` in glsl quickly becomes insufficient as we can't do state changes between draw calls anymore (which is good) to swap out materials. This is where Bindless Textures comes in.
 
 ### 2.0 Bindless Textures
 
-First of all `ARB_bindless_texture` is not a core extension. Nonetheless almost all AMD and Nvidia GPUs implement it as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately render doc doesn't support it.
+First of all `ARB_bindless_texture` is not a core extension. Nevertheless, almost all AMD and Nvidia GPUs implement it, as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately render doc doesn't support it.
 
-The main idea behind bindless textures is the ability to generate a unique 64 bit handle from any texture which can then be used to represent it inside glsl and therefore no longer depend on previous state based mechanics.
-Specifically that means no longer having to call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.
-Instead generate a handle and somehow communicate it to the gpu (most likely with a buffer).
+The main idea behind bindless textures is the ability to generate a unique 64 bit handle from any texture, which can then be used to represent it inside glsl and thus no longer depend on previous state based mechanics.
+Specifically, this means that you no longer call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.
+Instead, generate a handle and somehow communicate it to the GPU (most likely with a buffer).
 
 Example:
 ```cs
@@ -352,13 +353,13 @@ void main()
     vec4 color = texture(myTexture, coords);
 }
 ```
-Here we generate a handle upload that to a buffer and then access it through a shader storage block which exposes the buffer to the shader.
-After the handle is generated the texture's state is immutable. This can not be undone.
+Here we generate a handle, upload it into a buffer and then access it through a shader storage block which exposes the buffer to the shader.
+After the handle is generated, the texture's state is immutable. This cannot be undone.
 To sample a bindless texture it's handle must also be made resident.
-The extension allows you to directly store `sampler2D` inside the shader storage block as shown. Note however that you could also do `uvec2 Textures[];` and then perform a cast like: `sampler2D myTexture = sampler2D(textureSSBO.Textures[0])`.
+The extension allows you to place `sampler2D` directly inside the shader storage block as shown. Note however that you could also do `uvec2 Textures[];` and then perform a cast like: `sampler2D myTexture = sampler2D(textureSSBO.Textures[0])`.
 
-In the case of a MDI renderer as described in "1.0 Multi Draw Indirect".
-the process of fetching each mesh's texture would look something along the lines of:
+In the case of an MDI renderer as described in "1.0 Multi Draw Indirect".
+the process of fetching each mesh's texture would look something like this:
 ```glsl
 #version 460 core
 #extension GL_ARB_bindless_texture : require
@@ -382,14 +383,14 @@ void main()
 }
 ```
 `gl_DrawID` is in the range of [0, drawcount - 1] and identifies the current sub draw inside a multi draw. And each sub draw corresponds to a mesh.
-`Material` is just a struct which contains one or more bindless textures.
+`Material` is just a struct containing one or more bindless textures.
 
-There is one caveat (which is not exclusive to bindless textures) which is that they must be indexed with a [dynamically uniform expression](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)#Dynamically_uniform_expression). Luckily `gl_DrawID` is defined to fulfill that requirement.
+There is one caveat (not exclusive to bindless textures), which is that they must be indexed with a [dynamically uniform expression](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)#Dynamically_uniform_expression). Fortunately `gl_DrawID` is defined to satisfy this requirement.
 
 ### 3.0 Frustum Culling
 
-Frustum culling is the process of determining objects outside a camera frustum and consequently avoiding unnecessary computations for those.
-I find the following implementation to be fairly elegant and low overhead because it perfectly fits into the whole gpu driven rendering thing.
+Frustum culling is the process of identifying objects outside a camera frustum and then avoiding unnecessary computations for them.
+I find the following implementation to be quite elegant and low overhead because it fits perfectly into the whole GPU driven rendering thing.
 
 The ingredients needed to get started are:
 - A projection + view matrix
@@ -397,14 +398,14 @@ The ingredients needed to get started are:
 - A list of each mesh's draw command
 - A list of each mesh's bounding box
 
-In a MDI renderer like described in "1.0 Multi Draw Indirect" the first three points are required anyway.
+In an MDI renderer as described in "1.0 Multi Draw Indirect", the first three points are required anyway.
 And getting a local space bounding box from each mesh's vertices shouldn't be a problem.
 
 Remember how `MultiDrawElementsIndirect` reads draw commands from a buffer object?
-This means the gpu can modify it's own drawing parameters by writing into that buffer object (using shader storage blocks).
-And that's the key to gpu accelerated frustum culling without any cpu readback.
+This means that the GPU can modify it's own drawing parameters by writing into that buffer object (using shader storage blocks).
+And that's the key to GPU accelerated frustum culling without any CPU readback.
 
-Basically the cpu side of things is as simple as:
+Basically, the CPU side of things is as simple this:
 ```cs
 void Render()
 {
@@ -420,9 +421,9 @@ void Render()
     GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
 }
 ```
-A compute shader is dispatched which does the culling and accordingly adjusts the content of `drawCommandBuffer`.
+A compute shader is dispatched to do the culling and adjust the content of `drawCommandBuffer` accordingly.
 The memory barrier ensures that at the point where `MultiDrawElementsIndirect` reads from `drawCommandBuffer` all previous
-incoherent writes into that buffer are visible.
+incoherent writes into to that buffer are visible.
 
 Let's get to the culling shader:
 ```glsl
@@ -459,6 +460,6 @@ void main()
 The implementation of `ExtractFrustum` and `FrustumAABBIntersect` can be found [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/Culling/Frustum/compute.glsl).
 
 Each thread grabs a mesh builds a frustum and then compares it against the aabb.
-`drawCommandSSBO` is a shader storage block giving us access to the buffer which holds the draw commands that are used by `MultiDrawElementsIndirect`.
-If the test fails `InstanceCount` is set to 0 otherwise 1.
-A mesh with `InstanceCount = 0` will not cause any vertex shader invocations later when things are drawn saving us a lot of computations.
+`drawCommandSSBO` is a shader storage block giving us access to the buffer that holds the draw commands used by `MultiDrawElementsIndirect`.
+If the test fails, `InstanceCount` is set to 0 otherwise 1.
+A mesh with `InstanceCount = 0` will not cause any vertex shader invocations later when things are drawn, saving us a lot of computation.

@@ -16,7 +16,6 @@ namespace IDKEngine
                 _title = value;
                 GLFW.SetWindowTitle(window, _title);
             }
-
         }
 
         private bool _isVSync;
@@ -28,31 +27,6 @@ namespace IDKEngine
             {
                 _isVSync = value;
                 GLFW.SwapInterval(_isVSync ? 1 : 0);
-            }
-        }
-
-        private Vector2i _size;
-        public Vector2i WindowSize
-        {
-            get => _size;
-
-            set
-            {
-                _size = value;
-                GLFW.SetWindowSize(window, _size.X, _size.Y);
-                OnResize();
-            }
-        }
-
-        private Vector2i _position;
-        public Vector2i WindowPosition
-        {
-            get => _position;
-
-            set
-            {
-                _position = value;
-                GLFW.SetWindowPos(window, _position.X, _position.Y);
             }
         }
 
@@ -77,9 +51,6 @@ namespace IDKEngine
                 WindowVSync = _isVSync;
             }
         }
-
-        private bool _isFocused = true;
-        public bool WindowFocused => _isFocused;
         
         private float _time;
         public float WindowTime => _time;
@@ -115,15 +86,15 @@ namespace IDKEngine
             GLFW.WindowHint(WindowHintInt.ContextVersionMinor, openglMinor);
             GLFW.WindowHint(WindowHintInt.Samples, 1);
             _title = title;
-            _size.X = width;
-            _size.Y = height;
+            _framebufferSize.X = width;
+            _framebufferSize.Y = height;
 
-            window = GLFW.CreateWindow(_size.X, _size.Y, _title, null, null);
+            window = GLFW.CreateWindow(_framebufferSize.X, _framebufferSize.Y, _title, null, null);
             if (window == null)
             {
-                Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed. Make sure you have support for OpenGL {openglMajor}.{openglMinor}. Press Enter to exit");
+                Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed. Make sure you have OpenGL {openglMajor}.{openglMinor} support. Press Enter to exit");
                 Console.ReadLine();
-                Environment.Exit(1);
+                Environment.Exit(0);
             }
 
             GLFW.SwapBuffers(window);
@@ -144,7 +115,7 @@ namespace IDKEngine
             videoMode = GLFW.GetVideoMode(monitor);
             KeyboardState = new Keyboard(window);
             MouseState = new Mouse(window);
-            WindowPosition = new Vector2i(videoMode->Width / 2 - _size.X / 2, videoMode->Height / 2 - _size.Y / 2);
+            WindowPosition = new Vector2i(videoMode->Width / 2 - _framebufferSize.X / 2, videoMode->Height / 2 - _framebufferSize.Y / 2);
 
             GLFW.MakeContextCurrent(window);
             OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
@@ -184,23 +155,49 @@ namespace IDKEngine
         protected abstract void OnResize();
         protected abstract void OnKeyPress(char key);
 
-        
+
+        private Vector2i _framebufferSize;
+        public Vector2i WindowFramebufferSize
+        {
+            get => _framebufferSize;
+
+            set
+            {
+                GLFW.SetWindowSize(window, value.X, value.Y);
+            }
+        }
+
         private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeDelegate;
         private void FramebufferSizeCallback(Window* window, int width, int height)
         {
-            // Don't trigger resize when window toggled or minimized
-            if ((width > 0 && height > 0) && (_size.X != width || _size.Y != height))
+            if ((width > 0 && height > 0) && (_framebufferSize.X != width || _framebufferSize.Y != height))
             {
-                _size.X = width;
-                _size.Y = height;
+                _framebufferSize.X = width;
+                _framebufferSize.Y = height;
                 OnResize();
             }
         }
+
+
+        private bool _isFocused = true;
+        public bool WindowFocused => _isFocused;
 
         private readonly GLFWCallbacks.WindowFocusCallback windowFocusDelegate;
         private void WindowFocusCallback(Window* window, bool focused)
         {
             _isFocused = focused;
+        }
+
+
+        private Vector2i _position;
+        public Vector2i WindowPosition
+        {
+            get => _position;
+
+            set
+            {
+                GLFW.SetWindowPos(window, value.X, value.Y);
+            }
         }
 
         private readonly GLFWCallbacks.WindowPosCallback windowPosDelegate;
@@ -219,7 +216,7 @@ namespace IDKEngine
 
         public void Dispose()
         {
-            GLFW.DestroyWindow(window);
+            GLFW.Terminate();
             glfwInitialized = false;
         }
     }

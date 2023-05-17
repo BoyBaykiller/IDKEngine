@@ -8,148 +8,229 @@ namespace IDKEngine
         public const int MIN_TRIANGLES_PER_LEAF_COUNT = 2;
         public const int SAH_SAMPLES = 8;
 
-        public readonly GLSLBlasNode[] Nodes;
-
-        private int nodesUsed;
-        public unsafe BLAS(GLSLTriangle* triangles, int count, out int treeDepth)
+        public struct HitInfo
         {
-            treeDepth = (int)Math.Ceiling(MathF.Log2(count));
+            public GLSLTriangle Triangle;
+            public Vector3 Bary;
+            public float T;
+        }
 
-            Nodes = new GLSLBlasNode[2 * count];
-            ref GLSLBlasNode root = ref Nodes[nodesUsed++];
-            root.TriCount = (uint)count;
+        public GLSLBlasNode Root => Nodes[0];
+        public AABB RootBounds => new AABB(Root.Min, Root.Max);
+        public int NodesUsed { get; private set; }
+
+        public readonly int TreeDepth;
+        public readonly GLSLBlasNode[] Nodes;
+        public readonly GLSLTriangle[] Triangles;
+        public BLAS(GLSLTriangle[] triangles)
+        {
+            Triangles = triangles;
+            TreeDepth = (int)MathF.Ceiling(MathF.Log2(Triangles.Length)) + 1;
+            TreeDepth -= (int)MathF.Ceiling(MathF.Log2(MIN_TRIANGLES_PER_LEAF_COUNT)) + 1;
+            TreeDepth = Math.Max(TreeDepth, 1);
+
+            Nodes = new GLSLBlasNode[2 * Triangles.Length];
+
+            ref GLSLBlasNode root = ref Nodes[NodesUsed++];
+            root.TriCount = (uint)Triangles.Length;
             UpdateNodeBounds(ref root);
             Subdivide(ref root);
 
             // Artificially create child node and copy root node into it.
             // This is done because BVH traversal skips root node under the assumation there will always be at least one child
-            if (nodesUsed == 1)
+            if (NodesUsed == 1)
             {
-                Nodes[nodesUsed++] = root;
+                Nodes[NodesUsed++] = root;
+            }
+        }
+
+        public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo, float tMaxDist = float.MaxValue)
+        {
+            hitInfo = new HitInfo();
+            hitInfo.T = tMaxDist;
+
+            ref readonly GLSLBlasNode rootNode = ref Nodes[0];
+            if (!(MyMath.RayCuboidIntersect(ray, rootNode.Min, rootNode.Max, out float tMinRoot, out float tMaxRoot) && tMinRoot < hitInfo.T))
+            {
+                return false;
             }
 
-            void Subdivide(ref GLSLBlasNode parentNode)
+            uint stackPtr = 0;
+            uint stackTop = 1;
+            uint* stack = stackalloc uint[TreeDepth];
+            while (true)
             {
-                if (parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
-                {
-                    return;
-                }
+                ref readonly GLSLBlasNode left = ref Nodes[stackTop];
+                ref readonly GLSLBlasNode right = ref Nodes[stackTop + 1];
+                bool leftChildHit = MyMath.RayCuboidIntersect(ray, left.Min, left.Max, out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
+                bool rightChildHit = MyMath.RayCuboidIntersect(ray, right.Min, right.Max, out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
-                float splitSAH = FindBestSplitAxis(parentNode, out int splitAxis, out float splitPos);
-                float parentSAH = CalculateSAH(MyMath.Area(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
-                if (splitSAH >= parentSAH)
+                uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
+                if (triCount > 0)
                 {
-                    return;
-                }
-
-                uint start = parentNode.TriStartOrLeftChild;
-                uint end = start + parentNode.TriCount;
-
-                uint mid = start;
-                for (uint i = start; i < end; i++)
-                {
-                    ref GLSLTriangle tri = ref triangles[i];
-                    if ((tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f < splitPos)
+                    uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
+                    for (uint k = first; k < first + triCount; k++)
                     {
-                        MathHelper.Swap(ref tri, ref triangles[mid++]);
-                    }
-                }
-
-                int leftChildID = nodesUsed++;
-                int rightChildID = nodesUsed++;
-
-                ref GLSLBlasNode leftChild = ref Nodes[leftChildID];
-                leftChild.TriStartOrLeftChild = start;
-                leftChild.TriCount = mid - start;
-
-                ref GLSLBlasNode rightChild = ref Nodes[rightChildID];
-                rightChild.TriStartOrLeftChild = mid;
-                rightChild.TriCount = end - mid;
-
-                parentNode.TriStartOrLeftChild = (uint)leftChildID;
-                parentNode.TriCount = 0;
-
-                UpdateNodeBounds(ref Nodes[leftChildID]);
-                UpdateNodeBounds(ref Nodes[rightChildID]);
-
-                Subdivide(ref leftChild);
-                Subdivide(ref rightChild);
-            }
-
-            float FindBestSplitAxis(in GLSLBlasNode node, out int splitAxis, out float splitPos)
-            {
-                splitAxis = 1;
-                splitPos = 0;
-
-                AABB uniformDivideArea = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-                for (int i = 0; i < node.TriCount; i++)
-                {
-                    ref readonly GLSLTriangle tri = ref triangles[node.TriStartOrLeftChild + i];
-                    Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) / 3.0f;
-                    uniformDivideArea.Shrink(centroid);
-                }
-
-                float bestSplitCost = float.MaxValue;
-                for (int i = 0; i < 3; i++)
-                {
-                    if (uniformDivideArea.Min[i] == uniformDivideArea.Max[i])
-                        continue;
-
-                    float scale = (uniformDivideArea.Max[i] - uniformDivideArea.Min[i]) / SAH_SAMPLES;
-                    for (int j = 1; j < SAH_SAMPLES; j++)
-                    {
-                        float currentSplitPos = uniformDivideArea.Min[i] + j * scale;
-                        float currentSplitCost = GetSplitCost(node, i, currentSplitPos);
-                        if (currentSplitCost < bestSplitCost)
+                        ref readonly GLSLTriangle triangle = ref Triangles[k];
+                        if (MyMath.RayTriangleIntersect(ray, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, out Vector3 bary, out float t) && t < hitInfo.T)
                         {
-                            splitPos = currentSplitPos;
-                            splitAxis = i;
-                            bestSplitCost = currentSplitCost;
+                            hitInfo.Triangle = triangle;
+                            hitInfo.Bary = bary;
+                            hitInfo.T = t;
                         }
                     }
+
+                    leftChildHit = leftChildHit && (left.TriCount == 0);
+                    rightChildHit = rightChildHit && (right.TriCount == 0);
                 }
 
-                return bestSplitCost;
-            }
-
-            float GetSplitCost(in GLSLBlasNode node, int splitAxis, float splitPos)
-            {
-                AABB leftBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-                AABB rightBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-
-                uint leftCount = 0;
-                for (uint i = 0; i < node.TriCount; i++)
+                // Push closest hit child to the stack at last
+                if (leftChildHit || rightChildHit)
                 {
-                    ref readonly GLSLTriangle tri = ref triangles[node.TriStartOrLeftChild + i];
-                    float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f;
-                    if (triSplitPos < splitPos)
+                    if (leftChildHit && rightChildHit)
                     {
-                        leftCount++;
-                        leftBox.GrowToFit(tri);
+                        bool leftCloser = tMinLeft < tMinRight;
+                        stackTop = leftCloser ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
+                        stack[stackPtr++] = leftCloser ? right.TriStartOrLeftChild : left.TriStartOrLeftChild;
                     }
                     else
                     {
-                        rightBox.GrowToFit(tri);
+                        stackTop = leftChildHit ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
                     }
                 }
-                uint rightCount = node.TriCount - leftCount;
-                
-                float sah = CalculateSAH(leftBox.Area(), leftCount, rightBox.Area(), rightCount);
-                return sah;
-            }
-
-            void UpdateNodeBounds(ref GLSLBlasNode node)
-            {
-                AABB bounds = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-
-                for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
+                else
                 {
-                    bounds.GrowToFit(triangles[i]);
+                    // Here: On a leaf node or didn't hit any children which means we should traverse up
+                    if (stackPtr == 0) break;
+                    stackTop = stack[--stackPtr];
                 }
-
-                node.Min = bounds.Min;
-                node.Max = bounds.Max;
             }
+
+            return hitInfo.T != tMaxDist;
+        }
+
+        private void Subdivide(ref GLSLBlasNode parentNode)
+        {
+            if (parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
+            {
+                return;
+            }
+
+            float splitCost = FindBestSplitAxis(parentNode, out int splitAxis, out float splitPos);
+            float parentSAH = CalculateSAH(MyMath.HalfArea(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
+            if (splitCost >= parentSAH)
+            {
+                return;
+            }
+
+            uint start = parentNode.TriStartOrLeftChild;
+            uint end = start + parentNode.TriCount;
+
+            uint mid = start;
+            for (uint i = start; i < end; i++)
+            {
+                ref GLSLTriangle tri = ref Triangles[(int)i];
+                if ((tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f < splitPos)
+                {
+                    MathHelper.Swap(ref tri, ref Triangles[(int)mid++]);
+                }
+            }
+
+            parentNode.TriStartOrLeftChild = (uint)NodesUsed;
+            parentNode.TriCount = 0;
+
+
+            ref GLSLBlasNode leftChild = ref Nodes[NodesUsed++];
+            leftChild.TriStartOrLeftChild = start;
+            leftChild.TriCount = mid - start;
+
+            ref GLSLBlasNode rightChild = ref Nodes[NodesUsed++];
+            rightChild.TriStartOrLeftChild = mid;
+            rightChild.TriCount = end - mid;
+
+            UpdateNodeBounds(ref leftChild);
+            UpdateNodeBounds(ref rightChild);
+
+            Subdivide(ref leftChild);
+            Subdivide(ref rightChild);
+        }
+
+        private float FindBestSplitAxis(in GLSLBlasNode node, out int splitAxis, out float splitPos)
+        {
+            splitAxis = 0;
+            splitPos = 0;
+
+            AABB uniformDivideArea = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            for (int i = 0; i < node.TriCount; i++)
+            {
+                ref readonly GLSLTriangle tri = ref Triangles[(int)(node.TriStartOrLeftChild + i)];
+                Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) / 3.0f;
+                uniformDivideArea.GrowToFit(centroid);
+            }
+
+            float bestSplitCost = float.MaxValue;
+            for (int i = 0; i < 3; i++)
+            {
+                if (uniformDivideArea.Min[i] == uniformDivideArea.Max[i])
+                    continue;
+
+                float scale = (uniformDivideArea.Max[i] - uniformDivideArea.Min[i]) / SAH_SAMPLES;
+                for (int j = 1; j < SAH_SAMPLES; j++)
+                {
+                    float currentSplitPos = uniformDivideArea.Min[i] + j * scale;
+                    float currentSplitCost = GetSplitCost(node, i, currentSplitPos);
+                    if (currentSplitCost < bestSplitCost)
+                    {
+                        splitPos = currentSplitPos;
+                        splitAxis = i;
+                        bestSplitCost = currentSplitCost;
+                    }
+                }
+            }
+
+            return bestSplitCost;
+        }
+
+        private float GetSplitCost(in GLSLBlasNode node, int splitAxis, float splitPos)
+        {
+            AABB leftBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            AABB rightBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+
+            uint leftCount = 0;
+            for (uint i = 0; i < node.TriCount; i++)
+            {
+                ref readonly GLSLTriangle tri = ref Triangles[(int)(node.TriStartOrLeftChild + i)];
+
+                float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f;
+                if (triSplitPos < splitPos)
+                {
+                    leftCount++;
+                    leftBox.GrowToFit(tri);
+                }
+                else
+                {
+                    rightBox.GrowToFit(tri);
+                }
+            }
+            uint rightCount = node.TriCount - leftCount;
+
+
+            float sah = CalculateSAH(MyMath.HalfArea(leftBox.Max - leftBox.Min), leftCount, MyMath.HalfArea(rightBox.Max - rightBox.Min), rightCount);
+            return sah;
+        }
+
+        private void UpdateNodeBounds(ref GLSLBlasNode node)
+        {
+            AABB bounds = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+
+            for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
+            {
+                ref readonly GLSLTriangle tri = ref Triangles[(int)i];
+                bounds.GrowToFit(tri);
+            }
+
+            node.Min = bounds.Min;
+            node.Max = bounds.Max;
         }
 
         private static float CalculateSAH(float area0, uint triangles0, float area1, uint triangles1)

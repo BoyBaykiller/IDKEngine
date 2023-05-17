@@ -2,6 +2,8 @@
 #define PI 3.1415926536
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Constants.glsl)
+
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
@@ -48,21 +50,18 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;
@@ -83,7 +82,6 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
 bool Shadow(PointShadow pointShadow, vec3 lightToSample);
 vec3 NDCToWorld(vec3 ndc);
 float ComputeScattering(float lightDotView);
-float InterleavedGradientNoise(vec2 imgCoord, uint index);
 
 uniform int Samples;
 uniform float Scattering;
@@ -91,6 +89,8 @@ uniform float MaxDist;
 uniform float Strength;
 uniform vec3 Absorbance;
 uniform bool IsTemporalAccumulation;
+
+AppInclude(include/Random.glsl)
 
 void main()
 {
@@ -176,11 +176,4 @@ vec3 NDCToWorld(vec3 ndc)
 float ComputeScattering(float lightDotView)
 {
     return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * lightDotView, 1.5));
-}
-
-// Source: https://www.shadertoy.com/view/WsfBDf
-float InterleavedGradientNoise(vec2 imgCoord, uint index) 
-{
-    imgCoord += float(index) * 5.588238;
-    return fract(52.9829189 * fract(0.06711056 * imgCoord.x + 0.00583715 * imgCoord.y));
 }

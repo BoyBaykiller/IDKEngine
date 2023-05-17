@@ -1,5 +1,8 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
+
+AppInclude(include/Constants.glsl)
+
 layout(early_fragment_tests) in;
 
 layout(location = 1) out vec4 AlbedoAlpha;
@@ -48,7 +51,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;

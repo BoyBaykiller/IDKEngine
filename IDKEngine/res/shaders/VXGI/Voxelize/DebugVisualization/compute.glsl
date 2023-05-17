@@ -47,12 +47,12 @@ layout(std140, binding = 5) uniform VoxelizerDataUBO
 } voxelizerDataUBO;
 
 
-AppInclude(shaders/include/Transformations.glsl)
-AppInclude(shaders/include/IntersectionRoutines.glsl)
-AppInclude(shaders/include/TraceCone.glsl)
-
 layout(location = 0) uniform float StepMultiplier;
 layout(location = 1) uniform float ConeAngle;
+
+AppInclude(include/Transformations.glsl)
+AppInclude(include/IntersectionRoutines.glsl)
+AppInclude(include/TraceCone.glsl)
 
 void main()
 {

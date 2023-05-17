@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -17,8 +18,11 @@ namespace IDKEngine.Render
         {
             pointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
 
+            Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
+            shaderInsertions.Add("TAKE_VERTEX_LAYERED_RENDERING_PATH", PointShadow.TAKE_VERTEX_LAYERED_RENDERING_PATH ? "1" : "0");
+
             renderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl")),
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl"), shaderInsertions),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
 
             cullingProgram = new ShaderProgram(
@@ -61,7 +65,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            Logger.Log(Logger.LogLevel.Warn, $"Can not add {nameof(PointShadow)}. Limit of {GLSL_MAX_UBO_POINT_SHADOW_COUNT} is reached");
+            Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(PointShadow)}. Limit of {GLSL_MAX_UBO_POINT_SHADOW_COUNT} is reached");
             return false;
         }
 
@@ -69,7 +73,7 @@ namespace IDKEngine.Render
         {
             if (!TryGetPointShadow(index, out _))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Can not remove {nameof(PointShadow)} {index} as it already is null");
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot remove {nameof(PointShadow)} {index} as it already is null");
                 return;
             }
 
@@ -81,7 +85,7 @@ namespace IDKEngine.Render
         {
             if (!TryGetPointShadow(index, out PointShadow pointShadow))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(PointShadow)} {index} does not exist. Can not update it's buffer content");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(PointShadow)} {index} does not exist. Cannot update it's buffer content");
                 return;
             }
 

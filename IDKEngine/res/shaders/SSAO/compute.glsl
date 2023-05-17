@@ -37,15 +37,13 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 float SSAO(vec3 fragPos, vec3 normal);
 vec3 ViewToNDC(vec3 ndc);
 vec3 NDCToView(vec3 ndc);
-vec3 CosineSampleHemisphere(float u, float v, vec3 normal);
-float GetRandomFloat01();
-uint GetPCGHash(inout uint seed);
 
 uniform int Samples;
 uniform float Radius;
 uniform float Strength;
 
-uint rngSeed;
+AppInclude(include/Random.glsl)
+
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
@@ -57,7 +55,7 @@ void main()
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
     }
-    rngSeed = imgCoord.y * 4096 + imgCoord.x;
+    InitializeRandomSeed(imgCoord.y * 4096 + imgCoord.x);
 
     vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
 
@@ -72,12 +70,14 @@ void main()
 
 float SSAO(vec3 fragPos, vec3 normal)
 {
+    fragPos += normal * 0.01;
+
     float occlusion = 0.0;
     float samples = Samples;
     for (int i = 0; i < Samples; i++)
     {
         float progress = i / float(Samples);
-        vec3 samplePos = fragPos + CosineSampleHemisphere(GetRandomFloat01(), progress, normal) * Radius * mix(0.1, 1.0, progress * progress);
+        vec3 samplePos = fragPos + CosineSampleHemisphere(normal, progress, GetRandomFloat01()) * Radius * mix(0.1, 1.0, progress * progress);
         
         vec3 projectedSample = ViewToNDC(samplePos) * 0.5 + 0.5;
         float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
@@ -103,29 +103,3 @@ vec3 NDCToView(vec3 ndc)
     return viewPos.xyz / viewPos.w;
 }
 
-// Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
-vec3 CosineSampleHemisphere(float u, float v, vec3 normal)
-{
-    float z = u * 2.0 - 1.0;
-    float a = v * 2.0 * PI;
-    float r = sqrt(1.0 - z * z);
-    float x = r * cos(a);
-    float y = r * sin(a);
-
-    // Convert unit vector in sphere to a cosine weighted vector in hemisphere
-    return normalize(normal + vec3(x, y, z));
-}
-
-float GetRandomFloat01()
-{
-    return float(GetPCGHash(rngSeed)) / 4294967296.0;
-}
-
-// Faster and much more random than Wang Hash
-// See: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
-uint GetPCGHash(inout uint seed)
-{
-    seed = seed * 747796405u + 2891336453u;
-    uint word = ((seed >> ((seed >> 28u) + 4u)) ^ seed) * 277803737u;
-    return (word >> 22u) ^ word;
-}

@@ -3,9 +3,13 @@
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Constants.glsl)
+
 layout(location = 0) out vec4 FragColor;
 
-layout(binding = 1) uniform sampler2D SamplerAO;
+layout(binding = 0) uniform sampler2D SamplerAO;
+layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
+
 
 struct Light
 {
@@ -49,13 +53,11 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
 } shadowDataUBO;
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
@@ -127,8 +129,12 @@ void main()
         directLighting += contrib;
     }
 
-    vec3 indirectLight = vec3(0.0);
-    if (!IsVXGI)
+    vec3 indirectLight;
+    if (IsVXGI)
+    {
+        indirectLight = texture(SamplerIndirectLighting, uv).rgb * albedo;
+    }
+    else
     {
         indirectLight = vec3(0.03) * albedo;
     }

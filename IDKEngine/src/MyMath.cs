@@ -5,6 +5,11 @@ namespace IDKEngine
 {
     static class MyMath
     {
+        public static Vector3 Abs(this Vector3 a)
+        {
+            return new Vector3(MathF.Abs(a.X), MathF.Abs(a.Y), MathF.Abs(a.Z));
+        }
+
         // Source: https://github.com/leesg213/TemporalAA/blob/main/Renderer/AAPLRenderer.mm#L152
         public static void GetHaltonSequence_2_3(Span<float> buffer)
         {
@@ -60,9 +65,9 @@ namespace IDKEngine
             return (data >> offset) & mask;
         }
 
-        public static float Area(in Vector3 size)
+        public static float HalfArea(Vector3 size)
         {
-            return 2 * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+            return size.X * size.Y + size.X * size.Z + size.Z * size.Y;
         }
 
         public static bool AabbAabbIntersect(in AABB first, in Vector3 min, Vector3 max)
@@ -245,7 +250,7 @@ namespace IDKEngine
         }
 
         // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
-        public static bool RayTriangleIntersect(in Ray ray, in Vector3 v0, in Vector3 v1, in Vector3 v2, out Vector4 baryT)
+        public static bool RayTriangleIntersect(in Ray ray, in Vector3 v0, in Vector3 v1, in Vector3 v2, out Vector3 bary, out float t)
         {
             Vector3 v1v0 = v1 - v0;
             Vector3 v2v0 = v2 - v0;
@@ -253,12 +258,14 @@ namespace IDKEngine
             Vector3 normal = Vector3.Cross(v1v0, v2v0);
             Vector3 q = Vector3.Cross(rov0, ray.Direction);
 
-            // baryT = <u, v, w, t>
-            baryT = new Vector4();
-            baryT.Xyw = new Vector3(Vector3.Dot(-q, v2v0), Vector3.Dot(q, v1v0), Vector3.Dot(-normal, rov0)) / Vector3.Dot(ray.Direction, normal);
-            baryT.Z = 1.0f - baryT.X - baryT.Y;
-            
-            return (baryT.X >= 0.0f) && (baryT.Y >= 0.0f) && (baryT.Z >= 0.0f);
+            float x = Vector3.Dot(ray.Direction, normal);
+            bary = new Vector3();
+            bary.Yz = new Vector2(Vector3.Dot(-q, v2v0), Vector3.Dot(q, v1v0)) / x;
+            bary.X = 1.0f - bary.Y - bary.Z;
+
+            t = Vector3.Dot(-normal, rov0) / x;
+
+            return bary.X >= 0.0f && bary.Y >= 0.0f && bary.Z >= 0.0f && t > 0.0f;
         }
 
         // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
@@ -277,7 +284,7 @@ namespace IDKEngine
             t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, tsmaller.Z)));
             t2 = MathF.Min(t2, MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z)));
 
-            return t1 <= t2;
+            return t1 <= t2 && t2 > 0.0f;
         }
 
         // Source: https://antongerdelan.net/opengl/raycasting.html
@@ -296,7 +303,7 @@ namespace IDKEngine
             t1 = -b - squareRoot;
             t2 = -b + squareRoot;
 
-            return t1 <= t2;
+            return t1 <= t2 && t2 > 0.0f;
         }
     }
 }

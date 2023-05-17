@@ -1,6 +1,8 @@
 #version 460 core
 layout(location = 0) in vec3 Position;
 
+AppInclude(include/Constants.glsl)
+
 struct Light
 {
     vec3 Position;
@@ -11,7 +13,6 @@ struct Light
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
@@ -36,7 +37,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    #define GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT 36 // used in shader and client code - keep in sync!
     vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
     int Samples;
     int Enabled;

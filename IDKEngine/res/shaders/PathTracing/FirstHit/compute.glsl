@@ -1,5 +1,4 @@
 #version 460 core
-#define N_HIT_PROGRAM_LOCAL_SIZE_X 64 // used in shader and client code - keep in sync!
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX
 #define EPSILON 0.001
@@ -14,21 +13,12 @@
 #define HF_SAMPLER_2D sampler2D
 #endif
 
-// Positive integer expression
-#define MAX_BLAS_TREE_DEPTH AppInsert(MAX_BLAS_TREE_DEPTH)
+AppInclude(include/Constants.glsl)
+AppInclude(PathTracing/include/Constants.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict readonly writeonly uniform image2D ImgResult;
-
-struct HitInfo
-{
-    vec3 Bary;
-    float T;
-    int TriangleIndex;
-    uint MeshIndex;
-    uint InstanceID;
-};
 
 struct Ray
 {
@@ -92,7 +82,7 @@ struct Vertex
     uint Normal;
 };
 
-struct Node
+struct BlasNode
 {
     vec3 Min;
     uint TriStartOrLeftChild;
@@ -105,6 +95,14 @@ struct Triangle
     Vertex Vertex0;
     Vertex Vertex1;
     Vertex Vertex2;
+};
+
+struct TlasNode
+{
+    vec3 Min;
+    uint LeftChildAndRightChild;
+    vec3 Max;
+    uint BlasIndex;
 };
 
 struct TransportRay
@@ -159,7 +157,7 @@ layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
 
 layout(std430, binding = 4) restrict readonly buffer BlasSSBO
 {
-    Node Nodes[];
+    BlasNode Nodes[];
 } blasSSBO;
 
 layout(std430, binding = 5) restrict readonly buffer BlasTriangleSSBO
@@ -167,19 +165,24 @@ layout(std430, binding = 5) restrict readonly buffer BlasTriangleSSBO
     Triangle Triangles[];
 } blasTriangleSSBO;
 
-layout(std430, binding = 6) restrict writeonly buffer TransportRaySSBO
+layout(std430, binding = 6) restrict readonly buffer TlasSSBO
+{
+    TlasNode Nodes[];
+} tlasSSBO;
+
+layout(std430, binding = 7) restrict writeonly buffer TransportRaySSBO
 {
     TransportRay Rays[];
 } transportRaySSBO;
 
-layout(std430, binding = 7) restrict buffer RayIndicesSSBO
+layout(std430, binding = 8) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
     uint AccumulatedSamples;
     uint Indices[];
 } rayIndicesSSBO;
 
-layout(std430, binding = 8) restrict buffer DispatchCommandSSBO
+layout(std430, binding = 9) restrict buffer DispatchCommandSSBO
 {
     DispatchCommand DispatchCommands[2];
 } dispatchCommandSSBO;
@@ -204,7 +207,6 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    #define GLSL_MAX_UBO_LIGHT_COUNT 256 // used in shader and client code - keep in sync!
     Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
@@ -214,22 +216,10 @@ layout(std140, binding = 4) uniform SkyBoxUBO
     samplerCube Albedo;
 } skyBoxUBO;
 
-AppInclude(shaders/include/IntersectionRoutines.glsl)
-AppInclude(shaders/include/Transformations.glsl)
-
 bool TraceRay(inout TransportRay transportRay);
 vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
-bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter);
-vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary);
-vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary);
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
-vec3 UniformSampleSphere();
-vec3 CosineSampleHemisphere(vec3 normal);
-vec2 UniformSampleDisk();
-uint GetPCGHash(inout uint seed);
-float GetRandomFloat01();
-vec3 DecompressSNorm32Fast(uint data);
 ivec2 ReorderInvocations(uint n);
 
 uniform bool IsDebugBVHTraversal;
@@ -237,9 +227,12 @@ uniform bool IsTraceLights;
 uniform float FocalLength;
 uniform float LenseRadius;
 
-shared uint SharedStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
+AppInclude(include/IntersectionRoutines.glsl)
+AppInclude(include/Transformations.glsl)
+AppInclude(include/Compression.glsl)
+AppInclude(include/Random.glsl)
+AppInclude(PathTracing/include/ClosestHit.glsl)
 
-uint rngSeed;
 void main()
 {
     ivec2 imgResultSize = imageSize(ImgResult);
@@ -247,7 +240,7 @@ void main()
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
         return;
 
-    rngSeed = (imgCoord.y * 4096 + imgCoord.x) * (rayIndicesSSBO.AccumulatedSamples + 1);
+    InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (rayIndicesSSBO.AccumulatedSamples + 1));
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -325,9 +318,7 @@ bool TraceRay(inout TransportRay transportRay)
             vec3 B = cross(N, T);
             mat3 TBN = mat3(T, B, N);
 
-            Mesh mesh = meshSSBO.Meshes[hitInfo.MeshIndex];
-            // If no GL_NV_gpu_shader5 this is UB due to non dynamically uniform indexing
-            // Can't use GL_EXT_nonuniform_qualifier because only modern amd drivers get the implementation right without compile errors
+            Mesh mesh = meshSSBO.Meshes[hitInfo.MeshID];
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
 
             vec4 albedoAlpha = texture(material.BaseColor, texCoord) * unpackUnorm4x8(material.BaseColorFactor);
@@ -345,7 +336,7 @@ bool TraceRay(inout TransportRay transportRay)
         }
         else if (IsTraceLights)
         {
-            Light light = lightsUBO.Lights[hitInfo.MeshIndex];
+            Light light = lightsUBO.Lights[hitInfo.MeshID];
             emissive = light.Color;
             albedo = light.Color;
             normal = (transportRay.Origin - light.Position) / light.Radius;
@@ -471,174 +462,9 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }
 
-bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
-{
-    hitInfo.T = FLOAT_MAX;
-    hitInfo.TriangleIndex = -1;
-    float tMax;
-    debugNodeCounter = 0;
-
-    if (IsTraceLights)
-    {
-        float tMin;
-        for (int i = 0; i < lightsUBO.Count; i++)
-        {
-            Light light = lightsUBO.Lights[i];
-            if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
-            {
-                hitInfo.T = tMin;
-                hitInfo.MeshIndex = i;
-            }
-        }
-    }
-
-    for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
-    {
-        DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
-        uint baseNode = 2 * (cmd.FirstIndex / 3);
-
-        uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-        Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
-
-        float tMinLeft;
-        float tMinRight;
-        
-        Node rootNode = blasSSBO.Nodes[baseNode];
-        if (!(RayCuboidIntersect(localRay, rootNode.Min, rootNode.Max, tMinLeft, tMax) && tMinLeft < hitInfo.T))
-        {
-            continue;
-        }
-
-        uint stackPtr = 0;
-        uint stackTop = 1;
-        while (true)
-        {
-            debugNodeCounter++;
-            Node left = blasSSBO.Nodes[baseNode + stackTop];
-            Node right = blasSSBO.Nodes[baseNode + stackTop + 1];
-
-            bool leftChildHit = RayCuboidIntersect(localRay, left.Min, left.Max, tMinLeft, tMax) && tMinLeft < hitInfo.T;
-            bool rightChildHit = RayCuboidIntersect(localRay, right.Min, right.Max, tMinRight, tMax) && tMinRight < hitInfo.T;
-
-            uint triCount = (leftChildHit ? left.TriCount : 0) + (rightChildHit ? right.TriCount : 0);
-            if (triCount > 0)
-            {
-                uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
-                for (uint j = first; j < first + triCount; j++)
-                {
-                    vec3 bary;
-                    float hitT;
-                    Triangle triangle = blasTriangleSSBO.Triangles[j];
-                    if (RayTriangleIntersect(localRay, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, bary, hitT) && hitT < hitInfo.T)
-                    {
-                        hitInfo.Bary = bary;
-                        hitInfo.T = hitT;
-                        hitInfo.MeshIndex = i;
-                        hitInfo.TriangleIndex = int(j);
-                        hitInfo.InstanceID = glInstanceID;
-                    }
-                }
-
-                leftChildHit = leftChildHit && (left.TriCount == 0);
-                rightChildHit = rightChildHit && (right.TriCount == 0);
-            }
-
-            // Push closest hit child to the stack at last
-            if (leftChildHit || rightChildHit)
-            {
-                if (leftChildHit && rightChildHit)
-                {
-                    bool leftCloser = tMinLeft < tMinRight;
-                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftCloser);
-                    SharedStack[gl_LocalInvocationIndex][stackPtr++] = mix(left.TriStartOrLeftChild, right.TriStartOrLeftChild, leftCloser);
-                }
-                else
-                {
-                    stackTop = mix(right.TriStartOrLeftChild, left.TriStartOrLeftChild, leftChildHit);
-                }
-                continue;
-            }
-
-            // Here: On a leaf node or didn't hit any children which means we should traverse up
-            if (stackPtr == 0) break;
-            stackTop = SharedStack[gl_LocalInvocationIndex][--stackPtr];
-        }
-    }
-
-    return hitInfo.T != FLOAT_MAX;
-}
-
-vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary)
-{
-    return v0 * bary.x + v1 * bary.y + v2 * bary.z;
-}
-
-vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary)
-{
-    return v0 * bary.x + v1 * bary.y + v2 * bary.z;
-}
-
 Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel)
 {
     return Ray((invModel * vec4(ray.Origin, 1.0)).xyz, (invModel * vec4(ray.Direction, 0.0)).xyz);
-}
-
-vec3 UniformSampleSphere()
-{
-    float z = GetRandomFloat01() * 2.0 - 1.0;
-    float a = GetRandomFloat01() * 2.0 * PI;
-    float r = sqrt(1.0 - z * z);
-    float x = r * cos(a);
-    float y = r * sin(a);
-
-    return vec3(x, y, z);
-}
-
-// Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
-vec3 CosineSampleHemisphere(vec3 normal)
-{
-    // Convert unit vector in sphere to a cosine weighted vector in hemisphere
-    return normalize(normal + UniformSampleSphere());
-}
-
-vec2 UniformSampleDisk()
-{
-    vec2 point;
-    float dist;
-    do
-    {
-        point = vec2(GetRandomFloat01(), GetRandomFloat01()) * 2.0 - 1.0;
-        dist = dot(point, point);
-    } while (dist > 1.0);
-
-    return point;
-}
-
-// Faster and much more random than Wang Hash
-// Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
-uint GetPCGHash(inout uint seed)
-{
-    seed = seed * 747796405u + 2891336453u;
-    uint word = ((seed >> ((seed >> 28u) + 4u)) ^ seed) * 277803737u;
-    return (word >> 22u) ^ word;
-}
-
-float GetRandomFloat01()
-{
-    return float(GetPCGHash(rngSeed)) / 4294967296.0;
-}
-
-vec3 DecompressSNorm32Fast(uint data)
-{
-    float r = (data >> 0) & ((1u << 11) - 1);
-    float g = (data >> 11) & ((1u << 11) - 1);
-    float b = (data >> 22) & ((1u << 10) - 1);
-
-    r /= (1u << 11) - 1;
-    g /= (1u << 11) - 1;
-    b /= (1u << 10) - 1;
-
-    return vec3(r, g, b) * 2.0 - 1.0;
 }
 
 // Source: https://youtu.be/HgisCS30yAI

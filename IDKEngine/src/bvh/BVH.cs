@@ -1,139 +1,134 @@
 ﻿using System;
 using System.Linq;
-using OpenTK.Mathematics;
+using System.Threading.Tasks;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
-    class BVH
+    class BVH : IDisposable
     {
-        public struct HitInfo
-        {
-            public float T;
-            public int MeshID;
-            public int InstanceID;
-            public Vector3 Bary;
-            public GLSLTriangle Triangle;
-        }
-
-        public readonly int MaxBlasTreeDepth;
-        public readonly BLAS[] Blases;
+        public int MaxBlasTreeDepth { get; private set; }
+        public TLAS Tlas { get; private set; }
 
         private readonly ModelSystem ModelSystem;
-        private readonly BufferObject BlasBuffer;
-        private readonly BufferObject BlasTriangleBuffer;
-        private readonly GLSLTriangle[] triangles;
-
-        public unsafe BVH(ModelSystem modelSystem)
+        private readonly BufferObject blasBuffer;
+        private readonly BufferObject blasTriangleBuffer;
+        private readonly BufferObject tlasBuffer;
+        public BVH(ModelSystem modelSystem)
         {
             ModelSystem = modelSystem;
 
-            triangles = new GLSLTriangle[modelSystem.Indices.Length / 3];
-            for (int i = 0; i < modelSystem.Meshes.Length; i++)
-            {
-                ref readonly GLSLDrawElementsCommand cmd = ref modelSystem.DrawCommands[i];
-                for (int j = cmd.FirstIndex; j < cmd.FirstIndex + cmd.Count; j += 3)
-                {
-                    triangles[j / 3].Vertex0 = modelSystem.Vertices[modelSystem.Indices[j + 0] + cmd.BaseVertex];
-                    triangles[j / 3].Vertex1 = modelSystem.Vertices[modelSystem.Indices[j + 1] + cmd.BaseVertex];
-                    triangles[j / 3].Vertex2 = modelSystem.Vertices[modelSystem.Indices[j + 2] + cmd.BaseVertex];
-                }
-            }
+            blasBuffer = new BufferObject();
+            blasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
-            int maxTreeDepth = 0;
-            Blases = new BLAS[modelSystem.Meshes.Length];
-            System.Threading.Tasks.Parallel.For(0, modelSystem.Meshes.Length, i =>
-            {
-                ref readonly GLSLDrawElementsCommand cmd = ref modelSystem.DrawCommands[i];
-                int baseTriangleCount = cmd.FirstIndex / 3;
-                fixed (GLSLTriangle* ptr = &triangles[baseTriangleCount])
-                {
-                    Blases[i] = new BLAS(ptr, cmd.Count / 3, out int treeDepth);
-                    Helper.InterlockedMax(ref maxTreeDepth, treeDepth);
-                }
-                for (int j = 0; j < Blases[i].Nodes.Length; j++)
-                {
-                    if (Blases[i].Nodes[j].TriCount > 0)
-                    {
-                        Blases[i].Nodes[j].TriStartOrLeftChild += (uint)baseTriangleCount;
-                    }
-                }
-            });
-            MaxBlasTreeDepth = maxTreeDepth;
+            blasTriangleBuffer = new BufferObject();
+            blasTriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
 
-            BlasBuffer = new BufferObject();
-            BlasTriangleBuffer = new BufferObject();
+            tlasBuffer = new BufferObject();
+            tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
 
-            if (triangles.Length > 0)
-            {
-                BlasBuffer.ImmutableAllocate(sizeof(GLSLBlasNode) * Blases.Sum(blas => blas.Nodes.Length), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-                BlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
-                int nodesUploaded = 0;
-                for (int i = 0; i < Blases.Length; i++)
-                {
-                    BlasBuffer.SubData(nodesUploaded * sizeof(GLSLBlasNode), Blases[i].Nodes.Length * sizeof(GLSLBlasNode), Blases[i].Nodes);
-                    nodesUploaded += Blases[i].Nodes.Length;
-                }
-
-                BlasTriangleBuffer.ImmutableAllocate(sizeof(GLSLTriangle) * triangles.Length, triangles, BufferStorageFlags.None);
-                BlasTriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
-            }
+            FullRebuild();
         }
 
-        public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo)
+        public bool Intersect(in Ray ray, out TLAS.HitInfo hitInfo, float tMax = float.MaxValue)
         {
-            hitInfo = new HitInfo();
-            hitInfo.T = float.MaxValue;
+            const bool USE_TLAS = false;
+            if (USE_TLAS)
+            {
+                return Tlas.Intersect(ray, out hitInfo, tMax);
+            }
+            else
+            {
+                hitInfo = new TLAS.HitInfo();
+                hitInfo.T = tMax;
 
-            float rayTMin = 0.0f;
-            float rayTMax = 0.0f;
-            uint* stack = stackalloc uint[MaxBlasTreeDepth];
-            for (int i = 0; i < ModelSystem.Meshes.Length; i++)
+                for (int i = 0; i < Tlas.BlasesInstances.Length; i++)
+                {
+                    TLAS.BlasInstances blasInstances = Tlas.BlasesInstances[i];
+                    BLAS blas = blasInstances.Blas;
+
+                    int glInstanceID = 0; // TODO: Work out actual instanceID value
+                    Ray localRay = ray.Transformed(blasInstances.Instances[glInstanceID].InvModelMatrix);
+                    if (blas.Intersect(localRay, out BLAS.HitInfo blasHitInfo, hitInfo.T))
+                    {
+                        hitInfo.Triangle = blasHitInfo.Triangle;
+                        hitInfo.Bary = blasHitInfo.Bary;
+                        hitInfo.T = blasHitInfo.T;
+
+                        hitInfo.MeshID = i;
+                        hitInfo.InstanceID = glInstanceID;
+                    }
+                }
+
+                return hitInfo.T != tMax;
+            }
+        }
+       
+        private void FullRebuild()
+        {
+            TLAS.BlasInstances[] blasesInstances = new TLAS.BlasInstances[ModelSystem.Meshes.Length];
+            Parallel.For(0, blasesInstances.Length, i =>
             {
                 ref readonly GLSLDrawElementsCommand cmd = ref ModelSystem.DrawCommands[i];
 
-                int glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-                Ray localRay = ray.Transformed(ModelSystem.MeshInstances[glInstanceID].InvModelMatrix);
-
-                uint stackPtr = 0;
-                uint stackTop = 0;
-                while (true)
+                GLSLTriangle[] blasTriangles = new GLSLTriangle[cmd.Count / 3];
+                for (int j = 0; j < blasTriangles.Length; j++)
                 {
-                    ref readonly GLSLBlasNode node = ref Blases[i].Nodes[stackTop];
-                    if (!(MyMath.RayCuboidIntersect(localRay, node.Min, node.Max, out rayTMin, out rayTMax) && rayTMax > 0.0f && rayTMin < hitInfo.T))
-                    {
-                        if (stackPtr == 0) break;
-                        stackTop = stack[--stackPtr];
-                        continue;
-                    }
-
-                    if (node.TriCount > 0)
-                    {
-                        for (int k = (int)node.TriStartOrLeftChild; k < node.TriStartOrLeftChild + node.TriCount; k++)
-                        {
-                            hitInfo.Triangle = triangles[k];
-                            if (MyMath.RayTriangleIntersect(localRay, hitInfo.Triangle.Vertex0.Position, hitInfo.Triangle.Vertex1.Position, hitInfo.Triangle.Vertex2.Position, out Vector4 baryT) && baryT.W > 0.0f && baryT.W < hitInfo.T)
-                            {
-                                hitInfo.Bary = baryT.Xyz;
-                                hitInfo.T = baryT.W;
-                                hitInfo.MeshID = i;
-                                hitInfo.InstanceID = glInstanceID;
-                            }
-                        }
-                        if (stackPtr == 0) break;
-                        stackTop = stack[--stackPtr];
-                    }
-                    else
-                    {
-                        stackTop = node.TriStartOrLeftChild;
-                        stack[stackPtr++] = node.TriStartOrLeftChild + 1;
-                    }
+                    blasTriangles[j].Vertex0 = ModelSystem.Vertices[cmd.BaseVertex + ModelSystem.Indices[cmd.FirstIndex + (j * 3) + 0]];
+                    blasTriangles[j].Vertex1 = ModelSystem.Vertices[cmd.BaseVertex + ModelSystem.Indices[cmd.FirstIndex + (j * 3) + 1]];
+                    blasTriangles[j].Vertex2 = ModelSystem.Vertices[cmd.BaseVertex + ModelSystem.Indices[cmd.FirstIndex + (j * 3) + 2]];
                 }
+
+                BLAS blas = new BLAS(blasTriangles);
+                blasesInstances[i] = new TLAS.BlasInstances()
+                { 
+                    Blas = blas,
+                    Instances = new ArraySegment<GLSLMeshInstance>(ModelSystem.MeshInstances, cmd.BaseInstance, cmd.InstanceCount),
+                };
+            });
+            Tlas = new TLAS(blasesInstances);
+            UpdateBlasBuffer();
+            
+            MaxBlasTreeDepth = 0;
+            for (int i = 0; i < blasesInstances.Length; i++)
+            {
+                MaxBlasTreeDepth = Math.Max(MaxBlasTreeDepth, blasesInstances[i].Blas.TreeDepth);
             }
 
-            return hitInfo.T != float.MaxValue;
+            Tlas.Build();
+            UpdateTlasBuffer();
+        }
+
+        public unsafe void UpdateBlasBuffer()
+        {
+            blasBuffer.MutableAllocate(sizeof(GLSLBlasNode) * Tlas.BlasesInstances.Sum(blasInstances => blasInstances.Blas.Nodes.Length), IntPtr.Zero);
+            blasTriangleBuffer.MutableAllocate(sizeof(GLSLTriangle) * Tlas.BlasesInstances.Sum(blasInstances => blasInstances.Blas.Triangles.Length), IntPtr.Zero);
+
+            int uploadedBlasNodesCount = 0;
+            int uploadedTrianglesCount = 0;
+            for (int i = 0; i < Tlas.BlasesInstances.Length; i++)
+            {
+                BLAS blas = Tlas.BlasesInstances[i].Blas;
+
+                blasBuffer.SubData(uploadedBlasNodesCount * sizeof(GLSLBlasNode), blas.Nodes.Length * sizeof(GLSLBlasNode), blas.Nodes);
+                blasTriangleBuffer.SubData(uploadedTrianglesCount * sizeof(GLSLTriangle), blas.Triangles.Length * sizeof(GLSLTriangle), blas.Triangles);
+
+                uploadedBlasNodesCount += blas.Nodes.Length;
+                uploadedTrianglesCount += blas.Triangles.Length;
+            }
+        }
+
+        public unsafe void UpdateTlasBuffer()
+        {
+            tlasBuffer.MutableAllocate(sizeof(GLSLTlasNode) * Tlas.Nodes.Length, Tlas.Nodes);
+        }
+
+        public void Dispose()
+        {
+            blasTriangleBuffer.Dispose();
+            blasBuffer.Dispose();
         }
     }
 }

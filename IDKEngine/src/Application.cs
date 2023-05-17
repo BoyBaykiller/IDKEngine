@@ -26,26 +26,88 @@ namespace IDKEngine
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
 
-        public bool IsBloom = true, IsShadows = true;
-        public int FPS;
+        private Vector2i _renderResolution;
+        public Vector2i RenderResolution
+        {
+            get => _renderResolution;
 
-        public Vector2i ViewportResolution { get; private set; }
+            set
+            {
+                _renderResolution = value;
+
+                int width = _renderResolution.X;
+                int height = _renderResolution.Y;
+
+                if (width < 16 || height < 16)
+                    return;
+
+
+                GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), width / (float)height, NEAR_PLANE, FAR_PLANE);
+                GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
+                GLSLBasicData.NearPlane = NEAR_PLANE;
+                GLSLBasicData.FarPlane = FAR_PLANE;
+
+                if (RenderMode == RenderMode.Rasterizer)
+                {
+                    RasterizerPipeline.SetSize(width, height);
+                }
+
+                if (RenderMode == RenderMode.PathTracer)
+                {
+                    PathTracer.SetSize(width, height);
+                }
+
+                if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
+                {
+                    Bloom.SetSize(width, height);
+                    PostProcessor.SetSize(width, height);
+                }
+            }
+        }
+
+        private RenderMode _renderMode;
+        public RenderMode RenderMode
+        {
+            get => _renderMode;
+
+            set
+            {
+                if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
+                if (value == RenderMode.Rasterizer)
+                {
+                    RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y);
+                }
+
+                if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
+                if (value == RenderMode.PathTracer)
+                {
+                    PathTracer = new PathTracer(BVH, RenderResolution.X, RenderResolution.Y);
+                }
+
+                _renderMode = value;
+            }
+        }
 
         public bool RenderGui { get; private set; }
+        public int FPS { get; private set; }
+
+        public bool IsBloom = true;
+        public bool IsShadows = true;
         
-        private int fps;
+        private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
+
+        //public AABB debugNode;
         protected override unsafe void OnRender(float dT)
         {
             Update(dT);
-
-            if (GetRenderMode() == RenderMode.Rasterizer)
+            if (RenderMode == RenderMode.Rasterizer)
             {
                 if (IsShadows)
                 {
                     LightManager.RenderShadowMaps(ModelSystem);
                 }
-
+                
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
@@ -67,7 +129,7 @@ namespace IDKEngine
                 }
 
             }
-            else if (GetRenderMode() == RenderMode.PathTracer)
+            else if (RenderMode == RenderMode.PathTracer)
             {
                 PathTracer.Compute();
 
@@ -84,7 +146,7 @@ namespace IDKEngine
                 AABB aabb = new AABB();
                 if (gui.SelectedEntityType == Gui.EntityType.Mesh)
                 {
-                    GLSLBlasNode node = BVH.Blases[gui.SelectedEntityIndex].Nodes[0];
+                    GLSLBlasNode node = BVH.Tlas.BlasesInstances[gui.SelectedEntityIndex].Blas.Root;
                     aabb.Min = node.Min;
                     aabb.Max = node.Max;
 
@@ -103,17 +165,23 @@ namespace IDKEngine
                 MeshOutlineRenderer.Render(PostProcessor.Result, aabb);
             }
 
+            // debug
+            //{
+            //    MeshOutlineRenderer.Render(PostProcessor.Result, debugNode);
+            //}
+
             ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
-            bool modelMoved = false;
+            bool anyMeshInstanceMoved = false;
             for (int i = 0; i < ModelSystem.MeshInstances.Length; i++)
             {
-                if (ModelSystem.MeshInstances[i].ResetPrevModelMatrixToCurrent())
+                if (ModelSystem.MeshInstances[i].DidMove())
                 {
-                    modelMoved = true;
+                    ModelSystem.MeshInstances[i].SetPrevToCurrentMatrix();
+                    anyMeshInstanceMoved = true;
                 }
             }
 
-            if (GetRenderMode() == RenderMode.PathTracer && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || modelMoved))
+            if ((RenderMode == RenderMode.PathTracer) && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || anyMeshInstanceMoved))
             {
                 PathTracer.ResetRender();
             }
@@ -122,7 +190,7 @@ namespace IDKEngine
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
             GL.Enable(EnableCap.Blend);
-            GL.Viewport(0, 0, WindowSize.X, WindowSize.Y);
+            GL.Viewport(0, 0, WindowFramebufferSize.X, WindowFramebufferSize.Y);
             if (RenderGui)
             {
                 gui.Draw(this, (float)dT);
@@ -137,16 +205,16 @@ namespace IDKEngine
             GL.Enable(EnableCap.DepthTest);
             GL.Disable(EnableCap.Blend);
 
-            fps++;
+            fpsCounter++;
         }
 
         private unsafe void Update(float dT)
         {
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
-                FPS = fps;
-                WindowTitle = $"FPS: {FPS}; Position {Camera.Position};";
-                fps = 0;
+                FPS = fpsCounter;
+                WindowTitle = $"FPS: {FPS}; Position {Camera.CamState.Position};";
+                fpsCounter = 0;
                 fpsTimer.Restart();
             }
             if (KeyboardState[Keys.Escape] == InputState.Pressed)
@@ -162,7 +230,7 @@ namespace IDKEngine
                 RenderGui = !RenderGui;
                 if (!RenderGui)
                 {
-                    SetViewportResolution(WindowSize.X, WindowSize.Y);
+                    RenderResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
                 }
             }
             if (KeyboardState[Keys.F11] == InputState.Touched)
@@ -175,11 +243,11 @@ namespace IDKEngine
             GLSLBasicData.DeltaUpdate = dT;
             GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
             GLSLBasicData.PrevView = GLSLBasicData.View;
-            GLSLBasicData.View = Camera.ViewMatrix;
+            GLSLBasicData.View = Camera.GenerateViewMatrix();
             GLSLBasicData.InvView = GLSLBasicData.View.Inverted();
             GLSLBasicData.ProjView = GLSLBasicData.View * GLSLBasicData.Projection;
             GLSLBasicData.InvProjView = GLSLBasicData.ProjView.Inverted();
-            GLSLBasicData.CameraPos = Camera.Position;
+            GLSLBasicData.CameraPos = Camera.CamState.Position;
             GLSLBasicData.Time = WindowTime;
             basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
         }
@@ -219,11 +287,6 @@ namespace IDKEngine
                 Environment.Exit(0);
             }
 
-            RenderGui = true;
-            WindowVSync = true;
-            ViewportResolution = WindowSize;
-            MouseState.CursorMode = CursorModeValue.CursorNormal;
-
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.DebugCallback, 0);
 
@@ -234,8 +297,10 @@ namespace IDKEngine
             GL.Enable(EnableCap.ScissorTest);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
+            
+            _renderResolution = WindowFramebufferSize;
 
-            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), ViewportResolution.X / (float)ViewportResolution.Y, NEAR_PLANE, FAR_PLANE);
+            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), RenderResolution.X / (float)RenderResolution.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
@@ -290,7 +355,6 @@ namespace IDKEngine
             sponza.Meshes[46].SpecularBias = 1.0f; // floor
             sponza.Meshes[46].RoughnessBias = -0.436f; // floor
 
-
             Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
             lucy.Meshes[0].SpecularBias = -1.0f;
             lucy.Meshes[0].RefractionChance = 0.98f;
@@ -303,21 +367,27 @@ namespace IDKEngine
             //Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
             //Model cornellBox = new Model("res/models/CornellBox/scene.gltf");
 
+            //Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
+            //Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
+            //Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+
+            //Model bistroExterior = new Model(@"C:\Users\Julian\Downloads\Models\BistroExterior\BistroExterior.gltf");
+
             ModelSystem = new ModelSystem();
-            ModelSystem.Add(new Model[] { sponza, lucy, helmet });
-            //ModelSystem.Add(new Model[] { sponza, lucy, helmet });
+            ModelSystem.Add(sponza, lucy, helmet);
             BVH = new BVH(ModelSystem);
 
             LightManager = new LightManager(12, 12);
             MeshOutlineRenderer = new AABBRender();
-            Bloom = new Bloom(ViewportResolution.X, ViewportResolution.Y, 1.0f, 3.0f);
-            PostProcessor = new PostProcessor(ViewportResolution.X, ViewportResolution.Y);
+            Bloom = new Bloom(RenderResolution.X, RenderResolution.Y, 1.0f, 3.0f);
+            PostProcessor = new PostProcessor(RenderResolution.X, RenderResolution.Y);
 
             LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
-            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f));
 
+            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f));
+            //LightManager.CreatePointShadowForLight(new PointShadow(1536, 0.5f, 60.0f), LightManager.Count - 1);
 
             for (int i = 0; i < 3; i++)
             {
@@ -325,10 +395,13 @@ namespace IDKEngine
                 LightManager.CreatePointShadowForLight(pointShadow, i);
             }
 
-            SetRenderMode(RenderMode.Rasterizer);
-
+            RenderMode = RenderMode.Rasterizer;
+            RenderGui = true;
+            WindowVSync = true;
+            MouseState.CursorMode = CursorModeValue.CursorNormal;
             FrameRecorder = new FrameStateRecorder<Camera.State>();
-            gui = new Gui(WindowSize.X, WindowSize.Y);
+
+            gui = new Gui(WindowFramebufferSize.X, WindowFramebufferSize.Y);
 
             GC.Collect();
         }
@@ -340,70 +413,18 @@ namespace IDKEngine
 
         protected override void OnResize()
         {
-            gui.ImGuiBackend.WindowResized(WindowSize.X, WindowSize.Y);
-            // if we don't render to the screen via gui always make viewport match window size
+            gui.Backend.SetSize(WindowFramebufferSize.X, WindowFramebufferSize.Y);
 
+            // if we don't render to the screen via gui always make viewport match window size
             if (!RenderGui)
             {
-                SetViewportResolution(WindowSize.X, WindowSize.Y);
+                RenderResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
             }
         }
 
         protected override void OnKeyPress(char key)
         {
-            gui.ImGuiBackend.PressChar(key);
-        }
-
-        public void SetViewportResolution(int width, int height)
-        {
-            if (width < 16 || height < 16)
-                return;
-
-            ViewportResolution = new Vector2i(width, height);
-
-            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), width / (float)height, NEAR_PLANE, FAR_PLANE);
-            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
-            GLSLBasicData.NearPlane = NEAR_PLANE;
-            GLSLBasicData.FarPlane = FAR_PLANE;
-
-            if (GetRenderMode() == RenderMode.Rasterizer)
-            {
-                RasterizerPipeline.SetSize(width, height);
-            }
-
-            if (GetRenderMode() == RenderMode.PathTracer)
-            {
-                PathTracer.SetSize(width, height);
-            }
-
-            if (GetRenderMode() == RenderMode.Rasterizer || GetRenderMode() == RenderMode.PathTracer)
-            {
-                Bloom.SetSize(width, height);
-                PostProcessor.SetSize(width, height);
-            }
-        }
-
-        private RenderMode _renderMode;
-        public RenderMode GetRenderMode()
-        {
-            return _renderMode;
-        }
-
-        public void SetRenderMode(RenderMode renderMode)
-        {
-            if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
-            if (renderMode == RenderMode.Rasterizer)
-            {
-                RasterizerPipeline = new RasterPipeline(ViewportResolution.X, ViewportResolution.Y);
-            }
-
-            if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
-            if (renderMode == RenderMode.PathTracer)
-            {
-                PathTracer = new PathTracer(BVH, ViewportResolution.X, ViewportResolution.Y);
-            }
-
-            _renderMode = renderMode;
+            gui.Backend.PressChar(key);
         }
     }
 }

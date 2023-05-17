@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
@@ -107,21 +108,22 @@ namespace IDKEngine.Render
         private BufferObject rayIndicesBuffer;
         public unsafe PathTracer(BVH bvh, int width, int height)
         {
-            (string, string) appInsertions = ("MAX_BLAS_TREE_DEPTH", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
-            
+            Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
+            shaderInsertions.Add("MAX_BLAS_TREE_DEPTH", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
+
             firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl"),
-                appInsertions
+                shaderInsertions
             ));
 
             nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl"),
-                appInsertions
+                shaderInsertions
             ));
 
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
             dispatchCommandBuffer = new BufferObject();
             dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GLSLDispatchCommand), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
+            dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
 
             SetSize(width, height);
 
@@ -175,13 +177,13 @@ namespace IDKEngine.Render
             if (transportRayBuffer != null) transportRayBuffer.Dispose();
             transportRayBuffer = new BufferObject();
             transportRayBuffer.ImmutableAllocate(width * height * sizeof(GLSLTransportRay), IntPtr.Zero, BufferStorageFlags.None);
-            transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
+            transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
             rayIndicesBuffer = new BufferObject();
             rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0));
-            rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
+            rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
         }
 
         public void Dispose()

@@ -1,6 +1,8 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Constants.glsl)
+
 struct PointShadow
 {
     samplerCube Texture;
@@ -17,7 +19,6 @@ struct PointShadow
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16 // used in shader and client code - keep in sync!
     PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;

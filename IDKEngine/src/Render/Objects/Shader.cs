@@ -16,17 +16,17 @@ namespace IDKEngine.Render.Objects
             AppInclude,
         }
 
-        public const string INCLUDE_PATH_PREFIX = "res/";
+        public const string INCLUDE_PATH_PREFIX = "res/shaders/";
 
         public readonly int ID;
         public readonly ShaderType ShaderType;
-        public Shader(ShaderType shaderType, string srcCode, params ValueTuple<string, string>[] appInsertions)
+        public Shader(ShaderType shaderType, string srcCode, Dictionary<string, string> shaderInsertions = null)
         {
             ShaderType = shaderType;
 
             ID = GL.CreateShader(shaderType);
 
-            srcCode = PreProcess(srcCode, appInsertions.ToDictionary(it => it.Item1, it => it.Item2));
+            srcCode = PreProcess(srcCode, shaderInsertions);
 
             GL.ShaderSource(ID, srcCode);
             GL.CompileShader(ID);
@@ -46,7 +46,7 @@ namespace IDKEngine.Render.Objects
             return success == 1;
         }
 
-        private static string PreProcess(string src, Dictionary<string, string> appInsertions)
+        private static string PreProcess(string src, Dictionary<string, string> shaderInsertions)
         {
             StringBuilder result = new StringBuilder(src.Length);
 
@@ -71,13 +71,13 @@ namespace IDKEngine.Render.Objects
                 
                 if (keyword == Keyword.AppInsert)
                 {
-                    if (!appInsertions.TryGetValue(userKey, out string userValue))
+                    if (shaderInsertions == null || !shaderInsertions.TryGetValue(userKey, out string userValue))
                     {
                         Logger.Log(Logger.LogLevel.Error, $"The application does not provide a glsl {keyword} value for {userKey}");
                         continue;
                     }
 
-                    result.AppendLine(userValue);
+                    result.Append(userValue);
                 }
 
                 if (keyword == Keyword.AppInclude)
@@ -92,14 +92,14 @@ namespace IDKEngine.Render.Objects
                     }
 
                     string includeSrc = File.ReadAllText(path);
-                    if (includeSrc.Contains(Keyword.AppInclude.ToString()) || includeSrc.Contains(Keyword.AppInsert.ToString()))
+                    if (includeSrc.Contains(Keyword.AppInclude.ToString()))
                     {
-                        Logger.Log(Logger.LogLevel.Error, "Recursive includes or insertions intentionally not allowed");
+                        Logger.Log(Logger.LogLevel.Error, "Recursive includes deliberately not allowed");
                         continue;
                     }
 
                     result.AppendLine("#line 1");
-                    result.AppendLine(includeSrc);
+                    result.AppendLine(PreProcess(includeSrc, shaderInsertions));
                     result.AppendLine($"#line {lineCount + 1}");
                 }
             }
