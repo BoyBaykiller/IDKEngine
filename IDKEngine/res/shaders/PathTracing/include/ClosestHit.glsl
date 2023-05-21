@@ -120,7 +120,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
 #if USE_TLAS
     uint stackPtr = 0;
     uint stackTop = 0;
-    uint stack[16];
+    uint stack[32];
     while (true)
     {
         TlasNode parent = tlasSSBO.Nodes[stackTop];
@@ -128,11 +128,11 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
         // if (!(RayCuboidIntersect(ray, parent.Min, parent.Max, tMin, tMax) && tMin <= hitInfo.T))
         // {
         //     if (stackPtr == 0) break;
-        //     stackTop = stack[0][--stackPtr];
+        //     stackTop = stack[--stackPtr];
         //     continue;
         // }
 
-        if (parent.LeftChildAndRightChild == 0)
+        if (parent.LeftChild == 0)
         {
             DrawCommand cmd = drawCommandSSBO.DrawCommands[parent.BlasIndex];
 
@@ -158,8 +158,8 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
         }
         
 
-        uint leftChild = parent.LeftChildAndRightChild >> 16;
-        uint rightChild = parent.LeftChildAndRightChild & 0xffff;
+        uint leftChild = parent.LeftChild;
+        uint rightChild = leftChild + 1;
         TlasNode left = tlasSSBO.Nodes[leftChild];
         TlasNode right = tlasSSBO.Nodes[rightChild];
 

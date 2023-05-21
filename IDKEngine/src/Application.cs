@@ -97,7 +97,7 @@ namespace IDKEngine
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
 
-        //public AABB debugNode;
+        // public AABB debugNode;
         protected override unsafe void OnRender(float dT)
         {
             Update(dT);

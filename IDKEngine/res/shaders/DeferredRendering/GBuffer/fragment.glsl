@@ -82,7 +82,7 @@ void main()
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     
     vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * unpackUnorm4x8(material.BaseColorFactor);
-    vec3 emissive = (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
+    vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = inData.TangentToWorld * normalize(normal * 2.0 - 1.0);
     normal = normalize(mix(normalize(inData.Normal), normal, inData.NormalMapStrength));

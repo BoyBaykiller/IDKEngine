@@ -75,11 +75,11 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    DrawCommand meshCMD = drawCommandSSBO.DrawCommands[meshIndex];
-    BlasNode node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
+    DrawCommand drawCmd = drawCommandSSBO.DrawCommands[meshIndex];
+    BlasNode node = blasSSBO.Nodes[2 * (drawCmd.FirstIndex / 3)];
     
-    const uint glInstanceID = 0;  // TODO: Derive from built in variables
-    mat4 model = meshInstanceSSBO.MeshInstances[meshCMD.BaseInstance + glInstanceID].ModelMatrix;
+    const uint glInstanceID = 0; // TODO: Derive from built in variables
+    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].ModelMatrix;
     
     Frustum frustum = ExtractFrustum(ProjView * model);
     drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumAABBIntersect(frustum, node));

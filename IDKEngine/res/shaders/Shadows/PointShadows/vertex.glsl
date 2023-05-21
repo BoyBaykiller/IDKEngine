@@ -88,7 +88,7 @@ void main()
 
     gl_Layer = int(bitfieldExtract(cubemapShadowCullInfo, 3 * gl_InstanceID, 3));
     
-    const uint glInstanceID = 0;  // TODO: Work out actual instanceID value
+    const uint glInstanceID = 0; // TODO: Work out actual instanceID value
     mat4 model = meshInstanceSSBO.MeshInstances[gl_BaseInstance + glInstanceID].ModelMatrix;
     outData.FragPos = vec3(model * vec4(Position, 1.0));
     gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);

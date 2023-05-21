@@ -114,8 +114,6 @@ namespace IDKEngine.Render
             }
             else
             {
-                // TODO: Try ROC
-
                 GL.Viewport(0, 0, Result.Width, Result.Height);
 
                 if (IsWireframe)
@@ -123,10 +121,10 @@ namespace IDKEngine.Render
                     GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
                 }
 
+                modelSystem.FrustumCull(cullProjViewMatrix);
+
                 gBufferFBO.Bind();
                 gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-                modelSystem.FrustumCull(cullProjViewMatrix);
 
                 gBufferProgram.Use();
                 modelSystem.Draw();

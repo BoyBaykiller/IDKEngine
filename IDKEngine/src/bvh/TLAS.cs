@@ -39,17 +39,14 @@ namespace IDKEngine
             BlasesInstances = blasesInstances;
 
             int instanceCount = BlasesInstances.Sum(blasInstances => blasInstances.Instances.Count);
-            TreeDepth = (int)MathF.Ceiling(MathF.Log2(instanceCount)) + 2;
+            TreeDepth = (int)MathF.Ceiling(MathF.Log2(instanceCount)) + 1;
             Nodes = new GLSLTlasNode[2 * instanceCount];
         }
 
         public void Build()
         {
             int instanceCount = BlasesInstances.Sum(blasInstances => blasInstances.Instances.Count);
-
-            Span<uint> nodeIndices = stackalloc uint[instanceCount];
-            int nodeIndicesLength = nodeIndices.Length;
-            NodesUsed = 1;
+            NodesUsed = 0;
 
             {
                 for (int i = 0; i < BlasesInstances.Length; i++)
@@ -57,72 +54,73 @@ namespace IDKEngine
                     (BLAS blas, ArraySegment<GLSLMeshInstance> instances) = BlasesInstances[i];
                     for (int j = 0; j < instances.Count; j++)
                     {
-                        nodeIndices[NodesUsed - 1] = (uint)NodesUsed;
-
                         GLSLTlasNode newNode;
                         newNode.Min = Vector3.TransformPosition(blas.RootBounds.Min, instances[j].ModelMatrix);
                         newNode.Max = Vector3.TransformPosition(blas.RootBounds.Max, instances[j].ModelMatrix);
                         newNode.LeftChild = 0;
-                        newNode.RightChild = 0;
                         newNode.BlasIndex = (uint)i;
 
-                        Nodes[NodesUsed] = newNode;
-                        NodesUsed++;
+                        int newNodeIndex = Nodes.Length - 2 - NodesUsed++;
+                        Nodes[newNodeIndex] = newNode;
                     }
                 }
             }
 
-            // Source: https://jacco.ompf2.com/2022/05/13/how-to-build-a-bvh-part-6-all-together-now/
+            int nodesSearchCount = instanceCount;
+            int nodesSearchCountBackup = nodesSearchCount;
+            int nodeStart = Nodes.Length - 2;
+            while (nodesSearchCount > 1)
             {
-                int A = 0, B = FindSmallestMergedHalfArea(nodeIndices, nodeIndicesLength, A);
-                while (nodeIndicesLength > 1)
+                int nodeAId = nodeStart;
+                int nodeBId = FindBestMatch(nodeStart, nodesSearchCount, nodeStart);
+                int nodeCId = FindBestMatch(nodeStart, nodesSearchCount, nodeBId);
+
+                if (nodeStart == nodeCId)
                 {
-                    int C = FindSmallestMergedHalfArea(nodeIndices, nodeIndicesLength, B);
-                    if (A == C)
-                    {
-                        uint nodeIdxA = nodeIndices[A];
-                        uint nodeIdxB = nodeIndices[B];
-                        ref readonly GLSLTlasNode nodeA = ref Nodes[nodeIdxA];
-                        ref readonly GLSLTlasNode nodeB = ref Nodes[nodeIdxB];
+                    MathHelper.Swap(ref Nodes[nodeStart - 1], ref Nodes[nodeBId]);
+                    nodeBId = nodeStart - 1;
 
-                        AABB aabb = new AABB(nodeA.Min, nodeA.Max);
-                        aabb.GrowToFit(nodeB.Min);
-                        aabb.GrowToFit(nodeB.Max);
+                    ref readonly GLSLTlasNode nodeB = ref Nodes[nodeBId];
+                    ref readonly GLSLTlasNode nodeA = ref Nodes[nodeAId];
 
-                        ref GLSLTlasNode newNode = ref Nodes[NodesUsed];
-                        newNode.RightChild = (ushort)nodeIdxA;
-                        newNode.LeftChild = (ushort)nodeIdxB;
-                        newNode.Min = aabb.Min;
-                        newNode.Max = aabb.Max;
+                    AABB aabb = new AABB(nodeA.Min, nodeA.Max);
+                    aabb.GrowToFit(nodeB.Min);
+                    aabb.GrowToFit(nodeB.Max);
 
-                        nodeIndices[A] = (uint)NodesUsed++;
-                        nodeIndices[B] = nodeIndices[nodeIndicesLength - 1];
-                        B = FindSmallestMergedHalfArea(nodeIndices, --nodeIndicesLength, A);
-                    }
-                    else
-                    {
-                        A = B;
-                        B = C;
-                    }
+                    int newNodeIndex = Nodes.Length - 2 - NodesUsed++;
+
+                    GLSLTlasNode newNode = new GLSLTlasNode();
+                    newNode.LeftChild = (uint)nodeBId;
+                    newNode.Min = aabb.Min;
+                    newNode.Max = aabb.Max;
+
+                    Nodes[newNodeIndex] = newNode;
+
+                    nodeStart -= 2;
+                    nodesSearchCount = nodesSearchCountBackup - 1;
+                    nodesSearchCountBackup = nodesSearchCount;
                 }
-                Nodes[0] = Nodes[nodeIndices[A]];
+                else
+                {
+                    MathHelper.Swap(ref Nodes[nodeStart], ref Nodes[nodeStart - --nodesSearchCount]);
+                }
             }
         }
 
-        private int FindSmallestMergedHalfArea(Span<uint> indices, int count, int nodeIndex)
+        private int FindBestMatch(int start, int count, int nodeIndex)
         {
             float smallestArea = float.MaxValue;
             int bestNodeIndex = -1;
 
-            ref readonly GLSLTlasNode node = ref Nodes[indices[nodeIndex]];
-            for (int i = 0; i < count; i++)
+            ref readonly GLSLTlasNode node = ref Nodes[nodeIndex];
+            for (int i = start; i > start - count; i--)
             {
                 if (i == nodeIndex)
                 {
                     continue;
                 }
 
-                ref readonly GLSLTlasNode otherNode = ref Nodes[indices[i]];
+                ref readonly GLSLTlasNode otherNode = ref Nodes[i];
 
                 AABB fittingBox = new AABB(node.Min, node.Max);
                 fittingBox.GrowToFit(otherNode.Min);
@@ -172,8 +170,10 @@ namespace IDKEngine
                     continue;
                 }
 
-                ref readonly GLSLTlasNode left = ref Nodes[parent.LeftChild];
-                ref readonly GLSLTlasNode right = ref Nodes[parent.RightChild];
+                uint leftChild = parent.LeftChild;
+                uint rightChild = leftChild + 1;
+                ref readonly GLSLTlasNode left = ref Nodes[leftChild];
+                ref readonly GLSLTlasNode right = ref Nodes[rightChild];
                 bool leftChildHit = MyMath.RayCuboidIntersect(ray, left.Min, left.Max, out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
                 bool rightChildHit = MyMath.RayCuboidIntersect(ray, right.Min, right.Max, out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
@@ -182,12 +182,12 @@ namespace IDKEngine
                     if (leftChildHit && rightChildHit)
                     {
                         bool leftCloser = tMinLeft < tMinRight;
-                        stackTop = leftCloser ? parent.LeftChild : parent.RightChild;
-                        stack[stackPtr++] = leftCloser ? parent.RightChild : parent.LeftChild;
+                        stackTop = leftCloser ? leftChild : rightChild;
+                        stack[stackPtr++] = leftCloser ? rightChild : leftChild;
                     }
                     else
                     {
-                        stackTop = leftChildHit ? parent.LeftChild : parent.RightChild;
+                        stackTop = leftChildHit ? leftChild : rightChild;
                     }
                 }
                 else

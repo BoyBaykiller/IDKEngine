@@ -111,7 +111,7 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
         }
 
-        
+
         public unsafe void UpdateMeshBuffer(int start, int count)
         {
             if (count == 0) return;
