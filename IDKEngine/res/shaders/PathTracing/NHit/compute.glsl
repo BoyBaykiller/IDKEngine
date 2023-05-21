@@ -98,7 +98,7 @@ struct Triangle
 struct TlasNode
 {
     vec3 Min;
-    uint LeftChildAndRightChild;
+    uint LeftChild;
     vec3 Max;
     uint BlasIndex;
 };
@@ -299,7 +299,7 @@ bool TraceRay(inout TransportRay transportRay)
             vec4 albedoAlpha = texture(material.BaseColor, texCoord) * unpackUnorm4x8(material.BaseColorFactor);
             albedo = albedoAlpha.rgb;
             refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
-            emissive = (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
+            emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
             specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
             roughness = clamp(texture(material.MetallicRoughness, texCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
             normal = texture(material.Normal, texCoord).rgb;

@@ -102,13 +102,13 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    DrawCommand meshCMD = drawCommandSSBO.DrawCommands[meshIndex];
-    BlasNode node = blasSSBO.Nodes[2 * (meshCMD.FirstIndex / 3)];
+    DrawCommand drawCmd = drawCommandSSBO.DrawCommands[meshIndex];
+    BlasNode node = blasSSBO.Nodes[2 * (drawCmd.FirstIndex / 3)];
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
     int instances = 0;
     int packedValue = 0;
-    mat4 model = meshInstanceSSBO.MeshInstances[meshCMD.BaseInstance].ModelMatrix;
+    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance].ModelMatrix;
 
     for (int i = 0; i < 6; i++)
     {

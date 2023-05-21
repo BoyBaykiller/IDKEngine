@@ -26,7 +26,7 @@ namespace IDKEngine
         {
             Triangles = triangles;
             TreeDepth = (int)MathF.Ceiling(MathF.Log2(Triangles.Length)) + 1;
-            TreeDepth -= (int)MathF.Ceiling(MathF.Log2(MIN_TRIANGLES_PER_LEAF_COUNT)) + 1;
+            TreeDepth -= (int)MathF.Ceiling(MathF.Log2(MIN_TRIANGLES_PER_LEAF_COUNT));
             TreeDepth = Math.Max(TreeDepth, 1);
 
             Nodes = new GLSLBlasNode[2 * Triangles.Length];
@@ -118,7 +118,7 @@ namespace IDKEngine
 
             float splitCost = FindBestSplitAxis(parentNode, out int splitAxis, out float splitPos);
             float parentSAH = CalculateSAH(MyMath.HalfArea(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
-            if (splitCost >= parentSAH)
+            if (!(splitCost < parentSAH))
             {
                 return;
             }
@@ -172,7 +172,9 @@ namespace IDKEngine
             for (int i = 0; i < 3; i++)
             {
                 if (uniformDivideArea.Min[i] == uniformDivideArea.Max[i])
+                {
                     continue;
+                }
 
                 float scale = (uniformDivideArea.Max[i] - uniformDivideArea.Min[i]) / SAH_SAMPLES;
                 for (int j = 1; j < SAH_SAMPLES; j++)

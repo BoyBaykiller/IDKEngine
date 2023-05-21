@@ -61,7 +61,6 @@ namespace IDKEngine.Render
             //app.debugNode.Min = node.Min;
             //app.debugNode.Max = node.Max;
             //ImGui.Text($"LeftChild: {node.LeftChild}");
-            //ImGui.Text($"RightChild: {node.RightChild}");
             //ImGui.Text($"BlasIndex: {node.BlasIndex}");
             //ImGui.Text($"Min: {node.Min}");
             //ImGui.Text($"Max: {node.Max}");
@@ -786,10 +785,7 @@ namespace IDKEngine.Render
                         {
                             if (ImGui.Button("Delete PointShadow"))
                             {
-                                Console.WriteLine(abstractLight.GLSLLight.PointShadowIndex);
                                 app.LightManager.DeletePointShadowOfLight(SelectedEntityIndex);
-                                Console.WriteLine(abstractLight.GLSLLight.PointShadowIndex);
-                                Console.WriteLine("===============");
                             }
                         }
                         else
@@ -1010,19 +1006,22 @@ namespace IDKEngine.Render
                     return;
                 }
 
-                {
-                    Stopwatch a = Stopwatch.StartNew();
-                    for (float x = -1.0f; x < 1.0f; x += 0.05f)
-                    {
-                        for (float y = -1.0f; y < 1.0f; y += 0.05f)
-                        {
-                            Ray test = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, new Vector2(x, y));
-                            app.BVH.Intersect(test, out TLAS.HitInfo s);
-                        }
-                    }
-                    a.Stop();
-                    Console.WriteLine(a.Elapsed.Milliseconds);
-                }
+                //int counter = 0;
+                //for (float y = -1.0f; y < 1.0f; y += (2.0f / app.RenderResolution.X))
+                //{
+                //    for (float x = -1.0f; x < 1.0f; x += (2.0f / app.RenderResolution.Y))
+                //    {
+                //        Ray ray = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, new Vector2(x, y));
+                //        bool i = app.BVH.Intersect(ray, out TLAS.HitInfo h);
+                //    }
+                //    counter++;
+
+                //    if (counter % 50 == 0)
+                //    {
+                //        Console.WriteLine(counter);
+                //    }
+                //}
+
 
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
                 bool hitMesh = app.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo meshHitInfo);
