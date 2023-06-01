@@ -3,7 +3,7 @@
 #define EPSILON 0.001
 #extension GL_ARB_bindless_texture : require
 #extension GL_NV_shader_atomic_fp16_vector : enable
-#if defined GL_NV_shader_atomic_fp16_vector
+#if GL_NV_shader_atomic_fp16_vector
 #extension GL_NV_gpu_shader5 : require
 #endif
 
@@ -121,7 +121,7 @@ void main()
     directLighting += albedoAlpha.rgb * ambient;
     directLighting += emissive;
 
-#if defined GL_NV_shader_atomic_fp16_vector
+#if GL_NV_shader_atomic_fp16_vector
 
     imageAtomicMax(ImgResult, voxelPos, f16vec4(directLighting, 1.0));
 

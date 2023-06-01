@@ -3,16 +3,15 @@
 #define FLOAT_MIN -FLOAT_MAX
 #extension GL_ARB_bindless_texture : require
 
-AppInclude(include/Constants.glsl)
-
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0, rgba16f) restrict uniform image2D ImgResult;
-layout(binding = 0) uniform sampler2D SamplerHistory;
+layout(binding = 0) restrict writeonly uniform image2D ImgResult;
+layout(binding = 0) uniform sampler2D SamplerCurrent;
+layout(binding = 1) uniform sampler2D SamplerHistory;
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
+    vec2 Jitter;
     int Samples;
     int Enabled;
     uint Frame;
@@ -40,10 +39,10 @@ void main()
 
     if (!IsTaaArtifactMitigation)
     {
-        vec2 velocity = texelFetch(gBufferDataUBO.Velocity, imgCoord, 0).rg / taaDataUBO.VelScale;
+        vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg / taaDataUBO.VelScale;
         vec2 historyUV = uv - velocity;
 
-        vec3 currentColor = imageLoad(ImgResult, imgCoord).rgb;
+        vec3 currentColor = texture(SamplerCurrent, uv).rgb;
         vec3 historyColor = texture(SamplerHistory, historyUV).rgb;
 
         float blend = 1.0 / taaDataUBO.Samples;
@@ -97,7 +96,7 @@ void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocit
         {
             ivec2 curPixel = imgCoord + ivec2(x, y);
     
-            vec3 neighbor = imageLoad(ImgResult, curPixel).rgb;
+            vec3 neighbor = texelFetch(SamplerCurrent, curPixel, 0).rgb;
             neighborhoodMin = min(neighborhoodMin, neighbor);
             neighborhoodMax = max(neighborhoodMax, neighbor);
             

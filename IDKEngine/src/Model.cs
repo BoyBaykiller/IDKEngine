@@ -64,7 +64,7 @@ namespace IDKEngine
         public GLSLMesh[] Meshes;
         public GLSLMeshInstance[] MeshInstances;
         public GLSLMaterial[] Materials;
-        public GLSLDrawElementsCommand[] DrawCommands;
+        public GLSLDrawElementsCmd[] DrawCommands;
         public GLSLDrawVertex[] Vertices;
         public uint[] Indices;
 
@@ -96,7 +96,7 @@ namespace IDKEngine
 
             List<GLSLMesh> meshes = new List<GLSLMesh>();
             List<GLSLMeshInstance> meshInstances = new List<GLSLMeshInstance>();
-            List<GLSLDrawElementsCommand> drawCommands = new List<GLSLDrawElementsCommand>();
+            List<GLSLDrawElementsCmd> drawCommands = new List<GLSLDrawElementsCmd>();
             List<GLSLDrawVertex> vertices = new List<GLSLDrawVertex>();
             List<uint> indices = new List<uint>();
 
@@ -158,7 +158,7 @@ namespace IDKEngine
                         GLSLMeshInstance meshInstance = new GLSLMeshInstance();
                         meshInstance.ModelMatrix = globalTransform;
 
-                        GLSLDrawElementsCommand cmd = new GLSLDrawElementsCommand();
+                        GLSLDrawElementsCmd cmd = new GLSLDrawElementsCmd();
                         GLSLDrawVertex[] thisVertices = LoadVertexData(rootDir, gltfMesh.Primitives[i]);
                         uint[] thisIndices = LoadIndexData(rootDir, gltfMesh.Primitives[i]);
 

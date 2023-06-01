@@ -122,6 +122,8 @@ namespace IDKEngine.Render
         {
             width /= 2;
             height /= 2;
+            width = Math.Max(width, 1);
+            height = Math.Max(height, 1);
 
             lodCount = Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - MinusLods, 2);
 

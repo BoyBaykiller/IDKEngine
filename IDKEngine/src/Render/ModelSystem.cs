@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class ModelSystem : IDisposable
     {
-        public GLSLDrawElementsCommand[] DrawCommands;
+        public GLSLDrawElementsCmd[] DrawCommands;
         private readonly BufferObject drawCommandBuffer;
 
         public GLSLMesh[] Meshes;
@@ -31,7 +31,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram frustumCullingProgram;
         public unsafe ModelSystem()
         {
-            DrawCommands = Array.Empty<GLSLDrawElementsCommand>();
+            DrawCommands = Array.Empty<GLSLDrawElementsCmd>();
             drawCommandBuffer = new BufferObject();
             drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
 
@@ -61,7 +61,7 @@ namespace IDKEngine.Render
             vao.SetAttribFormatI(0, 2, 1, VertexAttribType.UnsignedInt, sizeof(float) * 6); // Tangent
             vao.SetAttribFormatI(0, 3, 1, VertexAttribType.UnsignedInt, sizeof(float) * 7); // Normal
 
-            frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Frustum/compute.glsl")));
+            frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/SingleView/Frustum/compute.glsl")));
         }
 
         public unsafe void Add(params Model[] models)
@@ -85,7 +85,7 @@ namespace IDKEngine.Render
                 LoadModelMatrices(models[i].MeshInstances);
             }
 
-            drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawElementsCommand), DrawCommands);
+            drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawElementsCmd), DrawCommands);
             meshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes);
             materialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
             vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLDrawVertex), Vertices);
@@ -99,10 +99,10 @@ namespace IDKEngine.Render
         {
             vao.Bind();
             drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GLSLDrawElementsCommand));
+            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GLSLDrawElementsCmd));
         }
 
-        public void FrustumCull(in Matrix4 projView)
+        public unsafe void FrustumCull(in Matrix4 projView)
         {
             frustumCullingProgram.Use();
             frustumCullingProgram.Upload(0, projView);
@@ -121,7 +121,7 @@ namespace IDKEngine.Render
         public unsafe void UpdateDrawCommandBuffer(int start, int count)
         {
             if (count == 0) return;
-            drawCommandBuffer.SubData(start * sizeof(GLSLDrawElementsCommand), count * sizeof(GLSLDrawElementsCommand), DrawCommands[start]);
+            drawCommandBuffer.SubData(start * sizeof(GLSLDrawElementsCmd), count * sizeof(GLSLDrawElementsCmd), DrawCommands[start]);
         }
 
         public unsafe void UpdateMeshInstanceBuffer(int start, int count)
@@ -130,7 +130,7 @@ namespace IDKEngine.Render
             meshInstanceBuffer.SubData(start * sizeof(GLSLMeshInstance), count * sizeof(GLSLMeshInstance), MeshInstances[start]);
         }
 
-        private void LoadDrawCommands(GLSLDrawElementsCommand[] drawCommands)
+        private void LoadDrawCommands(GLSLDrawElementsCmd[] drawCommands)
         {
             int prevCmdLength = DrawCommands.Length;
             int prevIndicesLength = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].FirstIndex + DrawCommands[prevCmdLength - 1].Count;

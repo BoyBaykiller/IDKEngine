@@ -296,7 +296,7 @@ This effectively allows multiple meshes to be drawn with one API call, reducing 
 
 Arguments for these underlying draw calls are provided by us and expected to have the following format:
 ```cs
-struct DrawCommand
+struct DrawElementsCmd
 {
     int Count; // indices count
     int InstanceCount; // number of instances
@@ -430,7 +430,7 @@ Let's get to the culling shader:
 #version 460 core
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-struct DrawCommand
+struct DrawElementsCmd
 {
     uint Count;
     uint InstanceCount;

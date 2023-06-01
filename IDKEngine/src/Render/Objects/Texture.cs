@@ -15,7 +15,6 @@ namespace IDKEngine.Render.Objects
             Three,
         }
 
-        public Vector2i Size => new Vector2i(Width, Height);
 
         public readonly int ID;
         public readonly TextureTarget Target;

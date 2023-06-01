@@ -29,7 +29,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
+    vec2 Jitter;
     int Samples;
     int Enabled;
     uint Frame;

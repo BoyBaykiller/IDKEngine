@@ -11,18 +11,18 @@ void main()
 {
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
     ivec3 imgSize = imageSize(ImgResult);
-    vec3 uvt = (imgCoord + 0.5) / imgSize;
+    vec3 uvw = (imgCoord + 0.5) / imgSize;
 
-    vec4 result = textureLod(SamplerDownsample, uvt, Lod);
+    vec4 result = textureLod(SamplerDownsample, uvw, Lod);
 
-    result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3(-1,  0,  0));
-    result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3( 1,  0,  0));
+    result += textureLodOffset(SamplerDownsample, uvw, Lod, ivec3(-1,  0,  0));
+    result += textureLodOffset(SamplerDownsample, uvw, Lod, ivec3( 1,  0,  0));
 
-    result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3( 0, -1,  0));
-    result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3( 0,  1,  0));
+    result += textureLodOffset(SamplerDownsample, uvw, Lod, ivec3( 0, -1,  0));
+    result += textureLodOffset(SamplerDownsample, uvw, Lod, ivec3( 0,  1,  0));
 
-    result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3( 0,  0, -1));
-    result += textureLodOffset(SamplerDownsample, uvt, Lod, ivec3( 0,  0,  1));
+    result += textureLodOffset(SamplerDownsample, uvw, Lod, ivec3( 0,  0, -1));
+    result += textureLodOffset(SamplerDownsample, uvw, Lod, ivec3( 0,  0,  1));
 
     result /= 7.0;
 

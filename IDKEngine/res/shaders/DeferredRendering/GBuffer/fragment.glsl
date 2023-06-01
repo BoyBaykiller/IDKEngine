@@ -3,8 +3,6 @@
 
 AppInclude(include/Constants.glsl)
 
-layout(early_fragment_tests) in;
-
 layout(location = 1) out vec4 AlbedoAlpha;
 layout(location = 2) out vec4 NormalSpecular;
 layout(location = 3) out vec4 EmissiveRoughness;
@@ -51,7 +49,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
+    vec2 Jitter;
     int Samples;
     int Enabled;
     uint Frame;

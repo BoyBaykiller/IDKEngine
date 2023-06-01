@@ -134,7 +134,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
 
         if (parent.LeftChild == 0)
         {
-            DrawCommand cmd = drawCommandSSBO.DrawCommands[parent.BlasIndex];
+            DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[parent.BlasIndex];
 
             uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
             Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
@@ -189,7 +189,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
 #else
     for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
     {
-        DrawCommand cmd = drawCommandSSBO.DrawCommands[i];
+        DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
         
         uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
         Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);

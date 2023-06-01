@@ -7,7 +7,7 @@ struct Frustum
     vec4 Planes[6];
 };
 
-struct DrawCommand
+struct DrawElementsCmd
 {
     uint Count;
     uint InstanceCount;
@@ -45,10 +45,10 @@ struct BlasNode
     uint TriCount;
 };
 
-layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
+layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
 {
-    DrawCommand DrawCommands[];
-} drawCommandSSBO;
+    DrawElementsCmd DrawCommands[];
+} drawElementsCmdSSBO;
 
 layout(std430, binding = 1) restrict readonly writeonly buffer MeshSSBO
 {
@@ -67,7 +67,7 @@ layout(std430, binding = 4) restrict readonly buffer BlasSSBO
 
 layout(location = 0) uniform mat4 ProjView;
 
-AppInclude(Culling/Frustum/include/common.glsl)
+AppInclude(Culling/include/common.glsl)
 
 void main()
 {
@@ -75,12 +75,14 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    DrawCommand drawCmd = drawCommandSSBO.DrawCommands[meshIndex];
+    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshIndex];
     BlasNode node = blasSSBO.Nodes[2 * (drawCmd.FirstIndex / 3)];
     
     const uint glInstanceID = 0; // TODO: Derive from built in variables
     mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].ModelMatrix;
     
     Frustum frustum = ExtractFrustum(ProjView * model);
-    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumAABBIntersect(frustum, node));
+    bool isMeshInFrustum = FrustumAABBIntersect(frustum, node);
+
+    drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = int(isMeshInFrustum);
 }

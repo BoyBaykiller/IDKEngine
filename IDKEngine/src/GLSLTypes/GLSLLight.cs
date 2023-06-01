@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    struct GLSLLight
+    public struct GLSLLight
     {
         public Vector3 Position;
         public float Radius;

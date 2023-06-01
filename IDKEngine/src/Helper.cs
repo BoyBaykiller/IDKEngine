@@ -279,7 +279,7 @@ namespace IDKEngine
             return min + rng.NextSingle() * (max - min);
         }
 
-        public static unsafe void TextureToDisk(Texture texture, string path, int quality = 200, bool flipVertically = true)
+        public static unsafe void TextureToDisk(Texture texture, string path, int quality = 100, bool flipVertically = true)
         {
             StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
 

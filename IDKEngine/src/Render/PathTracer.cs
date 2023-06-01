@@ -18,7 +18,7 @@ namespace IDKEngine.Render
             set
             {
                 _rayDepth = value;
-                ResetRender();
+                AccumulatedSamples = 0;
             }
         }
 
@@ -43,7 +43,7 @@ namespace IDKEngine.Render
                     LenseRadius = _lenseRadius;
                     RayDepth = cachedRayDepth;
                 }
-                ResetRender();
+                AccumulatedSamples = 0;
             }
         }
 
@@ -57,7 +57,7 @@ namespace IDKEngine.Render
                 _isTraceLights = value;
                 firstHitProgram.Upload("IsTraceLights", _isTraceLights);
                 nHitProgram.Upload("IsTraceLights", _isTraceLights);
-                ResetRender();
+                AccumulatedSamples = 0;
             }
         }
 
@@ -70,7 +70,7 @@ namespace IDKEngine.Render
             {
                 _focalLength = value;
                 firstHitProgram.Upload("FocalLength", value);
-                ResetRender();
+                AccumulatedSamples = 0;
             }
         }
 
@@ -83,7 +83,7 @@ namespace IDKEngine.Render
             {
                 _lenseRadius = value;
                 firstHitProgram.Upload("LenseRadius", value);
-                ResetRender();
+                AccumulatedSamples = 0;
             }
         }
 
@@ -158,11 +158,6 @@ namespace IDKEngine.Render
             AccumulatedSamples++;
         }
 
-        public void ResetRender()
-        {
-            AccumulatedSamples = 0;
-        }
-
         public unsafe void SetSize(int width, int height)
         {
             dispatchCommandBuffer.SubData(0, sizeof(GLSLDispatchCommand), new GLSLDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
@@ -184,6 +179,9 @@ namespace IDKEngine.Render
             rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0));
             rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
+
+            AccumulatedSamples = 0;
+
         }
 
         public void Dispose()

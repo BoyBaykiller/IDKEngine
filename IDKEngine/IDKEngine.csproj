@@ -38,4 +38,10 @@
     <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="FFX_FSR2">
+      <HintPath>res\FFX_FSR2.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
