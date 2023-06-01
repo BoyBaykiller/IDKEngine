@@ -71,7 +71,7 @@ namespace IDKEngine
             TLAS.BlasInstances[] blasesInstances = new TLAS.BlasInstances[ModelSystem.Meshes.Length];
             Parallel.For(0, blasesInstances.Length, i =>
             {
-                ref readonly GLSLDrawElementsCommand cmd = ref ModelSystem.DrawCommands[i];
+                ref readonly GLSLDrawElementsCmd cmd = ref ModelSystem.DrawCommands[i];
 
                 GLSLTriangle[] blasTriangles = new GLSLTriangle[cmd.Count / 3];
                 for (int j = 0; j < blasTriangles.Length; j++)

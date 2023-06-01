@@ -15,7 +15,7 @@ void main()
 {
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
 
-#if defined GL_NV_shader_atomic_fp16_vector
+#if GL_NV_shader_atomic_fp16_vector
 
     imageStore(ImgResult, imgCoord, vec4(0.0));
 

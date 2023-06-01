@@ -25,6 +25,7 @@ namespace IDKEngine
 
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.01f, FAR_PLANE = 500.0f;
+        public static readonly float CAMERA_FOV_Y = MathHelper.DegreesToRadians(102.0f);
 
         private Vector2i _renderResolution;
         public Vector2i RenderResolution
@@ -34,33 +35,25 @@ namespace IDKEngine
             set
             {
                 _renderResolution = value;
-
                 int width = _renderResolution.X;
                 int height = _renderResolution.Y;
 
-                if (width < 16 || height < 16)
-                    return;
-
-
-                GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), width / (float)height, NEAR_PLANE, FAR_PLANE);
-                GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
-                GLSLBasicData.NearPlane = NEAR_PLANE;
-                GLSLBasicData.FarPlane = FAR_PLANE;
-
                 if (RenderMode == RenderMode.Rasterizer)
                 {
-                    RasterizerPipeline.SetSize(width, height);
+                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(width, height);
+                    if (TaaResolve != null) TaaResolve.SetSize(width, height);
                 }
 
                 if (RenderMode == RenderMode.PathTracer)
                 {
-                    PathTracer.SetSize(width, height);
+                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(1, 1);
+                    if (PathTracer != null) PathTracer.SetSize(width, height);
                 }
 
                 if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
                 {
-                    Bloom.SetSize(width, height);
-                    PostProcessor.SetSize(width, height);
+                    if (Bloom != null) Bloom.SetSize(width, height);
+                    if (PostProcessor != null) PostProcessor.SetSize(width, height);
                 }
             }
         }
@@ -97,7 +90,6 @@ namespace IDKEngine
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
 
-        // public AABB debugNode;
         protected override unsafe void OnRender(float dT)
         {
             Update(dT);
@@ -107,13 +99,16 @@ namespace IDKEngine
                 {
                     LightManager.RenderShadowMaps(ModelSystem);
                 }
-                
+
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
-                    PostProcessor.Compute(false, RasterizerPipeline.Result);
-
+                    PostProcessor.Combine(RasterizerPipeline.Result);
                     MeshOutlineRenderer.Render(PostProcessor.Result, new AABB(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
+
+                    bool temp = TaaResolve.TaaEnabled; TaaResolve.TaaEnabled = false;
+                    TaaResolve.RunTAAResolve(PostProcessor.Result);
+                    TaaResolve.TaaEnabled = temp;
                 }
                 else
                 {
@@ -124,9 +119,11 @@ namespace IDKEngine
                         Bloom.Compute(RasterizerPipeline.Result);
                     }
                     
-                    PostProcessor.Compute(true, RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
-                    RasterizerPipeline.LightingVRS.DebugRender(PostProcessor.Result);
+                    PostProcessor.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
+                    TaaResolve.RunTAAResolve(PostProcessor.Result);
+                    //TaaResolve.RunFSR2(RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CAMERA_FOV_Y);
                 }
+                RasterizerPipeline.LightingVRS.DebugRender(TaaResolve.Result);
 
             }
             else if (RenderMode == RenderMode.PathTracer)
@@ -138,7 +135,11 @@ namespace IDKEngine
                     Bloom.Compute(PathTracer.Result);
                 }
 
-                PostProcessor.Compute(false, PathTracer.Result, IsBloom ? Bloom.Result : null);
+                PostProcessor.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
+
+                bool temp = TaaResolve.TaaEnabled; TaaResolve.TaaEnabled = false;
+                TaaResolve.RunTAAResolve(PostProcessor.Result);
+                TaaResolve.TaaEnabled = temp;
             }
 
             if (gui.SelectedEntityType != Gui.EntityType.None)
@@ -150,7 +151,7 @@ namespace IDKEngine
                     aabb.Min = node.Min;
                     aabb.Max = node.Max;
 
-                    GLSLDrawElementsCommand cmd = ModelSystem.DrawCommands[gui.SelectedEntityIndex];
+                    GLSLDrawElementsCmd cmd = ModelSystem.DrawCommands[gui.SelectedEntityIndex];
                     aabb.Transform(ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix);
                 }
                 else
@@ -162,13 +163,8 @@ namespace IDKEngine
                     aabb.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
 
-                MeshOutlineRenderer.Render(PostProcessor.Result, aabb);
+                MeshOutlineRenderer.Render(TaaResolve.Result, aabb);
             }
-
-            // debug
-            //{
-            //    MeshOutlineRenderer.Render(PostProcessor.Result, debugNode);
-            //}
 
             ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
             bool anyMeshInstanceMoved = false;
@@ -183,7 +179,7 @@ namespace IDKEngine
 
             if ((RenderMode == RenderMode.PathTracer) && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || anyMeshInstanceMoved))
             {
-                PathTracer.ResetRender();
+                PathTracer.AccumulatedSamples = 0;
             }
 
             Framebuffer.Bind(0);
@@ -197,7 +193,7 @@ namespace IDKEngine
             }
             else
             {
-                PostProcessor.Result.BindToUnit(0);
+                TaaResolve.Result.BindToUnit(0);
                 finalProgram.Use();
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             }
@@ -240,6 +236,10 @@ namespace IDKEngine
 
             gui.Update(this, dT);
 
+            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(CAMERA_FOV_Y, RenderResolution.X / (float)RenderResolution.Y, NEAR_PLANE, FAR_PLANE);
+            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
+            GLSLBasicData.NearPlane = NEAR_PLANE;
+            GLSLBasicData.FarPlane = FAR_PLANE;
             GLSLBasicData.DeltaUpdate = dT;
             GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
             GLSLBasicData.PrevView = GLSLBasicData.View;
@@ -259,7 +259,8 @@ namespace IDKEngine
         public FrameStateRecorder<Camera.State> FrameRecorder;
 
         public Bloom Bloom;
-        public PostProcessor PostProcessor;
+        public TonemapAndGammaCorrecter PostProcessor;
+        public TAAResolve TaaResolve;
         public LightManager LightManager;
         public AABBRender MeshOutlineRenderer;
 
@@ -269,6 +270,7 @@ namespace IDKEngine
         private Gui gui;
         private BufferObject basicDataUBO;
         private ShaderProgram finalProgram;
+
         protected override unsafe void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
@@ -297,16 +299,11 @@ namespace IDKEngine
             GL.Enable(EnableCap.ScissorTest);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
-            
-            _renderResolution = WindowFramebufferSize;
 
-            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(102.0f), RenderResolution.X / (float)RenderResolution.Y, NEAR_PLANE, FAR_PLANE);
-            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
-            GLSLBasicData.NearPlane = NEAR_PLANE;
-            GLSLBasicData.FarPlane = FAR_PLANE;
+            RenderResolution = WindowFramebufferSize;
 
             basicDataUBO = new BufferObject();
-            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), GLSLBasicData, BufferStorageFlags.DynamicStorageBit);
+            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             finalProgram = new ShaderProgram(
@@ -380,7 +377,8 @@ namespace IDKEngine
             LightManager = new LightManager(12, 12);
             MeshOutlineRenderer = new AABBRender();
             Bloom = new Bloom(RenderResolution.X, RenderResolution.Y, 1.0f, 3.0f);
-            PostProcessor = new PostProcessor(RenderResolution.X, RenderResolution.Y);
+            PostProcessor = new TonemapAndGammaCorrecter(RenderResolution.X, RenderResolution.Y);
+            TaaResolve = new TAAResolve(RenderResolution.X, RenderResolution.Y);
 
             LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
@@ -400,7 +398,6 @@ namespace IDKEngine
             WindowVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorNormal;
             FrameRecorder = new FrameStateRecorder<Camera.State>();
-
             gui = new Gui(WindowFramebufferSize.X, WindowFramebufferSize.Y);
 
             GC.Collect();

@@ -10,7 +10,7 @@ struct Frustum
 	vec4 Planes[6];
 };
 
-struct DrawCommand
+struct DrawElementsCmd
 {
     uint Count;
     uint InstanceCount;
@@ -62,10 +62,10 @@ struct PointShadow
     float FarPlane;
 };
 
-layout(std430, binding = 0) restrict buffer DrawCommandsSSBO
+layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
 {
-    DrawCommand DrawCommands[];
-} drawCommandSSBO;
+    DrawElementsCmd DrawCommands[];
+} drawElementsCmdSSBO;
 
 layout(std430, binding = 1) restrict writeonly buffer MeshSSBO
 {
@@ -90,7 +90,7 @@ layout(std140, binding = 1) uniform ShadowDataUBO
 
 layout(location = 0) uniform int ShadowIndex;
 
-AppInclude(Culling/Frustum/include/common.glsl)
+AppInclude(Culling/include/common.glsl)
 
 // 1. Count number of shadow-cubemap-faces the mesh is visible from the shadow source
 // 2. Pack each visible face into a single int
@@ -102,7 +102,7 @@ void main()
     if (meshIndex >= meshSSBO.Meshes.length())
         return;
 
-    DrawCommand drawCmd = drawCommandSSBO.DrawCommands[meshIndex];
+    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshIndex];
     BlasNode node = blasSSBO.Nodes[2 * (drawCmd.FirstIndex / 3)];
     PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
@@ -118,6 +118,6 @@ void main()
             packedValue = bitfieldInsert(packedValue, i, 3 * instances++, 3);
         }
     }
-    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = instances;
+    drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = instances;
     meshSSBO.Meshes[meshIndex].CubemapShadowCullInfo = packedValue;
 }

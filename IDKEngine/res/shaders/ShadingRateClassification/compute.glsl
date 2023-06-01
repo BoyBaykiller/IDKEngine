@@ -4,7 +4,6 @@
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_AMD_gcn_shader : enable
 
-AppInclude(include/Constants.glsl)
 AppInclude(ShadingRateClassification/include/Constants.glsl)
 
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
@@ -33,7 +32,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
+    vec2 Jitter;
     int Samples;
     int Enabled;
     uint Frame;
@@ -79,7 +78,7 @@ void main()
     vec2 uv = (imgCoord + 0.5) / textureSize(SamplerShaded, 0);
 
     vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg / taaDataUBO.VelScale;
-    vec3 srcColor = texelFetch(SamplerShaded, imgCoord, 0).rgb;
+    vec3 srcColor = texture(SamplerShaded, uv).rgb;
 
     float meanSpeed, meanLuminance, luminanceVariance;
     GetTileData(srcColor, velocity, meanSpeed, meanLuminance, luminanceVariance);
@@ -127,14 +126,14 @@ void main()
 
 void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanLuminance, out float luminanceVariance)
 {
-    #if defined GL_KHR_shader_subgroup_arithmetic
+    #if GL_KHR_shader_subgroup_arithmetic
     uint effectiveSubgroupSize = gl_SubgroupSize;
     #else
     uint effectiveSubgroupSize = 1; // effectively 1 if we can't use subgroup arithmetic
     #endif
     float luminance = GetLuminance(color);
 
-    #if defined GL_KHR_shader_subgroup_arithmetic
+    #if GL_KHR_shader_subgroup_arithmetic
     float subgroupAddedSpeed = subgroupAdd(length(velocity) * AVG_MULTIPLIER);
     float subgroupAddedLum = subgroupAdd(luminance * AVG_MULTIPLIER);
 
@@ -164,7 +163,7 @@ void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanL
     meanLuminance = SharedMeanLum[0];
 
     float deltaLumMean = luminance - meanLuminance;
-    #if defined GL_KHR_shader_subgroup_arithmetic
+    #if GL_KHR_shader_subgroup_arithmetic
     float subgroupAddedDeltaLumMean = subgroupAdd(pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER);
     if (subgroupElect())
     {

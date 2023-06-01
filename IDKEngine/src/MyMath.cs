@@ -3,56 +3,8 @@ using OpenTK.Mathematics;
 
 namespace IDKEngine
 {
-    static class MyMath
+    public static class MyMath
     {
-        public static Vector3 Abs(this Vector3 a)
-        {
-            return new Vector3(MathF.Abs(a.X), MathF.Abs(a.Y), MathF.Abs(a.Z));
-        }
-
-        // Source: https://github.com/leesg213/TemporalAA/blob/main/Renderer/AAPLRenderer.mm#L152
-        public static void GetHaltonSequence_2_3(Span<float> buffer)
-        {
-            int n2 = 0, d2 = 1, n3 = 0, d3 = 1;
-            for (int i = 0; i < buffer.Length; i += 2)
-            {
-                buffer[i + 0] = GetHalton(2, ref n2, ref d2);
-                buffer[i + 1] = GetHalton(3, ref n3, ref d3);
-            }
-        }
-
-        // Source: https://github.com/leesg213/TemporalAA/blob/main/Renderer/AAPLRenderer.mm#L124
-        public static float GetHalton(int baseHalton, ref int n, ref int d)
-        {
-            int x = d - n;
-            if (x == 1)
-            {
-                n = 1;
-                d *= baseHalton;
-            }
-            else
-            {
-                int y = d / baseHalton;
-                while(x <= y)
-                {
-                    y /= baseHalton;
-                }
-
-                n = (baseHalton + 1) * y - x;
-            }
-
-            float result = n / (float)d;
-            return result;
-        }
-        
-        public static void MapHaltonSequence(Span<float> halton, float width, float height)
-        {
-            for (int i = 0; i < halton.Length; i += 2)
-            {
-                halton[i + 0] = (halton[i + 0] * 2.0f - 1.0f) / width;
-                halton[i + 1] = (halton[i + 1] * 2.0f - 1.0f) / height;
-            }
-        }
 
         public static void BitsInsert(ref uint mem, uint data, int offset)
         {

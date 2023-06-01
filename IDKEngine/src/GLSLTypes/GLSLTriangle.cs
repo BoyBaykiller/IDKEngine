@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine
 {
-    struct GLSLTriangle
+    public struct GLSLTriangle
     {
         public GLSLDrawVertex Vertex0;
         public GLSLDrawVertex Vertex1;

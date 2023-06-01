@@ -47,25 +47,10 @@ namespace IDKEngine.Render
 
         private System.Numerics.Vector2 viewportHeaderSize;
 
-        private int debugIndex;
         public void Draw(Application app, float frameTime)
         {
             Backend.Update(app, frameTime);
             ImGui.DockSpaceOverViewport();
-
-
-            //ImGui.Begin("debug tlas");
-            //TLAS tlas = app.BVH.Tlas;
-            //ImGui.SliderInt("tlas node", ref debugIndex, 0, tlas.Nodes.Length - 1);
-            //ref readonly GLSLTlasNode node = ref tlas.Nodes[debugIndex];
-            //app.debugNode.Min = node.Min;
-            //app.debugNode.Max = node.Max;
-            //ImGui.Text($"LeftChild: {node.LeftChild}");
-            //ImGui.Text($"BlasIndex: {node.BlasIndex}");
-            //ImGui.Text($"Min: {node.Min}");
-            //ImGui.Text($"Max: {node.Max}");
-            //ImGui.End();
-
 
             bool tempBool;
             int tempInt;
@@ -308,7 +293,7 @@ namespace IDKEngine.Render
                                 }
                                 ImGui.SameLine();
                                 InfoMark(
-                                    $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)." +
+                                    $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting)." +
                                     "If TAA is disabled this has no effect."
                                 );
                             }
@@ -427,7 +412,7 @@ namespace IDKEngine.Render
                             }
                             ImGui.SameLine();
                             InfoMark(
-                                $"When active samples are accumulated over {app.PostProcessor.TaaSamples} frames (based on TAA setting)." +
+                                $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting)." +
                                 "If TAA is disabled this has no effect."
                             );
                         }
@@ -435,18 +420,18 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("TAA"))
                     {
-                        tempBool = app.PostProcessor.TaaEnabled;
+                        tempBool = app.TaaResolve.TaaEnabled;
                         if (ImGui.Checkbox("IsTAA", ref tempBool))
                         {
-                            app.PostProcessor.TaaEnabled = tempBool;
+                            app.TaaResolve.TaaEnabled = tempBool;
                         }
 
-                        if (app.PostProcessor.TaaEnabled)
+                        if (app.TaaResolve.TaaEnabled)
                         {
-                            tempBool = app.PostProcessor.IsTaaArtifactMitigation;
+                            tempBool = app.TaaResolve.IsTaaArtifactMitigation;
                             if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
                             {
-                                app.PostProcessor.IsTaaArtifactMitigation = tempBool;
+                                app.TaaResolve.IsTaaArtifactMitigation = tempBool;
                             }
                             ImGui.SameLine();
                             InfoMark(
@@ -454,10 +439,10 @@ namespace IDKEngine.Render
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
                             );
 
-                            tempInt = app.PostProcessor.TaaSamples;
+                            tempInt = app.TaaResolve.TaaSamples;
                             if (ImGui.SliderInt("Samples##1", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
                             {
-                                app.PostProcessor.TaaSamples = Math.Min(tempInt, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
+                                app.TaaResolve.TaaSamples = Math.Min(tempInt, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
                             }
                         }
                     }
@@ -666,7 +651,7 @@ namespace IDKEngine.Render
                 if (SelectedEntityType == EntityType.Mesh)
                 {
                     bool shouldUpdateMesh = false;
-                    ref readonly GLSLDrawElementsCommand cmd = ref app.ModelSystem.DrawCommands[SelectedEntityIndex];
+                    ref readonly GLSLDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[SelectedEntityIndex];
                     ref GLSLMesh mesh = ref app.ModelSystem.Meshes[SelectedEntityIndex];
                     ref GLSLMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance];
 
@@ -841,7 +826,7 @@ namespace IDKEngine.Render
                 System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
-                ImGui.Image(app.PostProcessor.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
+                ImGui.Image(app.TaaResolve.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
 
                 ImGui.End();
                 ImGui.PopStyleVar();
@@ -849,7 +834,7 @@ namespace IDKEngine.Render
 
             if (shouldResetPT && app.PathTracer != null)
             {
-                app.PathTracer.ResetRender();
+                app.PathTracer.AccumulatedSamples = 0;
             }
             Backend.Render();
         }
@@ -1006,23 +991,6 @@ namespace IDKEngine.Render
                     return;
                 }
 
-                //int counter = 0;
-                //for (float y = -1.0f; y < 1.0f; y += (2.0f / app.RenderResolution.X))
-                //{
-                //    for (float x = -1.0f; x < 1.0f; x += (2.0f / app.RenderResolution.Y))
-                //    {
-                //        Ray ray = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, new Vector2(x, y));
-                //        bool i = app.BVH.Intersect(ray, out TLAS.HitInfo h);
-                //    }
-                //    counter++;
-
-                //    if (counter % 50 == 0)
-                //    {
-                //        Console.WriteLine(counter);
-                //    }
-                //}
-
-
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
                 bool hitMesh = app.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);
@@ -1066,7 +1034,7 @@ namespace IDKEngine.Render
 
             if (shouldResetPT && app.PathTracer != null)
             {
-                app.PathTracer.ResetRender();
+                app.PathTracer.AccumulatedSamples = 0;
             }
         }
 

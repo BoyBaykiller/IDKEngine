@@ -6,7 +6,7 @@ using OpenTK.Mathematics;
 namespace IDKEngine
 {
     [StructLayout(LayoutKind.Explicit)]
-    struct AABB
+    public struct AABB
     {
         public Vector3 Center => (Max + Min) * 0.5f;
         public Vector3 HalfSize => (Max - Min) * 0.5f;

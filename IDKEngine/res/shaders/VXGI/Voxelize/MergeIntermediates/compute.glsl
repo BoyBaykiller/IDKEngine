@@ -1,6 +1,6 @@
 #version 460 core
 #extension GL_NV_shader_atomic_fp16_vector : enable
-#if defined GL_NV_shader_atomic_fp16_vector
+#if GL_NV_shader_atomic_fp16_vector
 #error "This GPU supports GL_NV_shader_atomic_fp16_vector. There is no need to use or compile this shader"
 #endif
 

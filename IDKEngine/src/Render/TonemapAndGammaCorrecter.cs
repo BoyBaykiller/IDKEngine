@@ -1,0 +1,76 @@
+﻿using System;
+using System.IO;
+using OpenTK.Graphics.OpenGL4;
+using IDKEngine.Render.Objects;
+
+namespace IDKEngine.Render
+{
+    unsafe class TonemapAndGammaCorrecter : IDisposable
+    {
+        private bool _isDithering;
+        public bool IsDithering
+        {
+            get => _isDithering;
+
+            set
+            {
+                _isDithering = value;
+                tonemapAndGammaCorrecterProgram.Upload("IsDithering", _isDithering);
+            }
+        }
+
+        private float _gamma;
+        public float Gamma
+        {
+            get => _gamma;
+
+            set
+            {
+                _gamma = value;
+                tonemapAndGammaCorrecterProgram.Upload("Gamma", _gamma);
+            }
+        }
+
+        public Texture Result;
+        private readonly ShaderProgram tonemapAndGammaCorrecterProgram;
+        public TonemapAndGammaCorrecter(int width, int height, float gamma = 2.2f)
+        {
+            tonemapAndGammaCorrecterProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TonemapAndGammaCorrecter/compute.glsl")));
+
+            SetSize(width, height);
+            
+            IsDithering = true;
+            Gamma = gamma;
+        }
+
+        public void Combine(Texture v0 = null, Texture v1 = null)
+        {
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+
+            if (v0 != null) v0.BindToUnit(0);
+            else Texture.UnbindFromUnit(0);
+
+            if (v1 != null) v1.BindToUnit(1);
+            else Texture.UnbindFromUnit(1);
+
+            tonemapAndGammaCorrecterProgram.Use();
+            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+        }
+
+        public void SetSize(int width, int height)
+        {
+            if (Result != null) Result.Dispose();
+            Result = new Texture(TextureTarget2d.Texture2D);
+            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
+        }
+        
+        public void Dispose()
+        {
+            Result.Dispose();
+            tonemapAndGammaCorrecterProgram.Dispose();
+        }
+    }
+}

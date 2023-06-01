@@ -37,7 +37,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
-    vec4 Jitters[GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT / 2];
+    vec2 Jitter;
     int Samples;
     int Enabled;
     uint Frame;
@@ -72,14 +72,8 @@ void main()
     outData.Position = light.Position;
     outData.Radius = light.Radius;
 
-    uint index = taaDataUBO.Frame % taaDataUBO.Samples;
-    vec2 offset = vec2(
-        taaDataUBO.Jitters[index / 2][(index % 2) * 2 + 0],
-        taaDataUBO.Jitters[index / 2][(index % 2) * 2 + 1]
-    );
-
     vec4 jitteredClipPos = outData.ClipPos;
-    jitteredClipPos.xy += offset * jitteredClipPos.w * taaDataUBO.Enabled;
+    jitteredClipPos.xy += taaDataUBO.Jitter * outData.ClipPos.w * taaDataUBO.Enabled;
 
     gl_Position = jitteredClipPos;
 }

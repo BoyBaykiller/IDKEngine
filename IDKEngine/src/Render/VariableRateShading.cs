@@ -46,10 +46,15 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
+            width /= 16;
+            height /= 16;
+            width = Math.Max(width, 1);
+            height = Math.Max(height, 1);
+
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.ImmutableAllocate(width / 16, height / 16, 1, SizedInternalFormat.R8ui);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.R8ui);
         }
 
         public void Dispose()

@@ -35,12 +35,11 @@ namespace IDKEngine.Render
         public readonly ConeTracer ConeTracer;
 
         public Texture Result;
-
-        private Texture albedoAlphaTexture;
-        private Texture normalSpecularTexture;
-        private Texture emissiveRoughnessTexture;
-        private Texture velocityTexture;
-        private Texture depthTexture;
+        public Texture AlbedoAlphaTexture;
+        public Texture NormalSpecularTexture;
+        public Texture EmissiveRoughnessTexture;
+        public Texture VelocityTexture;
+        public Texture DepthTexture;
 
         private readonly ShaderProgram gBufferProgram;
         private readonly ShaderProgram lightingProgram;
@@ -219,11 +218,11 @@ namespace IDKEngine.Render
 
         private void DisposeBindlessTextures()
         {
-            if (albedoAlphaTexture != null) { albedoAlphaTexture.Dispose(); }
-            if (normalSpecularTexture != null) {  normalSpecularTexture.Dispose(); }
-            if (emissiveRoughnessTexture != null) { emissiveRoughnessTexture.Dispose(); }
-            if (velocityTexture != null) {  velocityTexture.Dispose(); }
-            if (depthTexture != null) { depthTexture.Dispose(); }
+            if (AlbedoAlphaTexture != null) { AlbedoAlphaTexture.Dispose(); }
+            if (NormalSpecularTexture != null) {  NormalSpecularTexture.Dispose(); }
+            if (EmissiveRoughnessTexture != null) { EmissiveRoughnessTexture.Dispose(); }
+            if (VelocityTexture != null) {  VelocityTexture.Dispose(); }
+            if (DepthTexture != null) { DepthTexture.Dispose(); }
         }
 
         public unsafe void SetSize(int width, int height)
@@ -242,44 +241,44 @@ namespace IDKEngine.Render
 
             DisposeBindlessTextures();
 
-            albedoAlphaTexture = new Texture(TextureTarget2d.Texture2D);
-            albedoAlphaTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            albedoAlphaTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            albedoAlphaTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
-            glslGBufferData.AlbedoAlpha = albedoAlphaTexture.GetTextureHandleARB();
+            AlbedoAlphaTexture = new Texture(TextureTarget2d.Texture2D);
+            AlbedoAlphaTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            AlbedoAlphaTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            AlbedoAlphaTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
+            glslGBufferData.AlbedoAlpha = AlbedoAlphaTexture.GetTextureHandleARB();
 
-            normalSpecularTexture = new Texture(TextureTarget2d.Texture2D);
-            normalSpecularTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            normalSpecularTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            normalSpecularTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8Snorm);
-            glslGBufferData.NormalSpecular = normalSpecularTexture.GetTextureHandleARB();
+            NormalSpecularTexture = new Texture(TextureTarget2d.Texture2D);
+            NormalSpecularTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            NormalSpecularTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            NormalSpecularTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8Snorm);
+            glslGBufferData.NormalSpecular = NormalSpecularTexture.GetTextureHandleARB();
 
-            emissiveRoughnessTexture = new Texture(TextureTarget2d.Texture2D);
-            emissiveRoughnessTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            emissiveRoughnessTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            emissiveRoughnessTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
-            glslGBufferData.EmissiveRoughness = emissiveRoughnessTexture.GetTextureHandleARB();
+            EmissiveRoughnessTexture = new Texture(TextureTarget2d.Texture2D);
+            EmissiveRoughnessTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            EmissiveRoughnessTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            EmissiveRoughnessTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+            glslGBufferData.EmissiveRoughness = EmissiveRoughnessTexture.GetTextureHandleARB();
 
-            velocityTexture = new Texture(TextureTarget2d.Texture2D);
-            velocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            velocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            velocityTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rg16f);
-            glslGBufferData.Velocity = velocityTexture.GetTextureHandleARB();
+            VelocityTexture = new Texture(TextureTarget2d.Texture2D);
+            VelocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            VelocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            VelocityTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rg16f);
+            glslGBufferData.Velocity = VelocityTexture.GetTextureHandleARB();
 
-            depthTexture = new Texture(TextureTarget2d.Texture2D);
-            depthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            depthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            depthTexture.ImmutableAllocate(width, height, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent24);
-            glslGBufferData.Depth = depthTexture.GetTextureHandleARB();
+            DepthTexture = new Texture(TextureTarget2d.Texture2D);
+            DepthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            DepthTexture.ImmutableAllocate(width, height, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent24);
+            glslGBufferData.Depth = DepthTexture.GetTextureHandleARB();
 
             gBufferData.SubData(0, sizeof(GLSLGBufferData), glslGBufferData);
 
             gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
-            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment1, albedoAlphaTexture);
-            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment2, normalSpecularTexture);
-            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment3, emissiveRoughnessTexture);
-            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment4, velocityTexture);
-            gBufferFBO.SetRenderTarget(FramebufferAttachment.DepthAttachment, depthTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment1, AlbedoAlphaTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment2, NormalSpecularTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment3, EmissiveRoughnessTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment4, VelocityTexture);
+            gBufferFBO.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture);
             gBufferFBO.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3, DrawBuffersEnum.ColorAttachment4 });
 
             deferredLightingFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
