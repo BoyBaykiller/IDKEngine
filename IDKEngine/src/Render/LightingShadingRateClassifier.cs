@@ -93,14 +93,15 @@ namespace IDKEngine.Render
                 return;
             }
 
-            dest.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, dest.SizedInternalFormat);
+            dest.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, dest.SizedInternalFormat);
+            dest.BindToUnit(0);
             if (DebugValue != DebugMode.ShadingRate)
             {
-                debugTexture.BindToUnit(0);
+                debugTexture.BindToUnit(1);
             }
             else
             {
-                Result.BindToUnit(0);
+                Result.BindToUnit(1);
             }
 
             debugProgram.Use();

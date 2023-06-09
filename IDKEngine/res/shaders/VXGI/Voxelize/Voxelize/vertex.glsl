@@ -8,8 +8,6 @@ layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
 layout(location = 3) in uint Normal;
 
-layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
-
 struct Mesh
 {
     int InstanceCount;

@@ -6,38 +6,33 @@ namespace IDKEngine
 {
     class Camera
     {
-        public struct State
-        {
-            public Vector3 Position;
-            public Vector3 UpVector;
-            public Vector3 Velocity;
-            public float LookX;
-            public float _lookY;
-            public float LookY
-            {
-                get => _lookY;
+        public Vector3 ViewDir => GetViewDirFromAngles(LookX, LookY);
 
-                set
-                {
-                    _lookY = Math.Min(value, 89.999f);
-                    _lookY = Math.Max(_lookY, -89.99f);
-                }
+        public Vector3 Position;
+        public Vector3 UpVector;
+        public Vector3 Velocity;
+        public float LookX;
+        
+        public float _lookY;
+        public float LookY
+        {
+            get => _lookY;
+
+            set
+            {
+                _lookY = Math.Min(value, 89.999f);
+                _lookY = Math.Max(_lookY, -89.99f);
             }
         }
 
-        public Vector3 ViewDir { get; private set; }
-
-        public State CamState;
         public float Speed;
         public float Sensitivity;
         public Camera(Vector3 position, Vector3 up, float lookX = -90.0f, float lookY = 0.0f, float mouseSensitivity = 0.1f, float speed = 1.0f)
         {
-            CamState.Position = position;
-            CamState.UpVector = up;
-            CamState.LookX = lookX;
-            CamState.LookY = lookY;
-
-            ViewDir = GetViewDirFromAngles(CamState.LookX, CamState.LookY);
+            Position = position;
+            UpVector = up;
+            LookX = lookX;
+            LookY = lookY;
 
             Speed = speed;
             Sensitivity = mouseSensitivity;
@@ -47,10 +42,8 @@ namespace IDKEngine
         {
             Vector2 mouseDelta = mouse.Position - mouse.LastPosition;
 
-            CamState.LookX += mouseDelta.X * Sensitivity;
-            CamState.LookY -= mouseDelta.Y * Sensitivity;
-
-            ViewDir = GetViewDirFromAngles(CamState.LookX, CamState.LookY);
+            LookX += mouseDelta.X * Sensitivity;
+            LookY -= mouseDelta.Y * Sensitivity;
 
             Vector3 acceleration = Vector3.Zero;
             if (keyboard[Keys.W] == InputState.Pressed)
@@ -65,23 +58,23 @@ namespace IDKEngine
 
             if (keyboard[Keys.D] == InputState.Pressed)
             {
-                acceleration += Vector3.Cross(ViewDir, CamState.UpVector).Normalized();
+                acceleration += Vector3.Cross(ViewDir, UpVector).Normalized();
             }
 
             if (keyboard[Keys.A] == InputState.Pressed)
             {
-                acceleration -= Vector3.Cross(ViewDir, CamState.UpVector).Normalized();
+                acceleration -= Vector3.Cross(ViewDir, UpVector).Normalized();
             }
 
             acceleration *= 144.0f;
 
-            CamState.Velocity *= MathF.Exp(MathF.Log10(0.95f) * 144.0f * dT);
-            CamState.Position += dT * CamState.Velocity * Speed + 0.5f * acceleration * dT * dT;
-            CamState.Velocity += (keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.25f : acceleration)) * dT;
+            Velocity *= MathF.Exp(MathF.Log10(0.95f) * 144.0f * dT);
+            Position += dT * Velocity * Speed + 0.5f * acceleration * dT * dT;
+            Velocity += (keyboard[Keys.LeftShift] == InputState.Pressed ? acceleration * 5.0f : (keyboard[Keys.LeftControl] == InputState.Pressed ? acceleration * 0.25f : acceleration)) * dT;
 
-            if (Vector3.Dot(CamState.Velocity, CamState.Velocity) < 0.01f)
+            if (Vector3.Dot(Velocity, Velocity) < 0.01f)
             {
-                CamState.Velocity = Vector3.Zero;
+                Velocity = Vector3.Zero;
             }
         }
 
@@ -97,7 +90,7 @@ namespace IDKEngine
 
         public Matrix4 GenerateViewMatrix()
         {
-            return GenerateViewMatrix(CamState.Position, ViewDir, CamState.UpVector);
+            return GenerateViewMatrix(Position, ViewDir, UpVector);
         }
 
         public static Matrix4 GenerateViewMatrix(in Vector3 position, in Vector3 viewDir, in Vector3 upVector)

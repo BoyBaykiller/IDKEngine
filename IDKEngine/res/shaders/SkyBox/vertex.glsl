@@ -74,5 +74,5 @@ void main()
     outData.PrevClipPos = (basicDataUBO.Projection * prevViewNoTranslation * vec4(outData.TexCoord, 1.0));
     
     gl_Position = outData.ClipPos;
-    gl_Position.w = gl_Position.z;
+    gl_Position = gl_Position.xyww;
 }
