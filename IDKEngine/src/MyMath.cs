@@ -5,6 +5,49 @@ namespace IDKEngine
 {
     public static class MyMath
     {
+        // Source: https://github.com/leesg213/TemporalAA/blob/main/Renderer/AAPLRenderer.mm#L152
+        public static void GetHaltonSequence_2_3(Span<Vector2> buffer)
+        {
+            int n2 = 0, d2 = 1, n3 = 0, d3 = 1;
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                buffer[i].X = GetHalton(2, ref n2, ref d2);
+                buffer[i].Y = GetHalton(3, ref n3, ref d3);
+            }
+        }
+
+        // Source: https://github.com/leesg213/TemporalAA/blob/main/Renderer/AAPLRenderer.mm#L124
+        public static float GetHalton(int baseHalton, ref int n, ref int d)
+        {
+            int x = d - n;
+            if (x == 1)
+            {
+                n = 1;
+                d *= baseHalton;
+            }
+            else
+            {
+                int y = d / baseHalton;
+                while (x <= y)
+                {
+                    y /= baseHalton;
+                }
+
+                n = (baseHalton + 1) * y - x;
+            }
+
+            float result = n / (float)d;
+            return result;
+        }
+
+        public static void MapHaltonSequence(Span<Vector2> halton, float width, float height)
+        {
+            for (int i = 0; i < halton.Length; i++)
+            {
+                halton[i].X = (halton[i].X * 2.0f - 1.0f) / width;
+                halton[i].Y = (halton[i].Y * 2.0f - 1.0f) / height;
+            }
+        }
 
         public static void BitsInsert(ref uint mem, uint data, int offset)
         {

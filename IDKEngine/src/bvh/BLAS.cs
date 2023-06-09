@@ -25,9 +25,6 @@ namespace IDKEngine
         public BLAS(GLSLTriangle[] triangles)
         {
             Triangles = triangles;
-            TreeDepth = (int)MathF.Ceiling(MathF.Log2(Triangles.Length)) + 1;
-            TreeDepth -= (int)MathF.Ceiling(MathF.Log2(MIN_TRIANGLES_PER_LEAF_COUNT));
-            TreeDepth = Math.Max(TreeDepth, 1);
 
             Nodes = new GLSLBlasNode[2 * Triangles.Length];
 
@@ -42,6 +39,8 @@ namespace IDKEngine
             {
                 Nodes[NodesUsed++] = root;
             }
+
+            TreeDepth = (int)MathF.Ceiling(MathF.Log2(NodesUsed));
         }
 
         public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo, float tMaxDist = float.MaxValue)

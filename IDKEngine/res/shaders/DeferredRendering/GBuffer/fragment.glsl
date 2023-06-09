@@ -1,6 +1,5 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
-
 AppInclude(include/Constants.glsl)
 
 layout(location = 1) out vec4 AlbedoAlpha;
@@ -82,8 +81,8 @@ void main()
     vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * unpackUnorm4x8(material.BaseColorFactor);
     vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
-    normal = inData.TangentToWorld * normalize(normal * 2.0 - 1.0);
-    normal = normalize(mix(normalize(inData.Normal), normal, inData.NormalMapStrength));
+    normal = normalize(inData.TangentToWorld * normalize(normal * 2.0 - 1.0));
+    normal = mix(normalize(inData.Normal), normal, inData.NormalMapStrength);
 
     float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + inData.SpecularBias, 0.0, 1.0);
     float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + inData.RoughnessBias, 0.0, 1.0);

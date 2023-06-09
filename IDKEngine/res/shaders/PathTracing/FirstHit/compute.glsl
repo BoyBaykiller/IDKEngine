@@ -328,9 +328,9 @@ bool TraceRay(inout TransportRay transportRay)
             specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
             roughness = clamp(texture(material.MetallicRoughness, texCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
             normal = texture(material.Normal, texCoord).rgb;
-            normal = TBN * normalize(normal * 2.0 - 1.0);
+            normal = normalize(TBN * normalize(normal * 2.0 - 1.0));
             mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-            normal = normalize(mix(normalize(normalToWorld * geoNormal), normal, mesh.NormalMapStrength));
+            normal = mix(normalize(normalToWorld * geoNormal), normal, mesh.NormalMapStrength);
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;
         }
