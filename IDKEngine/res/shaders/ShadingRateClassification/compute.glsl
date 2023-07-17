@@ -70,7 +70,6 @@ shared float SharedMeanLum[TILE_SIZE * TILE_SIZE / MIN_EFFECTIVE_SUBGROUP_SIZE];
 shared float SharedLuminanceVariance[TILE_SIZE * TILE_SIZE / MIN_EFFECTIVE_SUBGROUP_SIZE];
 
 const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
-const float VARIANCE_AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE - 1);
 
 void main()
 {
@@ -88,20 +87,20 @@ void main()
         meanSpeed /= basicDataUBO.DeltaUpdate;
                 
         uint finalShadingRate;
-        float normalizedVariance;
+        float coeffOfVariation;
         if (meanLuminance <= 0.001)
         {
             finalShadingRate = SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV;
-            normalizedVariance = 0.0;
+            coeffOfVariation = 0.0;
         }
         else
         {
-            // Source: https://www.vosesoftware.com/riskwiki/Normalizedmeasuresofspread-theCofV.php
+            // https://en.wikipedia.org/wiki/Coefficient_of_variation
             float stdDev = sqrt(luminanceVariance);
-            normalizedVariance = stdDev / meanLuminance;
+            coeffOfVariation = stdDev / meanLuminance;
 
             float velocityShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, meanSpeed * SpeedFactor);
-            float varianceShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, LumVarianceFactor / normalizedVariance);
+            float varianceShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, LumVarianceFactor / coeffOfVariation);
             
             float combinedShadingRate = velocityShadingRate + varianceShadingRate;
             finalShadingRate = clamp(uint(round(combinedShadingRate)), SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV);
@@ -119,7 +118,7 @@ void main()
         }
         else if (DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
         {
-            imageStore(ImgDebug, ivec2(gl_WorkGroupID.xy), vec4(normalizedVariance));
+            imageStore(ImgDebug, ivec2(gl_WorkGroupID.xy), vec4(coeffOfVariation));
         }
     }
 }
@@ -164,13 +163,13 @@ void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanL
 
     float deltaLumMean = luminance - meanLuminance;
     #if GL_KHR_shader_subgroup_arithmetic
-    float subgroupAddedDeltaLumMean = subgroupAdd(pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER);
+    float subgroupAddedDeltaLumMean = subgroupAdd(pow(deltaLumMean, 2.0) * AVG_MULTIPLIER);
     if (subgroupElect())
     {
         SharedLuminanceVariance[gl_SubgroupID] = subgroupAddedDeltaLumMean;
     }
     #else
-    SharedLuminanceVariance[gl_LocalInvocationIndex] = pow(deltaLumMean, 2.0) * VARIANCE_AVG_MULTIPLIER;
+    SharedLuminanceVariance[gl_LocalInvocationIndex] = pow(deltaLumMean, 2.0) * AVG_MULTIPLIER;
     #endif
     barrier();
 

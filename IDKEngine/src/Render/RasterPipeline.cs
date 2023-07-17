@@ -127,8 +127,6 @@ namespace IDKEngine.Render
 
                 gBufferProgram.Use();
                 modelSystem.Draw();
-                // only needed because of broken amd drivers
-                GL.Flush();
                 
                 if (IsWireframe)
                 {
