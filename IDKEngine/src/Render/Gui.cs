@@ -298,8 +298,8 @@ namespace IDKEngine.Render
                             ImGui.Text($"TAKE_FAST_GEOMETRY_SHADER_PATH: {Voxelizer.TAKE_FAST_GEOMETRY_SHADER_PATH}");
                             ImGui.SameLine();
                             InfoMark(
-                                "Uses NV_geometry_shader_passthrough and NV_viewport_swizzle to take advantage of a \"passthrough geometry\" shader instead of emulating a geometry shader in the vertex shader. " +
-                                "The reason this emulation is done in the first place is because actual geometry shaders turned out to be slower (without suprise)."
+                                "Uses NV_geometry_shader_passthrough and NV_viewport_swizzle to take advantage of a \"passthrough geometry\" shader instead of having to render the scene 3 times. " +
+                                "Regular geometry shaders were even slower which is why they are avoided entirely."
                             );
 
                             ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");

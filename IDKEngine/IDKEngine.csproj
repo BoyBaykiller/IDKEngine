@@ -32,8 +32,8 @@
   <ItemGroup>
     <PackageReference Include="glTF2Loader" Version="1.1.4-alpha" />
     <PackageReference Include="ImGui.NET" Version="1.89.5" />
-    <PackageReference Include="OpenTK.Graphics" Version="4.7.7" />
-    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.7.7" />
+    <PackageReference Include="OpenTK.Graphics" Version="4.8.0" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.8.0" />
     <PackageReference Include="StbImageSharp" Version="2.27.13" />
     <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
   </ItemGroup>

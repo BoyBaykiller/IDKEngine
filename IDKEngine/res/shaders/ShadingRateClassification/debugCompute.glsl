@@ -7,7 +7,7 @@ layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerSrc;
 layout(binding = 1) uniform usampler2D SamplerDebugShadingRate;
-layout(binding = 1) uniform sampler2D SamplerDebugOtherData; // speed, luminance, or luminance variance 
+layout(binding = 1) uniform sampler2D SamplerDebugOtherData; // speed, luminance, or coefficient of variation of luminance 
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -72,8 +72,8 @@ void main()
     }
     else if (DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
     {
-        float normalizedVariance = texelFetch(SamplerDebugOtherData, ivec2(gl_WorkGroupID.xy), 0).r;
-        debugColor = vec3(normalizedVariance) * 0.2;
+        float coeffOfVariation = texelFetch(SamplerDebugOtherData, ivec2(gl_WorkGroupID.xy), 0).r;
+        debugColor = vec3(coeffOfVariation) * 0.2;
     }
     else if (DebugMode == DEBUG_MODE_SPEED)
     {

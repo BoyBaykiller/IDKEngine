@@ -66,7 +66,9 @@ namespace IDKEngine.GUI
         public void Update(GameWindowBase wnd, float dT)
         {
             if (frameBegun)
+            {
                 ImGui.Render();
+            }
 
             SetPerFrameImGuiData(dT);
             UpdateImGuiInput(wnd);

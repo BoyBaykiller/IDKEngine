@@ -100,17 +100,17 @@ Then it adds the first half of array entries to the other half. After that, all 
 That's it for the averaging part.
 
 Calculating the variance requires a little more work.
+Mathematically what we want is the [Coefficient of variation](https://en.wikipedia.org/wiki/Coefficient_of_variation) (CV).
+The CV is the standard deviation divided by the average. And the standard deviation is just variance squared.
 
-(Normalized) variance is defined as:
+So here is how to compute all of that:
 
-$$V(x) = \sum_{i = 1}^{n}(x_{i} - \overline{x})^{2} \times \frac{1}{n - 1}$$
-<!-- fix error of second formula not rendering properly -->
-&nbsp;
-$$VN = \frac{\sqrt{V(x)}}{\overline{x}}$$
+$$V(x) = \frac{\sum_{i = 1}^{n}(x_{i} - \overline{x})^{2}}{n}$$
+$$StdDev(x) = \sqrt{V(x)}$$
+$$CV = \frac{StdDev(x)}{\overline{x}}$$
 
-As before $\overline{x}$ is the average of set $x$ and $n$ the number of elements in it. $V(x)$ tells us the variance of that set.
-However $V(x)$ is dependent on scale which is not what we want. {5, 10} should result in the same variance as {10, 20}.
-The second part solves this by [normalizing the variance](https://www.vosesoftware.com/riskwiki/Normalizedmeasuresofspread-theCofV.php).
+As before $\overline{x}$ is the average of set $x$ and $n$ the number of elements in it, these are the only inputs. $V(x)$ is variance, $StdDev(x)$ the standard deviation and CV the Coefficient of variation. The result of $StdDev(x)$ is dependent on the scale of the input. Darker colors will have a lower stdDev as the same colors scaled up. That is bad as it creates a bias in the resulting shading rates. Dividing by the average fixes that, for example the sets {5, 10} and {10, 20} have the same CV (~0.47).
+
 
 Here's a implementation. I put the parallel adding stuff from above in the function `ParallelSum`.
 ```glsl
@@ -118,26 +118,25 @@ Here's a implementation. I put the parallel adding stuff from above in the funct
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
 const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
-const float VARIANCE_AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE - 1);
 
 void main()
 {
-    float lumAvg = ParallelSum(GetLuminance() * AVG_MULTIPLIER);
-    
-    float deltaLumAvg = pow(luminance - lumAvg, 2.0);
-    float varianceLum = ParallelSum(deltaLumAvg * VARIANCE_AVG_MULTIPLIER);
+    float pixelLuminance = GetLuminance();
+
+    float tileAvgLuminance = ParallelSum(pixelLuminance * AVG_MULTIPLIER);
+    float tileLuminanceVariance = ParallelSum(pow(pixelLuminance - tileAvgLuminance, 2.0) * AVG_MULTIPLIER);
 
     if (gl_LocalInvocationIndex == 0)
     {
-        // use this as a measure of "how different is luminance in this tile"
-        float normalizedVariance = sqrt(varianceLum) / deltaLumAvg;
+        float stdDev = sqrt(tileLuminanceVariance);
+        float coeffOfVariation = stdDev / tileAvgLuminance;
 
-        // compute and output final shading rate
+        // use coeffOfVariation as a measure of "how different are the luminance values to each other"
     }
 }
 ```
 
-At this point, you can use both the average speed and the variance of the luminance to get an appropriate shading rate. That is not the most interesting part.
+At this point, you can use both the average speed and the Coefficient of variation of the luminance to get an appropriate shading rate. That is not the most interesting part.
 I decided to scale both of these factors, add them together and then use that to mix between different rates. The code is [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/ShadingRateClassification/compute.glsl).
 
 ### 3.0 Subgroup optimizations

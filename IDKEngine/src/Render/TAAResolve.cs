@@ -1,9 +1,12 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render.Objects;
+//using FFX_FSR2;
 
 namespace IDKEngine.Render
 {
@@ -91,11 +94,6 @@ namespace IDKEngine.Render
                 return;
             }
 
-            //FSR2.GetJitterOffset(out float jitterX, out float jitterY, (int)taaData.Frame, taaData.Samples);
-            //jitterX = 2.0f * jitterX / taaPing.Width;
-            //jitterY = 2.0f * jitterY / taaPing.Height;
-            //taaData.Jitter = new Vector2(jitterX, jitterY);
-
             taaData.Jitter = jitterSequence[taaData.Frame % taaData.Samples];
             taaDataBuffer.SubData(0, sizeof(GLSLTaaData), taaData);
             taaData.Frame++;
@@ -113,7 +111,7 @@ namespace IDKEngine.Render
         }
 
         public void RunFSR2(Texture color, Texture depth, Texture velocity, float deltaMilliseconds, float cameraNear, float cameraFar, float cameraFovAngleVertical)
-        {   
+        {
             //FSR2.GetJitterOffset(out float jitterX, out float jitterY, (int)taaData.Frame, taaData.Samples);
             //jitterX = 2.0f * jitterX / taaPing.Width;
             //jitterY = 2.0f * jitterY / taaPing.Height;
@@ -123,13 +121,13 @@ namespace IDKEngine.Render
 
             //FSR2.DispatchDescription dispatchDesc = new FSR2.DispatchDescription()
             //{
-            //    Color = FSR2.GL.GetTextureResource(ref fsr2Context, (uint)color.ID, (uint)color.Width, (uint)color.Height, (uint)color.SizedInternalFormat),
-            //    Depth = FSR2.GL.GetTextureResource(ref fsr2Context, (uint)depth.ID, (uint)depth.Width, (uint)depth.Height, (uint)depth.SizedInternalFormat),
-            //    MotionVectors = FSR2.GL.GetTextureResource(ref fsr2Context, (uint)velocity.ID, (uint)velocity.Width, (uint)velocity.Height, (uint)velocity.SizedInternalFormat),
+            //    Color = FSR2.GL.GetTextureResource((uint)color.ID, (uint)color.Width, (uint)color.Height, (uint)color.SizedInternalFormat),
+            //    Depth = FSR2.GL.GetTextureResource((uint)depth.ID, (uint)depth.Width, (uint)depth.Height, (uint)depth.SizedInternalFormat),
+            //    MotionVectors = FSR2.GL.GetTextureResource((uint)velocity.ID, (uint)velocity.Width, (uint)velocity.Height, (uint)velocity.SizedInternalFormat),
             //    Exposure = new FSR2Types.Resource(),
             //    Reactive = new FSR2Types.Resource(),
             //    TransparencyAndComposition = new FSR2Types.Resource(),
-            //    Output = FSR2.GL.GetTextureResource(ref fsr2Context, (uint)Result.ID, (uint)Result.Width, (uint)Result.Height, (uint)Result.SizedInternalFormat),
+            //    Output = FSR2.GL.GetTextureResource((uint)Result.ID, (uint)Result.Width, (uint)Result.Height, (uint)Result.SizedInternalFormat),
             //    JitterOffset = new FSR2Types.FloatCoords2D() { X = jitterX, Y = jitterY },
             //    MotionVectorScale = new FSR2Types.FloatCoords2D() { X = taaData.VelScale, Y = taaData.VelScale },
             //    RenderSize = new FSR2Types.Dimensions2D() { Width = (uint)Result.Width, Height = (uint)Result.Height },
@@ -149,7 +147,6 @@ namespace IDKEngine.Render
             //GL.MemoryBarrier(MemoryBarrierFlags.AllBarrierBits);
         }
 
-
         private Vector2[] jitterSequence;
         //private bool isFsr2Initialized = false;
         //private FSR2.Context fsr2Context = new FSR2.Context();
@@ -168,7 +165,7 @@ namespace IDKEngine.Render
             taaPong.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             taaPong.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
 
-            jitterSequence = new Vector2[taaData.Samples];
+            jitterSequence = new Vector2[GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT];
             MyMath.GetHaltonSequence_2_3(jitterSequence);
             MyMath.MapHaltonSequence(jitterSequence, width, height);
 
@@ -192,7 +189,7 @@ namespace IDKEngine.Render
             //        FpMessage = (delegate* unmanaged<FSR2Interface.MsgType, string, void>)Marshal.GetFunctionPointerForDelegate(delegateMessage),
             //    };
             //    fsr2ScratchMemory = new byte[FSR2.GL.GetScratchMemorySize()];
-            //    FSR2CheckError(FSR2.GL.GetInterface(ref contextDesc.Callbacks, ref fsr2ScratchMemory[0], fsr2ScratchMemory.Length, GLFW.GetProcAddress));
+            //    FSR2CheckError(FSR2.GL.GetInterface(out contextDesc.Callbacks, ref fsr2ScratchMemory[0], (nuint)fsr2ScratchMemory.Length, GLFW.GetProcAddress));
 
             //    //Console.WriteLine((uint)contextDesc.Callbacks.FpCreateBackendContext);
             //    //Console.WriteLine((uint)contextDesc.Callbacks.FpGetDeviceCapabilities);
@@ -213,20 +210,23 @@ namespace IDKEngine.Render
             //    //Console.WriteLine($"Sizeof(FSR2Types.ComputeJobDescription): {sizeof(FSR2Types.ComputeJobDescription)}"); // 7568
             //    //Console.WriteLine($"Sizeof(FSR2Types.ClearFloatJobDescription): {sizeof(FSR2Types.ClearFloatJobDescription)}"); // 20
             //    //Console.WriteLine($"Sizeof(FSR2Types.CopyJobDescription): {sizeof(FSR2Types.CopyJobDescription)}"); // 8    
-            //    //Console.WriteLine($"Sizeof(FSR2.DispatchDescription): {sizeof(FSR2.DispatchDescription)}"); // 1560
             //    //Console.WriteLine($"Sizeof(FSR2Types.ResourceInternal): {sizeof(FSR2Types.ResourceInternal)}"); // 4
             //    //Console.WriteLine($"Sizeof(FSR2Types.ResourceBinding): {sizeof(FSR2Types.ResourceBinding)}"); // 136
             //    //Console.WriteLine($"Sizeof(FSR2Types.ContextDescription): {sizeof(FSR2.ContextDescription)}"); // 152
-            //    //Console.WriteLine($"Sizeof(FSR2Types.Context): {sizeof(FSR2.Context)}"); // 66144
             //    //Console.WriteLine($"Sizeof(FSR2Types.DeviceCapabilities): {sizeof(FSR2Types.DeviceCapabilities)}"); // 16
             //    //Console.WriteLine($"Sizeof(FSR2Types.CreateResourceDescription): {sizeof(FSR2Types.CreateResourceDescription)}"); // 64
             //    //Console.WriteLine($"Sizeof(FSR2Types.ResourceDescription): {sizeof(FSR2Types.ResourceDescription)}"); // 28
             //    //Console.WriteLine($"Sizeof(FSR2Types.PipelineDescription): {sizeof(FSR2Types.PipelineDescription)}"); // 40
             //    //Console.WriteLine($"Sizeof(FSR2Types.Resource): {sizeof(FSR2Types.Resource)}"); // 184
+            //    //Console.WriteLine($"Sizeof(FSR2Types.ConstantBuffer): {sizeof(FSR2Types.ConstantBuffer)}"); // 260
+            //    //Console.WriteLine($"Sizeof(FSR2Types.FloatCoords2D): {sizeof(FSR2Types.FloatCoords2D)}"); // 8
+            //    //Console.WriteLine($"Sizeof(FSR2Types.Dimensions2D): {sizeof(FSR2Types.Dimensions2D)}"); // 8
+            //    //Console.WriteLine($"Sizeof(FSR2.ContextDescription): {sizeof(FSR2.ContextDescription)}"); // 152
+            //    //Console.WriteLine($"Sizeof(FSR2.DispatchDescription): {sizeof(FSR2.DispatchDescription)}"); // 1560
+            //    //Console.WriteLine($"Sizeof(FSR2.Context): {sizeof(FSR2.Context)}"); // 66144
             //    //Console.WriteLine($"Sizeof(FSR2Interface.Interface): {sizeof(FSR2Interface.Interface)}"); // 112
-            //    //Console.WriteLine("=================");
 
-            //    FSR2CheckError(FSR2.ContextCreate(ref fsr2Context, contextDesc));
+            //    FSR2CheckError(FSR2.ContextCreate(out fsr2Context, contextDesc));
             //    isFsr2Initialized = true;
             //}
         }

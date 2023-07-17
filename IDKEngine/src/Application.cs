@@ -117,7 +117,7 @@ namespace IDKEngine
                     {
                         Bloom.Compute(RasterizerPipeline.Result);
                     }
-                    
+
                     PostProcessor.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
                     TaaResolve.RunTAAResolve(PostProcessor.Result);
                     //TaaResolve.RunFSR2(RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CAMERA_FOV_Y);
@@ -312,7 +312,7 @@ namespace IDKEngine
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
             Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f, 0.1f, 0.25f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
-
+            
             SkyBoxManager.Init(new string[]
             {
                 "res/textures/environmentMap/posx.jpg",
