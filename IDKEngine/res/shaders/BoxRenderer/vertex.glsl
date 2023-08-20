@@ -62,8 +62,8 @@ layout(location = 1) uniform vec3 Max;
 
 void main()
 {
-    vec3 aabbPos = (Min + Max) * 0.5;
-    vec3 aabbSize = Max - Min;
+    vec3 boxPos = (Min + Max) * 0.5;
+    vec3 boxSize = Max - Min;
 
-    gl_Position = basicDataUBO.ProjView * vec4(aabbPos + aabbSize * positions[gl_VertexID], 1.0);
+    gl_Position = basicDataUBO.ProjView * vec4(boxPos + boxSize * positions[gl_VertexID], 1.0);
 }

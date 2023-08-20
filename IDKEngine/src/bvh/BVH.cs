@@ -9,6 +9,8 @@ namespace IDKEngine
 {
     class BVH : IDisposable
     {
+        public const bool CPU_USE_TLAS = false;
+
         public int MaxBlasTreeDepth { get; private set; }
         public TLAS Tlas { get; private set; }
 
@@ -34,8 +36,7 @@ namespace IDKEngine
 
         public bool Intersect(in Ray ray, out TLAS.HitInfo hitInfo, float tMax = float.MaxValue)
         {
-            const bool USE_TLAS = false;
-            if (USE_TLAS)
+            if (CPU_USE_TLAS)
             {
                 return Tlas.Intersect(ray, out hitInfo, tMax);
             }

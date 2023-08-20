@@ -4,6 +4,8 @@
 // 1 if NV_geometry_shader_passthrough and NV_viewport_swizzle are supported else 0
 #define TAKE_FAST_GEOMETRY_SHADER_PATH AppInsert(TAKE_FAST_GEOMETRY_SHADER_PATH)
 
+AppInclude(include/Compression.glsl)
+
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
 layout(location = 3) in uint Normal;
@@ -79,8 +81,6 @@ out InOutVars
 layout(location = 0) uniform int SwizzleAxis;
 #endif
 
-AppInclude(include/Compression.glsl)
-
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
@@ -88,7 +88,7 @@ void main()
 
     outData.FragPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
 
-    vec3 normal = DecompressSNorm32Fast(Normal);
+    vec3 normal = DecompressSR11G11B10(Normal);
 
     mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
     outData.Normal = normalize(normalToWorld * normal);

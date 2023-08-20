@@ -3,16 +3,13 @@
 #define FLOAT_MIN -FLOAT_MAX
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Transformations.glsl)
+AppInclude(include/IntersectionRoutines.glsl)
+
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler3D SamplerVoxelsAlbedo;
-
-struct Ray
-{
-    vec3 Origin;
-    vec3 Direction;
-};
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -50,9 +47,7 @@ layout(std140, binding = 5) uniform VoxelizerDataUBO
 layout(location = 0) uniform float StepMultiplier;
 layout(location = 1) uniform float ConeAngle;
 
-AppInclude(include/Transformations.glsl)
-AppInclude(include/IntersectionRoutines.glsl)
-AppInclude(include/TraceCone.glsl)
+AppInclude(VXGI/include/TraceCone.glsl)
 
 void main()
 {

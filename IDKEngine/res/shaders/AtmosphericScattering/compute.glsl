@@ -4,6 +4,8 @@
 #version 460 core
 #define PI 3.14159265
 
+AppInclude(include/Transformations.glsl)
+
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform imageCube ImgResult;
@@ -19,7 +21,6 @@ uniform int JSteps;
 uniform mat4 InvViews[6];
 uniform mat4 InvProjection;
 
-AppInclude(include/Transformations.glsl)
 
 void main()
 {

@@ -3,6 +3,8 @@
 #define EPSILON 0.001
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Random.glsl)
+
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
@@ -41,8 +43,6 @@ vec3 NDCToView(vec3 ndc);
 uniform int Samples;
 uniform float Radius;
 uniform float Strength;
-
-AppInclude(include/Random.glsl)
 
 void main()
 {

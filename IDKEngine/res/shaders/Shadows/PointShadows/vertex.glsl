@@ -4,16 +4,14 @@
 #define TAKE_VERTEX_LAYERED_RENDERING_PATH AppInsert(TAKE_VERTEX_LAYERED_RENDERING_PATH)
 
 #if TAKE_VERTEX_LAYERED_RENDERING_PATH
-#extension GL_ARB_shader_viewport_layer_array : enable
-#extension GL_NV_viewport_array2 : enable
-#extension GL_AMD_vertex_shader_layer : enable
+    #extension GL_ARB_shader_viewport_layer_array : enable
+    #extension GL_NV_viewport_array2 : enable
+    #extension GL_AMD_vertex_shader_layer : enable
 
-#if !defined GL_ARB_shader_viewport_layer_array && !defined GL_NV_viewport_array2 && !defined GL_AMD_vertex_shader_layer
-#error "Cannot take the vertex layered rendering path as neither GL_ARB_shader_viewport_layer_array, GL_NV_viewport_array2 nor GL_AMD_vertex_shader_layer is supported" 
+    #if !GL_ARB_shader_viewport_layer_array && !GL_NV_viewport_array2 && !GL_AMD_vertex_shader_layer
+        #error "Cannot take the vertex layered rendering path as neither GL_ARB_shader_viewport_layer_array, GL_NV_viewport_array2 nor GL_AMD_vertex_shader_layer is supported" 
+    #endif
 #endif
-
-#endif
-
 
 AppInclude(include/Constants.glsl)
 

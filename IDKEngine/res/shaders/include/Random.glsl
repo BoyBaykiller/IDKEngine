@@ -1,3 +1,6 @@
+#ifndef Random_H
+#define Random_H
+
 uint Random_RNGSeed;
 
 void InitializeRandomSeed(uint value)
@@ -75,3 +78,4 @@ vec2 UniformSampleDisk()
 
     return point;
 }
+#endif

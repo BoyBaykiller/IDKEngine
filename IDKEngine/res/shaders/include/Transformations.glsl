@@ -1,3 +1,6 @@
+#ifndef Transformations_H
+#define Transformations_H
+
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)
 {
     vec4 rayEye = inverseProj * vec4(normalizedDeviceCoords, -1.0, 0.0);
@@ -14,3 +17,5 @@ vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary)
 {
     return v0 * bary.x + v1 * bary.y + v2 * bary.z;
 }
+
+#endif

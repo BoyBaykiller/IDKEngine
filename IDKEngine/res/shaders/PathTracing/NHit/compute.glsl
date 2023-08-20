@@ -14,15 +14,13 @@
 #endif
 
 AppInclude(include/Constants.glsl)
+AppInclude(include/Transformations.glsl)
+AppInclude(include/Compression.glsl)
+AppInclude(include/Random.glsl)
+AppInclude(include/Ray.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
 
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
-
-struct Ray
-{
-    vec3 Origin;
-    vec3 Direction;
-};
 
 struct Material
 {
@@ -222,10 +220,6 @@ Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
 layout(location = 0) uniform int PingPongIndex;
 uniform bool IsTraceLights;
 
-AppInclude(include/IntersectionRoutines.glsl)
-AppInclude(include/Transformations.glsl)
-AppInclude(include/Compression.glsl)
-AppInclude(include/Random.glsl)
 AppInclude(PathTracing/include/ClosestHit.glsl)
 
 void main()
@@ -283,8 +277,8 @@ bool TraceRay(inout TransportRay transportRay)
             Vertex v2 = triangle.Vertex2;
 
             vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
-            vec3 geoNormal = normalize(Interpolate(DecompressSNorm32Fast(v0.Normal), DecompressSNorm32Fast(v1.Normal), DecompressSNorm32Fast(v2.Normal), hitInfo.Bary));
-            vec3 tangent = normalize(Interpolate(DecompressSNorm32Fast(v0.Tangent), DecompressSNorm32Fast(v1.Tangent), DecompressSNorm32Fast(v2.Tangent), hitInfo.Bary));
+            vec3 geoNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
+            vec3 tangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
 
             MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
             vec3 T = normalize((meshInstance.ModelMatrix * vec4(tangent, 0.0)).xyz);
@@ -296,7 +290,7 @@ bool TraceRay(inout TransportRay transportRay)
             Mesh mesh = meshSSBO.Meshes[hitInfo.MeshID];
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
 
-            vec4 albedoAlpha = texture(material.BaseColor, texCoord) * unpackUnorm4x8(material.BaseColorFactor);
+            vec4 albedoAlpha = texture(material.BaseColor, texCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
             albedo = albedoAlpha.rgb;
             refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
             emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;

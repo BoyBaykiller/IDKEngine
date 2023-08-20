@@ -8,10 +8,11 @@
 #endif
 
 AppInclude(include/Constants.glsl)
+AppInclude(include/Compression.glsl)
 
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
-#if !defined GL_NV_shader_atomic_fp16_vector
+#if !GL_NV_shader_atomic_fp16_vector
 layout(binding = 1, r32ui) restrict uniform uimage3D ImgResultR;
 layout(binding = 2, r32ui) restrict uniform uimage3D ImgResultG;
 layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
@@ -98,7 +99,7 @@ void main()
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
 
     Material material = materialSSBO.Materials[inData.MaterialIndex];
-    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * unpackUnorm4x8(material.BaseColorFactor);
+    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
     vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
 
     vec3 directLighting = vec3(0.0);

@@ -6,6 +6,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
 using OpenTK.Graphics.OpenGL4;
+using System.Threading.Tasks;
 
 namespace IDKEngine.Render
 {
@@ -820,7 +821,7 @@ namespace IDKEngine.Render
 
             if (shouldResetPT && app.PathTracer != null)
             {
-                app.PathTracer.AccumulatedSamples = 0;
+                app.PathTracer.ResetRenderProcess();
             }
             Backend.Render();
         }
@@ -955,6 +956,21 @@ namespace IDKEngine.Render
                 }
 
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
+                //Stopwatch timer = Stopwatch.StartNew();
+                //Parallel.For(0, app.RenderResolution.X * app.RenderResolution.Y, i =>
+                //{
+                //    int y = i / app.RenderResolution.X;
+                //    int x = i % app.RenderResolution.X;
+
+                //    ndc = new Vector2((float)x / app.RenderResolution.X, (float)y / app.RenderResolution.Y) * 2.0f - new Vector2(1.0f);
+                //    worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
+
+                //    app.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo test);
+                //});
+                //timer.Stop();
+                //Console.WriteLine(timer.Elapsed.TotalMilliseconds);
+                //Console.WriteLine(TLAS.maxStack);
+
                 bool hitMesh = app.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);
                 if (app.RenderMode == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;

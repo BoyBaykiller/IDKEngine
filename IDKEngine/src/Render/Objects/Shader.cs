@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Text;
-using System.Linq;
 using System.Collections.Generic;
 using OpenTK.Graphics.OpenGL4;
 
@@ -92,15 +91,10 @@ namespace IDKEngine.Render.Objects
                     }
 
                     string includeSrc = File.ReadAllText(path);
-                    if (includeSrc.Contains(Keyword.AppInclude.ToString()))
-                    {
-                        Logger.Log(Logger.LogLevel.Error, "Recursive includes deliberately not allowed");
-                        continue;
-                    }
 
                     result.AppendLine("#line 1");
                     result.AppendLine(PreProcess(includeSrc, shaderInsertions));
-                    result.AppendLine($"#line {lineCount + 1}");
+                    result.AppendLine($"#line {lineCount}");
                 }
             }
             return result.ToString();

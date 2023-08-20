@@ -1,3 +1,6 @@
+#ifndef TraceCone_H
+#define TraceCone_H
+
 vec4 TraceCone(vec3 start, vec3 direction, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
 {
     vec3 voxelGridWorldSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
@@ -38,3 +41,4 @@ vec4 TraceCone(vec3 start, vec3 direction, float coneAngle, float stepMultiplier
     return TraceCone(start, direction, normal, coneAngle, stepMultiplier, normalRayOffset, 1.0);
 }
 
+#endif

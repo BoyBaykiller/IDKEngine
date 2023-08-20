@@ -1,9 +1,14 @@
+#ifndef PathTracing_ClosestHit_H
+#define PathTracing_ClosestHit_H
+
+#define USE_TLAS 0 // needs more optimization, for now only pays of on scenes with many blases
+
 // Positive integer expression
 #define MAX_BLAS_TREE_DEPTH AppInsert(MAX_BLAS_TREE_DEPTH)
 
-shared uint ClosestHit_SharedStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
+AppInclude(include/IntersectionRoutines.glsl)
 
-#define USE_TLAS 0
+shared uint ClosestHit_SharedStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
 
 struct BlasHitInfo
 {
@@ -97,7 +102,7 @@ struct HitInfo
 };
 bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
 {
-    hitInfo.T = FLOAT_MAX;
+    hitInfo.T = IntersectionRoutines_NotHit;
     hitInfo.TriangleIndex = -1;
     debugNodeCounter = 0;
 
@@ -209,7 +214,7 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
     }
 #endif
 
-    return hitInfo.T != FLOAT_MAX;
+    return hitInfo.T != IntersectionRoutines_NotHit;
 }
 
 bool ClosestHit(Ray ray, out HitInfo hitInfo)
@@ -217,3 +222,5 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo)
     uint debugNodeCounter;
     return ClosestHit(ray, hitInfo, debugNodeCounter);
 }
+
+#endif

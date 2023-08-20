@@ -1,11 +1,8 @@
 #version 460 core
 
-layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+AppInclude(include/Frustum.glsl)
 
-struct Frustum
-{
-    vec4 Planes[6];
-};
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 struct DrawElementsCmd
 {
@@ -67,8 +64,6 @@ layout(std430, binding = 4) restrict readonly buffer BlasSSBO
 
 layout(location = 0) uniform mat4 ProjView;
 
-AppInclude(Culling/include/common.glsl)
-
 void main()
 {
     uint meshIndex = gl_GlobalInvocationID.x;
@@ -81,8 +76,8 @@ void main()
     const uint glInstanceID = 0; // TODO: Derive from built in variables
     mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].ModelMatrix;
     
-    Frustum frustum = ExtractFrustum(ProjView * model);
-    bool isMeshInFrustum = FrustumAABBIntersect(frustum, node);
+    Frustum frustum = FrustumExtract(ProjView * model);
+    bool isMeshInFrustum = FrustumBoxIntersect(frustum, node.Min, node.Max);
 
     drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = int(isMeshInFrustum);
 }

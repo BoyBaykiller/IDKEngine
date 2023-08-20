@@ -20,7 +20,6 @@ namespace IDKEngine
         public Application(int width, int height, string title)
             : base(width, height, title, 4, 6)
         {
-
         }
 
         public const float EPSILON = 0.001f;
@@ -103,7 +102,7 @@ namespace IDKEngine
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
                     PostProcessor.Combine(RasterizerPipeline.Result);
-                    MeshOutlineRenderer.Render(PostProcessor.Result, new AABB(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
+                    MeshOutlineRenderer.Render(PostProcessor.Result, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
 
                     bool temp = TaaResolve.TaaEnabled; TaaResolve.TaaEnabled = false;
                     TaaResolve.RunTAAResolve(PostProcessor.Result);
@@ -143,26 +142,26 @@ namespace IDKEngine
 
             if (gui.SelectedEntityType != Gui.EntityType.None)
             {
-                AABB aabb = new AABB();
+                Box box = new Box();
                 if (gui.SelectedEntityType == Gui.EntityType.Mesh)
                 {
                     GLSLBlasNode node = BVH.Tlas.BlasesInstances[gui.SelectedEntityIndex].Blas.Root;
-                    aabb.Min = node.Min;
-                    aabb.Max = node.Max;
+                    box.Min = node.Min;
+                    box.Max = node.Max;
 
                     GLSLDrawElementsCmd cmd = ModelSystem.DrawCommands[gui.SelectedEntityIndex];
-                    aabb.Transform(ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix);
+                    box.Transform(ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix);
                 }
                 else
                 {
                     LightManager.TryGetLight(gui.SelectedEntityIndex, out Light abstractLight);
                     ref GLSLLight light = ref abstractLight.GLSLLight;
                     
-                    aabb.Min = new Vector3(light.Position) - new Vector3(light.Radius);
-                    aabb.Max = new Vector3(light.Position) + new Vector3(light.Radius);
+                    box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
+                    box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
 
-                MeshOutlineRenderer.Render(TaaResolve.Result, aabb);
+                MeshOutlineRenderer.Render(TaaResolve.Result, box);
             }
 
             Framebuffer.Bind(0);
@@ -248,7 +247,7 @@ namespace IDKEngine
 
             if ((RenderMode == RenderMode.PathTracer) && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || anyMeshInstanceMoved))
             {
-                PathTracer.AccumulatedSamples = 0;
+                PathTracer.ResetRenderProcess();
             }
         }
 
@@ -262,7 +261,7 @@ namespace IDKEngine
         public TonemapAndGammaCorrecter PostProcessor;
         public TAAResolve TaaResolve;
         public LightManager LightManager;
-        public AABBRender MeshOutlineRenderer;
+        public BoxRenderer MeshOutlineRenderer;
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
@@ -362,9 +361,11 @@ namespace IDKEngine
 
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
 
+
             //Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
             //Model cornellBox = new Model("res/models/CornellBox/scene.gltf");
 
+            //Model ueScene = new Model(@"C:\\Users\\Julian\\Downloads\\UEStarterMap\\UEStarterMap\\scene.gltf");
             //Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
             //Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
             //Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
@@ -376,7 +377,7 @@ namespace IDKEngine
             BVH = new BVH(ModelSystem);
 
             LightManager = new LightManager(12, 12);
-            MeshOutlineRenderer = new AABBRender();
+            MeshOutlineRenderer = new BoxRenderer();
             Bloom = new Bloom(RenderResolution.X, RenderResolution.Y, 1.0f, 3.0f);
             PostProcessor = new TonemapAndGammaCorrecter(RenderResolution.X, RenderResolution.Y);
             TaaResolve = new TAAResolve(RenderResolution.X, RenderResolution.Y);

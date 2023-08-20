@@ -28,7 +28,7 @@ namespace IDKEngine
         }
 
         public GLSLTlasNode Root => Nodes[0];
-        public AABB RootBounds => new AABB(Root.Min, Root.Max);
+        public Box RootBounds => new Box(Root.Min, Root.Max);
         public int NodesUsed { get; private set; }
 
         public readonly int TreeDepth;
@@ -83,16 +83,16 @@ namespace IDKEngine
                     ref readonly GLSLTlasNode nodeB = ref Nodes[nodeBId];
                     ref readonly GLSLTlasNode nodeA = ref Nodes[nodeAId];
 
-                    AABB aabb = new AABB(nodeA.Min, nodeA.Max);
-                    aabb.GrowToFit(nodeB.Min);
-                    aabb.GrowToFit(nodeB.Max);
+                    Box box = new Box(nodeA.Min, nodeA.Max);
+                    box.GrowToFit(nodeB.Min);
+                    box.GrowToFit(nodeB.Max);
 
                     int newNodeIndex = Nodes.Length - 2 - NodesUsed++;
 
                     GLSLTlasNode newNode = new GLSLTlasNode();
                     newNode.LeftChild = (uint)nodeBId;
-                    newNode.Min = aabb.Min;
-                    newNode.Max = aabb.Max;
+                    newNode.Min = box.Min;
+                    newNode.Max = box.Max;
 
                     Nodes[newNodeIndex] = newNode;
 
@@ -122,7 +122,7 @@ namespace IDKEngine
 
                 ref readonly GLSLTlasNode otherNode = ref Nodes[i];
 
-                AABB fittingBox = new AABB(node.Min, node.Max);
+                Box fittingBox = new Box(node.Min, node.Max);
                 fittingBox.GrowToFit(otherNode.Min);
                 fittingBox.GrowToFit(otherNode.Max);
 
@@ -137,6 +137,7 @@ namespace IDKEngine
             return bestNodeIndex;
         }
 
+        public static uint debugMaxStack = 0;
         public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo, float tMax = float.MaxValue)
         {
             hitInfo = new HitInfo();
@@ -144,7 +145,8 @@ namespace IDKEngine
 
             uint stackPtr = 0;
             uint stackTop = 0;
-            uint* stack = stackalloc uint[TreeDepth];
+            // FIX: Why is requied stack so much bigger than expected?
+            uint* stack = stackalloc uint[TreeDepth * 10];
             while (true)
             {
                 ref readonly GLSLTlasNode parent = ref Nodes[stackTop];
@@ -166,6 +168,7 @@ namespace IDKEngine
                     }
 
                     if (stackPtr == 0) break;
+                    debugMaxStack = Math.Max(stackTop, stackPtr - 1);
                     stackTop = stack[--stackPtr];
                     continue;
                 }
@@ -183,7 +186,8 @@ namespace IDKEngine
                     {
                         bool leftCloser = tMinLeft < tMinRight;
                         stackTop = leftCloser ? leftChild : rightChild;
-                        stack[stackPtr++] = leftCloser ? rightChild : leftChild;
+                        debugMaxStack = Math.Max(stackTop, stackPtr);
+                        stack[stackPtr++] = leftCloser ? rightChild : leftChild;   
                     }
                     else
                     {
@@ -193,6 +197,7 @@ namespace IDKEngine
                 else
                 {
                     if (stackPtr == 0) break;
+                    debugMaxStack = Math.Max(stackTop, stackPtr - 1);
                     stackTop = stack[--stackPtr];
                 }
             }

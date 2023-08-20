@@ -55,7 +55,7 @@ uniform float SpeedFactor;
 uniform float LumVarianceFactor;
 uniform int DebugMode;
 
-#if !defined GL_KHR_shader_subgroup_arithmetic
+#if !GL_KHR_shader_subgroup_arithmetic
 #define MIN_EFFECTIVE_SUBGROUP_SIZE 1 // effectively 1 if we can't use subgroup arithmetic
 #elif GL_NV_gpu_shader5
 #define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // NVIDIA device (fixed subgroup size)

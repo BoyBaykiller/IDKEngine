@@ -2,13 +2,9 @@
 #extension GL_ARB_bindless_texture : require
 
 AppInclude(include/Constants.glsl)
+AppInclude(include/Frustum.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
-
-struct Frustum
-{
-	vec4 Planes[6];
-};
 
 struct DrawElementsCmd
 {
@@ -90,8 +86,6 @@ layout(std140, binding = 1) uniform ShadowDataUBO
 
 layout(location = 0) uniform int ShadowIndex;
 
-AppInclude(Culling/include/common.glsl)
-
 // 1. Count number of shadow-cubemap-faces the mesh is visible from the shadow source
 // 2. Pack each visible face into a single int
 // 3. Write the packed int into a global variable. The shadow vertex shader will access this variable
@@ -112,8 +106,8 @@ void main()
 
     for (int i = 0; i < 6; i++)
     {
-        Frustum frustum = ExtractFrustum(pointShadow.ProjViewMatrices[i] * model);
-        if (FrustumAABBIntersect(frustum, node))
+        Frustum frustum = FrustumExtract(pointShadow.ProjViewMatrices[i] * model);
+        if (FrustumBoxIntersect(frustum, node.Min, node.Max))
         {
             packedValue = bitfieldInsert(packedValue, i, 3 * instances++, 3);
         }

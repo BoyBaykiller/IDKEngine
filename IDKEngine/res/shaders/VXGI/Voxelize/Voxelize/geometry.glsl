@@ -1,6 +1,6 @@
 #version 460 core
 #extension GL_NV_geometry_shader_passthrough : enable
-#if !defined GL_NV_geometry_shader_passthrough
+#if !GL_NV_geometry_shader_passthrough
 #error "You should only compile this shader if GL_NV_geometry_shader_passthrough is supported. Otherwise use the fallback path"
 #endif
 

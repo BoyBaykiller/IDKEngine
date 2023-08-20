@@ -1,3 +1,12 @@
+#ifndef IntersectionRoutines_H
+#define IntersectionRoutines_H
+
+#define IntersectionRoutines_FLOAT_MAX 3.4028235e+38
+#define IntersectionRoutines_FLOAT_MIN -IntersectionRoutines_FLOAT_MAX
+#define IntersectionRoutines_NotHit IntersectionRoutines_FLOAT_MAX
+
+AppInclude(include/Ray.glsl)
+
 // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t)
 {
@@ -17,13 +26,13 @@ bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out
 }
 
 // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
-bool RayCuboidIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, out float t1, out float t2)
+bool RayCuboidIntersect(Ray ray, vec3 boxMin, vec3 boxMax, out float t1, out float t2)
 {
-    t1 = FLOAT_MIN;
-    t2 = FLOAT_MAX;
+    t1 = IntersectionRoutines_FLOAT_MIN;
+    t2 = IntersectionRoutines_FLOAT_MAX;
 
-    vec3 t0s = (aabbMin - ray.Origin) / ray.Direction;
-    vec3 t1s = (aabbMax - ray.Origin) / ray.Direction;
+    vec3 t0s = (boxMin - ray.Origin) / ray.Direction;
+    vec3 t1s = (boxMax - ray.Origin) / ray.Direction;
 
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
@@ -37,8 +46,8 @@ bool RayCuboidIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, out float t1, out f
 // Source: https://antongerdelan.net/opengl/raycasting.html
 bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out float t2)
 {
-    t1 = FLOAT_MAX;
-    t2 = FLOAT_MAX;
+    t1 = IntersectionRoutines_FLOAT_MAX;
+    t2 = IntersectionRoutines_FLOAT_MAX;
 
     vec3 sphereToRay = ray.Origin - position;
     float b = dot(ray.Direction, sphereToRay);
@@ -53,3 +62,5 @@ bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out 
 
     return t1 <= t2 && t2 > 0.0;
 }
+
+#endif

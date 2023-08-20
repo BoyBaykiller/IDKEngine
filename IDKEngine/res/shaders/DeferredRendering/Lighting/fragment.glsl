@@ -99,18 +99,15 @@ void main()
         return;
     }
 
-    vec4 albedoAlpha = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0);
-    vec4 normalSpecular = textureLod(gBufferDataUBO.NormalSpecular, uv, 0.0);
-    vec4 emissiveRoughness = textureLod(gBufferDataUBO.EmissiveRoughness, uv, 0.0);
-
     vec3 ndc = vec3(uv, depth) * 2.0 - 1.0;
     vec3 fragPos = NDCToWorld(ndc);
 
-    vec3 albedo = albedoAlpha.rgb;
-    vec3 normal = normalSpecular.rgb;
-    float specular = normalSpecular.a;
-    vec3 emissive = emissiveRoughness.rgb;
-    float roughness = emissiveRoughness.a;
+    vec3 albedo = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).rgb;
+    float alpha = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).a;
+    vec3 normal = textureLod(gBufferDataUBO.NormalSpecular, uv, 0.0).rgb;
+    float specular = textureLod(gBufferDataUBO.NormalSpecular, uv, 0.0).a;
+    vec3 emissive = textureLod(gBufferDataUBO.EmissiveRoughness, uv, 0.0).rgb;
+    float roughness = textureLod(gBufferDataUBO.EmissiveRoughness, uv, 0.0).a;
 
     vec3 viewDir = normalize(fragPos - basicDataUBO.ViewPos);
 
@@ -140,7 +137,7 @@ void main()
     }
     float ambientOcclusion = 1.0 - texture(SamplerAO, uv).r;
 
-    FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, albedoAlpha.a);
+    FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, alpha);
 }
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight)

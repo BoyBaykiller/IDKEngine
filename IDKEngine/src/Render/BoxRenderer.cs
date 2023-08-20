@@ -5,17 +5,17 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class AABBRender : IDisposable
+    class BoxRenderer : IDisposable
     {
         private readonly ShaderProgram shaderProgram;
-        public AABBRender()
+        public BoxRenderer()
         {
             shaderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/AABBRender/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/AABBRender/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/BoxRenderer/vertex.glsl")),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/BoxRenderer/fragment.glsl")));
         }
 
-        public void Render(Texture result, in AABB aabb)
+        public void Render(Texture result, in Box box)
         {
             Framebuffer.Bind(0);
 
@@ -28,8 +28,8 @@ namespace IDKEngine.Render
             GL.Disable(EnableCap.CullFace);
             GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
 
-            shaderProgram.Upload(0, aabb.Min);
-            shaderProgram.Upload(1, aabb.Max);
+            shaderProgram.Upload(0, box.Min);
+            shaderProgram.Upload(1, box.Max);
 
             shaderProgram.Use();
             GL.DrawArrays(PrimitiveType.Quads, 0, 24);
