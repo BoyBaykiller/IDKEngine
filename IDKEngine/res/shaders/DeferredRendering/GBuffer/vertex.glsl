@@ -2,6 +2,7 @@
 #extension GL_ARB_bindless_texture : require
 
 AppInclude(include/Constants.glsl)
+AppInclude(include/Compression.glsl)
 
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
@@ -80,15 +81,13 @@ out InOutVars
     float RoughnessBias;
 } outData;
 
-AppInclude(include/Compression.glsl)
-
 void main()
 {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
     
-    vec3 normal = DecompressSNorm32Fast(Normal);
-    vec3 tangent = DecompressSNorm32Fast(Tangent);
+    vec3 normal = DecompressSR11G11B10(Normal);
+    vec3 tangent = DecompressSR11G11B10(Tangent);
     
     vec3 T = normalize((meshInstance.ModelMatrix * vec4(tangent, 0.0)).xyz);
     vec3 N = normalize((meshInstance.ModelMatrix * vec4(normal, 0.0)).xyz);

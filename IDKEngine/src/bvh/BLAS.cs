@@ -16,7 +16,7 @@ namespace IDKEngine
         }
 
         public GLSLBlasNode Root => Nodes[0];
-        public AABB RootBounds => new AABB(Root.Min, Root.Max);
+        public Box RootBounds => new Box(Root.Min, Root.Max);
         public int NodesUsed { get; private set; }
 
         public readonly int TreeDepth;
@@ -48,10 +48,13 @@ namespace IDKEngine
             hitInfo = new HitInfo();
             hitInfo.T = tMaxDist;
 
-            ref readonly GLSLBlasNode rootNode = ref Nodes[0];
-            if (!(MyMath.RayCuboidIntersect(ray, rootNode.Min, rootNode.Max, out float tMinRoot, out float tMaxRoot) && tMinRoot < hitInfo.T))
+            if (!BVH.CPU_USE_TLAS)
             {
-                return false;
+                ref readonly GLSLBlasNode rootNode = ref Nodes[0];
+                if (!(MyMath.RayCuboidIntersect(ray, rootNode.Min, rootNode.Max, out float tMinRoot, out float tMaxRoot) && tMinRoot < hitInfo.T))
+                {
+                    return false;
+                }
             }
 
             uint stackPtr = 0;
@@ -159,7 +162,7 @@ namespace IDKEngine
             splitAxis = 0;
             splitPos = 0;
 
-            AABB uniformDivideArea = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            Box uniformDivideArea = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (int i = 0; i < node.TriCount; i++)
             {
                 ref readonly GLSLTriangle tri = ref Triangles[(int)(node.TriStartOrLeftChild + i)];
@@ -194,8 +197,8 @@ namespace IDKEngine
 
         private float GetSplitCost(in GLSLBlasNode node, int splitAxis, float splitPos)
         {
-            AABB leftBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-            AABB rightBox = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            Box rightBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
             uint leftCount = 0;
             for (uint i = 0; i < node.TriCount; i++)
@@ -222,7 +225,7 @@ namespace IDKEngine
 
         private void UpdateNodeBounds(ref GLSLBlasNode node)
         {
-            AABB bounds = new AABB(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            Box bounds = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
             for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
             {

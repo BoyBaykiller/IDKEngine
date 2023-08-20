@@ -1,6 +1,8 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
+
 AppInclude(include/Constants.glsl)
+AppInclude(include/Compression.glsl)
 
 layout(location = 1) out vec4 AlbedoAlpha;
 layout(location = 2) out vec4 NormalSpecular;
@@ -78,7 +80,7 @@ void main()
 {
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     
-    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * unpackUnorm4x8(material.BaseColorFactor);
+    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
     vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = normalize(inData.TangentToWorld * normalize(normal * 2.0 - 1.0));

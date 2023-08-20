@@ -1,7 +1,8 @@
 #version 460 core
-layout(location = 0) in vec3 Position;
 
 AppInclude(include/Constants.glsl)
+
+layout(location = 0) in vec3 Position;
 
 struct Light
 {

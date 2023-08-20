@@ -65,7 +65,7 @@ namespace IDKEngine
             return size.X * size.Y + size.X * size.Z + size.Z * size.Y;
         }
 
-        public static bool AabbAabbIntersect(in AABB first, in Vector3 min, Vector3 max)
+        public static bool BoxBoxIntersect(in Box first, in Vector3 min, Vector3 max)
         {
             return  first.Min.X < max.X &&
                     first.Min.Y < max.Y &&
@@ -80,7 +80,7 @@ namespace IDKEngine
         // See also the published Errata at http://realtimecollisiondetection.net/books/rtcd/errata/
         public static bool TriangleBoxIntersect(in Vector3 a, in Vector3 b, in Vector3 c, in Vector3 boxCenter, in Vector3 halfSize)
         {
-            // Translate triangle as conceptually moving AABB to origin
+            // Translate triangle as conceptually moving Box to origin
             var v0 = (a - boxCenter);
             var v1 = (b - boxCenter);
             var v2 = (c - boxCenter);
@@ -193,7 +193,7 @@ namespace IDKEngine
 
             #endregion
 
-            #region Test the three axes corresponding to the face normals of AABB b (category 1)
+            #region Test the three axes corresponding to the face normals of Box b (category 1)
 
             // Exit if...
             // ... [-extents.x, extents.x] and [min(v0.x,v1.x,v2.x), max(v0.x,v1.x,v2.x)] do not overlap

@@ -162,17 +162,17 @@ namespace IDKEngine
             Unsafe.CopyBlock(dest, src, byteCount);
         }
 
-        public static uint CompressSNorm32Fast(Vector3 data)
+        public static uint CompressSR11G11B10(Vector3 data)
         {
             data = data * 0.5f + new Vector3(0.5f);
-            return CompressUNorm32Fast(data);
+            return CompressUR11G11B10(data);
         }
-        public static Vector3 DecompressSNorm32Fast(uint data)
+        public static Vector3 DecompressSR11G11B10(uint data)
         {
-            return DecompressUNorm32Fast(data) * 2.0f - new Vector3(1.0f);
+            return DecompressUR11G11B10(data) * 2.0f - new Vector3(1.0f);
         }
 
-        public static uint CompressUNorm32Fast(Vector3 data)
+        public static uint CompressUR11G11B10(Vector3 data)
         {
             uint r = (uint)MathF.Round(data.X * ((1u << 11) - 1));
             uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
@@ -182,7 +182,7 @@ namespace IDKEngine
 
             return packed;
         }
-        public static Vector3 DecompressUNorm32Fast(uint data)
+        public static Vector3 DecompressUR11G11B10(uint data)
         {
             float r = (data >> 0) & ((1u << 11) - 1);
             float g = (data >> 11) & ((1u << 11) - 1);
@@ -195,12 +195,7 @@ namespace IDKEngine
             return new Vector3(r, g, b);
         }
 
-        public static uint CompressSNorm32Fast(Vector4 data)
-        {
-            data = data * 0.5f + new Vector4(0.5f);
-            return CompressUNorm32Fast(data);
-        }
-        public static uint CompressUNorm32Fast(Vector4 data)
+        public static uint CompressUR8G8B8A8(Vector4 data)
         {
             uint r = (uint)MathF.Round(data.X * ((1u << 8) - 1));
             uint g = (uint)MathF.Round(data.Y * ((1u << 8) - 1));
@@ -210,29 +205,6 @@ namespace IDKEngine
             uint packed = (a << 24) | (b << 16) | (g << 8) | (r << 0);
 
             return packed;
-        }
-
-        public static ulong CompressUNorm64Fast(Vector3 data)
-        {
-            ulong r = (ulong)MathF.Round(data.X * ((1u << 21) - 1));
-            ulong g = (ulong)MathF.Round(data.Y * ((1u << 21) - 1));
-            ulong b = (ulong)MathF.Round(data.Z * ((1u << 21) - 1));
-
-            ulong packed = (b << 42) | (g << 21) | (r << 0);
-            
-            return packed;
-        }
-        public static Vector3 DecompressUNorm64Fast(ulong data)
-        {
-            float r = (data >> 0) & ((1u << 21) - 1);
-            float g = (data >> 21) & ((1u << 21) - 1);
-            float b = (data >> 42) & ((1u << 21) - 1);
-
-            r /= (1u << 21) - 1;
-            g /= (1u << 21) - 1;
-            b /= (1u << 21) - 1;
-
-            return new Vector3(r, g, b);
         }
 
         public delegate void FuncRunParallel(int i);

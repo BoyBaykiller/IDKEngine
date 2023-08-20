@@ -450,13 +450,13 @@ void main()
         return;
 
     Mesh mesh = meshSSBO.Meshes[meshIndex];
-    AABB aabb = mesh.AABB;
+    Box box = mesh.AABB;
         
-    Frustum frustum = ExtractFrustum(ProjView * mesh.ModelMatrix);
-    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumAABBIntersect(frustum, aabb));
+    Frustum frustum = FrustumExtract(ProjView * mesh.ModelMatrix);
+    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumBoxIntersect(frustum, box));
 }
 ```
-The implementation of `ExtractFrustum` and `FrustumAABBIntersect` can be found [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/Culling/Frustum/compute.glsl).
+The implementation of `FrustumExtract` and `FrustumBoxIntersect` can be found [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/include/Frustum.glsl).
 
 Each thread grabs a mesh builds a frustum and then compares it against the aabb.
 `drawCommandSSBO` is a shader storage block giving us access to the buffer that holds the draw commands used by `MultiDrawElementsIndirect`.

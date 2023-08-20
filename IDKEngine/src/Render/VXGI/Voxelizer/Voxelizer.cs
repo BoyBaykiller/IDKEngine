@@ -76,7 +76,7 @@ namespace IDKEngine.Render
         private GLSLVoxelizerData glslVoxelizerData;
 
         private readonly Framebuffer fboNoAttachments;
-        public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.2f)
+        public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
         {
             clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 

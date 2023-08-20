@@ -77,17 +77,24 @@ namespace IDKEngine
 
         public Model(string path)
         {
-            LoadFromFile(path, Matrix4.Identity);
-        }
+            Meshes = Array.Empty<GLSLMesh>();
+            MeshInstances = Array.Empty<GLSLMeshInstance>();
+            Materials = Array.Empty<GLSLMaterial>();
+            DrawCommands = Array.Empty<GLSLDrawElementsCmd>();
+            Vertices = Array.Empty<GLSLDrawVertex>();
+            Indices = Array.Empty<uint>();
 
-        public void LoadFromFile(string path, Matrix4 rootTransform)
-        {
             if (!File.Exists(path))
             {
                 Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
                 return;
             }
 
+            LoadFromFile(path, Matrix4.Identity);
+        }
+
+        public void LoadFromFile(string path, Matrix4 rootTransform)
+        {
             gltfModel = Interface.LoadModel(path);
             
             string rootDir = Path.GetDirectoryName(path);
@@ -209,7 +216,7 @@ namespace IDKEngine
                 // Let one thread load non image data
                 if (textureType == GLMaterialData.TextureType.BaseColor)
                 {
-                    materialData.BaseColorFactor = Helper.CompressUNorm32Fast(new Vector4(
+                    materialData.BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(
                         material.PbrMetallicRoughness.BaseColorFactor[0],
                         material.PbrMetallicRoughness.BaseColorFactor[1],
                         material.PbrMetallicRoughness.BaseColorFactor[2],
@@ -443,12 +450,12 @@ namespace IDKEngine
                         fileStream.Read(span);
 
                         Vector3 normal = data;
-                        vertices[i].Normal = Helper.CompressSNorm32Fast(normal);
+                        vertices[i].Normal = Helper.CompressSR11G11B10(normal);
 
                         Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
                         Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
                         Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
-                        vertices[i].Tangent = Helper.CompressSNorm32Fast(tangent);
+                        vertices[i].Tangent = Helper.CompressSR11G11B10(tangent);
                     }
                 }
                 else if (item.Key == GLTF_TEXCOORD_0_ATTRIBUTE)

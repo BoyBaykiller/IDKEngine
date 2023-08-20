@@ -18,7 +18,7 @@ namespace IDKEngine.Render
             set
             {
                 _rayDepth = value;
-                AccumulatedSamples = 0;
+                ResetRenderProcess();
             }
         }
 
@@ -43,7 +43,7 @@ namespace IDKEngine.Render
                     LenseRadius = _lenseRadius;
                     RayDepth = cachedRayDepth;
                 }
-                AccumulatedSamples = 0;
+                ResetRenderProcess();
             }
         }
 
@@ -57,7 +57,7 @@ namespace IDKEngine.Render
                 _isTraceLights = value;
                 firstHitProgram.Upload("IsTraceLights", _isTraceLights);
                 nHitProgram.Upload("IsTraceLights", _isTraceLights);
-                AccumulatedSamples = 0;
+                ResetRenderProcess();
             }
         }
 
@@ -70,7 +70,7 @@ namespace IDKEngine.Render
             {
                 _focalLength = value;
                 firstHitProgram.Upload("FocalLength", value);
-                AccumulatedSamples = 0;
+                ResetRenderProcess();
             }
         }
 
@@ -83,7 +83,7 @@ namespace IDKEngine.Render
             {
                 _lenseRadius = value;
                 firstHitProgram.Upload("LenseRadius", value);
-                AccumulatedSamples = 0;
+                ResetRenderProcess();
             }
         }
 
@@ -92,7 +92,7 @@ namespace IDKEngine.Render
         {
             get => _accumulatedSamples;
 
-            set
+            private set
             {
                 _accumulatedSamples = value;
                 rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), _accumulatedSamples);
@@ -180,8 +180,13 @@ namespace IDKEngine.Render
             rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0));
             rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
-            AccumulatedSamples = 0;
+            ResetRenderProcess();
 
+        }
+
+        public void ResetRenderProcess()
+        {
+            AccumulatedSamples = 0;
         }
 
         public void Dispose()

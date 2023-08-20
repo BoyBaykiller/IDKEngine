@@ -6,7 +6,7 @@ using OpenTK.Mathematics;
 namespace IDKEngine
 {
     [StructLayout(LayoutKind.Explicit)]
-    public struct AABB
+    public struct Box
     {
         public Vector3 Center => (Max + Min) * 0.5f;
         public Vector3 HalfSize => (Max - Min) * 0.5f;
@@ -29,7 +29,7 @@ namespace IDKEngine
         [FieldOffset(0)] public Vector128<float> SIMDMin;
         [FieldOffset(16)] public Vector128<float> SIMDMax;
 
-        public AABB(Vector3 min, Vector3 max)
+        public Box(Vector3 min, Vector3 max)
         {
             Min = min;
             Max = max;
@@ -47,10 +47,10 @@ namespace IDKEngine
             GrowToFit(p);
         }
 
-        public void GrowToFit(in AABB aaab)
+        public void GrowToFit(in Box box)
         {
-            GrowToFit(aaab.SIMDMin);
-            GrowToFit(aaab.SIMDMax);
+            GrowToFit(box.SIMDMin);
+            GrowToFit(box.SIMDMax);
         }
 
         public void GrowToFit(in GLSLTriangle tri)
@@ -65,11 +65,11 @@ namespace IDKEngine
             this = Transformed(this, model);
         }
 
-        public static AABB Transformed(AABB aabb, Matrix4 model)
+        public static Box Transformed(Box box, Matrix4 model)
         {
-            aabb.Min = Vector3.TransformPosition(aabb.Min, model);
-            aabb.Max = Vector3.TransformPosition(aabb.Max, model);
-            return aabb;
+            box.Min = Vector3.TransformPosition(box.Min, model);
+            box.Max = Vector3.TransformPosition(box.Max, model);
+            return box;
         }
     }
 }
