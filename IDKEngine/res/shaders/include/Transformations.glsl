@@ -18,4 +18,10 @@ vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary)
     return v0 * bary.x + v1 * bary.y + v2 * bary.z;
 }
 
+float GetLogarithmicDepth(float near, float far, float z)
+{
+    float depth = ((1.0 / z) - (1.0 / near)) / ((1.0 / far) - (1.0  / near));
+    return depth;
+}
+
 #endif

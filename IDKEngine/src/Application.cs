@@ -361,21 +361,19 @@ namespace IDKEngine
 
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
 
-
             //Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
             //Model cornellBox = new Model("res/models/CornellBox/scene.gltf");
 
-            //Model ueScene = new Model(@"C:\\Users\\Julian\\Downloads\\UEStarterMap\\UEStarterMap\\scene.gltf");
             //Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
             //Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
             //Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-
             //Model bistroExterior = new Model(@"C:\Users\Julian\Downloads\Models\BistroExterior\BistroExterior.gltf");
+            //Model minecraft = new Model(@"C:\Users\Julian\Downloads\Models\Minecraft\Minecraft.gltf");
 
             ModelSystem = new ModelSystem();
             ModelSystem.Add(sponza, lucy, helmet);
-            BVH = new BVH(ModelSystem);
 
+            BVH = new BVH(ModelSystem);
             LightManager = new LightManager(12, 12);
             MeshOutlineRenderer = new BoxRenderer();
             Bloom = new Bloom(RenderResolution.X, RenderResolution.Y, 1.0f, 3.0f);
@@ -386,7 +384,7 @@ namespace IDKEngine
             LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
 
-            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f));
+            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f)); // alt Color: new Vector3(50.450, 35.840, 25.270)
             //LightManager.CreatePointShadowForLight(new PointShadow(1536, 0.5f, 60.0f), LightManager.Count - 1);
 
             for (int i = 0; i < 3; i++)

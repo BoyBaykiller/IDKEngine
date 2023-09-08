@@ -73,8 +73,9 @@ void main()
     outData.Position = light.Position;
     outData.Radius = light.Radius;
 
+    // Add jitter independent of perspective by multypling with w
     vec4 jitteredClipPos = outData.ClipPos;
-    jitteredClipPos.xy += taaDataUBO.Jitter * outData.ClipPos.w * taaDataUBO.Enabled;
+    jitteredClipPos.xy += taaDataUBO.Jitter * outData.ClipPos.w;
 
     gl_Position = jitteredClipPos;
 }

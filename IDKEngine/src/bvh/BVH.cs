@@ -89,17 +89,20 @@ namespace IDKEngine
                     Instances = new ArraySegment<GLSLMeshInstance>(ModelSystem.MeshInstances, cmd.BaseInstance, cmd.InstanceCount),
                 };
             });
+            Logger.Log(Logger.LogLevel.Info, $"Build {blasesInstances.Length} Bottom Level Acceleration Structures (BLAS)");
+
             Tlas = new TLAS(blasesInstances);
+            Tlas.Build();
+            Logger.Log(Logger.LogLevel.Info, $"Build Top Level Acceleration Structures (TLAS) for {blasesInstances.Sum(blasInstances => blasInstances.Instances.Count)} instances");
+
             UpdateBlasBuffer();
-            
+            UpdateTlasBuffer();
+
             MaxBlasTreeDepth = 0;
             for (int i = 0; i < blasesInstances.Length; i++)
             {
                 MaxBlasTreeDepth = Math.Max(MaxBlasTreeDepth, blasesInstances[i].Blas.TreeDepth);
             }
-
-            Tlas.Build();
-            UpdateTlasBuffer();
         }
 
         public unsafe void UpdateBlasBuffer()

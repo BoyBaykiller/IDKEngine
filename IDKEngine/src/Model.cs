@@ -70,12 +70,12 @@ namespace IDKEngine
         public uint[] Indices;
 
         private Gltf gltfModel;
-        public Model(string path, Matrix4 rootTransform)
+        public Model(string path)
+            : this(path, Matrix4.Identity)
         {
-            LoadFromFile(path, rootTransform);
         }
 
-        public Model(string path)
+        public Model(string path, Matrix4 rootTransform)
         {
             Meshes = Array.Empty<GLSLMesh>();
             MeshInstances = Array.Empty<GLSLMeshInstance>();
@@ -90,8 +90,10 @@ namespace IDKEngine
                 return;
             }
 
-            LoadFromFile(path, Matrix4.Identity);
+            LoadFromFile(path, rootTransform);
+            Logger.Log(Logger.LogLevel.Info, $"Loaded model {path}");
         }
+
 
         public void LoadFromFile(string path, Matrix4 rootTransform)
         {

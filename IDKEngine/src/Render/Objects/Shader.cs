@@ -94,7 +94,7 @@ namespace IDKEngine.Render.Objects
 
                     result.AppendLine("#line 1");
                     result.AppendLine(PreProcess(includeSrc, shaderInsertions));
-                    result.AppendLine($"#line {lineCount}");
+                    result.AppendLine($"#line {lineCount + 1}");
                 }
             }
             return result.ToString();

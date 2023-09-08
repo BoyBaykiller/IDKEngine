@@ -10,11 +10,11 @@ namespace IDKEngine.Render
         // used in shader and client code - keep in sync!
         public enum DebugMode
         {
-            NoDebug = 0,
-            ShadingRate = 1,
-            Speed = 2,
-            Luminance = 3,
-            LuminanceVariance = 4,
+            NoDebug,
+            ShadingRate,
+            Speed,
+            Luminance,
+            LuminanceVariance,
         }
 
         private DebugMode _debugValue;

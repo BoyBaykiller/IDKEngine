@@ -38,9 +38,10 @@ void main()
 
     if (IsDithering)
     {
-        int x = int(imgCoord.x) % BayerMatrix8.length();
+        int x = int(imgCoord.x) % BayerMatrix8[0].length();
         int y = int(imgCoord.y) % BayerMatrix8.length();
-        srgbColor += (BayerMatrix8[x][y] - 0.5) * 0.015625;
+
+        srgbColor += (BayerMatrix8[x][y] - 0.5) / (BayerMatrix8.length() * BayerMatrix8[0].length());
     }
 
     imageStore(ImgResult, imgCoord, vec4(srgbColor, 1.0));
