@@ -5,7 +5,7 @@
 
 #define TAKE_ATOMIC_FP16_PATH AppInsert(TAKE_ATOMIC_FP16_PATH)
 
-#if TAKE_VERTEX_LAYERED_RENDERING_PATH
+#if TAKE_ATOMIC_FP16_PATH
     #extension GL_NV_shader_atomic_fp16_vector : require
     #extension GL_NV_gpu_shader5 : require
 #endif
