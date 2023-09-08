@@ -68,11 +68,6 @@ layout(std140, binding = 1) uniform ShadowDataUBO
     int Count;
 } shadowDataUBO;
 
-out InOutVars
-{
-    vec3 FragPos;
-} outData;
-
 layout(location = 0) uniform int ShadowIndex;
 layout(location = 1) uniform int Layer;
 
@@ -88,16 +83,16 @@ void main()
     
     const uint glInstanceID = 0; // TODO: Work out actual instanceID value
     mat4 model = meshInstanceSSBO.MeshInstances[gl_BaseInstance + glInstanceID].ModelMatrix;
-    outData.FragPos = vec3(model * vec4(Position, 1.0));
-    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(outData.FragPos, 1.0);
+    vec3 fragPos = vec3(model * vec4(Position, 1.0));
+    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[gl_Layer] * vec4(fragPos, 1.0);
 
 #else
 
     // In multi pass shadows the layer is simply passed as a uniform before each pass
 
     mat4 model = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance].ModelMatrix;
-    outData.FragPos = vec3(model * vec4(Position, 1.0));
-    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(outData.FragPos, 1.0);
+    vec3 fragPos = vec3(model * vec4(Position, 1.0));
+    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[Layer] * vec4(fragPos, 1.0);
 
 #endif
 }

@@ -178,10 +178,10 @@ namespace IDKEngine
                     continue;
                 }
 
-                float scale = (uniformDivideArea.Max[i] - uniformDivideArea.Min[i]) / SAH_SAMPLES;
-                for (int j = 1; j < SAH_SAMPLES; j++)
+                float scale = (uniformDivideArea.Max[i] - uniformDivideArea.Min[i]) / (SAH_SAMPLES + 1);
+                for (int j = 0; j < SAH_SAMPLES; j++)
                 {
-                    float currentSplitPos = uniformDivideArea.Min[i] + j * scale;
+                    float currentSplitPos = uniformDivideArea.Min[i] + (j + 1) * scale;
                     float currentSplitCost = GetSplitCost(node, i, currentSplitPos);
                     if (currentSplitCost < bestSplitCost)
                     {

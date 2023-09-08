@@ -108,8 +108,9 @@ void main()
     outData.SpecularBias = mesh.SpecularBias;
     outData.RoughnessBias = mesh.RoughnessBias;
 
+    // Add jitter independent of perspective by multypling with w
     vec4 jitteredClipPos = outData.ClipPos;
-    jitteredClipPos.xy += taaDataUBO.Jitter * outData.ClipPos.w * taaDataUBO.Enabled;
+    jitteredClipPos.xy += taaDataUBO.Jitter * outData.ClipPos.w;
     
     gl_Position = jitteredClipPos;
 }

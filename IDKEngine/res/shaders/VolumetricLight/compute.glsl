@@ -4,6 +4,7 @@
 
 AppInclude(include/Constants.glsl)
 AppInclude(include/Random.glsl)
+AppInclude(include/Transformations.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -80,9 +81,10 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 } gBufferDataUBO;
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);
-bool Shadow(PointShadow pointShadow, vec3 lightToSample);
-vec3 NDCToWorld(vec3 ndc);
+bool Shadow(PointShadow pointShadow, vec3 lightSpacePos);
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
 float ComputeScattering(float lightDotView);
+vec3 NDCToWorld(vec3 ndc);
 
 uniform int Samples;
 uniform float Scattering;
@@ -151,23 +153,20 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
 }
 
 // Only binaries shadow because soft shadows are not worth it in this case
-bool Shadow(PointShadow pointShadow, vec3 lightToSample)
+bool Shadow(PointShadow pointShadow, vec3 lightSpacePos)
 {
-    float twoDist = dot(lightToSample, lightToSample);
-    float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
-    float twoFarPlane = pointShadow.FarPlane * pointShadow.FarPlane;
+    float depth = GetLightSpaceDepth(pointShadow, lightSpacePos);
+    float closestDepth = texture(pointShadow.Texture, lightSpacePos).r;
 
-    // Map from [nearPlane; farPlane] to [0.0; 1.0]
-    float mapedDepth = (twoDist - twoNearPlane) / (twoFarPlane - twoNearPlane);
-    float closestDepth = texture(pointShadow.Texture, lightToSample).r;
-
-    return mapedDepth > closestDepth;
+    return depth > closestDepth;
 }
 
-vec3 NDCToWorld(vec3 ndc)
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
 {
-    vec4 worldPos = basicDataUBO.InvProjView * vec4(ndc, 1.0);
-    return worldPos.xyz / worldPos.w;
+    float dist = max(abs(lightSpacePos.x), max(abs(lightSpacePos.y), abs(lightSpacePos.z)));
+    float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);
+
+    return depth;
 }
 
 // Mie scaterring approximated with Henyey-Greenstein phase function
@@ -175,4 +174,10 @@ vec3 NDCToWorld(vec3 ndc)
 float ComputeScattering(float lightDotView)
 {
     return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * lightDotView, 1.5));
+}
+
+vec3 NDCToWorld(vec3 ndc)
+{
+    vec4 worldPos = basicDataUBO.InvProjView * vec4(ndc, 1.0);
+    return worldPos.xyz / worldPos.w;
 }

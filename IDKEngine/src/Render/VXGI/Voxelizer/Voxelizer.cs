@@ -78,21 +78,28 @@ namespace IDKEngine.Render
         private readonly Framebuffer fboNoAttachments;
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
         {
-            clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl")));
 
-            Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
-            shaderInsertions.Add("TAKE_FAST_GEOMETRY_SHADER_PATH", TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0");
+            {
+                Dictionary<string, string> takeFastGeometryShaderInsertion = new Dictionary<string, string>();
+                takeFastGeometryShaderInsertion.Add("TAKE_FAST_GEOMETRY_SHADER_PATH", TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0");
             
-            List<Shader> voxelizeProgramShaders = new List<Shader>()
-            {
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/vertex.glsl"), shaderInsertions),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/fragment.glsl"))
-            };
-            if (TAKE_FAST_GEOMETRY_SHADER_PATH)
-            {
-                voxelizeProgramShaders.Add(new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/geometry.glsl")));
+                Dictionary<string, string> takeAtomicFP16PathInsertion = new Dictionary<string, string>();
+                takeAtomicFP16PathInsertion.Add("TAKE_ATOMIC_FP16_PATH", HAS_ATOMIC_FP16_VECTOR ? "1" : "0");
+
+                List<Shader> voxelizeProgramShaders = new List<Shader>()
+                {
+                    new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/vertex.glsl"), takeFastGeometryShaderInsertion),
+                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/fragment.glsl"), takeAtomicFP16PathInsertion)
+                };
+                if (TAKE_FAST_GEOMETRY_SHADER_PATH)
+                {
+                    voxelizeProgramShaders.Add(new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/geometry.glsl")));
+                }
+
+                voxelizeProgram = new ShaderProgram(voxelizeProgramShaders.ToArray());
+                
+                clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl"), takeAtomicFP16PathInsertion));
             }
-            voxelizeProgram = new ShaderProgram(voxelizeProgramShaders.ToArray());
 
             mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Mipmap/compute.glsl")));
             visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/DebugVisualization/compute.glsl")));

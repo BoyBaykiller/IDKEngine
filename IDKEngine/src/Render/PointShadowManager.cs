@@ -8,6 +8,11 @@ namespace IDKEngine.Render
 {
     class PointShadowManager : IDisposable
     {
+        public static readonly bool TAKE_VERTEX_LAYERED_RENDERING_PATH =
+            (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
+            Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
+            Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
+
         public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
 
         private readonly PointShadow[] pointShadows;
@@ -19,7 +24,7 @@ namespace IDKEngine.Render
             pointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
 
             Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
-            shaderInsertions.Add("TAKE_VERTEX_LAYERED_RENDERING_PATH", PointShadow.TAKE_VERTEX_LAYERED_RENDERING_PATH ? "1" : "0");
+            shaderInsertions.Add("TAKE_VERTEX_LAYERED_RENDERING_PATH", TAKE_VERTEX_LAYERED_RENDERING_PATH ? "1" : "0");
 
             renderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl"), shaderInsertions),

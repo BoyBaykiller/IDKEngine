@@ -177,7 +177,7 @@ namespace IDKEngine.Render
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
             rayIndicesBuffer = new BufferObject();
             rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0));
+            rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0)); // clear counts
             rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             ResetRenderProcess();

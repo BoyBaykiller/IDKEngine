@@ -7,11 +7,6 @@ namespace IDKEngine.Render
 {
     class PointShadow : IDisposable
     {
-        public static readonly bool TAKE_VERTEX_LAYERED_RENDERING_PATH =
-            (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
-            Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
-            Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
-
         public unsafe Vector3 Position
         {
             get => glslPointShadow.Position;
@@ -71,7 +66,7 @@ namespace IDKEngine.Render
 
         public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex, ShaderProgram renderProgram, ShaderProgram cullingProgram)
         {
-            if (TAKE_VERTEX_LAYERED_RENDERING_PATH)
+            if (PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH)
             {
                 cullingProgram.Use();
                 cullingProgram.Upload(0, pointShadowIndex);
@@ -84,7 +79,7 @@ namespace IDKEngine.Render
 
             renderProgram.Upload(0, pointShadowIndex);
 
-            if (TAKE_VERTEX_LAYERED_RENDERING_PATH) // GL_ARB_shader_viewport_layer_array or GL_NV_viewport_array2 or GL_AMD_vertex_shader_layer
+            if (PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH) // GL_ARB_shader_viewport_layer_array or GL_NV_viewport_array2 or GL_AMD_vertex_shader_layer
             {
                 GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
                 renderProgram.Use();

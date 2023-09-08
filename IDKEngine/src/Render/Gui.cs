@@ -90,7 +90,7 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("Is Infite Replay", ref isInfiniteReplay);
                     
                     ImGui.Checkbox("Is Video Render", ref isVideoRender);
-                    ImGui.SameLine(); InfoMark($"When enabled rendered images are saved into a folder.");
+                    ToolTipForItemAboveHovered("When enabled rendered images are saved into a folder.");
 
                     tempInt = app.FrameRecorder.ReplayFrameIndex;
                     if (ImGui.SliderInt("ReplayFrame", ref tempInt, 0, app.FrameRecorder.FrameCount - 1))
@@ -191,6 +191,11 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsVXGI)
                         {
                             ImGui.Checkbox("IsConfigureGrid", ref app.RasterizerPipeline.IsConfigureGrid);
+                            ToolTipForItemAboveHovered(
+                                "Allows to change the size of the VXGI grid.\n" +
+                                "It defines the space the VXGI Lighting algorithm is applied over.\n" +
+                                "This needs to be set manually. The green box marks the grid."
+                            );
 
                             string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
                             current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
@@ -278,9 +283,8 @@ namespace IDKEngine.Render
                                 {
                                     app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
                                 }
-                                ImGui.SameLine();
-                                InfoMark(
-                                    $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting)." +
+                                ToolTipForItemAboveHovered(
+                                    $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting).\n" +
                                     "If TAA is disabled this has no effect."
                                 );
                             }
@@ -290,24 +294,21 @@ namespace IDKEngine.Render
                             if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
                             ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
-                            ImGui.SameLine();
-                            InfoMark(
-                                "Uses NV_conservative_raster to make the rasterizer invoke the fragment shader even if a pixel is only partially covered. " +
+                            ToolTipForItemAboveHovered(
+                                "Allows to make the rasterizer invoke the fragment shader even if a pixel is only partially covered.\n" +
                                 "Currently there is some bug with this which causes overly bright voxels."
                             );
 
                             ImGui.Text($"TAKE_FAST_GEOMETRY_SHADER_PATH: {Voxelizer.TAKE_FAST_GEOMETRY_SHADER_PATH}");
-                            ImGui.SameLine();
-                            InfoMark(
-                                "Uses NV_geometry_shader_passthrough and NV_viewport_swizzle to take advantage of a \"passthrough geometry\" shader instead of having to render the scene 3 times. " +
-                                "Regular geometry shaders were even slower which is why they are avoided entirely."
+                            ToolTipForItemAboveHovered(
+                                "Combination of NV_geometry_shader_passthrough and NV_viewport_swizzle to take advantage of a fast \"passthrough geometry\" shader instead of having to render the scene 3 times.\n" +
+                                "Regular geometry shaders were even slower which is why I decided to avoided them entirely."
                             );
 
                             ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
-                            ImGui.SameLine();
-                            InfoMark(
-                                "Uses NV_shader_atomic_fp16_vector to perform atomics on fp16 images without having to emulate such behaviour. " +
-                                "Most noticeably without this extension building the voxel grid requires 2.5x times the memory"
+                            ToolTipForItemAboveHovered(
+                                "Allows to perform atomics on fp16 images without having to emulate such behaviour.\n" +
+                                "Most noticeably without this extension voxelizing requires 2.5x times the memory."
                             );
                         }
                     }
@@ -315,12 +316,12 @@ namespace IDKEngine.Render
                     if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
                         ImGui.Text($"NV_shading_rate_image: {VariableRateShading.HAS_VARIABLE_RATE_SHADING}");
-                        ImGui.SameLine();
-                        InfoMark(
-                            "Uses NV_shading_rate_image to choose a unique shading rate " +
-                            "on each 16x16 tile as a mesaure of increasing performance by decreasing fragment " +
-                            "shader invocations in regions where less detail may be required."
+                        ToolTipForItemAboveHovered(
+                            "Allows the renderer to choose a unique shading rate on each 16x16 tile\n" +
+                            "as a mesaure of increasing performance by decreasing fragment shader\n" +
+                            "invocations in regions where less detail may be required."
                         );
+
                         if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
                         ImGui.Checkbox("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading);
                         if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
@@ -397,9 +398,8 @@ namespace IDKEngine.Render
                             {
                                 app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation = tempBool;
                             }
-                            ImGui.SameLine();
-                            InfoMark(
-                                $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting)." +
+                            ToolTipForItemAboveHovered(
+                                $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting).\n" +
                                 "If TAA is disabled this has no effect."
                             );
                         }
@@ -420,9 +420,8 @@ namespace IDKEngine.Render
                             {
                                 app.TaaResolve.IsTaaArtifactMitigation = tempBool;
                             }
-                            ImGui.SameLine();
-                            InfoMark(
-                                "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass. " +
+                            ToolTipForItemAboveHovered(
+                                "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass.\n" +
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
                             );
 
@@ -487,12 +486,10 @@ namespace IDKEngine.Render
                     if (ImGui.CollapsingHeader("Shadows"))
                     {
                         ImGui.Checkbox("IsShadows", ref app.IsShadows);
-                        ImGui.SameLine();
-                        InfoMark("Toggling this only controls the generation of updated shadow maps. It does not effect the use of existing shadow maps.");
-                        
-                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadow.TAKE_VERTEX_LAYERED_RENDERING_PATH}");
-                        ImGui.SameLine();
-                        InfoMark("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
+                        ToolTipForItemAboveHovered("Toggling this controls the generation of new shadow maps. It does not effect the use of existing shadow maps.");
+
+                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH}");
+                        ToolTipForItemAboveHovered("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
                     }
                 }
                 else if (app.RenderMode == RenderMode.PathTracer)
@@ -826,17 +823,11 @@ namespace IDKEngine.Render
             Backend.Render();
         }
 
-        private static void InfoMark(string text)
+        private static void ToolTipForItemAboveHovered(string text)
         {
-            ImGui.TextDisabled("(?)");
-
             if (ImGui.IsItemHovered())
             {
-                ImGui.BeginTooltip();
-                ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0f);
-                ImGui.TextUnformatted(text);
-                ImGui.PopTextWrapPos();
-                ImGui.EndTooltip();
+                ImGui.SetTooltip(text);
             }
         }
 
@@ -870,7 +861,6 @@ namespace IDKEngine.Render
                 Helper.TextureToDisk(app.PostProcessor.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
 
-            // TODO: fix wrong logic when replaying is started in gui.Render()
             if (frameRecState == FrameRecorderState.Replaying)
             {
                 if (app.RenderMode == RenderMode.Rasterizer || (app.RenderMode == RenderMode.PathTracer && app.PathTracer.AccumulatedSamples >= recordingRenderSampleGoal))
@@ -969,7 +959,8 @@ namespace IDKEngine.Render
                 //});
                 //timer.Stop();
                 //Console.WriteLine(timer.Elapsed.TotalMilliseconds);
-                //Console.WriteLine(TLAS.maxStack);
+                //Console.WriteLine($"stack size required: {TLAS.debugMaxStack}");
+                //Console.WriteLine($"actual stack size: {app.BVH.Tlas.TreeDepth}");
 
                 bool hitMesh = app.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);

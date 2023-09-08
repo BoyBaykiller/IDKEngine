@@ -19,6 +19,12 @@ namespace IDKEngine.Render
             set
             {
                 taaData.IsEnabled = value ? 1 : 0;
+
+                if (taaData.IsEnabled == 0)
+                {
+                    taaData.Jitter = new Vector2(0.0f);
+                    taaDataBuffer.SubData(0, sizeof(GLSLTaaData), taaData);
+                }
             }
         }
 
@@ -88,16 +94,12 @@ namespace IDKEngine.Render
 
         public void RunTAAResolve(Texture color)
         {
+            isPing = !isPing;
             if (taaData.IsEnabled == 0)
             {
                 GL.CopyImageSubData(color.ID, ImageTarget.Texture2D, 0, 0, 0, 0, Result.ID, ImageTarget.Texture2D, 0, 0, 0, 0, Result.Width, Result.Height, 1);
                 return;
             }
-
-            taaData.Jitter = jitterSequence[taaData.Frame % taaData.Samples];
-            taaDataBuffer.SubData(0, sizeof(GLSLTaaData), taaData);
-            taaData.Frame++;
-
 
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             color.BindToUnit(0);
@@ -107,7 +109,10 @@ namespace IDKEngine.Render
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
 
-            isPing = !isPing;
+
+            taaData.Jitter = jitterSequence[taaData.Frame % taaData.Samples];
+            taaData.Frame++;
+            taaDataBuffer.SubData(0, sizeof(GLSLTaaData), taaData);
         }
 
         public void RunFSR2(Texture color, Texture depth, Texture velocity, float deltaMilliseconds, float cameraNear, float cameraFar, float cameraFovAngleVertical)
@@ -157,13 +162,13 @@ namespace IDKEngine.Render
             taaPing = new Texture(TextureTarget2d.Texture2D);
             taaPing.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             taaPing.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPing.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
+            taaPing.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
 
             if (taaPong != null) taaPong.Dispose();
             taaPong = new Texture(TextureTarget2d.Texture2D);
             taaPong.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             taaPong.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPong.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
+            taaPong.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
 
             jitterSequence = new Vector2[GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT];
             MyMath.GetHaltonSequence_2_3(jitterSequence);

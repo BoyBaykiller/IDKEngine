@@ -1,9 +1,9 @@
 #version 460 core
-#define EPSILON 0.001
 #define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 
 AppInclude(include/Constants.glsl)
+AppInclude(include/Transformations.glsl)
 
 layout(location = 0) out vec4 FragColor;
 
@@ -62,6 +62,15 @@ layout(std140, binding = 2) uniform LightsUBO
     int Count;
 } lightsUBO;
 
+layout(std140, binding = 3) uniform TaaDataUBO
+{
+    vec2 Jitter;
+    int Samples;
+    int Enabled;
+    uint Frame;
+    float VelScale;
+} taaDataUBO;
+
 layout(std140, binding = 4) uniform SkyBoxUBO
 {
     samplerCube Albedo;
@@ -77,7 +86,8 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 } gBufferDataUBO;
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight);
-float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample);
+float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos);
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
 vec3 NDCToWorld(vec3 ndc);
 
 uniform bool IsVXGI;
@@ -101,6 +111,7 @@ void main()
 
     vec3 ndc = vec3(uv, depth) * 2.0 - 1.0;
     vec3 fragPos = NDCToWorld(ndc);
+    vec3 unjitteredFragPos = NDCToWorld(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z));
 
     vec3 albedo = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).rgb;
     float alpha = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).a;
@@ -121,7 +132,8 @@ void main()
         if (light.PointShadowIndex >= 0)
         {
             PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
-            contrib *= Visibility(pointShadow, normal, -sampleToLight);
+            vec3 lightSpacePos = unjitteredFragPos - light.Position;
+            contrib *= Visibility(pointShadow, normal, lightSpacePos);
         }
         directLighting += contrib;
     }
@@ -168,38 +180,39 @@ vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, 
 }
 
 // Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
-const vec3 SHADOW_SAMPLE_OFFSETS[] =
+const vec3 ShadowSampleOffsets[] =
 {
-   vec3( 1.0,  1.0,  1.0 ), vec3(  1.0, -1.0,  1.0 ), vec3( -1.0, -1.0,  1.0 ), vec3( -1.0,  1.0,  1.0 ), 
-   vec3( 1.0,  1.0, -1.0 ), vec3(  1.0, -1.0, -1.0 ), vec3( -1.0, -1.0, -1.0 ), vec3( -1.0,  1.0, -1.0 ),
-   vec3( 1.0,  1.0,  0.0 ), vec3(  1.0, -1.0,  0.0 ), vec3( -1.0, -1.0,  0.0 ), vec3( -1.0,  1.0,  0.0 ),
-   vec3( 1.0,  0.0,  1.0 ), vec3( -1.0,  0.0,  1.0 ), vec3(  1.0,  0.0, -1.0 ), vec3( -1.0,  0.0, -1.0 ),
-   vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
+    vec3( 0.0,  0.0,  0.0 ),
+    vec3( 1.0,  1.0,  1.0 ), vec3(  1.0, -1.0,  1.0 ), vec3( -1.0, -1.0,  1.0 ), vec3( -1.0,  1.0,  1.0 ), 
+    vec3( 1.0,  1.0, -1.0 ), vec3(  1.0, -1.0, -1.0 ), vec3( -1.0, -1.0, -1.0 ), vec3( -1.0,  1.0, -1.0 ),
+    vec3( 1.0,  1.0,  0.0 ), vec3(  1.0, -1.0,  0.0 ), vec3( -1.0, -1.0,  0.0 ), vec3( -1.0,  1.0,  0.0 ),
+    vec3( 1.0,  0.0,  1.0 ), vec3( -1.0,  0.0,  1.0 ), vec3(  1.0,  0.0, -1.0 ), vec3( -1.0,  0.0, -1.0 ),
+    vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
 };
 
-float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample)
+float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos)
 {
-    float lightToFragLength = length(lightToSample);
+    float bias = 0.02;
 
-    float twoDist = lightToFragLength * lightToFragLength;
-    float twoNearPlane = pointShadow.NearPlane * pointShadow.NearPlane;
-    float twoFarPlane = pointShadow.FarPlane * pointShadow.FarPlane;
-    
-    const float MIN_BIAS = EPSILON;
-    const float MAX_BIAS = 1.5;
-    float twoBias = mix(MAX_BIAS * MAX_BIAS, MIN_BIAS * MIN_BIAS, max(dot(normal, lightToSample / lightToFragLength), 0.0));
-
-    // Map from [nearPlane, farPlane] to [0.0, 1.0]
-    float mapedDepth = (twoDist - twoBias - twoNearPlane) / (twoFarPlane - twoNearPlane);
-    
-    const float DISK_RADIUS = 0.08;
-    float shadowFactor = texture(pointShadow.ShadowTexture, vec4(lightToSample, mapedDepth));
-    for (int i = 0; i < SHADOW_SAMPLE_OFFSETS.length(); i++)
+    float visibilityFactor = 0.0;
+    const float sampleDiskRadius = 0.08;
+    for (int i = 0; i < ShadowSampleOffsets.length(); i++)
     {
-        shadowFactor += texture(pointShadow.ShadowTexture, vec4(lightToSample + SHADOW_SAMPLE_OFFSETS[i] * DISK_RADIUS, mapedDepth));
+        vec3 samplePos = (lightSpacePos + ShadowSampleOffsets[i] * sampleDiskRadius);
+        float depth = GetLightSpaceDepth(pointShadow, samplePos * (1.0 - bias));
+        visibilityFactor += texture(pointShadow.ShadowTexture, vec4(samplePos, depth));
     }
+    visibilityFactor /= ShadowSampleOffsets.length();
 
-    return shadowFactor / 21.0;
+    return visibilityFactor;
+}
+
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
+{
+    float dist = max(abs(lightSpacePos.x), max(abs(lightSpacePos.y), abs(lightSpacePos.z)));
+    float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);
+
+    return depth;
 }
 
 vec3 NDCToWorld(vec3 ndc)
