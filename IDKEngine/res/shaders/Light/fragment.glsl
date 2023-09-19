@@ -10,9 +10,8 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 in InOutVars
@@ -31,8 +30,8 @@ void main()
     AlbedoAlpha = vec4(0.0, 0.0, 0.0, 1.0);
     NormalSpecular = vec4((inData.FragPos - inData.Position) / inData.Radius, 0.0);
     EmissiveRoughness = vec4(FragColor.rgb, 1.0);
-
-    vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
-    vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
-    Velocity = (uv - prevUV) * taaDataUBO.VelScale;
+    
+    vec2 ndc = inData.ClipPos.xy / inData.ClipPos.w;
+    vec2 prevNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
+    Velocity = (ndc - prevNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out
 }

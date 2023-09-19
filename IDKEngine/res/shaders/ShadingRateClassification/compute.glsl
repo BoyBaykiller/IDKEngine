@@ -34,9 +34,8 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO
@@ -76,7 +75,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / textureSize(SamplerShaded, 0);
 
-    vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg / taaDataUBO.VelScale;
+    vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg;
     vec3 srcColor = texture(SamplerShaded, uv).rgb;
 
     float meanSpeed, meanLuminance, luminanceVariance;

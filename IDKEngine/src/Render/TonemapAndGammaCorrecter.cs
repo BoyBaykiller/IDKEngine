@@ -64,7 +64,7 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
         }
         
         public void Dispose()

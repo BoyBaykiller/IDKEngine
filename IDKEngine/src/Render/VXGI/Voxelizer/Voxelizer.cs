@@ -20,7 +20,7 @@ namespace IDKEngine.Render
             set
             {
                 glslVoxelizerData.GridMin = Vector3.ComponentMin(value, glslVoxelizerData.GridMax - new Vector3(0.1f));
-                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
+                glslVoxelizerData.OrthoProjection = MyMath.CreateOrthographicOffCenterDepthZeroToOne(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
                 voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
         }
@@ -31,7 +31,7 @@ namespace IDKEngine.Render
             set
             {
                 glslVoxelizerData.GridMax = Vector3.ComponentMax(value, glslVoxelizerData.GridMin + new Vector3(0.1f));
-                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
+                glslVoxelizerData.OrthoProjection = MyMath.CreateOrthographicOffCenterDepthZeroToOne(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
                 voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
         }
@@ -72,7 +72,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram voxelizeProgram;
         private readonly ShaderProgram mipmapProgram;
         private readonly ShaderProgram visualizeDebugProgram;
-        private readonly BufferObject voxelizerDataBuffer;
+        public readonly BufferObject voxelizerDataBuffer;
         private GLSLVoxelizerData glslVoxelizerData;
 
         private readonly Framebuffer fboNoAttachments;

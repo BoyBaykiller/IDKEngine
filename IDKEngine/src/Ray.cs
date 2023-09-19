@@ -31,7 +31,8 @@ namespace IDKEngine
         {
             Vector4 rayEye = new Vector4(ndc.X, ndc.Y, -1.0f, 0.0f) * inverseProj;
             rayEye.Zw = new Vector2(-1.0f, 0.0f);
-            return new Ray(origin, Vector3.Normalize((rayEye * inverseView).Xyz));
+            Vector3 rayWorld = Vector3.Normalize((rayEye * inverseView).Xyz);
+            return new Ray(origin, rayWorld);
         }
     }
 }

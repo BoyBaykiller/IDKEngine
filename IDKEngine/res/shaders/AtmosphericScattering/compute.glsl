@@ -30,7 +30,7 @@ void main()
     vec3 toCubemap = GetWorldSpaceDirection(InvProjection, InvViews[imgCoord.z], ndc);
 
     vec3 color = Atmosphere(
-        toCubemap,                     // normalized ray direction
+        toCubemap,                      // normalized ray direction
         vec3(0, 6376e3, 0),             // ray origin
         LightPos,                       // position of the sun
         LightIntensity,                 // intensity of the sun

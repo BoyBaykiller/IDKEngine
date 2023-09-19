@@ -30,8 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FFX_FSR2" Version="1.0.0" />
     <PackageReference Include="glTF2Loader" Version="1.1.4-alpha" />
-    <PackageReference Include="ImGui.NET" Version="1.89.5" />
+    <PackageReference Include="ImGui.NET" Version="1.89.9.1" />
     <PackageReference Include="OpenTK.Graphics" Version="4.8.0" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.8.0" />
     <PackageReference Include="StbImageSharp" Version="2.27.13" />

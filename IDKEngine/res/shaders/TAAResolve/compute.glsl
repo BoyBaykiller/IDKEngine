@@ -6,16 +6,15 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
-layout(binding = 0) uniform sampler2D SamplerCurrent;
-layout(binding = 1) uniform sampler2D SamplerHistory;
+layout(binding = 0) uniform sampler2D SamplerPrevResult;
+layout(binding = 1) uniform sampler2D SamplerInputColor;
 
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO
@@ -27,7 +26,7 @@ layout(std140, binding = 6) uniform GBufferDataUBO
     sampler2D Depth;
 } gBufferDataUBO;
 
-void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocityPixel, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
+void GetResolveData(ivec2 imgCoord, out vec3 inputColor, out vec2 bestUv, out vec3 neighborhoodMin, out vec3 neighborhoodMax);
 vec4 SampleTextureCatmullRom(sampler2D src, vec2 uv);
 
 uniform bool IsTaaArtifactMitigation;
@@ -37,35 +36,41 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
+    if (!taaDataUBO.IsEnabled)
+    {
+        vec4 color = texture(SamplerInputColor, uv);
+        imageStore(ImgResult, imgCoord, color);
+        return;
+    }
+
     if (!IsTaaArtifactMitigation)
     {
-        vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg / taaDataUBO.VelScale;
+        vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg;
         vec2 historyUV = uv - velocity;
 
-        vec3 currentColor = texture(SamplerCurrent, uv).rgb;
-        vec3 historyColor = texture(SamplerHistory, historyUV).rgb;
+        vec3 inputColor = texture(SamplerInputColor, uv).rgb;
+        vec3 historyColor = texture(SamplerPrevResult, historyUV).rgb;
 
         float blend = 1.0 / taaDataUBO.Samples;
 
-        vec3 color = mix(historyColor, currentColor, blend);
+        vec3 color = mix(historyColor, inputColor, blend);
         imageStore(ImgResult, imgCoord, vec4(color, 1.0));
         return;
     }
 
-    ivec2 bestVelocityPixel;
-    vec3 neighborhoodMin, neighborhoodMax;
-    vec3 currentColor;
-    GetResolveData(imgCoord, currentColor, bestVelocityPixel, neighborhoodMin, neighborhoodMax);
+    vec2 bestUv;
+    vec3 inputColor, neighborhoodMin, neighborhoodMax;
+    GetResolveData(imgCoord, inputColor, bestUv, neighborhoodMin, neighborhoodMax);
 
-    vec2 velocity = texelFetch(gBufferDataUBO.Velocity, bestVelocityPixel, 0).rg / taaDataUBO.VelScale;
+    vec2 velocity = texture(gBufferDataUBO.Velocity, bestUv).rg;
     vec2 historyUV = uv - velocity;
     if (any(greaterThanEqual(historyUV, vec2(1.0))) || any(lessThan(historyUV, vec2(0.0))))
     {
-        imageStore(ImgResult, imgCoord, vec4(currentColor, 1.0));
+        imageStore(ImgResult, imgCoord, vec4(inputColor, 1.0));
         return;
     }
 
-    vec3 historyColor = SampleTextureCatmullRom(SamplerHistory, historyUV).rgb;
+    vec3 historyColor = SampleTextureCatmullRom(SamplerPrevResult, historyUV).rgb;
     historyColor = clamp(historyColor, neighborhoodMin, neighborhoodMax);
 
     float blend = 1.0 / taaDataUBO.Samples;
@@ -76,18 +81,17 @@ void main()
     float subpixelCorrection = fract(max(abs(velocity.x) * size.x, abs(velocity.y) * size.y)) * 0.5;
     blend = mix(blend, 0.8, subpixelCorrection);
 
-    vec3 color = mix(historyColor, currentColor, blend);
+    vec3 color = mix(historyColor, inputColor, blend);
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 
-// 1. Return color of the current coords 
+// 1. Return color at the image coordinates 
 // 2. Return best velocity pixel in a 3x3 radius
 // 3. Return min/max colors in a 3x3 radius
 // Source: https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
-void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocityPixel, out vec3 neighborhoodMin, out vec3 neighborhoodMax)
+void GetResolveData(ivec2 imgCoord, out vec3 inputColor, out vec2 bestUv, out vec3 neighborhoodMin, out vec3 neighborhoodMax)
 {
-    float minDepth = 1.0;
-    bestVelocityPixel = ivec2(imgCoord);
+    float minDepth = FLOAT_MAX;
     neighborhoodMin = vec3(FLOAT_MAX);
     neighborhoodMax = vec3(FLOAT_MIN);
     for (int y = -1; y <= 1; y++)
@@ -96,20 +100,21 @@ void GetResolveData(ivec2 imgCoord, out vec3 currentColor, out ivec2 bestVelocit
         {
             ivec2 curPixel = imgCoord + ivec2(x, y);
     
-            vec3 neighbor = texelFetch(SamplerCurrent, curPixel, 0).rgb;
-            neighborhoodMin = min(neighborhoodMin, neighbor);
-            neighborhoodMax = max(neighborhoodMax, neighbor);
+            vec2 uv = (curPixel + 0.5) / imageSize(ImgResult);
+            vec3 neighborColor = texture(SamplerInputColor, uv).rgb;
+            neighborhoodMin = min(neighborhoodMin, neighborColor);
+            neighborhoodMax = max(neighborhoodMax, neighborColor);
             
             if (x == 0 && y == 0)
             {
-                currentColor = neighbor;
+                inputColor = neighborColor;
             }
     
-            float currentDepth = texelFetch(gBufferDataUBO.Depth, curPixel, 0).r;
-            if (currentDepth < minDepth)
+            float inputDepth = texture(gBufferDataUBO.Depth, uv).r;
+            if (inputDepth < minDepth)
             {
-                minDepth = currentDepth;
-                bestVelocityPixel = curPixel;
+                minDepth = inputDepth;
+                bestUv = uv;
             }
         }
     }

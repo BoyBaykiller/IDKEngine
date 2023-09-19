@@ -66,9 +66,8 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 layout(std140, binding = 4) uniform SkyBoxUBO
@@ -88,7 +87,6 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
-vec3 NDCToWorld(vec3 ndc);
 
 uniform bool IsVXGI;
 
@@ -109,9 +107,9 @@ void main()
         return;
     }
 
-    vec3 ndc = vec3(uv, depth) * 2.0 - 1.0;
-    vec3 fragPos = NDCToWorld(ndc);
-    vec3 unjitteredFragPos = NDCToWorld(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z));
+    vec3 ndc = UvDepthToNdc(vec3(uv, depth));
+    vec3 fragPos = NdcToWorldSpace(ndc, basicDataUBO.InvProjView);
+    vec3 unjitteredFragPos = NdcToWorldSpace(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), basicDataUBO.InvProjView);
 
     vec3 albedo = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).rgb;
     float alpha = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).a;
@@ -213,10 +211,4 @@ float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
     float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);
 
     return depth;
-}
-
-vec3 NDCToWorld(vec3 ndc)
-{
-    vec4 worldPos = basicDataUBO.InvProjView * vec4(ndc, 1.0);
-    return worldPos.xyz / worldPos.w;
 }

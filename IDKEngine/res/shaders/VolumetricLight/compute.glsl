@@ -66,9 +66,8 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO
@@ -84,7 +83,6 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
 bool Shadow(PointShadow pointShadow, vec3 lightSpacePos);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
 float ComputeScattering(float lightDotView);
-vec3 NDCToWorld(vec3 ndc);
 
 uniform int Samples;
 uniform float Scattering;
@@ -98,8 +96,8 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec3 ndc = vec3(uv, texture(gBufferDataUBO.Depth, uv).r) * 2.0 - 1.0;
-    vec3 viewToFrag = NDCToWorld(ndc) - basicDataUBO.ViewPos;
+    vec3 uvw = vec3(uv, texture(gBufferDataUBO.Depth, uv).r);
+    vec3 viewToFrag = UvDepthToWorldSpace(uvw, basicDataUBO.InvProjView) - basicDataUBO.ViewPos;
     float viewToFragLen = length(viewToFrag);
     vec3 viewDir = viewToFrag / viewToFragLen;
     
@@ -174,10 +172,4 @@ float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
 float ComputeScattering(float lightDotView)
 {
     return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * lightDotView, 1.5));
-}
-
-vec3 NDCToWorld(vec3 ndc)
-{
-    vec4 worldPos = basicDataUBO.InvProjView * vec4(ndc, 1.0);
-    return worldPos.xyz / worldPos.w;
 }

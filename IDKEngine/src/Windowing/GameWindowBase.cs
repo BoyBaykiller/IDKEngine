@@ -99,17 +99,17 @@ namespace IDKEngine
 
             GLFW.SwapBuffers(window);
 
-            framebufferSizeDelegate = FramebufferSizeCallback;
-            GLFW.SetFramebufferSizeCallback(window, framebufferSizeDelegate);
+            framebufferSizeFuncPtr = FramebufferSizeCallback;
+            GLFW.SetFramebufferSizeCallback(window, framebufferSizeFuncPtr);
 
-            windowFocusDelegate = WindowFocusCallback;
-            GLFW.SetWindowFocusCallback(window, windowFocusDelegate);
+            windowFocusFuncPtr = WindowFocusCallback;
+            GLFW.SetWindowFocusCallback(window, windowFocusFuncPtr);
 
-            windowPosDelegate = WindowPosCallback;
-            GLFW.SetWindowPosCallback(window, windowPosDelegate);
+            windowPosFuncPtr = WindowPosCallback;
+            GLFW.SetWindowPosCallback(window, windowPosFuncPtr);
 
-            windowCharDelegate = WindowCharCallback;
-            GLFW.SetCharCallback(window, windowCharDelegate);
+            windowCharFuncPtr = WindowCharCallback;
+            GLFW.SetCharCallback(window, windowCharFuncPtr);
 
             monitor = GLFW.GetPrimaryMonitor();
             videoMode = GLFW.GetVideoMode(monitor);
@@ -167,7 +167,7 @@ namespace IDKEngine
             }
         }
 
-        private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeDelegate;
+        private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeFuncPtr;
         private void FramebufferSizeCallback(Window* window, int width, int height)
         {
             if ((width > 0 && height > 0) && (_framebufferSize.X != width || _framebufferSize.Y != height))
@@ -182,7 +182,7 @@ namespace IDKEngine
         private bool _isFocused = true;
         public bool WindowFocused => _isFocused;
 
-        private readonly GLFWCallbacks.WindowFocusCallback windowFocusDelegate;
+        private readonly GLFWCallbacks.WindowFocusCallback windowFocusFuncPtr;
         private void WindowFocusCallback(Window* window, bool focused)
         {
             _isFocused = focused;
@@ -200,7 +200,7 @@ namespace IDKEngine
             }
         }
 
-        private readonly GLFWCallbacks.WindowPosCallback windowPosDelegate;
+        private readonly GLFWCallbacks.WindowPosCallback windowPosFuncPtr;
         private void WindowPosCallback(Window* window, int x, int y)
         {
             _position.X = x;
@@ -208,7 +208,7 @@ namespace IDKEngine
             MouseState.Update();
         }
 
-        private readonly GLFWCallbacks.CharCallback windowCharDelegate;
+        private readonly GLFWCallbacks.CharCallback windowCharFuncPtr;
         private void WindowCharCallback(Window* window, uint codepoint)
         {
             OnKeyPress((char)codepoint);

@@ -52,9 +52,8 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 layout(std140, binding = 4) uniform SkyBoxUBO
@@ -80,7 +79,9 @@ void main()
 {
     Material material = materialSSBO.Materials[inData.MaterialIndex];
     
-    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
+    float lod = textureQueryLod(material.BaseColor, inData.TexCoord).y;
+
+    vec4 albedoAlpha = textureLod(material.BaseColor, inData.TexCoord, lod - 0.0) * DecompressUR8G8B8A8(material.BaseColorFactor);
     vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = normalize(inData.TangentToWorld * normalize(normal * 2.0 - 1.0));
@@ -93,7 +94,7 @@ void main()
     NormalSpecular = vec4(normal, specular);
     EmissiveRoughness = vec4(emissive, roughness); 
 
-    vec2 uv = (inData.ClipPos.xy / inData.ClipPos.w) * 0.5 + 0.5;
-    vec2 prevUV = (inData.PrevClipPos.xy / inData.PrevClipPos.w) * 0.5 + 0.5;
-    Velocity = (uv - prevUV) * taaDataUBO.VelScale;
+    vec2 ndc = inData.ClipPos.xy / inData.ClipPos.w;
+    vec2 prevNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
+    Velocity = (ndc - prevNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out
 }
