@@ -40,9 +40,8 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 out InOutVars

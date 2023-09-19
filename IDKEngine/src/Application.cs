@@ -23,8 +23,10 @@ namespace IDKEngine
         }
 
         public const float EPSILON = 0.001f;
-        public const float NEAR_PLANE = 0.075f, FAR_PLANE = 500.0f;
+        public const float NEAR_PLANE = 0.1f, FAR_PLANE = 500.0f;
         public static readonly float CAMERA_FOV_Y = MathHelper.DegreesToRadians(102.0f);
+
+        public const float debugResScale = 1.0f;
 
         private Vector2i _renderResolution;
         public Vector2i RenderResolution
@@ -39,7 +41,7 @@ namespace IDKEngine
 
                 if (RenderMode == RenderMode.Rasterizer)
                 {
-                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(width, height);
+                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize((int)(width * debugResScale), (int)(height * debugResScale));
                 }
 
                 if (RenderMode == RenderMode.PathTracer)
@@ -51,7 +53,7 @@ namespace IDKEngine
                 {
                     if (TaaResolve != null) TaaResolve.SetSize(width, height);
                     if (Bloom != null) Bloom.SetSize(width, height);
-                    if (PostProcessor != null) PostProcessor.SetSize(width, height);
+                    if (TonemapAndGamma != null) TonemapAndGamma.SetSize(width, height);
                 }
             }
         }
@@ -101,12 +103,8 @@ namespace IDKEngine
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
-                    PostProcessor.Combine(RasterizerPipeline.Result);
-                    MeshOutlineRenderer.Render(PostProcessor.Result, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
-
-                    bool temp = TaaResolve.TaaEnabled; TaaResolve.TaaEnabled = false;
-                    TaaResolve.RunTAAResolve(PostProcessor.Result);
-                    TaaResolve.TaaEnabled = temp;
+                    TonemapAndGamma.Combine(RasterizerPipeline.Result);
+                    MeshOutlineRenderer.Render(TonemapAndGamma.Result, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
                 {
@@ -117,12 +115,16 @@ namespace IDKEngine
                         Bloom.Compute(RasterizerPipeline.Result);
                     }
 
-                    PostProcessor.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
-                    TaaResolve.RunTAAResolve(PostProcessor.Result);
+                    TaaResolve.RunTAAResolve(RasterizerPipeline.Result);
                     //TaaResolve.RunFSR2(RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CAMERA_FOV_Y);
-                }
-                RasterizerPipeline.LightingVRS.DebugRender(TaaResolve.Result);
+                    TonemapAndGamma.Combine(TaaResolve.Result, IsBloom ? Bloom.Result : null);
+                    RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
 
+                    // temp hack to fix global bindings modified by FSR2
+                    TaaResolve.taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
+                    RasterizerPipeline.Voxelizer.voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
+                    RasterizerPipeline.gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
+                }
             }
             else if (RenderMode == RenderMode.PathTracer)
             {
@@ -133,11 +135,7 @@ namespace IDKEngine
                     Bloom.Compute(PathTracer.Result);
                 }
                 
-                PostProcessor.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
-
-                bool temp = TaaResolve.TaaEnabled; TaaResolve.TaaEnabled = false;
-                TaaResolve.RunTAAResolve(PostProcessor.Result);
-                TaaResolve.TaaEnabled = temp;
+                TonemapAndGamma.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
             if (gui.SelectedEntityType != Gui.EntityType.None)
@@ -161,7 +159,7 @@ namespace IDKEngine
                     box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
 
-                MeshOutlineRenderer.Render(TaaResolve.Result, box);
+                MeshOutlineRenderer.Render(TonemapAndGamma.Result, box);
             }
 
             Framebuffer.Bind(0);
@@ -175,7 +173,7 @@ namespace IDKEngine
             }
             else
             {
-                TaaResolve.Result.BindToUnit(0);
+                TonemapAndGamma.Result.BindToUnit(0);
                 finalProgram.Use();
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
             }
@@ -219,7 +217,7 @@ namespace IDKEngine
                 WindowFullscreen = !WindowFullscreen;
             }
 
-            GLSLBasicData.Projection = Matrix4.CreatePerspectiveFieldOfView(CAMERA_FOV_Y, RenderResolution.X / (float)RenderResolution.Y, NEAR_PLANE, FAR_PLANE);
+            GLSLBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CAMERA_FOV_Y, RenderResolution.X / (float)RenderResolution.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
@@ -258,7 +256,7 @@ namespace IDKEngine
         public FrameStateRecorder<FrameState> FrameRecorder;
 
         public Bloom Bloom;
-        public TonemapAndGammaCorrecter PostProcessor;
+        public TonemapAndGammaCorrecter TonemapAndGamma;
         public TAAResolve TaaResolve;
         public LightManager LightManager;
         public BoxRenderer MeshOutlineRenderer;
@@ -290,9 +288,9 @@ namespace IDKEngine
 
             GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
-            GL.DebugMessageCallback(Helper.DebugCallback, 0);
-
+            GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, 0);
             GL.PointSize(1.3f);
+            //GL.ClipControl(ClipOrigin.LowerLeft, ClipDepthMode.ZeroToOne);
             GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
@@ -377,7 +375,7 @@ namespace IDKEngine
             LightManager = new LightManager(12, 12);
             MeshOutlineRenderer = new BoxRenderer();
             Bloom = new Bloom(RenderResolution.X, RenderResolution.Y, 1.0f, 3.0f);
-            PostProcessor = new TonemapAndGammaCorrecter(RenderResolution.X, RenderResolution.Y);
+            TonemapAndGamma = new TonemapAndGammaCorrecter(RenderResolution.X, RenderResolution.Y);
             TaaResolve = new TAAResolve(RenderResolution.X, RenderResolution.Y);
 
             LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));

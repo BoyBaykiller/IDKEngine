@@ -3,6 +3,7 @@
 #extension GL_ARB_bindless_texture : require
 
 AppInclude(include/Constants.glsl)
+AppInclude(include/Transformations.glsl)
 AppInclude(include/Random.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -32,9 +33,8 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Enabled;
-    uint Frame;
-    float VelScale;
+    int Frame;
+    bool IsEnabled;
 } taaDataUBO;
 
 layout(std140, binding = 4) uniform SkyBoxUBO
@@ -62,7 +62,6 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 
 vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance, float roughness);
 float GetMaterialVariance(float specularChance, float roughness);
-vec3 NDCToWorld(vec3 ndc);
 
 uniform float NormalRayOffset;
 uniform int MaxSamples;
@@ -85,7 +84,7 @@ void main()
         return;
     }
 
-    vec3 fragPos = NDCToWorld(vec3(uv, depth) * 2.0 - 1.0);
+    vec3 fragPos = UvDepthToWorldSpace(vec3(uv, depth), basicDataUBO.InvProjView);
     vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
     float specular = texture(gBufferDataUBO.NormalSpecular, uv).a;
     float roughness = texture(gBufferDataUBO.EmissiveRoughness, uv).a;
@@ -145,8 +144,3 @@ float GetMaterialVariance(float specularChance, float roughness)
     return mix(perceivedFinalRoughness, 1.0, diffuseChance);
 }
 
-vec3 NDCToWorld(vec3 ndc)
-{
-    vec4 viewPos = basicDataUBO.InvProjView * vec4(ndc, 1.0);
-    return viewPos.xyz / viewPos.w;
-}

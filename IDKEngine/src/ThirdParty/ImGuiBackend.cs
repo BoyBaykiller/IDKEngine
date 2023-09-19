@@ -226,7 +226,7 @@ namespace IDKEngine.GUI
 
             for (int i = 0; i < drawData.CmdListsCount; i++)
             {
-                ImDrawListPtr cmdList = drawData.CmdListsRange[i];
+                ImDrawListPtr cmdList = drawData.CmdLists[i];
                 int vertexSize = cmdList.VtxBuffer.Size * sizeof(ImDrawVert);
                 if (vertexSize > vbo.Size)
                 {
@@ -254,7 +254,7 @@ namespace IDKEngine.GUI
             GL.Enable(EnableCap.ScissorTest);
             for (int i = 0; i < drawData.CmdListsCount; i++)
             {
-                ImDrawListPtr cmd_list = drawData.CmdListsRange[i];
+                ImDrawListPtr cmd_list = drawData.CmdLists[i];
 
                 vbo.SubData(0, cmd_list.VtxBuffer.Size * sizeof(ImDrawVert), cmd_list.VtxBuffer.Data);
                 ebo.SubData(0, cmd_list.IdxBuffer.Size * sizeof(ushort), cmd_list.IdxBuffer.Data);

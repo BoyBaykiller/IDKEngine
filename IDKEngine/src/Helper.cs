@@ -61,8 +61,8 @@ namespace IDKEngine
             return (APIVersion >= first) || IsExtensionsAvailable(extension);
         }
 
-        public static DebugProc DebugCallback = Debug;
-        private static void Debug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
+        public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;
+        private static void GLDebugCallback(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
         {
             string text = Marshal.PtrToStringAnsi(message, length);
             switch (severity)

@@ -232,7 +232,9 @@ void main()
     ivec2 imgResultSize = imageSize(ImgResult);
     ivec2 imgCoord = ReorderInvocations(20);
     if (any(greaterThanEqual(imgCoord, imgResultSize)))
+    {
         return;
+    }
 
     InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (rayIndicesSSBO.AccumulatedSamples + 1));
 

@@ -147,10 +147,10 @@ namespace IDKEngine.Render
                     ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
                 }
 
-                float tempFloat = app.PostProcessor.Gamma;
+                float tempFloat = app.TonemapAndGamma.Gamma;
                 if (ImGui.SliderFloat("Gamma", ref tempFloat, 0.1f, 3.0f))
                 {
-                    app.PostProcessor.Gamma = tempFloat;
+                    app.TonemapAndGamma.Gamma = tempFloat;
                 }
 
                 string current = app.RenderMode.ToString();
@@ -407,13 +407,13 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("TAA"))
                     {
-                        tempBool = app.TaaResolve.TaaEnabled;
+                        tempBool = app.TaaResolve.TaaIsEnabled;
                         if (ImGui.Checkbox("IsTAA", ref tempBool))
                         {
-                            app.TaaResolve.TaaEnabled = tempBool;
+                            app.TaaResolve.TaaIsEnabled = tempBool;
                         }
 
-                        if (app.TaaResolve.TaaEnabled)
+                        if (app.TaaResolve.TaaIsEnabled)
                         {
                             tempBool = app.TaaResolve.IsTaaArtifactMitigation;
                             if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
@@ -810,7 +810,7 @@ namespace IDKEngine.Render
                 System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
-                ImGui.Image(app.TaaResolve.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
+                ImGui.Image(app.TonemapAndGamma.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
 
                 ImGui.End();
                 ImGui.PopStyleVar();
@@ -858,7 +858,7 @@ namespace IDKEngine.Render
                 const string RECORDED_FRAME_DATA_OUT_DIR = "RecordedFrames";
                 Directory.CreateDirectory(RECORDED_FRAME_DATA_OUT_DIR);
 
-                Helper.TextureToDisk(app.PostProcessor.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
+                Helper.TextureToDisk(app.TonemapAndGamma.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
 
             if (frameRecState == FrameRecorderState.Replaying)
@@ -937,9 +937,9 @@ namespace IDKEngine.Render
                 {
                     point -= (Vector2i)viewportHeaderSize.ToOpenTK();
                 }
-                point.Y = app.PostProcessor.Result.Height - point.Y;
+                point.Y = app.TonemapAndGamma.Result.Height - point.Y;
 
-                Vector2 ndc = new Vector2((float)point.X / app.PostProcessor.Result.Width, (float)point.Y / app.PostProcessor.Result.Height) * 2.0f - new Vector2(1.0f);
+                Vector2 ndc = new Vector2((float)point.X / app.TonemapAndGamma.Result.Width, (float)point.Y / app.TonemapAndGamma.Result.Height) * 2.0f - new Vector2(1.0f);
                 if (ndc.X > 1.0f || ndc.Y > 1.0f || ndc.X < -1.0f || ndc.Y < -1.0f)
                 {
                     return;

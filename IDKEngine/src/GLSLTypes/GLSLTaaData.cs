@@ -8,8 +8,7 @@ namespace IDKEngine
 
         public Vector2 Jitter;
         public int Samples;
-        public int IsEnabled;
-        public uint Frame;
-        public float VelScale;
+        public int Frame;
+        public bool IsEnabled;
     }
 }

@@ -46,7 +46,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram skyBoxProgram;
         private readonly ShaderProgram mergeLightingProgram;
 
-        private readonly BufferObject gBufferData;
+        public readonly BufferObject gBufferData;
         private readonly Framebuffer gBufferFBO;
         private readonly Framebuffer deferredLightingFBO;
 

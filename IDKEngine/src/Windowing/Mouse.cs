@@ -54,8 +54,8 @@ namespace IDKEngine
             this.window = window;
             buttonStates = new InputState[8];
 
-            windowScrollDelegate = WindowScrollCallback;
-            GLFW.SetScrollCallback(window, windowScrollDelegate);
+            windowScrollFuncPtr = WindowScrollCallback;
+            GLFW.SetScrollCallback(window, windowScrollFuncPtr);
             
             GLFW.GetCursorPos(window, out double x, out double y);
             Position = new Vector2((float)x, (float)y);
@@ -91,7 +91,7 @@ namespace IDKEngine
             }
         }
 
-        private readonly GLFWCallbacks.ScrollCallback windowScrollDelegate;
+        private readonly GLFWCallbacks.ScrollCallback windowScrollFuncPtr;
         private void WindowScrollCallback(Window* window, double x, double y)
         {
             ScrollX += x;
