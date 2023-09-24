@@ -4,7 +4,7 @@ Feature list:
  - Wavefront Path Tracer
  - Real-Time Voxel Global Illumination
  - Multi Draw Indirect & Bindless Textures + other extensions
- - Temporal Anti Aliasing
+ - [AMD FSR2](https://github.com/GPUOpen-Effects/FidelityFX-FSR2) and Temporal Anti Aliasing
  - CoD-Modern-Warfare Bloom
  - Variable Rate Shading
  - Ray marched Volumetric Lighting

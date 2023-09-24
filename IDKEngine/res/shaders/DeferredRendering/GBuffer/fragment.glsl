@@ -37,7 +37,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 InvView;
     mat4 PrevView;
     vec3 ViewPos;
-    float _pad0;
+    uint Frame;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -52,8 +52,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Frame;
-    bool IsEnabled;
+    float MipmapBias;
 } taaDataUBO;
 
 layout(std140, binding = 4) uniform SkyBoxUBO
@@ -81,7 +80,7 @@ void main()
     
     float lod = textureQueryLod(material.BaseColor, inData.TexCoord).y;
 
-    vec4 albedoAlpha = textureLod(material.BaseColor, inData.TexCoord, lod - 0.0) * DecompressUR8G8B8A8(material.BaseColorFactor);
+    vec4 albedoAlpha = textureLod(material.BaseColor, inData.TexCoord, lod + taaDataUBO.MipmapBias) * DecompressUR8G8B8A8(material.BaseColorFactor);
     vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = normalize(inData.TangentToWorld * normalize(normal * 2.0 - 1.0));

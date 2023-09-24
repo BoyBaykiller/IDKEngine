@@ -192,7 +192,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 InvView;
     mat4 PrevView;
     vec3 ViewPos;
-    float _pad0;
+    uint Frame;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;

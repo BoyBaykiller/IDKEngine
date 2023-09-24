@@ -18,7 +18,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 InvView;
     mat4 PrevView;
     vec3 ViewPos;
-    float _pad0;
+    uint Frame;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -33,8 +33,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Frame;
-    bool IsEnabled;
+    float MipmapBias;
 } taaDataUBO;
 
 layout(std140, binding = 4) uniform SkyBoxUBO
@@ -101,7 +100,7 @@ vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance
     float materialVariance = GetMaterialVariance(specularChance, roughness);
     uint samples = uint(mix(1.0, float(MaxSamples), materialVariance));
 
-    uint noiseIndex = IsTemporalAccumulation ? (taaDataUBO.Frame % taaDataUBO.Samples) * MaxSamples : 0u;
+    uint noiseIndex = IsTemporalAccumulation ? (basicDataUBO.Frame % taaDataUBO.Samples) * MaxSamples : 0u;
     for (uint i = 0; i < samples; i++)
     {
         float rnd0 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 0);

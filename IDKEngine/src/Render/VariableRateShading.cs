@@ -46,10 +46,8 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            width /= 16;
-            height /= 16;
-            width = Math.Max(width, 1);
-            height = Math.Max(height, 1);
+            width = (int)MathF.Ceiling((float)width / TILE_SIZE);
+            height = (int)MathF.Ceiling((float)height / TILE_SIZE);
 
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);

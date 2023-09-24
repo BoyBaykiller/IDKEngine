@@ -13,8 +13,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Frame;
-    bool IsEnabled;
+    float MipmapBias;
 } taaDataUBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO
@@ -35,13 +34,6 @@ void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
-
-    if (!taaDataUBO.IsEnabled)
-    {
-        vec4 color = texture(SamplerInputColor, uv);
-        imageStore(ImgResult, imgCoord, color);
-        return;
-    }
 
     if (!IsTaaArtifactMitigation)
     {

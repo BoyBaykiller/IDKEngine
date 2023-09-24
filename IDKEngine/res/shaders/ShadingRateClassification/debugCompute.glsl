@@ -16,7 +16,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 InvView;
     mat4 PrevView;
     vec3 ViewPos;
-    float _pad0;
+    uint Frame;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -32,13 +32,16 @@ uniform int DebugMode;
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
+    ivec2 imgSize = imageSize(ImgResult);
+
+    vec2 uv = (imgCoord + 0.5) / imgSize;
+    vec2 scaledUv = ivec2(uv * imgSize) / vec2(imgSize); 
 
     vec3 debugColor = vec3(0.0);
     if (DebugMode == DEBUG_MODE_SHADING_RATES)
     {
-        uint shadingRate = texelFetch(SamplerDebugShadingRate, ivec2(gl_WorkGroupID.xy), 0).r;
-        vec3 srcColor = texture(SamplerSrc, uv).rgb;
+        uint shadingRate = texture(SamplerDebugShadingRate, scaledUv).r;
+        vec3 srcColor = texelFetch(SamplerSrc, imgCoord, 0).rgb;
         if (shadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
         {
             debugColor += vec3(4, 0, 0);
@@ -67,21 +70,22 @@ void main()
     }
     else if (DebugMode == DEBUG_MODE_LUMINANCE)
     {
-        float meanLuminance = texelFetch(SamplerDebugOtherData, ivec2(gl_WorkGroupID.xy), 0).r;
+        float meanLuminance = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(meanLuminance);
     }
     else if (DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
     {
-        float coeffOfVariation = texelFetch(SamplerDebugOtherData, ivec2(gl_WorkGroupID.xy), 0).r;
+        float coeffOfVariation = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(coeffOfVariation) * 0.2;
     }
     else if (DebugMode == DEBUG_MODE_SPEED)
     {
-        float meanSpeed = texelFetch(SamplerDebugOtherData, ivec2(gl_WorkGroupID.xy), 0).r;
+        float meanSpeed = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(meanSpeed);
     }
 
-    if (gl_LocalInvocationID.x == 0 || gl_LocalInvocationID.y == 0)
+    ivec2 tileLocalCoodinate = ivec2(uv * textureSize(SamplerDebugShadingRate, 0) * TILE_SIZE) % ivec2(TILE_SIZE);
+    if (tileLocalCoodinate.x == 0 || tileLocalCoodinate.y == 0)
     {
         debugColor = vec3(0.0);
     }

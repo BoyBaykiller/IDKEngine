@@ -9,7 +9,7 @@ namespace IDKEngine
         public Matrix4 InvView;
         public Matrix4 PrevView;
         public Vector3 CameraPos;
-        private readonly float _pad0;
+        public uint Frame;
         public Matrix4 Projection;
         public Matrix4 InvProjection;
         public Matrix4 InvProjView;

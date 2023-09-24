@@ -5,8 +5,6 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
-using OpenTK.Graphics.OpenGL4;
-using System.Threading.Tasks;
 
 namespace IDKEngine.Render
 {
@@ -138,7 +136,7 @@ namespace IDKEngine.Render
             ImGui.Begin("Renderer");
             {
                 ImGui.Text($"FPS: {app.FPS}");
-                ImGui.Text($"Viewport size: {app.RenderResolution.X}x{app.RenderResolution.Y}");
+                ImGui.Text($"Viewport size: {app.RenderPresentationResolution.X}x{app.RenderPresentationResolution.Y}");
                 ImGui.Text($"{Helper.API}");
                 ImGui.Text($"{Helper.GPU}");
 
@@ -151,6 +149,12 @@ namespace IDKEngine.Render
                 if (ImGui.SliderFloat("Gamma", ref tempFloat, 0.1f, 3.0f))
                 {
                     app.TonemapAndGamma.Gamma = tempFloat;
+                }
+
+                tempFloat = app.ResolutionScale;
+                if (ImGui.SliderFloat("ResolutionScale", ref tempFloat, 0.1f, 1.0f))
+                {
+                    app.ResolutionScale = Math.Max(tempFloat, 0.1f);
                 }
 
                 string current = app.RenderMode.ToString();
@@ -284,7 +288,7 @@ namespace IDKEngine.Render
                                     app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
                                 }
                                 ToolTipForItemAboveHovered(
-                                    $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting).\n" +
+                                    $"When active samples are accumulated over {app.TaaResolve} frames (based on TAA setting).\n" +
                                     "If TAA is disabled this has no effect."
                                 );
                             }
@@ -399,21 +403,37 @@ namespace IDKEngine.Render
                                 app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation = tempBool;
                             }
                             ToolTipForItemAboveHovered(
-                                $"When active samples are accumulated over {app.TaaResolve.TaaSamples} frames (based on TAA setting).\n" +
+                                $"When active samples are accumulated over {app.TAASamples} frames (based on TAA setting).\n" +
                                 "If TAA is disabled this has no effect."
                             );
                         }
                     }
 
-                    if (ImGui.CollapsingHeader("TAA"))
+                    if (ImGui.CollapsingHeader("Anti Aliasing"))
                     {
-                        tempBool = app.TaaResolve.TaaIsEnabled;
-                        if (ImGui.Checkbox("IsTAA", ref tempBool))
+                        current = app.TemporalAntiAliasingTechnique.ToString();
+                        if (ImGui.BeginCombo("Mode", current))
                         {
-                            app.TaaResolve.TaaIsEnabled = tempBool;
+                            TemporalAntiAliasingTechnique[] options = (TemporalAntiAliasingTechnique[])Enum.GetValues(typeof(TemporalAntiAliasingTechnique));
+                            for (int i = 0; i < options.Length; i++)
+                            {
+                                string enumName = options[i].ToString();
+                                bool isSelected = current == enumName;
+                                if (ImGui.Selectable(enumName, isSelected))
+                                {
+                                    current = enumName;
+                                    app.TemporalAntiAliasingTechnique = (TemporalAntiAliasingTechnique)i;
+                                }
+
+                                if (isSelected)
+                                {
+                                    ImGui.SetItemDefaultFocus();
+                                }
+                            }
+                            ImGui.EndCombo();
                         }
 
-                        if (app.TaaResolve.TaaIsEnabled)
+                        if (app.TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
                         {
                             tempBool = app.TaaResolve.IsTaaArtifactMitigation;
                             if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
@@ -425,10 +445,22 @@ namespace IDKEngine.Render
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
                             );
 
-                            tempInt = app.TaaResolve.TaaSamples;
-                            if (ImGui.SliderInt("Samples##1", ref tempInt, 1, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT))
+                            ImGui.SliderInt("Samples##1", ref app.TAASamples, 1, 36);
+                        }
+                        else if (app.TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
+                        {
+                            ImGui.Text(
+                                "FSR2 (by AMD) does Anti Aliasing but\n" + 
+                                "simultaneously also upscaling.\n" +
+                                "Try reducing resolution scale!"
+                            );
+
+                            ImGui.Checkbox("IsSharpening", ref app.FSR2Wrapper.IsSharpening);
+
+
+                            if (app.FSR2Wrapper.IsSharpening)
                             {
-                                app.TaaResolve.TaaSamples = Math.Min(tempInt, GLSLTaaData.GLSL_MAX_TAA_UBO_VEC2_JITTER_COUNT);
+                                ImGui.SliderFloat("Sharpness", ref app.FSR2Wrapper.Sharpness, 0.0f, 1.0f);
                             }
                         }
                     }
@@ -802,9 +834,9 @@ namespace IDKEngine.Render
             ImGui.Begin($"Viewport");
             {
                 System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
-                if (content.X != app.RenderResolution.X || content.Y != app.RenderResolution.Y)
+                if (content.X != app.RenderPresentationResolution.X || content.Y != app.RenderPresentationResolution.Y)
                 {
-                    app.RenderResolution = new Vector2i((int)content.X, (int)content.Y);
+                    app.RenderPresentationResolution = new Vector2i((int)content.X, (int)content.Y);
                 }
 
                 System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();

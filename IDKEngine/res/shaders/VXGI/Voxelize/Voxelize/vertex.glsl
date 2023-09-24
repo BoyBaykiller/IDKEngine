@@ -48,7 +48,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 InvView;
     mat4 PrevView;
     vec3 ViewPos;
-    float _pad0;
+    uint Frame;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -100,9 +100,13 @@ void main()
     gl_Position = voxelizerDataUBO.OrthoProjection * vec4(outData.FragPos, 1.0);
     
 #if !TAKE_FAST_GEOMETRY_SHADER_PATH
+    gl_Position.z = gl_Position.z * 2.0 - 1.0;
+
     // Instead of doing a single draw call with a standard geometry shader to select the swizzle
     // we render the scene 3 times, each time with a different swizzle. I have observed this to be slightly faster
     if (SwizzleAxis == 0) gl_Position = gl_Position.zyxw;
-    else if (SwizzleAxis == 1) gl_Position = gl_Position.xzyw;
+    if (SwizzleAxis == 1) gl_Position = gl_Position.xzyw;
+    
+    gl_Position.z = gl_Position.z * 0.5 + 0.5;
 #endif
 }
