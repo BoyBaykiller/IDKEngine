@@ -15,6 +15,13 @@ namespace IDKEngine
         PathTracer
     }
 
+    public enum TemporalAntiAliasingTechnique : int
+    {
+        None,
+        TAA,
+        FSR2,
+    }
+
     class Application : GameWindowBase
     {
         public Application(int width, int height, string title)
@@ -26,35 +33,28 @@ namespace IDKEngine
         public const float NEAR_PLANE = 0.1f, FAR_PLANE = 500.0f;
         public static readonly float CAMERA_FOV_Y = MathHelper.DegreesToRadians(102.0f);
 
-        public const float debugResScale = 1.0f;
-
-        private Vector2i _renderResolution;
-        public Vector2i RenderResolution
+        private float _resolutionScale = 1.0f;
+        public float ResolutionScale
         {
-            get => _renderResolution;
+            get => _resolutionScale;
+
+            set
+            { 
+                _resolutionScale = value;
+                RenderPresentationResolution = RenderPresentationResolution;
+            }
+        }
+
+        private Vector2i _renderPresentationResolution;
+        public Vector2i RenderPresentationResolution
+        {
+            get => _renderPresentationResolution;
 
             set
             {
-                _renderResolution = value;
-                int width = _renderResolution.X;
-                int height = _renderResolution.Y;
+                _renderPresentationResolution = value;
 
-                if (RenderMode == RenderMode.Rasterizer)
-                {
-                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize((int)(width * debugResScale), (int)(height * debugResScale));
-                }
-
-                if (RenderMode == RenderMode.PathTracer)
-                {
-                    if (PathTracer != null) PathTracer.SetSize(width, height);
-                }
-
-                if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
-                {
-                    if (TaaResolve != null) TaaResolve.SetSize(width, height);
-                    if (Bloom != null) Bloom.SetSize(width, height);
-                    if (TonemapAndGamma != null) TonemapAndGamma.SetSize(width, height);
-                }
+                shouldResizeRessources = true;
             }
         }
 
@@ -81,17 +81,27 @@ namespace IDKEngine
             }
         }
 
+        public Vector2i RenderResolution => new Vector2i((int)(RenderPresentationResolution.X * ResolutionScale), (int)(RenderPresentationResolution.Y * ResolutionScale));
         public bool RenderGui { get; private set; }
         public int FPS { get; private set; }
 
         public bool IsBloom = true;
         public bool IsShadows = true;
-        
+
+        public TemporalAntiAliasingTechnique TemporalAntiAliasingTechnique = TemporalAntiAliasingTechnique.TAA;
+        public int TAASamples = 6;
+
+        private bool shouldResizeRessources = false;
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-
         protected override unsafe void OnRender(float dT)
         {
+            if (shouldResizeRessources)
+            {
+                SetSize();
+                shouldResizeRessources = false;
+            }
+
             Update(dT);
             if (RenderMode == RenderMode.Rasterizer)
             {
@@ -115,15 +125,27 @@ namespace IDKEngine
                         Bloom.Compute(RasterizerPipeline.Result);
                     }
 
-                    TaaResolve.RunTAAResolve(RasterizerPipeline.Result);
-                    //TaaResolve.RunFSR2(RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CAMERA_FOV_Y);
-                    TonemapAndGamma.Combine(TaaResolve.Result, IsBloom ? Bloom.Result : null);
-                    RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
+                    if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                    {
+                        TaaResolve.RunTAA(RasterizerPipeline.Result);
+                        TonemapAndGamma.Combine(TaaResolve.Result, IsBloom ? Bloom.Result : null);
+                    }
+                    else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
+                    {
+                        FSR2Wrapper.RunFSR2(glslTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CAMERA_FOV_Y);
+                        TonemapAndGamma.Combine(FSR2Wrapper.Result, IsBloom ? Bloom.Result : null);
 
-                    // temp hack to fix global bindings modified by FSR2
-                    TaaResolve.taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
-                    RasterizerPipeline.Voxelizer.voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
-                    RasterizerPipeline.gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
+                        // TODO: This is a hack to fix global UBO bindings modified by FSR2
+                        taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
+                        SkyBoxManager.skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
+                        RasterizerPipeline.Voxelizer.voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
+                        RasterizerPipeline.gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
+                    }
+                    else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
+                    {
+                        TonemapAndGamma.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
+                    }
+                    RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
                 }
             }
             else if (RenderMode == RenderMode.PathTracer)
@@ -209,7 +231,7 @@ namespace IDKEngine
                 RenderGui = !RenderGui;
                 if (!RenderGui)
                 {
-                    RenderResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                    RenderPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
                 }
             }
             if (KeyboardState[Keys.F11] == InputState.Touched)
@@ -217,7 +239,31 @@ namespace IDKEngine
                 WindowFullscreen = !WindowFullscreen;
             }
 
-            GLSLBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CAMERA_FOV_Y, RenderResolution.X / (float)RenderResolution.Y, NEAR_PLANE, FAR_PLANE);
+            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
+            {
+                const float manualBias = 0.25f;
+                glslTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
+                glslTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
+            }
+            else
+            {
+                glslTaaData.MipmapBias = 0.0f;
+            }
+
+            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+            {
+                glslTaaData.Samples = TAASamples;
+            }
+
+            if (TemporalAntiAliasingTechnique != TemporalAntiAliasingTechnique.None)
+            {
+                Vector2 jitter = MyMath.GetHalton2D((int)GLSLBasicData.Frame % glslTaaData.Samples, 2, 3);
+                glslTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
+
+                taaDataBuffer.SubData(0, sizeof(GLSLTaaData), glslTaaData);
+            }
+
+            GLSLBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CAMERA_FOV_Y, RenderPresentationResolution.X / (float)RenderPresentationResolution.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
             GLSLBasicData.NearPlane = NEAR_PLANE;
             GLSLBasicData.FarPlane = FAR_PLANE;
@@ -230,7 +276,8 @@ namespace IDKEngine
             GLSLBasicData.InvProjView = GLSLBasicData.ProjView.Inverted();
             GLSLBasicData.CameraPos = Camera.Position;
             GLSLBasicData.Time = WindowTime;
-            basicDataUBO.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
+            GLSLBasicData.Frame++;
+            basicDataBuffer.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
 
             ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
             bool anyMeshInstanceMoved = false;
@@ -249,25 +296,29 @@ namespace IDKEngine
             }
         }
 
+        private Gui gui;
+        private ShaderProgram finalProgram;
+
         public Camera Camera;
         public ModelSystem ModelSystem;
         public BVH BVH;
-        public GLSLBasicData GLSLBasicData;
         public FrameStateRecorder<FrameState> FrameRecorder;
 
         public Bloom Bloom;
         public TonemapAndGammaCorrecter TonemapAndGamma;
         public TAAResolve TaaResolve;
+        public FSR2Wrapper FSR2Wrapper;
         public LightManager LightManager;
         public BoxRenderer MeshOutlineRenderer;
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
 
-        private Gui gui;
-        private BufferObject basicDataUBO;
-        private ShaderProgram finalProgram;
+        private BufferObject basicDataBuffer;
+        public GLSLBasicData GLSLBasicData;
 
+        private BufferObject taaDataBuffer;
+        private GLSLTaaData glslTaaData;
         protected override unsafe void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
@@ -290,7 +341,7 @@ namespace IDKEngine
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, 0);
             GL.PointSize(1.3f);
-            //GL.ClipControl(ClipOrigin.LowerLeft, ClipDepthMode.ZeroToOne);
+            GL.ClipControl(ClipOrigin.LowerLeft, ClipDepthMode.ZeroToOne);
             GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
@@ -298,11 +349,17 @@ namespace IDKEngine
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
 
-            RenderResolution = WindowFramebufferSize;
+            RenderPresentationResolution = WindowFramebufferSize;
 
-            basicDataUBO = new BufferObject();
-            basicDataUBO.ImmutableAllocate(sizeof(GLSLBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            basicDataUBO.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
+            basicDataBuffer = new BufferObject();
+            basicDataBuffer.ImmutableAllocate(sizeof(GLSLBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
+
+            glslTaaData.Samples = 6;
+            glslTaaData.Jitter = new Vector2(0.0f);
+            taaDataBuffer = new BufferObject();
+            taaDataBuffer.ImmutableAllocate(sizeof(GLSLTaaData), glslTaaData, BufferStorageFlags.DynamicStorageBit);
+            taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             finalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
@@ -374,9 +431,10 @@ namespace IDKEngine
             BVH = new BVH(ModelSystem);
             LightManager = new LightManager(12, 12);
             MeshOutlineRenderer = new BoxRenderer();
-            Bloom = new Bloom(RenderResolution.X, RenderResolution.Y, 1.0f, 3.0f);
-            TonemapAndGamma = new TonemapAndGammaCorrecter(RenderResolution.X, RenderResolution.Y);
-            TaaResolve = new TAAResolve(RenderResolution.X, RenderResolution.Y);
+            Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
+            TonemapAndGamma = new TonemapAndGammaCorrecter(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+            TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+            FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
 
             LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
@@ -413,7 +471,30 @@ namespace IDKEngine
             // if we don't render to the screen via gui always make viewport match window size
             if (!RenderGui)
             {
-                RenderResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                RenderPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+            }
+        }
+
+        // TODO: Temporary. This is not in RenderPresentationResolution because it causes bugs for now. Have to look into it
+        private void SetSize()
+        {
+            if (RenderMode == RenderMode.Rasterizer)
+            {
+                if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y);
+
+                if (TaaResolve != null) TaaResolve.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                if (FSR2Wrapper != null) FSR2Wrapper.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+            }
+
+            if (RenderMode == RenderMode.PathTracer)
+            {
+                if (PathTracer != null) PathTracer.SetSize(RenderResolution.X, RenderResolution.Y);
+            }
+
+            if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
+            {
+                if (Bloom != null) Bloom.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                if (TonemapAndGamma != null) TonemapAndGamma.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
             }
         }
 

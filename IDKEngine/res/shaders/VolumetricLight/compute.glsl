@@ -39,7 +39,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 InvView;
     mat4 PrevView;
     vec3 ViewPos;
-    float _pad0;
+    uint Frame;
     mat4 Projection;
     mat4 InvProjection;
     mat4 InvProjView;
@@ -66,8 +66,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Frame;
-    bool IsEnabled;
+    float MipmapBias;
 } taaDataUBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO
@@ -105,7 +104,7 @@ void main()
         viewToFrag = viewDir * MaxDist;
 
     vec3 deltaStep = viewToFrag / Samples;
-    float offset = InterleavedGradientNoise(imgCoord, IsTemporalAccumulation ? (taaDataUBO.Frame % taaDataUBO.Samples) : 0u);
+    float offset = InterleavedGradientNoise(imgCoord, IsTemporalAccumulation ? (basicDataUBO.Frame % taaDataUBO.Samples) : 0u);
     vec3 origin = basicDataUBO.ViewPos + deltaStep * offset;
 
     vec3 scattered = vec3(0.0);

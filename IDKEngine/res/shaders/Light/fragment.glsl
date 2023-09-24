@@ -10,8 +10,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
     int Samples;
-    int Frame;
-    bool IsEnabled;
+    float MipmapBias;
 } taaDataUBO;
 
 in InOutVars

@@ -293,8 +293,8 @@ namespace IDKEngine
             Matrix4 result = Matrix4.CreatePerspectiveFieldOfView(fovY, aspect, depthNear, depthFar);
 
             // [0, 1] depth
-            //result[2, 2] = depthFar / (depthNear - depthFar);
-            //result[3, 2] = -(depthFar * depthNear) / (depthFar - depthNear);
+            result[2, 2] = depthFar / (depthNear - depthFar);
+            result[3, 2] = -(depthFar * depthNear) / (depthFar - depthNear);
             return result;
         }
 
@@ -303,8 +303,8 @@ namespace IDKEngine
             Matrix4 result = Matrix4.CreateOrthographicOffCenter(left, right, bottom, top, depthNear, depthFar);
 
             // [0, 1] depth
-            //result[2, 2] = -1.0f / (depthFar - depthNear);
-            //result[3, 2] = -depthNear / (depthFar - depthNear);
+            result[2, 2] = -1.0f / (depthFar - depthNear);
+            result[3, 2] = -depthNear / (depthFar - depthNear);
             return result;
         }
     }
