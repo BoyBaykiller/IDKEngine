@@ -67,9 +67,12 @@ namespace IDKEngine
 
         public static Box Transformed(Box box, Matrix4 model)
         {
-            box.Min = Vector3.TransformPosition(box.Min, model);
-            box.Max = Vector3.TransformPosition(box.Max, model);
-            return box;
+            Box newBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            for (int i = 0; i < 8; i++)
+            {
+                newBox.GrowToFit((new Vector4(box[i], 1.0f) * model).Xyz);
+            }
+            return newBox;
         }
     }
 }

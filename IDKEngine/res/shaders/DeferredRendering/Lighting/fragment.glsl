@@ -189,10 +189,10 @@ const vec3 ShadowSampleOffsets[] =
 
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos)
 {
-    float bias = 0.02;
+    float bias = 0.018;
 
     float visibilityFactor = 0.0;
-    const float sampleDiskRadius = 0.08;
+    const float sampleDiskRadius = 0.04;
     for (int i = 0; i < ShadowSampleOffsets.length(); i++)
     {
         vec3 samplePos = (lightSpacePos + ShadowSampleOffsets[i] * sampleDiskRadius);

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -27,7 +26,7 @@ namespace IDKEngine.Render
         private Texture taaPong;
         private readonly ShaderProgram taaResolveProgram;
         private int frame;
-        public unsafe TAAResolve(int width, int height)
+        public TAAResolve(int width, int height)
         {
             taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TAAResolve/compute.glsl")));
 
@@ -35,8 +34,10 @@ namespace IDKEngine.Render
             IsTaaArtifactMitigation = true;
         }
 
-        public unsafe void RunTAA(Texture color)
+        public void RunTAA(Texture color)
         {
+            frame++;
+
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             PrevResult.BindToUnit(0);
             color.BindToUnit(1);
@@ -44,8 +45,6 @@ namespace IDKEngine.Render
             taaResolveProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-
-            frame++;
         }
 
         public void SetSize(int width, int height)

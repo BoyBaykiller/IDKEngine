@@ -53,8 +53,25 @@ namespace IDKEngine
             set
             {
                 _renderPresentationResolution = value;
+                
+                if (RenderMode == RenderMode.Rasterizer)
+                {
+                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y);
 
-                shouldResizeRessources = true;
+                    if (TaaResolve != null) TaaResolve.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                    if (FSR2Wrapper != null) FSR2Wrapper.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+                }
+
+                if (RenderMode == RenderMode.PathTracer)
+                {
+                    if (PathTracer != null) PathTracer.SetSize(RenderResolution.X, RenderResolution.Y);
+                }
+
+                if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
+                {
+                    if (Bloom != null) Bloom.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                    if (TonemapAndGamma != null) TonemapAndGamma.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                }
             }
         }
 
@@ -91,17 +108,10 @@ namespace IDKEngine
         public TemporalAntiAliasingTechnique TemporalAntiAliasingTechnique = TemporalAntiAliasingTechnique.TAA;
         public int TAASamples = 6;
 
-        private bool shouldResizeRessources = false;
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
         protected override unsafe void OnRender(float dT)
         {
-            if (shouldResizeRessources)
-            {
-                SetSize();
-                shouldResizeRessources = false;
-            }
-
             Update(dT);
             if (RenderMode == RenderMode.Rasterizer)
             {
@@ -120,19 +130,30 @@ namespace IDKEngine
                 {
                     RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView, LightManager);
 
-                    if (IsBloom)
+                    if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
                     {
-                        Bloom.Compute(RasterizerPipeline.Result);
+                        if (IsBloom)
+                        {
+                            Bloom.Compute(RasterizerPipeline.Result);
+                        }
+                        TonemapAndGamma.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
                     }
-
-                    if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                    else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
                     {
                         TaaResolve.RunTAA(RasterizerPipeline.Result);
+                        if (IsBloom)
+                        {
+                            Bloom.Compute(TaaResolve.Result);
+                        }
                         TonemapAndGamma.Combine(TaaResolve.Result, IsBloom ? Bloom.Result : null);
                     }
                     else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
                     {
                         FSR2Wrapper.RunFSR2(glslTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CAMERA_FOV_Y);
+                        if (IsBloom)
+                        {
+                            Bloom.Compute(FSR2Wrapper.Result);
+                        }
                         TonemapAndGamma.Combine(FSR2Wrapper.Result, IsBloom ? Bloom.Result : null);
 
                         // TODO: This is a hack to fix global UBO bindings modified by FSR2
@@ -141,11 +162,8 @@ namespace IDKEngine
                         RasterizerPipeline.Voxelizer.voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
                         RasterizerPipeline.gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
                     }
-                    else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
-                    {
-                        TonemapAndGamma.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
-                    }
                     RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
+
                 }
             }
             else if (RenderMode == RenderMode.PathTracer)
@@ -239,29 +257,26 @@ namespace IDKEngine
                 WindowFullscreen = !WindowFullscreen;
             }
 
+            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None || TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+            {
+                glslTaaData.MipmapBias = 0.0f;
+            }
+            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+            {
+                glslTaaData.Samples = TAASamples;
+            }
             if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
             {
                 const float manualBias = 0.25f;
                 glslTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
                 glslTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
             }
-            else
-            {
-                glslTaaData.MipmapBias = 0.0f;
-            }
-
-            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
-            {
-                glslTaaData.Samples = TAASamples;
-            }
-
             if (TemporalAntiAliasingTechnique != TemporalAntiAliasingTechnique.None)
             {
                 Vector2 jitter = MyMath.GetHalton2D((int)GLSLBasicData.Frame % glslTaaData.Samples, 2, 3);
                 glslTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
-
-                taaDataBuffer.SubData(0, sizeof(GLSLTaaData), glslTaaData);
             }
+            taaDataBuffer.SubData(0, sizeof(GLSLTaaData), glslTaaData);
 
             GLSLBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CAMERA_FOV_Y, RenderPresentationResolution.X / (float)RenderPresentationResolution.Y, NEAR_PLANE, FAR_PLANE);
             GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
@@ -341,7 +356,7 @@ namespace IDKEngine
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, 0);
             GL.PointSize(1.3f);
-            GL.ClipControl(ClipOrigin.LowerLeft, ClipDepthMode.ZeroToOne);
+            Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
             GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
@@ -350,6 +365,7 @@ namespace IDKEngine
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
 
             RenderPresentationResolution = WindowFramebufferSize;
+            RenderMode = RenderMode.Rasterizer;
 
             basicDataBuffer = new BufferObject();
             basicDataBuffer.ImmutableAllocate(sizeof(GLSLBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
@@ -377,8 +393,15 @@ namespace IDKEngine
                 "res/textures/environmentMap/negz.jpg"
             });
 
-            Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
+            LightManager = new LightManager(12, 12);
+            MeshOutlineRenderer = new BoxRenderer();
+            Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
+            TonemapAndGamma = new TonemapAndGammaCorrecter(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+            TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+            FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+            ModelSystem = new ModelSystem();
 
+            Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
             // fix minor transparency issue with roughness
             sponza.Meshes[0].RoughnessBias = -1.0f;
             sponza.Meshes[1].RoughnessBias = -1.0f;
@@ -394,7 +417,6 @@ namespace IDKEngine
             sponza.Meshes[89].RoughnessBias = -1.0f;
             sponza.Meshes[91].RoughnessBias = -1.0f;
             sponza.Meshes[93].RoughnessBias = -1.0f;
-
             sponza.Meshes[63].EmissiveBias = 10.0f;
             sponza.Meshes[70].EmissiveBias = 20.0f;
             sponza.Meshes[3].EmissiveBias = 12.0f;
@@ -404,8 +426,8 @@ namespace IDKEngine
             sponza.Meshes[38].EmissiveBias = 20.0f;
             sponza.Meshes[40].EmissiveBias = 20.0f;
             sponza.Meshes[42].EmissiveBias = 20.0f;
-            sponza.Meshes[46].SpecularBias = 1.0f; // floor
-            sponza.Meshes[46].RoughnessBias = -0.436f; // floor
+            sponza.Meshes[46].SpecularBias = 1.0f;
+            sponza.Meshes[46].RoughnessBias = -0.436f;
 
             Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
             lucy.Meshes[0].SpecularBias = -1.0f;
@@ -416,40 +438,31 @@ namespace IDKEngine
 
             Model helmet = new Model("res/models/Helmet/Helmet.gltf");
 
-            //Model giPlayground = new Model("res/models/GIPlayground/GIPlayground.gltf");
-            //Model cornellBox = new Model("res/models/CornellBox/scene.gltf");
-
-            //Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
-            //Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-            //Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-            //Model bistroExterior = new Model(@"C:\Users\Julian\Downloads\Models\BistroExterior\BistroExterior.gltf");
-            //Model minecraft = new Model(@"C:\Users\Julian\Downloads\Models\Minecraft\Minecraft.gltf");
-
-            ModelSystem = new ModelSystem();
-            ModelSystem.Add(sponza, lucy, helmet);
-
-            BVH = new BVH(ModelSystem);
-            LightManager = new LightManager(12, 12);
-            MeshOutlineRenderer = new BoxRenderer();
-            Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
-            TonemapAndGamma = new TonemapAndGammaCorrecter(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-            TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-            FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
-
             LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
             LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
-
-            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f)); // alt Color: new Vector3(50.450, 35.840, 25.270)
+            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
             //LightManager.CreatePointShadowForLight(new PointShadow(1536, 0.5f, 60.0f), LightManager.Count - 1);
-
             for (int i = 0; i < 3; i++)
             {
                 PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
                 LightManager.CreatePointShadowForLight(pointShadow, i);
             }
+            ModelSystem.Add(sponza, lucy, helmet);
 
-            RenderMode = RenderMode.Rasterizer;
+            //Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
+            //Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
+            //Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+            //LightManager.AddLight(new Light(new Vector3(2.002f, 18.693f, 3.117f), new Vector3(60.466f, 50.179f, 50.751f), 0.3f));
+            //LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
+            //LightManager.AddLight(new Light(new Vector3(-5.947f, 3.31f, 2.256f), new Vector3(5.036f, 5.862f, 5.658f), 0.3f));
+            //RasterizerPipeline.IsVXGI = true;
+            //RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
+            //RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
+            //ModelSystem.Add(a, b, c);
+
+            BVH = new BVH(ModelSystem);
+
             RenderGui = true;
             WindowVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorNormal;
@@ -472,29 +485,6 @@ namespace IDKEngine
             if (!RenderGui)
             {
                 RenderPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
-            }
-        }
-
-        // TODO: Temporary. This is not in RenderPresentationResolution because it causes bugs for now. Have to look into it
-        private void SetSize()
-        {
-            if (RenderMode == RenderMode.Rasterizer)
-            {
-                if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y);
-
-                if (TaaResolve != null) TaaResolve.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-                if (FSR2Wrapper != null) FSR2Wrapper.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
-            }
-
-            if (RenderMode == RenderMode.PathTracer)
-            {
-                if (PathTracer != null) PathTracer.SetSize(RenderResolution.X, RenderResolution.Y);
-            }
-
-            if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
-            {
-                if (Bloom != null) Bloom.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-                if (TonemapAndGamma != null) TonemapAndGamma.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
             }
         }
 

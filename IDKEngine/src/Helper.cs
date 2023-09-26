@@ -38,6 +38,17 @@ namespace IDKEngine
             return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
         }
 
+        public enum DepthConvention
+        {
+            ZeroToOne = ClipDepthMode.ZeroToOne,
+            NegativeOneToOne = ClipDepthMode.NegativeOneToOne,
+        }
+
+        public static void SetDepthConvention(DepthConvention mode)
+        {
+            GL.ClipControl(ClipOrigin.LowerLeft, (ClipDepthMode)mode);
+        }
+
         private static HashSet<string> GetExtensions()
         {
             HashSet<string> extensions = new HashSet<string>(GL.GetInteger(GetPName.NumExtensions));
@@ -50,8 +61,6 @@ namespace IDKEngine
         }
 
         private static readonly HashSet<string> glExtensions = GetExtensions();
-
-
         public static bool IsExtensionsAvailable(string extension)
         {
             return glExtensions.Contains(extension);
@@ -60,36 +69,6 @@ namespace IDKEngine
         {
             return (APIVersion >= first) || IsExtensionsAvailable(extension);
         }
-
-        public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;
-        private static void GLDebugCallback(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
-        {
-            string text = Marshal.PtrToStringAnsi(message, length);
-            switch (severity)
-            {
-                case DebugSeverity.DebugSeverityLow:
-                    Logger.Log(Logger.LogLevel.Info, text);
-                    break;
-
-                case DebugSeverity.DebugSeverityMedium:
-                    Logger.Log(Logger.LogLevel.Warn, text);
-                    break;
-
-                case DebugSeverity.DebugSeverityHigh:
-                    if (id == 2000) return; // Shader compile error, AMD
-                    if (id == 2001) return; // Program link error, AMD
-
-                    Logger.Log(Logger.LogLevel.Error, text);
-                    break;
-
-                default:
-                    if (id == 131185) return; // Buffer detailed info, NVIDIA
-
-                    Logger.Log(Logger.LogLevel.Info, text);
-                    break;
-            }
-        }
-
         public static unsafe void ParallelLoadCubemap(Texture texture, string[] paths, SizedInternalFormat sizedInternalFormat)
         {
             if (texture.Target != TextureTarget.TextureCubeMap)
@@ -141,6 +120,36 @@ namespace IDKEngine
                 }
             }
         }
+
+        public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;
+        private static void GLDebugCallback(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
+        {
+            string text = Marshal.PtrToStringAnsi(message, length);
+            switch (severity)
+            {
+                case DebugSeverity.DebugSeverityLow:
+                    Logger.Log(Logger.LogLevel.Info, text);
+                    break;
+
+                case DebugSeverity.DebugSeverityMedium:
+                    Logger.Log(Logger.LogLevel.Warn, text);
+                    break;
+
+                case DebugSeverity.DebugSeverityHigh:
+                    if (id == 2000) return; // Shader compile error, AMD
+                    if (id == 2001) return; // Program link error, AMD
+
+                    Logger.Log(Logger.LogLevel.Error, text);
+                    break;
+
+                default:
+                    if (id == 131185) return; // Buffer detailed info, NVIDIA
+
+                    Logger.Log(Logger.LogLevel.Info, text);
+                    break;
+            }
+        }
+
 
         public static unsafe T* Malloc<T>(int count = 1) where T : unmanaged
         {
