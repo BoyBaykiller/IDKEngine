@@ -20,7 +20,7 @@ namespace IDKEngine.Render
             set
             {
                 glslVoxelizerData.GridMin = Vector3.ComponentMin(value, glslVoxelizerData.GridMax - new Vector3(0.1f));
-                glslVoxelizerData.OrthoProjection = MyMath.CreateOrthographicOffCenterDepthZeroToOne(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
+                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
                 voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
         }
@@ -31,7 +31,7 @@ namespace IDKEngine.Render
             set
             {
                 glslVoxelizerData.GridMax = Vector3.ComponentMax(value, glslVoxelizerData.GridMin + new Vector3(0.1f));
-                glslVoxelizerData.OrthoProjection = MyMath.CreateOrthographicOffCenterDepthZeroToOne(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
+                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
                 voxelizerDataBuffer.SubData(0, sizeof(GLSLVoxelizerData), glslVoxelizerData);
             }
         }
@@ -172,6 +172,7 @@ namespace IDKEngine.Render
                 GL.NV.ViewportSwizzle(2, All.ViewportSwizzlePositiveZNv, All.ViewportSwizzlePositiveYNv, All.ViewportSwizzlePositiveXNv, All.ViewportSwizzlePositiveWNv); // xyzw -> zyxw
             }
 
+            Helper.SetDepthConvention(Helper.DepthConvention.NegativeOneToOne);
             GL.Viewport(0, 0, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
             GL.Disable(EnableCap.CullFace);
 
@@ -201,6 +202,7 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit | MemoryBarrierFlags.TextureFetchBarrierBit);
             
             GL.Enable(EnableCap.CullFace);
+            Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
 
             if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
             {

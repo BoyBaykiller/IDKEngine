@@ -21,7 +21,7 @@ vec4 TraceCone(vec3 start, vec3 direction, vec3 normal, float coneAngle, float s
         
         vec3 worldPos = start + direction * distFromStart;
         vec3 ndc = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz;
-        vec3 sampleUVW = NdcToUvDepth(ndc);
+        vec3 sampleUVW = ndc * 0.5 + 0.5;
         if (any(lessThan(sampleUVW, vec3(0.0))) || any(greaterThanEqual(sampleUVW, vec3(1.0))) || sampleLod > maxLevel)
         {
             break;

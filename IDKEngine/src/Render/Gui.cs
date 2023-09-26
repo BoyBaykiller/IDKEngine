@@ -450,9 +450,11 @@ namespace IDKEngine.Render
                         else if (app.TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
                         {
                             ImGui.Text(
-                                "FSR2 (by AMD) does Anti Aliasing but\n" + 
+                                "FSR2 (by AMD) does Anti Aliasing but\n" +
                                 "simultaneously also upscaling.\n" +
-                                "Try reducing resolution scale!"
+                                "Try reducing resolution scale!\n" +
+                                "Note: Performance is lower than expected\n" +
+                                "on NVIDIA!"
                             );
 
                             ImGui.Checkbox("IsSharpening", ref app.FSR2Wrapper.IsSharpening);
@@ -775,9 +777,9 @@ namespace IDKEngine.Render
                             light.Color = tempVec3.ToOpenTK();
                         }
 
-                        if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f))
+                        if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f, 0.25f, 10.0f))
                         {
-                            light.Radius = MathF.Max(light.Radius, 0.0f);
+                            light.Radius = MathF.Max(light.Radius, 0.25f);
                             shouldUpdateLight = true;
                         }
 

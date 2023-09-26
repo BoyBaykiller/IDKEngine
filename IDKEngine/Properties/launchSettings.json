@@ -2,7 +2,8 @@
   "profiles": {
     "Renderer": {
       "commandName": "Project",
-      "workingDirectory": "$(ProjectDir)"
+      "workingDirectory": "$(ProjectDir)",
+      "nativeDebugging": false
     }
   }
 }
