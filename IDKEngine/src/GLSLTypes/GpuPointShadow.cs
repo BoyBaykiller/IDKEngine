@@ -4,7 +4,7 @@ using OpenTK.Mathematics;
 
 namespace IDKEngine
 {
-    struct GLSLPointShadow
+    struct GpuPointShadow
     {
         public enum Matrix : int
         {

@@ -43,7 +43,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
 
             lightBufferObject = new BufferObject();
-            lightBufferObject.ImmutableAllocate(lights.Length * sizeof(GLSLLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            lightBufferObject.ImmutableAllocate(lights.Length * sizeof(GpuLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             lightBufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
 
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
@@ -95,7 +95,6 @@ namespace IDKEngine.Render
             }
 
             lights[Count++] = light;
-            UpdateLightBuffer(Count - 1);
 
             return true;
         }
@@ -116,7 +115,6 @@ namespace IDKEngine.Render
             if (Count - 1 >= 0)
             {
                 lights[index] = lights[Count - 1];
-                UpdateLightBuffer(index);
                 Count--;
             }
         }
@@ -138,7 +136,6 @@ namespace IDKEngine.Render
             if (pointShadowManager.TryAddPointShadow(pointShadow, out int pointShadowIndex))
             {
                 lights[index].GLSLLight.PointShadowIndex = pointShadowIndex;
-                UpdateLightBuffer(index);
                 return true;
             }
             return false;
@@ -160,18 +157,15 @@ namespace IDKEngine.Render
 
             pointShadowManager.RemovePointShadow(light.GLSLLight.PointShadowIndex);
             light.GLSLLight.PointShadowIndex = -1;
-            UpdateLightBuffer(index);
         }
 
-        public unsafe void UpdateLightBuffer(int index)
+        public unsafe void UpdateBufferData()
         {
-            if (!TryGetLight(index, out Light light))
+            for (int i = 0; i < Count; i++)
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(Light)} {index} does not exist. Cannot update it's buffer content");
-                return;
+                Light light = lights[i];
+                lightBufferObject.SubData(i * sizeof(GpuLight), sizeof(GpuLight), light.GLSLLight);
             }
-
-            lightBufferObject.SubData(index * sizeof(GLSLLight), sizeof(GLSLLight), light.GLSLLight);
         }
 
         public bool TryGetLight(int index, out Light light)

@@ -110,6 +110,7 @@ namespace IDKEngine.Render
         {
             Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
             shaderInsertions.Add("MAX_BLAS_TREE_DEPTH", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
+            shaderInsertions.Add("MAX_TLAS_TREE_DEPTH", $"{Math.Max(bvh.Tlas.TreeDepth, 1)}");
 
             firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl"),
                 shaderInsertions
@@ -118,11 +119,10 @@ namespace IDKEngine.Render
             nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl"),
                 shaderInsertions
             ));
-
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
             dispatchCommandBuffer = new BufferObject();
-            dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GLSLDispatchCommand), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GpuDispatchCommand), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
 
             SetSize(width, height);
@@ -147,7 +147,7 @@ namespace IDKEngine.Render
                 nHitProgram.Upload(0, pingPongIndex);
                 rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // reset ray counter
 
-                GL.DispatchComputeIndirect(sizeof(GLSLDispatchCommand) * (1 - pingPongIndex));
+                GL.DispatchComputeIndirect(sizeof(GpuDispatchCommand) * (1 - pingPongIndex));
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
             }
 
@@ -160,8 +160,8 @@ namespace IDKEngine.Render
 
         public unsafe void SetSize(int width, int height)
         {
-            dispatchCommandBuffer.SubData(0, sizeof(GLSLDispatchCommand), new GLSLDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
-            dispatchCommandBuffer.SubData(sizeof(GLSLDispatchCommand), sizeof(GLSLDispatchCommand), new GLSLDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
+            dispatchCommandBuffer.SubData(0, sizeof(GpuDispatchCommand), new GpuDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
+            dispatchCommandBuffer.SubData(sizeof(GpuDispatchCommand), sizeof(GpuDispatchCommand), new GpuDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
 
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
@@ -171,7 +171,7 @@ namespace IDKEngine.Render
 
             if (transportRayBuffer != null) transportRayBuffer.Dispose();
             transportRayBuffer = new BufferObject();
-            transportRayBuffer.ImmutableAllocate(width * height * sizeof(GLSLTransportRay), IntPtr.Zero, BufferStorageFlags.None);
+            transportRayBuffer.ImmutableAllocate(width * height * sizeof(GpuTransportRay), IntPtr.Zero, BufferStorageFlags.None);
             transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();

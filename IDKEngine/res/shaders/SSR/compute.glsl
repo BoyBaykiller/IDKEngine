@@ -53,8 +53,8 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    float specular = texture(gBufferDataUBO.NormalSpecular, uv).a;
-    float depth = texture(gBufferDataUBO.Depth, uv).r;
+    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
+    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (specular < EPSILON || depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
@@ -62,7 +62,7 @@ void main()
     }
 
     vec3 fragPos = NDCToView(vec3(uv, depth) * 2.0 - 1.0);
-    vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
+    vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
     mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
     normal = normalize(normalToView * normal);
 

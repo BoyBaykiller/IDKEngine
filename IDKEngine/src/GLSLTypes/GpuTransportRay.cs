@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    unsafe struct GLSLTransportRay
+    struct GpuTransportRay
     {
         public Vector3 Origin;
         public uint DebugNodeCounter;

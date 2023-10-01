@@ -74,8 +74,8 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / textureSize(SamplerShaded, 0);
 
-    vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg;
-    vec3 srcColor = texture(SamplerShaded, uv).rgb;
+    vec2 velocity = texelFetch(gBufferDataUBO.Velocity, imgCoord, 0).rg;
+    vec3 srcColor = texelFetch(SamplerShaded, imgCoord, 0).rgb;
 
     float meanSpeed, meanLuminance, luminanceVariance;
     GetTileData(srcColor, velocity, meanSpeed, meanLuminance, luminanceVariance);

@@ -20,6 +20,16 @@ namespace IDKEngine
         public static readonly string API = GL.GetString(StringName.Version);
         public static readonly string GPU = GL.GetString(StringName.Renderer);
 
+        public static int Sum<T>(this ReadOnlySpan<T> values, Func<T, int> func)
+        {
+            int sum = 0;
+            for (int i = 0; i < values.Length; i++)
+            {
+                sum += func(values[i]);
+            }
+            return sum;
+        }
+
         public static System.Numerics.Vector3 ToNumerics(this Vector3 vector3)
         {
             return Unsafe.As<Vector3, System.Numerics.Vector3>(ref vector3);

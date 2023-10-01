@@ -54,7 +54,7 @@ namespace IDKEngine.Render
         
         private readonly Framebuffer framebuffer;
         private SamplerObject shadowSampler;
-        private GLSLPointShadow glslPointShadow;
+        private GpuPointShadow glslPointShadow;
         public PointShadow(int size, float nearPlane, float farPlane)
         {
             framebuffer = new Framebuffer();
@@ -66,6 +66,11 @@ namespace IDKEngine.Render
 
         public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex, ShaderProgram renderProgram, ShaderProgram cullingProgram)
         {
+            if (modelSystem.Meshes.Length == 0)
+            {
+                return;
+            }
+
             if (PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH)
             {
                 cullingProgram.Use();
@@ -90,7 +95,7 @@ namespace IDKEngine.Render
                 // Using geometry shader would be slower
                 for (int i = 0; i < 6; i++)
                 {
-                    ref readonly Matrix4 projView = ref glslPointShadow[GLSLPointShadow.Matrix.PosX + i];
+                    ref readonly Matrix4 projView = ref glslPointShadow[GpuPointShadow.Matrix.PosX + i];
                     modelSystem.FrustumCull(projView);
 
                     framebuffer.SetRenderTargetLayer(FramebufferAttachment.DepthAttachment, Result, i);
@@ -114,7 +119,7 @@ namespace IDKEngine.Render
             glslPointShadow.NegZ = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
         }
 
-        public ref readonly GLSLPointShadow GetGLSLData()
+        public ref readonly GpuPointShadow GetGLSLData()
         {
             return ref glslPointShadow;
         }

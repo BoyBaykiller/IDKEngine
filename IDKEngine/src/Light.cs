@@ -4,7 +4,7 @@ namespace IDKEngine
 {
     class Light
     {
-        public GLSLLight GLSLLight;
+        public GpuLight GLSLLight;
         public Light(Vector3 position, Vector3 color, float radius)
         {
             GLSLLight.Position = position;

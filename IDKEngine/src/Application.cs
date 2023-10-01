@@ -31,7 +31,7 @@ namespace IDKEngine
 
         public const float EPSILON = 0.001f;
         public const float NEAR_PLANE = 0.1f, FAR_PLANE = 500.0f;
-        public static readonly float CAMERA_FOV_Y = MathHelper.DegreesToRadians(102.0f);
+        public float CameraFovY = MathHelper.DegreesToRadians(102.0f);
 
         private float _resolutionScale = 1.0f;
         public float ResolutionScale
@@ -83,15 +83,17 @@ namespace IDKEngine
             set
             {
                 if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
+                if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
+
+
                 if (value == RenderMode.Rasterizer)
                 {
                     RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y);
                 }
 
-                if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
                 if (value == RenderMode.PathTracer)
                 {
-                    PathTracer = new PathTracer(BVH, RenderResolution.X, RenderResolution.Y);
+                    PathTracer = new PathTracer(ModelSystem.BVH, RenderResolution.X, RenderResolution.Y);
                 }
 
                 _renderMode = value;
@@ -105,7 +107,37 @@ namespace IDKEngine
         public bool IsBloom = true;
         public bool IsShadows = true;
 
-        public TemporalAntiAliasingTechnique TemporalAntiAliasingTechnique = TemporalAntiAliasingTechnique.TAA;
+        private TemporalAntiAliasingTechnique _temporalAntiAliasingTechnique;
+        public TemporalAntiAliasingTechnique TemporalAntiAliasingTechnique
+        {
+            get => _temporalAntiAliasingTechnique;
+
+            set
+            {
+                _temporalAntiAliasingTechnique = value;
+
+                // We could also destroy the TAA and FSR2 ressources here but in my current implementation that means
+                // the related settings are lost which is annoying. So this is basically just a lazy load.
+                // 
+                // FSR2 is Windows only but as long as isn't initialized the native DLLs shouldn't get loaded and the APP will run on other Operating Sytems too
+
+                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
+                {
+                    return;
+                }
+
+                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA && TaaResolve == null)
+                {
+                    TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                }
+
+                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2 && FSR2Wrapper == null)
+                {
+                    FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+                }
+            }
+        }
+
         public int TAASamples = 6;
 
         private int fpsCounter;
@@ -149,7 +181,7 @@ namespace IDKEngine
                     }
                     else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
                     {
-                        FSR2Wrapper.RunFSR2(glslTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CAMERA_FOV_Y);
+                        FSR2Wrapper.RunFSR2(glslTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CameraFovY);
                         if (IsBloom)
                         {
                             Bloom.Compute(FSR2Wrapper.Result);
@@ -178,22 +210,30 @@ namespace IDKEngine
                 TonemapAndGamma.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
-            if (gui.SelectedEntityType != Gui.EntityType.None)
+            //{
+            //    Box box = new Box();
+            //    GLSLTlasNode node = ModelSystem.BVH.Tlas.Nodes[gui.debugTlasNode];
+            //    box.Min = node.Min;
+            //    box.Max = node.Max;
+            //    MeshOutlineRenderer.Render(TonemapAndGamma.Result, box);
+            //}
+
+            if (gui.SelectedEntity.Type != Gui.EntityType.None)
             {
                 Box box = new Box();
-                if (gui.SelectedEntityType == Gui.EntityType.Mesh)
+                if (gui.SelectedEntity.Type == Gui.EntityType.Mesh)
                 {
-                    GLSLBlasNode node = BVH.Tlas.BlasesInstances[gui.SelectedEntityIndex].Blas.Root;
+                    GpuBlasNode node = ModelSystem.BVH.Tlas.BlasesInstances[gui.SelectedEntity.Index].Blas.Root;
                     box.Min = node.Min;
                     box.Max = node.Max;
 
-                    GLSLDrawElementsCmd cmd = ModelSystem.DrawCommands[gui.SelectedEntityIndex];
+                    GpuDrawElementsCmd cmd = ModelSystem.DrawCommands[gui.SelectedEntity.Index];
                     box.Transform(ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix);
                 }
                 else
                 {
-                    LightManager.TryGetLight(gui.SelectedEntityIndex, out Light abstractLight);
-                    ref GLSLLight light = ref abstractLight.GLSLLight;
+                    LightManager.TryGetLight(gui.SelectedEntity.Index, out Light abstractLight);
+                    ref GpuLight light = ref abstractLight.GLSLLight;
                     
                     box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
                     box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
@@ -236,78 +276,96 @@ namespace IDKEngine
 
             gui.Update(this, dT);
 
-            if (KeyboardState[Keys.Escape] == InputState.Pressed)
+            // Keyboard Inputs
             {
-                ShouldClose();
-            }
-            if (KeyboardState[Keys.V] == InputState.Touched)
-            {
-                WindowVSync = !WindowVSync;
-            }
-            if (KeyboardState[Keys.G] == InputState.Touched)
-            {
-                RenderGui = !RenderGui;
-                if (!RenderGui)
+                if (KeyboardState[Keys.Escape] == InputState.Pressed)
                 {
-                    RenderPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                    ShouldClose();
+                }
+                if (KeyboardState[Keys.V] == InputState.Touched)
+                {
+                    WindowVSync = !WindowVSync;
+                }
+                if (KeyboardState[Keys.G] == InputState.Touched)
+                {
+                    RenderGui = !RenderGui;
+                    if (!RenderGui)
+                    {
+                        RenderPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                    }
+                }
+                if (KeyboardState[Keys.F11] == InputState.Touched)
+                {
+                    WindowFullscreen = !WindowFullscreen;
                 }
             }
-            if (KeyboardState[Keys.F11] == InputState.Touched)
+
+            // TAA
             {
-                WindowFullscreen = !WindowFullscreen;
+                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None || TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                {
+                    glslTaaData.MipmapBias = 0.0f;
+                }
+                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                {
+                    glslTaaData.Samples = TAASamples;
+                }
+                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
+                {
+                    const float manualBias = 0.25f;
+                    glslTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
+                    glslTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
+                }
+                if (TemporalAntiAliasingTechnique != TemporalAntiAliasingTechnique.None)
+                {
+                    Vector2 jitter = MyMath.GetHalton2D((int)GLSLBasicData.Frame % glslTaaData.Samples, 2, 3);
+                    glslTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
+                }
+                taaDataBuffer.SubData(0, sizeof(GpuTaaData), glslTaaData);
             }
 
-            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None || TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
-            {
-                glslTaaData.MipmapBias = 0.0f;
-            }
-            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
-            {
-                glslTaaData.Samples = TAASamples;
-            }
-            if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
-            {
-                const float manualBias = 0.25f;
-                glslTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
-                glslTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
-            }
-            if (TemporalAntiAliasingTechnique != TemporalAntiAliasingTechnique.None)
-            {
-                Vector2 jitter = MyMath.GetHalton2D((int)GLSLBasicData.Frame % glslTaaData.Samples, 2, 3);
-                glslTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
-            }
-            taaDataBuffer.SubData(0, sizeof(GLSLTaaData), glslTaaData);
+            LightManager.UpdateBufferData();
+            //ModelSystem.BVH.TlasBuild();
 
-            GLSLBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CAMERA_FOV_Y, RenderPresentationResolution.X / (float)RenderPresentationResolution.Y, NEAR_PLANE, FAR_PLANE);
-            GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
-            GLSLBasicData.NearPlane = NEAR_PLANE;
-            GLSLBasicData.FarPlane = FAR_PLANE;
-            GLSLBasicData.DeltaUpdate = dT;
-            GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
-            GLSLBasicData.PrevView = GLSLBasicData.View;
-            GLSLBasicData.View = Camera.GenerateViewMatrix();
-            GLSLBasicData.InvView = GLSLBasicData.View.Inverted();
-            GLSLBasicData.ProjView = GLSLBasicData.View * GLSLBasicData.Projection;
-            GLSLBasicData.InvProjView = GLSLBasicData.ProjView.Inverted();
-            GLSLBasicData.CameraPos = Camera.Position;
-            GLSLBasicData.Time = WindowTime;
-            GLSLBasicData.Frame++;
-            basicDataBuffer.SubData(0, sizeof(GLSLBasicData), GLSLBasicData);
+            // Updating global basicData Buffer
+            {
+                GLSLBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CameraFovY, RenderPresentationResolution.X / (float)RenderPresentationResolution.Y, NEAR_PLANE, FAR_PLANE);
+                GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
+                GLSLBasicData.NearPlane = NEAR_PLANE;
+                GLSLBasicData.FarPlane = FAR_PLANE;
+                GLSLBasicData.DeltaUpdate = dT;
+                GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
+                GLSLBasicData.PrevView = GLSLBasicData.View;
+                GLSLBasicData.View = Camera.GenerateViewMatrix();
+                GLSLBasicData.InvView = GLSLBasicData.View.Inverted();
+                GLSLBasicData.ProjView = GLSLBasicData.View * GLSLBasicData.Projection;
+                GLSLBasicData.InvProjView = GLSLBasicData.ProjView.Inverted();
+                GLSLBasicData.CameraPos = Camera.Position;
+                GLSLBasicData.Time = WindowTime;
+                GLSLBasicData.Frame++;
+                basicDataBuffer.SubData(0, sizeof(GpuBasicData), GLSLBasicData);
+            }
 
-            ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
             bool anyMeshInstanceMoved = false;
-            for (int i = 0; i < ModelSystem.MeshInstances.Length; i++)
+            // Updating MeshInstance Buffer
             {
-                if (ModelSystem.MeshInstances[i].DidMove())
+                ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
+                for (int i = 0; i < ModelSystem.MeshInstances.Length; i++)
                 {
-                    ModelSystem.MeshInstances[i].SetPrevToCurrentMatrix();
-                    anyMeshInstanceMoved = true;
+                    if (ModelSystem.MeshInstances[i].DidMove())
+                    {
+                        ModelSystem.MeshInstances[i].SetPrevToCurrentMatrix();
+                        anyMeshInstanceMoved = true;
+                    }
                 }
             }
 
-            if ((RenderMode == RenderMode.PathTracer) && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || anyMeshInstanceMoved))
+            // Resetting Path Tracer if necessary
             {
-                PathTracer.ResetRenderProcess();
+                if ((RenderMode == RenderMode.PathTracer) && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || anyMeshInstanceMoved))
+                {
+                    PathTracer.ResetRenderProcess();
+                }
             }
         }
 
@@ -316,7 +374,6 @@ namespace IDKEngine
 
         public Camera Camera;
         public ModelSystem ModelSystem;
-        public BVH BVH;
         public FrameStateRecorder<FrameState> FrameRecorder;
 
         public Bloom Bloom;
@@ -330,10 +387,10 @@ namespace IDKEngine
         public PathTracer PathTracer;
 
         private BufferObject basicDataBuffer;
-        public GLSLBasicData GLSLBasicData;
+        public GpuBasicData GLSLBasicData;
 
         private BufferObject taaDataBuffer;
-        private GLSLTaaData glslTaaData;
+        private GpuTaaData glslTaaData;
         protected override unsafe void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
@@ -368,13 +425,13 @@ namespace IDKEngine
             RenderMode = RenderMode.Rasterizer;
 
             basicDataBuffer = new BufferObject();
-            basicDataBuffer.ImmutableAllocate(sizeof(GLSLBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            basicDataBuffer.ImmutableAllocate(sizeof(GpuBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             glslTaaData.Samples = 6;
             glslTaaData.Jitter = new Vector2(0.0f);
             taaDataBuffer = new BufferObject();
-            taaDataBuffer.ImmutableAllocate(sizeof(GLSLTaaData), glslTaaData, BufferStorageFlags.DynamicStorageBit);
+            taaDataBuffer.ImmutableAllocate(sizeof(GpuTaaData), glslTaaData, BufferStorageFlags.DynamicStorageBit);
             taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             finalProgram = new ShaderProgram(
@@ -397,71 +454,89 @@ namespace IDKEngine
             MeshOutlineRenderer = new BoxRenderer();
             Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
             TonemapAndGamma = new TonemapAndGammaCorrecter(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-            TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-            FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+            TemporalAntiAliasingTechnique = TemporalAntiAliasingTechnique.TAA;
             ModelSystem = new ModelSystem();
 
-            Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
-            // fix minor transparency issue with roughness
-            sponza.Meshes[0].RoughnessBias = -1.0f;
-            sponza.Meshes[1].RoughnessBias = -1.0f;
-            sponza.Meshes[20].RoughnessBias = -1.0f;
-            sponza.Meshes[53].RoughnessBias = -1.0f;
-            sponza.Meshes[75].RoughnessBias = -1.0f;
-            sponza.Meshes[77].RoughnessBias = -1.0f;
-            sponza.Meshes[79].RoughnessBias = -1.0f;
-            sponza.Meshes[81].RoughnessBias = -1.0f;
-            sponza.Meshes[83].RoughnessBias = -1.0f;
-            sponza.Meshes[85].RoughnessBias = -1.0f;
-            sponza.Meshes[87].RoughnessBias = -1.0f;
-            sponza.Meshes[89].RoughnessBias = -1.0f;
-            sponza.Meshes[91].RoughnessBias = -1.0f;
-            sponza.Meshes[93].RoughnessBias = -1.0f;
-            sponza.Meshes[63].EmissiveBias = 10.0f;
-            sponza.Meshes[70].EmissiveBias = 20.0f;
-            sponza.Meshes[3].EmissiveBias = 12.0f;
-            sponza.Meshes[99].EmissiveBias = 15.0f;
-            sponza.Meshes[97].EmissiveBias = 9.0f;
-            sponza.Meshes[42].EmissiveBias = 20.0f;
-            sponza.Meshes[38].EmissiveBias = 20.0f;
-            sponza.Meshes[40].EmissiveBias = 20.0f;
-            sponza.Meshes[42].EmissiveBias = 20.0f;
-            sponza.Meshes[46].SpecularBias = 1.0f;
-            sponza.Meshes[46].RoughnessBias = -0.436f;
-
-            Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateScale(0.8f) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
-            lucy.Meshes[0].SpecularBias = -1.0f;
-            lucy.Meshes[0].RefractionChance = 0.98f;
-            lucy.Meshes[0].IOR = 1.174f;
-            lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
-            lucy.Meshes[0].RoughnessBias = -1.0f;
-
-            Model helmet = new Model("res/models/Helmet/Helmet.gltf");
-
-            LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-            LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-            LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
-            //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
-            //LightManager.CreatePointShadowForLight(new PointShadow(1536, 0.5f, 60.0f), LightManager.Count - 1);
-            for (int i = 0; i < 3; i++)
+            if (true)
             {
-                PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
-                LightManager.CreatePointShadowForLight(pointShadow, i);
+                Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
+                sponza.Meshes[63].EmissiveBias = 10.0f;
+                sponza.Meshes[70].EmissiveBias = 20.0f;
+                sponza.Meshes[3].EmissiveBias = 12.0f;
+                sponza.Meshes[99].EmissiveBias = 15.0f;
+                sponza.Meshes[97].EmissiveBias = 9.0f;
+                sponza.Meshes[42].EmissiveBias = 20.0f;
+                sponza.Meshes[38].EmissiveBias = 20.0f;
+                sponza.Meshes[40].EmissiveBias = 20.0f;
+                sponza.Meshes[42].EmissiveBias = 20.0f;
+                sponza.Meshes[46].SpecularBias = 1.0f;
+                sponza.Meshes[46].RoughnessBias = -0.436f;
+
+                Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
+                lucy.Meshes[0].SpecularBias = -1.0f;
+                lucy.Meshes[0].RefractionChance = 0.98f;
+                lucy.Meshes[0].IOR = 1.174f;
+                lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
+                lucy.Meshes[0].RoughnessBias = -1.0f;
+
+                Model helmet = new Model("res/models/Helmet/Helmet.gltf");
+                helmet.MeshInstances[0].ModelMatrix *= Matrix4.CreateRotationY(MathF.PI / 4.0f);
+
+                ModelSystem.Add(sponza, lucy, helmet);
+
+                LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+                //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
+                //LightManager.CreatePointShadowForLight(new PointShadow(1536, 0.5f, 60.0f), LightManager.Count - 1);
+                for (int i = 0; i < 3; i++)
+                {
+                    PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
+                    LightManager.CreatePointShadowForLight(pointShadow, i);
+                }
             }
-            ModelSystem.Add(sponza, lucy, helmet);
+            else
+            {
+                Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
+                a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
+                a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
+                a.MeshInstances[271].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
+                a.Meshes[288].SpecularBias = 1.0f;
+                a.Meshes[288].RoughnessBias = -0.64f;
+                a.Meshes[288].NormalMapStrength = 0.0f;
+                a.Meshes[93].EmissiveBias = 20.0f;
+                a.Meshes[96].EmissiveBias = 20.0f;
+                a.Meshes[99].EmissiveBias = 20.0f;
+                a.Meshes[102].EmissiveBias = 20.0f;
+                a.Meshes[105].EmissiveBias = 20.0f;
+                a.Meshes[108].EmissiveBias = 20.0f;
+                a.Meshes[111].EmissiveBias = 20.0f;
+                a.Meshes[246].EmissiveBias = 20.0f;
+                a.Meshes[291].EmissiveBias = 20.0f;
+                a.Meshes[294].EmissiveBias = 20.0f;
+                a.Meshes[297].EmissiveBias = 20.0f;
+                a.Meshes[300].EmissiveBias = 20.0f;
+                a.Meshes[303].EmissiveBias = 20.0f;
+                a.Meshes[306].EmissiveBias = 20.0f;
+                a.Meshes[312].EmissiveBias = 20.0f;
+                a.Meshes[315].EmissiveBias = 20.0f;
+                a.Meshes[318].EmissiveBias = 20.0f;
+                a.Meshes[321].EmissiveBias = 20.0f;
+                a.Meshes[324].EmissiveBias = 20.0f;
+                a.Meshes[376].EmissiveBias = 20.0f;
+                a.Meshes[379].EmissiveBias = 20.0f;
+                Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
+                Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+                LightManager.AddLight(new Light(new Vector3(2.002f, 18.693f, 3.4f), new Vector3(60.46f, 50.17f, 50.75f), 0.3f));
+                LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
+                RasterizerPipeline.IsVXGI = true;
+                RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
+                RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
+                RasterizerPipeline.VolumetricLight.Strength = 60.0f;
+                RasterizerPipeline.ConeTracer.MaxSamples = 6;
+                ModelSystem.Add(a, b, c);
+            }
 
-            //Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_Blender_glTF.gltf");
-            //Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-            //Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-            //LightManager.AddLight(new Light(new Vector3(2.002f, 18.693f, 3.117f), new Vector3(60.466f, 50.179f, 50.751f), 0.3f));
-            //LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
-            //LightManager.AddLight(new Light(new Vector3(-5.947f, 3.31f, 2.256f), new Vector3(5.036f, 5.862f, 5.658f), 0.3f));
-            //RasterizerPipeline.IsVXGI = true;
-            //RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
-            //RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
-            //ModelSystem.Add(a, b, c);
-
-            BVH = new BVH(ModelSystem);
 
             RenderGui = true;
             WindowVSync = true;

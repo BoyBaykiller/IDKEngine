@@ -27,7 +27,8 @@ struct Material
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
-    vec2 _pad0;
+    float _pad0;
+    float AlphaCutoff;
     float RoughnessFactor;
     float MetallicFactor;
 
