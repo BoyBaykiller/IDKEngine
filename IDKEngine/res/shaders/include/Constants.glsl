@@ -1,7 +1,7 @@
 #ifndef Constants_H
 #define Constants_H
 
-#define MATERIAL_EMISSIVE_FACTOR 4.0
+#define MATERIAL_EMISSIVE_FACTOR 10.0
 
 // These constants are used in shader and client code. Keep in sync!
 #define GLSL_MAX_UBO_POINT_SHADOW_COUNT 16

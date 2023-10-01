@@ -20,13 +20,12 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
     
-    vec3 albedo = texture(gBufferDataUBO.AlbedoAlpha, uv).rgb;
-    vec3 volumetricLighting = texture(SamplerVolumetricLighting, uv).rgb;
+    vec3 albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
+    vec3 volumetricLighting = texelFetch(SamplerVolumetricLighting, imgCoord, 0).rgb;
 
-    vec3 modulatedIrradiance = texture(SamplerModulatedIrradiance, uv).rgb;
-    vec3 ssIndirectLight = texture(SamplerSSUnmodulatedIrradiance, uv).rgb * albedo;
+    vec3 modulatedIrradiance = texelFetch(SamplerModulatedIrradiance, imgCoord, 0).rgb;
+    vec3 ssIndirectLight = texelFetch(SamplerSSUnmodulatedIrradiance, imgCoord, 0).rgb * albedo;
 
     vec3 color = modulatedIrradiance + ssIndirectLight + volumetricLighting;
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));

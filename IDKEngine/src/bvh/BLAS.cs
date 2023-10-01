@@ -5,42 +5,50 @@ namespace IDKEngine
 {
     class BLAS
     {
-        public const int MIN_TRIANGLES_PER_LEAF_COUNT = 2;
+        public const float TriangleIntersectCost = 1.18f; // Ray-Triangle test is empirically 1.1834x computationally slower than Ray-Box test, excluding memory fetch
         public const int SAH_SAMPLES = 8;
 
         public struct HitInfo
         {
-            public GLSLTriangle Triangle;
+            public GpuTriangle Triangle;
             public Vector3 Bary;
             public float T;
         }
 
-        public GLSLBlasNode Root => Nodes[0];
+        public GpuBlasNode Root => Nodes[0];
         public Box RootBounds => new Box(Root.Min, Root.Max);
-        public int NodesUsed { get; private set; }
+        public int TreeDepth { get; private set; }
 
-        public readonly int TreeDepth;
-        public readonly GLSLBlasNode[] Nodes;
-        public readonly GLSLTriangle[] Triangles;
-        public BLAS(GLSLTriangle[] triangles)
+
+        public readonly GpuTriangle[] Triangles;
+        public GpuBlasNode[] Nodes;
+        private int nodesUsed;
+        public BLAS(GpuTriangle[] triangles)
         {
             Triangles = triangles;
+            Nodes = Array.Empty<GpuBlasNode>();
+        }
 
-            Nodes = new GLSLBlasNode[2 * Triangles.Length];
+        public void Build()
+        {
+            Nodes = new GpuBlasNode[2 * Triangles.Length];
 
-            ref GLSLBlasNode root = ref Nodes[NodesUsed++];
+            ref GpuBlasNode root = ref Nodes[nodesUsed++];
+            root.TriStartOrLeftChild = 0;
             root.TriCount = (uint)Triangles.Length;
             UpdateNodeBounds(ref root);
             Subdivide(ref root);
 
-            // Artificially create child node and copy root node into it.
-            // This is done because BVH traversal skips root node under the assumation there will always be at least one child
-            if (NodesUsed == 1)
+            // Handle edge case of the root node being leaf, by creating a child node as a copy of the root node
+            if (nodesUsed == 1)
             {
-                Nodes[NodesUsed++] = root;
+                Nodes[nodesUsed++] = root;
             }
 
-            TreeDepth = (int)MathF.Ceiling(MathF.Log2(NodesUsed));
+            // +1 because the specifics of the traversal algorithm which tests always this and the next node at once
+            Array.Resize(ref Nodes, nodesUsed + 1);
+
+            TreeDepth = (int)MathF.Ceiling(MathF.Log2(nodesUsed));
         }
 
         public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo, float tMaxDist = float.MaxValue)
@@ -50,7 +58,7 @@ namespace IDKEngine
 
             if (!BVH.CPU_USE_TLAS)
             {
-                ref readonly GLSLBlasNode rootNode = ref Nodes[0];
+                ref readonly GpuBlasNode rootNode = ref Nodes[0];
                 if (!(MyMath.RayCuboidIntersect(ray, rootNode.Min, rootNode.Max, out float tMinRoot, out float tMaxRoot) && tMinRoot < hitInfo.T))
                 {
                     return false;
@@ -62,8 +70,8 @@ namespace IDKEngine
             uint* stack = stackalloc uint[TreeDepth];
             while (true)
             {
-                ref readonly GLSLBlasNode left = ref Nodes[stackTop];
-                ref readonly GLSLBlasNode right = ref Nodes[stackTop + 1];
+                ref readonly GpuBlasNode left = ref Nodes[stackTop];
+                ref readonly GpuBlasNode right = ref Nodes[stackTop + 1];
                 bool leftChildHit = MyMath.RayCuboidIntersect(ray, left.Min, left.Max, out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
                 bool rightChildHit = MyMath.RayCuboidIntersect(ray, right.Min, right.Max, out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
@@ -73,7 +81,7 @@ namespace IDKEngine
                     uint first = (leftChildHit && (left.TriCount > 0)) ? left.TriStartOrLeftChild : right.TriStartOrLeftChild;
                     for (uint k = first; k < first + triCount; k++)
                     {
-                        ref readonly GLSLTriangle triangle = ref Triangles[k];
+                        ref readonly GpuTriangle triangle = ref Triangles[k];
                         if (MyMath.RayTriangleIntersect(ray, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, out Vector3 bary, out float t) && t < hitInfo.T)
                         {
                             hitInfo.Triangle = triangle;
@@ -111,16 +119,11 @@ namespace IDKEngine
             return hitInfo.T != tMaxDist;
         }
 
-        private void Subdivide(ref GLSLBlasNode parentNode)
+        private void Subdivide(ref GpuBlasNode parentNode)
         {
-            if (parentNode.TriCount <= MIN_TRIANGLES_PER_LEAF_COUNT)
-            {
-                return;
-            }
-
             float splitCost = FindBestSplitAxis(parentNode, out int splitAxis, out float splitPos);
-            float parentSAH = CalculateSAH(MyMath.HalfArea(parentNode.Max - parentNode.Min), parentNode.TriCount, 0, 0);
-            if (!(splitCost < parentSAH))
+            float triangleIntersectCost = TriangleIntersectCost * parentNode.TriCount;
+            if (splitCost >= triangleIntersectCost)
             {
                 return;
             }
@@ -131,22 +134,21 @@ namespace IDKEngine
             uint mid = start;
             for (uint i = start; i < end; i++)
             {
-                ref GLSLTriangle tri = ref Triangles[(int)i];
+                ref GpuTriangle tri = ref Triangles[(int)i];
                 if ((tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f < splitPos)
                 {
                     MathHelper.Swap(ref tri, ref Triangles[(int)mid++]);
                 }
             }
 
-            parentNode.TriStartOrLeftChild = (uint)NodesUsed;
+            parentNode.TriStartOrLeftChild = (uint)nodesUsed;
             parentNode.TriCount = 0;
 
-
-            ref GLSLBlasNode leftChild = ref Nodes[NodesUsed++];
+            ref GpuBlasNode leftChild = ref Nodes[nodesUsed++];
             leftChild.TriStartOrLeftChild = start;
             leftChild.TriCount = mid - start;
 
-            ref GLSLBlasNode rightChild = ref Nodes[NodesUsed++];
+            ref GpuBlasNode rightChild = ref Nodes[nodesUsed++];
             rightChild.TriStartOrLeftChild = mid;
             rightChild.TriCount = end - mid;
 
@@ -157,15 +159,15 @@ namespace IDKEngine
             Subdivide(ref rightChild);
         }
 
-        private float FindBestSplitAxis(in GLSLBlasNode node, out int splitAxis, out float splitPos)
+        private float FindBestSplitAxis(in GpuBlasNode parentNode, out int splitAxis, out float splitPos)
         {
             splitAxis = 0;
             splitPos = 0;
 
             Box uniformDivideArea = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-            for (int i = 0; i < node.TriCount; i++)
+            for (int i = 0; i < parentNode.TriCount; i++)
             {
-                ref readonly GLSLTriangle tri = ref Triangles[(int)(node.TriStartOrLeftChild + i)];
+                ref readonly GpuTriangle tri = ref Triangles[(int)(parentNode.TriStartOrLeftChild + i)];
                 Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) / 3.0f;
                 uniformDivideArea.GrowToFit(centroid);
             }
@@ -182,7 +184,7 @@ namespace IDKEngine
                 for (int j = 0; j < SAH_SAMPLES; j++)
                 {
                     float currentSplitPos = uniformDivideArea.Min[i] + (j + 1) * scale;
-                    float currentSplitCost = GetSplitCost(node, i, currentSplitPos);
+                    float currentSplitCost = GetSplitCost(parentNode, i, currentSplitPos);
                     if (currentSplitCost < bestSplitCost)
                     {
                         splitPos = currentSplitPos;
@@ -195,15 +197,15 @@ namespace IDKEngine
             return bestSplitCost;
         }
 
-        private float GetSplitCost(in GLSLBlasNode node, int splitAxis, float splitPos)
+        private float GetSplitCost(in GpuBlasNode parentNode, int splitAxis, float splitPos)
         {
             Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             Box rightBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
             uint leftCount = 0;
-            for (uint i = 0; i < node.TriCount; i++)
+            for (uint i = 0; i < parentNode.TriCount; i++)
             {
-                ref readonly GLSLTriangle tri = ref Triangles[(int)(node.TriStartOrLeftChild + i)];
+                ref readonly GpuTriangle tri = ref Triangles[(int)(parentNode.TriStartOrLeftChild + i)];
 
                 float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f;
                 if (triSplitPos < splitPos)
@@ -216,20 +218,26 @@ namespace IDKEngine
                     rightBox.GrowToFit(tri);
                 }
             }
-            uint rightCount = node.TriCount - leftCount;
+            uint rightCount = parentNode.TriCount - leftCount;
 
-
-            float sah = CalculateSAH(MyMath.HalfArea(leftBox.Max - leftBox.Min), leftCount, MyMath.HalfArea(rightBox.Max - rightBox.Min), rightCount);
+            float sah = CostOfTracingRayAgainstNode(
+                MyMath.HalfArea(parentNode.Max - parentNode.Min),
+                MyMath.HalfArea(leftBox.Max - leftBox.Min),
+                MyMath.HalfArea(rightBox.Max - rightBox.Min),
+                leftCount,
+                rightCount
+            );
+            //float sah = CalculateSAH(MyMath.HalfArea(leftBox.Max - leftBox.Min), leftCount, MyMath.HalfArea(rightBox.Max - rightBox.Min), rightCount);
             return sah;
         }
 
-        private void UpdateNodeBounds(ref GLSLBlasNode node)
+        private void UpdateNodeBounds(ref GpuBlasNode node)
         {
             Box bounds = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
             for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
             {
-                ref readonly GLSLTriangle tri = ref Triangles[(int)i];
+                ref readonly GpuTriangle tri = ref Triangles[(int)i];
                 bounds.GrowToFit(tri);
             }
 
@@ -237,9 +245,18 @@ namespace IDKEngine
             node.Max = bounds.Max;
         }
 
-        private static float CalculateSAH(float area0, uint triangles0, float area1, uint triangles1)
+        // Desribed in https://www.nvidia.in/docs/IO/77714/sbvh.pdf, 2.1 BVH Construction
+        private static float CostOfTracingRayAgainstNode(float areaParent, float areaLeftChild, float areaRightChild, uint numPrimitivesLeftChild, uint numPrimitivesRightChild)
         {
-            return area0 * triangles0 + area1 * triangles1;
+            float probabilityHitLeftChild = areaLeftChild / areaParent;
+            float primitiveCostLeftChild = numPrimitivesLeftChild * TriangleIntersectCost;
+
+            float probabilityHitRightChild = areaRightChild / areaParent;
+            float primitiveCostRightChild = numPrimitivesRightChild * TriangleIntersectCost;
+
+            return 1.0f + // This is the traversal cost. Keep it 1 so we can expose only one ratio as a paramater
+                    probabilityHitLeftChild * primitiveCostLeftChild +
+                    probabilityHitRightChild * primitiveCostRightChild;
         }
     }
 }

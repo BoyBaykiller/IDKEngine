@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    public struct GLSLDrawVertex
+    public struct GpuDrawVertex
     {
         public Vector3 Position;
         private readonly float _pad0;

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
@@ -8,7 +10,7 @@ namespace IDKEngine
     {
         public struct HitInfo
         {
-            public GLSLTriangle Triangle;
+            public GpuTriangle Triangle;
             public Vector3 Bary;
             public float T;
             public int MeshID;
@@ -18,91 +20,111 @@ namespace IDKEngine
         public struct BlasInstances
         {
             public BLAS Blas;
-            public ArraySegment<GLSLMeshInstance> Instances;
+            public ArraySegment<GpuMeshInstance> Instances;
 
-            public void Deconstruct(out BLAS blas, out ArraySegment<GLSLMeshInstance> instances)
+            public void Deconstruct(out BLAS blas, out ArraySegment<GpuMeshInstance> instances)
             {
                 blas = Blas;
                 instances = Instances;
             }
         }
 
-        public GLSLTlasNode Root => Nodes[0];
+        public GpuTlasNode Root => Nodes[0];
         public Box RootBounds => new Box(Root.Min, Root.Max);
-        public int NodesUsed { get; private set; }
+        public int TreeDepth { get; private set; }
 
-        public readonly int TreeDepth;
-        public readonly GLSLTlasNode[] Nodes;
-        public readonly BlasInstances[] BlasesInstances;
-        public TLAS(BlasInstances[] blasesInstances)
+        public List<BlasInstances> BlasesInstances;
+        public GpuTlasNode[] Nodes;
+        private int allBlasInstancesCount;
+        public TLAS()
         {
-            BlasesInstances = blasesInstances;
+            BlasesInstances = new List<BlasInstances>();
+            Nodes = Array.Empty<GpuTlasNode>();
+        }
 
-            int instanceCount = BlasesInstances.Sum(blasInstances => blasInstances.Instances.Count);
-            TreeDepth = (int)MathF.Ceiling(MathF.Log2(instanceCount)) + 1;
-            Nodes = new GLSLTlasNode[2 * instanceCount];
+        public void AddBlases(BlasInstances[] blasesInstances)
+        {
+            BlasesInstances.AddRange(blasesInstances);
+
+            allBlasInstancesCount = BlasesInstances.Sum(blasInstances => blasInstances.Instances.Count);
+            Array.Resize(ref Nodes, 2 * allBlasInstancesCount - 1);
+            TreeDepth = (int)MathF.Ceiling(MathF.Log2(Nodes.Length)) + 2;
         }
 
         public void Build()
         {
-            int instanceCount = BlasesInstances.Sum(blasInstances => blasInstances.Instances.Count);
-            NodesUsed = 0;
+            int nodesUsed = 0;
 
+            // Flatten and transform local space blas instances into
+            // world space tlas nodes. These nodes are the primitives of the the TLAS.
             {
-                for (int i = 0; i < BlasesInstances.Length; i++)
+                for (int i = 0; i < BlasesInstances.Count; i++)
                 {
-                    (BLAS blas, ArraySegment<GLSLMeshInstance> instances) = BlasesInstances[i];
+                    (BLAS blas, ArraySegment<GpuMeshInstance> instances) = BlasesInstances[i];
                     for (int j = 0; j < instances.Count; j++)
                     {
-                        GLSLTlasNode newNode;
-                        newNode.Min = Vector3.TransformPosition(blas.RootBounds.Min, instances[j].ModelMatrix);
-                        newNode.Max = Vector3.TransformPosition(blas.RootBounds.Max, instances[j].ModelMatrix);
+                        GpuTlasNode newNode;
+                        Box worldSpaceBounds = Box.Transformed(new Box(blas.RootBounds.Min, blas.RootBounds.Max), instances[j].ModelMatrix);
+                        newNode.Min = worldSpaceBounds.Min;
+                        newNode.Max = worldSpaceBounds.Max;
                         newNode.LeftChild = 0;
                         newNode.BlasIndex = (uint)i;
 
-                        int newNodeIndex = Nodes.Length - 2 - NodesUsed++;
+                        int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
                         Nodes[newNodeIndex] = newNode;
                     }
                 }
             }
 
-            int nodesSearchCount = instanceCount;
-            int nodesSearchCountBackup = nodesSearchCount;
-            int nodeStart = Nodes.Length - 2;
-            while (nodesSearchCount > 1)
+            // Build TLAS from generated child nodes.
+            // Technique: Every two nodes with the lowest combined area form a parent node.
+            //            Apply this scheme recursivly until only a single root node encompassing the entire scene is left.          
+            //            This exact implementation doesnt run in optimal time complexity but can still be considered real time.    
             {
-                int nodeAId = nodeStart;
-                int nodeBId = FindBestMatch(nodeStart, nodesSearchCount, nodeStart);
-                int nodeCId = FindBestMatch(nodeStart, nodesSearchCount, nodeBId);
-
-                if (nodeStart == nodeCId)
+                int candidatesSearchCount = allBlasInstancesCount;
+                int candidatesSearchCountBackup = candidatesSearchCount;
+                int candidatesSearchStart = Nodes.Length - 1;
+                while (candidatesSearchCount > 1)
                 {
-                    MathHelper.Swap(ref Nodes[nodeStart - 1], ref Nodes[nodeBId]);
-                    nodeBId = nodeStart - 1;
+                    int nodeAId = candidatesSearchStart;
+                    int nodeBId = FindBestMatch(candidatesSearchStart, candidatesSearchCount, nodeAId);
+                    int nodeCId = FindBestMatch(candidatesSearchStart, candidatesSearchCount, nodeBId);
 
-                    ref readonly GLSLTlasNode nodeB = ref Nodes[nodeBId];
-                    ref readonly GLSLTlasNode nodeA = ref Nodes[nodeAId];
+                    // Check if BestMatch(BestMatch(nodeA)) == nodeA, that is a pair of nodes which agree on each other as the
+                    // best candiate to form the smallest possible bounding box out of all left over nodes
+                    if (nodeAId == nodeCId)
+                    {
+                        // Move other child node next to nodeA in memory
+                        MathHelper.Swap(ref Nodes[nodeAId - 1], ref Nodes[nodeBId]);
+                        nodeBId = nodeAId - 1;
 
-                    Box box = new Box(nodeA.Min, nodeA.Max);
-                    box.GrowToFit(nodeB.Min);
-                    box.GrowToFit(nodeB.Max);
+                        ref readonly GpuTlasNode nodeB = ref Nodes[nodeBId];
+                        ref readonly GpuTlasNode nodeA = ref Nodes[nodeAId];
 
-                    int newNodeIndex = Nodes.Length - 2 - NodesUsed++;
+                        Box boundsFittingChildren = new Box(nodeA.Min, nodeA.Max);
+                        boundsFittingChildren.GrowToFit(nodeB.Min);
+                        boundsFittingChildren.GrowToFit(nodeB.Max);
 
-                    GLSLTlasNode newNode = new GLSLTlasNode();
-                    newNode.LeftChild = (uint)nodeBId;
-                    newNode.Min = box.Min;
-                    newNode.Max = box.Max;
+                        GpuTlasNode newNode = new GpuTlasNode();
+                        newNode.LeftChild = (uint)nodeBId;
+                        newNode.Min = boundsFittingChildren.Min;
+                        newNode.Max = boundsFittingChildren.Max;
 
-                    Nodes[newNodeIndex] = newNode;
+                        int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
+                        Nodes[newNodeIndex] = newNode;
 
-                    nodeStart -= 2;
-                    nodesSearchCount = nodesSearchCountBackup - 1;
-                    nodesSearchCountBackup = nodesSearchCount;
-                }
-                else
-                {
-                    MathHelper.Swap(ref Nodes[nodeStart], ref Nodes[nodeStart - --nodesSearchCount]);
+                        // By subtracting two, the two child nodes (nodeAId, nodeBId) will no longer be included in the search for potential candidates
+                        candidatesSearchStart -= 2;
+
+                        // Newly created parent should be included in the search for potential candidates which is why -1 (i know intuitively should be +1 but we are building in reverse)
+                        candidatesSearchCount = candidatesSearchCountBackup - 1;
+                        candidatesSearchCountBackup = candidatesSearchCount;
+                    }
+                    else
+                    {
+                        // If no pair was found we swap nodeAID out with the end node, and exclude nodeAID for future search until a pair is found.
+                        MathHelper.Swap(ref Nodes[nodeAId], ref Nodes[nodeAId - --candidatesSearchCount]);
+                    }
                 }
             }
         }
@@ -112,7 +134,7 @@ namespace IDKEngine
             float smallestArea = float.MaxValue;
             int bestNodeIndex = -1;
 
-            ref readonly GLSLTlasNode node = ref Nodes[nodeIndex];
+            ref readonly GpuTlasNode node = ref Nodes[nodeIndex];
             for (int i = start; i > start - count; i--)
             {
                 if (i == nodeIndex)
@@ -120,7 +142,7 @@ namespace IDKEngine
                     continue;
                 }
 
-                ref readonly GLSLTlasNode otherNode = ref Nodes[i];
+                ref readonly GpuTlasNode otherNode = ref Nodes[i];
 
                 Box fittingBox = new Box(node.Min, node.Max);
                 fittingBox.GrowToFit(otherNode.Min);
@@ -137,7 +159,7 @@ namespace IDKEngine
             return bestNodeIndex;
         }
 
-        public static uint debugMaxStack = 0;
+        public static int debugMaxStack = 0;
         public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo, float tMax = float.MaxValue)
         {
             hitInfo = new HitInfo();
@@ -145,14 +167,13 @@ namespace IDKEngine
 
             uint stackPtr = 0;
             uint stackTop = 0;
-            // FIX: Why is requied stack so much bigger than expected?
-            uint* stack = stackalloc uint[TreeDepth * 10];
+            uint* stack = stackalloc uint[TreeDepth];
             while (true)
             {
-                ref readonly GLSLTlasNode parent = ref Nodes[stackTop];
+                ref readonly GpuTlasNode parent = ref Nodes[stackTop];
                 if (parent.IsLeaf())
                 {
-                    BlasInstances blasInstances = BlasesInstances[parent.BlasIndex];
+                    BlasInstances blasInstances = BlasesInstances[(int)parent.BlasIndex];
                     BLAS blas = blasInstances.Blas;
 
                     int glInstanceID = 0; // TODO: Work out actual instanceID value
@@ -168,15 +189,14 @@ namespace IDKEngine
                     }
 
                     if (stackPtr == 0) break;
-                    debugMaxStack = Math.Max(stackTop, stackPtr - 1);
                     stackTop = stack[--stackPtr];
                     continue;
                 }
 
                 uint leftChild = parent.LeftChild;
                 uint rightChild = leftChild + 1;
-                ref readonly GLSLTlasNode left = ref Nodes[leftChild];
-                ref readonly GLSLTlasNode right = ref Nodes[rightChild];
+                ref readonly GpuTlasNode left = ref Nodes[leftChild];
+                ref readonly GpuTlasNode right = ref Nodes[rightChild];
                 bool leftChildHit = MyMath.RayCuboidIntersect(ray, left.Min, left.Max, out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
                 bool rightChildHit = MyMath.RayCuboidIntersect(ray, right.Min, right.Max, out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
@@ -186,7 +206,7 @@ namespace IDKEngine
                     {
                         bool leftCloser = tMinLeft < tMinRight;
                         stackTop = leftCloser ? leftChild : rightChild;
-                        debugMaxStack = Math.Max(stackTop, stackPtr);
+                        debugMaxStack = Helper.InterlockedMax(ref debugMaxStack, (int)(stackPtr));
                         stack[stackPtr++] = leftCloser ? rightChild : leftChild;   
                     }
                     else
@@ -197,7 +217,6 @@ namespace IDKEngine
                 else
                 {
                     if (stackPtr == 0) break;
-                    debugMaxStack = Math.Max(stackTop, stackPtr - 1);
                     stackTop = stack[--stackPtr];
                 }
             }

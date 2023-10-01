@@ -120,10 +120,8 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height)
         {
-            width /= 2;
-            height /= 2;
-            width = Math.Max(width, 1);
-            height = Math.Max(height, 1);
+            width = (int)MathF.Ceiling(width / 2);
+            height = (int)MathF.Ceiling(height / 2);
 
             lodCount = Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - MinusLods, 2);
 

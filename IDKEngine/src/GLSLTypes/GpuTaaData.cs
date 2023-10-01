@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    struct GLSLTaaData
+    struct GpuTaaData
     {
         public Vector2 Jitter;
         public int Samples;

@@ -27,7 +27,8 @@ struct Material
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
-    vec2 _pad0;
+    float _pad0;
+    float AlphaCutoff;
     float RoughnessFactor;
     float MetallicFactor;
 
@@ -45,6 +46,8 @@ struct DrawElementsCmd
     uint FirstIndex;
     uint BaseVertex;
     uint BaseInstance;
+
+    uint BlasRootNodeIndex;
 };
 
 struct Mesh
@@ -289,19 +292,25 @@ bool TraceRay(inout TransportRay transportRay)
 
             Mesh mesh = meshSSBO.Meshes[hitInfo.MeshID];
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
-
-            vec4 albedoAlpha = texture(material.BaseColor, texCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
-            albedo = albedoAlpha.rgb;
-            refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
-            emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
-            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
-            roughness = clamp(texture(material.MetallicRoughness, texCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
+            
             normal = texture(material.Normal, texCoord).rgb;
             normal = normalize(TBN * normalize(normal * 2.0 - 1.0));
             mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             normal = mix(normalize(normalToWorld * geoNormal), normal, mesh.NormalMapStrength);
+
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;
+            vec4 albedoAlpha = texture(material.BaseColor, texCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
+            albedo = albedoAlpha.rgb;
+            emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
+            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+            refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
+            roughness = clamp(texture(material.MetallicRoughness, texCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
+            if (albedoAlpha.a < material.AlphaCutoff)
+            {
+                refractionChance = 1.0;
+                roughness = 0.0;
+            }
         }
         else
         {

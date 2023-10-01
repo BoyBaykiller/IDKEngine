@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    struct GLSLBasicData
+    struct GpuBasicData
     {
         public Matrix4 ProjView;
         public Matrix4 View;

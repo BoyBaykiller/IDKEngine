@@ -19,6 +19,7 @@ namespace IDKEngine.Render.Objects
 
         public readonly int ID;
         public readonly ShaderType ShaderType;
+        public static string debugShaderString;
         public Shader(ShaderType shaderType, string srcCode, Dictionary<string, string> shaderInsertions = null)
         {
             ShaderType = shaderType;
@@ -26,6 +27,7 @@ namespace IDKEngine.Render.Objects
             ID = GL.CreateShader(shaderType);
 
             srcCode = PreProcess(srcCode, shaderInsertions);
+            debugShaderString = srcCode;
 
             GL.ShaderSource(ID, srcCode);
             GL.CompileShader(ID);

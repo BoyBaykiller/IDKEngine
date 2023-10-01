@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
@@ -8,46 +9,47 @@ namespace IDKEngine.Render
 {
     class ModelSystem : IDisposable
     {
-        public GLSLDrawElementsCmd[] DrawCommands;
+        public GpuDrawElementsCmd[] DrawCommands;
         private readonly BufferObject drawCommandBuffer;
 
-        public GLSLMesh[] Meshes;
+        public GpuMesh[] Meshes;
         private readonly BufferObject meshBuffer;
 
-        public GLSLMeshInstance[] MeshInstances;
+        public GpuMeshInstance[] MeshInstances;
         private readonly BufferObject meshInstanceBuffer;
 
-        public GLSLMaterial[] Materials;
+        public GpuMaterial[] Materials;
         private readonly BufferObject materialBuffer;
 
-        public GLSLDrawVertex[] Vertices;
+        public GpuDrawVertex[] Vertices;
         private readonly BufferObject vertexBuffer;
 
         public uint[] Indices;
         private readonly BufferObject elementBuffer;
 
+        public BVH BVH;
 
         private readonly VAO vao;
         private readonly ShaderProgram frustumCullingProgram;
         public unsafe ModelSystem()
         {
-            DrawCommands = Array.Empty<GLSLDrawElementsCmd>();
+            DrawCommands = Array.Empty<GpuDrawElementsCmd>();
             drawCommandBuffer = new BufferObject();
             drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
 
-            Meshes = Array.Empty<GLSLMesh>();
+            Meshes = Array.Empty<GpuMesh>();
             meshBuffer = new BufferObject();
             meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
 
-            MeshInstances = Array.Empty<GLSLMeshInstance>();
+            MeshInstances = Array.Empty<GpuMeshInstance>();
             meshInstanceBuffer = new BufferObject();
             meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
 
-            Materials = Array.Empty<GLSLMaterial>();
+            Materials = Array.Empty<GpuMaterial>();
             materialBuffer = new BufferObject();
             materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
 
-            Vertices = Array.Empty<GLSLDrawVertex>();
+            Vertices = Array.Empty<GpuDrawVertex>();
             vertexBuffer = new BufferObject();
 
             Indices = Array.Empty<uint>();
@@ -55,13 +57,15 @@ namespace IDKEngine.Render
 
             vao = new VAO();
             vao.SetElementBuffer(elementBuffer);
-            vao.AddSourceBuffer(vertexBuffer, 0, sizeof(GLSLDrawVertex));
+            vao.AddSourceBuffer(vertexBuffer, 0, sizeof(GpuDrawVertex));
             vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
             vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
             vao.SetAttribFormatI(0, 2, 1, VertexAttribType.UnsignedInt, sizeof(float) * 6); // Tangent
             vao.SetAttribFormatI(0, 3, 1, VertexAttribType.UnsignedInt, sizeof(float) * 7); // Normal
 
             frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/SingleView/Frustum/compute.glsl")));
+
+            BVH = new BVH();
         }
 
         public unsafe void Add(params Model[] models)
@@ -85,25 +89,48 @@ namespace IDKEngine.Render
                 LoadModelMatrices(models[i].MeshInstances);
             }
 
-            drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GLSLDrawElementsCmd), DrawCommands);
-            meshBuffer.MutableAllocate(Meshes.Length * sizeof(GLSLMesh), Meshes);
-            materialBuffer.MutableAllocate(Materials.Length * sizeof(GLSLMaterial), Materials);
-            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GLSLDrawVertex), Vertices);
-            elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
-            meshInstanceBuffer.MutableAllocate(MeshInstances.Length * sizeof(GLSLMeshInstance), (IntPtr)0);
+            {
+                int addedDrawCommands = models.Sum(model => model.DrawCommands.Length);
+                int prevDrawCommandsLength = DrawCommands.Length - addedDrawCommands;
+                Memory<GpuDrawElementsCmd> newDrawCommands = new Memory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, addedDrawCommands);
+                BVH.AddMeshesAndBuild(newDrawCommands, MeshInstances, Vertices, Indices);
 
-            UpdateMeshInstanceBuffer(0, MeshInstances.Length);
+                // Caculate root node offset in blas buffer for each mesh
+                uint bvhNodesExclusiveSum = 0;
+                for (int i = 0; i < DrawCommands.Length; i++)
+                {
+                    DrawCommands[i].BlasRootNodeIndex = bvhNodesExclusiveSum;
+                    bvhNodesExclusiveSum += (uint)BVH.Tlas.BlasesInstances[i].Blas.Nodes.Length;
+                }
+            }
+
+            drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GpuDrawElementsCmd), DrawCommands);
+            meshBuffer.MutableAllocate(Meshes.Length * sizeof(GpuMesh), Meshes);
+            materialBuffer.MutableAllocate(Materials.Length * sizeof(GpuMaterial), Materials);
+            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GpuDrawVertex), Vertices);
+            elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
+            meshInstanceBuffer.MutableAllocate(MeshInstances.Length * sizeof(GpuMeshInstance), MeshInstances);
         }
 
         public unsafe void Draw()
         {
+            if (Meshes.Length == 0)
+            {
+                return;
+            }
+
             vao.Bind();
             drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GLSLDrawElementsCmd));
+            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GpuDrawElementsCmd));
         }
 
         public unsafe void FrustumCull(in Matrix4 projView)
         {
+            if (Meshes.Length == 0)
+            {
+                return;
+            }
+
             frustumCullingProgram.Use();
             frustumCullingProgram.Upload(0, projView);
 
@@ -111,34 +138,32 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
         }
 
-
         public unsafe void UpdateMeshBuffer(int start, int count)
         {
             if (count == 0) return;
-            meshBuffer.SubData(start * sizeof(GLSLMesh), count * sizeof(GLSLMesh), Meshes[start]);
+            meshBuffer.SubData(start * sizeof(GpuMesh), count * sizeof(GpuMesh), Meshes[start]);
         }
 
         public unsafe void UpdateDrawCommandBuffer(int start, int count)
         {
             if (count == 0) return;
-            drawCommandBuffer.SubData(start * sizeof(GLSLDrawElementsCmd), count * sizeof(GLSLDrawElementsCmd), DrawCommands[start]);
+            drawCommandBuffer.SubData(start * sizeof(GpuDrawElementsCmd), count * sizeof(GpuDrawElementsCmd), DrawCommands[start]);
         }
 
         public unsafe void UpdateMeshInstanceBuffer(int start, int count)
         {
             if (count == 0) return;
-            meshInstanceBuffer.SubData(start * sizeof(GLSLMeshInstance), count * sizeof(GLSLMeshInstance), MeshInstances[start]);
+            meshInstanceBuffer.SubData(start * sizeof(GpuMeshInstance), count * sizeof(GpuMeshInstance), MeshInstances[start]);
         }
 
-        private void LoadDrawCommands(GLSLDrawElementsCmd[] drawCommands)
+        private void LoadDrawCommands(ReadOnlySpan<GpuDrawElementsCmd> drawCommands)
         {
             int prevCmdLength = DrawCommands.Length;
             int prevIndicesLength = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].FirstIndex + DrawCommands[prevCmdLength - 1].Count;
             int prevBaseVertex = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].BaseVertex + GetMeshVertexCount(prevCmdLength - 1);
 
             Array.Resize(ref DrawCommands, prevCmdLength + drawCommands.Length);
-
-            Array.Copy(drawCommands, 0, DrawCommands, prevCmdLength, drawCommands.Length);
+            drawCommands.CopyTo(new Span<GpuDrawElementsCmd>(DrawCommands, prevCmdLength, drawCommands.Length));
 
             for (int i = 0; i < drawCommands.Length; i++)
             {
@@ -148,41 +173,41 @@ namespace IDKEngine.Render
                 DrawCommands[prevCmdLength + i].FirstIndex += prevIndicesLength;
             }
         }
-        private void LoadMeshes(GLSLMesh[] meshes)
+        private void LoadMeshes(ReadOnlySpan<GpuMesh> meshes)
         {
             int prevMeshesLength = Meshes.Length;
             int prevMaterialsLength = Materials.Length;
             Array.Resize(ref Meshes, prevMeshesLength + meshes.Length);
-            Array.Copy(meshes, 0, Meshes, prevMeshesLength, meshes.Length);
+            meshes.CopyTo(new Span<GpuMesh>(Meshes, prevMeshesLength, meshes.Length));
 
             for (int i = 0; i < meshes.Length; i++)
             {
                 Meshes[prevMeshesLength + i].MaterialIndex += prevMaterialsLength;
             }
         }
-        private void LoadModelMatrices(GLSLMeshInstance[] matrices)
+        private void LoadModelMatrices(ReadOnlySpan<GpuMeshInstance> meshInstances)
         {
             int prevMatricesLength = MeshInstances.Length;
-            Array.Resize(ref MeshInstances, prevMatricesLength + matrices.Length);
-            Array.Copy(matrices, 0, MeshInstances, prevMatricesLength, matrices.Length);
+            Array.Resize(ref MeshInstances, prevMatricesLength + meshInstances.Length);
+            meshInstances.CopyTo(new Span<GpuMeshInstance>(MeshInstances, prevMatricesLength, meshInstances.Length));
         }
-        private void LoadMaterials(GLSLMaterial[] materials)
+        private void LoadMaterials(ReadOnlySpan<GpuMaterial> materials)
         {
             int prevMaterialsLength = Materials.Length;
             Array.Resize(ref Materials, prevMaterialsLength + materials.Length);
-            Array.Copy(materials, 0, Materials, prevMaterialsLength, materials.Length);
+            materials.CopyTo(new Span<GpuMaterial>(Materials, prevMaterialsLength, materials.Length));
         }
-        private void LoadIndices(uint[] indices)
+        private void LoadIndices(ReadOnlySpan<uint> indices)
         {
             int prevIndicesLength = Indices.Length;
             Array.Resize(ref Indices, prevIndicesLength + indices.Length);
-            Array.Copy(indices, 0, Indices, prevIndicesLength, indices.Length);
+            indices.CopyTo(new Span<uint>(Indices, prevIndicesLength, indices.Length));
         }
-        private void LoadVertices(GLSLDrawVertex[] vertices)
+        private void LoadVertices(ReadOnlySpan<GpuDrawVertex> vertices)
         {
             int prevVerticesLength = Vertices.Length;
             Array.Resize(ref Vertices, prevVerticesLength + vertices.Length);
-            Array.Copy(vertices, 0, Vertices, prevVerticesLength, vertices.Length);
+            vertices.CopyTo(new Span<GpuDrawVertex>(Vertices, prevVerticesLength, vertices.Length));
         }
 
         public int GetMeshVertexCount(int meshIndex)

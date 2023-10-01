@@ -262,7 +262,6 @@ namespace IDKEngine
             Vector3 tsmaller = Vector3.ComponentMin(t0s, t1s);
             Vector3 tbigger = Vector3.ComponentMax(t0s, t1s);
 
-
             t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, tsmaller.Z)));
             t2 = MathF.Min(t2, MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z)));
 
@@ -270,7 +269,7 @@ namespace IDKEngine
         }
 
         // Source: https://antongerdelan.net/opengl/raycasting.html
-        public static bool RaySphereIntersect(in Ray ray, in GLSLLight light, out float t1, out float t2)
+        public static bool RaySphereIntersect(in Ray ray, in GpuLight light, out float t1, out float t2)
         {
             t1 = t2 = float.MaxValue;
 

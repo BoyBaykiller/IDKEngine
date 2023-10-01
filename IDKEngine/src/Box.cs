@@ -53,7 +53,7 @@ namespace IDKEngine
             GrowToFit(box.SIMDMax);
         }
 
-        public void GrowToFit(in GLSLTriangle tri)
+        public void GrowToFit(in GpuTriangle tri)
         {
             GrowToFit(tri.Vertex0.Position);
             GrowToFit(tri.Vertex1.Position);

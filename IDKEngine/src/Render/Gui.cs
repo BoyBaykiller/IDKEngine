@@ -24,15 +24,19 @@ namespace IDKEngine.Render
             Replaying,
         }
 
+        public struct SelectedEntityInfo
+        {
+            public EntityType Type;
+            public int Index;
+            public float Distance;
+        }
+
         public ImGuiBackend Backend { get; private set; }
         private bool isInfiniteReplay;
         private bool isVideoRender;
         private int recordingRenderSampleGoal;
 
-        public EntityType SelectedEntityType;
-        public int SelectedEntityIndex;
-        private float selectedEntityDist;
-
+        public SelectedEntityInfo SelectedEntity;
         private FrameRecorderState frameRecState;
         private int recordingFPS;
         public Gui(int width, int height)
@@ -46,7 +50,6 @@ namespace IDKEngine.Render
         }
 
         private System.Numerics.Vector2 viewportHeaderSize;
-
         public void Draw(Application app, float frameTime)
         {
             Backend.Update(app, frameTime);
@@ -137,8 +140,8 @@ namespace IDKEngine.Render
             {
                 ImGui.Text($"FPS: {app.FPS}");
                 ImGui.Text($"Viewport size: {app.RenderPresentationResolution.X}x{app.RenderPresentationResolution.Y}");
-                ImGui.Text($"{Helper.API}");
                 ImGui.Text($"{Helper.GPU}");
+                ImGui.Text($"Triangles: {app.ModelSystem.Indices.Length / 3}");
 
                 if (app.RenderMode == RenderMode.PathTracer)
                 {
@@ -155,6 +158,12 @@ namespace IDKEngine.Render
                 if (ImGui.SliderFloat("ResolutionScale", ref tempFloat, 0.1f, 1.0f))
                 {
                     app.ResolutionScale = Math.Max(tempFloat, 0.1f);
+                }
+
+                tempFloat = MathHelper.RadiansToDegrees(app.CameraFovY);
+                if (ImGui.SliderFloat("FovY", ref tempFloat, 10.0f, 130.0f))
+                {
+                    app.CameraFovY = MathHelper.DegreesToRadians(tempFloat);
                 }
 
                 string current = app.RenderMode.ToString();
@@ -652,8 +661,30 @@ namespace IDKEngine.Render
                     Light light = new Light(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
                     if (app.LightManager.AddLight(light))
                     {
-                        SelectedEntityType = EntityType.Light;
-                        SelectedEntityIndex = app.LightManager.Count - 1;
+                        SelectedEntity.Type = EntityType.Light;
+                        SelectedEntity.Index = app.LightManager.Count - 1;
+                        shouldResetPT = true;
+                    }
+                }
+
+                if (ImGui.Button("Load model"))
+                {
+                    NativeFileDialogSharp.DialogResult result = NativeFileDialogSharp.Dialog.FileOpen("gltf", null);
+                    if (result.IsError)
+                    {
+                        Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
+                    }
+                    else
+                    {
+                        Model newModel = new Model(result.Path);
+                        app.ModelSystem.Add(newModel);
+
+                        SelectedEntity.Index = app.ModelSystem.Meshes.Length - 1;
+                        SelectedEntity.Type = EntityType.Mesh; 
+                        ref readonly GpuDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[SelectedEntity.Index];
+                        Vector3 position = app.ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix.ExtractTranslation();
+                        SelectedEntity.Distance = Vector3.Distance(position, app.Camera.Position);
+
                         shouldResetPT = true;
                     }
                 }
@@ -661,17 +692,17 @@ namespace IDKEngine.Render
 
             ImGui.Begin("Entity Properties");
             {
-                if (SelectedEntityType != EntityType.None)
+                if (SelectedEntity.Type != EntityType.None)
                 {
-                    ImGui.Text($"{SelectedEntityType}ID: {SelectedEntityIndex}");
-                    ImGui.Text($"Distance: {MathF.Round(selectedEntityDist, 3)}");
+                    ImGui.Text($"{SelectedEntity.Type}ID: {SelectedEntity.Index}");
+                    ImGui.Text($"Distance: {MathF.Round(SelectedEntity.Distance, 3)}");
                 }
-                if (SelectedEntityType == EntityType.Mesh)
+                if (SelectedEntity.Type == EntityType.Mesh)
                 {
                     bool shouldUpdateMesh = false;
-                    ref readonly GLSLDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[SelectedEntityIndex];
-                    ref GLSLMesh mesh = ref app.ModelSystem.Meshes[SelectedEntityIndex];
-                    ref GLSLMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance];
+                    ref readonly GpuDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[SelectedEntity.Index];
+                    ref GpuMesh mesh = ref app.ModelSystem.Meshes[SelectedEntity.Index];
+                    ref GpuMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");
@@ -694,6 +725,17 @@ namespace IDKEngine.Render
                         shouldUpdateMesh = true;
                         Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTK(), new Vector3(0.001f));
                         meshInstance.ModelMatrix = Matrix4.CreateScale(temp) * meshInstance.ModelMatrix.ClearScale();
+                    }
+
+                    meshInstance.ModelMatrix.ExtractRotation().ToEulerAngles(out Vector3 angles);
+                    systemVec3 = angles.ToNumerics();
+                    if (ImGui.DragFloat3("Rotation", ref systemVec3, 0.005f))
+                    {
+                        shouldUpdateMesh = true;
+                        meshInstance.ModelMatrix = Matrix4.CreateRotationZ(systemVec3.ToOpenTK().Z) *
+                                                   Matrix4.CreateRotationY(systemVec3.ToOpenTK().Y) *
+                                                   Matrix4.CreateRotationX(systemVec3.ToOpenTK().X) *
+                                                   meshInstance.ModelMatrix.ClearRotation();
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
@@ -739,20 +781,20 @@ namespace IDKEngine.Render
                     if (shouldUpdateMesh)
                     {
                         shouldResetPT = true;
-                        app.ModelSystem.UpdateMeshBuffer(SelectedEntityIndex, 1);
+                        app.ModelSystem.UpdateMeshBuffer(SelectedEntity.Index, 1);
                     }
                 }
-                else if (SelectedEntityType == EntityType.Light)
+                else if (SelectedEntity.Type == EntityType.Light)
                 {
                     bool shouldUpdateLight = false;
                     
-                    app.LightManager.TryGetLight(SelectedEntityIndex, out Light abstractLight);
-                    ref GLSLLight light = ref abstractLight.GLSLLight;
+                    app.LightManager.TryGetLight(SelectedEntity.Index, out Light abstractLight);
+                    ref GpuLight light = ref abstractLight.GLSLLight;
 
                     if (ImGui.Button("Delete"))
                     {
-                        app.LightManager.RemoveLight(SelectedEntityIndex);
-                        SelectedEntityType = EntityType.None;
+                        app.LightManager.RemoveLight(SelectedEntity.Index);
+                        SelectedEntity.Type = EntityType.None;
                         shouldResetPT = true;
                     }
                     else
@@ -788,7 +830,7 @@ namespace IDKEngine.Render
                         {
                             if (ImGui.Button("Delete PointShadow"))
                             {
-                                app.LightManager.DeletePointShadowOfLight(SelectedEntityIndex);
+                                app.LightManager.DeletePointShadowOfLight(SelectedEntity.Index);
                             }
                         }
                         else
@@ -796,7 +838,7 @@ namespace IDKEngine.Render
                             if (ImGui.Button("Create PointShadow"))
                             {
                                 PointShadow pointShadow = new PointShadow(256, 0.5f, 60.0f);
-                                app.LightManager.CreatePointShadowForLight(pointShadow, SelectedEntityIndex);
+                                app.LightManager.CreatePointShadowForLight(pointShadow, SelectedEntity.Index);
                             }
                         }
 
@@ -820,7 +862,6 @@ namespace IDKEngine.Render
                         if (shouldUpdateLight)
                         {
                             shouldResetPT = true;
-                            app.LightManager.UpdateLightBuffer(SelectedEntityIndex);
                         }
                     }
                 }
@@ -979,30 +1020,32 @@ namespace IDKEngine.Render
                     return;
                 }
 
-                Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
+                Ray worldSpaceRay;
+                //TLAS.debugMaxStack = 0;
                 //Stopwatch timer = Stopwatch.StartNew();
-                //Parallel.For(0, app.RenderResolution.X * app.RenderResolution.Y, i =>
+                //System.Threading.Tasks.Parallel.For(0, app.RenderResolution.X * app.RenderResolution.Y, i =>
                 //{
                 //    int y = i / app.RenderResolution.X;
                 //    int x = i % app.RenderResolution.X;
 
-                //    ndc = new Vector2((float)x / app.RenderResolution.X, (float)y / app.RenderResolution.Y) * 2.0f - new Vector2(1.0f);
-                //    worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
+                //    Vector2 ndcDebug = new Vector2((float)x / app.RenderResolution.X, (float)y / app.RenderResolution.Y) * 2.0f - new Vector2(1.0f);
+                //    worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndcDebug);
 
-                //    app.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo test);
+                //    app.ModelSystem.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo test);
                 //});
                 //timer.Stop();
                 //Console.WriteLine(timer.Elapsed.TotalMilliseconds);
                 //Console.WriteLine($"stack size required: {TLAS.debugMaxStack}");
-                //Console.WriteLine($"actual stack size: {app.BVH.Tlas.TreeDepth}");
+                //Console.WriteLine($"actual stack size: {app.ModelSystem.BVH.Tlas.TreeDepth}");
+                worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
 
-                bool hitMesh = app.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo meshHitInfo);
+                bool hitMesh = app.ModelSystem.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);
                 if (app.RenderMode == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
 
                 if (!hitMesh && !hitLight)
                 {
-                    SelectedEntityType = EntityType.None;
+                    SelectedEntity.Type = EntityType.None;
                     return;
                 }
 
@@ -1013,26 +1056,26 @@ namespace IDKEngine.Render
                 EntityType hitEntityType;
                 if (meshHitInfo.T < lightHitInfo.T)
                 {
-                    selectedEntityDist = meshHitInfo.T;
+                    SelectedEntity.Distance = meshHitInfo.T;
                     hitEntityType = EntityType.Mesh;
                     hitEntityID = meshHitInfo.MeshID;
                 }
                 else
                 {
-                    selectedEntityDist = lightHitInfo.T;
+                    SelectedEntity.Distance = lightHitInfo.T;
                     hitEntityType = EntityType.Light;
                     hitEntityID = lightHitInfo.LightID;
                 }
 
-                if ((hitEntityID == SelectedEntityIndex) && (hitEntityType == SelectedEntityType))
+                if ((hitEntityID == SelectedEntity.Index) && (hitEntityType == SelectedEntity.Type))
                 {
-                    SelectedEntityType = EntityType.None;
-                    SelectedEntityIndex = -1;
+                    SelectedEntity.Type = EntityType.None;
+                    SelectedEntity.Index = -1;
                 }
                 else
                 {
-                    SelectedEntityIndex = hitEntityID;
-                    SelectedEntityType = hitEntityType;
+                    SelectedEntity.Index = hitEntityID;
+                    SelectedEntity.Type = hitEntityType;
                 }
             }
 

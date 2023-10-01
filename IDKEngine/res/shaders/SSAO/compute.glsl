@@ -49,7 +49,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    float depth = texture(gBufferDataUBO.Depth, uv).r;
+    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
@@ -57,7 +57,7 @@ void main()
     }
     InitializeRandomSeed(imgCoord.y * 4096 + imgCoord.x);
 
-    vec3 normal = texture(gBufferDataUBO.NormalSpecular, uv).rgb;
+    vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
 
     vec3 fragPos = NDCToView(vec3(uv, depth) * 2.0 - 1.0);
     mat3 normalToView = mat3(transpose(basicDataUBO.InvView));

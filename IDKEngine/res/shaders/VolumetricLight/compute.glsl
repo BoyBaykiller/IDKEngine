@@ -95,13 +95,15 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec3 uvw = vec3(uv, texture(gBufferDataUBO.Depth, uv).r);
+    vec3 uvw = vec3(uv, texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r);
     vec3 viewToFrag = UvDepthToWorldSpace(uvw, basicDataUBO.InvProjView) - basicDataUBO.ViewPos;
     float viewToFragLen = length(viewToFrag);
     vec3 viewDir = viewToFrag / viewToFragLen;
     
     if (viewToFragLen > MaxDist)
+    {
         viewToFrag = viewDir * MaxDist;
+    }
 
     vec3 deltaStep = viewToFrag / Samples;
     float offset = InterleavedGradientNoise(imgCoord, IsTemporalAccumulation ? (basicDataUBO.Frame % taaDataUBO.Samples) : 0u);

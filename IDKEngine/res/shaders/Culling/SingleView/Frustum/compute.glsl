@@ -11,6 +11,8 @@ struct DrawElementsCmd
     uint FirstIndex;
     uint BaseVertex;
     uint BaseInstance;
+
+    uint BlasRootNodeIndex;
 };
 
 struct Mesh
@@ -68,10 +70,12 @@ void main()
 {
     uint meshIndex = gl_GlobalInvocationID.x;
     if (meshIndex >= meshSSBO.Meshes.length())
+    {
         return;
+    }
 
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshIndex];
-    BlasNode node = blasSSBO.Nodes[2 * (drawCmd.FirstIndex / 3)];
+    BlasNode node = blasSSBO.Nodes[drawCmd.BlasRootNodeIndex];
     
     const uint glInstanceID = 0; // TODO: Derive from built in variables
     mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].ModelMatrix;

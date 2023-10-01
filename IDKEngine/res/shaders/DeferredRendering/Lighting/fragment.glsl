@@ -99,7 +99,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_FragCoord.xy);
     vec2 uv = inData.TexCoord;
     
-    float depth = textureLod(gBufferDataUBO.Depth, uv, 0.0).r;
+    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
         FragColor = vec4(0.0);
@@ -110,12 +110,12 @@ void main()
     vec3 fragPos = NdcToWorldSpace(ndc, basicDataUBO.InvProjView);
     vec3 unjitteredFragPos = NdcToWorldSpace(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), basicDataUBO.InvProjView);
 
-    vec3 albedo = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).rgb;
-    float alpha = textureLod(gBufferDataUBO.AlbedoAlpha, uv, 0.0).a;
-    vec3 normal = textureLod(gBufferDataUBO.NormalSpecular, uv, 0.0).rgb;
-    float specular = textureLod(gBufferDataUBO.NormalSpecular, uv, 0.0).a;
-    vec3 emissive = textureLod(gBufferDataUBO.EmissiveRoughness, uv, 0.0).rgb;
-    float roughness = textureLod(gBufferDataUBO.EmissiveRoughness, uv, 0.0).a;
+    vec3 albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
+    float alpha = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).a;
+    vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
+    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
+    vec3 emissive = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).rgb;
+    float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
 
     vec3 viewDir = normalize(fragPos - basicDataUBO.ViewPos);
 
@@ -138,13 +138,13 @@ void main()
     vec3 indirectLight;
     if (IsVXGI)
     {
-        indirectLight = texture(SamplerIndirectLighting, uv).rgb * albedo;
+        indirectLight = texelFetch(SamplerIndirectLighting, imgCoord, 0).rgb * albedo;
     }
     else
     {
         indirectLight = vec3(0.03) * albedo;
     }
-    float ambientOcclusion = 1.0 - texture(SamplerAO, uv).r;
+    float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
     FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, alpha);
 }

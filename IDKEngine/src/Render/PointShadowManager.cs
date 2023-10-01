@@ -34,7 +34,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/MultiView/Frustum/shadowCompute.glsl")));
 
             pointShadowsBuffer = new BufferObject();
-            pointShadowsBuffer.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GLSLPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            pointShadowsBuffer.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
         }
 
@@ -94,7 +94,7 @@ namespace IDKEngine.Render
                 return;
             }
 
-            pointShadowsBuffer.SubData(index * sizeof(GLSLPointShadow), sizeof(GLSLPointShadow), pointShadow.GetGLSLData());
+            pointShadowsBuffer.SubData(index * sizeof(GpuPointShadow), sizeof(GpuPointShadow), pointShadow.GetGLSLData());
         }
 
         public bool TryGetPointShadow(int index, out PointShadow pointShadow)

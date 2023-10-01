@@ -14,7 +14,8 @@ struct Material
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
-    vec2 _pad0;
+    float _pad0;
+    float AlphaCutoff;
     float RoughnessFactor;
     float MetallicFactor;
 
@@ -81,6 +82,10 @@ void main()
     float lod = textureQueryLod(material.BaseColor, inData.TexCoord).y;
 
     vec4 albedoAlpha = textureLod(material.BaseColor, inData.TexCoord, lod + taaDataUBO.MipmapBias) * DecompressUR8G8B8A8(material.BaseColorFactor);
+    if (albedoAlpha.a < material.AlphaCutoff)
+    {
+        discard;
+    }
     vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = normalize(inData.TangentToWorld * normalize(normal * 2.0 - 1.0));

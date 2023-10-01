@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    struct GLSLTlasNode
+    struct GpuTlasNode
     {
         public Vector3 Min;
         public uint LeftChild;

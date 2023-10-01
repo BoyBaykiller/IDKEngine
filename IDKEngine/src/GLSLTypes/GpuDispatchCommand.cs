@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine
 {
-    struct GLSLDispatchCommand
+    struct GpuDispatchCommand
     {
         public uint NumGroupsX;
         public uint NumGroupsY;
