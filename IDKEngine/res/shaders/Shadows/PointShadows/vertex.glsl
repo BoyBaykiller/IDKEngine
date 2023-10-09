@@ -64,7 +64,7 @@ layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 

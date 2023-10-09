@@ -15,24 +15,24 @@ namespace IDKEngine.Render
 
         public unsafe Vector3 GridMin
         {
-            get => glslVoxelizerData.GridMin;
+            get => gpuVoxelizerData.GridMin;
 
             set
             {
-                glslVoxelizerData.GridMin = Vector3.ComponentMin(value, glslVoxelizerData.GridMax - new Vector3(0.1f));
-                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
-                voxelizerDataBuffer.SubData(0, sizeof(GpuVoxelizerData), glslVoxelizerData);
+                gpuVoxelizerData.GridMin = Vector3.ComponentMin(value, gpuVoxelizerData.GridMax - new Vector3(0.1f));
+                gpuVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(gpuVoxelizerData.GridMin.X, gpuVoxelizerData.GridMax.X, gpuVoxelizerData.GridMin.Y, gpuVoxelizerData.GridMax.Y, gpuVoxelizerData.GridMax.Z, gpuVoxelizerData.GridMin.Z);
+                voxelizerDataBuffer.SubData(0, sizeof(GpuVoxelizerData), gpuVoxelizerData);
             }
         }
         public unsafe Vector3 GridMax
         {
-            get => glslVoxelizerData.GridMax;
+            get => gpuVoxelizerData.GridMax;
 
             set
             {
-                glslVoxelizerData.GridMax = Vector3.ComponentMax(value, glslVoxelizerData.GridMin + new Vector3(0.1f));
-                glslVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(glslVoxelizerData.GridMin.X, glslVoxelizerData.GridMax.X, glslVoxelizerData.GridMin.Y, glslVoxelizerData.GridMax.Y, glslVoxelizerData.GridMax.Z, glslVoxelizerData.GridMin.Z);
-                voxelizerDataBuffer.SubData(0, sizeof(GpuVoxelizerData), glslVoxelizerData);
+                gpuVoxelizerData.GridMax = Vector3.ComponentMax(value, gpuVoxelizerData.GridMin + new Vector3(0.1f));
+                gpuVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(gpuVoxelizerData.GridMin.X, gpuVoxelizerData.GridMax.X, gpuVoxelizerData.GridMin.Y, gpuVoxelizerData.GridMax.Y, gpuVoxelizerData.GridMax.Z, gpuVoxelizerData.GridMin.Z);
+                voxelizerDataBuffer.SubData(0, sizeof(GpuVoxelizerData), gpuVoxelizerData);
             }
         }
 
@@ -73,7 +73,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram mipmapProgram;
         private readonly ShaderProgram visualizeDebugProgram;
         public readonly BufferObject voxelizerDataBuffer;
-        private GpuVoxelizerData glslVoxelizerData;
+        private GpuVoxelizerData gpuVoxelizerData;
 
         private readonly Framebuffer fboNoAttachments;
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
@@ -115,8 +115,8 @@ namespace IDKEngine.Render
 
             fboNoAttachments = new Framebuffer();
 
-            glslVoxelizerData.GridMax = new Vector3( 1.0e10f);
-            glslVoxelizerData.GridMin = new Vector3(-1.0e10f);
+            gpuVoxelizerData.GridMax = new Vector3( 1.0e10f);
+            gpuVoxelizerData.GridMin = new Vector3(-1.0e10f);
 
             SetSize(width, height, depth);
             GridMin = gridMin;
@@ -266,7 +266,7 @@ namespace IDKEngine.Render
                     if (intermediateResultRbg[i] != null) intermediateResultRbg[i].Dispose();
                     intermediateResultRbg[i] = new Texture(TextureTarget3d.Texture3D);
                     intermediateResultRbg[i].SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, SizedInternalFormat.R32f);
+                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, SizedInternalFormat.R32ui);
                 }
             }
 

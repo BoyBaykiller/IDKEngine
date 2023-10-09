@@ -111,6 +111,11 @@ namespace IDKEngine
             windowCharFuncPtr = WindowCharCallback;
             GLFW.SetCharCallback(window, windowCharFuncPtr);
 
+            if (GLFW.RawMouseMotionSupported())
+            {
+                GLFW.SetInputMode(window, RawMouseMotionAttribute.RawMouseMotion, true);
+            }
+
             monitor = GLFW.GetPrimaryMonitor();
             videoMode = GLFW.GetVideoMode(monitor);
             KeyboardState = new Keyboard(window);

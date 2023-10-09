@@ -6,6 +6,7 @@ using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
+using IDKEngine.Shapes;
 
 namespace IDKEngine
 {
@@ -57,7 +58,6 @@ namespace IDKEngine
                 if (RenderMode == RenderMode.Rasterizer)
                 {
                     if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y);
-
                     if (TaaResolve != null) TaaResolve.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
                     if (FSR2Wrapper != null) FSR2Wrapper.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
                 }
@@ -85,10 +85,12 @@ namespace IDKEngine
                 if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
                 if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
 
-
                 if (value == RenderMode.Rasterizer)
                 {
                     RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y);
+
+                    if (TaaResolve != null) TaaResolve.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                    if (FSR2Wrapper != null) FSR2Wrapper.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
                 }
 
                 if (value == RenderMode.PathTracer)
@@ -100,13 +102,6 @@ namespace IDKEngine
             }
         }
 
-        public Vector2i RenderResolution => new Vector2i((int)(RenderPresentationResolution.X * ResolutionScale), (int)(RenderPresentationResolution.Y * ResolutionScale));
-        public bool RenderGui { get; private set; }
-        public int FPS { get; private set; }
-
-        public bool IsBloom = true;
-        public bool IsShadows = true;
-
         private TemporalAntiAliasingTechnique _temporalAntiAliasingTechnique;
         public TemporalAntiAliasingTechnique TemporalAntiAliasingTechnique
         {
@@ -114,12 +109,16 @@ namespace IDKEngine
 
             set
             {
+                if (!FSR2Wrapper.IS_FSR2_SUPPORTED && value == TemporalAntiAliasingTechnique.FSR2)
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"{TemporalAntiAliasingTechnique.FSR2} is Windows only");
+                    return;
+                }
+
                 _temporalAntiAliasingTechnique = value;
 
-                // We could also destroy the TAA and FSR2 ressources here but in my current implementation that means
-                // the related settings are lost which is annoying. So this is basically just a lazy load.
-                // 
-                // FSR2 is Windows only but as long as isn't initialized the native DLLs shouldn't get loaded and the APP will run on other Operating Sytems too
+                // TODO: Move TaaResolve and FSR2Wrapper into RasterizerPipeline
+                // also store settings outsied of class so that they arent lost after disposal
 
                 if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
                 {
@@ -138,7 +137,27 @@ namespace IDKEngine
             }
         }
 
+        public Vector2i RenderResolution => new Vector2i((int)(RenderPresentationResolution.X * ResolutionScale), (int)(RenderPresentationResolution.Y * ResolutionScale));
+        public bool RenderGui { get; private set; }
+        public int FPS { get; private set; }
+
+        public bool IsBloom = true;
+        public bool IsShadows = true;
         public int TAASamples = 6;
+
+        public struct CameraCollisionDetection
+        {
+            public bool IsEnabled;
+            public int Steps;
+            public float EpsilonNormalOffset;
+        }
+
+        public CameraCollisionDetection CamCollisionDetectionSettings = new CameraCollisionDetection()
+        {
+            IsEnabled = true,
+            Steps = 8,
+            EpsilonNormalOffset = 0.001f
+        };
 
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
@@ -154,13 +173,13 @@ namespace IDKEngine
 
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
-                    RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView);
+                    RasterizerPipeline.Render(ModelSystem, GpuBasicData.ProjView);
                     TonemapAndGamma.Combine(RasterizerPipeline.Result);
                     MeshOutlineRenderer.Render(TonemapAndGamma.Result, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
                 {
-                    RasterizerPipeline.Render(ModelSystem, GLSLBasicData.ProjView, LightManager);
+                    RasterizerPipeline.Render(ModelSystem, GpuBasicData.ProjView, LightManager);
 
                     if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
                     {
@@ -181,7 +200,7 @@ namespace IDKEngine
                     }
                     else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
                     {
-                        FSR2Wrapper.RunFSR2(glslTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CameraFovY);
+                        FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CameraFovY);
                         if (IsBloom)
                         {
                             Bloom.Compute(FSR2Wrapper.Result);
@@ -210,20 +229,12 @@ namespace IDKEngine
                 TonemapAndGamma.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
-            //{
-            //    Box box = new Box();
-            //    GLSLTlasNode node = ModelSystem.BVH.Tlas.Nodes[gui.debugTlasNode];
-            //    box.Min = node.Min;
-            //    box.Max = node.Max;
-            //    MeshOutlineRenderer.Render(TonemapAndGamma.Result, box);
-            //}
-
             if (gui.SelectedEntity.Type != Gui.EntityType.None)
             {
                 Box box = new Box();
                 if (gui.SelectedEntity.Type == Gui.EntityType.Mesh)
                 {
-                    GpuBlasNode node = ModelSystem.BVH.Tlas.BlasesInstances[gui.SelectedEntity.Index].Blas.Root;
+                    GpuBlasNode node = ModelSystem.BVH.Tlas.Blases[gui.SelectedEntity.Index].Root;
                     box.Min = node.Min;
                     box.Max = node.Max;
 
@@ -233,7 +244,7 @@ namespace IDKEngine
                 else
                 {
                     LightManager.TryGetLight(gui.SelectedEntity.Index, out Light abstractLight);
-                    ref GpuLight light = ref abstractLight.GLSLLight;
+                    ref GpuLight light = ref abstractLight.GpuLight;
                     
                     box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
                     box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
@@ -269,12 +280,10 @@ namespace IDKEngine
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
                 FPS = fpsCounter;
-                WindowTitle = $"FPS: {FPS}; Position {Camera.Position};";
+                WindowTitle = $"IDKEngine FPS: {FPS}";
                 fpsCounter = 0;
                 fpsTimer.Restart();
             }
-
-            gui.Update(this, dT);
 
             // Keyboard Inputs
             {
@@ -282,6 +291,7 @@ namespace IDKEngine
                 {
                     ShouldClose();
                 }
+
                 if (KeyboardState[Keys.V] == InputState.Touched)
                 {
                     WindowVSync = !WindowVSync;
@@ -300,50 +310,127 @@ namespace IDKEngine
                 }
             }
 
+            if (gui.FrameRecState != Gui.FrameRecorderState.Replaying)
+            {
+                if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+                {
+                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                    {
+                        MouseState.CursorMode = CursorModeValue.CursorNormal;
+                        Camera.Velocity = Vector3.Zero;
+                    }
+                    else
+                    {
+                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
+                    }
+                }
+
+                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                {
+                    Camera.ProcessInputs(KeyboardState, MouseState);
+                    Camera.AdvanceSimulation(dT);
+                }
+            }
+            gui.Update(this);
+
+            //ModelSystem.BVH.TlasBuild();
+
+            if (CamCollisionDetectionSettings.IsEnabled)
+            {
+                Vector3 cameraDeltaStep = Camera.Position - Camera.PrevPosition;
+                Sphere playerSphere = new Sphere(Camera.Position, 0.5f);
+                for (int i = 1; i <= CamCollisionDetectionSettings.Steps; i++)
+                {
+                    Vector3 thisPos = Camera.PrevPosition + cameraDeltaStep * (i / (float)CamCollisionDetectionSettings.Steps);
+                    Box playerBox = new Box(thisPos - new Vector3(playerSphere.Radius), thisPos + new Vector3(playerSphere.Radius));
+
+                    float penetrationDepth = float.MinValue;
+                    float cosTheta = 0.0f;
+                    Plane hitPlane = new Plane();
+                    ModelSystem.BVH.Intersect(playerBox, (in BVH.BoxHitInfo hitInfo) =>
+                    {
+                        Matrix4 model = ModelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
+                        Triangle worldSpaceTri = Triangle.Transformed(GpuTypes.Conversions.ToTriangle(hitInfo.Triangle), model);
+
+                        Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, playerSphere.Center);
+                        float distance = Vector3.Distance(closestPointOnTri, playerSphere.Center);
+                        float thisPenetrationDepth = playerSphere.Radius - distance;
+                        if (thisPenetrationDepth > 0.0f)
+                        {
+                            Plane thisHitPlane = new Plane(worldSpaceTri.Normal);
+
+                            Vector3 hitPointToCamera = Vector3.Normalize(thisPos - closestPointOnTri);
+                            float thisCosTheta = Vector3.Dot(thisHitPlane.Normal, hitPointToCamera);
+                            if (thisCosTheta < 0.0f)
+                            {
+                                thisHitPlane.Normal *= -1.0f;
+                            }
+
+                            if (MathF.Abs(thisCosTheta) > MathF.Abs(cosTheta))
+                            {
+                                cosTheta = thisCosTheta;
+                                hitPlane = thisHitPlane;
+                                penetrationDepth = thisPenetrationDepth;
+                            }
+                        }
+                    });
+
+                    if (penetrationDepth != float.MinValue)
+                    {
+                        Vector3 newVelocity = Plane.Project(Camera.Velocity, hitPlane);
+                        Camera.Velocity = newVelocity;
+
+                        thisPos += hitPlane.Normal * (penetrationDepth + CamCollisionDetectionSettings.EpsilonNormalOffset);
+                        Camera.Position = thisPos;
+                        break;
+                    }
+
+                }
+            }
+
             // TAA
             {
                 if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None || TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
                 {
-                    glslTaaData.MipmapBias = 0.0f;
+                    gpuTaaData.MipmapBias = 0.0f;
                 }
                 if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
                 {
-                    glslTaaData.Samples = TAASamples;
+                    gpuTaaData.Samples = TAASamples;
                 }
                 if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
                 {
                     const float manualBias = 0.25f;
-                    glslTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
-                    glslTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
+                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
+                    gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
                 }
                 if (TemporalAntiAliasingTechnique != TemporalAntiAliasingTechnique.None)
                 {
-                    Vector2 jitter = MyMath.GetHalton2D((int)GLSLBasicData.Frame % glslTaaData.Samples, 2, 3);
-                    glslTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
+                    Vector2 jitter = MyMath.GetHalton2D((int)GpuBasicData.Frame % gpuTaaData.Samples, 2, 3);
+                    gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
                 }
-                taaDataBuffer.SubData(0, sizeof(GpuTaaData), glslTaaData);
+                taaDataBuffer.SubData(0, sizeof(GpuTaaData), gpuTaaData);
             }
-
+            
             LightManager.UpdateBufferData();
-            //ModelSystem.BVH.TlasBuild();
 
             // Updating global basicData Buffer
             {
-                GLSLBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CameraFovY, RenderPresentationResolution.X / (float)RenderPresentationResolution.Y, NEAR_PLANE, FAR_PLANE);
-                GLSLBasicData.InvProjection = GLSLBasicData.Projection.Inverted();
-                GLSLBasicData.NearPlane = NEAR_PLANE;
-                GLSLBasicData.FarPlane = FAR_PLANE;
-                GLSLBasicData.DeltaUpdate = dT;
-                GLSLBasicData.PrevProjView = GLSLBasicData.ProjView;
-                GLSLBasicData.PrevView = GLSLBasicData.View;
-                GLSLBasicData.View = Camera.GenerateViewMatrix();
-                GLSLBasicData.InvView = GLSLBasicData.View.Inverted();
-                GLSLBasicData.ProjView = GLSLBasicData.View * GLSLBasicData.Projection;
-                GLSLBasicData.InvProjView = GLSLBasicData.ProjView.Inverted();
-                GLSLBasicData.CameraPos = Camera.Position;
-                GLSLBasicData.Time = WindowTime;
-                GLSLBasicData.Frame++;
-                basicDataBuffer.SubData(0, sizeof(GpuBasicData), GLSLBasicData);
+                GpuBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CameraFovY, RenderPresentationResolution.X / (float)RenderPresentationResolution.Y, NEAR_PLANE, FAR_PLANE);
+                GpuBasicData.InvProjection = GpuBasicData.Projection.Inverted();
+                GpuBasicData.NearPlane = NEAR_PLANE;
+                GpuBasicData.FarPlane = FAR_PLANE;
+                GpuBasicData.DeltaUpdate = dT;
+                GpuBasicData.PrevProjView = GpuBasicData.ProjView;
+                GpuBasicData.PrevView = GpuBasicData.View;
+                GpuBasicData.View = Camera.GenerateViewMatrix(Camera.Position, Camera.ViewDir, Camera.UpVector);
+                GpuBasicData.InvView = GpuBasicData.View.Inverted();
+                GpuBasicData.ProjView = GpuBasicData.View * GpuBasicData.Projection;
+                GpuBasicData.InvProjView = GpuBasicData.ProjView.Inverted();
+                GpuBasicData.CameraPos = Camera.Position;
+                GpuBasicData.Time = WindowTime;
+                GpuBasicData.Frame++;
+                basicDataBuffer.SubData(0, sizeof(GpuBasicData), GpuBasicData);
             }
 
             bool anyMeshInstanceMoved = false;
@@ -362,7 +449,7 @@ namespace IDKEngine
 
             // Resetting Path Tracer if necessary
             {
-                if ((RenderMode == RenderMode.PathTracer) && ((GLSLBasicData.PrevProjView != GLSLBasicData.ProjView) || anyMeshInstanceMoved))
+                if ((RenderMode == RenderMode.PathTracer) && ((GpuBasicData.PrevProjView != GpuBasicData.ProjView) || anyMeshInstanceMoved))
                 {
                     PathTracer.ResetRenderProcess();
                 }
@@ -387,10 +474,10 @@ namespace IDKEngine
         public PathTracer PathTracer;
 
         private BufferObject basicDataBuffer;
-        public GpuBasicData GLSLBasicData;
+        public GpuBasicData GpuBasicData;
 
         private BufferObject taaDataBuffer;
-        private GpuTaaData glslTaaData;
+        private GpuTaaData gpuTaaData;
         protected override unsafe void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
@@ -411,7 +498,7 @@ namespace IDKEngine
 
             GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
-            GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, 0);
+            GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, IntPtr.Zero);
             GL.PointSize(1.3f);
             Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
             GL.Disable(EnableCap.Multisample);
@@ -428,16 +515,16 @@ namespace IDKEngine
             basicDataBuffer.ImmutableAllocate(sizeof(GpuBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
-            glslTaaData.Samples = 6;
-            glslTaaData.Jitter = new Vector2(0.0f);
+            gpuTaaData.Samples = 6;
+            gpuTaaData.Jitter = new Vector2(0.0f);
             taaDataBuffer = new BufferObject();
-            taaDataBuffer.ImmutableAllocate(sizeof(GpuTaaData), glslTaaData, BufferStorageFlags.DynamicStorageBit);
+            taaDataBuffer.ImmutableAllocate(sizeof(GpuTaaData), gpuTaaData, BufferStorageFlags.DynamicStorageBit);
             taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             finalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
-            Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f, 0.1f, 0.25f);
+            Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
             
             SkyBoxManager.Init(new string[]
@@ -457,6 +544,7 @@ namespace IDKEngine
             TemporalAntiAliasingTechnique = TemporalAntiAliasingTechnique.TAA;
             ModelSystem = new ModelSystem();
 
+            // todo chill :))
             if (true)
             {
                 Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
@@ -482,6 +570,9 @@ namespace IDKEngine
                 Model helmet = new Model("res/models/Helmet/Helmet.gltf");
                 helmet.MeshInstances[0].ModelMatrix *= Matrix4.CreateRotationY(MathF.PI / 4.0f);
 
+                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", Matrix4.CreateTranslation(-100.0f, 50.0f, 0.0f));
+                //Model ramp = new Model(@"C:\Users\Julian\Downloads\Models\Ramp\Ramp.gltf", Matrix4.CreateTranslation(-100.0f, 0.0f, 0.0f) * Matrix4.CreateTranslation(0.0f, 0.0f, 0.0f));
+
                 ModelSystem.Add(sponza, lucy, helmet);
 
                 LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
@@ -504,27 +595,27 @@ namespace IDKEngine
                 a.Meshes[288].SpecularBias = 1.0f;
                 a.Meshes[288].RoughnessBias = -0.64f;
                 a.Meshes[288].NormalMapStrength = 0.0f;
-                a.Meshes[93].EmissiveBias = 20.0f;
-                a.Meshes[96].EmissiveBias = 20.0f;
-                a.Meshes[99].EmissiveBias = 20.0f;
-                a.Meshes[102].EmissiveBias = 20.0f;
-                a.Meshes[105].EmissiveBias = 20.0f;
-                a.Meshes[108].EmissiveBias = 20.0f;
-                a.Meshes[111].EmissiveBias = 20.0f;
-                a.Meshes[246].EmissiveBias = 20.0f;
-                a.Meshes[291].EmissiveBias = 20.0f;
-                a.Meshes[294].EmissiveBias = 20.0f;
-                a.Meshes[297].EmissiveBias = 20.0f;
-                a.Meshes[300].EmissiveBias = 20.0f;
-                a.Meshes[303].EmissiveBias = 20.0f;
-                a.Meshes[306].EmissiveBias = 20.0f;
-                a.Meshes[312].EmissiveBias = 20.0f;
-                a.Meshes[315].EmissiveBias = 20.0f;
-                a.Meshes[318].EmissiveBias = 20.0f;
-                a.Meshes[321].EmissiveBias = 20.0f;
-                a.Meshes[324].EmissiveBias = 20.0f;
-                a.Meshes[376].EmissiveBias = 20.0f;
-                a.Meshes[379].EmissiveBias = 20.0f;
+                //a.Meshes[93].EmissiveBias = 20.0f;
+                //a.Meshes[96].EmissiveBias = 20.0f;
+                //a.Meshes[99].EmissiveBias = 20.0f;
+                //a.Meshes[102].EmissiveBias = 20.0f;
+                //a.Meshes[105].EmissiveBias = 20.0f;
+                //a.Meshes[108].EmissiveBias = 20.0f;
+                //a.Meshes[111].EmissiveBias = 20.0f;
+                //a.Meshes[246].EmissiveBias = 20.0f;
+                //a.Meshes[291].EmissiveBias = 20.0f;
+                //a.Meshes[294].EmissiveBias = 20.0f;
+                //a.Meshes[297].EmissiveBias = 20.0f;
+                //a.Meshes[300].EmissiveBias = 20.0f;
+                //a.Meshes[303].EmissiveBias = 20.0f;
+                //a.Meshes[306].EmissiveBias = 20.0f;
+                //a.Meshes[312].EmissiveBias = 20.0f;
+                //a.Meshes[315].EmissiveBias = 20.0f;
+                //a.Meshes[318].EmissiveBias = 20.0f;
+                //a.Meshes[321].EmissiveBias = 20.0f;
+                //a.Meshes[324].EmissiveBias = 20.0f;
+                //a.Meshes[376].EmissiveBias = 20.0f;
+                //a.Meshes[379].EmissiveBias = 20.0f;
                 Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
                 Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 LightManager.AddLight(new Light(new Vector3(2.002f, 18.693f, 3.4f), new Vector3(60.46f, 50.17f, 50.75f), 0.3f));
@@ -534,6 +625,7 @@ namespace IDKEngine
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
                 RasterizerPipeline.VolumetricLight.Strength = 60.0f;
                 RasterizerPipeline.ConeTracer.MaxSamples = 6;
+
                 ModelSystem.Add(a, b, c);
             }
 

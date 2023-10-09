@@ -5,6 +5,7 @@ Feature list:
  - Real-Time Voxel Global Illumination
  - Multi Draw Indirect & Bindless Textures + other extensions
  - [AMD FSR2](https://github.com/GPUOpen-Effects/FidelityFX-FSR2) and Temporal Anti Aliasing
+ - Camera Collision Detection against arbitrary triangle meshes
  - CoD-Modern-Warfare Bloom
  - Variable Rate Shading
  - Ray marched Volumetric Lighting
@@ -22,18 +23,19 @@ Known Issues:
 - Certain shaders using `ARB_bindless_texture` do not compile on Intel due to driver bug
 
 # Controls
-| Key         | Action               | 
-|-------------|----------------------| 
-|  W, A, S, D | Move                 |
-|  Shift      | Move faster          |
-|  G          | Toggle GUI           |
-|  R          | Toogle Recording     |
-|  Space      | Toogle Replay        |
-|  E          | Toggle Cursor        |
-|  R-Click    | Select Object        |
-|  V          | Toggle VSync         |
-|  F11        | Toggle Fullscreen    |
-|  ESC        | Exit                 |
+| Key                   | Action               | 
+|-----------------------|----------------------| 
+|  W, A, S, D           | Move                 |
+|  Space                | Move Up              |
+|  Shift                | Move faster          |
+|  G                    | Toggle GUI           |
+|  Control + R          | Toogle Recording     |
+|  Control + Space      | Toogle Replay        |
+|  E                    | Toggle Cursor        |
+|  R-Click              | Select Object        |
+|  V                    | Toggle VSync         |
+|  F11                  | Toggle Fullscreen    |
+|  ESC                  | Exit                 |
 
 # Path Traced Render Samples
 

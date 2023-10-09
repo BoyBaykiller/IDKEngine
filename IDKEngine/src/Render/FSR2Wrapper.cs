@@ -10,9 +10,17 @@ namespace IDKEngine.Render
 {
     class FSR2Wrapper : IDisposable
     {
+        public static readonly bool IS_FSR2_SUPPORTED = OperatingSystem.IsWindows();
+
         public Texture Result;
         public FSR2Wrapper(int outputWidth, int outputHeight, int maxInputWidth, int maxInputHeight)
         {
+            if (!IS_FSR2_SUPPORTED)
+            {
+                Logger.Log(Logger.LogLevel.Fatal, $"{nameof(IS_FSR2_SUPPORTED)} was {IS_FSR2_SUPPORTED}. FSR2 is Windows only");
+                return;
+            }
+
             SetSize(outputWidth, outputHeight, maxInputWidth, maxInputHeight);
         }
 

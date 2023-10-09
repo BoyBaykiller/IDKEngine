@@ -52,13 +52,13 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
+    Light Lights[GPU_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 

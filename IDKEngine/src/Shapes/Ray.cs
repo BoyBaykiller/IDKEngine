@@ -1,6 +1,6 @@
 ﻿using OpenTK.Mathematics;
 
-namespace IDKEngine
+namespace IDKEngine.Shapes
 {
     public struct Ray
     {

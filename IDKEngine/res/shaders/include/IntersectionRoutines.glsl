@@ -26,7 +26,7 @@ bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out
 }
 
 // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
-bool RayCuboidIntersect(Ray ray, vec3 boxMin, vec3 boxMax, out float t1, out float t2)
+bool RayBoxIntersect(Ray ray, vec3 boxMin, vec3 boxMax, out float t1, out float t2)
 {
     t1 = IntersectionRoutines_FLOAT_MIN;
     t2 = IntersectionRoutines_FLOAT_MAX;

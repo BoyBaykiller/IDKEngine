@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-	struct GpuBlasNode
+	public struct GpuBlasNode
 	{
 		public Vector3 Min;
 		public uint TriStartOrLeftChild;

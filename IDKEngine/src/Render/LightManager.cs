@@ -2,12 +2,13 @@
 using System.IO;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.Render
 {
     class LightManager : IDisposable
     {
-        public const int GLSL_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
+        public const int GPU_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
 
         public struct HitInfo
         {
@@ -36,7 +37,7 @@ namespace IDKEngine.Render
         private readonly VAO vao;
         public unsafe LightManager(int latitudes, int longitudes)
         {
-            lights = new Light[GLSL_MAX_UBO_LIGHT_COUNT];
+            lights = new Light[GPU_MAX_UBO_LIGHT_COUNT];
 
             shaderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
@@ -79,8 +80,8 @@ namespace IDKEngine.Render
                 Light light = lights[i];
                 if (light.HasPointShadow())
                 {
-                    pointShadowManager.TryGetPointShadow(light.GLSLLight.PointShadowIndex, out PointShadow pointShadow);
-                    pointShadow.Position = light.GLSLLight.Position;
+                    pointShadowManager.TryGetPointShadow(light.GpuLight.PointShadowIndex, out PointShadow pointShadow);
+                    pointShadow.Position = light.GpuLight.Position;
                 }
             }
             pointShadowManager.RenderShadowMaps(modelSystem);
@@ -88,9 +89,9 @@ namespace IDKEngine.Render
 
         public bool AddLight(Light light)
         {
-            if (Count == GLSL_MAX_UBO_LIGHT_COUNT)
+            if (Count == GPU_MAX_UBO_LIGHT_COUNT)
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(Light)}. Limit of {GLSL_MAX_UBO_LIGHT_COUNT} is reached");
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(Light)}. Limit of {GPU_MAX_UBO_LIGHT_COUNT} is reached");
                 return false;
             }
 
@@ -109,7 +110,7 @@ namespace IDKEngine.Render
 
             if (light.HasPointShadow())
             {
-                pointShadowManager.RemovePointShadow(light.GLSLLight.PointShadowIndex);
+                pointShadowManager.RemovePointShadow(light.GpuLight.PointShadowIndex);
             }
 
             if (Count - 1 >= 0)
@@ -135,7 +136,7 @@ namespace IDKEngine.Render
 
             if (pointShadowManager.TryAddPointShadow(pointShadow, out int pointShadowIndex))
             {
-                lights[index].GLSLLight.PointShadowIndex = pointShadowIndex;
+                lights[index].GpuLight.PointShadowIndex = pointShadowIndex;
                 return true;
             }
             return false;
@@ -155,8 +156,8 @@ namespace IDKEngine.Render
                 return;
             }
 
-            pointShadowManager.RemovePointShadow(light.GLSLLight.PointShadowIndex);
-            light.GLSLLight.PointShadowIndex = -1;
+            pointShadowManager.RemovePointShadow(light.GpuLight.PointShadowIndex);
+            light.GpuLight.PointShadowIndex = -1;
         }
 
         public unsafe void UpdateBufferData()
@@ -164,7 +165,7 @@ namespace IDKEngine.Render
             for (int i = 0; i < Count; i++)
             {
                 Light light = lights[i];
-                lightBufferObject.SubData(i * sizeof(GpuLight), sizeof(GpuLight), light.GLSLLight);
+                lightBufferObject.SubData(i * sizeof(GpuLight), sizeof(GpuLight), light.GpuLight);
             }
         }
 
@@ -191,7 +192,7 @@ namespace IDKEngine.Render
             for (int i = 0; i < Count; i++)
             {
                 Light light = lights[i];
-                if (MyMath.RaySphereIntersect(ray, light.GLSLLight, out float min, out float max) && max < hitInfo.T)
+                if (Intersections.RayVsSphere(ray, GpuTypes.Conversions.ToSphere(light.GpuLight), out float min, out float max) && max < hitInfo.T)
                 {
                     hitInfo.T = min;
                     hitInfo.LightID = i;

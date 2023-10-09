@@ -17,14 +17,13 @@ namespace IDKEngine
 {
     class Model
     {
-        private struct GLTextureLoadData
+        private struct GpuTextureLoadData
         {
             public ImageResult Image;
             public Sampler Sampler;
             public SizedInternalFormat InternalFormat;
         }
-
-        private struct GLMaterialData
+        private struct GpuMaterialLoadData
         {
             public const int TEXTURE_COUNT = 4;
             
@@ -35,8 +34,7 @@ namespace IDKEngine
                 Normal,
                 Emissive,
             }
-
-            public ref GLTextureLoadData this[TextureType textureType]
+            public ref GpuTextureLoadData this[TextureType textureType]
             {
                 get
                 {
@@ -51,17 +49,25 @@ namespace IDKEngine
                 }
             }
 
-            public GLTextureLoadData BaseColorTexture;
-            public GLTextureLoadData MetallicRoughnessTexture;
-            public GLTextureLoadData NormalTexture;
-            public GLTextureLoadData EmissiveTexture;
+            public GpuTextureLoadData BaseColorTexture;
+            public GpuTextureLoadData MetallicRoughnessTexture;
+            public GpuTextureLoadData NormalTexture;
+            public GpuTextureLoadData EmissiveTexture;
 
             public Vector3 EmissiveFactor;
             public uint BaseColorFactor;
-
             public float MetallicFactor;
             public float RoughnessFactor;
             public float AlphaCutoff;
+
+            public static readonly GpuMaterialLoadData Default = new GpuMaterialLoadData()
+            {
+                EmissiveFactor = new Vector3(0.0f),
+                BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(1.0f)),
+                MetallicFactor = 1.0f,
+                RoughnessFactor = 1.0f,
+                AlphaCutoff = 0.5f,
+            };
         }
 
         public GpuMesh[] Meshes;
@@ -104,9 +110,8 @@ namespace IDKEngine
             
             RootDir = Path.GetDirectoryName(path);
 
-            GLMaterialData[] materialsData = LoadGLMaterialData(gltfModel.Materials, gltfModel.Textures);
-            List<GpuMaterial> materials = new List<GpuMaterial>(LoadGLMaterials(materialsData));
-
+            GpuMaterialLoadData[] glMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfModel.Materials, gltfModel.Textures);
+            List<GpuMaterial> materials = new List<GpuMaterial>(LoadGpuMaterials(glMaterialsLoadData));
             List<GpuMesh> meshes = new List<GpuMesh>();
             List<GpuMeshInstance> meshInstances = new List<GpuMeshInstance>();
             List<GpuDrawElementsCmd> drawCommands = new List<GpuDrawElementsCmd>();
@@ -140,55 +145,50 @@ namespace IDKEngine
                     Mesh gltfMesh = gltfModel.Meshes[node.Mesh.Value];
                     for (int i = 0; i < gltfMesh.Primitives.Length; i++)
                     {
-                        MeshPrimitive gltfPrimitive = gltfMesh.Primitives[i];
+                        MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
                         
                         GpuMesh mesh = new GpuMesh();
                         mesh.InstanceCount = 1;
-
-                        if (gltfPrimitive.Material.HasValue)
-                        {
-                            mesh.MaterialIndex = gltfPrimitive.Material.Value;
-                            bool hasNormalMap = materialsData[gltfPrimitive.Material.Value].NormalTexture.Image != null;
-                            mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
-                        }
-                        else
-                        {
-                            GLMaterialData materialData = new GLMaterialData();
-                            GpuMaterial material = LoadGLMaterials(new GLMaterialData[] { materialData })[0];
-                            materials.Add(material);
-
-                            mesh.MaterialIndex = materials.Count - 1;
-                            mesh.NormalMapStrength = 0.0f;
-                        }
-
                         mesh.EmissiveBias = 0.0f;
                         mesh.SpecularBias = 0.0f;
                         mesh.RoughnessBias = 0.0f;
                         mesh.RefractionChance = 0.0f;
                         mesh.IOR = 1.0f;
                         mesh.Absorbance = new Vector3(0.0f);
+                        if (gltfMeshPrimitive.Material.HasValue)
+                        {
+                            mesh.MaterialIndex = gltfMeshPrimitive.Material.Value;
+                            bool hasNormalMap = glMaterialsLoadData[gltfMeshPrimitive.Material.Value].NormalTexture.Image != null;
+                            mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
+                        }
+                        else
+                        {
+                            GpuMaterial material = LoadGpuMaterials(new GpuMaterialLoadData[] { GpuMaterialLoadData.Default })[0];
+                            materials.Add(material);
+
+                            mesh.MaterialIndex = materials.Count - 1;
+                            mesh.NormalMapStrength = 0.0f;
+                        }
+
+                        GpuDrawVertex[] meshVertices = LoadGpuVertexData(gltfMeshPrimitive);
+                        uint[] meshIndices = LoadGpuIndexData(gltfMeshPrimitive);
+
+                        GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
+                        drawCmd.Count = meshIndices.Length;
+                        drawCmd.InstanceCount = mesh.InstanceCount;
+                        drawCmd.FirstIndex = indices.Count;
+                        drawCmd.BaseVertex = vertices.Count;
+                        drawCmd.BaseInstance = drawCommands.Count;
+
+                        vertices.AddRange(meshVertices);
+                        indices.AddRange(meshIndices);
 
                         GpuMeshInstance meshInstance = new GpuMeshInstance();
                         meshInstance.ModelMatrix = globalTransform;
 
-                        GpuDrawElementsCmd cmd = new GpuDrawElementsCmd();
-                        GpuDrawVertex[] thisVertices = LoadVertexData(gltfMesh.Primitives[i]);
-                        uint[] thisIndices = LoadIndexData(gltfMesh.Primitives[i]);
-
-                        cmd.BaseVertex = vertices.Count;
-                        vertices.AddRange(thisVertices);
-
-                        cmd.FirstIndex = indices.Count;
-                        indices.AddRange(thisIndices);
-
-                        cmd.Count = thisIndices.Length;
-                        cmd.InstanceCount = mesh.InstanceCount;
-                        cmd.BaseInstance = drawCommands.Count;
-
-
                         meshes.Add(mesh);
                         meshInstances.Add(meshInstance);
-                        drawCommands.Add(cmd);
+                        drawCommands.Add(drawCmd);
                     }
                 }
             }
@@ -201,25 +201,25 @@ namespace IDKEngine
             Indices = indices.ToArray();
         }
 
-        private unsafe GLMaterialData[] LoadGLMaterialData(Material[] materials, GltfTexture[] textures)
+        private unsafe GpuMaterialLoadData[] GetGpuMaterialLoadDataFromGltf(Material[] materials, GltfTexture[] textures)
         {
             if (materials == null)
             {
-                return Array.Empty<GLMaterialData>();
+                return Array.Empty<GpuMaterialLoadData>();
             }
-            GLMaterialData[] materialsLoadData = new GLMaterialData[materials.Length];         
+            GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[materials.Length];         
             
-            Parallel.For(0, materialsLoadData.Length * GLMaterialData.TEXTURE_COUNT, i =>
+            Parallel.For(0, materialsLoadData.Length * GpuMaterialLoadData.TEXTURE_COUNT, i =>
             {
-                int materialIndex = i / GLMaterialData.TEXTURE_COUNT;
-                GLMaterialData.TextureType textureType = (GLMaterialData.TextureType)(i % GLMaterialData.TEXTURE_COUNT);
+                int materialIndex = i / GpuMaterialLoadData.TEXTURE_COUNT;
+                GpuMaterialLoadData.TextureType textureType = (GpuMaterialLoadData.TextureType)(i % GpuMaterialLoadData.TEXTURE_COUNT);
 
                 Material material = materials[materialIndex];
-                ref GLMaterialData materialData = ref materialsLoadData[materialIndex];
-                ref GLTextureLoadData textureLoadData = ref materialData[textureType];
+                ref GpuMaterialLoadData materialData = ref materialsLoadData[materialIndex];
+                ref GpuTextureLoadData textureLoadData = ref materialData[textureType];
                 
                 // Let one thread load non image data
-                if (textureType == GLMaterialData.TextureType.BaseColor)
+                if (textureType == GpuMaterialLoadData.TextureType.BaseColor)
                 {
                     materialData.BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(
                         material.PbrMetallicRoughness.BaseColorFactor[0],
@@ -240,14 +240,14 @@ namespace IDKEngine
                 GetGLTextureLoadData(material, textures, textureType, out textureLoadData);
             });
 
-            void GetGLTextureLoadData(Material material, GltfTexture[] textures, GLMaterialData.TextureType textureType, out GLTextureLoadData glTextureData)
+            void GetGLTextureLoadData(Material material, GltfTexture[] textures, GpuMaterialLoadData.TextureType textureType, out GpuTextureLoadData glTextureData)
             {
-                glTextureData = new GLTextureLoadData();
+                glTextureData = new GpuTextureLoadData();
 
                 GltfTexture gltfTextureToLoad = null;
                 ColorComponents colorComponentsToLoad = ColorComponents.RedGreenBlueAlpha;
                 {
-                    if (textureType == GLMaterialData.TextureType.BaseColor)
+                    if (textureType == GpuMaterialLoadData.TextureType.BaseColor)
                     {
                         glTextureData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
                         colorComponentsToLoad = ColorComponents.RedGreenBlueAlpha;
@@ -255,7 +255,7 @@ namespace IDKEngine
                         TextureInfo textureInfo = material.PbrMetallicRoughness.BaseColorTexture;
                         if (textureInfo != null) gltfTextureToLoad = textures[textureInfo.Index];
                     }
-                    else if (textureType == GLMaterialData.TextureType.MetallicRoughness)
+                    else if (textureType == GpuMaterialLoadData.TextureType.MetallicRoughness)
                     {
                         glTextureData.InternalFormat = SizedInternalFormat.Rgb8;
                         colorComponentsToLoad = ColorComponents.RedGreenBlue;
@@ -263,7 +263,7 @@ namespace IDKEngine
                         TextureInfo textureInfo = material.PbrMetallicRoughness.MetallicRoughnessTexture;
                         if (textureInfo != null) gltfTextureToLoad = textures[textureInfo.Index];
                     }
-                    else if (textureType == GLMaterialData.TextureType.Normal)
+                    else if (textureType == GpuMaterialLoadData.TextureType.Normal)
                     {
                         glTextureData.InternalFormat = SizedInternalFormat.R11fG11fB10f;
                         colorComponentsToLoad = ColorComponents.RedGreenBlue;
@@ -271,7 +271,7 @@ namespace IDKEngine
                         MaterialNormalTextureInfo textureInfo = material.NormalTexture;
                         if (textureInfo != null) gltfTextureToLoad = textures[textureInfo.Index];
                     }
-                    else if (textureType == GLMaterialData.TextureType.Emissive)
+                    else if (textureType == GpuMaterialLoadData.TextureType.Emissive)
                     {
                         glTextureData.InternalFormat = (SizedInternalFormat)PixelInternalFormat.CompressedSrgbAlphaBptcUnorm;
                         colorComponentsToLoad = ColorComponents.RedGreenBlue;
@@ -282,9 +282,9 @@ namespace IDKEngine
                 }
 
                 {
-                    bool shouldReportMissingTexture = textureType == GLMaterialData.TextureType.BaseColor ||
-                                                      textureType == GLMaterialData.TextureType.MetallicRoughness ||
-                                                      textureType == GLMaterialData.TextureType.Normal;
+                    bool shouldReportMissingTexture = textureType == GpuMaterialLoadData.TextureType.BaseColor ||
+                                                      textureType == GpuMaterialLoadData.TextureType.MetallicRoughness ||
+                                                      textureType == GpuMaterialLoadData.TextureType.Normal;
                     if (shouldReportMissingTexture && (gltfTextureToLoad == null || !gltfTextureToLoad.Source.HasValue))
                     {
                         Logger.Log(Logger.LogLevel.Warn, $"Material {material.Name} has no texture of type {textureType}");
@@ -318,50 +318,50 @@ namespace IDKEngine
 
             return materialsLoadData;
         }
-        private static GpuMaterial[] LoadGLMaterials(ReadOnlySpan<GLMaterialData> materialsLoadInfo)
+        private static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<GpuMaterialLoadData> materialsLoadInfo)
         {
             GpuMaterial[] materials = new GpuMaterial[materialsLoadInfo.Length];
 
             for (int i = 0; i < materials.Length; i++)
             {
-                ref GpuMaterial glslMaterial = ref materials[i];
-                ref readonly GLMaterialData materialLoadData = ref materialsLoadInfo[i];
+                ref GpuMaterial gpuMaterial = ref materials[i];
+                ref readonly GpuMaterialLoadData materialLoadData = ref materialsLoadInfo[i];
 
-                glslMaterial.EmissiveFactor = materialLoadData.EmissiveFactor;
-                glslMaterial.BaseColorFactor = materialLoadData.BaseColorFactor;
-                glslMaterial.RoughnessFactor = materialLoadData.RoughnessFactor;
-                glslMaterial.MetallicFactor = materialLoadData.MetallicFactor;
-                glslMaterial.AlphaCutoff = materialLoadData.AlphaCutoff;
+                gpuMaterial.EmissiveFactor = materialLoadData.EmissiveFactor;
+                gpuMaterial.BaseColorFactor = materialLoadData.BaseColorFactor;
+                gpuMaterial.RoughnessFactor = materialLoadData.RoughnessFactor;
+                gpuMaterial.MetallicFactor = materialLoadData.MetallicFactor;
+                gpuMaterial.AlphaCutoff = materialLoadData.AlphaCutoff;
 
                 {
-                    GLTextureLoadData loadData = materialLoadData.BaseColorTexture;
+                    GpuTextureLoadData loadData = materialLoadData.BaseColorTexture;
 
                     (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData);
-                    glslMaterial.BaseColorTextureHandle = texture.GetTextureHandleARB(sampler);
+                    gpuMaterial.BaseColorTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
                 {
-                    GLTextureLoadData loadData = materialLoadData.MetallicRoughnessTexture;
+                    GpuTextureLoadData loadData = materialLoadData.MetallicRoughnessTexture;
 
                     (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData);
                     // "Move" metallic from Blue into Red channel
                     texture.SetSwizzleR(All.Blue);
 
-                    glslMaterial.MetallicRoughnessTextureHandle = texture.GetTextureHandleARB(sampler);
+                    gpuMaterial.MetallicRoughnessTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
                 {
-                    GLTextureLoadData loadData = materialLoadData.NormalTexture;
+                    GpuTextureLoadData loadData = materialLoadData.NormalTexture;
 
                     (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData);
-                    glslMaterial.NormalTextureHandle = texture.GetTextureHandleARB(sampler);
+                    gpuMaterial.NormalTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
                 {
-                    GLTextureLoadData loadData = materialLoadData.EmissiveTexture;
+                    GpuTextureLoadData loadData = materialLoadData.EmissiveTexture;
 
                     (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(loadData);
-                    glslMaterial.EmissiveTextureHandle = texture.GetTextureHandleARB(sampler);
+                    gpuMaterial.EmissiveTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
 
-                static ValueTuple<GLTexture, SamplerObject> GetGLTextureAndSampler(GLTextureLoadData data)
+                static ValueTuple<GLTexture, SamplerObject> GetGLTextureAndSampler(GpuTextureLoadData data)
                 {
                     if (data.Sampler == null)
                     {
@@ -379,8 +379,8 @@ namespace IDKEngine
                         if (data.Sampler.MinFilter == null) data.Sampler.MinFilter = Sampler.MinFilterEnum.NEAREST;
                         if (data.Sampler.MagFilter == null) data.Sampler.MagFilter = Sampler.MagFilterEnum.NEAREST;
 
-                        texture.ImmutableAllocate(1, 1, 1, data.InternalFormat);
-                        texture.SubTexture2D(1, 1, PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
+                        texture.ImmutableAllocate(1, 1, 1, SizedInternalFormat.Rgba32f);
+                        texture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
                     }
                     else
                     {
@@ -412,7 +412,7 @@ namespace IDKEngine
             return materials;
         }
 
-        private unsafe GpuDrawVertex[] LoadVertexData(MeshPrimitive meshPrimitive)
+        private unsafe GpuDrawVertex[] LoadGpuVertexData(MeshPrimitive meshPrimitive)
         {
             const string GLTF_POSITION_ATTRIBUTE = "POSITION";
             const string GLTF_NORMAL_ATTRIBUTE = "NORMAL";
@@ -480,7 +480,7 @@ namespace IDKEngine
 
             return vertices;
         }
-        private unsafe uint[] LoadIndexData(MeshPrimitive meshPrimitive)
+        private unsafe uint[] LoadGpuIndexData(MeshPrimitive meshPrimitive)
         {
             Accessor accessor = gltfModel.Accessors[meshPrimitive.Indices.Value];
             BufferView bufferView = gltfModel.BufferViews[accessor.BufferView.Value];

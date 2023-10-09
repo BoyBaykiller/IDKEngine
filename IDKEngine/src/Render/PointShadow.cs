@@ -9,11 +9,11 @@ namespace IDKEngine.Render
     {
         public unsafe Vector3 Position
         {
-            get => glslPointShadow.Position;
+            get => gpuPointShadow.Position;
 
             set
             {
-                glslPointShadow.Position = value;
+                gpuPointShadow.Position = value;
 
                 UpdateViewMatrices();
             }
@@ -21,20 +21,20 @@ namespace IDKEngine.Render
 
         public Vector2 ClippingPlanes
         {
-            get => new Vector2(glslPointShadow.NearPlane, glslPointShadow.FarPlane);
+            get => new Vector2(gpuPointShadow.NearPlane, gpuPointShadow.FarPlane);
 
             set
             {
-                glslPointShadow.NearPlane = value.X;
-                glslPointShadow.FarPlane = value.Y;
+                gpuPointShadow.NearPlane = value.X;
+                gpuPointShadow.FarPlane = value.Y;
 
-                glslPointShadow.NearPlane = MathF.Max(glslPointShadow.NearPlane, 0.1f);
-                glslPointShadow.FarPlane = MathF.Max(glslPointShadow.FarPlane, 0.1f);
+                gpuPointShadow.NearPlane = MathF.Max(gpuPointShadow.NearPlane, 0.1f);
+                gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, 0.1f);
 
-                glslPointShadow.NearPlane = MathF.Min(glslPointShadow.NearPlane, glslPointShadow.FarPlane - 0.01f);
-                glslPointShadow.FarPlane = MathF.Max(glslPointShadow.FarPlane, glslPointShadow.NearPlane + 0.01f);
+                gpuPointShadow.NearPlane = MathF.Min(gpuPointShadow.NearPlane, gpuPointShadow.FarPlane - 0.01f);
+                gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, gpuPointShadow.NearPlane + 0.01f);
 
-                projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, glslPointShadow.NearPlane, glslPointShadow.FarPlane);
+                projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, gpuPointShadow.NearPlane, gpuPointShadow.FarPlane);
             }
         }
 
@@ -54,7 +54,7 @@ namespace IDKEngine.Render
         
         private readonly Framebuffer framebuffer;
         private SamplerObject shadowSampler;
-        private GpuPointShadow glslPointShadow;
+        private GpuPointShadow gpuPointShadow;
         public PointShadow(int size, float nearPlane, float farPlane)
         {
             framebuffer = new Framebuffer();
@@ -95,7 +95,7 @@ namespace IDKEngine.Render
                 // Using geometry shader would be slower
                 for (int i = 0; i < 6; i++)
                 {
-                    ref readonly Matrix4 projView = ref glslPointShadow[GpuPointShadow.Matrix.PosX + i];
+                    ref readonly Matrix4 projView = ref gpuPointShadow[GpuPointShadow.Matrix.PosX + i];
                     modelSystem.FrustumCull(projView);
 
                     framebuffer.SetRenderTargetLayer(FramebufferAttachment.DepthAttachment, Result, i);
@@ -111,17 +111,17 @@ namespace IDKEngine.Render
 
         private void UpdateViewMatrices()
         {
-            glslPointShadow.PosX = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-            glslPointShadow.NegX = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-            glslPointShadow.PosY = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
-            glslPointShadow.NegY = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
-            glslPointShadow.PosZ = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-            glslPointShadow.NegZ = Camera.GenerateViewMatrix(glslPointShadow.Position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow.PosX = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow.NegX = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow.PosY = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
+            gpuPointShadow.NegY = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
+            gpuPointShadow.PosZ = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow.NegZ = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
         }
 
-        public ref readonly GpuPointShadow GetGLSLData()
+        public ref readonly GpuPointShadow GetGpuData()
         {
-            return ref glslPointShadow;
+            return ref gpuPointShadow;
         }
 
         public void SetSize(int size)
@@ -144,8 +144,8 @@ namespace IDKEngine.Render
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
 
-            glslPointShadow.Texture = Result.GetTextureHandleARB();
-            glslPointShadow.ShadowTexture = Result.GetTextureHandleARB(shadowSampler);
+            gpuPointShadow.Texture = Result.GetTextureHandleARB();
+            gpuPointShadow.ShadowTexture = Result.GetTextureHandleARB(shadowSampler);
 
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
             framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);

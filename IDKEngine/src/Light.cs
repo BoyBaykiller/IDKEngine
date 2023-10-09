@@ -4,18 +4,18 @@ namespace IDKEngine
 {
     class Light
     {
-        public GpuLight GLSLLight;
+        public GpuLight GpuLight;
         public Light(Vector3 position, Vector3 color, float radius)
         {
-            GLSLLight.Position = position;
-            GLSLLight.Color = color;
-            GLSLLight.Radius = radius;
-            GLSLLight.PointShadowIndex = -1;
+            GpuLight.Position = position;
+            GpuLight.Color = color;
+            GpuLight.Radius = radius;
+            GpuLight.PointShadowIndex = -1;
         }
 
         public bool HasPointShadow()
         {
-            return GLSLLight.PointShadowIndex >= 0;
+            return GpuLight.PointShadowIndex >= 0;
         }
     }
 }

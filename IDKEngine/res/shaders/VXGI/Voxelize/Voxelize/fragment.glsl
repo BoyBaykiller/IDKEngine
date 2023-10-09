@@ -68,12 +68,12 @@ layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 } shadowDataUBO;
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
+    Light Lights[GPU_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
