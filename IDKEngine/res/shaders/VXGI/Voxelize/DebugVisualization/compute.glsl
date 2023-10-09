@@ -59,7 +59,7 @@ void main()
     worldRay.Direction = GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc);
 
     float t1, t2;
-    if (!(RayCuboidIntersect(worldRay, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax, t1, t2) && t2 > 0.0))
+    if (!(RayBoxIntersect(worldRay, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax, t1, t2) && t2 > 0.0))
     {
         vec4 skyColor = texture(skyBoxUBO.Albedo, worldRay.Direction);
         imageStore(ImgResult, imgCoord, skyColor);

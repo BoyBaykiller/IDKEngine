@@ -1,54 +1,46 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
+using IDKEngine.Shapes;
 using OpenTK.Mathematics;
 
 namespace IDKEngine
 {
     class TLAS
     {
-        public struct HitInfo
-        {
-            public GpuTriangle Triangle;
-            public Vector3 Bary;
-            public float T;
-            public int MeshID;
-            public int InstanceID;
-        }
+        //public struct BlasInstances
+        //{
+        //    public BLAS Blas;
+        //    public ArraySegment<GpuMeshInstance> Instances;
 
-        public struct BlasInstances
-        {
-            public BLAS Blas;
-            public ArraySegment<GpuMeshInstance> Instances;
-
-            public void Deconstruct(out BLAS blas, out ArraySegment<GpuMeshInstance> instances)
-            {
-                blas = Blas;
-                instances = Instances;
-            }
-        }
+        //    public void Deconstruct(out BLAS blas, out ArraySegment<GpuMeshInstance> instances)
+        //    {
+        //        blas = Blas;
+        //        instances = Instances;
+        //    }
+        //}
 
         public GpuTlasNode Root => Nodes[0];
-        public Box RootBounds => new Box(Root.Min, Root.Max);
         public int TreeDepth { get; private set; }
 
-        public List<BlasInstances> BlasesInstances;
+        //public List<BlasInstances> BlasesInstances;
+        public GpuMeshInstance[] MeshInstances;
+        public GpuDrawElementsCmd[] DrawCommands;
+        public List<BLAS> Blases;
         public GpuTlasNode[] Nodes;
-        private int allBlasInstancesCount;
         public TLAS()
         {
-            BlasesInstances = new List<BlasInstances>();
-            Nodes = Array.Empty<GpuTlasNode>();
+            Blases = new List<BLAS>();
         }
 
-        public void AddBlases(BlasInstances[] blasesInstances)
+        public void AddBlases(BLAS[] blases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
         {
-            BlasesInstances.AddRange(blasesInstances);
+            Blases.AddRange(blases);
+            DrawCommands = drawCommands;
+            MeshInstances = meshInstances;
 
-            allBlasInstancesCount = BlasesInstances.Sum(blasInstances => blasInstances.Instances.Count);
-            Array.Resize(ref Nodes, 2 * allBlasInstancesCount - 1);
-            TreeDepth = (int)MathF.Ceiling(MathF.Log2(Nodes.Length)) + 2;
+            Array.Resize(ref Nodes, 2 * meshInstances.Length - 1);
+            TreeDepth = (int)MathF.Ceiling(MathF.Log2(Nodes.Length));
         }
 
         public void Build()
@@ -58,13 +50,15 @@ namespace IDKEngine
             // Flatten and transform local space blas instances into
             // world space tlas nodes. These nodes are the primitives of the the TLAS.
             {
-                for (int i = 0; i < BlasesInstances.Count; i++)
+                for (int i = 0; i < Blases.Count; i++)
                 {
-                    (BLAS blas, ArraySegment<GpuMeshInstance> instances) = BlasesInstances[i];
-                    for (int j = 0; j < instances.Count; j++)
+                    BLAS blas = Blases[i];
+                    ref readonly GpuDrawElementsCmd cmd = ref DrawCommands[i];
+
+                    for (int j = 0; j < cmd.InstanceCount; j++)
                     {
                         GpuTlasNode newNode;
-                        Box worldSpaceBounds = Box.Transformed(new Box(blas.RootBounds.Min, blas.RootBounds.Max), instances[j].ModelMatrix);
+                        Box worldSpaceBounds = Box.Transformed(GpuTypes.Conversions.ToBox(blas.Root), MeshInstances[cmd.BaseInstance + j].ModelMatrix);
                         newNode.Min = worldSpaceBounds.Min;
                         newNode.Max = worldSpaceBounds.Max;
                         newNode.LeftChild = 0;
@@ -81,7 +75,7 @@ namespace IDKEngine
             //            Apply this scheme recursivly until only a single root node encompassing the entire scene is left.          
             //            This exact implementation doesnt run in optimal time complexity but can still be considered real time.    
             {
-                int candidatesSearchCount = allBlasInstancesCount;
+                int candidatesSearchCount = MeshInstances.Length;
                 int candidatesSearchCountBackup = candidatesSearchCount;
                 int candidatesSearchStart = Nodes.Length - 1;
                 while (candidatesSearchCount > 1)
@@ -101,7 +95,7 @@ namespace IDKEngine
                         ref readonly GpuTlasNode nodeB = ref Nodes[nodeBId];
                         ref readonly GpuTlasNode nodeA = ref Nodes[nodeAId];
 
-                        Box boundsFittingChildren = new Box(nodeA.Min, nodeA.Max);
+                        Box boundsFittingChildren = GpuTypes.Conversions.ToBox(nodeA);
                         boundsFittingChildren.GrowToFit(nodeB.Min);
                         boundsFittingChildren.GrowToFit(nodeB.Max);
 
@@ -144,7 +138,7 @@ namespace IDKEngine
 
                 ref readonly GpuTlasNode otherNode = ref Nodes[i];
 
-                Box fittingBox = new Box(node.Min, node.Max);
+                Box fittingBox = GpuTypes.Conversions.ToBox(node);
                 fittingBox.GrowToFit(otherNode.Min);
                 fittingBox.GrowToFit(otherNode.Max);
 
@@ -160,9 +154,9 @@ namespace IDKEngine
         }
 
         public static int debugMaxStack = 0;
-        public unsafe bool Intersect(in Ray ray, out HitInfo hitInfo, float tMax = float.MaxValue)
+        public unsafe bool Intersect(in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
         {
-            hitInfo = new HitInfo();
+            hitInfo = new BVH.RayHitInfo();
             hitInfo.T = tMax;
 
             uint stackPtr = 0;
@@ -171,14 +165,13 @@ namespace IDKEngine
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref Nodes[stackTop];
-                if (parent.IsLeaf())
+                if (parent.LeftChild == 0)
                 {
-                    BlasInstances blasInstances = BlasesInstances[(int)parent.BlasIndex];
-                    BLAS blas = blasInstances.Blas;
+                    BLAS blas = Blases[(int)parent.BlasIndex];
 
                     int glInstanceID = 0; // TODO: Work out actual instanceID value
-                    Ray localRay = ray.Transformed(blasInstances.Instances[glInstanceID].InvModelMatrix);
-                    if (blas.Intersect(localRay, out BLAS.HitInfo blasHitInfo, hitInfo.T))
+                    Ray localRay = ray.Transformed(MeshInstances[glInstanceID].InvModelMatrix);
+                    if (blas.Intersect(localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                     {
                         hitInfo.Triangle = blasHitInfo.Triangle;
                         hitInfo.Bary = blasHitInfo.Bary;
@@ -195,10 +188,10 @@ namespace IDKEngine
 
                 uint leftChild = parent.LeftChild;
                 uint rightChild = leftChild + 1;
-                ref readonly GpuTlasNode left = ref Nodes[leftChild];
-                ref readonly GpuTlasNode right = ref Nodes[rightChild];
-                bool leftChildHit = MyMath.RayCuboidIntersect(ray, left.Min, left.Max, out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
-                bool rightChildHit = MyMath.RayCuboidIntersect(ray, right.Min, right.Max, out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
+                ref readonly GpuTlasNode leftNode = ref Nodes[leftChild];
+                ref readonly GpuTlasNode rightNode = ref Nodes[rightChild];
+                bool leftChildHit = Intersections.RayVsBox(ray, GpuTypes.Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
+                bool rightChildHit = Intersections.RayVsBox(ray, GpuTypes.Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
 
                 if (leftChildHit || rightChildHit)
                 {

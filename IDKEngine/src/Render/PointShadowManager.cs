@@ -13,7 +13,7 @@ namespace IDKEngine.Render
             Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
             Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
 
-        public const int GLSL_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
+        public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
 
         private readonly PointShadow[] pointShadows;
         private readonly ShaderProgram renderProgram;
@@ -21,7 +21,7 @@ namespace IDKEngine.Render
         private readonly BufferObject pointShadowsBuffer;
         public unsafe PointShadowManager()
         {
-            pointShadows = new PointShadow[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+            pointShadows = new PointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
             Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
             shaderInsertions.Add("TAKE_VERTEX_LAYERED_RENDERING_PATH", TAKE_VERTEX_LAYERED_RENDERING_PATH ? "1" : "0");
@@ -34,7 +34,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/MultiView/Frustum/shadowCompute.glsl")));
 
             pointShadowsBuffer = new BufferObject();
-            pointShadowsBuffer.ImmutableAllocate(GLSL_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            pointShadowsBuffer.ImmutableAllocate(GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
         }
 
@@ -42,7 +42,7 @@ namespace IDKEngine.Render
         {
             GL.ColorMask(false, false, false, false);
             GL.Disable(EnableCap.CullFace);
-            for (int i = 0; i < GLSL_MAX_UBO_POINT_SHADOW_COUNT; i++)
+            for (int i = 0; i < GPU_MAX_UBO_POINT_SHADOW_COUNT; i++)
             {
                 if (TryGetPointShadow(i, out PointShadow pointShadow))
                 {
@@ -70,7 +70,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(PointShadow)}. Limit of {GLSL_MAX_UBO_POINT_SHADOW_COUNT} is reached");
+            Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(PointShadow)}. Limit of {GPU_MAX_UBO_POINT_SHADOW_COUNT} is reached");
             return false;
         }
 
@@ -94,13 +94,13 @@ namespace IDKEngine.Render
                 return;
             }
 
-            pointShadowsBuffer.SubData(index * sizeof(GpuPointShadow), sizeof(GpuPointShadow), pointShadow.GetGLSLData());
+            pointShadowsBuffer.SubData(index * sizeof(GpuPointShadow), sizeof(GpuPointShadow), pointShadow.GetGpuData());
         }
 
         public bool TryGetPointShadow(int index, out PointShadow pointShadow)
         {
             pointShadow = null;
-            if (index < 0 || index >= GLSL_MAX_UBO_POINT_SHADOW_COUNT) return false;
+            if (index < 0 || index >= GPU_MAX_UBO_POINT_SHADOW_COUNT) return false;
 
             pointShadow = pointShadows[index];
             return pointShadow != null;

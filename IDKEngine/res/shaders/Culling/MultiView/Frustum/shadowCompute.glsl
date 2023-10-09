@@ -82,7 +82,7 @@ layout(std430, binding = 4) restrict readonly buffer BlasSSBO
 
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    PointShadow PointShadows[GLSL_MAX_UBO_POINT_SHADOW_COUNT];
+    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowDataUBO;
 

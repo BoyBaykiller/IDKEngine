@@ -9,6 +9,9 @@ namespace IDKEngine.Render
 {
     class ModelSystem : IDisposable
     {
+        public int TriangleCount => Indices.Length / 3;
+
+
         public GpuDrawElementsCmd[] DrawCommands;
         private readonly BufferObject drawCommandBuffer;
 
@@ -92,15 +95,15 @@ namespace IDKEngine.Render
             {
                 int addedDrawCommands = models.Sum(model => model.DrawCommands.Length);
                 int prevDrawCommandsLength = DrawCommands.Length - addedDrawCommands;
-                Memory<GpuDrawElementsCmd> newDrawCommands = new Memory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, addedDrawCommands);
-                BVH.AddMeshesAndBuild(newDrawCommands, MeshInstances, Vertices, Indices);
+                ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, addedDrawCommands);
+                BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, Vertices, Indices);
 
                 // Caculate root node offset in blas buffer for each mesh
                 uint bvhNodesExclusiveSum = 0;
                 for (int i = 0; i < DrawCommands.Length; i++)
                 {
                     DrawCommands[i].BlasRootNodeIndex = bvhNodesExclusiveSum;
-                    bvhNodesExclusiveSum += (uint)BVH.Tlas.BlasesInstances[i].Blas.Nodes.Length;
+                    bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
             }
 
@@ -213,6 +216,15 @@ namespace IDKEngine.Render
         public int GetMeshVertexCount(int meshIndex)
         {
             return ((meshIndex + 1 > DrawCommands.Length - 1) ? Vertices.Length : DrawCommands[meshIndex + 1].BaseVertex) - DrawCommands[meshIndex].BaseVertex;
+        }
+
+        public GpuTriangle GetTriangle(int indicesIndex, int baseVertex)
+        {
+            GpuTriangle triangle;
+            triangle.Vertex0 = Vertices[Indices[indicesIndex + 0] + baseVertex];
+            triangle.Vertex1 = Vertices[Indices[indicesIndex + 1] + baseVertex];
+            triangle.Vertex2 = Vertices[Indices[indicesIndex + 2] + baseVertex];
+            return triangle;
         }
 
         public void Dispose()

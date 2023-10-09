@@ -206,7 +206,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 
 layout(std140, binding = 2) uniform LightsUBO
 {
-    Light Lights[GLSL_MAX_UBO_LIGHT_COUNT];
+    Light Lights[GPU_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 

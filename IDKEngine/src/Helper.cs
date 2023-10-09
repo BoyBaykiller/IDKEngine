@@ -30,6 +30,11 @@ namespace IDKEngine
             return sum;
         }
 
+        public static Vector4 ToOpenTK(this System.Numerics.Vector4 vector4)
+        {
+            return Unsafe.As<System.Numerics.Vector4, Vector4>(ref vector4);
+        }
+
         public static System.Numerics.Vector3 ToNumerics(this Vector3 vector3)
         {
             return Unsafe.As<Vector3, System.Numerics.Vector3>(ref vector3);
@@ -277,8 +282,8 @@ namespace IDKEngine
             byte* pixels = Malloc<byte>(texture.Width * texture.Height * 3);
             texture.GetImageData(PixelFormat.Rgb, PixelType.UnsignedByte, (IntPtr)pixels, texture.Width * texture.Height * 3 * sizeof(byte));
 
-            ImageWriter imageWriter = new ImageWriter();
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
+            ImageWriter imageWriter = new ImageWriter();
             imageWriter.WriteJpg(pixels, texture.Width, texture.Height, StbImageWriteSharp.ColorComponents.RedGreenBlue, fileStream, quality);
             
             Free(pixels);

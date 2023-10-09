@@ -1,15 +1,32 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Runtime.InteropServices;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using IDKEngine.Shapes;
 
 namespace IDKEngine
 {
     class BVH : IDisposable
     {
         public const bool CPU_USE_TLAS = false;
+
+        public struct RayHitInfo
+        {
+            public GpuTriangle Triangle;
+            public Vector3 Bary;
+            public float T;
+            public int MeshID;
+            public int InstanceID;
+        }
+
+        public struct BoxHitInfo
+        {
+            public GpuTriangle Triangle;
+            public int MeshID;
+            public int InstanceID;
+        }
 
         public int MaxBlasTreeDepth { get; private set; }
         public readonly TLAS Tlas;
@@ -31,7 +48,7 @@ namespace IDKEngine
             Tlas = new TLAS();
         }
 
-        public bool Intersect(in Ray ray, out TLAS.HitInfo hitInfo, float tMax = float.MaxValue)
+        public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMax = float.MaxValue)
         {
             if (CPU_USE_TLAS)
             {
@@ -39,28 +56,61 @@ namespace IDKEngine
             }
             else
             {
-                hitInfo = new TLAS.HitInfo();
+                hitInfo = new RayHitInfo();
                 hitInfo.T = tMax;
 
-                for (int i = 0; i < Tlas.BlasesInstances.Count; i++)
+                for (int i = 0; i < Tlas.Blases.Count; i++)
                 {
-                    TLAS.BlasInstances blasInstances = Tlas.BlasesInstances[i];
-                    BLAS blas = blasInstances.Blas;
+                    BLAS blas = Tlas.Blases[i];
+                    ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
 
-                    int glInstanceID = 0; // TODO: Work out actual instanceID value
-                    Ray localRay = ray.Transformed(blasInstances.Instances[glInstanceID].InvModelMatrix);
-                    if (blas.Intersect(localRay, out BLAS.HitInfo blasHitInfo, hitInfo.T))
+                    for (int j = 0; j < drawCmd.InstanceCount; j++)
                     {
-                        hitInfo.Triangle = blasHitInfo.Triangle;
-                        hitInfo.Bary = blasHitInfo.Bary;
-                        hitInfo.T = blasHitInfo.T;
+                        int instanceID = drawCmd.BaseInstance + j;
+                        ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
 
-                        hitInfo.MeshID = i;
-                        hitInfo.InstanceID = glInstanceID;
+                        Ray localRay = ray.Transformed(meshInstance.InvModelMatrix);
+                        if (blas.Intersect(localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
+                        {
+                            hitInfo.Triangle = blasHitInfo.Triangle;
+                            hitInfo.Bary = blasHitInfo.Bary;
+                            hitInfo.T = blasHitInfo.T;
+
+                            hitInfo.MeshID = i;
+                            hitInfo.InstanceID = instanceID;
+                        }
                     }
+
                 }
 
                 return hitInfo.T != tMax;
+            }
+        }
+
+        public delegate void BoxIntersectFunc(in BoxHitInfo hitInfo);
+        public void Intersect(in Box box, BoxIntersectFunc intersectFunc)
+        {
+            for (int i = 0; i < Tlas.Blases.Count; i++)
+            {
+                BLAS blas = Tlas.Blases[i];
+                ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
+
+                for (int j = 0; j < drawCmd.InstanceCount; j++)
+                {
+                    int instanceID = drawCmd.BaseInstance + j;
+                    ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
+
+                    Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
+                    blas.Intersect(localBox, (in GpuTriangle triangle) =>
+                    {
+                        BoxHitInfo hitInfo;
+                        hitInfo.Triangle = triangle;
+                        hitInfo.MeshID = i;
+                        hitInfo.InstanceID = instanceID;
+
+                        intersectFunc(hitInfo);
+                    });
+                }
             }
         }
 
@@ -72,24 +122,24 @@ namespace IDKEngine
         /// <param name="newMeshesDrawCommands"></param>
         /// <param name="vertices"></param>
         /// <param name="indices"></param>
-        public void AddMeshesAndBuild(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuMeshInstance[] meshInstances, GpuDrawVertex[] vertices, uint[] indices)
+        public void AddMeshesAndBuild(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, GpuDrawVertex[] vertices, uint[] indices)
         {
-            TLAS.BlasInstances[] newBlasInstances = CreateBlasInstancesFromGeometry(newMeshesDrawCommands, meshInstances, vertices, indices);
-            AddBlases(newBlasInstances);
+            BLAS[] newBlasInstances = CreateBlasesFromGeometry(newMeshesDrawCommands, vertices, indices);
+            AddBlases(newBlasInstances, drawCommands, meshInstances);
             Logger.Log(Logger.LogLevel.Info, $"Created {newBlasInstances.Length} new Bottom Level Acceleration Structures (BLAS)");
 
             TlasBuild();
-            Logger.Log(Logger.LogLevel.Info, $"Created Top Level Acceleration Structures (TLAS) for {Tlas.BlasesInstances.Sum(blasInstances => blasInstances.Instances.Count)} instances");
+            Logger.Log(Logger.LogLevel.Info, $"Created Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances");
         }
 
-        private void AddBlases(TLAS.BlasInstances[] newBlasInstances)
+        private void AddBlases(BLAS[] blases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
         {
-            Tlas.AddBlases(newBlasInstances);
-            SetBlasBuffersContent(CollectionsMarshal.AsSpan(Tlas.BlasesInstances));
+            Tlas.AddBlases(blases, drawCommands, meshInstances);
+            SetBlasBuffersContent();
 
-            for (int i = 0; i < newBlasInstances.Length; i++)
+            for (int i = 0; i < blases.Length; i++)
             {
-                MaxBlasTreeDepth = Math.Max(MaxBlasTreeDepth, newBlasInstances[i].Blas.TreeDepth);
+                MaxBlasTreeDepth = Math.Max(MaxBlasTreeDepth, blases[i].TreeDepth);
             }
         }
 
@@ -99,16 +149,16 @@ namespace IDKEngine
             SetTlasBufferContent(Tlas.Nodes);
         }
 
-        private unsafe void SetBlasBuffersContent(ReadOnlySpan<TLAS.BlasInstances> blasInstances)
+        private unsafe void SetBlasBuffersContent()
         {
-            blasBuffer.MutableAllocate((nint)sizeof(GpuBlasNode) * blasInstances.Sum(blasInstances => blasInstances.Blas.Nodes.Length), IntPtr.Zero);
-            blasTriangleBuffer.MutableAllocate((nint)sizeof(GpuTriangle) * blasInstances.Sum(blasInstances => blasInstances.Blas.Triangles.Length), IntPtr.Zero);
+            blasBuffer.MutableAllocate((nint)sizeof(GpuBlasNode) * Tlas.Blases.Sum(blasInstances => blasInstances.Nodes.Length), IntPtr.Zero);
+            blasTriangleBuffer.MutableAllocate((nint)sizeof(GpuTriangle) * Tlas.Blases.Sum(blasInstances => blasInstances.Triangles.Length), IntPtr.Zero);
 
             nint uploadedBlasNodesCount = 0;
             nint uploadedTrianglesCount = 0;
-            for (int i = 0; i < blasInstances.Length; i++)
+            for (int i = 0; i < Tlas.Blases.Count; i++)
             {
-                BLAS blas = blasInstances[i].Blas;
+                BLAS blas = Tlas.Blases[i];
 
                 blasBuffer.SubData(uploadedBlasNodesCount * sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
                 blasTriangleBuffer.SubData(uploadedTrianglesCount * sizeof(GpuTriangle), blas.Triangles.Length * (nint)sizeof(GpuTriangle), blas.Triangles);
@@ -128,10 +178,11 @@ namespace IDKEngine
             blasBuffer.Dispose();
         }
 
-        private static TLAS.BlasInstances[] CreateBlasInstancesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, GpuMeshInstance[] meshInstances, GpuDrawVertex[] vertices, uint[] indices)
+        private static BLAS[] CreateBlasesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, GpuDrawVertex[] vertices, uint[] indices)
         {
-            TLAS.BlasInstances[] blasInstances = new TLAS.BlasInstances[drawCommands.Length];
-            Parallel.For(0, blasInstances.Length, i =>
+            BLAS[] blases = new BLAS[drawCommands.Length];
+            Parallel.For(0, blases.Length, i =>
+            //for (int i = 0; i < blases.Length; i++)
             {
                 ref readonly GpuDrawElementsCmd cmd = ref drawCommands.Span[i];
 
@@ -145,14 +196,11 @@ namespace IDKEngine
 
                 BLAS blas = new BLAS(blasTriangles);
                 blas.Build();
-                blasInstances[i] = new TLAS.BlasInstances()
-                {
-                    Blas = blas,
-                    Instances = new ArraySegment<GpuMeshInstance>(meshInstances, cmd.BaseInstance, cmd.InstanceCount),
-                };
+
+                blases[i] = blas;
             });
 
-            return blasInstances;
+            return blases;
         }
     }
 }

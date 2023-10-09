@@ -26,6 +26,7 @@ namespace IDKEngine.Render
         public bool IsVolumetricLighting;
         public bool IsVariableRateShading;
         public bool IsConfigureGrid;
+        public bool ShouldVoxelize;
 
         public readonly SSAO SSAO;
         public readonly SSR SSR;
@@ -50,7 +51,7 @@ namespace IDKEngine.Render
         private readonly Framebuffer gBufferFBO;
         private readonly Framebuffer deferredLightingFBO;
 
-        private GpuGBuffer glslGBufferData;
+        private GpuGBuffer gpuGBufferData;
         public unsafe RasterPipeline(int width, int height)
         {
             LightingVRS = new LightingShadingRateClassifier(width, height, 0.025f, 0.2f);
@@ -88,13 +89,14 @@ namespace IDKEngine.Render
             IsVolumetricLighting = true;
             IsVariableRateShading = false;
             IsVXGI = false;
+            ShouldVoxelize = true;
 
             SetSize(width, height);
         }
 
         public void Render(ModelSystem modelSystem, in Matrix4 cullProjViewMatrix, LightManager lightManager = null)
         {
-            if (IsVXGI)
+            if (IsVXGI && ShouldVoxelize)
             {
                 // when voxelizing make sure every mesh is rendered and nothing culled
                 for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
@@ -246,33 +248,33 @@ namespace IDKEngine.Render
             AlbedoAlphaTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             AlbedoAlphaTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             AlbedoAlphaTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
-            glslGBufferData.AlbedoAlphaTextureHandle = AlbedoAlphaTexture.GetTextureHandleARB();
+            gpuGBufferData.AlbedoAlphaTextureHandle = AlbedoAlphaTexture.GetTextureHandleARB();
 
             NormalSpecularTexture = new Texture(TextureTarget2d.Texture2D);
             NormalSpecularTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             NormalSpecularTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             NormalSpecularTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8Snorm);
-            glslGBufferData.NormalSpecularTextureHandle = NormalSpecularTexture.GetTextureHandleARB();
+            gpuGBufferData.NormalSpecularTextureHandle = NormalSpecularTexture.GetTextureHandleARB();
 
             EmissiveRoughnessTexture = new Texture(TextureTarget2d.Texture2D);
             EmissiveRoughnessTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             EmissiveRoughnessTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             EmissiveRoughnessTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
-            glslGBufferData.EmissiveRoughnessTextureHandle = EmissiveRoughnessTexture.GetTextureHandleARB();
+            gpuGBufferData.EmissiveRoughnessTextureHandle = EmissiveRoughnessTexture.GetTextureHandleARB();
 
             VelocityTexture = new Texture(TextureTarget2d.Texture2D);
             VelocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             VelocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             VelocityTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rg16f);
-            glslGBufferData.VelocityTextureHandle = VelocityTexture.GetTextureHandleARB();
+            gpuGBufferData.VelocityTextureHandle = VelocityTexture.GetTextureHandleARB();
 
             DepthTexture = new Texture(TextureTarget2d.Texture2D);
             DepthTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             DepthTexture.ImmutableAllocate(width, height, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent24);
-            glslGBufferData.DepthTextureHandle = DepthTexture.GetTextureHandleARB();
+            gpuGBufferData.DepthTextureHandle = DepthTexture.GetTextureHandleARB();
 
-            gBufferData.SubData(0, sizeof(GpuGBuffer), glslGBufferData);
+            gBufferData.SubData(0, sizeof(GpuGBuffer), gpuGBufferData);
 
             gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, Result);
             gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment1, AlbedoAlphaTexture);

@@ -5,6 +5,7 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.Render
 {
@@ -32,17 +33,18 @@ namespace IDKEngine.Render
         }
 
         public ImGuiBackend Backend { get; private set; }
+        public FrameRecorderState FrameRecState { get; private set; }
+
+        public SelectedEntityInfo SelectedEntity;
+
+        private int recordingFPS;
         private bool isInfiniteReplay;
         private bool isVideoRender;
         private int recordingRenderSampleGoal;
-
-        public SelectedEntityInfo SelectedEntity;
-        private FrameRecorderState frameRecState;
-        private int recordingFPS;
         public Gui(int width, int height)
         {
             Backend = new ImGuiBackend(width, height);
-            frameRecState = FrameRecorderState.Nothing;
+            FrameRecState = FrameRecorderState.Nothing;
             isInfiniteReplay = false;
             recordingRenderSampleGoal = 1;
             recordingFPS = 48;
@@ -52,28 +54,76 @@ namespace IDKEngine.Render
         private System.Numerics.Vector2 viewportHeaderSize;
         public void Draw(Application app, float frameTime)
         {
+            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal)
+            {
+                Backend.IsIgnoreMouseInput = false;
+            }
+            else if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
+            {
+                Backend.IsIgnoreMouseInput = true;
+            }
+
             Backend.Update(app, frameTime);
             ImGui.DockSpaceOverViewport();
 
-            bool tempBool;
             int tempInt;
+            bool tempBool;
+            float tempFloat;
             System.Numerics.Vector2 tempVec2;
             System.Numerics.Vector3 tempVec3;
+
+            
+            if (ImGui.Begin("Camera"))
+            {
+                if (ImGui.CollapsingHeader("Collision Detection"))
+                {
+                    ImGui.Checkbox("IsEnabled", ref app.CamCollisionDetectionSettings.IsEnabled);
+                    ImGui.SliderInt("Steps", ref app.CamCollisionDetectionSettings.Steps, 1, 100);
+                    ImGui.SliderFloat("NormalEpsilonOffset", ref app.CamCollisionDetectionSettings.EpsilonNormalOffset, 0.001f, 0.01f);
+                }
+
+                if (ImGui.CollapsingHeader("Controls"))
+                {
+                    tempVec3 = app.Camera.Position.ToNumerics();
+                    if (ImGui.DragFloat3("Position", ref tempVec3))
+                    {
+                        app.Camera.Position = tempVec3.ToOpenTK();
+                    }
+
+                    ImGui.SliderFloat("Speed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f);
+                    ImGui.SliderFloat("Sensitivity", ref app.Camera.MouseSensitivity, 0.0f, 0.1f);
+
+                    tempFloat = MathHelper.RadiansToDegrees(app.CameraFovY);
+                    if (ImGui.SliderFloat("FovY", ref tempFloat, 10.0f, 130.0f))
+                    {
+                        app.CameraFovY = MathHelper.DegreesToRadians(tempFloat);
+                    }
+
+                    ImGui.Checkbox("HasGravity", ref app.Camera.HasGravity);
+                    if (app.Camera.HasGravity)
+                    {
+                        ImGui.SliderFloat("Gravity", ref app.Camera.GravityDownForce, 0.0f, 100.0f);
+                    }
+                }
+
+                ImGui.End();
+            }
+
 
             bool shouldResetPT = false;
             ImGui.Begin("Frame Recorder");
             {
-                if (frameRecState != FrameRecorderState.Replaying)
+                if (FrameRecState != FrameRecorderState.Replaying)
                 {
-                    bool isRecording = frameRecState == FrameRecorderState.Recording;
-                    ImGui.Text($"Is Recording (Press {Keys.R}): {isRecording}");
+                    bool isRecording = FrameRecState == FrameRecorderState.Recording;
+                    ImGui.Text($"Is Recording (Press {Keys.LeftControl} + {Keys.R}): {isRecording}");
 
                     if (ImGui.InputInt("Recording FPS", ref recordingFPS))
                     {
                         recordingFPS = Math.Max(5, recordingFPS);
                     }
 
-                    if (frameRecState == FrameRecorderState.Recording)
+                    if (FrameRecState == FrameRecorderState.Recording)
                     {
                         ImGui.Text($"   * Recorded frames: {app.FrameRecorder.FrameCount}");
                         unsafe
@@ -84,10 +134,10 @@ namespace IDKEngine.Render
                     ImGui.Separator();
                 }
                 
-                bool isReplaying = frameRecState == FrameRecorderState.Replaying;
-                if ((frameRecState == FrameRecorderState.Nothing && app.FrameRecorder.IsFramesLoaded) || isReplaying)
+                bool isReplaying = FrameRecState == FrameRecorderState.Replaying;
+                if ((FrameRecState == FrameRecorderState.Nothing && app.FrameRecorder.IsFramesLoaded) || isReplaying)
                 {
-                    ImGui.Text($"Is Replaying (Press {Keys.Space}): {isReplaying}");
+                    ImGui.Text($"Is Replaying (Press {Keys.LeftControl} + {Keys.Space}): {isReplaying}");
                     ImGui.Checkbox("Is Infite Replay", ref isInfiniteReplay);
                     
                     ImGui.Checkbox("Is Video Render", ref isVideoRender);
@@ -117,7 +167,7 @@ namespace IDKEngine.Render
                     ImGui.Separator();
                 }
 
-                if (frameRecState == FrameRecorderState.Nothing)
+                if (FrameRecState == FrameRecorderState.Nothing)
                 {
                     const string FRAME_RECORDER_FILE_PATH = "frameRecordData.frd";
                     if (ImGui.Button($"Save"))
@@ -141,14 +191,14 @@ namespace IDKEngine.Render
                 ImGui.Text($"FPS: {app.FPS}");
                 ImGui.Text($"Viewport size: {app.RenderPresentationResolution.X}x{app.RenderPresentationResolution.Y}");
                 ImGui.Text($"{Helper.GPU}");
-                ImGui.Text($"Triangles: {app.ModelSystem.Indices.Length / 3}");
+                ImGui.Text($"Triangles: {app.ModelSystem.TriangleCount}");
 
                 if (app.RenderMode == RenderMode.PathTracer)
                 {
                     ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
                 }
 
-                float tempFloat = app.TonemapAndGamma.Gamma;
+                tempFloat = app.TonemapAndGamma.Gamma;
                 if (ImGui.SliderFloat("Gamma", ref tempFloat, 0.1f, 3.0f))
                 {
                     app.TonemapAndGamma.Gamma = tempFloat;
@@ -158,12 +208,6 @@ namespace IDKEngine.Render
                 if (ImGui.SliderFloat("ResolutionScale", ref tempFloat, 0.1f, 1.0f))
                 {
                     app.ResolutionScale = Math.Max(tempFloat, 0.1f);
-                }
-
-                tempFloat = MathHelper.RadiansToDegrees(app.CameraFovY);
-                if (ImGui.SliderFloat("FovY", ref tempFloat, 10.0f, 130.0f))
-                {
-                    app.CameraFovY = MathHelper.DegreesToRadians(tempFloat);
                 }
 
                 string current = app.RenderMode.ToString();
@@ -203,6 +247,9 @@ namespace IDKEngine.Render
 
                         if (app.RasterizerPipeline.IsVXGI)
                         {
+                            ToolTipForItemAboveHovered("Controls wether the scene is re-voxelized every frame");
+                            ImGui.Checkbox("ShouldVoxelize", ref app.RasterizerPipeline.ShouldVoxelize);
+
                             ImGui.Checkbox("IsConfigureGrid", ref app.RasterizerPipeline.IsConfigureGrid);
                             ToolTipForItemAboveHovered(
                                 "Allows to change the size of the VXGI grid.\n" +
@@ -655,7 +702,7 @@ namespace IDKEngine.Render
             {
                 if (ImGui.Button("Add light"))
                 {
-                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, new Vector2(0.0f));
+                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new Vector2(0.0f));
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
                     Light light = new Light(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
@@ -674,7 +721,7 @@ namespace IDKEngine.Render
                     {
                         Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
                     }
-                    else
+                    else if (!result.IsCancelled)
                     {
                         Model newModel = new Model(result.Path);
                         app.ModelSystem.Add(newModel);
@@ -711,31 +758,33 @@ namespace IDKEngine.Render
                         meshInstance.ModelMatrix = meshInstance.ModelMatrix.ClearTranslation() * Matrix4.CreateTranslation(app.Camera.Position);
                         shouldUpdateMesh = true;
                     }
-                    
-                    System.Numerics.Vector3 systemVec3 = meshInstance.ModelMatrix.ExtractTranslation().ToNumerics();
-                    if (ImGui.DragFloat3("Position", ref systemVec3, 0.1f))
+
+                    Vector3 beforeTranslation = meshInstance.ModelMatrix.ExtractTranslation();
+                    tempVec3 = beforeTranslation.ToNumerics();
+                    if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
                     {
                         shouldUpdateMesh = true;
-                        meshInstance.ModelMatrix = meshInstance.ModelMatrix.ClearTranslation() * Matrix4.CreateTranslation(systemVec3.ToOpenTK());
+                        Vector3 dif = tempVec3.ToOpenTK() - beforeTranslation;
+                        meshInstance.ModelMatrix *= Matrix4.CreateTranslation(dif);
                     }
 
-                    systemVec3 = meshInstance.ModelMatrix.ExtractScale().ToNumerics();
-                    if (ImGui.DragFloat3("Scale", ref systemVec3, 0.005f))
+                    tempVec3 = meshInstance.ModelMatrix.ExtractScale().ToNumerics();
+                    if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
                     {
                         shouldUpdateMesh = true;
-                        Vector3 temp = Vector3.ComponentMax(systemVec3.ToOpenTK(), new Vector3(0.001f));
+                        Vector3 temp = Vector3.ComponentMax(tempVec3.ToOpenTK(), new Vector3(0.001f));
                         meshInstance.ModelMatrix = Matrix4.CreateScale(temp) * meshInstance.ModelMatrix.ClearScale();
                     }
 
-                    meshInstance.ModelMatrix.ExtractRotation().ToEulerAngles(out Vector3 angles);
-                    systemVec3 = angles.ToNumerics();
-                    if (ImGui.DragFloat3("Rotation", ref systemVec3, 0.005f))
+                    meshInstance.ModelMatrix.ExtractRotation().ToEulerAngles(out Vector3 beforeAngles);
+                    tempVec3 = beforeAngles.ToNumerics();
+                    if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
                     {
                         shouldUpdateMesh = true;
-                        meshInstance.ModelMatrix = Matrix4.CreateRotationZ(systemVec3.ToOpenTK().Z) *
-                                                   Matrix4.CreateRotationY(systemVec3.ToOpenTK().Y) *
-                                                   Matrix4.CreateRotationX(systemVec3.ToOpenTK().X) *
-                                                   meshInstance.ModelMatrix.ClearRotation();
+                        Vector3 dif = tempVec3.ToOpenTK() - beforeAngles;
+                        meshInstance.ModelMatrix *= Matrix4.CreateRotationZ(dif.Z) *
+                                                    Matrix4.CreateRotationY(dif.Y) *
+                                                    Matrix4.CreateRotationX(dif.X);
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
@@ -768,10 +817,10 @@ namespace IDKEngine.Render
                         shouldUpdateMesh = true;
                     }
 
-                    systemVec3 = mesh.Absorbance.ToNumerics();
-                    if (ImGui.InputFloat3("Absorbance", ref systemVec3))
+                    tempVec3 = mesh.Absorbance.ToNumerics();
+                    if (ImGui.InputFloat3("Absorbance", ref tempVec3))
                     {
-                        Vector3 temp = systemVec3.ToOpenTK();
+                        Vector3 temp = tempVec3.ToOpenTK();
                         temp = Vector3.ComponentMax(temp, Vector3.Zero);
 
                         mesh.Absorbance = temp;
@@ -789,7 +838,7 @@ namespace IDKEngine.Render
                     bool shouldUpdateLight = false;
                     
                     app.LightManager.TryGetLight(SelectedEntity.Index, out Light abstractLight);
-                    ref GpuLight light = ref abstractLight.GLSLLight;
+                    ref GpuLight light = ref abstractLight.GpuLight;
 
                     if (ImGui.Button("Delete"))
                     {
@@ -923,7 +972,7 @@ namespace IDKEngine.Render
         }
 
         private readonly Stopwatch recordingTimer;
-        public void Update(Application app, float dT)
+        public void Update(Application app)
         {
             void TakeScreenshot()
             {
@@ -936,7 +985,7 @@ namespace IDKEngine.Render
                 Helper.TextureToDisk(app.TonemapAndGamma.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
 
-            if (frameRecState == FrameRecorderState.Replaying)
+            if (FrameRecState == FrameRecorderState.Replaying)
             {
                 if (app.RenderMode == RenderMode.Rasterizer || (app.RenderMode == RenderMode.PathTracer && app.PathTracer.AccumulatedSamples >= recordingRenderSampleGoal))
                 {
@@ -949,33 +998,11 @@ namespace IDKEngine.Render
                 
                 if (!isInfiniteReplay && app.FrameRecorder.ReplayFrameIndex == 0)
                 {
-                    frameRecState = FrameRecorderState.Nothing;
-                }
-            }
-            else
-            {
-                if (app.KeyboardState[Keys.E] == InputState.Touched && !ImGui.GetIO().WantCaptureKeyboard)
-                {
-                    if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                    {
-                        app.MouseState.CursorMode = CursorModeValue.CursorNormal;
-                        app.Camera.Velocity = Vector3.Zero;
-                        Backend.IsIgnoreMouseInput = false;
-                    }
-                    else
-                    {
-                        app.MouseState.CursorMode = CursorModeValue.CursorDisabled;
-                        Backend.IsIgnoreMouseInput = true;
-                    }
-                }
-
-                if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                {
-                    app.Camera.ProcessInputs(app.KeyboardState, app.MouseState, dT);
+                    FrameRecState = FrameRecorderState.Nothing;
                 }
             }
 
-            if (frameRecState == FrameRecorderState.Recording && recordingTimer.Elapsed.TotalMilliseconds >= (1000.0f / recordingFPS))
+            if (FrameRecState == FrameRecorderState.Recording && recordingTimer.Elapsed.TotalMilliseconds >= (1000.0f / recordingFPS))
             {
                 FrameState state = new FrameState();
                 state.Position = app.Camera.Position;
@@ -987,22 +1014,31 @@ namespace IDKEngine.Render
                 recordingTimer.Restart();
             }
 
-            if (frameRecState != FrameRecorderState.Replaying && app.KeyboardState[Keys.R] == InputState.Touched)
+            if (FrameRecState != FrameRecorderState.Replaying &&
+                app.KeyboardState[Keys.R] == InputState.Touched &&
+                app.KeyboardState[Keys.LeftControl] == InputState.Pressed)
             {
-                if (frameRecState == FrameRecorderState.Recording)
+                if (FrameRecState == FrameRecorderState.Recording)
                 {
-                    frameRecState = FrameRecorderState.Nothing;
+                    FrameRecState = FrameRecorderState.Nothing;
                 }
                 else
                 {
-                    frameRecState = FrameRecorderState.Recording;
+                    FrameRecState = FrameRecorderState.Recording;
                     app.FrameRecorder.Clear();
                 }
             }
 
-            if (frameRecState != FrameRecorderState.Recording && app.FrameRecorder.IsFramesLoaded && app.KeyboardState[Keys.Space] == InputState.Touched)
+            if (FrameRecState != FrameRecorderState.Recording && app.FrameRecorder.IsFramesLoaded &&
+                app.KeyboardState[Keys.Space] == InputState.Touched &&
+                app.KeyboardState[Keys.LeftControl] == InputState.Pressed)
             {
-                frameRecState = frameRecState == FrameRecorderState.Replaying ? FrameRecorderState.Nothing : FrameRecorderState.Replaying;
+                FrameRecState = FrameRecState == FrameRecorderState.Replaying ? FrameRecorderState.Nothing : FrameRecorderState.Replaying;
+                if (FrameRecState == FrameRecorderState.Replaying)
+                {
+                    app.CamCollisionDetectionSettings.IsEnabled = false;
+                    app.MouseState.CursorMode = CursorModeValue.CursorNormal;
+                }
             }
 
             if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && app.MouseState[MouseButton.Left] == InputState.Touched)
@@ -1029,17 +1065,17 @@ namespace IDKEngine.Render
                 //    int x = i % app.RenderResolution.X;
 
                 //    Vector2 ndcDebug = new Vector2((float)x / app.RenderResolution.X, (float)y / app.RenderResolution.Y) * 2.0f - new Vector2(1.0f);
-                //    worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndcDebug);
+                //    worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndcDebug);
 
-                //    app.ModelSystem.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo test);
+                //    app.ModelSystem.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo test);
                 //});
                 //timer.Stop();
                 //Console.WriteLine(timer.Elapsed.TotalMilliseconds);
                 //Console.WriteLine($"stack size required: {TLAS.debugMaxStack}");
                 //Console.WriteLine($"actual stack size: {app.ModelSystem.BVH.Tlas.TreeDepth}");
-                worldSpaceRay = Ray.GetWorldSpaceRay(app.GLSLBasicData.CameraPos, app.GLSLBasicData.InvProjection, app.GLSLBasicData.InvView, ndc);
+                worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndc);
 
-                bool hitMesh = app.ModelSystem.BVH.Intersect(worldSpaceRay, out TLAS.HitInfo meshHitInfo);
+                bool hitMesh = app.ModelSystem.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);
                 if (app.RenderMode == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
 
@@ -1079,7 +1115,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (frameRecState == FrameRecorderState.Replaying)
+            if (FrameRecState == FrameRecorderState.Replaying)
             {
                 FrameState state = app.FrameRecorder[app.FrameRecorder.ReplayFrameIndex];
                 app.Camera.Position = state.Position;

@@ -2,8 +2,9 @@
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
+using System;
 
-namespace IDKEngine
+namespace IDKEngine.Shapes
 {
     [StructLayout(LayoutKind.Explicit)]
     public struct Box
@@ -60,19 +61,20 @@ namespace IDKEngine
             GrowToFit(tri.Vertex2.Position);
         }
 
-        public void Transform(Matrix4 model)
-        {
-            this = Transformed(this, model);
-        }
-
-        public static Box Transformed(Box box, Matrix4 model)
+        public void Transform(in Matrix4 model)
         {
             Box newBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (int i = 0; i < 8; i++)
             {
-                newBox.GrowToFit((new Vector4(box[i], 1.0f) * model).Xyz);
+                newBox.GrowToFit((new Vector4(this[i], 1.0f) * model).Xyz);
             }
-            return newBox;
+            this = newBox;
+        }
+
+        public static Box Transformed(Box box, in Matrix4 model)
+        {
+            box.Transform(model);
+            return box;
         }
     }
 }
