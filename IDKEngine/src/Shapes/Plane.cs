@@ -15,6 +15,5 @@ namespace IDKEngine.Shapes
         {
             return v - Vector3.Dot(plane.Normal, v) * plane.Normal;
         }
-
     }
 }

@@ -77,9 +77,10 @@ namespace IDKEngine.Render
             {
                 if (ImGui.CollapsingHeader("Collision Detection"))
                 {
-                    ImGui.Checkbox("IsEnabled", ref app.CamCollisionDetectionSettings.IsEnabled);
-                    ImGui.SliderInt("Steps", ref app.CamCollisionDetectionSettings.Steps, 1, 100);
-                    ImGui.SliderFloat("NormalEpsilonOffset", ref app.CamCollisionDetectionSettings.EpsilonNormalOffset, 0.001f, 0.01f);
+                    ImGui.Checkbox("IsEnabled", ref app.CamCollisionSettings.IsEnabled);
+                    ImGui.SliderInt("TestSteps", ref app.CamCollisionSettings.TestSteps, 1, 20);
+                    ImGui.SliderInt("ResponseSteps", ref app.CamCollisionSettings.ResponseSteps, 1, 20);
+                    ImGui.SliderFloat("NormalOffset", ref app.CamCollisionSettings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
                 }
 
                 if (ImGui.CollapsingHeader("Controls"))
@@ -99,10 +100,10 @@ namespace IDKEngine.Render
                         app.CameraFovY = MathHelper.DegreesToRadians(tempFloat);
                     }
 
-                    ImGui.Checkbox("HasGravity", ref app.Camera.HasGravity);
-                    if (app.Camera.HasGravity)
+                    ImGui.Checkbox("HasGravity", ref app.HasGravity );
+                    if (app.HasGravity)
                     {
-                        ImGui.SliderFloat("Gravity", ref app.Camera.GravityDownForce, 0.0f, 100.0f);
+                        ImGui.SliderFloat("Gravity", ref app.GravityDownForce, 0.0f, 100.0f);
                     }
                 }
 
@@ -1036,7 +1037,7 @@ namespace IDKEngine.Render
                 FrameRecState = FrameRecState == FrameRecorderState.Replaying ? FrameRecorderState.Nothing : FrameRecorderState.Replaying;
                 if (FrameRecState == FrameRecorderState.Replaying)
                 {
-                    app.CamCollisionDetectionSettings.IsEnabled = false;
+                    app.CamCollisionSettings.IsEnabled = false;
                     app.MouseState.CursorMode = CursorModeValue.CursorNormal;
                 }
             }

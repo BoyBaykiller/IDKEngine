@@ -40,7 +40,7 @@ namespace IDKEngine
             get => _resolutionScale;
 
             set
-            { 
+            {
                 _resolutionScale = value;
                 RenderPresentationResolution = RenderPresentationResolution;
             }
@@ -54,7 +54,7 @@ namespace IDKEngine
             set
             {
                 _renderPresentationResolution = value;
-                
+
                 if (RenderMode == RenderMode.Rasterizer)
                 {
                     if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y);
@@ -148,16 +148,21 @@ namespace IDKEngine
         public struct CameraCollisionDetection
         {
             public bool IsEnabled;
-            public int Steps;
+            public int TestSteps;
+            public int ResponseSteps;
             public float EpsilonNormalOffset;
         }
 
-        public CameraCollisionDetection CamCollisionDetectionSettings = new CameraCollisionDetection()
+        public CameraCollisionDetection CamCollisionSettings = new CameraCollisionDetection()
         {
-            IsEnabled = true,
-            Steps = 8,
-            EpsilonNormalOffset = 0.001f
+            IsEnabled = false,
+            TestSteps = 3,
+            ResponseSteps = 12,
+            EpsilonNormalOffset = 0.0f
         };
+
+        public bool HasGravity = false;
+        public float GravityDownForce = 70.0f;
 
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
@@ -225,7 +230,7 @@ namespace IDKEngine
                 {
                     Bloom.Compute(PathTracer.Result);
                 }
-                
+
                 TonemapAndGamma.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
@@ -245,7 +250,7 @@ namespace IDKEngine
                 {
                     LightManager.TryGetLight(gui.SelectedEntity.Index, out Light abstractLight);
                     ref GpuLight light = ref abstractLight.GpuLight;
-                    
+
                     box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
                     box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
@@ -328,63 +333,92 @@ namespace IDKEngine
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
                     Camera.ProcessInputs(KeyboardState, MouseState);
+                    if (HasGravity)
+                    {
+                        Camera.ThisFrameAcceleration.Y += -GravityDownForce;
+                    }
+
                     Camera.AdvanceSimulation(dT);
+
                 }
             }
             gui.Update(this);
 
             //ModelSystem.BVH.TlasBuild();
 
-            if (CamCollisionDetectionSettings.IsEnabled)
+            if (CamCollisionSettings.IsEnabled)
             {
-                Vector3 cameraDeltaStep = Camera.Position - Camera.PrevPosition;
-                Sphere playerSphere = new Sphere(Camera.Position, 0.5f);
-                for (int i = 1; i <= CamCollisionDetectionSettings.Steps; i++)
+                for (int i = 0; i < CamCollisionSettings.ResponseSteps; i++)
                 {
-                    Vector3 thisPos = Camera.PrevPosition + cameraDeltaStep * (i / (float)CamCollisionDetectionSettings.Steps);
-                    Box playerBox = new Box(thisPos - new Vector3(playerSphere.Radius), thisPos + new Vector3(playerSphere.Radius));
-
-                    float penetrationDepth = float.MinValue;
-                    float cosTheta = 0.0f;
-                    Plane hitPlane = new Plane();
-                    ModelSystem.BVH.Intersect(playerBox, (in BVH.BoxHitInfo hitInfo) =>
-                    {
-                        Matrix4 model = ModelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
-                        Triangle worldSpaceTri = Triangle.Transformed(GpuTypes.Conversions.ToTriangle(hitInfo.Triangle), model);
-
-                        Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, playerSphere.Center);
-                        float distance = Vector3.Distance(closestPointOnTri, playerSphere.Center);
-                        float thisPenetrationDepth = playerSphere.Radius - distance;
-                        if (thisPenetrationDepth > 0.0f)
-                        {
-                            Plane thisHitPlane = new Plane(worldSpaceTri.Normal);
-
-                            Vector3 hitPointToCamera = Vector3.Normalize(thisPos - closestPointOnTri);
-                            float thisCosTheta = Vector3.Dot(thisHitPlane.Normal, hitPointToCamera);
-                            if (thisCosTheta < 0.0f)
-                            {
-                                thisHitPlane.Normal *= -1.0f;
-                            }
-
-                            if (MathF.Abs(thisCosTheta) > MathF.Abs(cosTheta))
-                            {
-                                cosTheta = thisCosTheta;
-                                hitPlane = thisHitPlane;
-                                penetrationDepth = thisPenetrationDepth;
-                            }
-                        }
-                    });
-
-                    if (penetrationDepth != float.MinValue)
+                    Sphere boundingVolume = new Sphere(Camera.PrevPosition, 0.5f);
+                    Plane hitPlane;
+                    float penetrationDepth;
+                    bool hit = CollisionRoutine(ModelSystem, CamCollisionSettings, Camera.Position, &boundingVolume, &hitPlane, &penetrationDepth);
+                    if (hit)
                     {
                         Vector3 newVelocity = Plane.Project(Camera.Velocity, hitPlane);
                         Camera.Velocity = newVelocity;
 
-                        thisPos += hitPlane.Normal * (penetrationDepth + CamCollisionDetectionSettings.EpsilonNormalOffset);
-                        Camera.Position = thisPos;
+                        boundingVolume.Center += hitPlane.Normal * (penetrationDepth + CamCollisionSettings.EpsilonNormalOffset);
+                        Camera.Position = boundingVolume.Center;
+
+                        Camera.AdvanceSimulation(dT);
+                    }
+                    else
+                    {
                         break;
                     }
+                }
 
+                // We need to use raw pointers here instead of ref & out, because
+                // "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
+                static bool CollisionRoutine(ModelSystem modelSystem, in CameraCollisionDetection settings, Vector3 newPosition, Sphere* refBoundingVolume, Plane* outHitPlane, float* outPenetrationDepth)
+                {
+                    *outPenetrationDepth = float.MinValue;
+                    *outHitPlane = new Plane();
+
+                    Vector3 cameraStepSize = (newPosition - refBoundingVolume->Center) / settings.TestSteps;
+                    for (int i = 1; i <= settings.TestSteps; i++)
+                    {
+                        refBoundingVolume->Center += cameraStepSize;
+                        Box playerBox = new Box(refBoundingVolume->Center - new Vector3(refBoundingVolume->Radius), refBoundingVolume->Center + new Vector3(refBoundingVolume->Radius));
+
+                        float cosTheta = 0.0f;
+                        modelSystem.BVH.Intersect(playerBox, (in BVH.PrimitiveHitInfo hitInfo) =>
+                        {
+                            Matrix4 model = modelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
+                            Triangle worldSpaceTri = Triangle.Transformed(GpuTypes.Conversions.ToTriangle(hitInfo.Triangle), model);
+
+                            Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, refBoundingVolume->Center);
+                            float distance = Vector3.Distance(closestPointOnTri, refBoundingVolume->Center);
+                            float thisPenetrationDepth = refBoundingVolume->Radius - distance;
+                            if (thisPenetrationDepth > 0.0f)
+                            {
+                                Plane thisHitPlane = new Plane(worldSpaceTri.Normal);
+
+                                Vector3 hitPointToCameraDir = (refBoundingVolume->Center - closestPointOnTri) / distance;
+                                float thisCosTheta = Vector3.Dot(thisHitPlane.Normal, hitPointToCameraDir);
+                                if (thisCosTheta < 0.0f)
+                                {
+                                    thisHitPlane.Normal *= -1.0f;
+                                }
+
+                                if (MathF.Abs(thisCosTheta) > MathF.Abs(cosTheta))
+                                {
+                                    cosTheta = thisCosTheta;
+                                    *outHitPlane = thisHitPlane;
+                                    *outPenetrationDepth = thisPenetrationDepth;
+                                }
+                            }
+                        });
+
+                        if (*outPenetrationDepth != float.MinValue)
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
                 }
             }
 
@@ -411,7 +445,7 @@ namespace IDKEngine
                 }
                 taaDataBuffer.SubData(0, sizeof(GpuTaaData), gpuTaaData);
             }
-            
+
             LightManager.UpdateBufferData();
 
             // Updating global basicData Buffer
@@ -449,7 +483,8 @@ namespace IDKEngine
 
             // Resetting Path Tracer if necessary
             {
-                if ((RenderMode == RenderMode.PathTracer) && ((GpuBasicData.PrevProjView != GpuBasicData.ProjView) || anyMeshInstanceMoved))
+                bool cameraMoved = GpuBasicData.PrevProjView != GpuBasicData.ProjView;
+                if ((RenderMode == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved))
                 {
                     PathTracer.ResetRenderProcess();
                 }
@@ -526,7 +561,7 @@ namespace IDKEngine
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
             Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f);
             //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
-            
+
             SkyBoxManager.Init(new string[]
             {
                 "res/textures/environmentMap/posx.jpg",
@@ -544,7 +579,6 @@ namespace IDKEngine
             TemporalAntiAliasingTechnique = TemporalAntiAliasingTechnique.TAA;
             ModelSystem = new ModelSystem();
 
-            // todo chill :))
             if (true)
             {
                 Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
@@ -595,27 +629,29 @@ namespace IDKEngine
                 a.Meshes[288].SpecularBias = 1.0f;
                 a.Meshes[288].RoughnessBias = -0.64f;
                 a.Meshes[288].NormalMapStrength = 0.0f;
-                //a.Meshes[93].EmissiveBias = 20.0f;
-                //a.Meshes[96].EmissiveBias = 20.0f;
-                //a.Meshes[99].EmissiveBias = 20.0f;
-                //a.Meshes[102].EmissiveBias = 20.0f;
-                //a.Meshes[105].EmissiveBias = 20.0f;
-                //a.Meshes[108].EmissiveBias = 20.0f;
-                //a.Meshes[111].EmissiveBias = 20.0f;
-                //a.Meshes[246].EmissiveBias = 20.0f;
-                //a.Meshes[291].EmissiveBias = 20.0f;
-                //a.Meshes[294].EmissiveBias = 20.0f;
-                //a.Meshes[297].EmissiveBias = 20.0f;
-                //a.Meshes[300].EmissiveBias = 20.0f;
-                //a.Meshes[303].EmissiveBias = 20.0f;
-                //a.Meshes[306].EmissiveBias = 20.0f;
-                //a.Meshes[312].EmissiveBias = 20.0f;
-                //a.Meshes[315].EmissiveBias = 20.0f;
-                //a.Meshes[318].EmissiveBias = 20.0f;
-                //a.Meshes[321].EmissiveBias = 20.0f;
-                //a.Meshes[324].EmissiveBias = 20.0f;
-                //a.Meshes[376].EmissiveBias = 20.0f;
-                //a.Meshes[379].EmissiveBias = 20.0f;
+                a.Meshes[272].SpecularBias = 1.0f;
+                a.Meshes[272].RoughnessBias = -0.82f;
+                a.Meshes[93].EmissiveBias = 20.0f;
+                a.Meshes[96].EmissiveBias = 20.0f;
+                a.Meshes[99].EmissiveBias = 20.0f;
+                a.Meshes[102].EmissiveBias = 20.0f;
+                a.Meshes[105].EmissiveBias = 20.0f;
+                a.Meshes[108].EmissiveBias = 20.0f;
+                a.Meshes[111].EmissiveBias = 20.0f;
+                a.Meshes[246].EmissiveBias = 20.0f;
+                a.Meshes[291].EmissiveBias = 20.0f;
+                a.Meshes[294].EmissiveBias = 20.0f;
+                a.Meshes[297].EmissiveBias = 20.0f;
+                a.Meshes[300].EmissiveBias = 20.0f;
+                a.Meshes[303].EmissiveBias = 20.0f;
+                a.Meshes[306].EmissiveBias = 20.0f;
+                a.Meshes[312].EmissiveBias = 20.0f;
+                a.Meshes[315].EmissiveBias = 20.0f;
+                a.Meshes[318].EmissiveBias = 20.0f;
+                a.Meshes[321].EmissiveBias = 20.0f;
+                a.Meshes[324].EmissiveBias = 20.0f;
+                a.Meshes[376].EmissiveBias = 20.0f;
+                a.Meshes[379].EmissiveBias = 20.0f;
                 Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
                 Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 LightManager.AddLight(new Light(new Vector3(2.002f, 18.693f, 3.4f), new Vector3(60.46f, 50.17f, 50.75f), 0.3f));
@@ -624,9 +660,17 @@ namespace IDKEngine
                 RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
                 RasterizerPipeline.VolumetricLight.Strength = 60.0f;
-                RasterizerPipeline.ConeTracer.MaxSamples = 6;
-
+                RasterizerPipeline.ConeTracer.MaxSamples = 4;
                 ModelSystem.Add(a, b, c);
+
+                //Model a = new Model(@"C:\Users\Julian\Downloads\Models\Bistro\Bistro.gltf");
+                //Model helmet = new Model("res/models/Helmet/Helmet.gltf");
+                //helmet.MeshInstances[0].ModelMatrix *= Matrix4.CreateRotationY(MathF.PI / 4.0f);
+                //RasterizerPipeline.Voxelizer.GridMin = new Vector3(-39.2f, -1.7f, -51.2f);
+                //RasterizerPipeline.Voxelizer.GridMax = new Vector3(32.2f, 21.0f, 45.0f);
+                //RasterizerPipeline.ConeTracer.GISkyBoxBoost = 2.0f;
+
+                //ModelSystem.Add(a, helmet);
             }
 
 

@@ -15,8 +15,8 @@ namespace IDKEngine
 
         private const string PATH = "log.txt";
         private const string DATE_TIME_FORMAT = "HH:mm:ss.f";
-        private static StreamWriter outText;
 
+        private static StreamWriter outText;
         private static bool lazyLoaded = false;
         public static void Log(LogLevel level, string text)
         {

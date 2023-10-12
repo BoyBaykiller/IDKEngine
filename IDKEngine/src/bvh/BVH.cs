@@ -21,7 +21,7 @@ namespace IDKEngine
             public int InstanceID;
         }
 
-        public struct BoxHitInfo
+        public struct PrimitiveHitInfo
         {
             public GpuTriangle Triangle;
             public int MeshID;
@@ -87,8 +87,8 @@ namespace IDKEngine
             }
         }
 
-        public delegate void BoxIntersectFunc(in BoxHitInfo hitInfo);
-        public void Intersect(in Box box, BoxIntersectFunc intersectFunc)
+        public delegate void IntersectFunc(in PrimitiveHitInfo hitInfo);
+        public void Intersect(in Box box, IntersectFunc intersectFunc)
         {
             for (int i = 0; i < Tlas.Blases.Count; i++)
             {
@@ -103,7 +103,7 @@ namespace IDKEngine
                     Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
                     blas.Intersect(localBox, (in GpuTriangle triangle) =>
                     {
-                        BoxHitInfo hitInfo;
+                        PrimitiveHitInfo hitInfo;
                         hitInfo.Triangle = triangle;
                         hitInfo.MeshID = i;
                         hitInfo.InstanceID = instanceID;
