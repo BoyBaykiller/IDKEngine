@@ -70,6 +70,24 @@ namespace IDKEngine.Shapes
             return distSquared < sphere.RadiusSquared;
         }
 
+        // Source: https://stackoverflow.com/a/4579069/12103839
+        public static bool SphereVsBox(in Sphere sphere, Vector3 c1, Vector3 c2)
+        {
+            float distSquared = Squared(sphere.Radius);
+            if (sphere.Center.X < c1.X) distSquared -= Squared(sphere.Center.X - c1.X);
+            else if (sphere.Center.X > c2.X) distSquared -= Squared(sphere.Center.X - c2.X);
+            if (sphere.Center.Y < c1.Y) distSquared -= Squared(sphere.Center.Y - c1.Y);
+            else if (sphere.Center.Y > c2.Y) distSquared -= Squared(sphere.Center.Y - c2.Y);
+            if (sphere.Center.Z < c1.Z) distSquared -= Squared(sphere.Center.Z - c1.Z);
+            else if (sphere.Center.Z > c2.Z) distSquared -= Squared(sphere.Center.Z - c2.Z);
+            return distSquared > 0.0f;
+
+            static float Squared(float x)
+            {
+                return x * x;
+            }
+        }        
+
         public static bool BoxVsBox(in Box a, in Box b)
         {
             return a.Min.X < b.Max.X &&

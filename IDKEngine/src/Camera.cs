@@ -31,8 +31,6 @@ namespace IDKEngine
         public float KeyboardAccelerationSpeed;
         public float MouseSensitivity;
 
-        public bool HasGravity = false;
-        public float GravityDownForce;
         public Camera(Vector3 position, Vector3 up, float lookX = -90.0f, float lookY = 0.0f)
         {
             Position = position;
@@ -43,7 +41,6 @@ namespace IDKEngine
 
             MouseSensitivity = 0.05f;
             KeyboardAccelerationSpeed = 30.0f;
-            GravityDownForce = 70.0f;
         }
 
         public void ProcessInputs(Keyboard keyboard, Mouse mouse)
@@ -88,19 +85,13 @@ namespace IDKEngine
 
         public void AdvanceSimulation(float dT)
         {
-            if (HasGravity)
-            {
-                ThisFrameAcceleration.Y += -GravityDownForce;
-            }
-
             PrevPosition = Position;
             Position += dT * Velocity + 0.5f * ThisFrameAcceleration * dT * dT;
             Velocity += ThisFrameAcceleration * dT;
 
-            if (Velocity.Length < 9.0f * dT)
-            {
-                Velocity = new Vector3(0.0f);
-            }
+            if (MathF.Abs(Velocity.X) < 3.0f * dT) Velocity.X = 0.0f;
+            if (MathF.Abs(Velocity.Y) < 3.0f * dT) Velocity.Y = 0.0f;
+            if (MathF.Abs(Velocity.Z) < 3.0f * dT) Velocity.Z = 0.0f;
 
 
             const float dragConstant = 0.95f;
