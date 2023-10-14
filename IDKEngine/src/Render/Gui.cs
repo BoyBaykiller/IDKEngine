@@ -345,8 +345,8 @@ namespace IDKEngine.Render
                                     app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
                                 }
                                 ToolTipForItemAboveHovered(
-                                    $"When active samples are accumulated over {app.TaaResolve} frames (based on TAA setting).\n" +
-                                    "If TAA is disabled this has no effect."
+                                    $"When active samples are accumulated over multiple frames.\n" +
+                                    "If there is no Temporal Anti Aliasing this is treated as being disabled."
                                 );
                             }
 
@@ -460,18 +460,18 @@ namespace IDKEngine.Render
                                 app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation = tempBool;
                             }
                             ToolTipForItemAboveHovered(
-                                $"When active samples are accumulated over {app.TAASamples} frames (based on TAA setting).\n" +
-                                "If TAA is disabled this has no effect."
+                                $"When active samples are accumulated over multiple frames.\n" +
+                                "If there is no Temporal Anti Aliasing this is treated as being disabled."
                             );
                         }
                     }
 
                     if (ImGui.CollapsingHeader("Anti Aliasing"))
                     {
-                        current = app.TemporalAntiAliasingTechnique.ToString();
+                        current = app.TemporalAntiAliasingMode.ToString();
                         if (ImGui.BeginCombo("Mode", current))
                         {
-                            TemporalAntiAliasingTechnique[] options = (TemporalAntiAliasingTechnique[])Enum.GetValues(typeof(TemporalAntiAliasingTechnique));
+                            TemporalAntiAliasingMode[] options = (TemporalAntiAliasingMode[])Enum.GetValues(typeof(TemporalAntiAliasingMode));
                             for (int i = 0; i < options.Length; i++)
                             {
                                 string enumName = options[i].ToString();
@@ -479,7 +479,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
                                     current = enumName;
-                                    app.TemporalAntiAliasingTechnique = (TemporalAntiAliasingTechnique)i;
+                                    app.TemporalAntiAliasingMode = (TemporalAntiAliasingMode)i;
                                 }
 
                                 if (isSelected)
@@ -490,7 +490,7 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        if (app.TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                        if (app.TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
                         {
                             tempBool = app.TaaResolve.IsTaaArtifactMitigation;
                             if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
@@ -504,7 +504,7 @@ namespace IDKEngine.Render
 
                             ImGui.SliderInt("Samples##1", ref app.TAASamples, 1, 36);
                         }
-                        else if (app.TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
+                        else if (app.TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
                         {
                             ImGui.Text(
                                 "FSR2 (by AMD) does Anti Aliasing but\n" +
@@ -717,12 +717,16 @@ namespace IDKEngine.Render
 
                 if (ImGui.Button("Load model"))
                 {
-                    NativeFileDialogSharp.DialogResult result = NativeFileDialogSharp.Dialog.FileOpen("gltf", null);
-                    if (result.IsError)
+                    NativeFileDialogExtendedSharp.NfdFilter[] filter = new NativeFileDialogExtendedSharp.NfdFilter[]
                     {
-                        Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
+                        new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "gltf"}
+                    };
+                    NativeFileDialogExtendedSharp.NfdDialogResult result = NativeFileDialogExtendedSharp.Nfd.FileOpen(filter);
+                    if (result.Status == NativeFileDialogExtendedSharp.NfdStatus.Error)
+                    {
+                        Logger.Log(Logger.LogLevel.Error, result.Error);
                     }
-                    else if (!result.IsCancelled)
+                    else if (result.Status != NativeFileDialogExtendedSharp.NfdStatus.Cancel)
                     {
                         Model newModel = new Model(result.Path);
                         app.ModelSystem.Add(newModel);

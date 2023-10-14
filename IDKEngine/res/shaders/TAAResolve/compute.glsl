@@ -14,6 +14,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec2 Jitter;
     int Samples;
     float MipmapBias;
+    int TemporalAntiAliasingMode;
 } taaDataUBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO

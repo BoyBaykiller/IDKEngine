@@ -116,23 +116,10 @@ namespace IDKEngine
             }
             int size = images[0].Width;
 
-            const bool AMD_DRIVER_BAD = true; // since 22.7.1, fixed in 23.2.2
-            if (AMD_DRIVER_BAD)
+            texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
+            for (int i = 0; i < 6; i++)
             {
-                // use old style non dsa mutable for buggy driver
-                GL.BindTexture(TextureTarget.TextureCubeMap, texture.ID);
-                for (int i = 0; i < 6; i++)
-                {
-                    GL.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0, (PixelInternalFormat)sizedInternalFormat, size, size, 0, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data);
-                }
-            }
-            else
-            {
-                texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
-                for (int i = 0; i < 6; i++)
-                {
-                    texture.SubTexture3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data, 0, 0, 0, i);
-                }
+                texture.SubTexture3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data, 0, 0, 0, i);
             }
         }
 

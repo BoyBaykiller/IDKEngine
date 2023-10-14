@@ -16,7 +16,7 @@ namespace IDKEngine
         PathTracer
     }
 
-    public enum TemporalAntiAliasingTechnique : int
+    public enum TemporalAntiAliasingMode : int
     {
         None,
         TAA,
@@ -102,35 +102,35 @@ namespace IDKEngine
             }
         }
 
-        private TemporalAntiAliasingTechnique _temporalAntiAliasingTechnique;
-        public TemporalAntiAliasingTechnique TemporalAntiAliasingTechnique
+        private TemporalAntiAliasingMode _temporalAntiAliasingMode;
+        public TemporalAntiAliasingMode TemporalAntiAliasingMode
         {
-            get => _temporalAntiAliasingTechnique;
+            get => _temporalAntiAliasingMode;
 
             set
             {
-                if (!FSR2Wrapper.IS_FSR2_SUPPORTED && value == TemporalAntiAliasingTechnique.FSR2)
+                if (!FSR2Wrapper.IS_FSR2_SUPPORTED && value == TemporalAntiAliasingMode.FSR2)
                 {
-                    Logger.Log(Logger.LogLevel.Error, $"{TemporalAntiAliasingTechnique.FSR2} is Windows only");
+                    Logger.Log(Logger.LogLevel.Error, $"{TemporalAntiAliasingMode.FSR2} is Windows only");
                     return;
                 }
 
-                _temporalAntiAliasingTechnique = value;
+                _temporalAntiAliasingMode = value;
 
                 // TODO: Move TaaResolve and FSR2Wrapper into RasterizerPipeline
                 // also store settings outsied of class so that they arent lost after disposal
 
-                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
+                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None)
                 {
                     return;
                 }
 
-                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA && TaaResolve == null)
+                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA && TaaResolve == null)
                 {
                     TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
                 }
 
-                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2 && FSR2Wrapper == null)
+                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2 && FSR2Wrapper == null)
                 {
                     FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
                 }
@@ -158,7 +158,7 @@ namespace IDKEngine
             IsEnabled = false,
             TestSteps = 3,
             ResponseSteps = 12,
-            EpsilonNormalOffset = 0.0f
+            EpsilonNormalOffset = 0.001f
         };
 
         public bool HasGravity = false;
@@ -186,7 +186,7 @@ namespace IDKEngine
                 {
                     RasterizerPipeline.Render(ModelSystem, GpuBasicData.ProjView, LightManager);
 
-                    if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None)
+                    if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None)
                     {
                         if (IsBloom)
                         {
@@ -194,7 +194,7 @@ namespace IDKEngine
                         }
                         TonemapAndGamma.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
                     }
-                    else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                    else if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
                     {
                         TaaResolve.RunTAA(RasterizerPipeline.Result);
                         if (IsBloom)
@@ -203,7 +203,7 @@ namespace IDKEngine
                         }
                         TonemapAndGamma.Combine(TaaResolve.Result, IsBloom ? Bloom.Result : null);
                     }
-                    else if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
+                    else if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
                     {
                         FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CameraFovY);
                         if (IsBloom)
@@ -424,25 +424,26 @@ namespace IDKEngine
 
             // TAA
             {
-                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.None || TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None || TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
                 {
                     gpuTaaData.MipmapBias = 0.0f;
                 }
-                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.TAA)
+                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
                 {
                     gpuTaaData.Samples = TAASamples;
                 }
-                if (TemporalAntiAliasingTechnique == TemporalAntiAliasingTechnique.FSR2)
+                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
                 {
                     const float manualBias = 0.25f;
                     gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
                     gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
                 }
-                if (TemporalAntiAliasingTechnique != TemporalAntiAliasingTechnique.None)
+                if (TemporalAntiAliasingMode != TemporalAntiAliasingMode.None)
                 {
                     Vector2 jitter = MyMath.GetHalton2D((int)GpuBasicData.Frame % gpuTaaData.Samples, 2, 3);
                     gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
                 }
+                gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasingMode;
                 taaDataBuffer.SubData(0, sizeof(GpuTaaData), gpuTaaData);
             }
 
@@ -576,7 +577,7 @@ namespace IDKEngine
             MeshOutlineRenderer = new BoxRenderer();
             Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
             TonemapAndGamma = new TonemapAndGammaCorrecter(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-            TemporalAntiAliasingTechnique = TemporalAntiAliasingTechnique.TAA;
+            TemporalAntiAliasingMode = TemporalAntiAliasingMode.TAA;
             ModelSystem = new ModelSystem();
 
             if (true)
@@ -654,23 +655,15 @@ namespace IDKEngine
                 a.Meshes[379].EmissiveBias = 20.0f;
                 Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
                 Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                LightManager.AddLight(new Light(new Vector3(2.002f, 18.693f, 3.4f), new Vector3(60.46f, 50.17f, 50.75f), 0.3f));
+                Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
                 LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
-                RasterizerPipeline.IsVXGI = true;
+                RasterizerPipeline.IsVXGI = false;
                 RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
-                RasterizerPipeline.VolumetricLight.Strength = 60.0f;
+                RasterizerPipeline.VolumetricLight.Strength = 10.0f;
                 RasterizerPipeline.ConeTracer.MaxSamples = 4;
-                ModelSystem.Add(a, b, c);
-
-                //Model a = new Model(@"C:\Users\Julian\Downloads\Models\Bistro\Bistro.gltf");
-                //Model helmet = new Model("res/models/Helmet/Helmet.gltf");
-                //helmet.MeshInstances[0].ModelMatrix *= Matrix4.CreateRotationY(MathF.PI / 4.0f);
-                //RasterizerPipeline.Voxelizer.GridMin = new Vector3(-39.2f, -1.7f, -51.2f);
-                //RasterizerPipeline.Voxelizer.GridMax = new Vector3(32.2f, 21.0f, 45.0f);
-                //RasterizerPipeline.ConeTracer.GISkyBoxBoost = 2.0f;
-
-                //ModelSystem.Add(a, helmet);
+                ModelSystem.Add(a, b, c, d);
             }
 
 

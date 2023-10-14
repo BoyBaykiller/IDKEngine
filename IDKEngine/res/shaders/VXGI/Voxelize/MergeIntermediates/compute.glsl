@@ -1,4 +1,8 @@
 #version 460 core
+// This shader is only used when TAKE_ATOMIC_FP16_PATH is false (GL_NV_shader_atomic_fp16_vector is not supported)
+// In this case the voxelizer atomically writes to 3 seperate r32ui textures
+// instead of only one rgba16f texture. Here we merge them together into one.
+
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
