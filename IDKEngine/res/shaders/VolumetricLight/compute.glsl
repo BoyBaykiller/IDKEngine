@@ -67,6 +67,7 @@ layout(std140, binding = 3) uniform TaaDataUBO
     vec2 Jitter;
     int Samples;
     float MipmapBias;
+    int TemporalAntiAliasingMode;
 } taaDataUBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO
@@ -106,7 +107,8 @@ void main()
     }
 
     vec3 deltaStep = viewToFrag / Samples;
-    float offset = InterleavedGradientNoise(imgCoord, IsTemporalAccumulation ? (basicDataUBO.Frame % taaDataUBO.Samples) : 0u);
+    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
+    float offset = InterleavedGradientNoise(imgCoord, (IsTemporalAccumulation && taaEnabled) ? (basicDataUBO.Frame % taaDataUBO.Samples) : 0u);
     vec3 origin = basicDataUBO.ViewPos + deltaStep * offset;
 
     vec3 scattered = vec3(0.0);

@@ -7,5 +7,6 @@ namespace IDKEngine
         public Vector2 Jitter;
         public int Samples;
         public float MipmapBias;
+        public TemporalAntiAliasingMode TemporalAntiAliasingMode;
     }
 }
