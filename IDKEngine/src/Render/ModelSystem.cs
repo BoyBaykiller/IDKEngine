@@ -24,8 +24,11 @@ namespace IDKEngine.Render
         public GpuMaterial[] Materials;
         private readonly BufferObject materialBuffer;
 
-        public GpuDrawVertex[] Vertices;
+        public GpuVertex[] Vertices;
         private readonly BufferObject vertexBuffer;
+
+        public Vector3[] VertexPositions;
+        private readonly BufferObject vertexPositionBuffer;
 
         public uint[] Indices;
         private readonly BufferObject elementBuffer;
@@ -52,23 +55,30 @@ namespace IDKEngine.Render
             materialBuffer = new BufferObject();
             materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
 
-            Vertices = Array.Empty<GpuDrawVertex>();
+            Vertices = Array.Empty<GpuVertex>();
             vertexBuffer = new BufferObject();
+            vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
+
+            VertexPositions = Array.Empty<Vector3>();
+            vertexPositionBuffer = new BufferObject();
 
             Indices = Array.Empty<uint>();
             elementBuffer = new BufferObject();
 
             vao = new VAO();
             vao.SetElementBuffer(elementBuffer);
-            vao.AddSourceBuffer(vertexBuffer, 0, sizeof(GpuDrawVertex));
-            vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, sizeof(float) * 0); // Position
-            vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, sizeof(float) * 4); // TexCoord
-            vao.SetAttribFormatI(0, 2, 1, VertexAttribType.UnsignedInt, sizeof(float) * 6); // Tangent
-            vao.SetAttribFormatI(0, 3, 1, VertexAttribType.UnsignedInt, sizeof(float) * 7); // Normal
 
-            frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/SingleView/Frustum/compute.glsl")));
+            vao.AddSourceBuffer(vertexPositionBuffer, 0, sizeof(Vector3));
+            vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0); // Position
+
+            vao.AddSourceBuffer(vertexBuffer, 1, sizeof(GpuVertex));
+            vao.SetAttribFormat(1, 1, 2, VertexAttribType.Float, 0); // TexCoord
+            vao.SetAttribFormatI(1, 2, 1, VertexAttribType.UnsignedInt, sizeof(Vector2)); // Tangent
+            vao.SetAttribFormatI(1, 3, 1, VertexAttribType.UnsignedInt, sizeof(Vector2) + sizeof(uint)); // Normal
 
             BVH = new BVH();
+
+            frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/SingleView/Frustum/compute.glsl")));
         }
 
         public unsafe void Add(params Model[] models)
@@ -83,6 +93,7 @@ namespace IDKEngine.Render
                 // Don't modify order
                 LoadDrawCommands(models[i].DrawCommands);
                 LoadVertices(models[i].Vertices);
+                LoadVertexPositions(models[i].VertexPositions);
 
                 // Don't modify order
                 LoadMeshes(models[i].Meshes);
@@ -96,7 +107,7 @@ namespace IDKEngine.Render
                 int addedDrawCommands = models.Sum(model => model.DrawCommands.Length);
                 int prevDrawCommandsLength = DrawCommands.Length - addedDrawCommands;
                 ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, addedDrawCommands);
-                BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, Vertices, Indices);
+                BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, Indices);
 
                 // Caculate root node offset in blas buffer for each mesh
                 uint bvhNodesExclusiveSum = 0;
@@ -110,7 +121,8 @@ namespace IDKEngine.Render
             drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GpuDrawElementsCmd), DrawCommands);
             meshBuffer.MutableAllocate(Meshes.Length * sizeof(GpuMesh), Meshes);
             materialBuffer.MutableAllocate(Materials.Length * sizeof(GpuMaterial), Materials);
-            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GpuDrawVertex), Vertices);
+            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GpuVertex), Vertices);
+            vertexPositionBuffer.MutableAllocate(VertexPositions.Length * sizeof(Vector3), VertexPositions);
             elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
             meshInstanceBuffer.MutableAllocate(MeshInstances.Length * sizeof(GpuMeshInstance), MeshInstances);
         }
@@ -206,11 +218,18 @@ namespace IDKEngine.Render
             Array.Resize(ref Indices, prevIndicesLength + indices.Length);
             indices.CopyTo(new Span<uint>(Indices, prevIndicesLength, indices.Length));
         }
-        private void LoadVertices(ReadOnlySpan<GpuDrawVertex> vertices)
+        private void LoadVertices(ReadOnlySpan<GpuVertex> vertices)
         {
             int prevVerticesLength = Vertices.Length;
             Array.Resize(ref Vertices, prevVerticesLength + vertices.Length);
-            vertices.CopyTo(new Span<GpuDrawVertex>(Vertices, prevVerticesLength, vertices.Length));
+            vertices.CopyTo(new Span<GpuVertex>(Vertices, prevVerticesLength, vertices.Length));
+        }
+
+        private void LoadVertexPositions(ReadOnlySpan<Vector3> vertexPositions)
+        {
+            int prevVerticesLength = VertexPositions.Length;
+            Array.Resize(ref VertexPositions, prevVerticesLength + vertexPositions.Length);
+            vertexPositions.CopyTo(new Span<Vector3>(VertexPositions, prevVerticesLength, vertexPositions.Length));
         }
 
         public int GetMeshVertexCount(int meshIndex)

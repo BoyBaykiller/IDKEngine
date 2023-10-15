@@ -606,7 +606,6 @@ namespace IDKEngine
                 helmet.MeshInstances[0].ModelMatrix *= Matrix4.CreateRotationY(MathF.PI / 4.0f);
 
                 //Model test = new Model(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", Matrix4.CreateTranslation(-100.0f, 50.0f, 0.0f));
-                //Model ramp = new Model(@"C:\Users\Julian\Downloads\Models\Ramp\Ramp.gltf", Matrix4.CreateTranslation(-100.0f, 0.0f, 0.0f) * Matrix4.CreateTranslation(0.0f, 0.0f, 0.0f));
 
                 ModelSystem.Add(sponza, lucy, helmet);
 

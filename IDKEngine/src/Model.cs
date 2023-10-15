@@ -83,7 +83,8 @@ namespace IDKEngine
         public GpuMeshInstance[] MeshInstances;
         public GpuMaterial[] Materials;
         public GpuDrawElementsCmd[] DrawCommands;
-        public GpuDrawVertex[] Vertices;
+        public GpuVertex[] Vertices;
+        public Vector3[] VertexPositions;
         public uint[] Indices;
 
         private Gltf gltfModel;
@@ -99,7 +100,8 @@ namespace IDKEngine
             MeshInstances = Array.Empty<GpuMeshInstance>();
             Materials = Array.Empty<GpuMaterial>();
             DrawCommands = Array.Empty<GpuDrawElementsCmd>();
-            Vertices = Array.Empty<GpuDrawVertex>();
+            Vertices = Array.Empty<GpuVertex>();
+            VertexPositions = Array.Empty<Vector3>();
             Indices = Array.Empty<uint>();
 
             if (!File.Exists(path))
@@ -124,7 +126,8 @@ namespace IDKEngine
             List<GpuMesh> meshes = new List<GpuMesh>();
             List<GpuMeshInstance> meshInstances = new List<GpuMeshInstance>();
             List<GpuDrawElementsCmd> drawCommands = new List<GpuDrawElementsCmd>();
-            List<GpuDrawVertex> vertices = new List<GpuDrawVertex>();
+            List<GpuVertex> vertices = new List<GpuVertex>();
+            List<Vector3> vertexPositions = new List<Vector3>();
             List<uint> indices = new List<uint>();
 
             Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
@@ -179,7 +182,7 @@ namespace IDKEngine
                             mesh.MaterialIndex = materials.Count - 1;
                         }
 
-                        GpuDrawVertex[] meshVertices = LoadGpuVertexData(gltfMeshPrimitive);
+                        (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfMeshPrimitive);
                         uint[] meshIndices = LoadGpuIndexData(gltfMeshPrimitive);
 
                         GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
@@ -193,6 +196,7 @@ namespace IDKEngine
                         meshInstance.ModelMatrix = globalTransform;
 
                         vertices.AddRange(meshVertices);
+                        vertexPositions.AddRange(meshVertexPositions);
                         indices.AddRange(meshIndices);
                         meshes.Add(mesh);
                         meshInstances.Add(meshInstance);
@@ -206,6 +210,7 @@ namespace IDKEngine
             Materials = materials.ToArray();
             DrawCommands = drawCommands.ToArray();
             Vertices = vertices.ToArray();
+            VertexPositions = vertexPositions.ToArray();
             Indices = indices.ToArray();
         }
 
@@ -426,13 +431,14 @@ namespace IDKEngine
             return materials;
         }
 
-        private unsafe GpuDrawVertex[] LoadGpuVertexData(MeshPrimitive meshPrimitive)
+        private unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertexData(MeshPrimitive meshPrimitive)
         {
             const string GLTF_POSITION_ATTRIBUTE = "POSITION";
             const string GLTF_NORMAL_ATTRIBUTE = "NORMAL";
             const string GLTF_TEXCOORD_0_ATTRIBUTE = "TEXCOORD_0";
 
-            GpuDrawVertex[] vertices = null;
+            GpuVertex[] vertices = null;
+            Vector3[] vertexPositions = null;
 
             Dictionary<string, int> myDict = meshPrimitive.Attributes;
             for (int j = 0; j < myDict.Count; j++)
@@ -448,7 +454,8 @@ namespace IDKEngine
 
                 if (vertices == null)
                 {
-                    vertices = new GpuDrawVertex[accessor.Count];
+                    vertices = new GpuVertex[accessor.Count];
+                    vertexPositions = new Vector3[accessor.Count];
                 }
 
                 if (item.Key == GLTF_POSITION_ATTRIBUTE)
@@ -459,7 +466,7 @@ namespace IDKEngine
                         Span<byte> span = new Span<byte>(&data, sizeof(Vector3));
                         fileStream.Read(span);
 
-                        vertices[i].Position = data;
+                        vertexPositions[i] = data;
                     }
                 }
                 else if (item.Key == GLTF_NORMAL_ATTRIBUTE)
@@ -492,7 +499,7 @@ namespace IDKEngine
                 }
             }
 
-            return vertices;
+            return (vertices, vertexPositions);
         }
         private unsafe uint[] LoadGpuIndexData(MeshPrimitive meshPrimitive)
         {

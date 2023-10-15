@@ -6,24 +6,25 @@ namespace IDKEngine
 {
     class BLAS
     {
-        public const float TRIANGLE_INTERSECT_COST = 1.18f; // Ray-Triangle test is empirically 1.1834x computationally slower than Ray-Box test, excluding memory fetch
+        public const float TRIANGLE_INTERSECT_COST = 1.0f;
         public const int SAH_SAMPLES = 8;
 
         public struct RayHitInfo
         {
-            public GpuTriangle Triangle;
+            public GpuBlasTriangle Triangle;
             public Vector3 Bary;
             public float T;
         }
 
+
         public GpuBlasNode Root => Nodes[0];
         public int TreeDepth { get; private set; }
 
-        public readonly GpuTriangle[] Triangles;
+        public readonly GpuBlasTriangle[] Triangles;
         public GpuBlasNode[] Nodes;
 
         private int nodesUsed;
-        public BLAS(GpuTriangle[] triangles)
+        public BLAS(GpuBlasTriangle[] triangles)
         {
             Triangles = triangles;
             Nodes = Array.Empty<GpuBlasNode>();
@@ -64,8 +65,8 @@ namespace IDKEngine
             uint end = currentIndex + parentNode.TriCount;
             while (currentIndex < end)
             {
-                ref GpuTriangle tri = ref Triangles[(int)currentIndex];
-                float posOnSplitAxis = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f;
+                ref GpuBlasTriangle tri = ref Triangles[(int)currentIndex];
+                float posOnSplitAxis = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;
                 if (posOnSplitAxis < splitPos)
                 {
                     currentIndex++;
@@ -99,8 +100,8 @@ namespace IDKEngine
             Box uniformDivideArea = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (int i = 0; i < parentNode.TriCount; i++)
             {
-                ref readonly GpuTriangle tri = ref Triangles[parentNode.TriStartOrLeftChild + i];
-                Vector3 centroid = (tri.Vertex0.Position + tri.Vertex1.Position + tri.Vertex2.Position) / 3.0f;
+                ref readonly GpuBlasTriangle tri = ref Triangles[parentNode.TriStartOrLeftChild + i];
+                Vector3 centroid = (tri.Position0 + tri.Position1 + tri.Position2) / 3.0f;
                 uniformDivideArea.GrowToFit(centroid);
             }
 
@@ -140,9 +141,9 @@ namespace IDKEngine
             uint leftBoxCount = 0;
             for (uint i = 0; i < parentNode.TriCount; i++)
             {
-                ref readonly GpuTriangle tri = ref Triangles[parentNode.TriStartOrLeftChild + i];
+                ref readonly GpuBlasTriangle tri = ref Triangles[parentNode.TriStartOrLeftChild + i];
 
-                float triSplitPos = (tri.Vertex0.Position[splitAxis] + tri.Vertex1.Position[splitAxis] + tri.Vertex2.Position[splitAxis]) / 3.0f;
+                float triSplitPos = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;
                 if (triSplitPos < splitPos)
                 {
                     leftBoxCount++;
@@ -172,7 +173,7 @@ namespace IDKEngine
 
             for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
             {
-                ref readonly GpuTriangle tri = ref Triangles[i];
+                ref readonly GpuBlasTriangle tri = ref Triangles[i];
                 bounds.GrowToFit(tri);
             }
 
@@ -210,7 +211,7 @@ namespace IDKEngine
                     uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightode.TriStartOrLeftChild;
                     for (uint i = first; i < first + triCount; i++)
                     {
-                        ref readonly GpuTriangle triangle = ref Triangles[i];
+                        ref readonly GpuBlasTriangle triangle = ref Triangles[i];
                         if (Intersections.RayVsTriangle(ray, GpuTypes.Conversions.ToTriangle(triangle), out Vector3 bary, out float t) && t < hitInfo.T)
                         {
                             hitInfo.Triangle = triangle;
@@ -246,7 +247,7 @@ namespace IDKEngine
             return hitInfo.T != tMaxDist;
         }
 
-        public delegate void BoxIntersectFunc(in GpuTriangle triangle);
+        public delegate void BoxIntersectFunc(in GpuBlasTriangle triangle);
         public unsafe void Intersect(in Box box, BoxIntersectFunc intersectFunc)
         {
             uint stackPtr = 0;
@@ -265,7 +266,7 @@ namespace IDKEngine
                     uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
                     for (uint i = first; i < first + triCount; i++)
                     {
-                        ref readonly GpuTriangle triangle = ref Triangles[i];
+                        ref readonly GpuBlasTriangle triangle = ref Triangles[i];
                         if (Intersections.BoxVsTriangle(box, GpuTypes.Conversions.ToTriangle(triangle)))
                         {
                             intersectFunc(triangle);

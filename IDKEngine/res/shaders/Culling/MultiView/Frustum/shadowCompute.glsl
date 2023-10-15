@@ -75,7 +75,7 @@ layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
 
-layout(std430, binding = 4) restrict readonly buffer BlasSSBO
+layout(std430, binding = 5) restrict readonly buffer BlasSSBO
 {
     BlasNode Nodes[];
 } blasSSBO;
