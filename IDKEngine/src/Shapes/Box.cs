@@ -54,11 +54,11 @@ namespace IDKEngine.Shapes
             GrowToFit(box.SIMDMax);
         }
 
-        public void GrowToFit(in GpuTriangle tri)
+        public void GrowToFit(in GpuBlasTriangle tri)
         {
-            GrowToFit(tri.Vertex0.Position);
-            GrowToFit(tri.Vertex1.Position);
-            GrowToFit(tri.Vertex2.Position);
+            GrowToFit(tri.Position0);
+            GrowToFit(tri.Position1);
+            GrowToFit(tri.Position2);
         }
 
         public void Transform(in Matrix4 model)

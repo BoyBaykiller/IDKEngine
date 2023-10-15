@@ -123,7 +123,7 @@ namespace IDKEngine.Render
 
             dispatchCommandBuffer = new BufferObject();
             dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GpuDispatchCommand), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
+            dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
 
             SetSize(width, height);
 
@@ -172,13 +172,13 @@ namespace IDKEngine.Render
             if (transportRayBuffer != null) transportRayBuffer.Dispose();
             transportRayBuffer = new BufferObject();
             transportRayBuffer.ImmutableAllocate(width * height * sizeof(GpuTransportRay), IntPtr.Zero, BufferStorageFlags.None);
-            transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
+            transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
             rayIndicesBuffer = new BufferObject();
             rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0)); // clear counts
-            rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
+            rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
 
             ResetRenderProcess();
 

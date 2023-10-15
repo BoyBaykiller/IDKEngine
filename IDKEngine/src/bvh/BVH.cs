@@ -14,7 +14,7 @@ namespace IDKEngine
 
         public struct RayHitInfo
         {
-            public GpuTriangle Triangle;
+            public GpuBlasTriangle Triangle;
             public Vector3 Bary;
             public float T;
             public int MeshID;
@@ -23,7 +23,7 @@ namespace IDKEngine
 
         public struct PrimitiveHitInfo
         {
-            public GpuTriangle Triangle;
+            public GpuBlasTriangle Triangle;
             public int MeshID;
             public int InstanceID;
         }
@@ -37,13 +37,13 @@ namespace IDKEngine
         public BVH()
         {
             blasBuffer = new BufferObject();
-            blasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
+            blasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
 
             blasTriangleBuffer = new BufferObject();
-            blasTriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
+            blasTriangleBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
 
             tlasBuffer = new BufferObject();
-            tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
+            tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
             Tlas = new TLAS();
         }
@@ -101,7 +101,7 @@ namespace IDKEngine
                     ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
 
                     Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
-                    blas.Intersect(localBox, (in GpuTriangle triangle) =>
+                    blas.Intersect(localBox, (in GpuBlasTriangle triangle) =>
                     {
                         PrimitiveHitInfo hitInfo;
                         hitInfo.Triangle = triangle;
@@ -120,11 +120,11 @@ namespace IDKEngine
         /// </summary>
         /// <param name="meshInstances"></param>
         /// <param name="newMeshesDrawCommands"></param>
-        /// <param name="vertices"></param>
+        /// <param name="vertexPositions"></param>
         /// <param name="indices"></param>
-        public void AddMeshesAndBuild(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, GpuDrawVertex[] vertices, uint[] indices)
+        public void AddMeshesAndBuild(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] indices)
         {
-            BLAS[] newBlasInstances = CreateBlasesFromGeometry(newMeshesDrawCommands, vertices, indices);
+            BLAS[] newBlasInstances = CreateBlasesFromGeometry(newMeshesDrawCommands, vertexPositions, indices);
             AddBlases(newBlasInstances, drawCommands, meshInstances);
             Logger.Log(Logger.LogLevel.Info, $"Created {newBlasInstances.Length} new Bottom Level Acceleration Structures (BLAS)");
 
@@ -152,7 +152,7 @@ namespace IDKEngine
         private unsafe void SetBlasBuffersContent()
         {
             blasBuffer.MutableAllocate((nint)sizeof(GpuBlasNode) * Tlas.Blases.Sum(blasInstances => blasInstances.Nodes.Length), IntPtr.Zero);
-            blasTriangleBuffer.MutableAllocate((nint)sizeof(GpuTriangle) * Tlas.Blases.Sum(blasInstances => blasInstances.Triangles.Length), IntPtr.Zero);
+            blasTriangleBuffer.MutableAllocate((nint)sizeof(GpuBlasTriangle) * Tlas.Blases.Sum(blasInstances => blasInstances.Triangles.Length), IntPtr.Zero);
 
             nint uploadedBlasNodesCount = 0;
             nint uploadedTrianglesCount = 0;
@@ -161,7 +161,7 @@ namespace IDKEngine
                 BLAS blas = Tlas.Blases[i];
 
                 blasBuffer.SubData(uploadedBlasNodesCount * sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
-                blasTriangleBuffer.SubData(uploadedTrianglesCount * sizeof(GpuTriangle), blas.Triangles.Length * (nint)sizeof(GpuTriangle), blas.Triangles);
+                blasTriangleBuffer.SubData(uploadedTrianglesCount * sizeof(GpuBlasTriangle), blas.Triangles.Length * (nint)sizeof(GpuBlasTriangle), blas.Triangles);
 
                 uploadedBlasNodesCount += blas.Nodes.Length;
                 uploadedTrianglesCount += blas.Triangles.Length;
@@ -178,7 +178,7 @@ namespace IDKEngine
             blasBuffer.Dispose();
         }
 
-        private static BLAS[] CreateBlasesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, GpuDrawVertex[] vertices, uint[] indices)
+        private static BLAS[] CreateBlasesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, Vector3[] vertexPositions, uint[] indices)
         {
             BLAS[] blases = new BLAS[drawCommands.Length];
             Parallel.For(0, blases.Length, i =>
@@ -186,12 +186,24 @@ namespace IDKEngine
             {
                 ref readonly GpuDrawElementsCmd cmd = ref drawCommands.Span[i];
 
-                GpuTriangle[] blasTriangles = new GpuTriangle[cmd.Count / 3];
+                GpuBlasTriangle[] blasTriangles = new GpuBlasTriangle[cmd.Count / 3];
                 for (int j = 0; j < blasTriangles.Length; j++)
                 {
-                    blasTriangles[j].Vertex0 = vertices[cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 0]];
-                    blasTriangles[j].Vertex1 = vertices[cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 1]];
-                    blasTriangles[j].Vertex2 = vertices[cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 2]];
+                    {
+                        uint index = (uint)cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 0];
+                        blasTriangles[j].Position0 = vertexPositions[index];
+                        blasTriangles[j].VertexIndex0 = index;
+                    }
+                    {
+                        uint index = (uint)cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 1];
+                        blasTriangles[j].Position1 = vertexPositions[index];
+                        blasTriangles[j].VertexIndex1 = index;
+                    }
+                    {
+                        uint index = (uint)cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 2];
+                        blasTriangles[j].Position2 = vertexPositions[index];
+                        blasTriangles[j].VertexIndex2 = index;
+                    }
                 }
 
                 BLAS blas = new BLAS(blasTriangles);

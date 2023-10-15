@@ -28,19 +28,19 @@ struct DispatchCommand
     uint NumGroupsZ;
 };
 
-layout(std430, binding = 7) restrict readonly buffer TransportRaySSBO
+layout(std430, binding = 8) restrict readonly buffer TransportRaySSBO
 {
     TransportRay Rays[];
 } transportRaySSBO;
 
-layout(std430, binding = 8) restrict buffer RayIndicesSSBO
+layout(std430, binding = 9) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
     uint AccumulatedSamples;
     uint Indices[];
 } rayIndicesSSBO;
 
-layout(std430, binding = 9) restrict writeonly buffer DispatchCommandSSBO
+layout(std430, binding = 10) restrict writeonly buffer DispatchCommandSSBO
 {
     DispatchCommand DispatchCommands[2];
 } dispatchCommandSSBO;

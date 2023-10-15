@@ -19,7 +19,7 @@ struct HitInfo
 {
     vec3 Bary;
     float T;
-    int TriangleIndex;
+    uvec3 VertexIndices;
     uint MeshID;
     uint InstanceID;
 };
@@ -61,11 +61,11 @@ bool IntersectBlas(Ray ray, uint firstIndex, uint blasRootNodeIndex, inout HitIn
                 vec3 bary;
                 float hitT;
                 int triIndex = int(baseTriangle + j);
-                Triangle triangle = blasTriangleSSBO.Triangles[triIndex];
-                if (RayTriangleIntersect(ray, triangle.Vertex0.Position, triangle.Vertex1.Position, triangle.Vertex2.Position, bary, hitT) && hitT < hitInfo.T)
+                BlasTriangle triangle = blasTriangleSSBO.Triangles[triIndex];
+                if (RayTriangleIntersect(ray, triangle.Position0, triangle.Position1, triangle.Position2, bary, hitT) && hitT < hitInfo.T)
                 {
                     hit = true;
-                    hitInfo.TriangleIndex = triIndex;
+                    hitInfo.VertexIndices = uvec3(triangle.VertexIndex0, triangle.VertexIndex1, triangle.VertexIndex2);
                     hitInfo.Bary = bary;
                     hitInfo.T = hitT;
                 }
@@ -103,7 +103,7 @@ bool IntersectBlas(Ray ray, uint firstIndex, uint blasRootNodeIndex, inout HitIn
 bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
 {
     hitInfo.T = IntersectionRoutines_NotHit;
-    hitInfo.TriangleIndex = -1;
+    hitInfo.VertexIndices = uvec3(0);
     debugNodeCounter = 0;
 
     if (IsTraceLights)

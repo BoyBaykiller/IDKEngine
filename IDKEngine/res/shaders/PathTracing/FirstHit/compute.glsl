@@ -75,9 +75,6 @@ struct MeshInstance
 
 struct Vertex
 {
-    vec3 Position;
-    float _pad0;
-
     vec2 TexCoord;
     uint Tangent;
     uint Normal;
@@ -91,11 +88,16 @@ struct BlasNode
     uint TriCount;
 };
 
-struct Triangle
+struct BlasTriangle
 {
-    Vertex Vertex0;
-    Vertex Vertex1;
-    Vertex Vertex2;
+    vec3 Position0;
+    uint VertexIndex0;
+
+    vec3 Position1;
+    uint VertexIndex1;
+
+    vec3 Position2;
+    uint VertexIndex2;
 };
 
 struct TlasNode
@@ -156,34 +158,39 @@ layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
     Material Materials[];
 } materialSSBO;
 
-layout(std430, binding = 4) restrict readonly buffer BlasSSBO
+layout(std430, binding = 4) restrict readonly buffer VertexSSBO
+{
+    Vertex Vertices[];
+} vertexSSBO;
+
+layout(std430, binding = 5) restrict readonly buffer BlasSSBO
 {
     BlasNode Nodes[];
 } blasSSBO;
 
-layout(std430, binding = 5) restrict readonly buffer BlasTriangleSSBO
+layout(std430, binding = 6) restrict readonly buffer BlasTriangleSSBO
 {
-    Triangle Triangles[];
+    BlasTriangle Triangles[];
 } blasTriangleSSBO;
 
-layout(std430, binding = 6) restrict readonly buffer TlasSSBO
+layout(std430, binding = 7) restrict readonly buffer TlasSSBO
 {
     TlasNode Nodes[];
 } tlasSSBO;
 
-layout(std430, binding = 7) restrict writeonly buffer TransportRaySSBO
+layout(std430, binding = 8) restrict writeonly buffer TransportRaySSBO
 {
     TransportRay Rays[];
 } transportRaySSBO;
 
-layout(std430, binding = 8) restrict buffer RayIndicesSSBO
+layout(std430, binding = 9) restrict buffer RayIndicesSSBO
 {
     uint Counts[2];
     uint AccumulatedSamples;
     uint Indices[];
 } rayIndicesSSBO;
 
-layout(std430, binding = 9) restrict buffer DispatchCommandSSBO
+layout(std430, binding = 10) restrict buffer DispatchCommandSSBO
 {
     DispatchCommand DispatchCommands[2];
 } dispatchCommandSSBO;
@@ -298,13 +305,12 @@ bool TraceRay(inout TransportRay transportRay)
         float ior;
         vec3 absorbance;
         
-        bool hitLight = hitInfo.TriangleIndex == -1;
+        bool hitLight = hitInfo.VertexIndices == uvec3(0);
         if (!hitLight)
         {
-            Triangle triangle = blasTriangleSSBO.Triangles[hitInfo.TriangleIndex];
-            Vertex v0 = triangle.Vertex0;
-            Vertex v1 = triangle.Vertex1;
-            Vertex v2 = triangle.Vertex2;
+            Vertex v0 = vertexSSBO.Vertices[hitInfo.VertexIndices.x];
+            Vertex v1 = vertexSSBO.Vertices[hitInfo.VertexIndices.y];
+            Vertex v2 = vertexSSBO.Vertices[hitInfo.VertexIndices.z];
 
             vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
             vec3 geoNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
