@@ -7,8 +7,8 @@ namespace IDKEngine
         public int MaterialIndex;
         public float NormalMapStrength;
         public float EmissiveBias;
-
         public float SpecularBias;
+
         public float RoughnessBias;
         public float RefractionChance;
         public float IOR;

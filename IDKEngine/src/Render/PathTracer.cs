@@ -104,7 +104,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram nHitProgram;
         private readonly ShaderProgram finalDrawProgram;
         private readonly BufferObject dispatchCommandBuffer;
-        private BufferObject transportRayBuffer;
+        private BufferObject wavefrontRayBuffer;
         private BufferObject rayIndicesBuffer;
         public unsafe PathTracer(BVH bvh, int width, int height)
         {
@@ -170,10 +170,10 @@ namespace IDKEngine.Render
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba32f);
 
-            if (transportRayBuffer != null) transportRayBuffer.Dispose();
-            transportRayBuffer = new BufferObject();
-            transportRayBuffer.ImmutableAllocate(width * height * sizeof(GpuTransportRay), IntPtr.Zero, BufferStorageFlags.None);
-            transportRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
+            if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
+            wavefrontRayBuffer = new BufferObject();
+            wavefrontRayBuffer.ImmutableAllocate(width * height * sizeof(GpuWavefrontRay), IntPtr.Zero, BufferStorageFlags.None);
+            wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
             rayIndicesBuffer = new BufferObject();
@@ -199,7 +199,7 @@ namespace IDKEngine.Render
             finalDrawProgram.Dispose();
             
             dispatchCommandBuffer.Dispose();
-            transportRayBuffer.Dispose();
+            wavefrontRayBuffer.Dispose();
             rayIndicesBuffer.Dispose();
         }
     }

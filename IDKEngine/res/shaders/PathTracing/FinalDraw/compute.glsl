@@ -6,7 +6,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 
-struct TransportRay
+struct WavefrontRay
 {
     vec3 Origin;
     uint DebugNodeCounter;
@@ -15,10 +15,10 @@ struct TransportRay
     float PreviousIOR;
 
     vec3 Throughput;
-    bool IsRefractive;
+    float _pad0;
 
     vec3 Radiance;
-    float _pad0;
+    float _pad1;
 };
 
 struct DispatchCommand
@@ -28,10 +28,10 @@ struct DispatchCommand
     uint NumGroupsZ;
 };
 
-layout(std430, binding = 8) restrict readonly buffer TransportRaySSBO
+layout(std430, binding = 8) restrict readonly buffer WavefrontRaySSBO
 {
-    TransportRay Rays[];
-} transportRaySSBO;
+    WavefrontRay Rays[];
+} wavefrontRaySSBO;
 
 layout(std430, binding = 9) restrict buffer RayIndicesSSBO
 {
@@ -83,13 +83,13 @@ void main()
     }
 
     uint rayIndex = imgCoord.y * imgResultSize.x + imgCoord.x;
-    TransportRay transportRay = transportRaySSBO.Rays[rayIndex];
+    WavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
 
-    vec3 irradiance = transportRay.Radiance;
+    vec3 irradiance = wavefrontRay.Radiance;
     if (IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
-        float a = min(transportRay.DebugNodeCounter / 150.0, 1.0);
+        float a = min(wavefrontRay.DebugNodeCounter / 150.0, 1.0);
         vec3 col = SpectralJet(a);
         irradiance = col;
     }

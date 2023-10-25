@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    struct GpuTransportRay
+    struct GpuWavefrontRay
     {
         public Vector3 Origin;
         public uint DebugNodeCounter;
@@ -11,9 +11,9 @@ namespace IDKEngine
         public float PreviousIOR;
 
         public Vector3 Throughput;
-        public bool IsRefractive;
+        private readonly float _pad0;
 
         public Vector3 Radiance;
-        private float _pad0;
+        private readonly float _pad1;
     }
 }

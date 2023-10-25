@@ -102,7 +102,7 @@ struct TlasNode
     uint BlasIndex;
 };
 
-struct TransportRay
+struct WavefrontRay
 {
     vec3 Origin;
     uint DebugNodeCounter;
@@ -111,10 +111,10 @@ struct TransportRay
     float PreviousIOR;
 
     vec3 Throughput;
-    bool IsRefractive;
+    float _pad0;
 
     vec3 Radiance;
-    float _pad0;
+    float _pad1;
 };
 
 struct DispatchCommand
@@ -172,10 +172,10 @@ layout(std430, binding = 7) restrict readonly buffer TlasSSBO
     TlasNode Nodes[];
 } tlasSSBO;
 
-layout(std430, binding = 8) restrict buffer TransportRaySSBO
+layout(std430, binding = 8) restrict buffer WavefrontRaySSBO
 {
-    TransportRay Rays[];
-} transportRaySSBO;
+    WavefrontRay Rays[];
+} wavefrontRaySSBO;
 
 layout(std430, binding = 9) restrict buffer RayIndicesSSBO
 {
@@ -218,7 +218,7 @@ layout(std140, binding = 4) uniform SkyBoxUBO
     samplerCube Albedo;
 } skyBoxUBO;
 
-bool TraceRay(inout TransportRay transportRay);
+bool TraceRay(inout WavefrontRay wavefrontRay);
 vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 
@@ -243,10 +243,10 @@ void main()
     InitializeRandomSeed(gl_GlobalInvocationID.x * 4096 + rayIndicesSSBO.AccumulatedSamples);
 
     uint rayIndex = rayIndicesSSBO.Indices[gl_GlobalInvocationID.x];
-    TransportRay transportRay = transportRaySSBO.Rays[rayIndex];
+    WavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
     
-    bool continueRay = TraceRay(transportRay);
-    transportRaySSBO.Rays[rayIndex] = transportRay;
+    bool continueRay = TraceRay(wavefrontRay);
+    wavefrontRaySSBO.Rays[rayIndex] = wavefrontRay;
 
     if (continueRay)
     {
@@ -260,12 +260,12 @@ void main()
     }
 }
 
-bool TraceRay(inout TransportRay transportRay)
+bool TraceRay(inout WavefrontRay wavefrontRay)
 {
     HitInfo hitInfo;
-    if (BVHRayTrace(Ray(transportRay.Origin, transportRay.Direction), hitInfo, IsTraceLights, FLOAT_MAX))
+    if (BVHRayTrace(Ray(wavefrontRay.Origin, wavefrontRay.Direction), hitInfo, IsTraceLights, FLOAT_MAX))
     {
-        transportRay.Origin += transportRay.Direction * hitInfo.T;
+        wavefrontRay.Origin += wavefrontRay.Direction * hitInfo.T;
 
         vec3 albedo;
         vec3 normal;
@@ -303,7 +303,7 @@ bool TraceRay(inout TransportRay transportRay)
             vec4 albedoAlpha = texture(material.BaseColor, texCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
             albedo = albedoAlpha.rgb;
             emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
-            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+            
             refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
             roughness = clamp(texture(material.MetallicRoughness, texCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
             if (albedoAlpha.a < material.AlphaCutoff)
@@ -311,13 +311,15 @@ bool TraceRay(inout TransportRay transportRay)
                 refractionChance = 1.0;
                 roughness = 0.0;
             }
+
+            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
         }
         else
         {
             Light light = lightsUBO.Lights[hitInfo.MeshID];
             emissive = light.Color;
             albedo = light.Color;
-            normal = (transportRay.Origin - light.Position) / light.Radius;
+            normal = (wavefrontRay.Origin - light.Position) / light.Radius;
 
             refractionChance = 0.0;
             specularChance = 1.0;
@@ -326,46 +328,45 @@ bool TraceRay(inout TransportRay transportRay)
             absorbance = vec3(0.0);
         }
 
-        float cosTheta = dot(-transportRay.Direction, normal);
+        float cosTheta = dot(-wavefrontRay.Direction, normal);
         bool fromInside = cosTheta < 0.0;
+
         if (fromInside)
         {
             normal *= -1.0;
             cosTheta *= -1.0;
-        }
 
-        if (fromInside)
-        {
-            transportRay.Throughput *= exp(-absorbance * hitInfo.T);
+            wavefrontRay.Throughput *= exp(-absorbance * hitInfo.T);
         }
 
         if (specularChance > 0.0) // adjust specular chance based on view angle
         {
-            float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, transportRay.PreviousIOR, ior));
+            float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, wavefrontRay.PreviousIOR, ior));
             float chanceMultiplier = (1.0 - newSpecularChance) / (1.0 - specularChance);
             refractionChance *= chanceMultiplier;
             specularChance = newSpecularChance;
         }
         
-        transportRay.Radiance += emissive * transportRay.Throughput;
+        wavefrontRay.Radiance += emissive * wavefrontRay.Throughput;
 
         float rayProbability, newIor;
-        transportRay.Direction = BounceOffMaterial(transportRay.Direction, specularChance, roughness, refractionChance, ior, transportRay.PreviousIOR, normal, fromInside, rayProbability, newIor, transportRay.IsRefractive);
-        transportRay.Origin += transportRay.Direction * EPSILON;
-        transportRay.PreviousIOR = newIor;
+        bool newRayRefractive;
+        wavefrontRay.Direction = BounceOffMaterial(wavefrontRay.Direction, specularChance, roughness, refractionChance, ior, wavefrontRay.PreviousIOR, normal, fromInside, rayProbability, newIor, newRayRefractive);
+        wavefrontRay.Origin += wavefrontRay.Direction * EPSILON;
+        wavefrontRay.PreviousIOR = newIor;
 
-        if (!transportRay.IsRefractive)
+        if (!newRayRefractive)
         {
-            transportRay.Throughput *= albedo;
+            wavefrontRay.Throughput *= albedo;
         }
-        transportRay.Throughput /= rayProbability;
+        wavefrontRay.Throughput /= rayProbability;
 
-        bool terminateRay = RussianRouletteTerminateRay(transportRay.Throughput);
+        bool terminateRay = RussianRouletteTerminateRay(wavefrontRay.Throughput);
         return !terminateRay;
     }
     else
     {
-        transportRay.Radiance += texture(skyBoxUBO.Albedo, transportRay.Direction).rgb * transportRay.Throughput;
+        wavefrontRay.Radiance += texture(skyBoxUBO.Albedo, wavefrontRay.Direction).rgb * wavefrontRay.Throughput;
         return false;
     }
 }
