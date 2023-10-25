@@ -43,15 +43,18 @@ namespace IDKEngine.Render
             Gamma = gamma;
         }
 
-        public void Combine(Texture v0 = null, Texture v1 = null)
+        public void Combine(Texture texture0 = null, Texture texture1 = null, Texture texture2 = null)
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
 
-            if (v0 != null) v0.BindToUnit(0);
+            if (texture0 != null) texture0.BindToUnit(0);
             else Texture.UnbindFromUnit(0);
 
-            if (v1 != null) v1.BindToUnit(1);
+            if (texture1 != null) texture1.BindToUnit(1);
             else Texture.UnbindFromUnit(1);
+
+            if (texture2 != null) texture2.BindToUnit(2);
+            else Texture.UnbindFromUnit(2);
 
             tonemapAndGammaCorrecterProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);

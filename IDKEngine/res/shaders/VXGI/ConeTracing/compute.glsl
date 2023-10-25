@@ -1,10 +1,9 @@
 #version 460 core
-#define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 
+AppInclude(include/Random.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
-AppInclude(include/Random.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -84,7 +83,7 @@ void main()
         return;
     }
 
-    vec3 fragPos = UvDepthToWorldSpace(vec3(uv, depth), basicDataUBO.InvProjView);
+    vec3 fragPos = TransformUvDepthToWorldSpace(vec3(uv, depth), basicDataUBO.InvProjView);
     vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
     float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
     float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;

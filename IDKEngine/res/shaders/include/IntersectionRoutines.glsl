@@ -3,7 +3,6 @@
 
 #define IntersectionRoutines_FLOAT_MAX 3.4028235e+38
 #define IntersectionRoutines_FLOAT_MIN -IntersectionRoutines_FLOAT_MAX
-#define IntersectionRoutines_NotHit IntersectionRoutines_FLOAT_MAX
 
 AppInclude(include/Ray.glsl)
 
@@ -54,7 +53,9 @@ bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out 
     float c = dot(sphereToRay, sphereToRay) - radius * radius;
     float discriminant = b * b - c;
     if (discriminant < 0.0)
+    {
         return false;
+    }
 
     float squareRoot = sqrt(discriminant);
     t1 = -b - squareRoot;

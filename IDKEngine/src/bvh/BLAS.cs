@@ -45,10 +45,15 @@ namespace IDKEngine
             {
                 Nodes[nodesUsed++] = root;
             }
-
             // Add dummy invisible node because of the specifics of the traversal algorithm which tests always two nodes at once
-            Nodes[nodesUsed].Min = new Vector3(float.MinValue);
-            Nodes[nodesUsed++].Max = new Vector3(float.MinValue);
+            Nodes[nodesUsed++] = new GpuBlasNode()
+            {
+                Min = new Vector3(float.MinValue),
+                Max = new Vector3(float.MinValue),
+                TriCount = 0,
+                TriStartOrLeftChild = 0,
+            };
+
             Array.Resize(ref Nodes, nodesUsed);
 
             TreeDepth = (int)MathF.Ceiling(MathF.Log2(nodesUsed));
@@ -97,12 +102,12 @@ namespace IDKEngine
 
         private bool ShouldSplitNode(in GpuBlasNode parentNode, out int splitAxis, out float splitPos, out float splitCost)
         {
-            Box uniformDivideArea = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            Box areaForSplits = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (int i = 0; i < parentNode.TriCount; i++)
             {
                 ref readonly GpuBlasTriangle tri = ref Triangles[parentNode.TriStartOrLeftChild + i];
                 Vector3 centroid = (tri.Position0 + tri.Position1 + tri.Position2) / 3.0f;
-                uniformDivideArea.GrowToFit(centroid);
+                areaForSplits.GrowToFit(centroid);
             }
 
             splitAxis = 0;
@@ -110,15 +115,15 @@ namespace IDKEngine
             splitCost = float.MaxValue;
             for (int i = 0; i < 3; i++)
             {
-                if (uniformDivideArea.Min[i] == uniformDivideArea.Max[i])
+                if (areaForSplits.Min[i] == areaForSplits.Max[i])
                 {
                     continue;
                 }
 
-                float scale = (uniformDivideArea.Max[i] - uniformDivideArea.Min[i]) / (SAH_SAMPLES + 1);
+                float scale = (areaForSplits.Max[i] - areaForSplits.Min[i]) / (SAH_SAMPLES + 1);
                 for (int j = 0; j < SAH_SAMPLES; j++)
                 {
-                    float currentSplitPos = uniformDivideArea.Min[i] + (j + 1) * scale;
+                    float currentSplitPos = areaForSplits.Min[i] + (j + 1) * scale;
                     float currentSplitCost = GetCostOfSplittingNodeAt(parentNode, i, currentSplitPos);
                     if (currentSplitCost < splitCost)
                     {
@@ -129,8 +134,10 @@ namespace IDKEngine
                 }
             }
 
-            float parentNodeCost = TrianglesIntersectCost(parentNode.TriCount);
-            return splitCost < parentNodeCost;
+            float parentNodeCost = CostOfHittingLeafNode(parentNode.TriCount);
+            bool splittingIsWorthIt = splitCost < parentNodeCost;
+
+            return splittingIsWorthIt;
         }
 
         private float GetCostOfSplittingNodeAt(in GpuBlasNode parentNode, int splitAxis, float splitPos)
@@ -157,9 +164,9 @@ namespace IDKEngine
             uint rightBoxCount = parentNode.TriCount - leftBoxCount;
 
             float sah = SurfaceAreaHeuristic(
-                MyMath.HalfArea(parentNode.Max - parentNode.Min),
-                MyMath.HalfArea(leftBox.Max - leftBox.Min),
-                MyMath.HalfArea(rightBox.Max - rightBox.Min),
+                MyMath.Area(parentNode.Max - parentNode.Min),
+                leftBox.Area(),
+                rightBox.Area(),
                 leftBoxCount,
                 rightBoxCount
             );
@@ -293,6 +300,28 @@ namespace IDKEngine
             }
         }
 
+        public void InternalNodeGetTriStartAndCount(in GpuBlasNode node, out uint triStart, out uint triCount)
+        {
+            GpuBlasNode nextNode = node;
+            uint veryLeftLeafTriStart;
+            while (nextNode.TriCount == 0)
+            {
+                nextNode = Nodes[nextNode.TriStartOrLeftChild];
+            }
+            veryLeftLeafTriStart = nextNode.TriStartOrLeftChild;
+
+
+            nextNode = node;
+            uint veryRightLeafTriEnd;
+            while (nextNode.TriCount == 0)
+            {
+                nextNode = Nodes[nextNode.TriStartOrLeftChild + 1];
+            }
+            veryRightLeafTriEnd = nextNode.TriStartOrLeftChild + nextNode.TriCount;
+
+            triStart = veryLeftLeafTriStart;
+            triCount = veryRightLeafTriEnd - veryLeftLeafTriStart;
+        }
 
         // Desribed in https://www.nvidia.in/docs/IO/77714/sbvh.pdf, 2.1 BVH Construction
         private static float SurfaceAreaHeuristic(float areaParent, float areaLeftChild, float areaRightChild, uint numTrianglesLeftChild, uint numTrianglesRightChild)
@@ -301,16 +330,16 @@ namespace IDKEngine
             float probabilityHitRightChild = areaRightChild / areaParent;
 
             return 1.0f + // This is the traversal cost. Keep it 1 so we can expose only one ratio as a paramater
-                    CostOfHittingNode(probabilityHitLeftChild, numTrianglesLeftChild) +
-                    CostOfHittingNode(probabilityHitRightChild, numTrianglesRightChild);
+                   (CostOfHittingInternalNode(probabilityHitLeftChild, numTrianglesLeftChild) +
+                   CostOfHittingInternalNode(probabilityHitRightChild, numTrianglesRightChild));
         }
 
-        private static float CostOfHittingNode(float probabilityOfHitting, uint numTriangles)
+        private static float CostOfHittingInternalNode(float probabilityOfHitting, uint numTriangles)
         {
-            return probabilityOfHitting * TrianglesIntersectCost(numTriangles);
+            return probabilityOfHitting * CostOfHittingLeafNode(numTriangles);
         }
 
-        private static float TrianglesIntersectCost(uint numTriangles)
+        private static float CostOfHittingLeafNode(uint numTriangles)
         {
             return numTriangles * TRIANGLE_INTERSECT_COST;
         }

@@ -31,7 +31,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
 
             cullingProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/MultiView/Frustum/shadowCompute.glsl")));
+                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/MultiView/Frustum/compute.glsl")));
 
             pointShadowsBuffer = new BufferObject();
             pointShadowsBuffer.ImmutableAllocate(GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);

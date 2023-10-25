@@ -93,7 +93,6 @@ namespace IDKEngine
             if (window == null)
             {
                 Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed. Make sure you have OpenGL {openglMajor}.{openglMinor} support. Press Enter to exit");
-                Console.ReadLine();
                 Environment.Exit(0);
             }
 

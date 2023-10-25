@@ -249,7 +249,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsVXGI)
                         {
                             ToolTipForItemAboveHovered("Controls wether the scene is re-voxelized every frame");
-                            ImGui.Checkbox("ShouldVoxelize", ref app.RasterizerPipeline.ShouldVoxelize);
+                            ImGui.Checkbox("ShouldReVoxelize", ref app.RasterizerPipeline.ShouldReVoxelize);
 
                             ImGui.Checkbox("IsConfigureGrid", ref app.RasterizerPipeline.IsConfigureGrid);
                             ToolTipForItemAboveHovered(
@@ -425,50 +425,40 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("VolumetricLighting"))
                     {
-                        ImGui.Checkbox("IsVolumetricLighting", ref app.RasterizerPipeline.IsVolumetricLighting);
-                        if (app.RasterizerPipeline.IsVolumetricLighting)
+                        ImGui.Checkbox("IsVolumetricLighting", ref app.IsVolumetricLighting);
+                        if (app.IsVolumetricLighting)
                         {
-                            tempInt = app.RasterizerPipeline.VolumetricLight.Samples;
+                            tempInt = app.VolumetricLight.Samples;
                             if (ImGui.SliderInt("Samples##0", ref tempInt, 1, 100))
                             {
-                                app.RasterizerPipeline.VolumetricLight.Samples = tempInt;
+                                app.VolumetricLight.Samples = tempInt;
                             }
 
-                            tempFloat = app.RasterizerPipeline.VolumetricLight.Scattering;
+                            tempFloat = app.VolumetricLight.Scattering;
                             if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
                             {
-                                app.RasterizerPipeline.VolumetricLight.Scattering = tempFloat;
+                                app.VolumetricLight.Scattering = tempFloat;
                             }
 
-                            tempFloat = app.RasterizerPipeline.VolumetricLight.Strength;
+                            tempFloat = app.VolumetricLight.Strength;
                             if (ImGui.SliderFloat("Strength##0", ref tempFloat, 0.0f, 500.0f))
                             {
-                                app.RasterizerPipeline.VolumetricLight.Strength = tempFloat;
+                                app.VolumetricLight.Strength = tempFloat;
                             }
 
-                            System.Numerics.Vector3 tempVec = app.RasterizerPipeline.VolumetricLight.Absorbance.ToNumerics();
+                            System.Numerics.Vector3 tempVec = app.VolumetricLight.Absorbance.ToNumerics();
                             if (ImGui.InputFloat3("Absorbance", ref tempVec))
                             {
                                 Vector3 temp = tempVec.ToOpenTK();
                                 temp = Vector3.ComponentMax(temp, Vector3.Zero);
-                                app.RasterizerPipeline.VolumetricLight.Absorbance = temp;
+                                app.VolumetricLight.Absorbance = temp;
                             }
-
-                            tempBool = app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation;
-                            if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
-                            {
-                                app.RasterizerPipeline.VolumetricLight.IsTemporalAccumulation = tempBool;
-                            }
-                            ToolTipForItemAboveHovered(
-                                $"When active samples are accumulated over multiple frames.\n" +
-                                "If there is no Temporal Anti Aliasing this is treated as being disabled."
-                            );
                         }
                     }
 
                     if (ImGui.CollapsingHeader("Anti Aliasing"))
                     {
-                        current = app.TemporalAntiAliasingMode.ToString();
+                        current = app.RasterizerPipeline.TemporalAntiAliasingMode.ToString();
                         if (ImGui.BeginCombo("Mode", current))
                         {
                             TemporalAntiAliasingMode[] options = (TemporalAntiAliasingMode[])Enum.GetValues(typeof(TemporalAntiAliasingMode));
@@ -479,7 +469,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
                                     current = enumName;
-                                    app.TemporalAntiAliasingMode = (TemporalAntiAliasingMode)i;
+                                    app.RasterizerPipeline.TemporalAntiAliasingMode = (TemporalAntiAliasingMode)i;
                                 }
 
                                 if (isSelected)
@@ -490,21 +480,21 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        if (app.TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
+                        if (app.RasterizerPipeline.TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
                         {
-                            tempBool = app.TaaResolve.IsTaaArtifactMitigation;
+                            tempBool = app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation;
                             if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
                             {
-                                app.TaaResolve.IsTaaArtifactMitigation = tempBool;
+                                app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation = tempBool;
                             }
                             ToolTipForItemAboveHovered(
                                 "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass.\n" +
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
                             );
 
-                            ImGui.SliderInt("Samples##1", ref app.TAASamples, 1, 36);
+                            ImGui.SliderInt("Samples##1", ref app.RasterizerPipeline.TAASamples, 1, 36);
                         }
-                        else if (app.TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
+                        else if (app.RasterizerPipeline.TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
                         {
                             ImGui.Text(
                                 "FSR2 (by AMD) does Anti Aliasing but\n" +
@@ -514,12 +504,12 @@ namespace IDKEngine.Render
                                 "on NVIDIA!"
                             );
 
-                            ImGui.Checkbox("IsSharpening", ref app.FSR2Wrapper.IsSharpening);
+                            ImGui.Checkbox("IsSharpening", ref app.RasterizerPipeline.FSR2Wrapper.IsSharpening);
 
 
-                            if (app.FSR2Wrapper.IsSharpening)
+                            if (app.RasterizerPipeline.FSR2Wrapper.IsSharpening)
                             {
-                                ImGui.SliderFloat("Sharpness", ref app.FSR2Wrapper.Sharpness, 0.0f, 1.0f);
+                                ImGui.SliderFloat("Sharpness", ref app.RasterizerPipeline.FSR2Wrapper.Sharpness, 0.0f, 1.0f);
                             }
                         }
                     }
@@ -1108,7 +1098,8 @@ namespace IDKEngine.Render
                     hitEntityID = lightHitInfo.LightID;
                 }
 
-                if ((hitEntityID == SelectedEntity.Index) && (hitEntityType == SelectedEntity.Type))
+                bool entityWasAlreadySelected = (hitEntityID == SelectedEntity.Index) && (hitEntityType == SelectedEntity.Type);
+                if (entityWasAlreadySelected)
                 {
                     SelectedEntity.Type = EntityType.None;
                     SelectedEntity.Index = -1;

@@ -73,10 +73,10 @@ namespace IDKEngine.Render.Objects
             Size = size;
         }
 
-        public void GetSubData<T>(nint offset, nint size, out T data) where T : unmanaged
+        public unsafe void GetSubData<T>(nint offset, out T data) where T : unmanaged
         {
             data = new T();
-            GL.GetNamedBufferSubData(ID, offset, size, ref data);
+            GL.GetNamedBufferSubData(ID, offset, sizeof(T), ref data);
         }
         public void GetSubData<T>(nint offset, nint size, T[] data) where T : unmanaged
         {

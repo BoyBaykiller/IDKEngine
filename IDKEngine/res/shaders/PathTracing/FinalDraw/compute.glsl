@@ -75,9 +75,6 @@ void main()
     // Reset global memory for next frame
     if (gl_GlobalInvocationID.x == 0)
     {
-        uint maxPossibleRayCount = imgResultSize.x * imgResultSize.y;
-        uint maxPossibleNumGroupsX = (maxPossibleRayCount + N_HIT_PROGRAM_LOCAL_SIZE_X - 1) / N_HIT_PROGRAM_LOCAL_SIZE_X;
-        
         dispatchCommandSSBO.DispatchCommands[0].NumGroupsX = 0u;
         dispatchCommandSSBO.DispatchCommands[1].NumGroupsX = 0u;
         
@@ -105,22 +102,22 @@ void main()
 // Source: https://www.shadertoy.com/view/ls2Bz1
 vec3 SpectralJet(float a)
 {
-	vec3 c;
-	if (a < 0.25)
+    vec3 c;
+    if (a < 0.25)
     {
         c = vec3(0.0, 4.0 * a, 1.0);
     }
-	else if (a < 0.5)
+    else if (a < 0.5)
     {
-		c = vec3(0.0, 1.0, 1.0 + 4.0 * (0.25 - a));
+        c = vec3(0.0, 1.0, 1.0 + 4.0 * (0.25 - a));
     }
-	else if (a < 0.75)
+    else if (a < 0.75)
     {
-		c = vec3(4.0 * (a - 0.5), 1.0, 0.0);
+        c = vec3(4.0 * (a - 0.5), 1.0, 0.0);
     }
-	else
+    else
     {
-		c = vec3(1.0, 1.0 + 4.0 * (0.75 - a), 0.0);
+        c = vec3(1.0, 1.0 + 4.0 * (0.75 - a), 0.0);
     }
-	return clamp(c, vec3(0.0), vec3(1.0));
+    return clamp(c, vec3(0.0), vec3(1.0));
 }

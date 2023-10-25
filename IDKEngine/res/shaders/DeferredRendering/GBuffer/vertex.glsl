@@ -3,6 +3,7 @@
 
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
+AppInclude(include/Transformations.glsl)
 
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
@@ -11,7 +12,6 @@ layout(location = 3) in uint Normal;
 
 struct Mesh
 {
-    int InstanceCount;
     int MaterialIndex;
     float NormalMapStrength;
     float EmissiveBias;
@@ -19,6 +19,7 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
+    float _pad0;
     vec3 Absorbance;
     uint CubemapShadowCullInfo;
 };
@@ -87,14 +88,10 @@ void main()
     
     vec3 normal = DecompressSR11G11B10(Normal);
     vec3 tangent = DecompressSR11G11B10(Tangent);
-    
-    vec3 T = normalize((meshInstance.ModelMatrix * vec4(tangent, 0.0)).xyz);
-    vec3 N = normalize((meshInstance.ModelMatrix * vec4(normal, 0.0)).xyz);
-    T = normalize(T - dot(T, N) * N);
-    vec3 B = cross(N, T);
 
-    outData.TangentToWorld = mat3(T, B, N);
+    outData.TangentToWorld = GetTBN(meshInstance.ModelMatrix, tangent, normal);
     outData.TexCoord = TexCoord;
+    
     vec3 worldPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(worldPos, 1.0);
     outData.PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(Position, 1.0);

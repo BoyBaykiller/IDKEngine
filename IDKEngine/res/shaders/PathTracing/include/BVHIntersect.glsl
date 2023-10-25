@@ -1,5 +1,5 @@
-#ifndef PathTracing_ClosestHit_H
-#define PathTracing_ClosestHit_H
+#ifndef PathTracing_BVHIntersect_H
+#define PathTracing_BVHIntersect_H
 
 // Needs more optimization.
 // Currently only pays of on scenes with many BLAS'es.
@@ -10,6 +10,7 @@
 #define MAX_BLAS_TREE_DEPTH AppInsert(MAX_BLAS_TREE_DEPTH)
 #define MAX_TLAS_TREE_DEPTH AppInsert(MAX_TLAS_TREE_DEPTH) + 4 // TODO: Fix traversal occasionally using more than MAX_TLAS_TREE_DEPTH  
 
+AppInclude(include/Ray.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
 
 // Minus one because we store the stack top in a seperate local variable instead of shared
@@ -24,10 +25,8 @@ struct HitInfo
     uint InstanceID;
 };
 
-bool IntersectBlas(Ray ray, uint firstIndex, uint blasRootNodeIndex, inout HitInfo hitInfo, inout uint debugNodeCounter)
+bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex, inout HitInfo hitInfo, inout uint debugNodeCounter)
 {
-    uint baseTriangle = firstIndex / 3;
-
     bool hit = false;
     float tMinLeft;
     float tMinRight;
@@ -60,7 +59,7 @@ bool IntersectBlas(Ray ray, uint firstIndex, uint blasRootNodeIndex, inout HitIn
             {
                 vec3 bary;
                 float hitT;
-                int triIndex = int(baseTriangle + j);
+                uint triIndex = blasFirstTriangleIndex + j;
                 BlasTriangle triangle = blasTriangleSSBO.Triangles[triIndex];
                 if (RayTriangleIntersect(ray, triangle.Position0, triangle.Position1, triangle.Position2, bary, hitT) && hitT < hitInfo.T)
                 {
@@ -100,13 +99,13 @@ bool IntersectBlas(Ray ray, uint firstIndex, uint blasRootNodeIndex, inout HitIn
     return hit;
 }
 
-bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
+bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool traceLights, float maxDist)
 {
-    hitInfo.T = IntersectionRoutines_NotHit;
+    hitInfo.T = maxDist;
     hitInfo.VertexIndices = uvec3(0);
     debugNodeCounter = 0;
 
-    if (IsTraceLights)
+    if (traceLights)
     {
         float tMin;
         float tMax;
@@ -130,7 +129,6 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
     uint stackPtr = 0;
     uint stackTop = 0;
     uint stack[MAX_TLAS_TREE_DEPTH];
-    // uint stack;
     while (true)
     {
         TlasNode parent = tlasSSBO.Nodes[stackTop];
@@ -147,10 +145,11 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
             DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[parent.BlasIndex];
 
             uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-            Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+            Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
-            if (IntersectBlas(localRay, cmd.FirstIndex, cmd.BlasRootNodeIndex, hitInfo, debugNodeCounter))
+            if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
             {
+                hitInfo.VertexIndices += cmd.BaseVertex;
                 hitInfo.MeshID = parent.BlasIndex;
                 hitInfo.InstanceID = glInstanceID;
             }
@@ -195,22 +194,23 @@ bool ClosestHit(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter)
         DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
         
         uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-        Ray localRay = WorldSpaceRayToLocal(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
-        if (IntersectBlas(localRay, cmd.FirstIndex, cmd.BlasRootNodeIndex, hitInfo, debugNodeCounter))
+        Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+        if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
         {
+            hitInfo.VertexIndices += cmd.BaseVertex;
             hitInfo.MeshID = i;
             hitInfo.InstanceID = glInstanceID;
         }
     }
 #endif
 
-    return hitInfo.T != IntersectionRoutines_NotHit;
+    return hitInfo.T != maxDist;
 }
 
-bool ClosestHit(Ray ray, out HitInfo hitInfo)
+bool BVHRayTrace(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 {
     uint debugNodeCounter;
-    return ClosestHit(ray, hitInfo, debugNodeCounter);
+    return BVHRayTrace(ray, hitInfo, debugNodeCounter, traceLights, maxDist);
 }
 
 #endif

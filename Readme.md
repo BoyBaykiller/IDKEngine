@@ -454,7 +454,7 @@ void main()
     Mesh mesh = meshSSBO.Meshes[meshIndex];
     Box box = mesh.AABB;
         
-    Frustum frustum = FrustumExtract(ProjView * mesh.ModelMatrix);
+    Frustum frustum = GetFrustum(ProjView * mesh.ModelMatrix);
     drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumBoxIntersect(frustum, box));
 }
 ```

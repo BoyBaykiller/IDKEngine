@@ -23,7 +23,6 @@ namespace IDKEngine
         public GpuTlasNode Root => Nodes[0];
         public int TreeDepth { get; private set; }
 
-        //public List<BlasInstances> BlasesInstances;
         public GpuMeshInstance[] MeshInstances;
         public GpuDrawElementsCmd[] DrawCommands;
         public List<BLAS> Blases;
@@ -142,7 +141,7 @@ namespace IDKEngine
                 fittingBox.GrowToFit(otherNode.Min);
                 fittingBox.GrowToFit(otherNode.Max);
 
-                float area = MyMath.HalfArea(fittingBox.Max - fittingBox.Min);
+                float area = MyMath.Area(fittingBox.Max - fittingBox.Min);
                 if (area < smallestArea)
                 {
                     smallestArea = area;

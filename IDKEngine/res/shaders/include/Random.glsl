@@ -1,6 +1,8 @@
 #ifndef Random_H
 #define Random_H
 
+AppInclude(include/Constants.glsl)
+
 uint Random_RNGSeed;
 
 void InitializeRandomSeed(uint value)
@@ -51,6 +53,12 @@ vec3 UniformSampleSphere(float rnd0, float rnd1)
     float y = r * sin(a);
 
     return vec3(x, y, z);
+}
+
+vec3 UniformSampleHemisphere(vec3 normal)
+{
+    vec3 dir = UniformSampleSphere(GetRandomFloat01(), GetRandomFloat01());
+    return dir * sign(dot(dir, normal));
 }
 
 // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/

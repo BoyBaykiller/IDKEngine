@@ -18,7 +18,7 @@ namespace IDKEngine.Render
             if (!IS_FSR2_SUPPORTED)
             {
                 Logger.Log(Logger.LogLevel.Fatal, $"{nameof(IS_FSR2_SUPPORTED)} was {IS_FSR2_SUPPORTED}. FSR2 is Windows only");
-                return;
+                Environment.Exit(0);
             }
 
             SetSize(outputWidth, outputHeight, maxInputWidth, maxInputHeight);

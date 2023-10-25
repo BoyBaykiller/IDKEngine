@@ -27,9 +27,17 @@ namespace IDKEngine
             return result;
         }
 
-        public static float HalfArea(Vector3 size)
+        public static float Area(Vector3 size)
         {
-            return size.X * size.Y + size.X * size.Z + size.Z * size.Y;
+            if (size.X < 0.0f || size.Y < 0.0f || size.Z < 0.0f) return 0.0f;
+
+            float area = 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+            return area;
+        }
+
+        public static float Volume(Vector3 extends)
+        {
+            return extends.X * extends.Y * extends.X;
         }
 
         public static Vector3 Lerp(Vector3 x, Vector3 y, float a)
