@@ -2,8 +2,8 @@
 // Source: https://github.com/wwwtyro/glsl-atmosphere
 
 #version 460 core
-#define PI 3.14159265
 
+AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;

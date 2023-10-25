@@ -17,7 +17,6 @@ struct DrawElementsCmd
 
 struct Mesh
 {
-    int InstanceCount;
     int MaterialIndex;
     float NormalMapStrength;
     float EmissiveBias;
@@ -25,6 +24,7 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
+    float _pad0;
     vec3 Absorbance;
     uint CubemapShadowCullInfo;
 };
@@ -80,8 +80,8 @@ void main()
     const uint glInstanceID = 0; // TODO: Derive from built in variables
     mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].ModelMatrix;
     
-    Frustum frustum = FrustumExtract(ProjView * model);
+    Frustum frustum = GetFrustum(ProjView * model);
     bool isMeshInFrustum = FrustumBoxIntersect(frustum, node.Min, node.Max);
 
-    drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = int(isMeshInFrustum);
+    drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = isMeshInFrustum ? 1 : 0;
 }

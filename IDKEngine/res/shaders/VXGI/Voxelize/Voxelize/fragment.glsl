@@ -1,6 +1,4 @@
 #version 460 core
-#define PI 3.14159265
-#define EPSILON 0.001
 #extension GL_ARB_bindless_texture : require
 
 #define TAKE_ATOMIC_FP16_PATH AppInsert(TAKE_ATOMIC_FP16_PATH)

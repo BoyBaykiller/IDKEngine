@@ -24,7 +24,7 @@ namespace IDKEngine.Render.Objects
         public int Depth { get; private set; } = 1;
         public SizedInternalFormat SizedInternalFormat { get; private set; }
 
-        private readonly List<ulong> associatedTextureHandles = new List<ulong>();
+        private readonly List<ulong> associatedTextureHandles = new List<ulong>(0);
 
         private static readonly int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
         private static int GetDummyTexture(TextureTarget textureTarget)

@@ -67,7 +67,7 @@ namespace IDKEngine.Shapes
             Vector3 triangleClosestPoint = TriangleClosestPoint(triangle, sphere.Center);
             float distSquared = Vector3.DistanceSquared(triangleClosestPoint, sphere.Center);
 
-            return distSquared < sphere.RadiusSquared;
+            return distSquared < sphere.RadiusSquared();
         }
 
         // Source: https://stackoverflow.com/a/4579069/12103839
@@ -103,9 +103,9 @@ namespace IDKEngine.Shapes
         public static bool BoxVsTriangle(in Box box, in Triangle triangle)
         {
             // Translate triangle as conceptually moving Box to origin
-            var v0 = (triangle.P0 - box.Center);
-            var v1 = (triangle.P1 - box.Center);
-            var v2 = (triangle.P2 - box.Center);
+            var v0 = (triangle.P0 - box.Center());
+            var v1 = (triangle.P1 - box.Center());
+            var v2 = (triangle.P2 - box.Center());
 
             // Compute edge vectors for triangle
             var f0 = (v1 - v0);
@@ -119,7 +119,7 @@ namespace IDKEngine.Shapes
             var p0 = Vector3.Dot(v0, a00);
             var p1 = Vector3.Dot(v1, a00);
             var p2 = Vector3.Dot(v2, a00);
-            var halfSize = box.HalfSize;
+            var halfSize = box.HalfSize();
             var r = halfSize.Y * MathF.Abs(f0.Z) + halfSize.Z * MathF.Abs(f0.Y);
             if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
             {
@@ -313,7 +313,7 @@ namespace IDKEngine.Shapes
 
             Vector3 sphereToRay = ray.Origin - sphere.Center;
             float b = Vector3.Dot(ray.Direction, sphereToRay);
-            float c = Vector3.Dot(sphereToRay, sphereToRay) - sphere.RadiusSquared;
+            float c = Vector3.Dot(sphereToRay, sphereToRay) - sphere.RadiusSquared();
             float discriminant = b * b - c;
             if (discriminant < 0.0f)
             {

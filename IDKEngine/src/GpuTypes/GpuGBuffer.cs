@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine
 {
-    struct GpuGBuffer
+    public struct GpuGBuffer
     {
         public ulong AlbedoAlphaTextureHandle;
         public ulong NormalSpecularTextureHandle;

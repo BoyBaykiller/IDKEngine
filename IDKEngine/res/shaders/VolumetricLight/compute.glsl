@@ -1,9 +1,8 @@
 #version 460 core
-#define PI 3.1415926536
 #extension GL_ARB_bindless_texture : require
 
-AppInclude(include/Constants.glsl)
 AppInclude(include/Random.glsl)
+AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -89,15 +88,25 @@ uniform float Scattering;
 uniform float MaxDist;
 uniform float Strength;
 uniform vec3 Absorbance;
-uniform bool IsTemporalAccumulation;
+
+// From: http://www.alexandre-pestana.com/volumetric-lights/
+const float DitherPattern[][4] = 
+{
+    { 0.0, 0.5, 0.125, 0.625 },
+    { 0.75, 0.22, 0.875, 0.375 },
+    { 0.1875, 0.6875, 0.0625, 0.5625 },
+    { 0.9375, 0.4375, 0.8125, 0.3125 }
+};
 
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec3 uvw = vec3(uv, texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r);
-    vec3 viewToFrag = UvDepthToWorldSpace(uvw, basicDataUBO.InvProjView) - basicDataUBO.ViewPos;
+    vec3 ndc = vec3(uv * 2.0 - 1.0, texture(gBufferDataUBO.Depth, uv).r);
+    vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), basicDataUBO.InvProjView);
+    vec3 viewToFrag = unjitteredFragPos - basicDataUBO.ViewPos;
+
     float viewToFragLen = length(viewToFrag);
     vec3 viewDir = viewToFrag / viewToFragLen;
     
@@ -107,9 +116,8 @@ void main()
     }
 
     vec3 deltaStep = viewToFrag / Samples;
-    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
-    float offset = InterleavedGradientNoise(imgCoord, (IsTemporalAccumulation && taaEnabled) ? (basicDataUBO.Frame % taaDataUBO.Samples) : 0u);
-    vec3 origin = basicDataUBO.ViewPos + deltaStep * offset;
+    float randomJitter = DitherPattern[imgCoord.x % DitherPattern[0].length()][imgCoord.y % DitherPattern.length()];
+    vec3 origin = basicDataUBO.ViewPos + deltaStep * randomJitter;
 
     vec3 scattered = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)

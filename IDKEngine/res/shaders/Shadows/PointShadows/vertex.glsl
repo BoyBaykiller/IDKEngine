@@ -33,7 +33,6 @@ struct PointShadow
 
 struct Mesh
 {
-    int InstanceCount;
     int MaterialIndex;
     float NormalMapStrength;
     float EmissiveBias;
@@ -41,6 +40,7 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
+    float _pad0;
     vec3 Absorbance;
     uint CubemapShadowCullInfo;
 };

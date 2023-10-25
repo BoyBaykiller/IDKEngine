@@ -6,14 +6,6 @@ layout(location = 2) out vec4 NormalSpecular;
 layout(location = 3) out vec4 EmissiveRoughness;
 layout(location = 4) out vec2 Velocity;
 
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    vec2 Jitter;
-    int Samples;
-    float MipmapBias;
-    int TemporalAntiAliasingMode;
-} taaDataUBO;
-
 in InOutVars
 {
     vec3 LightColor;

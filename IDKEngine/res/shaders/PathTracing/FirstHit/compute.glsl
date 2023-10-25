@@ -1,8 +1,4 @@
 #version 460 core
-#define FLOAT_MAX 3.4028235e+38
-#define FLOAT_MIN -FLOAT_MAX
-#define EPSILON 0.001
-#define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 #extension GL_AMD_gpu_shader_half_float : enable
 #extension GL_AMD_gpu_shader_half_float_fetch : enable // requires GL_AMD_gpu_shader_half_float
@@ -54,7 +50,6 @@ struct DrawElementsCmd
 
 struct Mesh
 {
-    int InstanceCount;
     int MaterialIndex;
     float NormalMapStrength;
     float EmissiveBias;
@@ -62,6 +57,7 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
+    float _pad0;
     vec3 Absorbance;
     uint CubemapShadowCullInfo;
 };
@@ -227,7 +223,6 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 bool TraceRay(inout TransportRay transportRay);
 vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
-Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel);
 ivec2 ReorderInvocations(uint n);
 
 uniform bool IsDebugBVHTraversal;
@@ -235,7 +230,8 @@ uniform bool IsTraceLights;
 uniform float FocalLength;
 uniform float LenseRadius;
 
-AppInclude(PathTracing/include/ClosestHit.glsl)
+AppInclude(PathTracing/include/BVHIntersect.glsl)
+AppInclude(PathTracing/include/RussianRoulette.glsl)
 
 void main()
 {
@@ -286,7 +282,7 @@ bool TraceRay(inout TransportRay transportRay)
 {
     HitInfo hitInfo;
     uint debugNodeCounter = 0;
-    if (ClosestHit(Ray(transportRay.Origin, transportRay.Direction), hitInfo, debugNodeCounter))
+    if (BVHRayTrace(Ray(transportRay.Origin, transportRay.Direction), hitInfo, debugNodeCounter, IsTraceLights, FLOAT_MAX))
     {
         if (IsDebugBVHTraversal)
         {
@@ -317,11 +313,7 @@ bool TraceRay(inout TransportRay transportRay)
             vec3 tangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
 
             MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
-            vec3 T = normalize((meshInstance.ModelMatrix * vec4(tangent, 0.0)).xyz);
-            vec3 N = normalize((meshInstance.ModelMatrix * vec4(geoNormal, 0.0)).xyz);
-            T = normalize(T - dot(T, N) * N);
-            vec3 B = cross(N, T);
-            mat3 TBN = mat3(T, B, N);
+            mat3 TBN = GetTBN(meshInstance.ModelMatrix, tangent, geoNormal);
 
             Mesh mesh = meshSSBO.Meshes[hitInfo.MeshID];
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
@@ -375,6 +367,11 @@ bool TraceRay(inout TransportRay transportRay)
             prevIor = 1.0;
         }
 
+        if (fromInside)
+        {
+            transportRay.Throughput *= exp(-absorbance * hitInfo.T);
+        }
+
         if (specularChance > 0.0) // adjust specular chance based on view angle
         {
             float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, prevIor, ior));
@@ -383,31 +380,21 @@ bool TraceRay(inout TransportRay transportRay)
             specularChance = newSpecularChance;
         }
 
+        transportRay.Radiance += emissive * transportRay.Throughput;
+        
         float rayProbability, newIor;
         transportRay.Direction = BounceOffMaterial(transportRay.Direction, specularChance, roughness, refractionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, transportRay.IsRefractive);
-        transportRay.Origin += normal * EPSILON;
+        transportRay.Origin += transportRay.Direction * EPSILON;
         transportRay.PreviousIOR = newIor;
 
-        if (fromInside)
-        {
-            transportRay.Throughput *= exp(-absorbance * hitInfo.T);
-        }
-
-        transportRay.Radiance += emissive * transportRay.Throughput;
         if (!transportRay.IsRefractive)
         {
             transportRay.Throughput *= albedo;
         }
         transportRay.Throughput /= rayProbability;
 
-        float p = max(transportRay.Throughput.x, max(transportRay.Throughput.y, transportRay.Throughput.z));
-        if (GetRandomFloat01() > p)
-        {
-            return false;
-        }
-        transportRay.Throughput /= p;
-
-        return true;
+        bool terminateRay = RussianRouletteTerminateRay(transportRay.Throughput);
+        return !terminateRay;
     }
     else
     {
@@ -471,11 +458,6 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     r0 *= r0;
 
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
-}
-
-Ray WorldSpaceRayToLocal(Ray ray, mat4 invModel)
-{
-    return Ray((invModel * vec4(ray.Origin, 1.0)).xyz, (invModel * vec4(ray.Direction, 0.0)).xyz);
 }
 
 // Source: https://youtu.be/HgisCS30yAI

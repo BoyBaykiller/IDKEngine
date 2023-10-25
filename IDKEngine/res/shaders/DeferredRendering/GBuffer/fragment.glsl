@@ -83,6 +83,7 @@ void main()
     float lod = textureQueryLod(material.BaseColor, inData.TexCoord).y;
 
     vec4 albedoAlpha = textureLod(material.BaseColor, inData.TexCoord, lod + taaDataUBO.MipmapBias) * DecompressUR8G8B8A8(material.BaseColorFactor);
+    // if (albedoAlpha.a > material.AlphaCutoff - 10.0)
     if (albedoAlpha.a < material.AlphaCutoff)
     {
         discard;

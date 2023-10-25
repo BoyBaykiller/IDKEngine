@@ -9,7 +9,7 @@ namespace IDKEngine.Render
 {
     class ModelSystem : IDisposable
     {
-        public int TriangleCount => Indices.Length / 3;
+        public int TriangleCount => VertexIndices.Length / 3;
 
 
         public GpuDrawElementsCmd[] DrawCommands;
@@ -30,8 +30,8 @@ namespace IDKEngine.Render
         public Vector3[] VertexPositions;
         private readonly BufferObject vertexPositionBuffer;
 
-        public uint[] Indices;
-        private readonly BufferObject elementBuffer;
+        public uint[] VertexIndices;
+        private readonly BufferObject vertexIndicesBuffer;
 
         public BVH BVH;
 
@@ -62,11 +62,12 @@ namespace IDKEngine.Render
             VertexPositions = Array.Empty<Vector3>();
             vertexPositionBuffer = new BufferObject();
 
-            Indices = Array.Empty<uint>();
-            elementBuffer = new BufferObject();
+            VertexIndices = Array.Empty<uint>();
+            vertexIndicesBuffer = new BufferObject();
+            vertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
 
             vao = new VAO();
-            vao.SetElementBuffer(elementBuffer);
+            vao.SetElementBuffer(vertexIndicesBuffer);
 
             vao.AddSourceBuffer(vertexPositionBuffer, 0, sizeof(Vector3));
             vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0); // Position
@@ -107,7 +108,7 @@ namespace IDKEngine.Render
                 int addedDrawCommands = models.Sum(model => model.DrawCommands.Length);
                 int prevDrawCommandsLength = DrawCommands.Length - addedDrawCommands;
                 ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, addedDrawCommands);
-                BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, Indices);
+                BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);
 
                 // Caculate root node offset in blas buffer for each mesh
                 uint bvhNodesExclusiveSum = 0;
@@ -120,11 +121,11 @@ namespace IDKEngine.Render
 
             drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GpuDrawElementsCmd), DrawCommands);
             meshBuffer.MutableAllocate(Meshes.Length * sizeof(GpuMesh), Meshes);
+            meshInstanceBuffer.MutableAllocate(MeshInstances.Length * sizeof(GpuMeshInstance), MeshInstances);
             materialBuffer.MutableAllocate(Materials.Length * sizeof(GpuMaterial), Materials);
             vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GpuVertex), Vertices);
             vertexPositionBuffer.MutableAllocate(VertexPositions.Length * sizeof(Vector3), VertexPositions);
-            elementBuffer.MutableAllocate(Indices.Length * sizeof(uint), Indices);
-            meshInstanceBuffer.MutableAllocate(MeshInstances.Length * sizeof(GpuMeshInstance), MeshInstances);
+            vertexIndicesBuffer.MutableAllocate(VertexIndices.Length * sizeof(uint), VertexIndices);
         }
 
         public unsafe void Draw()
@@ -214,9 +215,9 @@ namespace IDKEngine.Render
         }
         private void LoadIndices(ReadOnlySpan<uint> indices)
         {
-            int prevIndicesLength = Indices.Length;
-            Array.Resize(ref Indices, prevIndicesLength + indices.Length);
-            indices.CopyTo(new Span<uint>(Indices, prevIndicesLength, indices.Length));
+            int prevIndicesLength = VertexIndices.Length;
+            Array.Resize(ref VertexIndices, prevIndicesLength + indices.Length);
+            indices.CopyTo(new Span<uint>(VertexIndices, prevIndicesLength, indices.Length));
         }
         private void LoadVertices(ReadOnlySpan<GpuVertex> vertices)
         {
@@ -240,9 +241,9 @@ namespace IDKEngine.Render
         public GpuTriangle GetTriangle(int indicesIndex, int baseVertex)
         {
             GpuTriangle triangle;
-            triangle.Vertex0 = Vertices[Indices[indicesIndex + 0] + baseVertex];
-            triangle.Vertex1 = Vertices[Indices[indicesIndex + 1] + baseVertex];
-            triangle.Vertex2 = Vertices[Indices[indicesIndex + 2] + baseVertex];
+            triangle.Vertex0 = Vertices[VertexIndices[indicesIndex + 0] + baseVertex];
+            triangle.Vertex1 = Vertices[VertexIndices[indicesIndex + 1] + baseVertex];
+            triangle.Vertex2 = Vertices[VertexIndices[indicesIndex + 2] + baseVertex];
             return triangle;
         }
 
@@ -252,7 +253,7 @@ namespace IDKEngine.Render
             meshBuffer.Dispose();
             materialBuffer.Dispose();
             vertexBuffer.Dispose();
-            elementBuffer.Dispose();
+            vertexIndicesBuffer.Dispose();
             meshInstanceBuffer.Dispose();
 
             vao.Dispose();

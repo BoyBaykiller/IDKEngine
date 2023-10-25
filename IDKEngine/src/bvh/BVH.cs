@@ -149,10 +149,16 @@ namespace IDKEngine
             SetTlasBufferContent(Tlas.Nodes);
         }
 
+        public int GetBlasesTriangleCount()
+        {
+            return Tlas.Blases.Sum(blasInstances => blasInstances.Triangles.Length);
+        }
+
+
         private unsafe void SetBlasBuffersContent()
         {
-            blasBuffer.MutableAllocate((nint)sizeof(GpuBlasNode) * Tlas.Blases.Sum(blasInstances => blasInstances.Nodes.Length), IntPtr.Zero);
-            blasTriangleBuffer.MutableAllocate((nint)sizeof(GpuBlasTriangle) * Tlas.Blases.Sum(blasInstances => blasInstances.Triangles.Length), IntPtr.Zero);
+            blasBuffer.MutableAllocate((nint)sizeof(GpuBlasNode) * Tlas.Blases.Sum(blas => blas.Nodes.Length), IntPtr.Zero);
+            blasTriangleBuffer.MutableAllocate((nint)sizeof(GpuBlasTriangle) * GetBlasesTriangleCount(), IntPtr.Zero);
 
             nint uploadedBlasNodesCount = 0;
             nint uploadedTrianglesCount = 0;
@@ -172,13 +178,14 @@ namespace IDKEngine
             tlasBuffer.MutableAllocate(sizeof(GpuTlasNode) * tlasNodes.Length, tlasNodes[0]);
         }
 
+
         public void Dispose()
         {
             blasTriangleBuffer.Dispose();
             blasBuffer.Dispose();
         }
 
-        private static BLAS[] CreateBlasesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, Vector3[] vertexPositions, uint[] indices)
+        private static BLAS[] CreateBlasesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, Vector3[] vertexPositions, uint[] vertexIndices)
         {
             BLAS[] blases = new BLAS[drawCommands.Length];
             Parallel.For(0, blases.Length, i =>
@@ -190,18 +197,18 @@ namespace IDKEngine
                 for (int j = 0; j < blasTriangles.Length; j++)
                 {
                     {
-                        uint index = (uint)cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 0];
-                        blasTriangles[j].Position0 = vertexPositions[index];
+                        uint index = vertexIndices[cmd.FirstIndex + (j * 3) + 0];
+                        blasTriangles[j].Position0 = vertexPositions[(uint)cmd.BaseVertex + index];
                         blasTriangles[j].VertexIndex0 = index;
                     }
                     {
-                        uint index = (uint)cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 1];
-                        blasTriangles[j].Position1 = vertexPositions[index];
+                        uint index = vertexIndices[cmd.FirstIndex + (j * 3) + 1];
+                        blasTriangles[j].Position1 = vertexPositions[(uint)cmd.BaseVertex + index];
                         blasTriangles[j].VertexIndex1 = index;
                     }
                     {
-                        uint index = (uint)cmd.BaseVertex + indices[cmd.FirstIndex + (j * 3) + 2];
-                        blasTriangles[j].Position2 = vertexPositions[index];
+                        uint index = vertexIndices[cmd.FirstIndex + (j * 3) + 2];
+                        blasTriangles[j].Position2 = vertexPositions[(uint)cmd.BaseVertex + index];
                         blasTriangles[j].VertexIndex2 = index;
                     }
                 }

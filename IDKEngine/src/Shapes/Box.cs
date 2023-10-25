@@ -9,8 +9,6 @@ namespace IDKEngine.Shapes
     [StructLayout(LayoutKind.Explicit)]
     public struct Box
     {
-        public Vector3 Center => (Max + Min) * 0.5f;
-        public Vector3 HalfSize => (Max - Min) * 0.5f;
         public Vector3 this[int vertex]
         {
             get
@@ -59,6 +57,45 @@ namespace IDKEngine.Shapes
             GrowToFit(tri.Position0);
             GrowToFit(tri.Position1);
             GrowToFit(tri.Position2);
+        }
+
+        public Vector3 GetOverlappingExtends(in Box other)
+        {
+            Vector3 addedExtends = Extends() + other.Extends();
+
+            Box boundingBox = this;
+            boundingBox.GrowToFit(other);
+
+            Vector3 extends = addedExtends - boundingBox.Extends();
+
+            return extends;
+        }
+
+        public Vector3 Center()
+        {
+            return (Max + Min) * 0.5f;
+        }
+
+        public Vector3 Extends()
+        {
+            return Max - Min;
+        }
+
+        public Vector3 HalfSize()
+        {
+            return Extends() * 0.5f;
+        }
+
+        public float Volume()
+        {
+            Vector3 extends = Extends();
+            return extends.X * extends.Y * extends.Z;
+        }
+
+        public float Area()
+        {
+            Vector3 extends = Extends();
+            return 2.0f * (extends.X * extends.Y + extends.X * extends.Z + extends.Z * extends.Y);
         }
 
         public void Transform(in Matrix4 model)

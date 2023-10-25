@@ -119,6 +119,7 @@ namespace IDKEngine.Render
             nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl"),
                 shaderInsertions
             ));
+
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
             dispatchCommandBuffer = new BufferObject();

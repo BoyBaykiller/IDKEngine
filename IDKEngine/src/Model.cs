@@ -121,8 +121,8 @@ namespace IDKEngine
             
             RootDir = Path.GetDirectoryName(path);
 
-            GpuMaterialLoadData[] glMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfModel.Materials, gltfModel.Textures);
-            List<GpuMaterial> materials = new List<GpuMaterial>(LoadGpuMaterials(glMaterialsLoadData));
+            GpuMaterialLoadData[] gpuMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfModel.Materials, gltfModel.Textures);
+            List<GpuMaterial> materials = new List<GpuMaterial>(LoadGpuMaterials(gpuMaterialsLoadData));
             List<GpuMesh> meshes = new List<GpuMesh>();
             List<GpuMeshInstance> meshInstances = new List<GpuMeshInstance>();
             List<GpuDrawElementsCmd> drawCommands = new List<GpuDrawElementsCmd>();
@@ -160,7 +160,6 @@ namespace IDKEngine
                         MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
                         
                         GpuMesh mesh = new GpuMesh();
-                        mesh.InstanceCount = 1;
                         mesh.EmissiveBias = 0.0f;
                         mesh.SpecularBias = 0.0f;
                         mesh.RoughnessBias = 0.0f;
@@ -169,7 +168,7 @@ namespace IDKEngine
                         mesh.Absorbance = new Vector3(0.0f);
                         if (gltfMeshPrimitive.Material.HasValue)
                         {
-                            bool hasNormalMap = glMaterialsLoadData[gltfMeshPrimitive.Material.Value].NormalTexture.Image != null;
+                            bool hasNormalMap = gpuMaterialsLoadData[gltfMeshPrimitive.Material.Value].NormalTexture.Image != null;
                             mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
                             mesh.MaterialIndex = gltfMeshPrimitive.Material.Value;
                         }
@@ -187,7 +186,7 @@ namespace IDKEngine
 
                         GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
                         drawCmd.Count = meshIndices.Length;
-                        drawCmd.InstanceCount = mesh.InstanceCount;
+                        drawCmd.InstanceCount = 1;
                         drawCmd.FirstIndex = indices.Count;
                         drawCmd.BaseVertex = vertices.Count;
                         drawCmd.BaseInstance = drawCommands.Count;

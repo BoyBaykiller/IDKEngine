@@ -19,7 +19,6 @@ struct DrawElementsCmd
 
 struct Mesh
 {
-    int InstanceCount;
     int MaterialIndex;
     float NormalMapStrength;
     float EmissiveBias;
@@ -27,6 +26,7 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
+    float _pad0;
     vec3 Absorbance;
     uint CubemapShadowCullInfo;
 };
@@ -110,7 +110,7 @@ void main()
 
     for (int i = 0; i < 6; i++)
     {
-        Frustum frustum = FrustumExtract(pointShadow.ProjViewMatrices[i] * model);
+        Frustum frustum = GetFrustum(pointShadow.ProjViewMatrices[i] * model);
         if (FrustumBoxIntersect(frustum, node.Min, node.Max))
         {
             packedValue = bitfieldInsert(packedValue, i, 3 * instances++, 3);

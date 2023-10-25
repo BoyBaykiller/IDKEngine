@@ -57,9 +57,7 @@ namespace IDKEngine
 
                 if (RenderMode == RenderMode.Rasterizer)
                 {
-                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y);
-                    if (TaaResolve != null) TaaResolve.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-                    if (FSR2Wrapper != null) FSR2Wrapper.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y, RenderPresentationResolution.X, RenderPresentationResolution.Y);
                 }
 
                 if (RenderMode == RenderMode.PathTracer)
@@ -69,6 +67,7 @@ namespace IDKEngine
 
                 if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
                 {
+                    if (VolumetricLight != null) VolumetricLight.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
                     if (Bloom != null) Bloom.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
                     if (TonemapAndGamma != null) TonemapAndGamma.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
                 }
@@ -87,10 +86,7 @@ namespace IDKEngine
 
                 if (value == RenderMode.Rasterizer)
                 {
-                    RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y);
-
-                    if (TaaResolve != null) TaaResolve.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-                    if (FSR2Wrapper != null) FSR2Wrapper.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+                    RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y, RenderPresentationResolution.X, RenderPresentationResolution.Y);
                 }
 
                 if (value == RenderMode.PathTracer)
@@ -102,48 +98,13 @@ namespace IDKEngine
             }
         }
 
-        private TemporalAntiAliasingMode _temporalAntiAliasingMode;
-        public TemporalAntiAliasingMode TemporalAntiAliasingMode
-        {
-            get => _temporalAntiAliasingMode;
-
-            set
-            {
-                if (!FSR2Wrapper.IS_FSR2_SUPPORTED && value == TemporalAntiAliasingMode.FSR2)
-                {
-                    Logger.Log(Logger.LogLevel.Error, $"{TemporalAntiAliasingMode.FSR2} is Windows only");
-                    return;
-                }
-
-                _temporalAntiAliasingMode = value;
-
-                // TODO: Move TaaResolve and FSR2Wrapper into RasterizerPipeline
-                // also store settings outsied of class so that they arent lost after disposal
-
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None)
-                {
-                    return;
-                }
-
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA && TaaResolve == null)
-                {
-                    TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-                }
-
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2 && FSR2Wrapper == null)
-                {
-                    FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
-                }
-            }
-        }
-
         public Vector2i RenderResolution => new Vector2i((int)(RenderPresentationResolution.X * ResolutionScale), (int)(RenderPresentationResolution.Y * ResolutionScale));
         public bool RenderGui { get; private set; }
         public int FPS { get; private set; }
 
         public bool IsBloom = true;
         public bool IsShadows = true;
-        public int TAASamples = 6;
+        public bool IsVolumetricLighting = true;
 
         public struct CameraCollisionDetection
         {
@@ -178,48 +139,26 @@ namespace IDKEngine
 
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
-                    RasterizerPipeline.Render(ModelSystem, GpuBasicData.ProjView);
+                    RasterizerPipeline.Render(ModelSystem, dT, NEAR_PLANE, FAR_PLANE, CameraFovY, GpuBasicData.ProjView);
                     TonemapAndGamma.Combine(RasterizerPipeline.Result);
-                    MeshOutlineRenderer.Render(TonemapAndGamma.Result, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
+                    BoxRenderer.Render(TonemapAndGamma.Result, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
                 {
-                    RasterizerPipeline.Render(ModelSystem, GpuBasicData.ProjView, LightManager);
+                    RasterizerPipeline.Render(ModelSystem, dT, NEAR_PLANE, FAR_PLANE, CameraFovY, GpuBasicData.ProjView, LightManager);
 
-                    if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None)
+                    if (IsBloom)
                     {
-                        if (IsBloom)
-                        {
-                            Bloom.Compute(RasterizerPipeline.Result);
-                        }
-                        TonemapAndGamma.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null);
+                        Bloom.Compute(RasterizerPipeline.Result);
                     }
-                    else if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
-                    {
-                        TaaResolve.RunTAA(RasterizerPipeline.Result);
-                        if (IsBloom)
-                        {
-                            Bloom.Compute(TaaResolve.Result);
-                        }
-                        TonemapAndGamma.Combine(TaaResolve.Result, IsBloom ? Bloom.Result : null);
-                    }
-                    else if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
-                    {
-                        FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, RasterizerPipeline.Result, RasterizerPipeline.DepthTexture, RasterizerPipeline.VelocityTexture, dT * 1000.0f, NEAR_PLANE, FAR_PLANE, CameraFovY);
-                        if (IsBloom)
-                        {
-                            Bloom.Compute(FSR2Wrapper.Result);
-                        }
-                        TonemapAndGamma.Combine(FSR2Wrapper.Result, IsBloom ? Bloom.Result : null);
 
-                        // TODO: This is a hack to fix global UBO bindings modified by FSR2
-                        taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
-                        SkyBoxManager.skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
-                        RasterizerPipeline.Voxelizer.voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
-                        RasterizerPipeline.gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
+                    if (IsVolumetricLighting)
+                    {
+                        VolumetricLight.Compute();
                     }
+
+                    TonemapAndGamma.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null);
                     RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
-
                 }
             }
             else if (RenderMode == RenderMode.PathTracer)
@@ -255,7 +194,7 @@ namespace IDKEngine
                     box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
 
-                MeshOutlineRenderer.Render(TonemapAndGamma.Result, box);
+                BoxRenderer.Render(TonemapAndGamma.Result, box);
             }
 
             Framebuffer.Bind(0);
@@ -342,6 +281,7 @@ namespace IDKEngine
 
                 }
             }
+
             gui.Update(this);
 
             //ModelSystem.BVH.TlasBuild();
@@ -422,31 +362,6 @@ namespace IDKEngine
                 }
             }
 
-            // TAA
-            {
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None || TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
-                {
-                    gpuTaaData.MipmapBias = 0.0f;
-                }
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
-                {
-                    gpuTaaData.Samples = TAASamples;
-                }
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
-                {
-                    const float manualBias = 0.25f;
-                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
-                    gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
-                }
-                if (TemporalAntiAliasingMode != TemporalAntiAliasingMode.None)
-                {
-                    Vector2 jitter = MyMath.GetHalton2D((int)GpuBasicData.Frame % gpuTaaData.Samples, 2, 3);
-                    gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
-                }
-                gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasingMode;
-                taaDataBuffer.SubData(0, sizeof(GpuTaaData), gpuTaaData);
-            }
-
             LightManager.UpdateBufferData();
 
             // Updating global basicData Buffer
@@ -499,21 +414,18 @@ namespace IDKEngine
         public ModelSystem ModelSystem;
         public FrameStateRecorder<FrameState> FrameRecorder;
 
+        public VolumetricLighter VolumetricLight;
         public Bloom Bloom;
         public TonemapAndGammaCorrecter TonemapAndGamma;
-        public TAAResolve TaaResolve;
-        public FSR2Wrapper FSR2Wrapper;
+        public BoxRenderer BoxRenderer;
+
         public LightManager LightManager;
-        public BoxRenderer MeshOutlineRenderer;
 
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
 
         private BufferObject basicDataBuffer;
         public GpuBasicData GpuBasicData;
-
-        private BufferObject taaDataBuffer;
-        private GpuTaaData gpuTaaData;
         protected override unsafe void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
@@ -522,13 +434,11 @@ namespace IDKEngine
             if (Helper.APIVersion < 4.6)
             {
                 Logger.Log(Logger.LogLevel.Fatal, "Your system does not support OpenGL 4.6. Press Enter to exit");
-                Console.ReadLine();
                 Environment.Exit(0);
             }
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
             {
                 Logger.Log(Logger.LogLevel.Fatal, "Your system does not support GL_ARB_bindless_texture. Press Enter to exit");
-                Console.ReadLine();
                 Environment.Exit(0);
             }
 
@@ -551,12 +461,6 @@ namespace IDKEngine
             basicDataBuffer.ImmutableAllocate(sizeof(GpuBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
-            gpuTaaData.Samples = 6;
-            gpuTaaData.Jitter = new Vector2(0.0f);
-            taaDataBuffer = new BufferObject();
-            taaDataBuffer.ImmutableAllocate(sizeof(GpuTaaData), gpuTaaData, BufferStorageFlags.DynamicStorageBit);
-            taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
-
             finalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
@@ -573,11 +477,12 @@ namespace IDKEngine
                 "res/textures/environmentMap/negz.jpg"
             });
 
-            LightManager = new LightManager(12, 12);
-            MeshOutlineRenderer = new BoxRenderer();
+            VolumetricLight = new VolumetricLighter(RenderPresentationResolution.X, RenderPresentationResolution.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
             TonemapAndGamma = new TonemapAndGammaCorrecter(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-            TemporalAntiAliasingMode = TemporalAntiAliasingMode.TAA;
+            BoxRenderer = new BoxRenderer();
+
+            LightManager = new LightManager(12, 12);
             ModelSystem = new ModelSystem();
 
             if (true)
@@ -653,16 +558,18 @@ namespace IDKEngine
                 a.Meshes[376].EmissiveBias = 20.0f;
                 a.Meshes[379].EmissiveBias = 20.0f;
                 Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-                Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                //Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+                //Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                //Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
                 LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
-                LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
+                //LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
                 RasterizerPipeline.IsVXGI = false;
                 RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
-                RasterizerPipeline.VolumetricLight.Strength = 10.0f;
                 RasterizerPipeline.ConeTracer.MaxSamples = 4;
-                ModelSystem.Add(a, b, c, d);
+                ModelSystem.Add(a, b);
+
+                VolumetricLight.Strength = 10.0f;
             }
 
 

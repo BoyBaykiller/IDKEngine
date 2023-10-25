@@ -27,26 +27,28 @@ float GetLogarithmicDepth(float near, float far, float z)
     return depth;
 }
 
-vec3 UvDepthToNdc(vec3 uvAndDepth)
+vec3 PerspectiveTransform(vec3 ndc, mat4 matrix)
 {
-    return vec3(uvAndDepth.xy * 2.0 - 1.0, uvAndDepth.z);
-}
-
-vec3 NdcToUvDepth(vec3 ndc)
-{
-    return vec3(ndc.xy * 0.5 + 0.5, ndc.z);
-}
-
-vec3 NdcToWorldSpace(vec3 ndc, mat4 inverseProjView)
-{
-    vec4 worldPos = inverseProjView * vec4(ndc, 1.0);
+    vec4 worldPos = matrix * vec4(ndc, 1.0);
     return worldPos.xyz / worldPos.w;
 }
 
-vec3 UvDepthToWorldSpace(vec3 uvAndDepth, mat4 inverseProjView)
+vec3 TransformUvDepthToWorldSpace(vec3 uvAndDepth, mat4 matrix)
 {
-    vec3 ndc = UvDepthToNdc(uvAndDepth);
-    return NdcToWorldSpace(ndc, inverseProjView);
+    vec3 ndc;
+    ndc.xy = uvAndDepth.xy * 2.0 - 1.0;
+    ndc.z = uvAndDepth.z;
+    return PerspectiveTransform(ndc, matrix);
+}
+
+mat3 GetTBN(mat4 matrix, vec3 tangent, vec3 normal)
+{
+    vec3 T = normalize((matrix * vec4(tangent, 0.0)).xyz);
+    vec3 N = normalize((matrix * vec4(normal, 0.0)).xyz);
+    T = normalize(T - dot(T, N) * N);
+    vec3 B = cross(N, T);
+    mat3 TBN = mat3(T, B, N);
+    return TBN;
 }
 
 #endif

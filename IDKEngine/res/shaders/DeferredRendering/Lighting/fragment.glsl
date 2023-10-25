@@ -1,5 +1,4 @@
 #version 460 core
-#define PI 3.14159265
 #extension GL_ARB_bindless_texture : require
 
 AppInclude(include/Constants.glsl)
@@ -107,9 +106,9 @@ void main()
         return;
     }
 
-    vec3 ndc = UvDepthToNdc(vec3(uv, depth));
-    vec3 fragPos = NdcToWorldSpace(ndc, basicDataUBO.InvProjView);
-    vec3 unjitteredFragPos = NdcToWorldSpace(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), basicDataUBO.InvProjView);
+    vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
+    vec3 fragPos = PerspectiveTransform(ndc, basicDataUBO.InvProjView);
+    vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), basicDataUBO.InvProjView);
 
     vec3 albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
     float alpha = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).a;
