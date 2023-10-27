@@ -9,16 +9,13 @@ layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 struct WavefrontRay
 {
     vec3 Origin;
-    uint DebugNodeCounter;
-
-    vec3 Direction;
-    float PreviousIOR;
+    float PreviousIOROrDebugNodeCounter;
 
     vec3 Throughput;
-    float _pad0;
+    float CompressedDirectionX;
 
     vec3 Radiance;
-    float _pad1;
+    float CompressedDirectionY;
 };
 
 struct DispatchCommand
@@ -89,7 +86,7 @@ void main()
     if (IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
-        float a = min(wavefrontRay.DebugNodeCounter / 150.0, 1.0);
+        float a = min(wavefrontRay.PreviousIOROrDebugNodeCounter / 150.0, 1.0);
         vec3 col = SpectralJet(a);
         irradiance = col;
     }

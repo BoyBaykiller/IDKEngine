@@ -83,7 +83,7 @@ void main()
         return;
     }
 
-    vec3 fragPos = TransformUvDepthToWorldSpace(vec3(uv, depth), basicDataUBO.InvProjView);
+    vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), basicDataUBO.InvProjView);
     vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
     float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
     float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
@@ -94,7 +94,7 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(indirectLight, 1.0));
 }
 
-vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance, float roughness)
+vec3 IndirectLight(vec3 position, vec3 incomming, vec3 normal, float specularChance, float roughness)
 {
     vec3 irradiance = vec3(0.0);
     float materialVariance = GetMaterialVariance(specularChance, roughness);
@@ -109,16 +109,19 @@ vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance
         float rnd2 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 2);
         noiseIndex++;
         
-        vec3 dir = CosineSampleHemisphere(normal, rnd1, rnd0);
+        Ray coneRay;
+        coneRay.Origin = position;
+        coneRay.Direction = CosineSampleHemisphere(normal, rnd1, rnd0);
 
+        
         const float maxConeAngle = 0.32;
         const float minConeAngle = 0.005;
         float coneAngle;
         if (specularChance > rnd2)
         {
             vec3 reflectionDir = reflect(incomming, normal);
-            reflectionDir = normalize(mix(reflectionDir, dir, roughness));
-            dir = reflectionDir;
+            reflectionDir = normalize(mix(reflectionDir, coneRay.Direction, roughness));
+            coneRay.Direction = reflectionDir;
             
             coneAngle = mix(minConeAngle, maxConeAngle, roughness);
         }
@@ -127,8 +130,11 @@ vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance
             coneAngle = maxConeAngle;
         }
 
-        vec4 coneTrace = TraceCone(point, dir, normal, coneAngle, StepMultiplier, NormalRayOffset, 0.99);
-        coneTrace += (1.0 - coneTrace.a) * (texture(skyBoxUBO.Albedo, dir) * GISkyBoxBoost);
+        // Experimental: For low cone angles we can get away with a lower step size 
+        // float adaptiveStepSizeAdjustment = MapRangeToAnOther(coneAngle, minConeAngle, maxConeAngle, 1.0, 3.0); 
+
+        vec4 coneTrace = TraceCone(coneRay, normal, coneAngle, StepMultiplier, NormalRayOffset, 0.99);
+        coneTrace += (1.0 - coneTrace.a) * (texture(skyBoxUBO.Albedo, coneRay.Direction) * GISkyBoxBoost);
         
         irradiance += coneTrace.rgb;
     }

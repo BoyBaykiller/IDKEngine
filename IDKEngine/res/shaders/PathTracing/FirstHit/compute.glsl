@@ -107,16 +107,13 @@ struct TlasNode
 struct WavefrontRay
 {
     vec3 Origin;
-    uint DebugNodeCounter;
-
-    vec3 Direction;
-    float PreviousIOR;
+    float PreviousIOROrDebugNodeCounter;
 
     vec3 Throughput;
-    float _pad0;
+    float CompressedDirectionX;
 
     vec3 Radiance;
-    float _pad1;
+    float CompressedDirectionY;
 };
 
 struct DispatchCommand
@@ -255,7 +252,10 @@ void main()
 
     WavefrontRay wavefrontRay;
     wavefrontRay.Origin = pointOnLense;
-    wavefrontRay.Direction = camDir;
+    
+    vec2 compressedDir = CompressOctahedron(camDir);
+    wavefrontRay.CompressedDirectionX = compressedDir.x;
+    wavefrontRay.CompressedDirectionY = compressedDir.y;
 
     wavefrontRay.Throughput = vec3(1.0);
     wavefrontRay.Radiance = vec3(0.0);
@@ -279,17 +279,19 @@ void main()
 
 bool TraceRay(inout WavefrontRay wavefrontRay)
 {
+    vec3 uncompressedDir = DecompressOctahedron(vec2(wavefrontRay.CompressedDirectionX, wavefrontRay.CompressedDirectionY));
+
     HitInfo hitInfo;
     uint debugNodeCounter = 0;
-    if (BVHRayTrace(Ray(wavefrontRay.Origin, wavefrontRay.Direction), hitInfo, debugNodeCounter, IsTraceLights, FLOAT_MAX))
+    if (BVHRayTrace(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, debugNodeCounter, IsTraceLights, FLOAT_MAX))
     {
         if (IsDebugBVHTraversal)
         {
-            wavefrontRay.DebugNodeCounter = debugNodeCounter;
+            wavefrontRay.PreviousIOROrDebugNodeCounter = debugNodeCounter;
             return false;
         }
 
-        wavefrontRay.Origin += wavefrontRay.Direction * hitInfo.T;
+        wavefrontRay.Origin += uncompressedDir * hitInfo.T;
 
         vec3 albedo;
         vec3 normal;
@@ -353,7 +355,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         }
 
 
-        float cosTheta = dot(-wavefrontRay.Direction, normal);
+        float cosTheta = dot(-uncompressedDir, normal);
         bool fromInside = cosTheta < 0.0;
 
         float prevIor = 1.0;
@@ -380,9 +382,13 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
 
         float rayProbability, newIor;
         bool newRayRefractive;
-        wavefrontRay.Direction = BounceOffMaterial(wavefrontRay.Direction, specularChance, roughness, refractionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, newRayRefractive);
-        wavefrontRay.Origin += wavefrontRay.Direction * EPSILON;
-        wavefrontRay.PreviousIOR = newIor;
+        uncompressedDir = BounceOffMaterial(uncompressedDir, specularChance, roughness, refractionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, newRayRefractive);
+        wavefrontRay.Origin += uncompressedDir * EPSILON;
+        wavefrontRay.PreviousIOROrDebugNodeCounter = newIor;
+
+        vec2 compressedDir = CompressOctahedron(uncompressedDir);
+        wavefrontRay.CompressedDirectionX = compressedDir.x;
+        wavefrontRay.CompressedDirectionY = compressedDir.y;
 
         if (!newRayRefractive)
         {
@@ -395,7 +401,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
     }
     else
     {
-        wavefrontRay.Radiance += texture(skyBoxUBO.Albedo, wavefrontRay.Direction).rgb * wavefrontRay.Throughput;
+        wavefrontRay.Radiance += texture(skyBoxUBO.Albedo, uncompressedDir).rgb * wavefrontRay.Throughput;
         return false;
     }
 }
