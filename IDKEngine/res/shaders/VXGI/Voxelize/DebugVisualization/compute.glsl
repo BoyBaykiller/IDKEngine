@@ -59,25 +59,24 @@ void main()
     worldRay.Direction = GetWorldSpaceDirection(basicDataUBO.InvProjection, basicDataUBO.InvView, ndc);
 
     float t1, t2;
-    if (!(RayBoxIntersect(worldRay, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax, t1, t2) && t2 > 0.0))
+    if (!(RayBoxIntersect(worldRay, Box(voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax), t1, t2) && t2 > 0.0))
     {
         vec4 skyColor = texture(skyBoxUBO.Albedo, worldRay.Direction);
         imageStore(ImgResult, imgCoord, skyColor);
         return;
     }
 
-    vec3 gridRayStart;
     bool isInsideGrid = t1 < 0.0 && t2 > 0.0;
     if (isInsideGrid)
     {
-        gridRayStart = basicDataUBO.ViewPos;
+        worldRay.Origin = basicDataUBO.ViewPos;
     }
     else
     {
-        gridRayStart = worldRay.Origin + worldRay.Direction * t1;
+        worldRay.Origin = worldRay.Origin + worldRay.Direction * t1;
     }
 
-    vec4 color = TraceCone(gridRayStart, worldRay.Direction, ConeAngle, StepMultiplier);
+    vec4 color = TraceCone(worldRay, ConeAngle, StepMultiplier);
     color += (1.0 - color.a) * (texture(skyBoxUBO.Albedo, worldRay.Direction));
 
     imageStore(ImgResult, imgCoord, color);

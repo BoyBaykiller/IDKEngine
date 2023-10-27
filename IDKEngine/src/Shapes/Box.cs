@@ -9,14 +9,14 @@ namespace IDKEngine.Shapes
     [StructLayout(LayoutKind.Explicit)]
     public struct Box
     {
-        public Vector3 this[int vertex]
+        public Vector3 this[int index]
         {
             get
             {
-                System.Diagnostics.Debug.Assert(vertex < 8);
-                bool isMaxX = (vertex & 1) == 0 ? false : true;
-                bool isMaxY = (vertex & 2) == 0 ? false : true;
-                bool isMaxZ = (vertex & 4) == 0 ? false : true;
+                System.Diagnostics.Debug.Assert(index < 8);
+                bool isMaxX = (index & 1) != 0;
+                bool isMaxY = (index & 2) != 0;
+                bool isMaxZ = (index & 4) != 0;
                 return new Vector3(isMaxX ? Max.X : Min.X, isMaxY ? Max.Y : Min.Y, isMaxZ ? Max.Z : Min.Z);
             }
         }
@@ -59,18 +59,6 @@ namespace IDKEngine.Shapes
             GrowToFit(tri.Position2);
         }
 
-        public Vector3 GetOverlappingExtends(in Box other)
-        {
-            Vector3 addedExtends = Extends() + other.Extends();
-
-            Box boundingBox = this;
-            boundingBox.GrowToFit(other);
-
-            Vector3 extends = addedExtends - boundingBox.Extends();
-
-            return extends;
-        }
-
         public Vector3 Center()
         {
             return (Max + Min) * 0.5f;
@@ -98,20 +86,32 @@ namespace IDKEngine.Shapes
             return 2.0f * (extends.X * extends.Y + extends.X * extends.Z + extends.Z * extends.Y);
         }
 
-        public void Transform(in Matrix4 model)
+        public void Transform(in Matrix4 matrix)
         {
             Box newBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (int i = 0; i < 8; i++)
             {
-                newBox.GrowToFit((new Vector4(this[i], 1.0f) * model).Xyz);
+                newBox.GrowToFit((new Vector4(this[i], 1.0f) * matrix).Xyz);
             }
             this = newBox;
         }
 
-        public static Box Transformed(Box box, in Matrix4 model)
+        public static Box Transformed(Box box, in Matrix4 matrix)
         {
-            box.Transform(model);
+            box.Transform(matrix);
             return box;
+        }
+
+        public static Vector3 GetOverlappingExtends(in Box a, in Box b)
+        {
+            Vector3 addedExtends = a.Extends() + b.Extends();
+
+            Box boundingBox = a;
+            boundingBox.GrowToFit(b);
+
+            Vector3 extends = addedExtends - boundingBox.Extends();
+
+            return extends;
         }
     }
 }

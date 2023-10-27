@@ -5,6 +5,7 @@
 #define IntersectionRoutines_FLOAT_MIN -IntersectionRoutines_FLOAT_MAX
 
 AppInclude(include/Ray.glsl)
+AppInclude(include/Box.glsl)
 
 // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t)
@@ -25,13 +26,13 @@ bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out
 }
 
 // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
-bool RayBoxIntersect(Ray ray, vec3 boxMin, vec3 boxMax, out float t1, out float t2)
+bool RayBoxIntersect(Ray ray, Box box, out float t1, out float t2)
 {
     t1 = IntersectionRoutines_FLOAT_MIN;
     t2 = IntersectionRoutines_FLOAT_MAX;
 
-    vec3 t0s = (boxMin - ray.Origin) / ray.Direction;
-    vec3 t1s = (boxMax - ray.Origin) / ray.Direction;
+    vec3 t0s = (box.Min - ray.Origin) / ray.Direction;
+    vec3 t1s = (box.Max - ray.Origin) / ray.Direction;
 
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
@@ -62,6 +63,17 @@ bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out 
     t2 = -b + squareRoot;
 
     return t1 <= t2 && t2 > 0.0;
+}
+
+bool BoxBoxIntersect(Box a, Box b)
+{
+    return  a.Min.x < b.Max.x &&
+            a.Min.y < b.Max.y &&
+            a.Min.z < b.Max.z &&
+
+            a.Max.x > b.Min.x &&
+            a.Max.y > b.Min.y &&
+            a.Max.z > b.Min.z;
 }
 
 #endif

@@ -189,9 +189,9 @@ namespace IDKEngine
             uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
             uint b = (uint)MathF.Round(data.Z * ((1u << 10) - 1));
 
-            uint packed = (b << 22) | (g << 11) | (r << 0);
+            uint compressed = (b << 22) | (g << 11) | (r << 0);
 
-            return packed;
+            return compressed;
         }
         public static Vector3 DecompressUR11G11B10(uint data)
         {
@@ -213,9 +213,9 @@ namespace IDKEngine
             uint b = (uint)MathF.Round(data.Z * ((1u << 8) - 1));
             uint a = (uint)MathF.Round(data.W * ((1u << 8) - 1));
 
-            uint packed = (a << 24) | (b << 16) | (g << 8) | (r << 0);
+            uint compressed = (a << 24) | (b << 16) | (g << 8) | (r << 0);
 
-            return packed;
+            return compressed;
         }
 
         public delegate void FuncRunParallel(int i);

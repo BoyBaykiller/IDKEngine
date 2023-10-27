@@ -208,14 +208,14 @@ namespace IDKEngine
             while (true)
             {
                 ref readonly GpuBlasNode leftNode = ref Nodes[stackTop];
-                ref readonly GpuBlasNode rightode = ref Nodes[stackTop + 1];
+                ref readonly GpuBlasNode rightNode = ref Nodes[stackTop + 1];
                 bool leftChildHit = Intersections.RayVsBox(ray, GpuTypes.Conversions.ToBox(leftNode), out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
-                bool rightChildHit = Intersections.RayVsBox(ray, GpuTypes.Conversions.ToBox(rightode), out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
+                bool rightChildHit = Intersections.RayVsBox(ray, GpuTypes.Conversions.ToBox(rightNode), out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
-                uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightode.TriCount : 0);
+                uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
                 if (triCount > 0)
                 {
-                    uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightode.TriStartOrLeftChild;
+                    uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
                     for (uint i = first; i < first + triCount; i++)
                     {
                         ref readonly GpuBlasTriangle triangle = ref Triangles[i];
@@ -228,7 +228,7 @@ namespace IDKEngine
                     }
 
                     leftChildHit = leftChildHit && (leftNode.TriCount == 0);
-                    rightChildHit = rightChildHit && (rightode.TriCount == 0);
+                    rightChildHit = rightChildHit && (rightNode.TriCount == 0);
                 }
 
                 if (leftChildHit || rightChildHit)
@@ -236,12 +236,12 @@ namespace IDKEngine
                     if (leftChildHit && rightChildHit)
                     {
                         bool leftCloser = tMinLeft < tMinRight;
-                        stackTop = leftCloser ? leftNode.TriStartOrLeftChild : rightode.TriStartOrLeftChild;
-                        stack[stackPtr++] = leftCloser ? rightode.TriStartOrLeftChild : leftNode.TriStartOrLeftChild;
+                        stackTop = leftCloser ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
+                        stack[stackPtr++] = leftCloser ? rightNode.TriStartOrLeftChild : leftNode.TriStartOrLeftChild;
                     }
                     else
                     {
-                        stackTop = leftChildHit ? leftNode.TriStartOrLeftChild : rightode.TriStartOrLeftChild;
+                        stackTop = leftChildHit ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
                     }
                 }
                 else

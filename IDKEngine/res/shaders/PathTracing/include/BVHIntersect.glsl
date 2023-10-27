@@ -34,7 +34,7 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
     
 #if !USE_TLAS
     BlasNode rootNode = blasSSBO.Nodes[blasRootNodeIndex];
-    if (!(RayBoxIntersect(ray, rootNode.Min, rootNode.Max, tMinLeft, tMax) && tMinLeft < hitInfo.T))
+    if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft, tMax) && tMinLeft < hitInfo.T))
     {
         return false;
     }
@@ -48,8 +48,8 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
         BlasNode leftNode = blasSSBO.Nodes[blasRootNodeIndex + stackTopNode];
         BlasNode rightNode = blasSSBO.Nodes[blasRootNodeIndex + stackTopNode + 1];
 
-        bool leftChildHit = RayBoxIntersect(ray, leftNode.Min, leftNode.Max, tMinLeft, tMax) && tMinLeft <= hitInfo.T;
-        bool rightChildHit = RayBoxIntersect(ray, rightNode.Min, rightNode.Max, tMinRight, tMax) && tMinRight <= hitInfo.T;
+        bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
+        bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
 
         uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
         if (triCount > 0)
@@ -133,7 +133,7 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
     {
         TlasNode parent = tlasSSBO.Nodes[stackTop];
         // float tMin;
-        // if (!(RayBoxIntersect(ray, parent.Min, parent.Max, tMin, tMax) && tMin <= hitInfo.T))
+        // if (!(RayBoxIntersect(ray, Box(parent.Min, parent.Max), tMin, tMax) && tMin <= hitInfo.T))
         // {
         //     if (stackPtr == 0) break;
         //     stackTop = stack[--stackPtr];
@@ -165,8 +165,8 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
         TlasNode leftNode = tlasSSBO.Nodes[leftChild];
         TlasNode rightNode = tlasSSBO.Nodes[rightChild];
 
-        bool leftChildHit = RayBoxIntersect(ray, leftNode.Min, leftNode.Max, tMinLeft, tMax) && tMinLeft <= hitInfo.T;
-        bool rightChildHit = RayBoxIntersect(ray, rightNode.Min, rightNode.Max, tMinRight, tMax) && tMinRight <= hitInfo.T;
+        bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
+        bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
 
         if (leftChildHit || rightChildHit)
         {

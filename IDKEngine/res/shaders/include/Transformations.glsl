@@ -33,7 +33,7 @@ vec3 PerspectiveTransform(vec3 ndc, mat4 matrix)
     return worldPos.xyz / worldPos.w;
 }
 
-vec3 TransformUvDepthToWorldSpace(vec3 uvAndDepth, mat4 matrix)
+vec3 PerspectiveTransformUvDepth(vec3 uvAndDepth, mat4 matrix)
 {
     vec3 ndc;
     ndc.xy = uvAndDepth.xy * 2.0 - 1.0;
@@ -49,6 +49,11 @@ mat3 GetTBN(mat4 matrix, vec3 tangent, vec3 normal)
     vec3 B = cross(N, T);
     mat3 TBN = mat3(T, B, N);
     return TBN;
+}
+
+float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMin, float mapMax)
+{
+    return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
 }
 
 #endif
