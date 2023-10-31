@@ -19,8 +19,8 @@ Required OpenGL: 4.6 + `ARB_bindless_texture`
 
 Known Issues:
 
-- VXGI (voxelization) doesn't work on AMD due to driver bug since version 22.7.1
-- Certain shaders using `ARB_bindless_texture` do not compile on Intel due to driver bug
+- Volumetric Lighting may flicker because I am not undoing the jitter when reprojecting to world space
+- Intel iGPU not supported (rendering artifacts for unknown reasons)
 
 # Controls
 | Key                   | Action               | 

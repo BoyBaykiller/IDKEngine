@@ -90,7 +90,7 @@ uniform float Strength;
 uniform vec3 Absorbance;
 
 // From: http://www.alexandre-pestana.com/volumetric-lights/
-const float DitherPattern[][4] = 
+const float DitherPattern[4][4] = 
 {
     { 0.0, 0.5, 0.125, 0.625 },
     { 0.75, 0.22, 0.875, 0.375 },

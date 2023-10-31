@@ -11,7 +11,7 @@ vec3 LinearToSrgb(vec3 rgb, float gamma);
 vec3 ACESFilm(vec3 x);
 
 // Source: https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/shaders/globals.hlsli#L824
-const float BayerMatrix8[][8] =
+const float BayerMatrix8[8][8] =
 {
 	{ 1.0 / 65.0, 49.0 / 65.0, 13.0 / 65.0, 61.0 / 65.0, 4.0 / 65.0, 52.0 / 65.0, 16.0 / 65.0, 64.0 / 65.0 },
 	{ 33.0 / 65.0, 17.0 / 65.0, 45.0 / 65.0, 29.0 / 65.0, 36.0 / 65.0, 20.0 / 65.0, 48.0 / 65.0, 32.0 / 65.0 },
