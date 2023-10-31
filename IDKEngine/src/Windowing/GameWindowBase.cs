@@ -96,8 +96,6 @@ namespace IDKEngine
                 Environment.Exit(0);
             }
 
-            GLFW.SwapBuffers(window);
-
             framebufferSizeFuncPtr = FramebufferSizeCallback;
             GLFW.SetFramebufferSizeCallback(window, framebufferSizeFuncPtr);
 
@@ -123,6 +121,13 @@ namespace IDKEngine
 
             GLFW.MakeContextCurrent(window);
             OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
+
+            {
+                // Set black loading screen
+                Vector4 clearColor = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+                OpenTK.Graphics.OpenGL4.GL.ClearNamedFramebuffer(0, OpenTK.Graphics.OpenGL4.ClearBuffer.Color, 0, ref clearColor.X);
+                GLFW.SwapBuffers(window);
+            }
         }
 
         public void Start()

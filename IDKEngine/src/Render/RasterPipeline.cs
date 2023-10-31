@@ -63,6 +63,7 @@ namespace IDKEngine.Render
         public bool ShouldReVoxelize;
 
         public int TAASamples = 6;
+        public float FSR2AddMipBias = 0.25f;
 
         // Runs at render presentation resolution
         public TAAResolve TaaResolve;
@@ -176,8 +177,7 @@ namespace IDKEngine.Render
                 }
                 if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
                 {
-                    const float manualBias = 0.25f;
-                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + manualBias;
+                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + FSR2AddMipBias;
                     gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
                 }
                 if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None)
@@ -212,72 +212,87 @@ namespace IDKEngine.Render
             {
                 GL.Viewport(0, 0, RenderResolution.X, RenderResolution.Y);
 
-                if (IsWireframe)
+                // G Buffer generation
                 {
-                    GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
+                    if (IsWireframe)
+                    {
+                        GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
+                    }
+
+                    modelSystem.FrustumCull(cullProjViewMatrix);
+
+                    gBufferFBO.Bind();
+                    gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+                    gBufferProgram.Use();
+                    modelSystem.Draw();
+
+                    if (IsWireframe)
+                    {
+                        GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
+                    }
                 }
-
-                modelSystem.FrustumCull(cullProjViewMatrix);
-
-                gBufferFBO.Bind();
-                gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-                gBufferProgram.Use();
-                modelSystem.Draw();
 
                 // only needed because of broken amd drivers
                 GL.Flush();
-                
-                if (IsWireframe)
+
+                // Compute stuff from G Buffer needed for Deferred Lighting like SSAO
                 {
-                    GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
+                    if (IsSSAO)
+                    {
+                        SSAO.Compute();
+                        SSAO.Result.BindToUnit(0);
+                    }
+                    else
+                    {
+                        Texture.UnbindFromUnit(0);
+                    }
+
+                    if (IsVXGI)
+                    {
+                        ConeTracer.Compute(Voxelizer.ResultVoxelsAlbedo);
+                        ConeTracer.Result.BindToUnit(1);
+                    }
+                    else
+                    {
+                        Texture.UnbindFromUnit(1);
+                    }
                 }
 
-                if (IsSSAO)
-                {
-                    SSAO.Compute();
-                    SSAO.Result.BindToUnit(0);
-                }
-                else
-                {
-                    Texture.UnbindFromUnit(0);
-                }
-
-                if (IsVXGI)
-                {
-                    ConeTracer.Compute(Voxelizer.ResultVoxelsAlbedo);
-                    ConeTracer.Result.BindToUnit(1);
-                }
-                else
-                {
-                    Texture.UnbindFromUnit(1);
-                }
-                
                 if (IsVariableRateShading)
                 {
                     VariableRateShading.Activate(LightingVRS);
                 }
 
-                deferredLightingFBO.Bind();
-                lightingProgram.Use();
-                GL.DepthMask(false);
-                GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
-                GL.DepthMask(true);
-
-                gBufferFBO.Bind();
-                if (lightManager != null)
+                // Deferred Lighting
                 {
-                    lightManager.Draw();
+                    deferredLightingFBO.Bind();
+                    lightingProgram.Use();
+                    GL.DepthMask(false);
+                    GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
+                    GL.DepthMask(true);
                 }
 
-                GL.Disable(EnableCap.CullFace);
-                GL.DepthFunc(DepthFunction.Lequal);
-                skyBoxProgram.Use();
-                GL.DrawArrays(PrimitiveType.Quads, 0, 24);
-                GL.Enable(EnableCap.CullFace);
-                GL.DepthFunc(DepthFunction.Less);
+                // Forward rendering
+                {
+                    gBufferFBO.Bind();
+                    if (lightManager != null)
+                    {
+                        lightManager.Draw();
+                    }
 
-                VariableRateShading.Deactivate();
+                    GL.Disable(EnableCap.CullFace);
+                    GL.DepthFunc(DepthFunction.Lequal);
+                    skyBoxProgram.Use();
+                    GL.DrawArrays(PrimitiveType.Quads, 0, 24);
+                    GL.DepthFunc(DepthFunction.Less);
+                    GL.Enable(EnableCap.CullFace);
+                }
+
+                if (IsVariableRateShading)
+                {
+                    VariableRateShading.Deactivate();
+                }
 
                 if (IsVariableRateShading || LightingVRS.DebugValue != LightingShadingRateClassifier.DebugMode.NoDebug)
                 {

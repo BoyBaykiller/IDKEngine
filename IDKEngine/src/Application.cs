@@ -454,9 +454,6 @@ namespace IDKEngine
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
 
-            RenderPresentationResolution = WindowFramebufferSize;
-            RenderMode = RenderMode.Rasterizer;
-
             basicDataBuffer = new BufferObject();
             basicDataBuffer.ImmutableAllocate(sizeof(GpuBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
@@ -477,6 +474,7 @@ namespace IDKEngine
                 "res/textures/environmentMap/negz.jpg"
             });
 
+            RenderPresentationResolution = WindowFramebufferSize;
             VolumetricLight = new VolumetricLighter(RenderPresentationResolution.X, RenderPresentationResolution.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
             TonemapAndGamma = new TonemapAndGammaCorrecter(RenderPresentationResolution.X, RenderPresentationResolution.Y);
@@ -525,6 +523,8 @@ namespace IDKEngine
                     PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
                     LightManager.CreatePointShadowForLight(pointShadow, i);
                 }
+
+                RenderMode = RenderMode.Rasterizer;
             }
             else
             {
@@ -562,17 +562,20 @@ namespace IDKEngine
                 Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 //Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
+
+                ModelSystem.Add(a, b, c);
+
                 LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
+
+                RenderMode = RenderMode.Rasterizer;
                 RasterizerPipeline.IsVXGI = false;
                 RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
                 RasterizerPipeline.ConeTracer.MaxSamples = 4;
-                ModelSystem.Add(a, b, c);
 
                 VolumetricLight.Strength = 10.0f;
             }
-
 
             RenderGui = true;
             WindowVSync = true;

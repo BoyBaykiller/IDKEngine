@@ -134,20 +134,25 @@ namespace IDKEngine
                     break;
 
                 case DebugSeverity.DebugSeverityMedium:
+                    if (id == 0) return; // Shader compile warning, Intel
                     Logger.Log(Logger.LogLevel.Warn, text);
                     break;
 
                 case DebugSeverity.DebugSeverityHigh:
+                    if (id == 0) return; // Shader compile error, Intel
                     if (id == 2000) return; // Shader compile error, AMD
                     if (id == 2001) return; // Program link error, AMD
 
                     Logger.Log(Logger.LogLevel.Error, text);
                     break;
 
-                default:
+                case DebugSeverity.DebugSeverityNotification:
                     if (id == 131185) return; // Buffer detailed info, NVIDIA
-
                     Logger.Log(Logger.LogLevel.Info, text);
+                    break;
+
+                case DebugSeverity.DontCare:
+                default:
                     break;
             }
         }

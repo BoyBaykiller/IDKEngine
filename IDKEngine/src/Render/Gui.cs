@@ -506,11 +506,13 @@ namespace IDKEngine.Render
 
                             ImGui.Checkbox("IsSharpening", ref app.RasterizerPipeline.FSR2Wrapper.IsSharpening);
 
-
                             if (app.RasterizerPipeline.FSR2Wrapper.IsSharpening)
                             {
                                 ImGui.SliderFloat("Sharpness", ref app.RasterizerPipeline.FSR2Wrapper.Sharpness, 0.0f, 1.0f);
                             }
+
+                            ImGui.SliderFloat("AddMipBias", ref app.RasterizerPipeline.FSR2AddMipBias, -3.0f, 3.0f);
+                            ToolTipForItemAboveHovered("This bias is applied in addition to the 'optimal' FSR2 computed bias\n");
                         }
                     }
 
