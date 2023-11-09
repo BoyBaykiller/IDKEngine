@@ -108,10 +108,18 @@ The CV is the standard deviation divided by the average. And the standard deviat
 So here is how to compute all of that:
 
 $$V(x) = \frac{\sum_{i = 1}^{n}(x_{i} - \overline{x})^{2}}{n}$$
+
+<!-- fix error of proceeding formula not rendering properly -->
+&nbsp;
+
 $$StdDev(x) = \sqrt{V(x)}$$
+
+<!-- fix error of proceeding formula not rendering properly -->
+&nbsp;
+
 $$CV = \frac{StdDev(x)}{\overline{x}}$$
 
-As before $\overline{x}$ is the average of set $x$ and $n$ the number of elements in it, these are the only inputs. $V(x)$ is variance, $StdDev(x)$ the standard deviation and CV the Coefficient of variation. The result of $StdDev(x)$ is dependent on the scale of the input. Darker colors will have a lower stdDev as the same colors scaled up. That is bad as it creates a bias in the resulting shading rates. Dividing by the average fixes that, for example the sets {5, 10} and {10, 20} have the same CV (~0.47).
+As before $\overline{x}$ is the average of set $x$ and $n$ the number of elements in it, these are the only inputs. $V(x)$ is variance, $StdDev(x)$ the standard deviation and CV the Coefficient of variation. The result of $StdDev(x)$ is dependent on the scale of the input. Darker colors will have a lower stdDev as the same colors scaled up. That is bad as it creates a bias in the resulting shading rates. Dividing by the average fixes that, for example the sets {5, 10} and {10, 20} have the same CV (~0.33).
 
 
 Here's a implementation. I put the parallel adding stuff from above in the function `ParallelSum`.

@@ -81,7 +81,7 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);
 bool Shadow(PointShadow pointShadow, vec3 lightSpacePos);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
-float ComputeScattering(float lightDotView);
+float ComputeScattering(float cosTheta);
 
 uniform int Samples;
 uniform float Scattering;
@@ -146,19 +146,22 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
             float lengthToLight = length(lightToSample);
             vec3 power = light.Color / (4.0 * PI * dot(lightToSample, lightToSample));
             
-            // Apply Beers's law
             vec3 lightDir = lightToSample / lengthToLight;
             vec3 absorbed = exp(-Absorbance * lengthToLight);
-            scattered += ComputeScattering(dot(lightDir, -viewDir)) * power * absorbed;
+            float cosTheta = dot(lightDir, -viewDir);
+            
+            scattered += ComputeScattering(cosTheta) * power * absorbed;
         }
 
         samplePoint += deltaStep;
     }
+    scattered /= Samples;
+
     // Apply Beers's law, Absorbance is constant so we can have it outside the loop
     vec3 absorbed = exp(-Absorbance * length(origin - samplePoint));
     scattered *= absorbed;
     
-    return scattered / Samples;
+    return scattered;
 }
 
 // Only binaries shadow because soft shadows are not worth it in this case
@@ -180,7 +183,7 @@ float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
 
 // Mie scaterring approximated with Henyey-Greenstein phase function
 // Source: http://www.alexandre-pestana.com/volumetric-lights/
-float ComputeScattering(float lightDotView)
+float ComputeScattering(float cosTheta)
 {
-    return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * lightDotView, 1.5));
+    return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * cosTheta, 1.5));
 }

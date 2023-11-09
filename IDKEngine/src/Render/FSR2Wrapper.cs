@@ -107,7 +107,7 @@ namespace IDKEngine.Render
 
         private static void Fsr2Message(FSR2Interface.MsgType type, string message)
         {
-            Console.WriteLine($"{type}: {message}");
+            Logger.Log(Logger.LogLevel.Info, $"FSR2: {type} {message}");
         }
     }
 }

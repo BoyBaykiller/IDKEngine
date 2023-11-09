@@ -178,17 +178,16 @@ namespace IDKEngine
             Unsafe.CopyBlock(dest, src, byteCount);
         }
 
-        public static uint CompressSR11G11B10(Vector3 data)
+        public static uint CompressSR11G11B10(in Vector3 data)
         {
-            data = data * 0.5f + new Vector3(0.5f);
-            return CompressUR11G11B10(data);
+            return CompressUR11G11B10(data * 0.5f + new Vector3(0.5f));
         }
         public static Vector3 DecompressSR11G11B10(uint data)
         {
             return DecompressUR11G11B10(data) * 2.0f - new Vector3(1.0f);
         }
 
-        public static uint CompressUR11G11B10(Vector3 data)
+        public static uint CompressUR11G11B10(in Vector3 data)
         {
             uint r = (uint)MathF.Round(data.X * ((1u << 11) - 1));
             uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
@@ -211,7 +210,7 @@ namespace IDKEngine
             return new Vector3(r, g, b);
         }
 
-        public static uint CompressUR8G8B8A8(Vector4 data)
+        public static uint CompressUR8G8B8A8(in Vector4 data)
         {
             uint r = (uint)MathF.Round(data.X * ((1u << 8) - 1));
             uint g = (uint)MathF.Round(data.Y * ((1u << 8) - 1));
@@ -257,7 +256,7 @@ namespace IDKEngine
             return new Vector3(min) + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
         }
 
-        public static Vector3 RandomVec3(Vector3 min, Vector3 max)
+        public static Vector3 RandomVec3(in Vector3 min, in Vector3 max)
         {
             return min + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
         }
