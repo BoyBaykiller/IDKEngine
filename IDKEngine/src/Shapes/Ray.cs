@@ -29,9 +29,12 @@ namespace IDKEngine.Shapes
 
         public static Ray GetWorldSpaceRay(Vector3 origin, Matrix4 inverseProj, Matrix4 inverseView, Vector2 ndc)
         {
-            Vector4 rayEye = new Vector4(ndc.X, ndc.Y, -1.0f, 0.0f) * inverseProj;
-            rayEye.Zw = new Vector2(-1.0f, 0.0f);
-            Vector3 rayWorld = Vector3.Normalize((rayEye * inverseView).Xyz);
+            Vector4 rayView = new Vector4(0.0f);
+            rayView.Xy = ndc * new Matrix2(inverseProj.Row0.Xy, inverseProj.Row1.Xy);
+            rayView.Z = -1.0f;
+            rayView.W = 0.0f;
+
+            Vector3 rayWorld = Vector3.Normalize((rayView * inverseView).Xyz);
             return new Ray(origin, rayWorld);
         }
     }
