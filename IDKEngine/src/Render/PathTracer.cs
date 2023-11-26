@@ -106,20 +106,10 @@ namespace IDKEngine.Render
         private readonly BufferObject dispatchCommandBuffer;
         private BufferObject wavefrontRayBuffer;
         private BufferObject rayIndicesBuffer;
-        public unsafe PathTracer(BVH bvh, int width, int height)
+        public unsafe PathTracer(int width, int height)
         {
-            Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
-            shaderInsertions.Add("MAX_BLAS_TREE_DEPTH", $"{Math.Max(bvh.MaxBlasTreeDepth, 1)}");
-            shaderInsertions.Add("MAX_TLAS_TREE_DEPTH", $"{Math.Max(bvh.Tlas.TreeDepth, 1)}");
-
-            firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl"),
-                shaderInsertions
-            ));
-
-            nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl"),
-                shaderInsertions
-            ));
-
+            firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl")));
+            nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl")));
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
 
             dispatchCommandBuffer = new BufferObject();

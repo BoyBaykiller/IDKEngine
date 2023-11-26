@@ -1,4 +1,5 @@
 ﻿using OpenTK.Mathematics;
+using IDKEngine.Render;
 
 namespace IDKEngine
 {
@@ -7,6 +8,6 @@ namespace IDKEngine
         public Vector2 Jitter;
         public int Samples;
         public float MipmapBias;
-        public TemporalAntiAliasingMode TemporalAntiAliasingMode;
+        public RasterPipeline.TemporalAntiAliasingMode TemporalAntiAliasingMode;
     }
 }

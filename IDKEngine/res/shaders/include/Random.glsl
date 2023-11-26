@@ -55,35 +55,56 @@ vec3 UniformSampleSphere(float rnd0, float rnd1)
     return vec3(x, y, z);
 }
 
+vec3 UniformSampleHemisphere(vec3 normal, float rnd0, float rnd1)
+{
+    vec3 dir = UniformSampleSphere(rnd0, rnd1);
+    return dir * sign(dot(dir, normal));
+}
+
 vec3 UniformSampleHemisphere(vec3 normal)
 {
-    vec3 dir = UniformSampleSphere(GetRandomFloat01(), GetRandomFloat01());
-    return dir * sign(dot(dir, normal));
+    return UniformSampleHemisphere(normal, GetRandomFloat01(), GetRandomFloat01());
 }
 
 // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
 vec3 CosineSampleHemisphere(vec3 normal)
 {
-    // Convert unit vector in sphere to a cosine weighted vector in hemisphere
     return normalize(normal + UniformSampleSphere());
 }
 
 vec3 CosineSampleHemisphere(vec3 normal, float rnd0, float rnd1)
 {
-    // Convert unit vector in sphere to a cosine weighted vector in hemisphere
     return normalize(normal + UniformSampleSphere(rnd0, rnd1));
 }
 
-vec2 UniformSampleDisk()
+vec2 UniformSampleDisk(float rnd0, float rnd1)
 {
     vec2 point;
     float dist;
     do
     {
-        point = vec2(GetRandomFloat01(), GetRandomFloat01()) * 2.0 - 1.0;
+        point = vec2(rnd0, rnd1) * 2.0 - 1.0;
         dist = dot(point, point);
     } while (dist > 1.0);
 
     return point;
 }
+
+vec2 UniformSampleDisk()
+{
+    return UniformSampleDisk(GetRandomFloat01(), GetRandomFloat01());
+}
+
+// Source: https://github.com/LWJGL/lwjgl3-demos/blob/main/res/org/lwjgl/demo/opengl/raytracing/randomCommon.glsl#L14
+vec3 UniformSampleDisk(vec3 normal, float rnd0, float rnd1)
+{
+    vec2 diskSample = UniformSampleDisk(rnd0, rnd1);
+
+    vec3 tangent = vec3(1.0, 0.0, 0.0);
+    vec3 bitangent = cross(tangent, normal);
+    tangent = cross(bitangent, normal);
+
+    return tangent * diskSample.x + bitangent * diskSample.y;
+}
+
 #endif

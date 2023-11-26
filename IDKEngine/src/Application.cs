@@ -16,13 +16,6 @@ namespace IDKEngine
         PathTracer
     }
 
-    public enum TemporalAntiAliasingMode : int
-    {
-        None,
-        TAA,
-        FSR2,
-    }
-
     class Application : GameWindowBase
     {
         public Application(int width, int height, string title)
@@ -91,7 +84,7 @@ namespace IDKEngine
 
                 if (value == RenderMode.PathTracer)
                 {
-                    PathTracer = new PathTracer(ModelSystem.BVH, RenderResolution.X, RenderResolution.Y);
+                    PathTracer = new PathTracer(RenderResolution.X, RenderResolution.Y);
                 }
 
                 _renderMode = value;
@@ -103,7 +96,6 @@ namespace IDKEngine
         public int FPS { get; private set; }
 
         public bool IsBloom = true;
-        public bool IsShadows = true;
         public bool IsVolumetricLighting = true;
 
         public struct CameraCollisionDetection
@@ -132,11 +124,6 @@ namespace IDKEngine
             Update(dT);
             if (RenderMode == RenderMode.Rasterizer)
             {
-                if (IsShadows)
-                {
-                    LightManager.RenderShadowMaps(ModelSystem);
-                }
-
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
                     RasterizerPipeline.Render(ModelSystem, dT, NEAR_PLANE, FAR_PLANE, CameraFovY, GpuBasicData.ProjView);
@@ -508,7 +495,8 @@ namespace IDKEngine
                 Model helmet = new Model("res/models/Helmet/Helmet.gltf");
                 helmet.MeshInstances[0].ModelMatrix *= Matrix4.CreateRotationY(MathF.PI / 4.0f);
 
-                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", Matrix4.CreateTranslation(-100.0f, 50.0f, 0.0f));
+                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf");
+                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\Skeleton\Skeleton.gltf", Matrix4.CreateScale(0.4f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90.0f)) * Matrix4.CreateTranslation(-6.1f, 1.8f, 0.0f));
 
                 ModelSystem.Add(sponza, lucy, helmet);
 
@@ -516,8 +504,9 @@ namespace IDKEngine
                 LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
                 LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
 
-                //LightManager.AddLight(new Light(new Vector3(-6.0f, 21.0f, 2.95f), new Vector3(1.0f) * 200.0f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
-                //LightManager.CreatePointShadowForLight(new PointShadow(1536, 0.5f, 60.0f), LightManager.Count - 1);
+                //LightManager.AddLight(new Light(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.7f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
+                //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);
+                
                 for (int i = 0; i < 3; i++)
                 {
                     PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);

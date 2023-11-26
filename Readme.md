@@ -7,9 +7,10 @@ Feature list:
  - [AMD FSR2](https://github.com/GPUOpen-Effects/FidelityFX-FSR2) and Temporal Anti Aliasing
  - Camera Collision Detection against arbitrary triangle meshes
  - CoD-Modern-Warfare Bloom
+ - Ray Traced Shadows
  - Variable Rate Shading
  - Ray marched Volumetric Lighting
- - GPU accelerated Frustum Culling for Shadows and Camera
+ - GPU Frustum Culling
  - Screen Space Reflections
  - Screen Space Ambient Occlusion
  - Atmospheric Scattering

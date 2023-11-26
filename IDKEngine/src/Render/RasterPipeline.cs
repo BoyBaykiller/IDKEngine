@@ -22,9 +22,16 @@ namespace IDKEngine.Render
                 lightingProgram.Upload("IsVXGI", _isVXGI);
             }
         }
+        
+        public enum TemporalAntiAliasingMode : int
+        {
+            None,
+            TAA,
+            FSR2,
+        }
 
         private TemporalAntiAliasingMode _temporalAntiAliasingMode;
-        public TemporalAntiAliasingMode TemporalAntiAliasingMode
+        public TemporalAntiAliasingMode TemporalAntiAliasing
         {
             get => _temporalAntiAliasingMode;
 
@@ -38,24 +45,56 @@ namespace IDKEngine.Render
 
                 _temporalAntiAliasingMode = value;
 
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.None)
                 {
                     return;
                 }
 
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA && TaaResolve == null)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA && TaaResolve == null)
                 {
                     TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
                 }
 
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2 && FSR2Wrapper == null)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2 && FSR2Wrapper == null)
                 {
                     FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
                 }
             }
         }
 
+        public enum ShadowTechnique
+        {
+            None,
+            PcfShadowMap,
+            RayTraced
+        }
+
+        private ShadowTechnique _shadowMode;
+        public ShadowTechnique ShadowMode
+        {
+            get => _shadowMode;
+
+            set
+            {
+                _shadowMode = value;
+                lightingProgram.Upload("ShadowMode", (int)ShadowMode);
+            }
+        }
+
+        private int _rayTracingSampes;
+        public int RayTracingSamples
+        {
+            get => _rayTracingSampes;
+
+            set
+            {
+                _rayTracingSampes = value;
+                lightingProgram.Upload("RayTracingSamples", RayTracingSamples);
+            }
+        }
+
         public bool IsWireframe;
+        public bool GenerateShadowMaps;
         public bool IsSSAO;
         public bool IsSSR;
         public bool IsVariableRateShading;
@@ -81,12 +120,12 @@ namespace IDKEngine.Render
         {
             get
             {
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
                 {
                     return TaaResolve.Result;
                 }
 
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
                     return FSR2Wrapper.Result;
                 }
@@ -153,34 +192,43 @@ namespace IDKEngine.Render
             deferredLightingFBO = new Framebuffer();
 
             IsWireframe = false;
+            GenerateShadowMaps = true;
             IsSSAO = true;
             IsSSR = false;
             IsVariableRateShading = false;
             IsVXGI = false;
             ShouldReVoxelize = true;
+            RayTracingSamples = 1;
 
             SetSize(width, height, renderPresentationWidth, renderPresentationHeight);
-            TemporalAntiAliasingMode = TemporalAntiAliasingMode.TAA;
+
+            TemporalAntiAliasing = TemporalAntiAliasingMode.TAA;
+            ShadowMode = ShadowTechnique.PcfShadowMap;
         }
 
         public unsafe void Render(ModelSystem modelSystem, float dT, float nearPlane, float farPlane, float cameraFovY, in Matrix4 cullProjViewMatrix, LightManager lightManager = null)
         {
+            if (GenerateShadowMaps && lightManager != null)
+            {
+                lightManager.RenderShadowMaps(modelSystem);
+            }
+
             // Update Temporal AntiAliasing related stuff
             {
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None || TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.None || TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
                 {
                     gpuTaaData.MipmapBias = 0.0f;
                 }
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
                 {
                     gpuTaaData.Samples = TAASamples;
                 }
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
                     gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + FSR2AddMipBias;
                     gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
                 }
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.None)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.None)
                 {
                     gpuTaaData.Jitter = new Vector2(0.0f);
                 }
@@ -189,7 +237,7 @@ namespace IDKEngine.Render
                     Vector2 jitter = MyMath.GetHalton2D(frameIndex % gpuTaaData.Samples, 2, 3);
                     gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
                 }
-                gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasingMode;
+                gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasing;
                 taaDataBuffer.SubData(0, sizeof(GpuTaaData), gpuTaaData);
 
                 frameIndex++;
@@ -316,11 +364,11 @@ namespace IDKEngine.Render
                     GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
                 }
 
-                if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
                 {
                     TaaResolve.RunTAA(upscalerInputTexture);
                 }
-                else if (TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
+                else if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
                     FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, upscalerInputTexture, DepthTexture, VelocityTexture, dT * 1000.0f, nearPlane, farPlane, cameraFovY);
 

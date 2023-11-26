@@ -3,12 +3,64 @@
 
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/Random.glsl)
 
 layout(location = 0) out vec4 FragColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
 
+struct DrawElementsCmd
+{
+    uint Count;
+    uint InstanceCount;
+    uint FirstIndex;
+    uint BaseVertex;
+    uint BaseInstance;
+
+    uint BlasRootNodeIndex;
+};
+
+struct Mesh
+{
+    int MaterialIndex;
+    float NormalMapStrength;
+    float EmissiveBias;
+    float SpecularBias;
+    float RoughnessBias;
+    float RefractionChance;
+    float IOR;
+    float _pad0;
+    vec3 Absorbance;
+    uint CubemapShadowCullInfo;
+};
+
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InvModelMatrix;
+    mat4 PrevModelMatrix;
+};
+
+struct BlasNode
+{
+    vec3 Min;
+    uint TriStartOrLeftChild;
+    vec3 Max;
+    uint TriCount;
+};
+
+struct BlasTriangle
+{
+    vec3 Position0;
+    uint VertexIndex0;
+
+    vec3 Position1;
+    uint VertexIndex1;
+
+    vec3 Position2;
+    uint VertexIndex2;
+};
 
 struct Light
 {
@@ -83,9 +135,41 @@ layout(std140, binding = 6) uniform GBufferDataUBO
     sampler2D Depth;
 } gBufferDataUBO;
 
+layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
+{
+    DrawElementsCmd DrawCommands[];
+} drawElementsCmdSSBO;
+
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
+{
+    Mesh Meshes[];
+} meshSSBO;
+
+layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+{
+    MeshInstance MeshInstances[];
+} meshInstanceSSBO;
+
+layout(std430, binding = 5) restrict readonly buffer BlasSSBO
+{
+    BlasNode Nodes[];
+} blasSSBO;
+
+layout(std430, binding = 6) restrict readonly buffer BlasTriangleSSBO
+{
+    BlasTriangle Triangles[];
+} blasTriangleSSBO;
+
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
+
+#define SHADOW_MODE_NONE 0
+#define SHADOW_MODE_PCF_SHADOW_MAP 1 
+#define SHADOW_MODE_RAY_TRACED 2 
+uniform int ShadowMode;
+
+uniform int RayTracingSamples;
 
 uniform bool IsVXGI;
 
@@ -93,6 +177,9 @@ in InOutVars
 {
     vec2 TexCoord;
 } inData;
+
+#define TRAVERSAL_STACK_DONT_USE_SHARED_MEM
+AppInclude(PathTracing/include/BVHIntersect.glsl)
 
 void main()
 {
@@ -125,14 +212,56 @@ void main()
         Light light = lightsUBO.Lights[i];
 
         vec3 sampleToLight = light.Position - fragPos;
-        vec3 contrib = GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight);
-        if (light.PointShadowIndex >= 0)
+        vec3 contribution = GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight);
+        
+        if (contribution != vec3(0.0))
         {
-            PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
-            vec3 lightSpacePos = unjitteredFragPos - light.Position;
-            contrib *= Visibility(pointShadow, normal, lightSpacePos);
+            if (ShadowMode == SHADOW_MODE_PCF_SHADOW_MAP)
+            {
+                if (light.PointShadowIndex >= 0)
+                {
+                    PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
+                    vec3 lightSpacePos = unjitteredFragPos - light.Position;
+                    contribution *= Visibility(pointShadow, normal, lightSpacePos);
+                }
+            }
+            else if (ShadowMode == SHADOW_MODE_RAY_TRACED)
+            {
+                float shadow = 0.0;
+                uint noiseIndex = basicDataUBO.Frame * RayTracingSamples;
+                for (int i = 0; i < RayTracingSamples; i++)
+                {
+                    vec3 offsetedPos = unjitteredFragPos + normal * 0.05;
+
+                    vec3 lightSamplePoint;
+                    {
+                        float rnd0 = InterleavedGradientNoise(imgCoord, noiseIndex + 0);
+                        float rnd1 = InterleavedGradientNoise(imgCoord, noiseIndex + 1);
+                        noiseIndex++;
+
+                        vec3 samplingDiskNormal = normalize(offsetedPos - light.Position);
+                        lightSamplePoint = light.Position + UniformSampleHemisphere(samplingDiskNormal, rnd0, rnd1) * light.Radius;
+                    }
+
+                    float dist = distance(lightSamplePoint, offsetedPos);
+
+                    Ray ray;
+                    ray.Origin = offsetedPos;
+                    ray.Direction = (lightSamplePoint - offsetedPos) / dist;
+
+                    HitInfo hitInfo;
+                    if (BVHRayTraceAny(ray, hitInfo, false, dist - 0.001))
+                    {
+                        shadow += 1.0;
+                    }
+                }
+                shadow /= RayTracingSamples;
+
+                contribution *= (1.0 - shadow);
+            }
         }
-        directLighting += contrib;
+
+        directLighting += contribution;
     }
 
     vec3 indirectLight;

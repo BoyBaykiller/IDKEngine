@@ -54,6 +54,8 @@ namespace IDKEngine.Render.Objects
             int startIndex = 0;
             while (true)
             {
+                // Advance to the next keyword and append all text leading up to it
+
                 int oldStartIndex = startIndex;
                 startIndex = AdvanceToNextKeyword(src, startIndex, out Keyword keyword);
 
@@ -64,18 +66,19 @@ namespace IDKEngine.Render.Objects
                     break;
                 }
 
-                startIndex += keyword.ToString().Length + 1; // account for keyword length and starting "("
-                int endIndex = src.IndexOf(')', startIndex); // find startIndex of ending ")"
+                startIndex += keyword.ToString().Length + 1;
+                int endIndex = src.IndexOf(')', startIndex);
 
-                string userKey = src.Substring(startIndex, endIndex - startIndex);
+                string userKey = src.Substring(startIndex, endIndex - startIndex); // this gets the userKey between the parentheses, for example MY_VALUE in AppInsert(MY_VALUE)
                 startIndex += userKey.Length + 1; // account for user key name and ending ")"
                 
                 if (keyword == Keyword.AppInsert)
                 {
                     if (shaderInsertions == null || !shaderInsertions.TryGetValue(userKey, out string userValue))
                     {
-                        Logger.Log(Logger.LogLevel.Error, $"The application does not provide a glsl {keyword} value for {userKey}");
-                        continue;
+                        const string defaultFallbackValue = "0";
+                        Logger.Log(Logger.LogLevel.Warn, $"The application does not provide a glsl {keyword} value for {userKey}. {defaultFallbackValue} as fallback is inserted");
+                        userValue = defaultFallbackValue;
                     }
 
                     result.Append(userValue);
@@ -83,8 +86,6 @@ namespace IDKEngine.Render.Objects
 
                 if (keyword == Keyword.AppInclude)
                 {
-                    int lineCount = CountLines(src, startIndex);
-
                     string path = INCLUDE_PATH_PREFIX + userKey;
                     if (!File.Exists(path))
                     {
@@ -92,6 +93,7 @@ namespace IDKEngine.Render.Objects
                         continue;
                     }
 
+                    int lineCount = CountLines(src, startIndex);
                     string includeSrc = File.ReadAllText(path);
 
                     result.AppendLine("#line 1");
@@ -101,8 +103,11 @@ namespace IDKEngine.Render.Objects
             }
             return result.ToString();
         }
+
         private static int AdvanceToNextKeyword(string srcCode, int startIndex, out Keyword keyword)
         {
+            // TODO: If wee add more Keywords then we should generalize and optimize this function
+
             keyword = Keyword.NoKeyword;
 
             int appInsertIndex = srcCode.IndexOf(Keyword.AppInsert.ToString(), startIndex);
