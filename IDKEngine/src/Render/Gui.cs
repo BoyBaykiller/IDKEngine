@@ -211,28 +211,30 @@ namespace IDKEngine.Render
                     app.ResolutionScale = Math.Max(tempFloat, 0.1f);
                 }
 
-                string current = app.RenderMode.ToString();
-                if (ImGui.BeginCombo("Render Mode", current))
                 {
-                    RenderMode[] renderModes = (RenderMode[])Enum.GetValues(typeof(RenderMode));
-                    for (int i = 0; i < renderModes.Length; i++)
+                    string current = app.RenderMode.ToString();
+                    if (ImGui.BeginCombo("Render Mode", current))
                     {
-                        string enumName = renderModes[i].ToString();
-                        bool isSelected = current == enumName;
-                        if (ImGui.Selectable(enumName, isSelected))
+                        RenderMode[] renderModes = (RenderMode[])Enum.GetValues(typeof(RenderMode));
+                        for (int i = 0; i < renderModes.Length; i++)
                         {
-                            current = enumName;
-                            app.RenderMode = (RenderMode)i;
-                        }
+                            string enumName = renderModes[i].ToString();
+                            bool isSelected = current == enumName;
+                            if (ImGui.Selectable(enumName, isSelected))
+                            {
+                                current = enumName;
+                                app.RenderMode = (RenderMode)i;
+                            }
 
-                        if (isSelected)
-                        {
-                            ImGui.SetItemDefaultFocus();
+                            if (isSelected)
+                            {
+                                ImGui.SetItemDefaultFocus();
+                            }
                         }
+                        ImGui.EndCombo();
                     }
-                    ImGui.EndCombo();
+                    ImGui.Separator();
                 }
-                ImGui.Separator();
 
                 if (app.RenderMode == RenderMode.Rasterizer)
                 {
@@ -259,7 +261,7 @@ namespace IDKEngine.Render
                             );
 
                             string[] resolutions = new string[] { "512", "384", "256", "128", "64" };
-                            current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
+                            string current = app.RasterizerPipeline.Voxelizer.ResultVoxelsAlbedo.Width.ToString();
                             if (ImGui.BeginCombo("Resolution", current))
                             {
                                 for (int i = 0; i < resolutions.Length; i++)
@@ -340,7 +342,7 @@ namespace IDKEngine.Render
                                 }
 
                                 tempBool = app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation;
-                                if (ImGui.Checkbox("IsTemporalAccumulation##0", ref tempBool))
+                                if (ImGui.Checkbox("IsTemporalAccumulation", ref tempBool))
                                 {
                                     app.RasterizerPipeline.ConeTracer.IsTemporalAccumulation = tempBool;
                                 }
@@ -374,32 +376,21 @@ namespace IDKEngine.Render
                         }
                     }
 
-                    if (ImGui.CollapsingHeader("Variable Rate Shading"))
+                    if (ImGui.CollapsingHeader("Shadows"))
                     {
-                        ImGui.Text($"NV_shading_rate_image: {VariableRateShading.HAS_VARIABLE_RATE_SHADING}");
-                        ToolTipForItemAboveHovered(
-                            "Allows the renderer to choose a unique shading rate on each 16x16 tile\n" +
-                            "as a mesaure of increasing performance by decreasing fragment shader\n" +
-                            "invocations in regions where less detail may be required."
-                        );
-
-                        if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
-                        ImGui.Checkbox("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading);
-                        if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
-
-                        current = app.RasterizerPipeline.LightingVRS.DebugValue.ToString();
-                        if (ImGui.BeginCombo("DebugMode", current))
+                        string current = app.RasterizerPipeline.ShadowMode.ToString();
+                        if (ImGui.BeginCombo("ShadowMode", current))
                         {
-                            LightingShadingRateClassifier.DebugMode[] debugModes = (LightingShadingRateClassifier.DebugMode[])Enum.GetValues(typeof(LightingShadingRateClassifier.DebugMode));
-                            for (int i = 0; i < debugModes.Length; i++)
+                            RasterPipeline.ShadowTechnique[] shadowTechniques = (RasterPipeline.ShadowTechnique[])Enum.GetValues(typeof(RasterPipeline.ShadowTechnique));
+                            for (int i = 0; i < shadowTechniques.Length; i++)
                             {
-                                string enumName = debugModes[i].ToString();
+                                string enumName = shadowTechniques[i].ToString();
 
                                 bool isSelected = current == enumName;
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
                                     current = enumName;
-                                    app.RasterizerPipeline.LightingVRS.DebugValue = LightingShadingRateClassifier.DebugMode.NoDebug + i;
+                                    app.RasterizerPipeline.ShadowMode = (RasterPipeline.ShadowTechnique)i;
                                 }
 
                                 if (isSelected)
@@ -410,16 +401,88 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        tempFloat = app.RasterizerPipeline.LightingVRS.SpeedFactor;
-                        if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
+                        if (app.RasterizerPipeline.ShadowMode == RasterPipeline.ShadowTechnique.RayTraced)
                         {
-                            app.RasterizerPipeline.LightingVRS.SpeedFactor = tempFloat;
+                            ImGui.Text(
+                                "This is mostly just a tech demo.\n" +
+                                "For example there is no dedicated denoising.\n" +
+                                "Requires abuse of TAA. FSR2 works best"
+                            );
+
+                            tempInt = app.RasterizerPipeline.RayTracingSamples;
+                            if (ImGui.SliderInt("Samples##0", ref tempInt, 1, 10))
+                            {
+                                app.RasterizerPipeline.RayTracingSamples = tempInt;
+                            }
                         }
 
-                        tempFloat = app.RasterizerPipeline.LightingVRS.LumVarianceFactor;
-                        if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
+
+                        ImGui.Separator();
+
+                        ImGui.Checkbox("GenerateShadowMaps", ref app.RasterizerPipeline.GenerateShadowMaps);
+                        ToolTipForItemAboveHovered("Regardless of shadow map technique used, this is still needed for effects such as volumetric lighting. Controls wether shadow maps are regenerated every frame.");
+
+                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH}");
+                        ToolTipForItemAboveHovered("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
+                    }
+
+                    if (ImGui.CollapsingHeader("Anti Aliasing"))
+                    {
+                        string current = app.RasterizerPipeline.TemporalAntiAliasing.ToString();
+                        if (ImGui.BeginCombo("Mode", current))
                         {
-                            app.RasterizerPipeline.LightingVRS.LumVarianceFactor = tempFloat;
+                            RasterPipeline.TemporalAntiAliasingMode[] options = (RasterPipeline.TemporalAntiAliasingMode[])Enum.GetValues(typeof(RasterPipeline.TemporalAntiAliasingMode));
+                            for (int i = 0; i < options.Length; i++)
+                            {
+                                string enumName = options[i].ToString();
+                                bool isSelected = current == enumName;
+                                if (ImGui.Selectable(enumName, isSelected))
+                                {
+                                    current = enumName;
+                                    app.RasterizerPipeline.TemporalAntiAliasing = (RasterPipeline.TemporalAntiAliasingMode)i;
+                                }
+
+                                if (isSelected)
+                                {
+                                    ImGui.SetItemDefaultFocus();
+                                }
+                            }
+                            ImGui.EndCombo();
+                        }
+
+                        if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.TAA)
+                        {
+                            tempBool = app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation;
+                            if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
+                            {
+                                app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation = tempBool;
+                            }
+                            ToolTipForItemAboveHovered(
+                                "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass.\n" +
+                                "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
+                            );
+
+                            ImGui.SliderInt("Samples##1", ref app.RasterizerPipeline.TAASamples, 1, 36);
+                        }
+                        else if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.FSR2)
+                        {
+                            ImGui.Text(
+                                "FSR2 (by AMD) does Anti Aliasing but\n" +
+                                "simultaneously also upscaling.\n" +
+                                "Try reducing resolution scale!\n" +
+                                "Note: Performance is lower than expected\n" +
+                                "on NVIDIA!"
+                            );
+
+                            ImGui.Checkbox("IsSharpening", ref app.RasterizerPipeline.FSR2Wrapper.IsSharpening);
+
+                            if (app.RasterizerPipeline.FSR2Wrapper.IsSharpening)
+                            {
+                                ImGui.SliderFloat("Sharpness", ref app.RasterizerPipeline.FSR2Wrapper.Sharpness, 0.0f, 1.0f);
+                            }
+
+                            ImGui.SliderFloat("AddMipBias", ref app.RasterizerPipeline.FSR2AddMipBias, -3.0f, 3.0f);
+                            ToolTipForItemAboveHovered("This bias is applied in addition to the 'optimal' FSR2 computed bias\n");
                         }
                     }
 
@@ -429,7 +492,7 @@ namespace IDKEngine.Render
                         if (app.IsVolumetricLighting)
                         {
                             tempInt = app.VolumetricLight.Samples;
-                            if (ImGui.SliderInt("Samples##0", ref tempInt, 1, 100))
+                            if (ImGui.SliderInt("Samples##2", ref tempInt, 1, 100))
                             {
                                 app.VolumetricLight.Samples = tempInt;
                             }
@@ -456,20 +519,32 @@ namespace IDKEngine.Render
                         }
                     }
 
-                    if (ImGui.CollapsingHeader("Anti Aliasing"))
+                    if (ImGui.CollapsingHeader("Variable Rate Shading"))
                     {
-                        current = app.RasterizerPipeline.TemporalAntiAliasingMode.ToString();
-                        if (ImGui.BeginCombo("Mode", current))
+                        ImGui.Text($"NV_shading_rate_image: {VariableRateShading.HAS_VARIABLE_RATE_SHADING}");
+                        ToolTipForItemAboveHovered(
+                            "Allows the renderer to choose a unique shading rate on each 16x16 tile\n" +
+                            "as a mesaure of increasing performance by decreasing fragment shader\n" +
+                            "invocations in regions where less detail may be required."
+                        );
+
+                        if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
+                        ImGui.Checkbox("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading);
+                        if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
+
+                        string current = app.RasterizerPipeline.LightingVRS.DebugValue.ToString();
+                        if (ImGui.BeginCombo("DebugMode", current))
                         {
-                            TemporalAntiAliasingMode[] options = (TemporalAntiAliasingMode[])Enum.GetValues(typeof(TemporalAntiAliasingMode));
-                            for (int i = 0; i < options.Length; i++)
+                            LightingShadingRateClassifier.DebugMode[] debugModes = (LightingShadingRateClassifier.DebugMode[])Enum.GetValues(typeof(LightingShadingRateClassifier.DebugMode));
+                            for (int i = 0; i < debugModes.Length; i++)
                             {
-                                string enumName = options[i].ToString();
+                                string enumName = debugModes[i].ToString();
+
                                 bool isSelected = current == enumName;
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
                                     current = enumName;
-                                    app.RasterizerPipeline.TemporalAntiAliasingMode = (TemporalAntiAliasingMode)i;
+                                    app.RasterizerPipeline.LightingVRS.DebugValue = (LightingShadingRateClassifier.DebugMode)i;
                                 }
 
                                 if (isSelected)
@@ -480,39 +555,16 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        if (app.RasterizerPipeline.TemporalAntiAliasingMode == TemporalAntiAliasingMode.TAA)
+                        tempFloat = app.RasterizerPipeline.LightingVRS.SpeedFactor;
+                        if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
                         {
-                            tempBool = app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation;
-                            if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
-                            {
-                                app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation = tempBool;
-                            }
-                            ToolTipForItemAboveHovered(
-                                "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass.\n" +
-                                "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
-                            );
-
-                            ImGui.SliderInt("Samples##1", ref app.RasterizerPipeline.TAASamples, 1, 36);
+                            app.RasterizerPipeline.LightingVRS.SpeedFactor = tempFloat;
                         }
-                        else if (app.RasterizerPipeline.TemporalAntiAliasingMode == TemporalAntiAliasingMode.FSR2)
+
+                        tempFloat = app.RasterizerPipeline.LightingVRS.LumVarianceFactor;
+                        if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
                         {
-                            ImGui.Text(
-                                "FSR2 (by AMD) does Anti Aliasing but\n" +
-                                "simultaneously also upscaling.\n" +
-                                "Try reducing resolution scale!\n" +
-                                "Note: Performance is lower than expected\n" +
-                                "on NVIDIA!"
-                            );
-
-                            ImGui.Checkbox("IsSharpening", ref app.RasterizerPipeline.FSR2Wrapper.IsSharpening);
-
-                            if (app.RasterizerPipeline.FSR2Wrapper.IsSharpening)
-                            {
-                                ImGui.SliderFloat("Sharpness", ref app.RasterizerPipeline.FSR2Wrapper.Sharpness, 0.0f, 1.0f);
-                            }
-
-                            ImGui.SliderFloat("AddMipBias", ref app.RasterizerPipeline.FSR2AddMipBias, -3.0f, 3.0f);
-                            ToolTipForItemAboveHovered("This bias is applied in addition to the 'optimal' FSR2 computed bias\n");
+                            app.RasterizerPipeline.LightingVRS.LumVarianceFactor = tempFloat;
                         }
                     }
 
@@ -522,7 +574,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsSSAO)
                         {
                             tempInt = app.RasterizerPipeline.SSAO.Samples;
-                            if (ImGui.SliderInt("Samples##2", ref tempInt, 1, 50))
+                            if (ImGui.SliderInt("Samples##3", ref tempInt, 1, 50))
                             {
                                 app.RasterizerPipeline.SSAO.Samples = tempInt;
                             }
@@ -547,7 +599,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsSSR)
                         {
                             tempInt = app.RasterizerPipeline.SSR.Samples;
-                            if (ImGui.SliderInt("Samples##3", ref tempInt, 1, 100))
+                            if (ImGui.SliderInt("Samples##4", ref tempInt, 1, 100))
                             {
                                 app.RasterizerPipeline.SSR.Samples = tempInt;
                             }
@@ -564,15 +616,6 @@ namespace IDKEngine.Render
                                 app.RasterizerPipeline.SSR.MaxDist = tempFloat;
                             }
                         }
-                    }
-
-                    if (ImGui.CollapsingHeader("Shadows"))
-                    {
-                        ImGui.Checkbox("IsShadows", ref app.IsShadows);
-                        ToolTipForItemAboveHovered("Toggling this controls the generation of new shadow maps. It does not effect the use of existing shadow maps.");
-
-                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH}");
-                        ToolTipForItemAboveHovered("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
                     }
                 }
                 else if (app.RenderMode == RenderMode.PathTracer)
@@ -865,9 +908,8 @@ namespace IDKEngine.Render
                             light.Color = tempVec3.ToOpenTK();
                         }
 
-                        if (ImGui.DragFloat("Radius", ref light.Radius, 0.1f, 0.25f, 10.0f))
+                        if (ImGui.DragFloat("Radius", ref light.Radius, 0.05f, 0.01f, 7.0f))
                         {
-                            light.Radius = MathF.Max(light.Radius, 0.25f);
                             shouldUpdateLight = true;
                         }
 

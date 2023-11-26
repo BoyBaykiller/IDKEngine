@@ -70,16 +70,16 @@ namespace IDKEngine
             Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             Box rightBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
-            uint rightChildTriStart = parentNode.TriStartOrLeftChild;
-            uint end = rightChildTriStart + parentNode.TriCount;
-            while (rightChildTriStart < end)
+            uint middle = parentNode.TriStartOrLeftChild;
+            uint end = middle + parentNode.TriCount;
+            while (middle < end)
             {
-                ref GpuBlasTriangle tri = ref Triangles[(int)rightChildTriStart];
+                ref GpuBlasTriangle tri = ref Triangles[(int)middle];
                 float posOnSplitAxis = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;
                 if (posOnSplitAxis < splitPos)
                 {
                     leftBox.GrowToFit(tri);
-                    rightChildTriStart++;
+                    middle++;
                 }
                 else
                 {
@@ -90,16 +90,16 @@ namespace IDKEngine
 
             ref GpuBlasNode leftChild = ref Nodes[nodesUsed++];
             leftChild.TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
-            leftChild.TriCount = rightChildTriStart - leftChild.TriStartOrLeftChild;
+            leftChild.TriCount = middle - leftChild.TriStartOrLeftChild;
             leftChild.Min = leftBox.Min;
             leftChild.Max = leftBox.Max;
 
             ref GpuBlasNode rightChild = ref Nodes[nodesUsed++];
-            rightChild.TriStartOrLeftChild = rightChildTriStart;
+            rightChild.TriStartOrLeftChild = middle;
             rightChild.TriCount = parentNode.TriCount - leftChild.TriCount;
             rightChild.Min = rightBox.Min;
             rightChild.Max = rightBox.Max;
-
+    
             parentNode.TriStartOrLeftChild = (uint)nodesUsed - 2;
             parentNode.TriCount = 0;
 
