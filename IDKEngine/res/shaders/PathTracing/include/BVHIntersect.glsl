@@ -6,7 +6,7 @@
 // Also does not get rebuild automatically.
 #define USE_TLAS 0
 
-#define MAX_BLAS_TREE_DEPTH 17
+#define MAX_BLAS_TREE_DEPTH 16
 #define MAX_TLAS_TREE_DEPTH 10 // TODO: Fix traversal occasionally using more than CPU side MAX_TLAS_TREE_DEPTH  
 
 AppInclude(include/Ray.glsl)
@@ -14,9 +14,9 @@ AppInclude(include/IntersectionRoutines.glsl)
 
 // Minus one because we store the stack top in a seperate local variable instead of shared
 #ifdef TRAVERSAL_STACK_DONT_USE_SHARED_MEM
-uint BlasTraversalStack[max(MAX_BLAS_TREE_DEPTH - 1, 1)];
+uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
 #else
-shared uint BlasTraversalStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][max(MAX_BLAS_TREE_DEPTH - 1, 1)];
+shared uint BlasTraversalStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
 #endif
 
 struct HitInfo
@@ -359,7 +359,7 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
             uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
             Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
 
-            if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
+            if (IntersectBlasAny(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
             {
                 hitInfo.VertexIndices += cmd.BaseVertex;
                 hitInfo.MeshID = parent.BlasIndex;

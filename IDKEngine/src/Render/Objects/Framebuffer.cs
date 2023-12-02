@@ -41,7 +41,7 @@ namespace IDKEngine.Render.Objects
             GL.NamedFramebufferTextureLayer(ID, framebufferAttachment, texture.ID, level, layer);
         }
 
-        public unsafe void SetDrawBuffers(Span<DrawBuffersEnum> drawBuffersEnums)
+        public unsafe void SetDrawBuffers(ReadOnlySpan<DrawBuffersEnum> drawBuffersEnums)
         {
             fixed (DrawBuffersEnum* ptr = drawBuffersEnums)
             {

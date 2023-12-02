@@ -16,98 +16,114 @@ namespace IDKEngine
             public float T;
         }
 
-
         public GpuBlasNode Root => Nodes[0];
-        public int TreeDepth { get; private set; }
+        public int MaxTreeDepth { get; private set; }
 
         public readonly GpuBlasTriangle[] Triangles;
         public GpuBlasNode[] Nodes;
 
-        private int nodesUsed;
+        private uint nodesUsed;
         public BLAS(GpuBlasTriangle[] triangles)
         {
             Triangles = triangles;
-            Nodes = Array.Empty<GpuBlasNode>();
+            Nodes = new GpuBlasNode[Math.Max(2 * Triangles.Length - 1, 3)];
         }
 
         public void Build()
         {
-            Nodes = new GpuBlasNode[Math.Max(2 * Triangles.Length - 1, 3)];
+            uint parentNodeId = 0;
+            nodesUsed = parentNodeId;
 
-            ref GpuBlasNode root = ref Nodes[nodesUsed++];
-            root.TriStartOrLeftChild = 0;
-            root.TriCount = (uint)Triangles.Length;
-            UpdateNodeBounds(ref root);
-            SplitNode(ref root);
+            {
+                ref GpuBlasNode rootNode = ref Nodes[nodesUsed++];
+                rootNode.TriStartOrLeftChild = 0;
+                rootNode.TriCount = (uint)Triangles.Length;
+                UpdateNodeBounds(ref rootNode);
+            }
 
-            // Handle edge case of the root node being leaf, by creating a child node as a copy of the root node
+            int maxTraversalDepth = 0;
+            int stackPtr = 0;
+            Span<uint> stack = stackalloc uint[128];
+            while (true)
+            {
+                ref GpuBlasNode parentNode = ref Nodes[parentNodeId];
+                if (!ShouldSplitNode(parentNode, out int splitAxis, out float splitPos, out float splitCost))
+                {
+                    if (stackPtr == 0) break;
+                    parentNodeId = stack[--stackPtr];
+                    continue;
+                }
+
+                GpuBlasNode newLeftNode;
+                GpuBlasNode newRightNode;
+                {
+                    Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+                    Box rightBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+
+                    uint middle = parentNode.TriStartOrLeftChild;
+                    uint end = middle + parentNode.TriCount;
+                    while (middle < end)
+                    {
+                        ref GpuBlasTriangle tri = ref Triangles[(int)middle];
+                        float posOnSplitAxis = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;
+                        if (posOnSplitAxis < splitPos)
+                        {
+                            leftBox.GrowToFit(tri);
+                            middle++;
+                        }
+                        else
+                        {
+                            rightBox.GrowToFit(tri);
+                            MathHelper.Swap(ref tri, ref Triangles[--end]);
+                        }
+                    }
+
+                    newLeftNode.TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
+                    newLeftNode.TriCount = middle - newLeftNode.TriStartOrLeftChild;
+                    newLeftNode.Min = leftBox.Min;
+                    newLeftNode.Max = leftBox.Max;
+
+                    newRightNode.TriStartOrLeftChild = middle;
+                    newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
+                    newRightNode.Min = rightBox.Min;
+                    newRightNode.Max = rightBox.Max;
+                }
+
+                Nodes[nodesUsed++] = newLeftNode;
+                Nodes[nodesUsed++] = newRightNode;
+
+                parentNode.TriStartOrLeftChild = nodesUsed - 2;
+                parentNode.TriCount = 0;
+
+                parentNodeId = parentNode.TriStartOrLeftChild;
+                stack[stackPtr++] = parentNode.TriStartOrLeftChild + 1;
+                maxTraversalDepth = Math.Max(stackPtr, maxTraversalDepth);
+            }
+
             if (nodesUsed == 1)
             {
-                Nodes[nodesUsed++] = root;
+                // Handle edge case of the root node being a leaf by creating an artificial child node
+                GpuBlasNode copyRoot = Nodes[0];
+                Nodes[0].TriCount = 0;
+                Nodes[0].TriStartOrLeftChild = 1;
 
-                // Add dummy invisible node because of the specifics of the traversal algorithm which tests always two nodes at once
+                Nodes[nodesUsed++] = copyRoot;
+
+                // Add an other dummy invisible node because the traversal algorithm always tests two nodes at once
                 Nodes[nodesUsed++] = new GpuBlasNode()
                 {
                     Min = new Vector3(float.MinValue),
                     Max = new Vector3(float.MinValue),
-                    TriCount = 0,
+                    TriCount = 1, // mark as leaf
                     TriStartOrLeftChild = 0,
                 };
             }
 
-            Array.Resize(ref Nodes, nodesUsed);
-
-            TreeDepth = (int)MathF.Ceiling(MathF.Log2(nodesUsed));
+            Array.Resize(ref Nodes, (int)nodesUsed);
+            MaxTreeDepth = maxTraversalDepth;
         }
 
-        private void SplitNode(ref GpuBlasNode parentNode)
-        {
-            if (!ShouldSplitNode(parentNode, out int splitAxis, out float splitPos, out float splitCost))
-            {
-                return;
-            }
-
-            Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-            Box rightBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-
-            uint middle = parentNode.TriStartOrLeftChild;
-            uint end = middle + parentNode.TriCount;
-            while (middle < end)
-            {
-                ref GpuBlasTriangle tri = ref Triangles[(int)middle];
-                float posOnSplitAxis = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;
-                if (posOnSplitAxis < splitPos)
-                {
-                    leftBox.GrowToFit(tri);
-                    middle++;
-                }
-                else
-                {
-                    rightBox.GrowToFit(tri);
-                    MathHelper.Swap(ref tri, ref Triangles[--end]);
-                }
-            }
-
-            ref GpuBlasNode leftChild = ref Nodes[nodesUsed++];
-            leftChild.TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
-            leftChild.TriCount = middle - leftChild.TriStartOrLeftChild;
-            leftChild.Min = leftBox.Min;
-            leftChild.Max = leftBox.Max;
-
-            ref GpuBlasNode rightChild = ref Nodes[nodesUsed++];
-            rightChild.TriStartOrLeftChild = middle;
-            rightChild.TriCount = parentNode.TriCount - leftChild.TriCount;
-            rightChild.Min = rightBox.Min;
-            rightChild.Max = rightBox.Max;
-    
-            parentNode.TriStartOrLeftChild = (uint)nodesUsed - 2;
-            parentNode.TriCount = 0;
-
-            SplitNode(ref leftChild);
-            SplitNode(ref rightChild);
-        }
-
-        private bool ShouldSplitNode(in GpuBlasNode parentNode, out int splitAxis, out float splitPos, out float splitCost)
+        private bool ShouldSplitNode(in GpuBlasNode parentNode, out int splitAxis, out float splitPos, out float splittedCost)
         {
             Box areaForSplits = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (int i = 0; i < parentNode.TriCount; i++)
@@ -119,10 +135,11 @@ namespace IDKEngine
 
             splitAxis = 0;
             splitPos = 0;
-            splitCost = float.MaxValue;
+            splittedCost = float.MaxValue;
             for (int i = 0; i < 3; i++)
             {
-                if (areaForSplits.Min[i] == areaForSplits.Max[i])
+                float minMaxLength = MathF.Abs(areaForSplits.Max[i] - areaForSplits.Min[i]);
+                if (minMaxLength < 0.001f)
                 {
                     continue;
                 }
@@ -132,17 +149,17 @@ namespace IDKEngine
                 {
                     float currentSplitPos = areaForSplits.Min[i] + (j + 1) * scale;
                     float currentSplitCost = GetCostOfSplittingNodeAt(parentNode, i, currentSplitPos);
-                    if (currentSplitCost < splitCost)
+                    if (currentSplitCost < splittedCost)
                     {
                         splitPos = currentSplitPos;
                         splitAxis = i;
-                        splitCost = currentSplitCost;
+                        splittedCost = currentSplitCost;
                     }
                 }
             }
 
             float parentNodeCost = CostOfHittingLeafNode(parentNode.TriCount);
-            bool splittingIsWorthIt = splitCost < parentNodeCost;
+            bool splittingIsWorthIt = splittedCost < parentNodeCost;
 
             return splittingIsWorthIt;
         }
@@ -195,7 +212,7 @@ namespace IDKEngine
             node.Max = bounds.Max;
         }
 
-        public unsafe bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMaxDist = float.MaxValue)
+        public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMaxDist = float.MaxValue)
         {
             hitInfo = new RayHitInfo();
             hitInfo.T = tMaxDist;
@@ -209,9 +226,9 @@ namespace IDKEngine
                 }
             }
 
-            uint stackPtr = 0;
+            int stackPtr = 0;
             uint stackTop = 1;
-            uint* stack = stackalloc uint[TreeDepth];
+            Span<uint> stack = stackalloc uint[MaxTreeDepth];
             while (true)
             {
                 ref readonly GpuBlasNode leftNode = ref Nodes[stackTop];
@@ -222,7 +239,7 @@ namespace IDKEngine
                 uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
                 if (triCount > 0)
                 {
-                    uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
+                    uint first = (leftChildHit && leftNode.IsLeaf()) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
                     for (uint i = first; i < first + triCount; i++)
                     {
                         ref readonly GpuBlasTriangle triangle = ref Triangles[i];
@@ -234,8 +251,8 @@ namespace IDKEngine
                         }
                     }
 
-                    leftChildHit = leftChildHit && (leftNode.TriCount == 0);
-                    rightChildHit = rightChildHit && (rightNode.TriCount == 0);
+                    leftChildHit = leftChildHit && !leftNode.IsLeaf();
+                    rightChildHit = rightChildHit && !rightNode.IsLeaf();
                 }
 
                 if (leftChildHit || rightChildHit)
@@ -262,11 +279,11 @@ namespace IDKEngine
         }
 
         public delegate void BoxIntersectFunc(in GpuBlasTriangle triangle);
-        public unsafe void Intersect(in Box box, BoxIntersectFunc intersectFunc)
+        public void Intersect(in Box box, BoxIntersectFunc intersectFunc)
         {
-            uint stackPtr = 0;
+            int stackPtr = 0;
             uint stackTop = 1;
-            uint* stack = stackalloc uint[TreeDepth];
+            Span<uint> stack = stackalloc uint[MaxTreeDepth];
             while (true)
             {
                 ref readonly GpuBlasNode leftNode = ref Nodes[stackTop];
@@ -287,8 +304,8 @@ namespace IDKEngine
                         }
                     }
 
-                    leftChildHit = leftChildHit && (leftNode.TriCount == 0);
-                    rightChildHit = rightChildHit && (rightNode.TriCount == 0);
+                    leftChildHit = leftChildHit && !leftNode.IsLeaf();
+                    rightChildHit = rightChildHit && !rightNode.IsLeaf();
                 }
 
                 if (leftChildHit || rightChildHit)
@@ -311,7 +328,7 @@ namespace IDKEngine
         {
             GpuBlasNode nextNode = node;
             uint veryLeftLeafTriStart;
-            while (nextNode.TriCount == 0)
+            while (!nextNode.IsLeaf())
             {
                 nextNode = Nodes[nextNode.TriStartOrLeftChild];
             }
@@ -320,7 +337,7 @@ namespace IDKEngine
 
             nextNode = node;
             uint veryRightLeafTriEnd;
-            while (nextNode.TriCount == 0)
+            while (!nextNode.IsLeaf())
             {
                 nextNode = Nodes[nextNode.TriStartOrLeftChild + 1];
             }

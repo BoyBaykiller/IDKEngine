@@ -9,5 +9,10 @@ namespace IDKEngine
 
         public Vector3 Max;
         public uint BlasIndex;
+
+        public bool IsLeaf()
+        {
+            return LeftChild == 0;
+        }
     }
 }

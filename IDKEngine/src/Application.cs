@@ -265,7 +265,6 @@ namespace IDKEngine
                     }
 
                     Camera.AdvanceSimulation(dT);
-
                 }
             }
 
@@ -299,16 +298,16 @@ namespace IDKEngine
 
                 // We need to use raw pointers here instead of ref & out, because
                 // "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
-                static bool CollisionRoutine(ModelSystem modelSystem, in CameraCollisionDetection settings, Vector3 newPosition, Sphere* refBoundingVolume, Plane* outHitPlane, float* outPenetrationDepth)
+                static bool CollisionRoutine(ModelSystem modelSystem, in CameraCollisionDetection settings, Vector3 newPos, Sphere* previousPos, Plane* outHitPlane, float* outPenetrationDepth)
                 {
                     *outPenetrationDepth = float.MinValue;
                     *outHitPlane = new Plane();
 
-                    Vector3 cameraStepSize = (newPosition - refBoundingVolume->Center) / settings.TestSteps;
+                    Vector3 cameraStepSize = (newPos - previousPos->Center) / settings.TestSteps;
                     for (int i = 1; i <= settings.TestSteps; i++)
                     {
-                        refBoundingVolume->Center += cameraStepSize;
-                        Box playerBox = new Box(refBoundingVolume->Center - new Vector3(refBoundingVolume->Radius), refBoundingVolume->Center + new Vector3(refBoundingVolume->Radius));
+                        previousPos->Center += cameraStepSize;
+                        Box playerBox = new Box(previousPos->Center - new Vector3(previousPos->Radius), previousPos->Center + new Vector3(previousPos->Radius));
 
                         float cosTheta = 0.0f;
                         modelSystem.BVH.Intersect(playerBox, (in BVH.PrimitiveHitInfo hitInfo) =>
@@ -316,14 +315,14 @@ namespace IDKEngine
                             Matrix4 model = modelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
                             Triangle worldSpaceTri = Triangle.Transformed(GpuTypes.Conversions.ToTriangle(hitInfo.Triangle), model);
 
-                            Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, refBoundingVolume->Center);
-                            float distance = Vector3.Distance(closestPointOnTri, refBoundingVolume->Center);
-                            float thisPenetrationDepth = refBoundingVolume->Radius - distance;
+                            Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, previousPos->Center);
+                            float distance = Vector3.Distance(closestPointOnTri, previousPos->Center);
+                            float thisPenetrationDepth = previousPos->Radius - distance;
                             if (thisPenetrationDepth > 0.0f)
                             {
                                 Plane thisHitPlane = new Plane(worldSpaceTri.Normal);
 
-                                Vector3 hitPointToCameraDir = (refBoundingVolume->Center - closestPointOnTri) / distance;
+                                Vector3 hitPointToCameraDir = (previousPos->Center - closestPointOnTri) / distance;
                                 float thisCosTheta = Vector3.Dot(thisHitPlane.Normal, hitPointToCameraDir);
                                 if (thisCosTheta < 0.0f)
                                 {
@@ -504,14 +503,14 @@ namespace IDKEngine
                 LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
                 LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
 
-                //LightManager.AddLight(new Light(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.7f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
-                //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);
-                
                 for (int i = 0; i < 3; i++)
                 {
                     PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
                     LightManager.CreatePointShadowForLight(pointShadow, i);
                 }
+
+                //LightManager.AddLight(new Light(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.7f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
+                //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);
 
                 RenderMode = RenderMode.Rasterizer;
             }

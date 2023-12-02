@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace IDKEngine
 {
@@ -94,11 +95,10 @@ namespace IDKEngine
             }
 
             recordedFrames = new T[fileStream.Length / sizeof(T)];
-            fixed (void* ptr = recordedFrames)
-            {
-                Span<byte> data = new Span<byte>(ptr, recordedFrames.Length * sizeof(T));
-                fileStream.Read(data);
-            }
+            
+            Span<byte> data = MemoryMarshal.AsBytes<T>(recordedFrames);
+            fileStream.Read(data);
+
             FrameCount = recordedFrames.Length;
             ReplayFrameIndex = 0;
         }
@@ -115,11 +115,8 @@ namespace IDKEngine
             }
 
             using FileStream file = File.OpenWrite(path);
-            fixed (void* ptr = recordedFrames)
-            {
-                ReadOnlySpan<byte> data = new ReadOnlySpan<byte>(ptr, FrameCount * sizeof(T));
-                file.Write(data);
-            }
+            ReadOnlySpan<byte> data = MemoryMarshal.AsBytes(new ReadOnlySpan<T>(recordedFrames, 0, FrameCount));
+            file.Write(data);
         }
     }
 }

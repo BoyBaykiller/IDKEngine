@@ -28,7 +28,6 @@ namespace IDKEngine
             public int InstanceID;
         }
 
-        public int MaxBlasTreeDepth { get; private set; }
         public readonly TLAS Tlas;
 
         private readonly BufferObject blasBuffer;
@@ -139,11 +138,6 @@ namespace IDKEngine
         {
             Tlas.AddBlases(blases, drawCommands, meshInstances);
             SetBlasBuffersContent();
-
-            for (int i = 0; i < blases.Length; i++)
-            {
-                MaxBlasTreeDepth = Math.Max(MaxBlasTreeDepth, blases[i].TreeDepth);
-            }
         }
 
         public void TlasBuild()
@@ -191,6 +185,7 @@ namespace IDKEngine
         private static BLAS[] CreateBlasesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, Vector3[] vertexPositions, uint[] vertexIndices)
         {
             BLAS[] blases = new BLAS[drawCommands.Length];
+
             Parallel.For(0, blases.Length, i =>
             //for (int i = 0; i < blases.Length; i++)
             {

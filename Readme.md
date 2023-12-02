@@ -40,9 +40,98 @@ Known Issues:
 
 # Path Traced Render Samples
 
-![PTTemple](Screenshots/PTTemple.png?raw=true)
-![PTSponza](Screenshots/PTSponza.png?raw=true)
-![PTHorse](Screenshots/PTHorse.png?raw=true)
+![PTTemple](Screenshots/Showcase/PTTemple.png?raw=true)
+![PTSponza](Screenshots/Showcase/PTSponza.png?raw=true)
+![PTHorse](Screenshots/Showcase/PTHorse.png?raw=true)
+
+## Voxel Global Illumination
+
+### 1.0. Overview
+
+VXGI (or Voxel Cone Tracing) is a global illumination technique developed by NVIDIA, originally [published](https://research.nvidia.com/sites/default/files/publications/GIVoxels-pg2011-authors.pdf) in 2011. Later when the Maxwell Architecture (GTX-900 series) released, the implementation was improved using GPU specific features starting from that generation. I'll show how to use those in a bit.
+
+The basic idea of VXGI is:
+1. Voxelize the scene
+2. Cone Trace voxelized scene for second bounce lighting
+
+The voxelized representation is an approximation of the actual scene and Cone Tracing is an approximation of actual Ray Tracing.
+Trading accuracy for speed! Still, VXGI has the potential to naturally account for various lighting effects such as Rough Specular Reflections, Light bleeding, Emissive Indirect Shadows... Here is a [video](https://youtu.be/5m9fOVWaqdE) of mine showcasing that.
+Overall I think VXGI is a great technique to implement in a hobby renderer, since it's conceptually easy to understand, gives decent results and you get to play with advanced OpenGL features!
+
+### 2.0 Voxelization
+
+Here is an image of a voxelized scene.
+
+![VoxelizedSponza](Screenshots/Articles/VoxelizedSponza.png?raw=true)
+
+Every voxel is as a pixel in a `rgba16f`-format 3D texture. What you see is a visualization of all 384^3 pixels, showing
+only those which were colored - using basic lighting and classic shadow maps. I only have this single texture, but others might store additional information such as normals for multiple bounces. This is implementation specific.
+The voxelization happens using a single shader program. A basic vertex shader and a rather unusal but clever fragment shader.
+
+#### Vertex Shader
+There are two variables `vec3: GridMin, GridMax`.
+Those define the world space region (a cube) which the voxel grid spans over. We need these because when rendering, triangles get transformed into world space like normally and then mapped from the range `[GridMin, GridMax]` to `[-1, 1]` (normalized device coordinates).
+Triangles outside the grid will thus be clipped and not considered further.
+You can do this linear transformation yourself or construct an orthographic projection.
+As the grid grows, voxel resolution decreases. 
+
+```glsl
+#version 460 core
+layout(location = 0) in vec3 Position;
+
+uniform mat4 VoxelGridMatrix; // Matrix4.CreateOrthographicOffCenter(GridMin, GridMax)
+out vec3 NormalizedDeviceCoords;
+
+void main() {
+    vec3 fragPos = vec4(ModelMatrix * Position, 1.0);
+
+    // transform fragPos from [GridMin, GridMax] to [-1, 1]
+    NormalizedDeviceCoords = (VoxelGridMatrix * fragPos).xyz;
+
+    gl_Position = vec4(NormalizedDeviceCoords, 1.0);
+}
+```
+
+#### Fragment Shader
+
+We won't have any color attachments. In fact there is no FBO at all.
+We will write into the 3D voxel-texture manually using OpenGL [image store](https://www.khronos.org/opengl/wiki/Image_Load_Store).
+Framebuffers are avoided because you can only ever attach a single texture-layer for rendering.
+Image store works on absolute integer coordinates, so to find the corresponding voxel position for that fragment we can transform the normalized device coordinates.
+
+```glsl
+#version 460 core
+layout(location = 0) in vec3 Position;
+
+layout(binding = 0, rgba16f) uniform restrict image3D ImgVoxels;
+
+in vec3 NormalizedDeviceCoords;
+
+void main()  {
+    vec3 uvt = NormalizedDeviceCoords * 0.5 + 0.5; // transform from [-1, 1] to [0, 1]
+    ivec3 imgCoords = ivec3(uvt * imageSize(ImgVoxels)); // transform from [0, 1] to [0, imageSize() - 1]
+
+    vec4 voxelColor = ...; // compute some basic lighting
+    imageStore(ImgVoxels, imgCoords, voxelColor);
+}
+```
+
+---
+
+Finally the pipeline state. Since we don't have any color or depth attachments we want to use an [empty framebuffer](https://www.khronos.org/opengl/wiki/Framebuffer_Object#Empty_framebuffers). It's used to explicitly communicate OpenGL the render width & height, which normally is derived from the color attachments. To not miss triangles face culling is off. Color and other writes are turned off implicitly by using the empty framebuffer.
+
+Now, running the voxelization as described so far gives me this. There are two issues that I'll discuss.
+
+![VoxelizationAttempt](Screenshots/Articles/VoxelizationAttempt.gif)
+
+TODO
+### 2.1 Fixing the flickering
+
+### 2.2 Fixing the missing voxels
+
+### 3.0 Cone Tracing
+
+### 4.0 Optimizations using NV-extensions
 
 ## Variable Rate Shading
 
@@ -50,11 +139,11 @@ Known Issues:
 
 Variable Rate Shading is when you render different regions of the framebuffer at different resolutions. This feature is exposed in OpenGL through the [`NV_shading_rate_image`](https://registry.khronos.org/OpenGL/extensions/NV/NV_shading_rate_image.txt) extension. When drawing the hardware fetches a "Shading Rate Image" looks up the value in a user defined shading rate palette and applies that shading rate to the block of fragments.
 
-So all we need to do is generate this Shading Rate Image, which is really just a `r8ui` format texture where each pixel covers
+So all we need to do is generate this Shading Rate Image, which is really just a `r8ui`-format texture where each pixel covers
 a 16x16 tile of the framebuffer. This image will control the resolution at which each tile is rendered.
 
-Example of a generated Shading Rate Image while the camera is moving taking into account velocity and variance of luminance
-![ShadingRateImage](Screenshots/ShadingRateImageExample.png?raw=true)
+Example of a generated Shading Rate Image while the camera is rapidly moving forward, taking into account velocity and variance of luminance
+![ShadingRateImage](Screenshots/Articles/ShadingRateImage.png?raw=true)
 
 Red stands for 1 invocation per 4x4 pixels which means 16x less fragment shader invocations in those regions.
 No color is the default - 1 invocation per pixel.
@@ -292,7 +381,7 @@ void main()
 ```
 
 Here is a comparison of using shadow samplers (right) vs not using them.
-![SamplingComparison](Screenshots/SamplingComparison.png?raw=true)
+![SamplingComparison](Screenshots/Articles/SamplingComparison.png?raw=true)
 
 Of course, you can combine this with software filtering like PCF to get even better results.
 
@@ -333,7 +422,7 @@ While this renders all geometry just fine, you might be wondering how to access 
 
 ### 2.0 Bindless Textures
 
-First of all `ARB_bindless_texture` is not a core extension. Nevertheless, almost all AMD and Nvidia GPUs implement it, as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately render doc doesn't support it.
+First of all `ARB_bindless_texture` is not a core extension. Nevertheless, almost all AMD and NVIDIA GPUs implement it, as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately render doc doesn't support it.
 
 The main idea behind bindless textures is the ability to generate a unique 64 bit handle from any texture, which can then be used to represent it inside glsl and thus no longer depend on previous state based mechanics.
 Specifically, this means that you no longer call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.
