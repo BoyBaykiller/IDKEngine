@@ -58,7 +58,7 @@ namespace IDKEngine.Render
         public PointShadow(int size, float nearPlane, float farPlane)
         {
             framebuffer = new Framebuffer();
-            framebuffer.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.None });
+            framebuffer.SetDrawBuffers([DrawBuffersEnum.None]);
 
             ClippingPlanes = new Vector2(nearPlane, farPlane);
             SetSize(size);

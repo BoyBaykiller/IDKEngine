@@ -62,6 +62,14 @@ struct BlasTriangle
     uint VertexIndex2;
 };
 
+struct TlasNode
+{
+    vec3 Min;
+    uint LeftChild;
+    vec3 Max;
+    uint BlasIndex;
+};
+
 struct Light
 {
     vec3 Position;
@@ -160,6 +168,11 @@ layout(std430, binding = 6) restrict readonly buffer BlasTriangleSSBO
     BlasTriangle Triangles[];
 } blasTriangleSSBO;
 
+layout(std430, binding = 7) restrict readonly buffer TlasSSBO
+{
+    TlasNode Nodes[];
+} tlasSSBO;
+
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
@@ -192,6 +205,8 @@ void main()
         FragColor = vec4(0.0);
         return;
     }
+    
+    // InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (basicDataUBO.Frame + 1));
 
     vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
     vec3 fragPos = PerspectiveTransform(ndc, basicDataUBO.InvProjView);

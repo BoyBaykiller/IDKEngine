@@ -449,7 +449,7 @@ namespace IDKEngine.Render
             gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment3, EmissiveRoughnessTexture);
             gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment4, VelocityTexture);
             gBufferFBO.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture);
-            gBufferFBO.SetDrawBuffers(stackalloc DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3, DrawBuffersEnum.ColorAttachment4 });
+            gBufferFBO.SetDrawBuffers([DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3, DrawBuffersEnum.ColorAttachment4]);
 
             deferredLightingFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, upscalerInputTexture);
         }

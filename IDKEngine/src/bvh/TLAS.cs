@@ -164,7 +164,7 @@ namespace IDKEngine
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref Nodes[stackTop];
-                if (parent.LeftChild == 0)
+                if (parent.IsLeaf())
                 {
                     BLAS blas = Blases[(int)parent.BlasIndex];
 

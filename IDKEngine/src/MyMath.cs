@@ -29,8 +29,6 @@ namespace IDKEngine
 
         public static float Area(Vector3 size)
         {
-            if (size.X < 0.0f || size.Y < 0.0f || size.Z < 0.0f) return 0.0f;
-
             float area = 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
             return area;
         }

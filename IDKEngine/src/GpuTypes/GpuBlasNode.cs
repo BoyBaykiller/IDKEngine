@@ -8,5 +8,10 @@ namespace IDKEngine
 		public uint TriStartOrLeftChild;
 		public Vector3 Max;
 		public uint TriCount;
+
+		public bool IsLeaf()
+		{
+			return TriCount > 0;
+		}
 	}
 }

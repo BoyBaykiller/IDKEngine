@@ -2,7 +2,6 @@
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
-using System;
 
 namespace IDKEngine.Shapes
 {
@@ -28,7 +27,7 @@ namespace IDKEngine.Shapes
         [FieldOffset(0)] public Vector128<float> SIMDMin;
         [FieldOffset(16)] public Vector128<float> SIMDMax;
 
-        public Box(Vector3 min, Vector3 max)
+        public Box(in Vector3 min, in Vector3 max)
         {
             Min = min;
             Max = max;
@@ -96,10 +95,11 @@ namespace IDKEngine.Shapes
             this = newBox;
         }
 
-        public static Box Transformed(Box box, in Matrix4 matrix)
+        public static Box Transformed(in Box box, in Matrix4 matrix)
         {
-            box.Transform(matrix);
-            return box;
+            Box newBox = box;
+            newBox.Transform(matrix);
+            return newBox;
         }
 
         public static Vector3 GetOverlappingExtends(in Box a, in Box b)
