@@ -94,8 +94,8 @@ in InOutVars
 } inData;
 
 vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight);
-float Visibility(PointShadow pointShadow, vec3 lightSpacePos);
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
+float Visibility(PointShadow pointShadow, vec3 lightToSample);
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos);
 
 void main()
@@ -146,7 +146,7 @@ vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight)
     float sampleToLightLength = length(sampleToLight);
 
     vec3 lightDir = sampleToLight / sampleToLightLength;
-    float cosTerm = dot(inData.Normal, lightDir);
+    float cosTerm = dot(normalize(inData.Normal), lightDir);
     if (cosTerm > 0.0)
     {
         vec3 diffuse = light.Color * cosTerm * albedo;
@@ -158,20 +158,20 @@ vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight)
     return vec3(0.0);
 }
 
-float Visibility(PointShadow pointShadow, vec3 lightSpacePos)
+float Visibility(PointShadow pointShadow, vec3 lightToSample)
 {
     float bias = 0.02;
     const float sampleDiskRadius = 0.08;
 
-    float depth = GetLightSpaceDepth(pointShadow, lightSpacePos * (1.0 - bias));
-    float visibilityFactor = texture(pointShadow.ShadowTexture, vec4(lightSpacePos, depth));
+    float depth = GetLightSpaceDepth(pointShadow, lightToSample * (1.0 - bias));
+    float visibilityFactor = texture(pointShadow.ShadowTexture, vec4(lightToSample, depth));
 
     return visibilityFactor;
 }
 
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
 {
-    float dist = max(abs(lightSpacePos.x), max(abs(lightSpacePos.y), abs(lightSpacePos.z)));
+    float dist = max(abs(lightSpaceSamplePos.x), max(abs(lightSpaceSamplePos.y), abs(lightSpaceSamplePos.z)));
     float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);
 
     return depth;

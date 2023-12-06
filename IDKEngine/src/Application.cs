@@ -468,7 +468,7 @@ namespace IDKEngine
 
             LightManager = new LightManager(12, 12);
             ModelSystem = new ModelSystem();
-
+            
             if (true)
             {
                 Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
@@ -496,6 +496,7 @@ namespace IDKEngine
 
                 //Model test = new Model(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf");
                 //Model test = new Model(@"C:\Users\Julian\Downloads\Models\Skeleton\Skeleton.gltf", Matrix4.CreateScale(0.4f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90.0f)) * Matrix4.CreateTranslation(-6.1f, 1.8f, 0.0f));
+                //Model test = new Model("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\BoomBoxWithAxes\\glTF\\BoomBoxWithAxes.gltf", Matrix4.CreateScale(100.0f));
 
                 ModelSystem.Add(sponza, lucy, helmet);
 

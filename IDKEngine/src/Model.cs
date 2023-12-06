@@ -12,11 +12,31 @@ using glTFLoader.Schema;
 using IDKEngine.Render.Objects;
 using GLTexture = IDKEngine.Render.Objects.Texture;
 using GltfTexture = glTFLoader.Schema.Texture;
+using System.Diagnostics;
+using System.Threading;
 
 namespace IDKEngine
 {
     class Model
     {
+        public struct MaterialDetails
+        {
+            public Vector3 EmissiveFactor;
+            public uint BaseColorFactor;
+            public float MetallicFactor;
+            public float RoughnessFactor;
+            public float AlphaCutoff;
+
+            public static readonly MaterialDetails Default = new MaterialDetails()
+            {
+                EmissiveFactor = new Vector3(0.0f),
+                BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(1.0f)),
+                MetallicFactor = 1.0f,
+                RoughnessFactor = 1.0f,
+                AlphaCutoff = 0.5f,
+            };
+        }
+
         private struct GpuTextureLoadData
         {
             public ImageResult Image;
@@ -34,6 +54,7 @@ namespace IDKEngine
                 Normal,
                 Emissive,
             }
+
             public ref GpuTextureLoadData this[TextureType textureType]
             {
                 get
@@ -49,33 +70,19 @@ namespace IDKEngine
                 }
             }
 
-            public struct MaterialDetails
-            {
-                public Vector3 EmissiveFactor;
-                public uint BaseColorFactor;
-                public float MetallicFactor;
-                public float RoughnessFactor;
-                public float AlphaCutoff;
-
-                public static readonly MaterialDetails Default = new MaterialDetails()
-                {
-                    EmissiveFactor = new Vector3(0.0f),
-                    BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(1.0f)),
-                    MetallicFactor = 1.0f,
-                    RoughnessFactor = 1.0f,
-                    AlphaCutoff = 0.5f,
-                };
-            }
-
             public GpuTextureLoadData BaseColorTexture;
             public GpuTextureLoadData MetallicRoughnessTexture;
             public GpuTextureLoadData NormalTexture;
             public GpuTextureLoadData EmissiveTexture;
-            public MaterialDetails MaterialDetail;
+            public MaterialDetails MaterialDetails;
 
             public static readonly GpuMaterialLoadData Default = new GpuMaterialLoadData()
             {
-                MaterialDetail = MaterialDetails.Default,
+                BaseColorTexture = { },
+                MetallicRoughnessTexture = { },
+                NormalTexture = { },
+                EmissiveTexture = { },
+                MaterialDetails = MaterialDetails.Default,
             };
         }
 
@@ -114,7 +121,6 @@ namespace IDKEngine
             Logger.Log(Logger.LogLevel.Info, $"Loaded model {path}");
         }
 
-
         public void LoadFromFile(string path, Matrix4 rootTransform)
         {
             gltfModel = Interface.LoadModel(path);
@@ -131,24 +137,26 @@ namespace IDKEngine
             List<uint> indices = new List<uint>();
 
             Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
+
+            // Push all root nodes (of first scene only)
             for (int i = 0; i < gltfModel.Scenes[0].Nodes.Length; i++)
             {
-                Node node = gltfModel.Nodes[gltfModel.Scenes[0].Nodes[i]];
-                nodeStack.Push((node, rootTransform));
+                Node rootNode = gltfModel.Nodes[gltfModel.Scenes[0].Nodes[i]];
+                nodeStack.Push((rootNode, rootTransform));
             }
 
             while (nodeStack.Count > 0)
             {
                 (Node node, Matrix4 globalParentTransform) = nodeStack.Pop();
-                Matrix4 localTransform = NodeGetModelMatrix(node);
-                Matrix4 globalTransform = localTransform * globalParentTransform;
+                Matrix4 localModelMatrix = GetNodeModelMatrix(node);
+                Matrix4 globalModelMatrix = localModelMatrix * globalParentTransform;
 
                 if (node.Children != null)
                 {
                     for (int i = 0; i < node.Children.Length; i++)
                     {
                         Node childNode = gltfModel.Nodes[node.Children[i]];
-                        nodeStack.Push(new ValueTuple<Node, Matrix4>(childNode, globalTransform));
+                        nodeStack.Push((childNode, globalModelMatrix));
                     }
                 }
 
@@ -192,7 +200,7 @@ namespace IDKEngine
                         drawCmd.BaseInstance = drawCommands.Count;
 
                         GpuMeshInstance meshInstance = new GpuMeshInstance();
-                        meshInstance.ModelMatrix = globalTransform;
+                        meshInstance.ModelMatrix = globalModelMatrix;
 
                         vertices.AddRange(meshVertices);
                         vertexPositions.AddRange(meshVertexPositions);
@@ -219,8 +227,9 @@ namespace IDKEngine
             {
                 return Array.Empty<GpuMaterialLoadData>();
             }
-            GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[materials.Length];         
-            
+
+            GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[materials.Length];
+
             Parallel.For(0, materialsLoadData.Length * GpuMaterialLoadData.TEXTURE_COUNT, i =>
             {
                 int materialIndex = i / GpuMaterialLoadData.TEXTURE_COUNT;
@@ -232,12 +241,12 @@ namespace IDKEngine
                 // Let one thread load non image data
                 if (textureType == GpuMaterialLoadData.TextureType.BaseColor)
                 {
-                    materialData.MaterialDetail = GpuMaterialLoadData.MaterialDetails.Default;
-                    materialData.MaterialDetail.AlphaCutoff = material.AlphaCutoff;
+                    materialData.MaterialDetails = MaterialDetails.Default;
+                    materialData.MaterialDetails.AlphaCutoff = material.AlphaCutoff;
 
                     if (material.EmissiveFactor != null)
                     {
-                        materialData.MaterialDetail.EmissiveFactor = new Vector3(
+                        materialData.MaterialDetails.EmissiveFactor = new Vector3(
                             material.EmissiveFactor[0],
                             material.EmissiveFactor[1],
                             material.EmissiveFactor[2]);
@@ -246,15 +255,15 @@ namespace IDKEngine
                     {
                         if (material.PbrMetallicRoughness.BaseColorFactor != null)
                         {
-                            materialData.MaterialDetail.BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(
+                            materialData.MaterialDetails.BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(
                                 material.PbrMetallicRoughness.BaseColorFactor[0],
                                 material.PbrMetallicRoughness.BaseColorFactor[1],
                                 material.PbrMetallicRoughness.BaseColorFactor[2],
                                 material.PbrMetallicRoughness.BaseColorFactor[3]));
                         }
 
-                        materialData.MaterialDetail.RoughnessFactor = material.PbrMetallicRoughness.RoughnessFactor;
-                        materialData.MaterialDetail.MetallicFactor = material.PbrMetallicRoughness.MetallicFactor;
+                        materialData.MaterialDetails.RoughnessFactor = material.PbrMetallicRoughness.RoughnessFactor;
+                        materialData.MaterialDetails.MetallicFactor = material.PbrMetallicRoughness.MetallicFactor;
                     }
                 }
 
@@ -302,7 +311,7 @@ namespace IDKEngine
                         colorComponentsToLoad = ColorComponents.RedGreenBlue;
 
                         TextureInfo textureInfo = material.EmissiveTexture;
-                        if (textureInfo != null) gltfTextureToLoad = gltfModel.Textures[textureInfo.Index];
+                        if (textureInfo != null) gltfTextureToLoad = textures[textureInfo.Index];
                     }
                 }
 
@@ -355,11 +364,11 @@ namespace IDKEngine
                 ref GpuMaterial gpuMaterial = ref materials[i];
                 ref readonly GpuMaterialLoadData materialLoadData = ref materialsLoadInfo[i];
 
-                gpuMaterial.EmissiveFactor = materialLoadData.MaterialDetail.EmissiveFactor;
-                gpuMaterial.BaseColorFactor = materialLoadData.MaterialDetail.BaseColorFactor;
-                gpuMaterial.RoughnessFactor = materialLoadData.MaterialDetail.RoughnessFactor;
-                gpuMaterial.MetallicFactor = materialLoadData.MaterialDetail.MetallicFactor;
-                gpuMaterial.AlphaCutoff = materialLoadData.MaterialDetail.AlphaCutoff;
+                gpuMaterial.EmissiveFactor = materialLoadData.MaterialDetails.EmissiveFactor;
+                gpuMaterial.BaseColorFactor = materialLoadData.MaterialDetails.BaseColorFactor;
+                gpuMaterial.RoughnessFactor = materialLoadData.MaterialDetails.RoughnessFactor;
+                gpuMaterial.MetallicFactor = materialLoadData.MaterialDetails.MetallicFactor;
+                gpuMaterial.AlphaCutoff = materialLoadData.MaterialDetails.AlphaCutoff;
 
                 {
                     (GLTexture texture, SamplerObject sampler) = GetGLTextureAndSampler(materialLoadData.BaseColorTexture);
@@ -523,7 +532,7 @@ namespace IDKEngine
             return indices;
         }
 
-        private static Matrix4 NodeGetModelMatrix(Node node)
+        private static Matrix4 GetNodeModelMatrix(Node node)
         {
             Matrix4 modelMatrix = new Matrix4(
                     node.Matrix[0], node.Matrix[1], node.Matrix[2], node.Matrix[3],

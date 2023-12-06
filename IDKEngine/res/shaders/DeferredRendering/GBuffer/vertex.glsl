@@ -73,7 +73,7 @@ out InOutVars
     vec4 ClipPos;
     vec4 PrevClipPos;
     vec3 Normal;
-    mat3 TangentToWorld;
+    mat3 TBN;
     uint MaterialIndex;
     float EmissiveBias;
     float NormalMapStrength;
@@ -89,15 +89,14 @@ void main()
     vec3 normal = DecompressSR11G11B10(Normal);
     vec3 tangent = DecompressSR11G11B10(Tangent);
 
-    outData.TangentToWorld = GetTBN(meshInstance.ModelMatrix, tangent, normal);
+    outData.TBN = GetTBN(mat3(meshInstance.ModelMatrix), tangent, normal);
     outData.TexCoord = TexCoord;
     
     vec3 worldPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(worldPos, 1.0);
     outData.PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(Position, 1.0);
     
-    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-    outData.Normal = normalize(normalToWorld * normal);
+    outData.Normal = mat3(meshInstance.ModelMatrix) * normal;
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
     outData.NormalMapStrength = mesh.NormalMapStrength;

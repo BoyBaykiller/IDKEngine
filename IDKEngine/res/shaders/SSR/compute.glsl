@@ -64,7 +64,7 @@ void main()
     vec3 fragPos = PerspectiveTransform(vec3(uv, depth) * 2.0 - 1.0, basicDataUBO.InvProjection);
     vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
     mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
-    normal = normalize(normalToView * normal);
+    normal = normalToView * normal;
 
     vec3 color = SSR(normal, fragPos) * specular;
 

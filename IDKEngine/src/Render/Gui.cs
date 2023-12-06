@@ -91,6 +91,13 @@ namespace IDKEngine.Render
                         app.Camera.Position = tempVec3.ToOpenTK();
                     }
 
+                    tempVec2 = new System.Numerics.Vector2(app.Camera.LookX, app.Camera.LookY);
+                    if (ImGui.DragFloat2("LookAt", ref tempVec2))
+                    {
+                        app.Camera.LookX = tempVec2.X;
+                        app.Camera.LookY = tempVec2.Y;
+                    }
+
                     ImGui.SliderFloat("Speed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f);
                     ImGui.SliderFloat("Sensitivity", ref app.Camera.MouseSensitivity, 0.0f, 0.1f);
 
@@ -215,7 +222,7 @@ namespace IDKEngine.Render
                     string current = app.RenderMode.ToString();
                     if (ImGui.BeginCombo("Render Mode", current))
                     {
-                        RenderMode[] renderModes = (RenderMode[])Enum.GetValues(typeof(RenderMode));
+                        RenderMode[] renderModes = Enum.GetValues<RenderMode>();
                         for (int i = 0; i < renderModes.Length; i++)
                         {
                             string enumName = renderModes[i].ToString();
@@ -381,7 +388,7 @@ namespace IDKEngine.Render
                         string current = app.RasterizerPipeline.ShadowMode.ToString();
                         if (ImGui.BeginCombo("ShadowMode", current))
                         {
-                            RasterPipeline.ShadowTechnique[] shadowTechniques = (RasterPipeline.ShadowTechnique[])Enum.GetValues(typeof(RasterPipeline.ShadowTechnique));
+                            RasterPipeline.ShadowTechnique[] shadowTechniques = Enum.GetValues<RasterPipeline.ShadowTechnique>();
                             for (int i = 0; i < shadowTechniques.Length; i++)
                             {
                                 string enumName = shadowTechniques[i].ToString();
@@ -431,7 +438,7 @@ namespace IDKEngine.Render
                         string current = app.RasterizerPipeline.TemporalAntiAliasing.ToString();
                         if (ImGui.BeginCombo("Mode", current))
                         {
-                            RasterPipeline.TemporalAntiAliasingMode[] options = (RasterPipeline.TemporalAntiAliasingMode[])Enum.GetValues(typeof(RasterPipeline.TemporalAntiAliasingMode));
+                            RasterPipeline.TemporalAntiAliasingMode[] options = Enum.GetValues<RasterPipeline.TemporalAntiAliasingMode>();
                             for (int i = 0; i < options.Length; i++)
                             {
                                 string enumName = options[i].ToString();
@@ -535,7 +542,7 @@ namespace IDKEngine.Render
                         string current = app.RasterizerPipeline.LightingVRS.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
-                            LightingShadingRateClassifier.DebugMode[] debugModes = (LightingShadingRateClassifier.DebugMode[])Enum.GetValues(typeof(LightingShadingRateClassifier.DebugMode));
+                            LightingShadingRateClassifier.DebugMode[] debugModes = Enum.GetValues<LightingShadingRateClassifier.DebugMode>();
                             for (int i = 0; i < debugModes.Length; i++)
                             {
                                 string enumName = debugModes[i].ToString();

@@ -265,6 +265,7 @@ namespace IDKEngine.Render
                     if (IsWireframe)
                     {
                         GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
+                        GL.Disable(EnableCap.CullFace);
                     }
 
                     modelSystem.FrustumCull(cullProjViewMatrix);
@@ -278,6 +279,7 @@ namespace IDKEngine.Render
                     if (IsWireframe)
                     {
                         GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
+                        GL.Enable(EnableCap.CullFace);
                     }
                 }
 
@@ -316,9 +318,9 @@ namespace IDKEngine.Render
                 {
                     deferredLightingFBO.Bind();
                     lightingProgram.Use();
-                    GL.DepthMask(false);
+                    GL.Disable(EnableCap.DepthTest);
                     GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
-                    GL.DepthMask(true);
+                    GL.Enable(EnableCap.DepthTest);
                 }
 
                 // Forward rendering

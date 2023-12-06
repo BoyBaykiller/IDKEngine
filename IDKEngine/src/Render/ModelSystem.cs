@@ -89,6 +89,7 @@ namespace IDKEngine.Render
                 return;
             }
 
+            int addedDrawCommands = 0;
             for (int i = 0; i < models.Length; i++)
             {
                 // Don't modify order
@@ -102,10 +103,11 @@ namespace IDKEngine.Render
 
                 LoadIndices(models[i].Indices);
                 LoadModelMatrices(models[i].MeshInstances);
+
+                addedDrawCommands += models[i].DrawCommands.Length;
             }
 
             {
-                int addedDrawCommands = models.Sum(model => model.DrawCommands.Length);
                 int prevDrawCommandsLength = DrawCommands.Length - addedDrawCommands;
                 ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, addedDrawCommands);
                 BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);

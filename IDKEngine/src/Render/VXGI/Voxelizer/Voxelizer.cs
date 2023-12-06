@@ -162,7 +162,7 @@ namespace IDKEngine.Render
 
             if (TAKE_FAST_GEOMETRY_SHADER_PATH)
             {
-                Vector4[] viewports = new Vector4[3];
+                Span<Vector4> viewports = stackalloc Vector4[3];
                 viewports[0] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
                 viewports[1] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
                 viewports[2] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
