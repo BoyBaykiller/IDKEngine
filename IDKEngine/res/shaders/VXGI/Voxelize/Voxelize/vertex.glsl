@@ -78,7 +78,7 @@ out InOutVars
 } outData;
 
 #if !TAKE_FAST_GEOMETRY_SHADER_PATH
-layout(location = 0) uniform int SwizzleAxis;
+layout(location = 0) uniform int RenderAxis;
 #endif
 
 void main()
@@ -90,20 +90,19 @@ void main()
 
     vec3 normal = DecompressSR11G11B10(Normal);
 
-    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-    outData.Normal = normalize(normalToWorld * normal);
+    outData.Normal = mat3(meshInstance.ModelMatrix) * normal;
     outData.TexCoord = TexCoord;
 
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
 
     gl_Position = voxelizerDataUBO.OrthoProjection * vec4(outData.FragPos, 1.0);
-    
+
 #if !TAKE_FAST_GEOMETRY_SHADER_PATH
 
     // Instead of doing a single draw call with a standard geometry shader to select the swizzle
     // we render the scene 3 times, each time with a different swizzle. I have observed this to be slightly faster
-    if (SwizzleAxis == 0) gl_Position = gl_Position.zyxw;
-    if (SwizzleAxis == 1) gl_Position = gl_Position.xzyw;
+    if (RenderAxis == 0) gl_Position = gl_Position.zyxw;
+    if (RenderAxis == 1) gl_Position = gl_Position.xzyw;
 #endif
 }

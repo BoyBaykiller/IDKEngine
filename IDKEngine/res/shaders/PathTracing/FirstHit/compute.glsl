@@ -309,36 +309,36 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             Vertex v1 = vertexSSBO.Vertices[hitInfo.VertexIndices.y];
             Vertex v2 = vertexSSBO.Vertices[hitInfo.VertexIndices.z];
 
-            vec2 texCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
-            vec3 geoNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
-            vec3 tangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
+            vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
+            vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
+            vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
 
             MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
-            mat3 TBN = GetTBN(meshInstance.ModelMatrix, tangent, geoNormal);
+            mat3 TBN = GetTBN(mat3(meshInstance.ModelMatrix), interpTangent, interpNormal);
 
             Mesh mesh = meshSSBO.Meshes[hitInfo.MeshID];
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
             
-            normal = texture(material.Normal, texCoord).rgb;
-            normal = normalize(TBN * normalize(normal * 2.0 - 1.0));
-            mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-            normal = mix(normalize(normalToWorld * geoNormal), normal, mesh.NormalMapStrength);
+            normal = texture(material.Normal, interpTexCoord).rgb;
+            normal = TBN * normalize(normal * 2.0 - 1.0);
+            mat3 normalToWorld = mat3(meshInstance.ModelMatrix);
+            normal = mix(normalize(normalToWorld * interpNormal), normal, mesh.NormalMapStrength);
 
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;
-            vec4 albedoAlpha = texture(material.BaseColor, texCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
+            vec4 albedoAlpha = texture(material.BaseColor, interpTexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
             albedo = albedoAlpha.rgb;
-            emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, texCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
+            emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, interpTexCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedo;
             
             refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
-            roughness = clamp(texture(material.MetallicRoughness, texCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
+            roughness = clamp(texture(material.MetallicRoughness, interpTexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
             if (albedoAlpha.a < material.AlphaCutoff)
             {
                 refractionChance = 1.0;
                 roughness = 0.0;
             }
 
-            specularChance = clamp(texture(material.MetallicRoughness, texCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+            specularChance = clamp(texture(material.MetallicRoughness, interpTexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
         }
         else if (IsTraceLights)
         {

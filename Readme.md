@@ -40,39 +40,35 @@ Known Issues:
 
 # Path Traced Render Samples
 
-![PTTemple](Screenshots/Showcase/PTTemple.png?raw=true)
-![PTSponza](Screenshots/Showcase/PTSponza.png?raw=true)
-![PTHorse](Screenshots/Showcase/PTHorse.png?raw=true)
+![Path Traced Temple](Screenshots/Showcase/PTTemple.png?raw=true)
+![Path Traced Sponza](Screenshots/Showcase/PTSponza.png?raw=true)
+![Path Traced Horse](Screenshots/Showcase/PTHorse.png?raw=true)
 
 ## Voxel Global Illumination
 
 ### 1.0. Overview
 
-VXGI (or Voxel Cone Tracing) is a global illumination technique developed by NVIDIA, originally [published](https://research.nvidia.com/sites/default/files/publications/GIVoxels-pg2011-authors.pdf) in 2011. Later when the Maxwell Architecture (GTX-900 series) released, the implementation was improved using GPU specific features starting from that generation. I'll show how to use those in a bit.
+VXGI (or Voxel Cone Tracing) is a global illumination technique developed by NVIDIA, originally [published](https://research.nvidia.com/sites/default/files/publications/GIVoxels-pg2011-authors.pdf) in 2011. Later when the Maxwell architecture (GTX-900 series) released, the implementation was improved using GPU specific features starting from that generation. I'll show how to use those in a bit.
 
 The basic idea of VXGI is:
 1. Voxelize the scene
 2. Cone Trace voxelized scene for second bounce lighting
 
 The voxelized representation is an approximation of the actual scene and Cone Tracing is an approximation of actual Ray Tracing.
-Trading accuracy for speed! Still, VXGI has the potential to naturally account for various lighting effects such as Rough Specular Reflections, Light bleeding, Emissive Indirect Shadows... Here is a [video](https://youtu.be/5m9fOVWaqdE) of mine showcasing that.
-Overall I think VXGI is a great technique to implement in a hobby renderer, since it's conceptually easy to understand, gives decent results and you get to play with advanced OpenGL features!
+Trading accuracy for speed! Still, VXGI has the potential to naturally account for various lighting effects. Here is a [video](https://youtu.be/5m9fOVWaqdE) showcasing some of them.
+I think it's a great technique to implement in a hobby renderer, since it's conceptually easy to understand, gives decent results and you get to play with advanced OpenGL features!
 
 ### 2.0 Voxelization
 
-Here is an image of a voxelized scene.
+![Voxelized Sponza](Screenshots/Articles/VoxelizedSponza.png?raw=true)
 
-![VoxelizedSponza](Screenshots/Articles/VoxelizedSponza.png?raw=true)
-
-Every voxel is as a pixel in a `rgba16f`-format 3D texture. What you see is a visualization of all 384^3 pixels, showing
-only those which were colored - using basic lighting and classic shadow maps. I only have this single texture, but others might store additional information such as normals for multiple bounces. This is implementation specific.
-The voxelization happens using a single shader program. A basic vertex shader and a rather unusal but clever fragment shader.
+This is a visualization of a 384-sized `rgba16f`-format 3D texture. It's the output of the voxelization stage. Every pixel/voxel is shaded normally using some basic lighting and classic shadow maps. I only have this single texture, but others might store additional information such as normals for multiple bounces. The voxelization happens using a single shader program. A basic vertex shader and a rather unusal but clever fragment shader.
 
 #### Vertex Shader
 There are two variables `vec3: GridMin, GridMax`.
-Those define the world space region (a cube) which the voxel grid spans over. We need these because when rendering, triangles get transformed into world space like normally and then mapped from the range `[GridMin, GridMax]` to `[-1, 1]` (normalized device coordinates).
-Triangles outside the grid will thus be clipped and not considered further.
-You can do this linear transformation yourself or construct an orthographic projection.
+Those define the world space region which the voxel grid spans over. When rendering, triangles get transformed to world space like normally and then mapped from the range `[GridMin, GridMax]` to `[-1, 1]` (normalized device coordinates).
+Triangles outside the grid will not be voxelized.
+You can do this mapping yourself or use an orthographic projection.
 As the grid grows, voxel resolution decreases. 
 
 ```glsl
@@ -95,43 +91,152 @@ void main() {
 #### Fragment Shader
 
 We won't have any color attachments. In fact there is no FBO at all.
-We will write into the 3D voxel-texture manually using OpenGL [image store](https://www.khronos.org/opengl/wiki/Image_Load_Store).
+We will write into the 3D texture manually using OpenGL [image store](https://www.khronos.org/opengl/wiki/Image_Load_Store).
 Framebuffers are avoided because you can only ever attach a single texture-layer for rendering.
-Image store works on absolute integer coordinates, so to find the corresponding voxel position for that fragment we can transform the normalized device coordinates.
+Image store works on absolute integer coordinates, so to find the corresponding voxel position we can transform the normalized device coordinates.
 
 ```glsl
 #version 460 core
-layout(location = 0) in vec3 Position;
-
-layout(binding = 0, rgba16f) uniform restrict image3D ImgVoxels;
+layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxels;
 
 in vec3 NormalizedDeviceCoords;
 
 void main()  {
-    vec3 uvt = NormalizedDeviceCoords * 0.5 + 0.5; // transform from [-1, 1] to [0, 1]
-    ivec3 imgCoords = ivec3(uvt * imageSize(ImgVoxels)); // transform from [0, 1] to [0, imageSize() - 1]
+    vec3 uvw = NormalizedDeviceCoords * 0.5 + 0.5; // transform from [-1, 1] to [0, 1]
+    ivec3 voxelPos = ivec3(uvw * imageSize(ImgVoxels)); // transform from [0, 1] to [0, imageSize() - 1]
 
-    vec4 voxelColor = ...; // compute some basic lighting
-    imageStore(ImgVoxels, imgCoords, voxelColor);
+    vec3 voxelColor = ...; // compute some basic lighting
+    imageStore(ImgVoxels, voxelPos, vec4(voxelColor, 1.0));
 }
 ```
 
 ---
 
-Finally the pipeline state. Since we don't have any color or depth attachments we want to use an [empty framebuffer](https://www.khronos.org/opengl/wiki/Framebuffer_Object#Empty_framebuffers). It's used to explicitly communicate OpenGL the render width & height, which normally is derived from the color attachments. To not miss triangles face culling is off. Color and other writes are turned off implicitly by using the empty framebuffer.
+Since we don't have any color or depth attachments we want to use an [empty framebuffer](https://www.khronos.org/opengl/wiki/Framebuffer_Object#Empty_framebuffers). It's used to explicitly communicate OpenGL the render width & height, which normally is derived from the color attachments. To not miss triangles, face culling is off. Color and other writes are turned off implicitly by using the empty framebuffer. Clearing is done by a simple compute shader.
 
-Now, running the voxelization as described so far gives me this. There are two issues that I'll discuss.
+Now, running the voxelization as described so far gives me this. There are two obvious issues that I'll address.
 
-![VoxelizationAttempt](Screenshots/Articles/VoxelizationAttempt.gif)
+![Voxelization Attempt](Screenshots/Articles/VoxelizationAttempt.gif)
 
-TODO
-### 2.1 Fixing the flickering
+### 2.1 Fixing flickering
 
-### 2.2 Fixing the missing voxels
+Flickering happens because the world space position for different fragment shader invocations can get mapped to the same voxel, and the invocation that writes to the image at last is random. One decent solution is to store the `max()` of the already stored and the new voxel color. There are several ways to implement this in a thread-safe manner: Fragment Shader Interlock, CAS-Loop, Atomic Operations.
+Fragment Shader Interlock is only available on NVIDIA & Intel. CAS-Loop is what I've seen the most but it's unstable and slow.
+So I decided to go with `imageAtomicMax`.
+
+```glsl
+layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxels;
+layout(binding = 1, r32ui) restrict uniform uimage3D ImgVoxelsR;
+layout(binding = 2, r32ui) restrict uniform uimage3D ImgVoxelsG;
+layout(binding = 3, r32ui) restrict uniform uimage3D ImgVoxelsB;
+
+void main() {
+    uvec3 uintVoxelColor = floatBitsToUint(voxelColor);
+    imageAtomicMax(ImgVoxelsR, voxelPos, uintVoxelColor.r);
+    imageAtomicMax(ImgVoxelsG, voxelPos, uintVoxelColor.g);
+    imageAtomicMax(ImgVoxelsB, voxelPos, uintVoxelColor.b);
+    imageStore(ImgVoxels, voxelPos, vec4(0.0, 0.0, 0.0, 1.0));
+}
+```
+
+Image atomics can only be performed on single channel integer formats, but the voxel texture is required to be at least `rgba16f`. So I create three additional `r32ui`-format intermediate textures to perform the atomic operations on. Alpha is just always set to 1.0, no atomic operations needed. After voxelization, in a simple compute shader, they get merged into the final `rgba16f` texture.
+
+### 2.2 Fixing missing voxels
+
+Why are there so many missing voxels? Consider the floor. What do we see if we view it from the side.
+
+![Plane From Side](Screenshots/Articles/PlaneFromSide.png?raw=true)
+
+Well, there is a thin line, but technically even that shouldn't be visible. When this gets rasterized the [voxelization fragment shader](#fragment-shader) won't even run.
+The camera should have been looking along the Y axis, not Z, because this is the dominant axis that maximizes the amount of projected area (more fragment shader invocations). The [voxelization vertex shader](#vertex-shader) doesn't have a view matrix and adding one would be overkill. To make the "camera" look a certain axis we can simply swizzle the vertex positions.
+
+This is typically implemented in a geometry shader by finding the dominant axis of the triangle's geometric normal and then swizzling the vertex positions accordingly. Geometry shaders are known to be very slow, so I went with a different approach.
+
+```glsl
+uniform int RenderAxis; // Set to 0, 1, 2 for each draw
+
+void main() {
+    gl_Position = vec4(NormalizedDeviceCoords, 1.0);
+
+    if (RenderAxis == 0) gl_Position = gl_Position.zyxw;
+    if (RenderAxis == 1) gl_Position = gl_Position.xzyw;
+}
+```
+
+The entire scene simply gets rendered 3 times, once from each axis. No geometry shader is used. This works great together with `imageAtomicMax` from [2.2 Fixing missing voxels](#22-fixing-missing-voxels), since the fragment shader doesn't just overwrite a voxel's color each draw.
+
+Performance comparison of voxelizing the 11 million triangles [Intel Sponza](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html) on AMD RX 5700 XT:
+
+* 5.3 ms without geometry shader (rendering thrice method)
+* 10.5 ms with geometry shader (rendering once method)
+
+The rendering thrice method is simpler to implement and faster. Still it's far from optimal. For example swizzling the vertices in a compute shader and then rendering only once, basically emulating the geometry shader, would likely be more performant.
+
+### 2.3 Optimizations (using NV-extensions)
+
+There are certain extensions we can use to improve the voxelization process. These are only supported on NVIDIA GPUs starting from the Maxwell architecture (GTX-900 series).
+
+#### GL_NV_shader_atomic_fp16_vector
+This extensions is used to improve the implementation discussed in [2.1 Fixing flickering](#21-fixing-flickering).
+
+It allows to perform atomics on `rgba16f`-format images. This means the three `r32ui`-format intermediate textures and the compute shader that merges them into the final voxel texture are no longer needed. Instead we can directly perform `imageAtomicMax` on the voxel texture.
+
+```glsl
+#version 460 core
+#extension GL_NV_shader_atomic_fp16_vector : require
+layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxels;
+
+void main() {
+    imageAtomicMax(ImgResult, voxelPos, f16vec4(voxelColor, 1.0));
+}
+```
+
+#### GL_NV_geometry_shader_passthrough + GL_NV_viewport_swizzle
+These extensions are used to improve the implementation discussed in [2.2 Fixing missing voxels](#22-fixing-missing-voxels)
+
+What if the geometry shader wasn't painfully slow? Then we could actually use it instead of rendering the scene 3 times.
+Fortunately, `GL_NV_geometry_shader_passthrough` allows exactly that. The extension limits the abilities of normal geometry shaders, but it lets the hardware implement them with minimal overhead. One limitation is that you can no longer modify vertex positions of the primitive. So how are we going to do per vertex swizzling then? With `GL_NV_viewport_swizzle`. The extension allows associating a swizzle with a viewport.
+```glsl
+#version 460 core
+#extension GL_NV_geometry_shader_passthrough : require
+
+layout(triangles) in;
+layout(passthrough) in gl_PerVertex {
+    vec4 gl_Position;
+} gl_in[];
+
+layout(passthrough) in InOutVars {
+    // in & out variables...
+} inData[];
+
+void main() {
+    vec3 p1 = gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz;
+    vec3 p2 = gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz;
+    vec3 normalWeights = abs(cross(p1, p2));
+
+    int dominantAxis = normalWeights.y > normalWeights.x ? 1 : 0;
+    dominantAxis = normalWeights.z > normalWeights[dominantAxis] ? 2 : dominantAxis;
+
+    // Swizzle is applied by selecting a viewport
+    // This works using the GL_NV_viewport_swizzle extension
+    gl_ViewportIndex = 2 - dominantAxis;
+}
+```
+
+This is like a standard voxelization geometry shader. It finds the axis from which the triangle should be rendered to maximize projected area and then applies the swizzle accordingly. Except that the swizzle is applied indirectly using `GL_NV_viewport_swizzle` and the geometry shader is written using `GL_NV_geometry_shader_passthrough`. How to associate a particular swizzle with a viewport is an exercise left to the reader :).
+
+---
+
+Voxelization performance of 11 million triangles [Intel Sponza](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html) at 256^3 resolution. Even though the RTX 3050 Ti Laptop is a less powerful GPU we can make it voxelize faster and take up less memory in the process by using the extensions.
+
+| GPU                  | Baseline       | FP16-Atomics(2.5x less memory)  | Passthrough-GS | FP16-Atomics(2.5x less memory) + Passthrough-GS |
+|----------------------|----------------|---------------------------------|----------------|-------------------------------------------------|
+| RTX 3050 Ti Laptop   | 17.1ms         | 17.0ms                          | 4.4ms          | 4.3 ms                                          |
+| RX 5700 XT           | 5.3ms          | not available                   | not available  | not available                                   |
 
 ### 3.0 Cone Tracing
 
-### 4.0 Optimizations using NV-extensions
+TODO
 
 ## Variable Rate Shading
 
@@ -381,7 +486,7 @@ void main()
 ```
 
 Here is a comparison of using shadow samplers (right) vs not using them.
-![SamplingComparison](Screenshots/Articles/SamplingComparison.png?raw=true)
+![Sampling Comparison](Screenshots/Articles/SamplingComparison.png?raw=true)
 
 Of course, you can combine this with software filtering like PCF to get even better results.
 
@@ -457,7 +562,7 @@ After the handle is generated, the texture's state is immutable. This cannot be 
 To sample a bindless texture it's handle must also be made resident.
 The extension allows you to place `sampler2D` directly inside the shader storage block as shown. Note however that you could also do `uvec2 Textures[];` and then perform a cast like: `sampler2D myTexture = sampler2D(textureSSBO.Textures[0])`.
 
-In the case of an MDI renderer as described in "1.0 Multi Draw Indirect".
+In the case of an MDI renderer as described in [1.0 Multi Draw Indirect](#10-multi-draw-indirect).
 the process of fetching each mesh's texture would look something like this:
 ```glsl
 #version 460 core

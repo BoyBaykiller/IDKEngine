@@ -68,7 +68,7 @@ in InOutVars
     vec4 ClipPos;
     vec4 PrevClipPos;
     vec3 Normal;
-    mat3 TangentToWorld;
+    mat3 TBN;
     flat uint MaterialIndex;
     flat float EmissiveBias;
     flat float NormalMapStrength;
@@ -89,7 +89,7 @@ void main()
     }
     vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
-    normal = normalize(inData.TangentToWorld * normalize(normal * 2.0 - 1.0));
+    normal = inData.TBN * normalize(normal * 2.0 - 1.0);
     normal = mix(normalize(inData.Normal), normal, inData.NormalMapStrength);
 
     float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + inData.SpecularBias, 0.0, 1.0);

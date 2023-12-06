@@ -79,8 +79,8 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 } gBufferDataUBO;
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);
-bool Shadow(PointShadow pointShadow, vec3 lightSpacePos);
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
+bool Shadow(PointShadow pointShadow, vec3 lightToSample);
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
 float ComputeScattering(float cosTheta);
 
 uniform int Samples;
@@ -165,17 +165,17 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
 }
 
 // Only binaries shadow because soft shadows are not worth it in this case
-bool Shadow(PointShadow pointShadow, vec3 lightSpacePos)
+bool Shadow(PointShadow pointShadow, vec3 lightToSample)
 {
-    float depth = GetLightSpaceDepth(pointShadow, lightSpacePos);
-    float closestDepth = texture(pointShadow.Texture, lightSpacePos).r;
+    float depth = GetLightSpaceDepth(pointShadow, lightToSample);
+    float closestDepth = texture(pointShadow.Texture, lightToSample).r;
 
     return depth > closestDepth;
 }
 
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
 {
-    float dist = max(abs(lightSpacePos.x), max(abs(lightSpacePos.y), abs(lightSpacePos.z)));
+    float dist = max(abs(lightSpaceSamplePos.x), max(abs(lightSpaceSamplePos.y), abs(lightSpaceSamplePos.z)));
     float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);
 
     return depth;

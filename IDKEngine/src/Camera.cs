@@ -15,7 +15,17 @@ namespace IDKEngine
 
         public Vector3 UpVector;
 
-        public float LookX;
+        private float _lookX;
+        public float LookX
+        {
+            get => _lookX;
+
+            set
+            {
+                _lookX = value;
+            }
+        }
+
         public float _lookY;
         public float LookY
         {
@@ -89,10 +99,10 @@ namespace IDKEngine
             Position += dT * Velocity + 0.5f * ThisFrameAcceleration * dT * dT;
             Velocity += ThisFrameAcceleration * dT;
 
-            if (MathF.Abs(Velocity.X) < 3.0f * dT) Velocity.X = 0.0f;
-            if (MathF.Abs(Velocity.Y) < 3.0f * dT) Velocity.Y = 0.0f;
-            if (MathF.Abs(Velocity.Z) < 3.0f * dT) Velocity.Z = 0.0f;
-
+            if (Velocity.Length < 9.0f * dT)
+            {
+                Velocity = new Vector3(0.0f);
+            }
 
             const float dragConstant = 0.95f;
             float drag = MathF.Log10(dragConstant) * 144.0f;

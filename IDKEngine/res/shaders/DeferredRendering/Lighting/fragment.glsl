@@ -174,8 +174,8 @@ layout(std430, binding = 7) restrict readonly buffer TlasSSBO
 } tlasSSBO;
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight);
-float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos);
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos);
+float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample);
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
 
 #define SHADOW_MODE_NONE 0
 #define SHADOW_MODE_PCF_SHADOW_MAP 1 
@@ -236,8 +236,8 @@ void main()
                 if (light.PointShadowIndex >= 0)
                 {
                     PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
-                    vec3 lightSpacePos = unjitteredFragPos - light.Position;
-                    contribution *= Visibility(pointShadow, normal, lightSpacePos);
+                    vec3 lightToSample = unjitteredFragPos - light.Position;
+                    contribution *= Visibility(pointShadow, normal, lightToSample);
                 }
             }
             else if (ShadowMode == SHADOW_MODE_RAY_TRACED)
@@ -331,15 +331,15 @@ const vec3 ShadowSampleOffsets[] =
     vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
 };
 
-float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos)
+float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample)
 {
-    float bias = 0.018;
+    const float bias = 0.018;
+    const float sampleDiskRadius = 0.04;
 
     float visibilityFactor = 0.0;
-    const float sampleDiskRadius = 0.04;
     for (int i = 0; i < ShadowSampleOffsets.length(); i++)
     {
-        vec3 samplePos = (lightSpacePos + ShadowSampleOffsets[i] * sampleDiskRadius);
+        vec3 samplePos = (lightToSample + ShadowSampleOffsets[i] * sampleDiskRadius);
         float depth = GetLightSpaceDepth(pointShadow, samplePos * (1.0 - bias));
         visibilityFactor += texture(pointShadow.ShadowTexture, vec4(samplePos, depth));
     }
@@ -348,9 +348,9 @@ float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightSpacePos)
     return visibilityFactor;
 }
 
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpacePos)
+float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
 {
-    float dist = max(abs(lightSpacePos.x), max(abs(lightSpacePos.y), abs(lightSpacePos.z)));
+    float dist = max(abs(lightSpaceSamplePos.x), max(abs(lightSpaceSamplePos.y), abs(lightSpaceSamplePos.z)));
     float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);
 
     return depth;

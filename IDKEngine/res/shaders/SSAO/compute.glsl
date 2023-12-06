@@ -58,7 +58,7 @@ void main()
 
     vec3 fragPos = PerspectiveTransform(vec3(uv, depth) * 2.0 - 1.0, basicDataUBO.InvProjection);
     mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
-    normal = normalize(normalToView * normal);
+    normal = normalToView * normal;
 
     float occlusion = SSAO(fragPos, normal);
 
