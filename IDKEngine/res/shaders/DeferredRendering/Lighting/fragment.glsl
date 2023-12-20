@@ -106,7 +106,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
-    float DeltaUpdate;
+    float DeltaRenderTime;
     float Time;
 } basicDataUBO;
 

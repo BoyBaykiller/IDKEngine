@@ -16,7 +16,7 @@ namespace IDKEngine
         public Matrix4 PrevProjView;
         public float NearPlane;
         public float FarPlane;
-        public float DeltaUpdate;
+        public float DeltaRenderTime;
         public float Time;
     }
 }

@@ -23,16 +23,4 @@ Frustum GetFrustum(mat4 matrix)
     return frustum;
 }
 
-bool FrustumBoxIntersect(Frustum frustum, vec3 boxMin, vec3 boxMax)
-{
-    float a = 1.0;
-    for (int i = 0; i < 6 && a >= 0.0; i++)
-    {
-        vec3 negative = mix(boxMin, boxMax, greaterThan(frustum.Planes[i].xyz, vec3(0.0)));
-        a = dot(vec4(negative, 1.0), frustum.Planes[i]);
-    }
-
-    return a >= 0.0;
-}
-
 #endif

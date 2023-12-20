@@ -29,6 +29,7 @@ namespace IDKEngine.Render
         {
             public EntityType Type;
             public int Index;
+            public int Instance;
             public float Distance;
         }
 
@@ -72,7 +73,7 @@ namespace IDKEngine.Render
             System.Numerics.Vector2 tempVec2;
             System.Numerics.Vector3 tempVec3;
 
-            
+
             if (ImGui.Begin("Camera"))
             {
                 if (ImGui.CollapsingHeader("Collision Detection"))
@@ -242,7 +243,7 @@ namespace IDKEngine.Render
                     }
                     ImGui.Separator();
                 }
-
+                
                 if (app.RenderMode == RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
@@ -428,9 +429,6 @@ namespace IDKEngine.Render
 
                         ImGui.Checkbox("GenerateShadowMaps", ref app.RasterizerPipeline.GenerateShadowMaps);
                         ToolTipForItemAboveHovered("Regardless of shadow map technique used, this is still needed for effects such as volumetric lighting. Controls wether shadow maps are regenerated every frame.");
-
-                        ImGui.Text($"HAS_VERTEX_LAYERED_RENDERING: {PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH}");
-                        ToolTipForItemAboveHovered("Uses (ARB_shader_viewport_layer_array or NV_viewport_array2 or AMD_vertex_shader_layer) to generate point shadows in only 1 draw call instead of 6.");
                     }
 
                     if (ImGui.CollapsingHeader("Anti Aliasing"))
@@ -459,10 +457,10 @@ namespace IDKEngine.Render
 
                         if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.TAA)
                         {
-                            tempBool = app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation;
-                            if (ImGui.Checkbox("IsTaaArtifactMitigation", ref tempBool))
+                            tempBool = app.RasterizerPipeline.TaaResolve.IsNaiveTaa;
+                            if (ImGui.Checkbox("IsNaiveTaa", ref tempBool))
                             {
-                                app.RasterizerPipeline.TaaResolve.IsTaaArtifactMitigation = tempBool;
+                                app.RasterizerPipeline.TaaResolve.IsNaiveTaa = tempBool;
                             }
                             ToolTipForItemAboveHovered(
                                 "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass.\n" +
@@ -470,6 +468,15 @@ namespace IDKEngine.Render
                             );
 
                             ImGui.SliderInt("Samples##1", ref app.RasterizerPipeline.TAASamples, 1, 36);
+
+                            if (!app.RasterizerPipeline.TaaResolve.IsNaiveTaa)
+                            {
+                                tempFloat = app.RasterizerPipeline.TaaResolve.PreferAliasingOverBlur;
+                                if (ImGui.SliderFloat("PreferAliasingOverBlur", ref tempFloat, 0.0f, 1.0f))
+                                {
+                                    app.RasterizerPipeline.TaaResolve.PreferAliasingOverBlur = tempFloat;
+                                }
+                            }
                         }
                         else if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.FSR2)
                         {
@@ -773,11 +780,14 @@ namespace IDKEngine.Render
                         Model newModel = new Model(result.Path);
                         app.ModelSystem.Add(newModel);
 
-                        SelectedEntity.Index = app.ModelSystem.Meshes.Length - 1;
-                        SelectedEntity.Type = EntityType.Mesh; 
-                        ref readonly GpuDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[SelectedEntity.Index];
+                        int newMeshIndex = app.ModelSystem.Meshes.Length - 1;
+
+                        ref readonly GpuDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[newMeshIndex];
                         Vector3 position = app.ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix.ExtractTranslation();
+
                         SelectedEntity.Distance = Vector3.Distance(position, app.Camera.Position);
+                        SelectedEntity.Index = newMeshIndex;
+                        SelectedEntity.Type = EntityType.Mesh; 
 
                         shouldResetPT = true;
                     }
@@ -796,7 +806,7 @@ namespace IDKEngine.Render
                     bool shouldUpdateMesh = false;
                     ref readonly GpuDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[SelectedEntity.Index];
                     ref GpuMesh mesh = ref app.ModelSystem.Meshes[SelectedEntity.Index];
-                    ref GpuMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance];
+                    ref GpuMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance + SelectedEntity.Instance];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"Triangle Count: {cmd.Count / 3}");
@@ -1134,31 +1144,34 @@ namespace IDKEngine.Render
                 if (!hitLight) lightHitInfo.T = float.MaxValue;
                 if (!hitMesh) meshHitInfo.T = float.MaxValue;
 
-                int hitEntityID;
-                EntityType hitEntityType;
+                SelectedEntityInfo newSelectedEntity;
                 if (meshHitInfo.T < lightHitInfo.T)
                 {
-                    SelectedEntity.Distance = meshHitInfo.T;
-                    hitEntityType = EntityType.Mesh;
-                    hitEntityID = meshHitInfo.MeshID;
+                    newSelectedEntity.Type = EntityType.Mesh;
+                    newSelectedEntity.Index = meshHitInfo.MeshID;
+                    newSelectedEntity.Instance = meshHitInfo.InstanceID;
+                    newSelectedEntity.Distance = meshHitInfo.T;
                 }
                 else
                 {
-                    SelectedEntity.Distance = lightHitInfo.T;
-                    hitEntityType = EntityType.Light;
-                    hitEntityID = lightHitInfo.LightID;
+                    newSelectedEntity.Type = EntityType.Light;
+                    newSelectedEntity.Index = lightHitInfo.LightID;
+                    newSelectedEntity.Instance = 0;
+                    newSelectedEntity.Distance = lightHitInfo.T;
                 }
 
-                bool entityWasAlreadySelected = (hitEntityID == SelectedEntity.Index) && (hitEntityType == SelectedEntity.Type);
+                bool entityWasAlreadySelected =
+                    (newSelectedEntity.Type == SelectedEntity.Type) &&
+                    (newSelectedEntity.Index == SelectedEntity.Index) &&
+                    (newSelectedEntity.Instance == SelectedEntity.Instance);
+
                 if (entityWasAlreadySelected)
                 {
                     SelectedEntity.Type = EntityType.None;
-                    SelectedEntity.Index = -1;
                 }
                 else
                 {
-                    SelectedEntity.Index = hitEntityID;
-                    SelectedEntity.Type = hitEntityType;
+                    SelectedEntity = newSelectedEntity;
                 }
             }
 

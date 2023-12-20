@@ -2,7 +2,7 @@
 #extension GL_ARB_bindless_texture : require
 
 AppInclude(include/Constants.glsl)
-AppInclude(include/Frustum.glsl)
+AppInclude(include/IntersectionRoutines.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -65,7 +65,7 @@ layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
     DrawElementsCmd DrawCommands[];
 } drawElementsCmdSSBO;
 
-layout(std430, binding = 1) restrict writeonly buffer MeshSSBO
+layout(std430, binding = 1) restrict readonly writeonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
@@ -83,15 +83,11 @@ layout(std430, binding = 5) restrict readonly buffer BlasSSBO
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
     PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
-    int Count;
 } shadowDataUBO;
 
-layout(location = 0) uniform int ShadowIndex;
+layout(location = 0) uniform int PointShadowIndex;
+layout(location = 1) uniform int FaceIndex;
 
-// 1. Count number of shadow-cubemap-faces the mesh is visible from the shadow source
-// 2. Pack each visible face into a single int
-// 3. Write the packed int into a global variable. The shadow vertex shader will access this variable
-// 4. Also write the InstanceCount into the draw command buffer - one instance for each mesh
 void main()
 {
     uint meshIndex = gl_GlobalInvocationID.x;
@@ -102,20 +98,14 @@ void main()
 
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshIndex];
     BlasNode node = blasSSBO.Nodes[drawCmd.BlasRootNodeIndex];
-    PointShadow pointShadow = shadowDataUBO.PointShadows[ShadowIndex];
 
-    int instances = 0;
-    int packedValue = 0;
-    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance].ModelMatrix;
+    const uint glInstanceID = 0; // TODO: Derive from built in variables
+    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].PrevModelMatrix;
 
-    for (int i = 0; i < 6; i++)
-    {
-        Frustum frustum = GetFrustum(pointShadow.ProjViewMatrices[i] * model);
-        if (FrustumBoxIntersect(frustum, node.Min, node.Max))
-        {
-            packedValue = bitfieldInsert(packedValue, i, 3 * instances++, 3);
-        }
-    }
-    drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = instances;
-    meshSSBO.Meshes[meshIndex].CubemapShadowCullInfo = packedValue;
+    mat4 projView = shadowDataUBO.PointShadows[PointShadowIndex].ProjViewMatrices[FaceIndex];
+
+    Frustum frustum = GetFrustum(projView * model);
+    bool isVisible = FrustumBoxIntersect(frustum, node.Min, node.Max);
+
+    drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = isVisible ? 1 : 0;
 }

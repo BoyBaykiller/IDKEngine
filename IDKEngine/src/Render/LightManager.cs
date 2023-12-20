@@ -80,8 +80,8 @@ namespace IDKEngine.Render
                 Light light = lights[i];
                 if (light.HasPointShadow())
                 {
-                    pointShadowManager.TryGetPointShadow(light.GpuLight.PointShadowIndex, out PointShadow pointShadow);
-                    pointShadow.Position = light.GpuLight.Position;
+                    pointShadowManager.TryGetPointShadow(light.GpuLight.PointShadowIndex, out PointShadow associatedPointShadow);
+                    associatedPointShadow.Position = light.GpuLight.Position;
                 }
             }
             pointShadowManager.RenderShadowMaps(modelSystem);

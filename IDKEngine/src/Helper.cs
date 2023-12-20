@@ -30,6 +30,13 @@ namespace IDKEngine
             return sum;
         }
 
+        public static void ArrayAdd<T>(ref T[] arr, ReadOnlySpan<T> toAdd)
+        {
+            int prevLength = arr.Length;
+            Array.Resize(ref arr, prevLength + toAdd.Length);
+            toAdd.CopyTo(new Span<T>(arr, prevLength, toAdd.Length));
+        }
+
         public static Vector4 ToOpenTK(this System.Numerics.Vector4 vector4)
         {
             return Unsafe.As<System.Numerics.Vector4, Vector4>(ref vector4);

@@ -19,9 +19,11 @@ namespace IDKEngine.Render.Objects
         public readonly int ID;
         public readonly TextureTarget Target;
         public readonly TextureDimension Dimension;
-        public int Width { get; private set; } = 1;
-        public int Height { get; private set; } = 1;
-        public int Depth { get; private set; } = 1;
+        public int Width { get; private set; }
+        public int Height { get; private set; }
+        public int Depth { get; private set; }
+        public int Levels { get; private set; }
+
         public SizedInternalFormat SizedInternalFormat { get; private set; }
 
         private readonly List<ulong> associatedTextureHandles = new List<ulong>(0);
@@ -251,7 +253,8 @@ namespace IDKEngine.Render.Objects
 
         public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)
         {
-            return new Vector3i(width / (1 << level), height / (1 << level), depth / (1 << level));
+            Vector3i size = new Vector3i(width, height, depth) / (1 << level);
+            return Vector3i.ComponentMax(size, new Vector3i(1));
         }
 
         public void ImmutableAllocate(int width, int height, int depth, SizedInternalFormat sizedInternalFormat, int levels = 1)
@@ -260,17 +263,20 @@ namespace IDKEngine.Render.Objects
             {
                 case TextureDimension.One:
                     GL.TextureStorage1D(ID, levels, sizedInternalFormat, width);
-                    Width = width;
+                    Width = width; Height = 1; Depth = 1;
+                    Levels = levels;
                     break;
 
                 case TextureDimension.Two:
                     GL.TextureStorage2D(ID, levels, sizedInternalFormat, width, height);
-                    Width = width; Height = height;
+                    Width = width; Height = height; Depth = 1;
+                    Levels = levels;
                     break;
 
                 case TextureDimension.Three:
                     GL.TextureStorage3D(ID, levels, sizedInternalFormat, width, height, depth);
                     Width = width; Height = height; Depth = depth;
+                    Levels = levels;
                     break;
 
                 default:

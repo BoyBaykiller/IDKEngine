@@ -55,7 +55,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
-    float DeltaUpdate;
+    float DeltaRenderTime;
     float Time;
 } basicDataUBO;
 
@@ -108,4 +108,14 @@ void main()
     jitteredClipPos.xy += taaDataUBO.Jitter * outData.ClipPos.w;
     
     gl_Position = jitteredClipPos;
+
+    // if (gl_DrawID == 67)
+    // {
+    //     uint ass = 0;
+    //     for (int i = 0; i < 500000; i++)
+    //     {
+    //         ass += i;
+    //     }
+    //     gl_Position.x += ass / 100000000000.0; 
+    // }
 }

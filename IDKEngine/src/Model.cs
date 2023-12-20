@@ -12,8 +12,6 @@ using glTFLoader.Schema;
 using IDKEngine.Render.Objects;
 using GLTexture = IDKEngine.Render.Objects.Texture;
 using GltfTexture = glTFLoader.Schema.Texture;
-using System.Diagnostics;
-using System.Threading;
 
 namespace IDKEngine
 {

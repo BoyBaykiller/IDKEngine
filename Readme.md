@@ -79,7 +79,7 @@ uniform mat4 VoxelGridMatrix; // Matrix4.CreateOrthographicOffCenter(GridMin, Gr
 out vec3 NormalizedDeviceCoords;
 
 void main() {
-    vec3 fragPos = vec4(ModelMatrix * Position, 1.0);
+    vec3 fragPos = (ModelMatrix * vec4(Position, 1.0)).xyz;
 
     // transform fragPos from [GridMin, GridMax] to [-1, 1]
     NormalizedDeviceCoords = (VoxelGridMatrix * fragPos).xyz;
@@ -165,7 +165,7 @@ void main() {
 
 The entire scene simply gets rendered 3 times, once from each axis. No geometry shader is used. This works great together with `imageAtomicMax` from [2.2 Fixing missing voxels](#22-fixing-missing-voxels), since the fragment shader doesn't just overwrite a voxel's color each draw.
 
-Performance comparison of voxelizing the 11 million triangles [Intel Sponza](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html) on AMD RX 5700 XT:
+Performance comparison on 11 million triangles [Intel Sponza](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html) scene with AMD RX 5700 XT, only measuring the actual voxelization program:
 
 * 5.3 ms without geometry shader (rendering thrice method)
 * 10.5 ms with geometry shader (rendering once method)
@@ -227,12 +227,12 @@ This is like a standard voxelization geometry shader. It finds the axis from whi
 
 ---
 
-Voxelization performance of 11 million triangles [Intel Sponza](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html) at 256^3 resolution. Even though the RTX 3050 Ti Laptop is a less powerful GPU we can make it voxelize faster and take up less memory in the process by using the extensions.
+Voxelization performance for 11 million triangles [Intel Sponza](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html) at 256^3 resolution, including texture clearing and (potential) merging. Even though the RTX 3050 Ti Laptop is a less powerful GPU we can make it voxelize faster and take up less memory in the process by using the extensions.
 
 | GPU                  | Baseline       | FP16-Atomics(2.5x less memory)  | Passthrough-GS | FP16-Atomics(2.5x less memory) + Passthrough-GS |
 |----------------------|----------------|---------------------------------|----------------|-------------------------------------------------|
-| RTX 3050 Ti Laptop   | 17.1ms         | 17.0ms                          | 4.4ms          | 4.3 ms                                          |
-| RX 5700 XT           | 5.3ms          | not available                   | not available  | not available                                   |
+| RTX 3050 Ti Laptop   | 19.05ms        | 17.60ms                         | 6.41ms         | 4.93ms                                          |
+| RX 5700 XT           | 6.49ms         | not available                   | not available  | not available                                   |
 
 ### 3.0 Cone Tracing
 
@@ -244,7 +244,7 @@ TODO
 
 Variable Rate Shading is when you render different regions of the framebuffer at different resolutions. This feature is exposed in OpenGL through the [`NV_shading_rate_image`](https://registry.khronos.org/OpenGL/extensions/NV/NV_shading_rate_image.txt) extension. When drawing the hardware fetches a "Shading Rate Image" looks up the value in a user defined shading rate palette and applies that shading rate to the block of fragments.
 
-So all we need to do is generate this Shading Rate Image, which is really just a `r8ui`-format texture where each pixel covers
+So all we need to do is generate this Shading Rate Image which is really just a `r8ui`-format texture where each pixel covers
 a 16x16 tile of the framebuffer. This image will control the resolution at which each tile is rendered.
 
 Example of a generated Shading Rate Image while the camera is rapidly moving forward, taking into account velocity and variance of luminance
@@ -270,7 +270,7 @@ $$\overline{x} = \sum_{i = 1}^{n} \frac{1}{n} \cdot x_{i}$$
 
 Where $\overline{x}$ is the average of $x$ and $n$ the number of elements.
 
-For starters you could call `atomicAdd(SharedMem, value * (1.0 / n))` on shared memory, but atomics on floats is not a core feature, and as far as my testing goes, the following approach was no slower:
+For starters you could call `atomicAdd(SharedMem, value * (1.0 / n))` on shared memory, but atomics on floats is not a core feature and, as far as my testing goes, the following approach was no slower:
 ```glsl
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
@@ -291,16 +291,15 @@ void main()
     // average is computed and stored in Average[0]
 }
 ```
-The algorithm first loads all the values of the set we want to average into shared memory.
-Then it adds the first half of array entries to the other half. After that, all the new values are again divided in half and added to the new rest, which is now 1/4 the size of the original array. At some point, the final sum is collapsed into the first element.
+This algorithm first loads all the values we want to average into shared memory.
+Then it adds the first half of array entries to the other half, storing results in the first half. After that, all the new values are again divided and added together. The output is now 1/4 the size of the original array. At some point, the final sum is collapsed into the first element.
 
 That's it for the averaging part.
 
 Calculating the variance requires a little more work.
-Mathematically what we want is the [Coefficient of variation](https://en.wikipedia.org/wiki/Coefficient_of_variation) (CV).
-The CV is the standard deviation divided by the average. And the standard deviation is just variance squared.
+What we actually want is the [Coefficient of variation](https://en.wikipedia.org/wiki/Coefficient_of_variation) (CV), because that is normalized and independent of scale (e.g {5, 10} and {10, 20} have same CV = ~0.33). But the two are related - variance is needed to compute CV.
 
-So here is how to compute all of that:
+The CV equals standard deviation divided by the average. And standard deviation is just the square root of variance.
 
 $$V(x) = \frac{\sum_{i = 1}^{n}(x_{i} - \overline{x})^{2}}{n}$$
 
@@ -314,10 +313,8 @@ $$StdDev(x) = \sqrt{V(x)}$$
 
 $$CV = \frac{StdDev(x)}{\overline{x}}$$
 
-As before $\overline{x}$ is the average of set $x$ and $n$ the number of elements in it, these are the only inputs. $V(x)$ is variance, $StdDev(x)$ the standard deviation and CV the Coefficient of variation. The result of $StdDev(x)$ is dependent on the scale of the input. Darker colors will have a lower stdDev as the same colors scaled up. That is bad as it creates a bias in the resulting shading rates. Dividing by the average fixes that, for example the sets {5, 10} and {10, 20} have the same CV (~0.33).
 
-
-Here's a implementation. I put the parallel adding stuff from above in the function `ParallelSum`.
+Here is an implementation. I put the parallel adding stuff from above in the function `ParallelSum`.
 ```glsl
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
@@ -352,7 +349,7 @@ Anyway, the one that is particularly interesting for our case of computing a sum
 
 On my GPU a subgroup is 32 invocations big.
 When I call `subgroupAdd(2)` the function will return 64.
-So it does a sum over all values passed to the function in the scope of a all (active) subgroup invocations.
+So it does a sum over all values passed to the function in the scope of all (active) subgroup invocations.
 
 Using this knowledge, my optimized version of a workgroup wide sum looks like this:
 ```glsl
@@ -598,15 +595,15 @@ I find the following implementation to be quite elegant and low overhead because
 
 The ingredients needed to get started are:
 - A projection + view matrix
-- A list of each mesh's model matrix
-- A list of each mesh's draw command
-- A list of each mesh's bounding box
+- Buffer containing each mesh's model matrix
+- Buffer containing each mesh's draw command
+- Buffer containing each mesh's bounding box
 
-In an MDI renderer as described in "1.0 Multi Draw Indirect", the first three points are required anyway.
+In an MDI renderer as described in [1.0 Multi Draw Indirect](#10-multi-draw-indirect), the first three points are required anyway.
 And getting a local space bounding box from each mesh's vertices shouldn't be a problem.
 
 Remember how `MultiDrawElementsIndirect` reads draw commands from a buffer object?
-This means that the GPU can modify it's own drawing parameters by writing into that buffer object (using shader storage blocks).
+That means the GPU can modify it's own drawing parameters by writing into this buffer object (using shader storage blocks).
 And that's the key to GPU accelerated frustum culling without any CPU readback.
 
 Basically, the CPU side of things is as simple this:
@@ -658,12 +655,13 @@ void main()
     Box box = mesh.AABB;
         
     Frustum frustum = GetFrustum(ProjView * mesh.ModelMatrix);
-    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = int(FrustumBoxIntersect(frustum, box));
+    bool isMeshInFrustum = FrustumBoxIntersect(frustum, node.Min, node.Max);
+
+    drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = isMeshInFrustum ? 1 : 0;
 }
 ```
-The implementation of `FrustumExtract` and `FrustumBoxIntersect` can be found [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/include/Frustum.glsl).
 
 Each thread grabs a mesh builds a frustum and then compares it against the aabb.
-`drawCommandSSBO` is a shader storage block giving us access to the buffer that holds the draw commands used by `MultiDrawElementsIndirect`.
+`drawCommandSSBO` holds the draw commands used by `MultiDrawElementsIndirect`.
 If the test fails, `InstanceCount` is set to 0 otherwise 1.
-A mesh with `InstanceCount = 0` will not cause any vertex shader invocations later when things are drawn, saving us a lot of computation.
+A mesh with `InstanceCount = 0` will not cause any vertex shader invocations later when things are drawn, saving a lot of computations.
