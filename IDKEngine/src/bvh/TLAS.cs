@@ -1,40 +1,27 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using IDKEngine.Shapes;
 using OpenTK.Mathematics;
+using IDKEngine.Shapes;
 
 namespace IDKEngine
 {
     class TLAS
     {
-        //public struct BlasInstances
-        //{
-        //    public BLAS Blas;
-        //    public ArraySegment<GpuMeshInstance> Instances;
-
-        //    public void Deconstruct(out BLAS blas, out ArraySegment<GpuMeshInstance> instances)
-        //    {
-        //        blas = Blas;
-        //        instances = Instances;
-        //    }
-        //}
-
         public GpuTlasNode Root => Nodes[0];
         public int TreeDepth { get; private set; }
 
         public GpuMeshInstance[] MeshInstances;
         public GpuDrawElementsCmd[] DrawCommands;
-        public List<BLAS> Blases;
+        public BLAS[] Blases;
         public GpuTlasNode[] Nodes;
         public TLAS()
         {
-            Blases = new List<BLAS>();
+            Blases = Array.Empty<BLAS>();
         }
 
         public void AddBlases(BLAS[] blases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
         {
-            Blases.AddRange(blases);
+            Helper.ArrayAdd(ref Blases, blases);
+
             DrawCommands = drawCommands;
             MeshInstances = meshInstances;
 
@@ -49,7 +36,7 @@ namespace IDKEngine
             // Flatten and transform local space blas instances into
             // world space tlas nodes. These nodes are the primitives of the the TLAS.
             {
-                for (int i = 0; i < Blases.Count; i++)
+                for (int i = 0; i < Blases.Length; i++)
                 {
                     BLAS blas = Blases[i];
                     ref readonly GpuDrawElementsCmd cmd = ref DrawCommands[i];

@@ -15,19 +15,21 @@ vec3 Downsample(sampler2D srcTexture, vec2 uv, float lod);
 vec3 Upsample(sampler2D srcTexture, vec2 uv, float lod);
 vec3 Prefilter(vec3 color);
 
+layout(location = 0) uniform int Lod;
+layout(location = 1) uniform int Stage;
+
 uniform float Threshold;
 uniform float Clamp;
 uniform float Radius;
-
-layout(location = 3) uniform int Lod;
-layout(location = 4) uniform int Stage;
 
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     ivec2 imgSize = imageSize(ImgResult);
     if (any(greaterThanEqual(imgCoord, imgSize)))
+    {
         return;
+    }
 
     vec3 result = vec3(0.0);
     vec2 uv = (imgCoord + 0.5) / imgSize;
@@ -44,7 +46,8 @@ void main()
     {
         result = Upsample(SamplerUpsample, uv, Lod) + textureLod(SamplerDownsample, uv, Lod).rgb;
     }
-    // writes to Lod + 1 mip level when downsampling
+    
+    // writes to Lod + 1 mip level when downsampling (except when Lod == 0)
     // writes to Lod - 1 mip level when upsampling
     imageStore(ImgResult, imgCoord, vec4(result, 1.0));
 }

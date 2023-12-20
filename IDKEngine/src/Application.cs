@@ -126,13 +126,13 @@ namespace IDKEngine
             {
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
-                    RasterizerPipeline.Render(ModelSystem, dT, NEAR_PLANE, FAR_PLANE, CameraFovY, GpuBasicData.ProjView);
+                    RasterizerPipeline.Render(ModelSystem, LightManager, dT, NEAR_PLANE, FAR_PLANE, CameraFovY);
                     TonemapAndGamma.Combine(RasterizerPipeline.Result);
-                    BoxRenderer.Render(TonemapAndGamma.Result, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
+                    BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
                 {
-                    RasterizerPipeline.Render(ModelSystem, dT, NEAR_PLANE, FAR_PLANE, CameraFovY, GpuBasicData.ProjView, LightManager);
+                    RasterizerPipeline.Render(ModelSystem, LightManager, dT, NEAR_PLANE, FAR_PLANE, CameraFovY);
 
                     if (IsBloom)
                     {
@@ -170,7 +170,7 @@ namespace IDKEngine
                     box.Max = node.Max;
 
                     GpuDrawElementsCmd cmd = ModelSystem.DrawCommands[gui.SelectedEntity.Index];
-                    box.Transform(ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix);
+                    box.Transform(ModelSystem.MeshInstances[cmd.BaseInstance + gui.SelectedEntity.Instance].ModelMatrix);
                 }
                 else
                 {
@@ -181,7 +181,7 @@ namespace IDKEngine
                     box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
 
-                BoxRenderer.Render(TonemapAndGamma.Result, box);
+                BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, box);
             }
 
             Framebuffer.Bind(0);
@@ -356,7 +356,7 @@ namespace IDKEngine
                 GpuBasicData.InvProjection = GpuBasicData.Projection.Inverted();
                 GpuBasicData.NearPlane = NEAR_PLANE;
                 GpuBasicData.FarPlane = FAR_PLANE;
-                GpuBasicData.DeltaUpdate = dT;
+                GpuBasicData.DeltaRenderTime = dT;
                 GpuBasicData.PrevProjView = GpuBasicData.ProjView;
                 GpuBasicData.PrevView = GpuBasicData.View;
                 GpuBasicData.View = Camera.GenerateViewMatrix(Camera.Position, Camera.ViewDir, Camera.UpVector);
@@ -468,7 +468,7 @@ namespace IDKEngine
 
             LightManager = new LightManager(12, 12);
             ModelSystem = new ModelSystem();
-            
+
             if (true)
             {
                 Model sponza = new Model("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
@@ -491,8 +491,7 @@ namespace IDKEngine
                 lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
-                Model helmet = new Model("res/models/Helmet/Helmet.gltf");
-                helmet.MeshInstances[0].ModelMatrix *= Matrix4.CreateRotationY(MathF.PI / 4.0f);
+                Model helmet = new Model("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
                 //Model test = new Model(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf");
                 //Model test = new Model(@"C:\Users\Julian\Downloads\Models\Skeleton\Skeleton.gltf", Matrix4.CreateScale(0.4f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90.0f)) * Matrix4.CreateTranslation(-6.1f, 1.8f, 0.0f));
@@ -549,12 +548,12 @@ namespace IDKEngine
                 a.Meshes[379].EmissiveBias = 20.0f;
                 Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
                 Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                //Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
 
-                ModelSystem.Add(a, b, c);
+                ModelSystem.Add(a, b, c, d);
 
-                LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
+                //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
 
                 RenderMode = RenderMode.Rasterizer;

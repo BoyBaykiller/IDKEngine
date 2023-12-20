@@ -1,9 +1,8 @@
 ﻿using System;
-using System.IO;
-using System.Linq;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
+using System.Runtime.InteropServices;
 
 namespace IDKEngine.Render
 {
@@ -36,7 +35,6 @@ namespace IDKEngine.Render
         public BVH BVH;
 
         private readonly VAO vao;
-        private readonly ShaderProgram frustumCullingProgram;
         public unsafe ModelSystem()
         {
             DrawCommands = Array.Empty<GpuDrawElementsCmd>();
@@ -70,16 +68,14 @@ namespace IDKEngine.Render
             vao.SetElementBuffer(vertexIndicesBuffer);
 
             vao.AddSourceBuffer(vertexPositionBuffer, 0, sizeof(Vector3));
-            vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0); // Position
+            vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0);
 
             vao.AddSourceBuffer(vertexBuffer, 1, sizeof(GpuVertex));
-            vao.SetAttribFormat(1, 1, 2, VertexAttribType.Float, 0); // TexCoord
-            vao.SetAttribFormatI(1, 2, 1, VertexAttribType.UnsignedInt, sizeof(Vector2)); // Tangent
-            vao.SetAttribFormatI(1, 3, 1, VertexAttribType.UnsignedInt, sizeof(Vector2) + sizeof(uint)); // Normal
+            vao.SetAttribFormat(1, 1, 2, VertexAttribType.Float, (int)Marshal.OffsetOf<GpuVertex>(nameof(GpuVertex.TexCoord)));
+            vao.SetAttribFormatI(1, 2, 1, VertexAttribType.UnsignedInt, (int)Marshal.OffsetOf<GpuVertex>(nameof(GpuVertex.Tangent)));
+            vao.SetAttribFormatI(1, 3, 1, VertexAttribType.UnsignedInt, (int)Marshal.OffsetOf<GpuVertex>(nameof(GpuVertex.Normal)));
 
             BVH = new BVH();
-
-            frustumCullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/SingleView/Frustum/compute.glsl")));
         }
 
         public unsafe void Add(params Model[] models)
@@ -89,7 +85,7 @@ namespace IDKEngine.Render
                 return;
             }
 
-            int addedDrawCommands = 0;
+            int prevDrawCommandsLength = DrawCommands.Length;
             for (int i = 0; i < models.Length; i++)
             {
                 // Don't modify order
@@ -102,17 +98,14 @@ namespace IDKEngine.Render
                 LoadMaterials(models[i].Materials);
 
                 LoadIndices(models[i].Indices);
-                LoadModelMatrices(models[i].MeshInstances);
-
-                addedDrawCommands += models[i].DrawCommands.Length;
+                LoadMeshInstances(models[i].MeshInstances);
             }
 
             {
-                int prevDrawCommandsLength = DrawCommands.Length - addedDrawCommands;
-                ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, addedDrawCommands);
+                ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
                 BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);
 
-                // Caculate root node offset in blas buffer for each mesh
+                // Caculate root node BVH index for each mesh
                 uint bvhNodesExclusiveSum = 0;
                 for (int i = 0; i < DrawCommands.Length; i++)
                 {
@@ -142,20 +135,6 @@ namespace IDKEngine.Render
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, 0, Meshes.Length, sizeof(GpuDrawElementsCmd));
         }
 
-        public unsafe void FrustumCull(in Matrix4 projView)
-        {
-            if (Meshes.Length == 0)
-            {
-                return;
-            }
-
-            frustumCullingProgram.Use();
-            frustumCullingProgram.Upload(0, projView);
-
-            GL.DispatchCompute((Meshes.Length + 64 - 1) / 64, 1, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
-        }
-
         public unsafe void UpdateMeshBuffer(int start, int count)
         {
             if (count == 0) return;
@@ -179,13 +158,10 @@ namespace IDKEngine.Render
             int prevCmdLength = DrawCommands.Length;
             int prevIndicesLength = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].FirstIndex + DrawCommands[prevCmdLength - 1].Count;
             int prevBaseVertex = DrawCommands.Length == 0 ? 0 : DrawCommands[prevCmdLength - 1].BaseVertex + GetMeshVertexCount(prevCmdLength - 1);
-
-            Array.Resize(ref DrawCommands, prevCmdLength + drawCommands.Length);
-            drawCommands.CopyTo(new Span<GpuDrawElementsCmd>(DrawCommands, prevCmdLength, drawCommands.Length));
+            Helper.ArrayAdd(ref DrawCommands, drawCommands);
 
             for (int i = 0; i < drawCommands.Length; i++)
             {
-                // TODO: Fix calculation of base instance to account for more than 1 instance per gltfModel
                 DrawCommands[prevCmdLength + i].BaseInstance += prevCmdLength;
                 DrawCommands[prevCmdLength + i].BaseVertex += prevBaseVertex;
                 DrawCommands[prevCmdLength + i].FirstIndex += prevIndicesLength;
@@ -195,44 +171,33 @@ namespace IDKEngine.Render
         {
             int prevMeshesLength = Meshes.Length;
             int prevMaterialsLength = Materials.Length;
-            Array.Resize(ref Meshes, prevMeshesLength + meshes.Length);
-            meshes.CopyTo(new Span<GpuMesh>(Meshes, prevMeshesLength, meshes.Length));
+            Helper.ArrayAdd(ref Meshes, meshes);
 
             for (int i = 0; i < meshes.Length; i++)
             {
                 Meshes[prevMeshesLength + i].MaterialIndex += prevMaterialsLength;
             }
+
         }
-        private void LoadModelMatrices(ReadOnlySpan<GpuMeshInstance> meshInstances)
+        private void LoadMeshInstances(ReadOnlySpan<GpuMeshInstance> meshInstances)
         {
-            int prevMatricesLength = MeshInstances.Length;
-            Array.Resize(ref MeshInstances, prevMatricesLength + meshInstances.Length);
-            meshInstances.CopyTo(new Span<GpuMeshInstance>(MeshInstances, prevMatricesLength, meshInstances.Length));
+            Helper.ArrayAdd(ref MeshInstances, meshInstances);
         }
         private void LoadMaterials(ReadOnlySpan<GpuMaterial> materials)
         {
-            int prevMaterialsLength = Materials.Length;
-            Array.Resize(ref Materials, prevMaterialsLength + materials.Length);
-            materials.CopyTo(new Span<GpuMaterial>(Materials, prevMaterialsLength, materials.Length));
+            Helper.ArrayAdd(ref Materials, materials);
         }
         private void LoadIndices(ReadOnlySpan<uint> indices)
         {
-            int prevIndicesLength = VertexIndices.Length;
-            Array.Resize(ref VertexIndices, prevIndicesLength + indices.Length);
-            indices.CopyTo(new Span<uint>(VertexIndices, prevIndicesLength, indices.Length));
+            Helper.ArrayAdd(ref VertexIndices, indices);
         }
         private void LoadVertices(ReadOnlySpan<GpuVertex> vertices)
         {
-            int prevVerticesLength = Vertices.Length;
-            Array.Resize(ref Vertices, prevVerticesLength + vertices.Length);
-            vertices.CopyTo(new Span<GpuVertex>(Vertices, prevVerticesLength, vertices.Length));
+            Helper.ArrayAdd(ref Vertices, vertices);
         }
-
-        private void LoadVertexPositions(ReadOnlySpan<Vector3> vertexPositions)
+        private void LoadVertexPositions(ReadOnlySpan<Vector3> positions)
         {
-            int prevVerticesLength = VertexPositions.Length;
-            Array.Resize(ref VertexPositions, prevVerticesLength + vertexPositions.Length);
-            vertexPositions.CopyTo(new Span<Vector3>(VertexPositions, prevVerticesLength, vertexPositions.Length));
+            Helper.ArrayAdd(ref VertexPositions, positions);
         }
 
         public int GetMeshVertexCount(int meshIndex)
@@ -259,8 +224,6 @@ namespace IDKEngine.Render
             meshInstanceBuffer.Dispose();
 
             vao.Dispose();
-
-            frustumCullingProgram.Dispose();
         }
     }
 }

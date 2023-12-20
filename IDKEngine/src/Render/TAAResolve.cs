@@ -7,15 +7,27 @@ namespace IDKEngine.Render
 {
     class TAAResolve : IDisposable
     {
-        private bool _isTaaArtifactMitigation;
-        public bool IsTaaArtifactMitigation
+        private bool _isNaiveTaa;
+        public bool IsNaiveTaa
         {
-            get => _isTaaArtifactMitigation;
+            get => _isNaiveTaa;
 
             set
             {
-                _isTaaArtifactMitigation = value;
-                taaResolveProgram.Upload("IsTaaArtifactMitigation", _isTaaArtifactMitigation);
+                _isNaiveTaa = value;
+                taaResolveProgram.Upload("IsNaiveTaa", _isNaiveTaa);
+            }
+        }
+
+        private float _preferAliasingOverBlur;
+        public float PreferAliasingOverBlur
+        {
+            get => _preferAliasingOverBlur;
+
+            set
+            {
+                _preferAliasingOverBlur = value;
+                taaResolveProgram.Upload("PreferAliasingOverBlur", _preferAliasingOverBlur);
             }
         }
 
@@ -26,12 +38,13 @@ namespace IDKEngine.Render
         private Texture taaPong;
         private readonly ShaderProgram taaResolveProgram;
         private int frame;
-        public TAAResolve(int width, int height)
+        public TAAResolve(int width, int height, float favourAliasingOverBlurAmount = 0.25f)
         {
             taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TAAResolve/compute.glsl")));
 
             SetSize(width, height);
-            IsTaaArtifactMitigation = true;
+
+            PreferAliasingOverBlur = favourAliasingOverBlurAmount;
         }
 
         public void RunTAA(Texture color)

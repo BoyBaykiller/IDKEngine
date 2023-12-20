@@ -58,7 +58,7 @@ namespace IDKEngine
                 hitInfo = new RayHitInfo();
                 hitInfo.T = tMax;
 
-                for (int i = 0; i < Tlas.Blases.Count; i++)
+                for (int i = 0; i < Tlas.Blases.Length; i++)
                 {
                     BLAS blas = Tlas.Blases[i];
                     ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
@@ -76,7 +76,7 @@ namespace IDKEngine
                             hitInfo.T = blasHitInfo.T;
 
                             hitInfo.MeshID = i;
-                            hitInfo.InstanceID = instanceID;
+                            hitInfo.InstanceID = j;
                         }
                     }
 
@@ -89,7 +89,7 @@ namespace IDKEngine
         public delegate void IntersectFunc(in PrimitiveHitInfo hitInfo);
         public void Intersect(in Box box, IntersectFunc intersectFunc)
         {
-            for (int i = 0; i < Tlas.Blases.Count; i++)
+            for (int i = 0; i < Tlas.Blases.Length; i++)
             {
                 BLAS blas = Tlas.Blases[i];
                 ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
@@ -159,7 +159,7 @@ namespace IDKEngine
 
             nint uploadedBlasNodesCount = 0;
             nint uploadedTrianglesCount = 0;
-            for (int i = 0; i < Tlas.Blases.Count; i++)
+            for (int i = 0; i < Tlas.Blases.Length; i++)
             {
                 BLAS blas = Tlas.Blases[i];
 

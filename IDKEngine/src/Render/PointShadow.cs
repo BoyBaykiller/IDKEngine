@@ -64,40 +64,29 @@ namespace IDKEngine.Render
             SetSize(size);
         }
 
-        public unsafe void Render(ModelSystem modelSystem, int pointShadowIndex, ShaderProgram renderProgram, ShaderProgram cullingProgram)
+        public unsafe void Render(ModelSystem modelSystem, ShaderProgram renderProgram, ShaderProgram cullingProgram)
         {
             if (modelSystem.Meshes.Length == 0)
             {
                 return;
             }
 
-            if (PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH)
-            {
-                cullingProgram.Use();
-                cullingProgram.Upload(0, pointShadowIndex);
-                GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
-            }
-
             GL.Viewport(0, 0, Result.Width, Result.Height);
             framebuffer.Bind();
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
-            renderProgram.Upload(0, pointShadowIndex);
-
-            if (PointShadowManager.TAKE_VERTEX_LAYERED_RENDERING_PATH) // GL_ARB_shader_viewport_layer_array or GL_NV_viewport_array2 or GL_AMD_vertex_shader_layer
+            for (int i = 0; i < 6; i++)
             {
-                GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
-                renderProgram.Use();
-                modelSystem.Draw();
-            }
-            else
-            {
-                // Using geometry shader would be slower
-                for (int i = 0; i < 6; i++)
+                // Culling face i
                 {
-                    ref readonly Matrix4 projView = ref gpuPointShadow[GpuPointShadow.Matrix.PosX + i];
-                    modelSystem.FrustumCull(projView);
+                    cullingProgram.Use();
+                    cullingProgram.Upload(1, i);
+                    GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
+                    GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
+                }
 
+                // Rendering face i
+                {
                     framebuffer.SetRenderTargetLayer(FramebufferAttachment.DepthAttachment, Result, i);
 
                     renderProgram.Use();
@@ -105,8 +94,8 @@ namespace IDKEngine.Render
 
                     modelSystem.Draw();
                 }
-                framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
             }
+            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
         }
 
         private void UpdateViewMatrices()

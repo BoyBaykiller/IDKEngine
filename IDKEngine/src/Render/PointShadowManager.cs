@@ -8,11 +8,6 @@ namespace IDKEngine.Render
 {
     class PointShadowManager : IDisposable
     {
-        public static readonly bool TAKE_VERTEX_LAYERED_RENDERING_PATH =
-            (Helper.IsExtensionsAvailable("GL_ARB_shader_viewport_layer_array") ||
-            Helper.IsExtensionsAvailable("GL_NV_viewport_array2") ||
-            Helper.IsExtensionsAvailable("GL_AMD_vertex_shader_layer"));
-
         public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
 
         private readonly PointShadow[] pointShadows;
@@ -24,14 +19,13 @@ namespace IDKEngine.Render
             pointShadows = new PointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
             Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
-            shaderInsertions.Add("TAKE_VERTEX_LAYERED_RENDERING_PATH", TAKE_VERTEX_LAYERED_RENDERING_PATH ? "1" : "0");
 
             renderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadows/vertex.glsl"), shaderInsertions),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadows/fragment.glsl")));
+                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadow/vertex.glsl"), shaderInsertions),
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadow/fragment.glsl")));
 
             cullingProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/MultiView/Frustum/compute.glsl")));
+                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/PointShadow/Cull/compute.glsl")));
 
             pointShadowsBuffer = new BufferObject();
             pointShadowsBuffer.ImmutableAllocate(GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
@@ -42,15 +36,18 @@ namespace IDKEngine.Render
         {
             GL.ColorMask(false, false, false, false);
             GL.Disable(EnableCap.CullFace);
+            GL.DepthFunc(DepthFunction.Less);
             for (int i = 0; i < GPU_MAX_UBO_POINT_SHADOW_COUNT; i++)
             {
                 if (TryGetPointShadow(i, out PointShadow pointShadow))
                 {
                     UploadPointShadow(i);
-                    pointShadow.Render(modelSystem, i, renderProgram, cullingProgram);
+
+                    renderProgram.Upload(0, i);
+                    cullingProgram.Upload(0, i);
+                    pointShadow.Render(modelSystem, renderProgram, cullingProgram);
                 }
             }
-            GL.Enable(EnableCap.CullFace);
             GL.ColorMask(true, true, true, true);
         }
 

@@ -6,6 +6,7 @@
 
 AppInclude(include/Ray.glsl)
 AppInclude(include/Box.glsl)
+AppInclude(include/Frustum.glsl)
 
 // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t)
@@ -65,15 +66,27 @@ bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out 
     return t1 <= t2 && t2 > 0.0;
 }
 
+bool FrustumBoxIntersect(Frustum frustum, vec3 boxMin, vec3 boxMax)
+{
+    float a = 1.0;
+    for (int i = 0; i < 6 && a >= 0.0; i++)
+    {
+        vec3 negative = mix(boxMin, boxMax, greaterThan(frustum.Planes[i].xyz, vec3(0.0)));
+        a = dot(vec4(negative, 1.0), frustum.Planes[i]);
+    }
+
+    return a >= 0.0;
+}
+
 bool BoxBoxIntersect(Box a, Box b)
 {
-    return  a.Min.x < b.Max.x &&
-            a.Min.y < b.Max.y &&
-            a.Min.z < b.Max.z &&
+    return a.Min.x < b.Max.x &&
+           a.Min.y < b.Max.y &&
+           a.Min.z < b.Max.z &&
 
-            a.Max.x > b.Min.x &&
-            a.Max.y > b.Min.y &&
-            a.Max.z > b.Min.z;
+           a.Max.x > b.Min.x &&
+           a.Max.y > b.Min.y &&
+           a.Max.z > b.Min.z;
 }
 
 #endif

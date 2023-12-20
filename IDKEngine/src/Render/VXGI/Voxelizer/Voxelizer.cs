@@ -78,7 +78,7 @@ namespace IDKEngine.Render
         private readonly Framebuffer fboNoAttachments;
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
         {
-
+            
             {
                 Dictionary<string, string> takeFastGeometryShaderInsertion = new Dictionary<string, string>();
                 takeFastGeometryShaderInsertion.Add("TAKE_FAST_GEOMETRY_SHADER_PATH", TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0");
@@ -129,10 +129,6 @@ namespace IDKEngine.Render
         {
             ClearTextures();
             Voxelize(modelSystem);
-            if (!HAS_ATOMIC_FP16_VECTOR)
-            {
-                MergeIntermediateTextures();
-            }
             Mipmap();
         }
 
@@ -207,6 +203,11 @@ namespace IDKEngine.Render
             if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
             {
                 GL.Disable((EnableCap)All.ConservativeRasterizationNv);
+            }
+
+            if (!HAS_ATOMIC_FP16_VECTOR)
+            {
+                MergeIntermediateTextures();
             }
         }
 

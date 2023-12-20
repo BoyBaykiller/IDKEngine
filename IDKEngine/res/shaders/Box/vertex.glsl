@@ -53,17 +53,18 @@ layout(std140, binding = 0) uniform BasicDataUBO
     mat4 PrevProjView;
     float NearPlane;
     float FarPlane;
-    float DeltaUpdate;
+    float DeltaRenderTime;
     float Time;
 } basicDataUBO;
 
 layout(location = 0) uniform vec3 Min;
 layout(location = 1) uniform vec3 Max;
+layout(location = 2) uniform mat4 Matrix;
 
 void main()
 {
     vec3 boxPos = (Min + Max) * 0.5;
     vec3 boxSize = Max - Min;
 
-    gl_Position = basicDataUBO.ProjView * vec4(boxPos + boxSize * positions[gl_VertexID], 1.0);
+    gl_Position = Matrix * vec4(boxPos + boxSize * positions[gl_VertexID], 1.0);
 }
