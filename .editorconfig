@@ -1,7 +1,4 @@
 ﻿[*.{cs,vb}]
 
-# IDE0028: Simplify collection initialization
-dotnet_style_collection_initializer = false
-
-# CS8500: This takes the address of, gets the size of, or declares a pointer to a managed type
-dotnet_diagnostic.CS8500.severity = silent
+# IDE0302: Simplify collection initialization
+dotnet_style_prefer_collection_expression = false

@@ -8,7 +8,7 @@ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 struct DrawElementsCmd
 {
-    uint Count;
+    uint IndexCount;
     uint InstanceCount;
     uint FirstIndex;
     uint BaseVertex;
@@ -26,9 +26,9 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
-    float _pad0;
+    uint MeshletsStart;
     vec3 Absorbance;
-    uint CubemapShadowCullInfo;
+    uint MeshletsCount;
 };
 
 struct MeshInstance

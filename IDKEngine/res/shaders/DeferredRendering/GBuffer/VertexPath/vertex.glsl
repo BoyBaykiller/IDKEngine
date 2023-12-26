@@ -10,31 +10,12 @@ layout(location = 1) in vec2 TexCoord;
 layout(location = 2) in uint Tangent;
 layout(location = 3) in uint Normal;
 
-struct Mesh
-{
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float RefractionChance;
-    float IOR;
-    float _pad0;
-    vec3 Absorbance;
-    uint CubemapShadowCullInfo;
-};
-
 struct MeshInstance
 {
     mat4 ModelMatrix;
     mat4 InvModelMatrix;
     mat4 PrevModelMatrix;
 };
-
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
 
 layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 {
@@ -74,16 +55,11 @@ out InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    uint MaterialIndex;
-    float EmissiveBias;
-    float NormalMapStrength;
-    float SpecularBias;
-    float RoughnessBias;
+    uint MeshID;
 } outData;
 
 void main()
 {
-    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
     
     vec3 normal = DecompressSR11G11B10(Normal);
@@ -92,30 +68,26 @@ void main()
     outData.TBN = GetTBN(mat3(meshInstance.ModelMatrix), tangent, normal);
     outData.TexCoord = TexCoord;
     
-    vec3 worldPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
-    outData.ClipPos = basicDataUBO.ProjView * vec4(worldPos, 1.0);
+    outData.ClipPos = basicDataUBO.ProjView * meshInstance.ModelMatrix * vec4(Position, 1.0);
     outData.PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(Position, 1.0);
     
-    outData.Normal = mat3(meshInstance.ModelMatrix) * normal;
-    outData.MaterialIndex = mesh.MaterialIndex;
-    outData.EmissiveBias = mesh.EmissiveBias;
-    outData.NormalMapStrength = mesh.NormalMapStrength;
-    outData.SpecularBias = mesh.SpecularBias;
-    outData.RoughnessBias = mesh.RoughnessBias;
+    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+    outData.Normal = normalToWorld * normal;
+    outData.MeshID = gl_DrawID;
 
-    // Add jitter independent of perspective by multypling with w
+    // Add jitter independent of perspective by multiplying with w
     vec4 jitteredClipPos = outData.ClipPos;
-    jitteredClipPos.xy += taaDataUBO.Jitter * outData.ClipPos.w;
+    jitteredClipPos.xy += taaDataUBO.Jitter * jitteredClipPos.w;
+
+
+    // Debug lag    
+    // if (gl_DrawID == 63)
+    // {
+    //     for (int i = 0; i < 1000000; i++)
+    //     {
+    //         jitteredClipPos.x += i / 10000000000000000.0;
+    //     }
+    // }
     
     gl_Position = jitteredClipPos;
-
-    // if (gl_DrawID == 67)
-    // {
-    //     uint ass = 0;
-    //     for (int i = 0; i < 500000; i++)
-    //     {
-    //         ass += i;
-    //     }
-    //     gl_Position.x += ass / 100000000000.0; 
-    // }
 }

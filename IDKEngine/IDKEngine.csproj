@@ -38,6 +38,7 @@
     <PackageReference Include="FFX_FSR2" Version="1.0.1" />
     <PackageReference Include="glTF2LoaderFork" Version="1.1.4-alpha" />
     <PackageReference Include="ImGui.NET" Version="1.89.9.4" />
+    <PackageReference Include="Meshoptimizer.NET" Version="1.0.1" />
     <PackageReference Include="NativeFileDialogExtendedSharp" Version="0.1.0" />
     <PackageReference Include="OpenTK.GraphicsFork" Version="4.8.2" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.8.2" />

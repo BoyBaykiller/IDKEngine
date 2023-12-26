@@ -2,7 +2,7 @@
 {
     public struct GpuDrawElementsCmd
     {
-        public int Count;
+        public int IndexCount;
         public int InstanceCount;
         public int FirstIndex;
         public int BaseVertex;

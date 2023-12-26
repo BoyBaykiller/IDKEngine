@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
@@ -87,14 +88,14 @@ namespace IDKEngine.Render
         }
 
         private uint _accumulatedSamples;
-        public uint AccumulatedSamples
+        public unsafe uint AccumulatedSamples
         {
             get => _accumulatedSamples;
 
             private set
             {
                 _accumulatedSamples = value;
-                rayIndicesBuffer.SubData(2 * sizeof(uint), sizeof(uint), _accumulatedSamples);
+                wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.AccumulatedSamples)), sizeof(uint), _accumulatedSamples);
             }
         }
 
@@ -102,18 +103,13 @@ namespace IDKEngine.Render
         private readonly ShaderProgram firstHitProgram;
         private readonly ShaderProgram nHitProgram;
         private readonly ShaderProgram finalDrawProgram;
-        private readonly BufferObject dispatchCommandBuffer;
         private BufferObject wavefrontRayBuffer;
-        private BufferObject rayIndicesBuffer;
+        private BufferObject wavefrontPTBuffer;
         public unsafe PathTracer(int width, int height)
         {
             firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl")));
             nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl")));
             finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
-
-            dispatchCommandBuffer = new BufferObject();
-            dispatchCommandBuffer.ImmutableAllocate(2 * sizeof(GpuDispatchCommand), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            dispatchCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
 
             SetSize(width, height);
 
@@ -129,15 +125,18 @@ namespace IDKEngine.Render
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
 
-            dispatchCommandBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
+            wavefrontPTBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
             nHitProgram.Use();
             for (int j = 1; j < RayDepth; j++)
             {
                 int pingPongIndex = 1 - (j % 2);
                 nHitProgram.Upload(0, pingPongIndex);
-                rayIndicesBuffer.SubData(pingPongIndex * sizeof(uint), sizeof(uint), 0u); // reset ray counter
+                
+                nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
+                wavefrontPTBuffer.SubData(rayCountsBaseOffset + pingPongIndex * sizeof(uint), sizeof(uint), 0);
 
-                GL.DispatchComputeIndirect(sizeof(GpuDispatchCommand) * (1 - pingPongIndex));
+                nint dispatchCmdsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommands));
+                GL.DispatchComputeIndirect(dispatchCmdsBaseOffset + sizeof(GpuDispatchCmd) * (1 - pingPongIndex));
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
             }
 
@@ -150,9 +149,6 @@ namespace IDKEngine.Render
 
         public unsafe void SetSize(int width, int height)
         {
-            dispatchCommandBuffer.SubData(0, sizeof(GpuDispatchCommand), new GpuDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
-            dispatchCommandBuffer.SubData(sizeof(GpuDispatchCommand), sizeof(GpuDispatchCommand), new GpuDispatchCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 });
-
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
@@ -164,11 +160,13 @@ namespace IDKEngine.Render
             wavefrontRayBuffer.ImmutableAllocate(width * height * sizeof(GpuWavefrontRay), IntPtr.Zero, BufferStorageFlags.None);
             wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
-            if (rayIndicesBuffer != null) rayIndicesBuffer.Dispose();
-            rayIndicesBuffer = new BufferObject();
-            rayIndicesBuffer.ImmutableAllocate(width * height * sizeof(uint) + 3 * sizeof(uint), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            rayIndicesBuffer.SubData(0, sizeof(Vector3i), new Vector3i(0)); // clear counts
-            rayIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
+            if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
+            wavefrontPTBuffer = new BufferObject();
+            wavefrontPTBuffer.ImmutableAllocate(sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommands)), sizeof(GpuDispatchCmd) * 2, new GpuDispatchCmd[2]); // clear header dispatch cmds
+            wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts)), sizeof(Vector2i), new Vector2(0)); // clear header counts
+            wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.AccumulatedSamples)), sizeof(uint), 0); // clear header counts
+            wavefrontPTBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
 
             ResetRenderProcess();
 
@@ -187,9 +185,8 @@ namespace IDKEngine.Render
             nHitProgram.Dispose();
             finalDrawProgram.Dispose();
             
-            dispatchCommandBuffer.Dispose();
             wavefrontRayBuffer.Dispose();
-            rayIndicesBuffer.Dispose();
+            wavefrontPTBuffer.Dispose();
         }
     }
 }

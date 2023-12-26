@@ -12,7 +12,29 @@
 AppInclude(include/Ray.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
 
-// Minus one because we store the stack top in a seperate local variable instead of shared
+struct PackedUVec3 { uint x, y, z; };
+uvec3 UintsToUVec3(PackedUVec3 uints)
+{
+    return uvec3(uints.x, uints.y, uints.z);
+}
+
+layout(std430, binding = 6) restrict readonly buffer BlasTriangleIndicesSSBO
+{
+    PackedUVec3 Indices[];
+} blasTriangleIndicesSSBO;
+
+struct PackedVec3 { float x, y, z; };
+vec3 FloatsToVec3(PackedVec3 floats)
+{
+    return vec3(floats.x, floats.y, floats.z);
+}
+
+layout(std430, binding = 10) restrict readonly buffer VertexPositions
+{
+    PackedVec3 VertexPositions[];
+} vertexPositionsSSBO;
+
+
 #ifdef TRAVERSAL_STACK_DONT_USE_SHARED_MEM
 uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
 #else
@@ -60,14 +82,18 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
             for (uint j = first; j < first + triCount; j++)
             {
+                uvec3 indices = UintsToUVec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
+
+                vec3 v0 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 v1 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 v2 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
+
                 vec3 bary;
                 float hitT;
-                uint triIndex = blasFirstTriangleIndex + j;
-                BlasTriangle triangle = blasTriangleSSBO.Triangles[triIndex];
-                if (RayTriangleIntersect(ray, triangle.Position0, triangle.Position1, triangle.Position2, bary, hitT) && hitT < hitInfo.T)
+                if (RayTriangleIntersect(ray, v0, v1, v2, bary, hitT) && hitT < hitInfo.T)
                 {
                     hit = true;
-                    hitInfo.VertexIndices = uvec3(triangle.VertexIndex0, triangle.VertexIndex1, triangle.VertexIndex2);
+                    hitInfo.VertexIndices = indices;
                     hitInfo.Bary = bary;
                     hitInfo.T = hitT;
                 }
@@ -143,13 +169,16 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
             for (uint j = first; j < first + triCount; j++)
             {
+                uvec3 indices = UintsToUVec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
+                vec3 v0 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 v1 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 v2 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
+
                 vec3 bary;
                 float hitT;
-                uint triIndex = blasFirstTriangleIndex + j;
-                BlasTriangle triangle = blasTriangleSSBO.Triangles[triIndex];
-                if (RayTriangleIntersect(ray, triangle.Position0, triangle.Position1, triangle.Position2, bary, hitT) && hitT < hitInfo.T)
+                if (RayTriangleIntersect(ray, v0, v1, v2, bary, hitT) && hitT < hitInfo.T)
                 {
-                    hitInfo.VertexIndices = uvec3(triangle.VertexIndex0, triangle.VertexIndex1, triangle.VertexIndex2);
+                    hitInfo.VertexIndices = indices;
                     hitInfo.Bary = bary;
                     hitInfo.T = hitT;
 
@@ -246,7 +275,6 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
 
             if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
             {
-                hitInfo.VertexIndices += cmd.BaseVertex;
                 hitInfo.MeshID = parent.BlasIndex;
                 hitInfo.InstanceID = glInstanceID;
             }
@@ -294,7 +322,6 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
         Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
         if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
         {
-            hitInfo.VertexIndices += cmd.BaseVertex;
             hitInfo.MeshID = i;
             hitInfo.InstanceID = glInstanceID;
         }
@@ -361,7 +388,6 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
 
             if (IntersectBlasAny(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
             {
-                hitInfo.VertexIndices += cmd.BaseVertex;
                 hitInfo.MeshID = parent.BlasIndex;
                 hitInfo.InstanceID = glInstanceID;
 
@@ -412,7 +438,6 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
         Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
         if (IntersectBlasAny(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
         {
-            hitInfo.VertexIndices += cmd.BaseVertex;
             hitInfo.MeshID = i;
             hitInfo.InstanceID = glInstanceID;
             return true;

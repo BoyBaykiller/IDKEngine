@@ -12,7 +12,7 @@ layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
 
 struct DrawElementsCmd
 {
-    uint Count;
+    uint IndexCount;
     uint InstanceCount;
     uint FirstIndex;
     uint BaseVertex;
@@ -30,9 +30,9 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
-    float _pad0;
+    uint MeshletsStart;
     vec3 Absorbance;
-    uint CubemapShadowCullInfo;
+    uint MeshletsCount;
 };
 
 struct MeshInstance
@@ -48,18 +48,6 @@ struct BlasNode
     uint TriStartOrLeftChild;
     vec3 Max;
     uint TriCount;
-};
-
-struct BlasTriangle
-{
-    vec3 Position0;
-    uint VertexIndex0;
-
-    vec3 Position1;
-    uint VertexIndex1;
-
-    vec3 Position2;
-    uint VertexIndex2;
 };
 
 struct TlasNode
@@ -162,11 +150,6 @@ layout(std430, binding = 5) restrict readonly buffer BlasSSBO
 {
     BlasNode Nodes[];
 } blasSSBO;
-
-layout(std430, binding = 6) restrict readonly buffer BlasTriangleSSBO
-{
-    BlasTriangle Triangles[];
-} blasTriangleSSBO;
 
 layout(std430, binding = 7) restrict readonly buffer TlasSSBO
 {

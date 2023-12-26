@@ -8,6 +8,8 @@ namespace IDKEngine.Render
 {
     class RasterPipeline : IDisposable
     {
+        private static readonly bool HAS_MESH_SHADER_SUPPORT = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
+
         public Vector2i RenderResolution { get; private set; }
         public Vector2i RenderPresentationResolution { get; private set; }
 
@@ -169,9 +171,20 @@ namespace IDKEngine.Render
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
             ConeTracer = new ConeTracer(width, height);
 
-            gBufferProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/fragment.glsl")));
+            if (HAS_MESH_SHADER_SUPPORT)
+            {
+                gBufferProgram = new ShaderProgram(
+                    new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/MeshPath/task.glsl")),
+                    new Shader((ShaderType)NvMeshShader.MeshShaderNv, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/MeshPath/mesh.glsl")),
+                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/fragment.glsl")));
+            }
+            else
+            {
+                gBufferProgram = new ShaderProgram(
+                    new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/VertexPath/vertex.glsl")),
+                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/fragment.glsl")));
+            }
+
 
             lightingProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
@@ -275,12 +288,17 @@ namespace IDKEngine.Render
             // G Buffer generation
             {
                 HiZGenerate();
-
+                
                 // Frustum + Occlusion Culling
                 {
+                    //string message = "DebugMarker";
+                    //GL.PushDebugGroup(DebugSourceExternal.DebugSourceApplication, 0, message.Length, message);
+
                     cullProgram.Use();
                     GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
                     GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
+
+                    //GL.PopDebugGroup();
                 }
 
                 GL.DepthFunc(DepthFunction.Less);
@@ -292,12 +310,20 @@ namespace IDKEngine.Render
                     GL.Disable(EnableCap.CullFace);
                 }
 
+
                 gBufferFBO.Bind();
                 gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
                 GL.Viewport(0, 0, RenderResolution.X, RenderResolution.Y);
                 gBufferProgram.Use();
-                modelSystem.Draw();
+                if (HAS_MESH_SHADER_SUPPORT)
+                {
+                    modelSystem.MeshDraw();
+                }
+                else
+                {
+                    modelSystem.Draw();
+                }
 
                 if (IsWireframe)
                 {

@@ -3,7 +3,8 @@
     "Renderer": {
       "commandName": "Project",
       "workingDirectory": "$(ProjectDir)",
-      "nativeDebugging": false
+      "nativeDebugging": false,
+      "hotReloadEnabled": false
     }
   }
 }

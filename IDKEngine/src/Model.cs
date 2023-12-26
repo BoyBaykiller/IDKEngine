@@ -9,6 +9,8 @@ using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
 using glTFLoader;
 using glTFLoader.Schema;
+using Meshoptimizer;
+using IDKEngine.Shapes;
 using IDKEngine.Render.Objects;
 using GLTexture = IDKEngine.Render.Objects.Texture;
 using GltfTexture = glTFLoader.Schema.Texture;
@@ -92,6 +94,12 @@ namespace IDKEngine
         public Vector3[] VertexPositions;
         public uint[] Indices;
 
+        public GpuMeshTasksCmd[] MeshTasksCmds;
+        public GpuMeshlet[] Meshlets;
+        public GpuMeshletInfo[] MeshletsInfo;
+        public uint[] MeshletsVertexIndices;
+        public byte[] MeshletsPrimitiveIndices;
+
         private Gltf gltfModel;
         private string RootDir;
         public Model(string path)
@@ -101,14 +109,6 @@ namespace IDKEngine
 
         public Model(string path, Matrix4 rootTransform)
         {
-            Meshes = Array.Empty<GpuMesh>();
-            MeshInstances = Array.Empty<GpuMeshInstance>();
-            Materials = Array.Empty<GpuMaterial>();
-            DrawCommands = Array.Empty<GpuDrawElementsCmd>();
-            Vertices = Array.Empty<GpuVertex>();
-            VertexPositions = Array.Empty<Vector3>();
-            Indices = Array.Empty<uint>();
-
             if (!File.Exists(path))
             {
                 Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
@@ -119,20 +119,26 @@ namespace IDKEngine
             Logger.Log(Logger.LogLevel.Info, $"Loaded model {path}");
         }
 
-        public void LoadFromFile(string path, Matrix4 rootTransform)
+        public unsafe void LoadFromFile(string path, Matrix4 rootTransform)
         {
             gltfModel = Interface.LoadModel(path);
             
             RootDir = Path.GetDirectoryName(path);
 
             GpuMaterialLoadData[] gpuMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfModel.Materials, gltfModel.Textures);
-            List<GpuMaterial> materials = new List<GpuMaterial>(LoadGpuMaterials(gpuMaterialsLoadData));
-            List<GpuMesh> meshes = new List<GpuMesh>();
-            List<GpuMeshInstance> meshInstances = new List<GpuMeshInstance>();
-            List<GpuDrawElementsCmd> drawCommands = new List<GpuDrawElementsCmd>();
-            List<GpuVertex> vertices = new List<GpuVertex>();
-            List<Vector3> vertexPositions = new List<Vector3>();
-            List<uint> indices = new List<uint>();
+            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(gpuMaterialsLoadData));
+            List<GpuMesh> listMeshes = new List<GpuMesh>();
+            List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
+            List<GpuDrawElementsCmd> listDrawCommands = new List<GpuDrawElementsCmd>();
+            List<GpuVertex> listVertices = new List<GpuVertex>();
+            List<Vector3> listVertexPositions = new List<Vector3>();
+            List<uint> listIndices = new List<uint>();
+
+            List<GpuMeshTasksCmd> listMeshTasksCmd = new List<GpuMeshTasksCmd>();
+            List<GpuMeshlet> listMeshlets = new List<GpuMeshlet>();
+            List<GpuMeshletInfo> listMeshletsInfo = new List<GpuMeshletInfo>();
+            List<uint> listMeshletsVertexIndices = new List<uint>();
+            List<byte> listMeshletsPrimitiveIndices = new List<byte>();
 
             Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
 
@@ -164,12 +170,119 @@ namespace IDKEngine
                     for (int i = 0; i < gltfMesh.Primitives.Length; i++)
                     {
                         MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
-                        
+
+                        (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfMeshPrimitive);
+                        uint[] mehsIndices = LoadGpuIndexData(gltfMeshPrimitive);
+
+                        const bool VERTEX_REMAP_OPTIMIZATION = false;
+                        const bool VERTEX_CACHE_OPTIMIZATION = true;
+                        const bool VERTEX_FETCH_OPTIMIZATION = false;
+                        {
+                            uint[] remapTable = new uint[meshVertices.Length];
+                            if (VERTEX_REMAP_OPTIMIZATION)
+                            {
+                                nuint optimizedVertexCount = 0;
+                                fixed (void* meshVerticesPtr = meshVertices, meshPositionsPtr = meshVertexPositions)
+                                {
+                                    Span<Meshopt.Stream> vertexStreams = stackalloc Meshopt.Stream[2];
+                                    vertexStreams[0] = new Meshopt.Stream() { Data = meshVerticesPtr, Size = (nuint)sizeof(GpuVertex), Stride = (nuint)sizeof(GpuVertex) };
+                                    vertexStreams[1] = new Meshopt.Stream() { Data = meshPositionsPtr, Size = (nuint)sizeof(Vector3), Stride = (nuint)sizeof(Vector3) };
+
+                                    optimizedVertexCount = Meshopt.GenerateVertexRemapMulti(ref remapTable[0], mehsIndices[0], (nuint)mehsIndices.Length, (nuint)meshVertices.Length, vertexStreams[0], (nuint)vertexStreams.Length);
+
+                                    Meshopt.RemapIndexBuffer(ref mehsIndices[0], mehsIndices[0], (nuint)mehsIndices.Length, remapTable[0]);
+                                    Meshopt.RemapVertexBuffer(vertexStreams[0].Data, vertexStreams[0].Data, (nuint)meshVertices.Length, vertexStreams[0].Stride, remapTable[0]);
+                                    Meshopt.RemapVertexBuffer(vertexStreams[1].Data, vertexStreams[1].Data, (nuint)meshVertices.Length, vertexStreams[1].Stride, remapTable[0]);
+                                }
+                                Array.Resize(ref meshVertices, (int)optimizedVertexCount);
+                                Array.Resize(ref meshVertexPositions, (int)optimizedVertexCount);
+                            }
+                            if (VERTEX_CACHE_OPTIMIZATION)
+                            {
+                                Meshopt.OptimizeVertexCache(ref mehsIndices[0], mehsIndices[0], (nuint)mehsIndices.Length, (nuint)meshVertices.Length);
+                            }
+                            if (VERTEX_FETCH_OPTIMIZATION)
+                            {
+                                fixed (void* meshVerticesPtr = meshVertices, meshPositionsPtr = meshVertexPositions)
+                                {
+                                    Meshopt.OptimizeVertexFetchRemap(ref remapTable[0], mehsIndices[0], (nuint)mehsIndices.Length, (nuint)meshVertices.Length);
+
+                                    Meshopt.RemapIndexBuffer(ref mehsIndices[0], mehsIndices[0], (nuint)mehsIndices.Length, remapTable[0]);
+                                    Meshopt.RemapVertexBuffer(meshVerticesPtr, meshVerticesPtr, (nuint)meshVertices.Length, (nuint)sizeof(GpuVertex), remapTable[0]);
+                                    Meshopt.RemapVertexBuffer(meshPositionsPtr, meshPositionsPtr, (nuint)meshVertexPositions.Length, (nuint)sizeof(Vector3), remapTable[0]);
+                                }
+                            }
+                        }
+
+                        // Meshlet generation
+                        nuint meshletCount = 0;
+                        uint meshletsVertexIndicesLength = 0;
+                        uint meshletsPrimitiveIndicesLength = 0;
+                        uint[] meshletsVertexIndices;
+                        byte[] meshletsPrimitiveIndices;
+                        Meshopt.Meshlet[] meshOptMeshlets;
+                        {
+                            // keep in sync with mesh shader
+                            const uint maxVertices = 128;
+                            const uint maxTriangles = 252;
+
+                            const float coneWeight = 0.0f;
+                            nuint maxMeshlets = Meshopt.BuildMeshletsBound((nuint)mehsIndices.Length, maxVertices, maxTriangles);
+
+                            meshOptMeshlets = new Meshopt.Meshlet[maxMeshlets];
+                            meshletsVertexIndices = new uint[maxMeshlets * maxVertices];
+                            meshletsPrimitiveIndices = new byte[maxMeshlets * maxTriangles * 3];
+                            meshletCount = Meshopt.BuildMeshlets(ref meshOptMeshlets[0],
+                                meshletsVertexIndices[0],
+                                meshletsPrimitiveIndices[0],
+                                mehsIndices[0],
+                                (nuint)mehsIndices.Length,
+                                meshVertexPositions[0].X,
+                                (nuint)meshVertexPositions.Length,
+                                (nuint)sizeof(Vector3),
+                                maxVertices,
+                                maxTriangles,
+                                coneWeight);
+
+                            ref readonly Meshopt.Meshlet last = ref meshOptMeshlets[meshletCount - 1];
+                            meshletsVertexIndicesLength = last.VertexOffset + last.VertexCount;
+                            meshletsPrimitiveIndicesLength = last.TriangleOffset + ((last.TriangleCount * 3u + 3u) & ~3u);
+                        }
+
+                        GpuMeshlet[] meshMeshlets = new GpuMeshlet[meshletCount];
+                        GpuMeshletInfo[] meshMeshletsInfo = new GpuMeshletInfo[meshletCount];
+                        for (int j = 0; j < meshMeshlets.Length; j++)
+                        {
+                            ref GpuMeshlet myMeshlet = ref meshMeshlets[j];
+                            ref readonly Meshopt.Meshlet meshOptMeshlet = ref meshOptMeshlets[j];
+
+                            myMeshlet.VertexOffset = meshOptMeshlet.VertexOffset;
+                            myMeshlet.VertexCount = (byte)meshOptMeshlet.VertexCount;
+                            myMeshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
+                            myMeshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
+
+                            Box meshletBoundingBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+                            for (int k = 0; k < myMeshlet.VertexCount; k++)
+                            {
+                                uint vertexIndex = meshletsVertexIndices[myMeshlet.VertexOffset + k];
+                                Vector3 pos = meshVertexPositions[vertexIndex];
+                                meshletBoundingBox.GrowToFit(pos);
+                            }
+                            meshMeshletsInfo[j].Min = meshletBoundingBox.Min;
+                            meshMeshletsInfo[j].Max = meshletBoundingBox.Max;
+
+                            // Adjust offsets in context of all meshes
+                            myMeshlet.VertexOffset += (uint)listMeshletsVertexIndices.Count;
+                            myMeshlet.IndicesOffset += (uint)listMeshletsPrimitiveIndices.Count;
+                        }
+
                         GpuMesh mesh = new GpuMesh();
                         mesh.EmissiveBias = 0.0f;
                         mesh.SpecularBias = 0.0f;
                         mesh.RoughnessBias = 0.0f;
                         mesh.RefractionChance = 0.0f;
+                        mesh.MeshletsStart = listMeshlets.Count;
+                        mesh.MeshletsCount = meshMeshlets.Length;
                         mesh.IOR = 1.0f;
                         mesh.Absorbance = new Vector3(0.0f);
                         if (gltfMeshPrimitive.Material.HasValue)
@@ -181,42 +294,53 @@ namespace IDKEngine
                         else
                         {
                             GpuMaterial defaultGpuMaterial = LoadGpuMaterials(new GpuMaterialLoadData[] { GpuMaterialLoadData.Default })[0];
-                            materials.Add(defaultGpuMaterial);
+                            listMaterials.Add(defaultGpuMaterial);
 
                             mesh.NormalMapStrength = 0.0f;
-                            mesh.MaterialIndex = materials.Count - 1;
+                            mesh.MaterialIndex = listMaterials.Count - 1;
                         }
-
-                        (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfMeshPrimitive);
-                        uint[] meshIndices = LoadGpuIndexData(gltfMeshPrimitive);
-
-                        GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
-                        drawCmd.Count = meshIndices.Length;
-                        drawCmd.InstanceCount = 1;
-                        drawCmd.FirstIndex = indices.Count;
-                        drawCmd.BaseVertex = vertices.Count;
-                        drawCmd.BaseInstance = drawCommands.Count;
 
                         GpuMeshInstance meshInstance = new GpuMeshInstance();
                         meshInstance.ModelMatrix = globalModelMatrix;
 
-                        vertices.AddRange(meshVertices);
-                        vertexPositions.AddRange(meshVertexPositions);
-                        indices.AddRange(meshIndices);
-                        meshes.Add(mesh);
-                        meshInstances.Add(meshInstance);
-                        drawCommands.Add(drawCmd);
+                        GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
+                        drawCmd.IndexCount = mehsIndices.Length;
+                        drawCmd.InstanceCount = 1;
+                        drawCmd.FirstIndex = listIndices.Count;
+                        drawCmd.BaseVertex = listVertices.Count;
+                        drawCmd.BaseInstance = listDrawCommands.Count;
+
+                        GpuMeshTasksCmd meshTaskCmd = new GpuMeshTasksCmd();
+                        meshTaskCmd.First = 0; // listMeshlets.Count
+                        meshTaskCmd.Count = (int)MathF.Ceiling(meshletCount / 32.0f); // divide by task shader work group size
+
+                        listMeshlets.AddRange(meshMeshlets);
+                        listMeshletsInfo.AddRange(meshMeshletsInfo);
+                        listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshletsVertexIndices, 0, (int)meshletsVertexIndicesLength));
+                        listMeshletsPrimitiveIndices.AddRange(new ReadOnlySpan<byte>(meshletsPrimitiveIndices, 0, (int)meshletsPrimitiveIndicesLength));
+                        listMeshTasksCmd.Add(meshTaskCmd);
+                        listVertices.AddRange(meshVertices);
+                        listVertexPositions.AddRange(meshVertexPositions);
+                        listIndices.AddRange(mehsIndices);
+                        listMeshes.Add(mesh);
+                        listMeshInstances.Add(meshInstance);
+                        listDrawCommands.Add(drawCmd);
                     }
                 }
             }
 
-            Meshes = meshes.ToArray();
-            MeshInstances = meshInstances.ToArray();
-            Materials = materials.ToArray();
-            DrawCommands = drawCommands.ToArray();
-            Vertices = vertices.ToArray();
-            VertexPositions = vertexPositions.ToArray();
-            Indices = indices.ToArray();
+            Meshes = listMeshes.ToArray();
+            MeshInstances = listMeshInstances.ToArray();
+            Materials = listMaterials.ToArray();
+            DrawCommands = listDrawCommands.ToArray();
+            Vertices = listVertices.ToArray();
+            VertexPositions = listVertexPositions.ToArray();
+            Indices = listIndices.ToArray();
+            MeshTasksCmds = listMeshTasksCmd.ToArray();
+            Meshlets = listMeshlets.ToArray();
+            MeshletsInfo = listMeshletsInfo.ToArray();
+            MeshletsVertexIndices = listMeshletsVertexIndices.ToArray();
+            MeshletsPrimitiveIndices = listMeshletsPrimitiveIndices.ToArray();
         }
 
         private unsafe GpuMaterialLoadData[] GetGpuMaterialLoadDataFromGltf(Material[] materials, GltfTexture[] textures)
@@ -227,6 +351,12 @@ namespace IDKEngine
             }
 
             GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[materials.Length];
+
+            //for (int i = 0; i < materialsLoadData.Length; i++)
+            //{
+            //    materialsLoadData[i] = GpuMaterialLoadData.Default;
+            //}
+            //return materialsLoadData;
 
             Parallel.For(0, materialsLoadData.Length * GpuMaterialLoadData.TEXTURE_COUNT, i =>
             {

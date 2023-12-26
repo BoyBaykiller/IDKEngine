@@ -50,8 +50,8 @@ namespace IDKEngine.Shapes
             GrowToFit(box.SIMDMin);
             GrowToFit(box.SIMDMax);
         }
-
-        public void GrowToFit(in GpuBlasTriangle tri)
+        
+        public void GrowToFit(in BLAS.Triangle tri)
         {
             GrowToFit(tri.Position0);
             GrowToFit(tri.Position1);

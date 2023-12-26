@@ -89,4 +89,65 @@ bool BoxBoxIntersect(Box a, Box b)
            a.Max.z > b.Min.z;
 }
 
+bool BoxDepthBufferIntersect(Box box, sampler2D samplerHiZ, mat4 boxTransformations, out bool behindFrustum)
+{
+    vec2 boxNdcMin = vec2(1.0);
+    vec2 boxNdcMax = vec2(-1.0);
+    float boxClosestDepth = 1.0;
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            vec4 clipSpace = boxTransformations * vec4(BoxGetVertexPos(box, i), 1.0);
+            if (clipSpace.w <= 0.0)
+            {
+                behindFrustum = true;
+
+                // Note: Imagine a long object that starts left behind the camera and extends forward into the frustum but is obscured.
+                // Frustum culling test will say its visible. Returning true here will also cause occlusion culling test to pass even though its obscured.
+                // Returning false however will be wrong when we camera is inside the object and the objects goes behind camera.
+                return true;
+            }
+            vec2 ndc = clipSpace.xy / clipSpace.w;
+            boxNdcMin = min(boxNdcMin, ndc);
+            boxNdcMax = max(boxNdcMax, ndc);
+
+            float depth = clipSpace.z / clipSpace.w;
+            boxClosestDepth = min(boxClosestDepth, depth);
+        }
+    }
+    behindFrustum = false;
+
+    vec2 boxUvMin = boxNdcMin * 0.5 + 0.5;
+    vec2 boxUvMax = boxNdcMax * 0.5 + 0.5;
+
+    boxUvMin = clamp(boxUvMin, vec2(0.0), vec2(1.0));
+    boxUvMax = clamp(boxUvMax, vec2(0.0), vec2(1.0));
+
+    ivec2 size = ivec2((boxUvMax - boxUvMin) * textureSize(samplerHiZ, 0));
+    uint level = uint(ceil(log2(max(size.x, size.y))));
+
+    // Source: https://interplayoflight.wordpress.com/2017/11/15/experiments-in-gpu-based-occlusion-culling/
+    // uint lowerLevel = max(level - 1, 1);
+    // float scale = exp2(-float(lowerLevel));
+    // ivec2 a = ivec2(floor(boxUvMin * scale));
+    // ivec2 b = ivec2(ceil(boxUvMax * scale));
+    // ivec2 dims = b - a;
+    // // Use the lower level if we only touch <= 2 texels in both dimensions
+    // if (dims.x <= 2 && dims.y <= 2)
+    // {
+    //     level = lowerLevel;
+    // }
+
+    vec4 depths;
+    depths.x = textureLod(samplerHiZ, boxUvMin, level).r;
+    depths.y = textureLod(samplerHiZ, vec2(boxUvMax.x, boxUvMin.y), level).r;
+    depths.w = textureLod(samplerHiZ, vec2(boxUvMin.x, boxUvMax.y), level).r;
+    depths.z = textureLod(samplerHiZ, boxUvMax, level).r;
+
+    float furthestDepth = max(max(depths.x, depths.y), max(depths.z, depths.w));
+    bool isVisible = boxClosestDepth <= furthestDepth;
+
+    return isVisible;
+}
+
 #endif

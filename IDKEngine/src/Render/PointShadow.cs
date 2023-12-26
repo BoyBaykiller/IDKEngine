@@ -66,11 +66,6 @@ namespace IDKEngine.Render
 
         public unsafe void Render(ModelSystem modelSystem, ShaderProgram renderProgram, ShaderProgram cullingProgram)
         {
-            if (modelSystem.Meshes.Length == 0)
-            {
-                return;
-            }
-
             GL.Viewport(0, 0, Result.Width, Result.Height);
             framebuffer.Bind();
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
