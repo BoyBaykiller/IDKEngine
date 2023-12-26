@@ -8,7 +8,7 @@ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 struct DrawElementsCmd
 {
-    uint Count;
+    uint IndexCount;
     uint InstanceCount;
     uint FirstIndex;
     uint BaseVertex;
@@ -26,9 +26,9 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
-    float _pad0;
+    uint MeshletsStart;
     vec3 Absorbance;
-    uint CubemapShadowCullInfo;
+    uint MeshletsCount;
 };
 
 struct MeshInstance
@@ -105,77 +105,29 @@ void main()
     BlasNode node = blasSSBO.Nodes[drawCmd.BlasRootNodeIndex];
 
     const uint glInstanceID = 0; // TODO: Derive from built in variables
-    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].PrevModelMatrix;
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID];
 
     bool isVisible = true;
 
-    Frustum frustum = GetFrustum(basicDataUBO.ProjView * model);
+    Frustum frustum = GetFrustum(basicDataUBO.ProjView * meshInstance.ModelMatrix);
     isVisible = FrustumBoxIntersect(frustum, node.Min, node.Max);
 
     // Occlusion cull
-    const bool hiZCulling = false; // false for now
-    if (hiZCulling && isVisible)
+    const bool hiZCulling = false;
+    if (isVisible && hiZCulling)
     {
-        bool behindFrustum = false;
-        vec2 boxNdcMin = vec2(FLOAT_MAX);
-        vec2 boxNdcMax = vec2(FLOAT_MIN);
-        float boxClosestDepth = FLOAT_MAX;
-        {
-            Box localBox = Box(node.Min, node.Max);
-            for (int i = 0; i < 8; i++)
-            {
-                vec4 clipSpace = basicDataUBO.PrevProjView * model * vec4(BoxGetVertexPos(localBox, i), 1.0);
-                if (clipSpace.w <= 0.0)
-                {
-                    behindFrustum = true;
-                    break;
-                }
-                vec2 ndc = clipSpace.xy / clipSpace.w;
-                boxNdcMin = min(boxNdcMin, ndc);
-                boxNdcMax = max(boxNdcMax, ndc);
-
-                float depth = clipSpace.z / clipSpace.w;
-                boxClosestDepth = min(boxClosestDepth, depth);
-            }
-        }
-
+        Box localBox = Box(node.Min, node.Max);
+        sampler2D samplerHiZ = gBufferDataUBO.Depth;
+        mat4 prevProjViewModel = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix;
+        
+        bool behindFrustum;
+        bool occlusionCullVisible = BoxDepthBufferIntersect(localBox, samplerHiZ, prevProjViewModel, behindFrustum);
         if (!behindFrustum)
         {
-            vec2 boxUvMin = boxNdcMin * 0.5 + 0.5;
-            vec2 boxUvMax = boxNdcMax * 0.5 + 0.5;
-
-            boxUvMin = clamp(boxUvMin, vec2(0.0), vec2(1.0));
-            boxUvMax = clamp(boxUvMax, vec2(0.0), vec2(1.0));
-
-            sampler2D samplerHiZ = gBufferDataUBO.Depth;
-            ivec2 size = ivec2((boxUvMax - boxUvMin) * textureSize(samplerHiZ, 0));
-            uint level = uint(ceil(log2(max(size.x, size.y))));
-
-            // Source: https://interplayoflight.wordpress.com/2017/11/15/experiments-in-gpu-based-occlusion-culling/
-            // uint lowerLevel = max(level - 1, 0);
-            // float scale = exp2(-float(lowerLevel));
-            // ivec2 a = ivec2(floor(boxUvMin * scale));
-            // ivec2 b = ivec2(ceil(boxUvMax * scale));
-            // ivec2 dims = b - a;
-            // // Use the lower level if we only touch <= 2 texels in both dimensions
-            // if (dims.x <= 2 && dims.y <= 2)
-            // {
-            //     level = lowerLevel;
-            // }
-
-            vec4 depths;
-            depths.x = textureLod(samplerHiZ, boxUvMin, level).r;
-            depths.y = textureLod(samplerHiZ, vec2(boxUvMax.x, boxUvMin.y), level).r;
-            depths.w = textureLod(samplerHiZ, vec2(boxUvMin.x, boxUvMax.y), level).r;
-            depths.z = textureLod(samplerHiZ, boxUvMax, level).r;
-
-            float furthestDepth = max(max(depths.x, depths.y), max(depths.z, depths.w));
-            if (boxClosestDepth > furthestDepth)
-            {
-                isVisible = false;
-            }
+            isVisible = occlusionCullVisible;
         }
     }
     
     drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = isVisible ? 1 : 0;
+    // drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = 1;
 }

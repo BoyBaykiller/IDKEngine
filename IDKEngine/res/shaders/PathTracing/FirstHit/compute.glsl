@@ -39,7 +39,7 @@ struct Material
 
 struct DrawElementsCmd
 {
-    uint Count;
+    uint IndexCount;
     uint InstanceCount;
     uint FirstIndex;
     uint BaseVertex;
@@ -57,9 +57,9 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
-    float _pad0;
+    uint MeshletsStart;
     vec3 Absorbance;
-    uint CubemapShadowCullInfo;
+    uint MeshletsCount;
 };
 
 struct MeshInstance
@@ -82,18 +82,6 @@ struct BlasNode
     uint TriStartOrLeftChild;
     vec3 Max;
     uint TriCount;
-};
-
-struct BlasTriangle
-{
-    vec3 Position0;
-    uint VertexIndex0;
-
-    vec3 Position1;
-    uint VertexIndex1;
-
-    vec3 Position2;
-    uint VertexIndex2;
 };
 
 struct TlasNode
@@ -161,11 +149,6 @@ layout(std430, binding = 5) restrict readonly buffer BlasSSBO
     BlasNode Nodes[];
 } blasSSBO;
 
-layout(std430, binding = 6) restrict readonly buffer BlasTriangleSSBO
-{
-    BlasTriangle Triangles[];
-} blasTriangleSSBO;
-
 layout(std430, binding = 7) restrict readonly buffer TlasSSBO
 {
     TlasNode Nodes[];
@@ -176,17 +159,13 @@ layout(std430, binding = 8) restrict writeonly buffer WavefrontRaySSBO
     WavefrontRay Rays[];
 } wavefrontRaySSBO;
 
-layout(std430, binding = 9) restrict buffer RayIndicesSSBO
+layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
 {
+    DispatchCommand DispatchCommands[2];
     uint Counts[2];
     uint AccumulatedSamples;
     uint Indices[];
-} rayIndicesSSBO;
-
-layout(std430, binding = 10) restrict buffer DispatchCommandSSBO
-{
-    DispatchCommand DispatchCommands[2];
-} dispatchCommandSSBO;
+} wavefrontPTSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -239,7 +218,7 @@ void main()
         return;
     }
 
-    InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (rayIndicesSSBO.AccumulatedSamples + 1));
+    InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (wavefrontPTSSBO.AccumulatedSamples + 1));
 
     vec2 subPixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
     vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -267,12 +246,12 @@ void main()
 
     if (continueRay)
     {
-        uint index = atomicAdd(rayIndicesSSBO.Counts[1], 1u);
-        rayIndicesSSBO.Indices[index] = rayIndex;
+        uint index = atomicAdd(wavefrontPTSSBO.Counts[1], 1u);
+        wavefrontPTSSBO.Indices[index] = rayIndex;
 
         if (index % N_HIT_PROGRAM_LOCAL_SIZE_X == 0)
         {
-            atomicAdd(dispatchCommandSSBO.DispatchCommands[1].NumGroupsX, 1u);
+            atomicAdd(wavefrontPTSSBO.DispatchCommands[1].NumGroupsX, 1u);
         }
     }
 }
@@ -321,7 +300,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             
             normal = texture(material.Normal, interpTexCoord).rgb;
             normal = TBN * normalize(normal * 2.0 - 1.0);
-            mat3 normalToWorld = mat3(meshInstance.ModelMatrix);
+            mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             normal = mix(normalize(normalToWorld * interpNormal), normal, mesh.NormalMapStrength);
 
             ior = mesh.IOR;

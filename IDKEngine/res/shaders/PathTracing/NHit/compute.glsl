@@ -37,7 +37,7 @@ struct Material
 
 struct DrawElementsCmd
 {
-    uint Count;
+    uint IndexCount;
     uint InstanceCount;
     uint FirstIndex;
     uint BaseVertex;
@@ -55,9 +55,9 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
-    float _pad0;
+    uint MeshletsStart;
     vec3 Absorbance;
-    uint CubemapShadowCullInfo;
+    uint MeshletsCount;
 };
 
 struct MeshInstance
@@ -80,18 +80,6 @@ struct BlasNode
     uint TriStartOrLeftChild;
     vec3 Max;
     uint TriCount;
-};
-
-struct BlasTriangle
-{
-    vec3 Position0;
-    uint VertexIndex0;
-
-    vec3 Position1;
-    uint VertexIndex1;
-
-    vec3 Position2;
-    uint VertexIndex2;
 };
 
 struct TlasNode
@@ -159,11 +147,6 @@ layout(std430, binding = 5) restrict readonly buffer BlasSSBO
     BlasNode Nodes[];
 } blasSSBO;
 
-layout(std430, binding = 6) restrict readonly buffer BlasTriangleSSBO
-{
-    BlasTriangle Triangles[];
-} blasTriangleSSBO;
-
 layout(std430, binding = 7) restrict readonly buffer TlasSSBO
 {
     TlasNode Nodes[];
@@ -174,17 +157,13 @@ layout(std430, binding = 8) restrict buffer WavefrontRaySSBO
     WavefrontRay Rays[];
 } wavefrontRaySSBO;
 
-layout(std430, binding = 9) restrict buffer RayIndicesSSBO
+layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
 {
+    DispatchCommand DispatchCommands[2];
     uint Counts[2];
     uint AccumulatedSamples;
     uint Indices[];
-} rayIndicesSSBO;
-
-layout(std430, binding = 10) restrict buffer DispatchCommandSSBO
-{
-    DispatchCommand DispatchCommands[2];
-} dispatchCommandSSBO;
+} wavefrontPTSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -227,19 +206,19 @@ AppInclude(PathTracing/include/RussianRoulette.glsl)
 
 void main()
 {
-    if (gl_GlobalInvocationID.x > rayIndicesSSBO.Counts[1 - PingPongIndex])
+    if (gl_GlobalInvocationID.x > wavefrontPTSSBO.Counts[1 - PingPongIndex])
     {
         return;
     }
 
     if (gl_GlobalInvocationID.x == 0)
     {
-        dispatchCommandSSBO.DispatchCommands[1 - PingPongIndex].NumGroupsX = 0u;
+        wavefrontPTSSBO.DispatchCommands[1 - PingPongIndex].NumGroupsX = 0u;
     }
 
-    InitializeRandomSeed(gl_GlobalInvocationID.x * 4096 + rayIndicesSSBO.AccumulatedSamples);
+    InitializeRandomSeed(gl_GlobalInvocationID.x * 4096 + wavefrontPTSSBO.AccumulatedSamples);
 
-    uint rayIndex = rayIndicesSSBO.Indices[gl_GlobalInvocationID.x];
+    uint rayIndex = wavefrontPTSSBO.Indices[gl_GlobalInvocationID.x];
     WavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
     
     bool continueRay = TraceRay(wavefrontRay);
@@ -247,12 +226,12 @@ void main()
 
     if (continueRay)
     {
-        uint index = atomicAdd(rayIndicesSSBO.Counts[PingPongIndex], 1u);
-        rayIndicesSSBO.Indices[index] = rayIndex;
+        uint index = atomicAdd(wavefrontPTSSBO.Counts[PingPongIndex], 1u);
+        wavefrontPTSSBO.Indices[index] = rayIndex;
 
         if (index % N_HIT_PROGRAM_LOCAL_SIZE_X == 0)
         {
-            atomicAdd(dispatchCommandSSBO.DispatchCommands[PingPongIndex].NumGroupsX, 1u);
+            atomicAdd(wavefrontPTSSBO.DispatchCommands[PingPongIndex].NumGroupsX, 1u);
         }
     }
 }
@@ -294,7 +273,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             
             normal = texture(material.Normal, interpTexCoord).rgb;
             normal = TBN * normalize(normal * 2.0 - 1.0);
-            mat3 normalToWorld = mat3(meshInstance.ModelMatrix);
+            mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             normal = mix(normalize(normalToWorld * interpNormal), normal, mesh.NormalMapStrength);
 
             ior = mesh.IOR;

@@ -19,31 +19,12 @@ struct PointShadow
     float FarPlane;
 };
 
-struct Mesh
-{
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float RefractionChance;
-    float IOR;
-    float _pad0;
-    vec3 Absorbance;
-    uint CubemapShadowCullInfo;
-};
-
 struct MeshInstance
 {
     mat4 ModelMatrix;
     mat4 InvModelMatrix;
     mat4 PrevModelMatrix;
 };
-
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
 
 layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
 {

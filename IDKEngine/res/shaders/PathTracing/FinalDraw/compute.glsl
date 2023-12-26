@@ -30,17 +30,13 @@ layout(std430, binding = 8) restrict readonly buffer WavefrontRaySSBO
     WavefrontRay Rays[];
 } wavefrontRaySSBO;
 
-layout(std430, binding = 9) restrict buffer RayIndicesSSBO
+layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
 {
+    DispatchCommand DispatchCommands[2];
     uint Counts[2];
     uint AccumulatedSamples;
     uint Indices[];
-} rayIndicesSSBO;
-
-layout(std430, binding = 10) restrict writeonly buffer DispatchCommandSSBO
-{
-    DispatchCommand DispatchCommands[2];
-} dispatchCommandSSBO;
+} wavefrontPTSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -72,11 +68,16 @@ void main()
     // Reset global memory for next frame
     if (gl_GlobalInvocationID.x == 0)
     {
-        dispatchCommandSSBO.DispatchCommands[0].NumGroupsX = 0u;
-        dispatchCommandSSBO.DispatchCommands[1].NumGroupsX = 0u;
+        wavefrontPTSSBO.DispatchCommands[0].NumGroupsX = 0u;
+        wavefrontPTSSBO.DispatchCommands[0].NumGroupsY = 1u;
+        wavefrontPTSSBO.DispatchCommands[0].NumGroupsZ = 1u;
+
+        wavefrontPTSSBO.DispatchCommands[1].NumGroupsX = 0u;
+        wavefrontPTSSBO.DispatchCommands[1].NumGroupsY = 1u;
+        wavefrontPTSSBO.DispatchCommands[1].NumGroupsZ = 1u;
         
-        rayIndicesSSBO.Counts[0] = 0u;
-        rayIndicesSSBO.Counts[1] = 0u;
+        wavefrontPTSSBO.Counts[0] = 0u;
+        wavefrontPTSSBO.Counts[1] = 0u;
     }
 
     uint rayIndex = imgCoord.y * imgResultSize.x + imgCoord.x;
@@ -92,7 +93,7 @@ void main()
     }
 
     vec3 lastFrameIrradiance = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameIrradiance, irradiance, 1.0 / (float(rayIndicesSSBO.AccumulatedSamples) + 1.0));
+    irradiance = mix(lastFrameIrradiance, irradiance, 1.0 / (float(wavefrontPTSSBO.AccumulatedSamples) + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 

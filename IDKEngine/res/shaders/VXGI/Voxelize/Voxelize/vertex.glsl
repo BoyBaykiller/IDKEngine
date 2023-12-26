@@ -19,9 +19,9 @@ struct Mesh
     float RoughnessBias;
     float RefractionChance;
     float IOR;
-    float _pad0;
+    uint MeshletsStart;
     vec3 Absorbance;
-    uint CubemapShadowCullInfo;
+    uint MeshletsCount;
 };
 
 struct MeshInstance
@@ -90,7 +90,8 @@ void main()
 
     vec3 normal = DecompressSR11G11B10(Normal);
 
-    outData.Normal = mat3(meshInstance.ModelMatrix) * normal;
+    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+    outData.Normal = normalToWorld * normal;
     outData.TexCoord = TexCoord;
 
     outData.MaterialIndex = mesh.MaterialIndex;

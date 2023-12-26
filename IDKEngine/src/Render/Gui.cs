@@ -53,7 +53,7 @@ namespace IDKEngine.Render
         }
 
         private System.Numerics.Vector2 viewportHeaderSize;
-        public void Draw(Application app, float frameTime)
+        public unsafe void Draw(Application app, float frameTime)
         {
             if (app.MouseState.CursorMode == CursorModeValue.CursorNormal)
             {
@@ -70,11 +70,42 @@ namespace IDKEngine.Render
             int tempInt;
             bool tempBool;
             float tempFloat;
+            bool shouldResetPT = false;
             System.Numerics.Vector2 tempVec2;
             System.Numerics.Vector3 tempVec3;
 
 
-            if (ImGui.Begin("Camera"))
+            ImGui.Begin("Stats");
+            {
+                float mbDrawVertices = (app.ModelSystem.Vertices.Length * ((nint)sizeof(GpuVertex) + sizeof(Vector3))) / 1000000.0f;
+                float mbDrawIndices = (app.ModelSystem.VertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
+                float mbMeshlets = (app.ModelSystem.Meshlets.Length * (nint)sizeof(GpuMeshlet)) / 1000000.0f;
+                float mbMeshletsVertexIndices = (app.ModelSystem.MeshletsVertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
+                float mbMeshletsPrimitiveIndices = (app.ModelSystem.MeshletsPrimitiveIndices.Length * (nint)sizeof(byte)) / 1000000.0f;
+                if (ImGui.TreeNode($"Rasterizer Geometry total = {mbDrawVertices + mbDrawIndices}mb"))
+                {
+                    ImGui.Text($"  * Vertices ({app.ModelSystem.Vertices.Length}) = {mbDrawVertices}mb");
+                    ImGui.Text($"  * Indices ({app.ModelSystem.VertexIndices.Length}) = {mbDrawIndices}mb");
+                    ImGui.Text($"  * Meshlets ({app.ModelSystem.Meshlets.Length}) = {mbMeshlets}mb");
+                    ImGui.Text($"  * MeshletsVertexIndices ({app.ModelSystem.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
+                    ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelSystem.MeshletsPrimitiveIndices.Length}) = {mbMeshletsPrimitiveIndices}mb");
+                    ImGui.TreePop();
+                }
+
+                float mbBlasTrianglesIndices = (app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet)) / 1000000.0f;
+                float mbBlasNodes = (app.ModelSystem.BVH.GetBlasesNodeCount() * (nint)sizeof(GpuBlasNode)) / 1000000.0f;
+                if (ImGui.TreeNode($"BVH total = {mbBlasTrianglesIndices + mbBlasNodes}mb"))
+                {
+                    ImGui.Text($"  * Vertex Indices ({app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * 3}) = {mbBlasTrianglesIndices}mb");
+                    ImGui.Text($"  * Blas Nodes ({app.ModelSystem.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
+
+                    ImGui.TreePop();
+                }
+
+                ImGui.End();
+            }
+
+            ImGui.Begin("Camera");
             {
                 if (ImGui.CollapsingHeader("Collision Detection"))
                 {
@@ -114,12 +145,9 @@ namespace IDKEngine.Render
                         ImGui.SliderFloat("Gravity", ref app.GravityDownForce, 0.0f, 100.0f);
                     }
                 }
-
                 ImGui.End();
             }
 
-
-            bool shouldResetPT = false;
             ImGui.Begin("Frame Recorder");
             {
                 if (FrameRecState != FrameRecorderState.Replaying)
@@ -200,7 +228,6 @@ namespace IDKEngine.Render
                 ImGui.Text($"FPS: {app.FPS}");
                 ImGui.Text($"Viewport size: {app.RenderPresentationResolution.X}x{app.RenderPresentationResolution.Y}");
                 ImGui.Text($"{Helper.GPU}");
-                ImGui.Text($"Triangles: {app.ModelSystem.TriangleCount}");
 
                 if (app.RenderMode == RenderMode.PathTracer)
                 {
@@ -809,7 +836,7 @@ namespace IDKEngine.Render
                     ref GpuMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[cmd.BaseInstance + SelectedEntity.Instance];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
-                    ImGui.Text($"Triangle Count: {cmd.Count / 3}");
+                    ImGui.Text($"Triangle Count: {cmd.IndexCount / 3}");
                     ImGui.SameLine(); if (ImGui.Button("Teleport to camera"))
                     {
                         meshInstance.ModelMatrix = meshInstance.ModelMatrix.ClearTranslation() * Matrix4.CreateTranslation(app.Camera.Position);

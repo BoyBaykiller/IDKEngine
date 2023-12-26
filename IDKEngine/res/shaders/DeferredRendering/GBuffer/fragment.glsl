@@ -9,6 +9,20 @@ layout(location = 2) out vec4 NormalSpecular;
 layout(location = 3) out vec4 EmissiveRoughness;
 layout(location = 4) out vec2 Velocity;
 
+struct Mesh
+{
+    int MaterialIndex;
+    float NormalMapStrength;
+    float EmissiveBias;
+    float SpecularBias;
+    float RoughnessBias;
+    float RefractionChance;
+    float IOR;
+    uint MeshletsStart;
+    vec3 Absorbance;
+    uint MeshletsCount;
+};
+
 struct Material
 {
     vec3 EmissiveFactor;
@@ -25,6 +39,11 @@ struct Material
     sampler2D Normal;
     sampler2D Emissive;
 };
+
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
+{
+    Mesh Meshes[];
+} meshSSBO;
 
 layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
 {
@@ -69,16 +88,13 @@ in InOutVars
     vec4 PrevClipPos;
     vec3 Normal;
     mat3 TBN;
-    flat uint MaterialIndex;
-    flat float EmissiveBias;
-    flat float NormalMapStrength;
-    flat float SpecularBias;
-    flat float RoughnessBias;
+    flat uint MeshID;
 } inData;
 
 void main()
 {
-    Material material = materialSSBO.Materials[inData.MaterialIndex];
+    Mesh mesh = meshSSBO.Meshes[inData.MeshID];
+    Material material = materialSSBO.Materials[mesh.MaterialIndex];
     
     float lod = textureQueryLod(material.BaseColor, inData.TexCoord).y;
 
@@ -87,13 +103,13 @@ void main()
     {
         discard;
     }
-    vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + inData.EmissiveBias * albedoAlpha.rgb;
+    vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
     normal = inData.TBN * normalize(normal * 2.0 - 1.0);
-    normal = mix(normalize(inData.Normal), normal, inData.NormalMapStrength);
+    normal = mix(normalize(inData.Normal), normal, mesh.NormalMapStrength);
 
-    float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + inData.SpecularBias, 0.0, 1.0);
-    float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + inData.RoughnessBias, 0.0, 1.0);
+    float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0);
+    float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
 
     AlbedoAlpha = albedoAlpha;
     NormalSpecular = vec4(normal, specular);

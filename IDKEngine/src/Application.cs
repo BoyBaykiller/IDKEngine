@@ -493,10 +493,9 @@ namespace IDKEngine
 
                 Model helmet = new Model("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
-                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf");
+                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\cornell-box\scene.gltf");
                 //Model test = new Model(@"C:\Users\Julian\Downloads\Models\Skeleton\Skeleton.gltf", Matrix4.CreateScale(0.4f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90.0f)) * Matrix4.CreateTranslation(-6.1f, 1.8f, 0.0f));
                 //Model test = new Model("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\BoomBoxWithAxes\\glTF\\BoomBoxWithAxes.gltf", Matrix4.CreateScale(100.0f));
-
                 ModelSystem.Add(sponza, lucy, helmet);
 
                 LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
@@ -516,6 +515,7 @@ namespace IDKEngine
             }
             else
             {
+                Stopwatch sw = Stopwatch.StartNew();
                 Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
                 a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
@@ -550,6 +550,7 @@ namespace IDKEngine
                 Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
+                Console.WriteLine(sw.ElapsedMilliseconds / 1000.0f);
 
                 ModelSystem.Add(a, b, c, d);
 

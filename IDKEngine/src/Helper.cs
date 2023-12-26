@@ -133,6 +133,11 @@ namespace IDKEngine
         public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;
         private static void GLDebugCallback(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
         {
+            if (source == DebugSource.DebugSourceApplication)
+            {
+                return;
+            }
+
             string text = Marshal.PtrToStringAnsi(message, length);
             switch (severity)
             {

@@ -12,9 +12,9 @@ namespace IDKEngine
         public float RoughnessBias;
         public float RefractionChance;
         public float IOR;
-        private readonly int _pad0;
+        public int MeshletsStart;
 
         public Vector3 Absorbance;
-        private uint cubemapShadowCullInfo;
+        public int MeshletsCount;
     }
 }

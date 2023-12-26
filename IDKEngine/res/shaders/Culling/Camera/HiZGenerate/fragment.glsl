@@ -1,5 +1,4 @@
 #version 460 core
-#extension GL_AMD_texture_gather_bias_lod : enable
 
 layout(binding = 0) uniform sampler2D SamplerDepth;
 

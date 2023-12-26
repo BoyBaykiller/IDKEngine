@@ -19,7 +19,7 @@ namespace IDKEngine.GpuTypes
             return new Box(node.Min, node.Max);
         }
 
-        public static Triangle ToTriangle(in GpuBlasTriangle triangle)
+        public static Triangle ToTriangle(in BLAS.Triangle triangle)
         {
             return new Triangle(triangle.Position0, triangle.Position1, triangle.Position2);
         }
