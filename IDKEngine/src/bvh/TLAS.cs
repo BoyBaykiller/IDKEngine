@@ -18,9 +18,9 @@ namespace IDKEngine
             Blases = Array.Empty<BLAS>();
         }
 
-        public void AddBlases(BLAS[] blases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
+        public void AddBlases(BLAS[] newBlases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
         {
-            Helper.ArrayAdd(ref Blases, blases);
+            Helper.ArrayAdd(ref Blases, newBlases);
 
             DrawCommands = drawCommands;
             MeshInstances = meshInstances;

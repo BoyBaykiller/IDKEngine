@@ -32,7 +32,7 @@ struct Mesh
     float IOR;
     uint MeshletsStart;
     vec3 Absorbance;
-    uint MeshletsCount;
+    uint MeshletCount;
 };
 
 struct MeshInstance
@@ -274,6 +274,7 @@ void main()
     float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
     FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, alpha);
+    //FragColor = vec4(indirectLight, alpha);
 }
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight)
@@ -286,14 +287,19 @@ vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, 
     {
         vec3 diffuseContrib = light.Color * cosTerm * albedo;  
     
-        vec3 specularContrib = vec3(0.0);
-        vec3 halfwayDir = normalize(lightDir + -viewDir);
-        float temp = dot(normal, halfwayDir);
         // TODO: Implement not shit lighting that doesnt break under some conditions
-        if (!IsVXGI && temp > 0.0)
+        vec3 specularContrib = vec3(0.0);
+        if (!IsVXGI)
         {
-            float spec = pow(temp, 256.0 * (1.0 - roughness));
-            specularContrib = light.Color * spec * specular;
+            vec3 halfwayDir = normalize(lightDir + -viewDir);
+            float temp = dot(normal, halfwayDir);
+            if (temp > 0.0)
+            {
+                // double spec = pow(double(temp), 256.0lf * (1.0lf - double(roughness)));
+                // This bugged on bistro for some reason
+                float spec = pow(temp, 256.0 * (1.0 - roughness));
+                specularContrib = light.Color * float(spec) * specular;
+            }
         }
         
         vec3 attenuation = light.Color / (4.0 * PI * fragToLightLength * fragToLightLength);

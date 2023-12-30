@@ -8,8 +8,6 @@ namespace IDKEngine.Render
 {
     class ModelSystem : IDisposable
     {
-        public int TriangleCount => VertexIndices.Length / 3;
-
         public GpuDrawElementsCmd[] DrawCommands = Array.Empty<GpuDrawElementsCmd>();
         private readonly BufferObject drawCommandBuffer;
 
@@ -31,8 +29,8 @@ namespace IDKEngine.Render
         public uint[] VertexIndices = Array.Empty<uint>();
         private readonly BufferObject vertexIndicesBuffer;
 
-        public GpuMeshTasksCmd[] MeshTasksCmds = Array.Empty<GpuMeshTasksCmd>();
-        private readonly BufferObject meshTasksCmdsBuffer;
+        public GpuMeshletTaskCmd[] MeshTasksCmds = Array.Empty<GpuMeshletTaskCmd>();
+        private readonly BufferObject meshletTasksCmdsBuffer;
 
         public GpuMeshlet[] Meshlets = Array.Empty<GpuMeshlet>();
         private readonly BufferObject meshletBuffer;
@@ -43,7 +41,7 @@ namespace IDKEngine.Render
         public uint[] MeshletsVertexIndices = Array.Empty<uint>();
         private readonly BufferObject meshletsVertexIndicesBuffer;
 
-        public byte[] MeshletsPrimitiveIndices = Array.Empty<byte>();
+        public byte[] MeshletsLocalIndices = Array.Empty<byte>();
         private readonly BufferObject meshletsPrimitiveIndicesBuffer;
 
         public BVH BVH;
@@ -57,7 +55,7 @@ namespace IDKEngine.Render
             materialBuffer = new BufferObject();
             vertexBuffer = new BufferObject();
             vertexIndicesBuffer = new BufferObject();
-            meshTasksCmdsBuffer = new BufferObject();
+            meshletTasksCmdsBuffer = new BufferObject();
             meshletBuffer = new BufferObject();
             meshletInfoBuffer = new BufferObject();
             vertexPositionBuffer = new BufferObject();
@@ -70,10 +68,11 @@ namespace IDKEngine.Render
             materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
             vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
             vertexPositionBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
-            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
-            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
-            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
-            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
+            meshletTasksCmdsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
+            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
+            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
+            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
+            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
 
             vao = new VAO();
             vao.SetElementBuffer(vertexIndicesBuffer);
@@ -111,7 +110,7 @@ namespace IDKEngine.Render
                 {
                     ref GpuMeshlet meshlet = ref models[i].Meshlets[j];
                     meshlet.VertexOffset += (uint)MeshletsVertexIndices.Length;
-                    meshlet.IndicesOffset += (uint)MeshletsPrimitiveIndices.Length;
+                    meshlet.IndicesOffset += (uint)MeshletsLocalIndices.Length;
                 }
                 for (int j = 0; j < models[i].DrawCommands.Length; j++)
                 {
@@ -135,7 +134,7 @@ namespace IDKEngine.Render
                 Helper.ArrayAdd(ref Meshlets, models[i].Meshlets);
                 Helper.ArrayAdd(ref MeshletsInfo, models[i].MeshletsInfo);
                 Helper.ArrayAdd(ref MeshletsVertexIndices, models[i].MeshletsVertexIndices);
-                Helper.ArrayAdd(ref MeshletsPrimitiveIndices, models[i].MeshletsPrimitiveIndices);
+                Helper.ArrayAdd(ref MeshletsLocalIndices, models[i].MeshletsLocalIndices);
             }
 
             // Handle BVH build
@@ -161,11 +160,11 @@ namespace IDKEngine.Render
             vertexPositionBuffer.MutableAllocate(VertexPositions.Length * sizeof(Vector3), VertexPositions);
             vertexIndicesBuffer.MutableAllocate(VertexIndices.Length * sizeof(uint), VertexIndices);
 
-            meshTasksCmdsBuffer.MutableAllocate(MeshTasksCmds.Length * sizeof(GpuMeshTasksCmd), MeshTasksCmds);
+            meshletTasksCmdsBuffer.MutableAllocate(MeshTasksCmds.Length * sizeof(GpuMeshletTaskCmd), MeshTasksCmds);
             meshletBuffer.MutableAllocate(Meshlets.Length * sizeof(GpuMeshlet), Meshlets);
             meshletInfoBuffer.MutableAllocate(MeshletsInfo.Length * sizeof(GpuMeshletInfo), MeshletsInfo);
             meshletsVertexIndicesBuffer.MutableAllocate(MeshletsVertexIndices.Length * sizeof(uint), MeshletsVertexIndices);
-            meshletsPrimitiveIndicesBuffer.MutableAllocate(MeshletsPrimitiveIndices.Length * sizeof(byte), MeshletsPrimitiveIndices);
+            meshletsPrimitiveIndicesBuffer.MutableAllocate(MeshletsLocalIndices.Length * sizeof(byte), MeshletsLocalIndices);
         }
 
         public unsafe void Draw()
@@ -177,8 +176,8 @@ namespace IDKEngine.Render
 
         public unsafe void MeshDraw()
         {
-            meshTasksCmdsBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.NV.MultiDrawMeshTasksIndirect(IntPtr.Zero, MeshTasksCmds.Length, sizeof(GpuMeshTasksCmd));
+            meshletTasksCmdsBuffer.Bind(BufferTarget.DrawIndirectBuffer);
+            GL.NV.MultiDrawMeshTasksIndirect(IntPtr.Zero, MeshTasksCmds.Length, sizeof(GpuMeshletTaskCmd));
         }
 
         public unsafe void UpdateMeshBuffer(int start, int count)
@@ -199,11 +198,6 @@ namespace IDKEngine.Render
             meshInstanceBuffer.SubData(start * sizeof(GpuMeshInstance), count * sizeof(GpuMeshInstance), MeshInstances[start]);
         }
 
-        public int GetMeshVertexCount(int meshIndex)
-        {
-            return ((meshIndex + 1 > DrawCommands.Length - 1) ? Vertices.Length : DrawCommands[meshIndex + 1].BaseVertex) - DrawCommands[meshIndex].BaseVertex;
-        }
-
         public GpuTriangle GetTriangle(int indicesIndex, int baseVertex)
         {
             GpuTriangle triangle;
@@ -221,7 +215,7 @@ namespace IDKEngine.Render
             materialBuffer.Dispose();
             vertexBuffer.Dispose();
             vertexIndicesBuffer.Dispose();
-            meshTasksCmdsBuffer.Dispose();
+            meshletTasksCmdsBuffer.Dispose();
             meshletBuffer.Dispose();
             meshletInfoBuffer.Dispose();
             vertexPositionBuffer.Dispose();
@@ -229,6 +223,8 @@ namespace IDKEngine.Render
             meshletsPrimitiveIndicesBuffer.Dispose();
 
             vao.Dispose();
+
+            BVH.Dispose();
         }
     }
 }

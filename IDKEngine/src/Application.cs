@@ -216,6 +216,12 @@ namespace IDKEngine
                 fpsTimer.Restart();
             }
 
+            //if (LightManager.TryGetLight(0, out Light light))
+            //{
+            //    light.GpuLight.Position.X += (MathF.Sin(GpuBasicData.Time) * 8.0f) * dT;
+            //    light.GpuLight.Position.Z += (MathF.Cos(GpuBasicData.Time) * 4.0f) * dT;
+            //}
+
             // Keyboard Inputs
             {
                 if (KeyboardState[Keys.Escape] == InputState.Pressed)
@@ -483,20 +489,22 @@ namespace IDKEngine
                 sponza.Meshes[42].EmissiveBias = 20.0f;
                 sponza.Meshes[46].SpecularBias = 1.0f;
                 sponza.Meshes[46].RoughnessBias = -0.436f;
-
                 Model lucy = new Model("res/models/Lucy/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
                 lucy.Meshes[0].SpecularBias = -1.0f;
                 lucy.Meshes[0].RefractionChance = 0.98f;
                 lucy.Meshes[0].IOR = 1.174f;
                 lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.Meshes[0].RoughnessBias = -1.0f;
-
+                
                 Model helmet = new Model("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
-
-                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\cornell-box\scene.gltf");
-                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\Skeleton\Skeleton.gltf", Matrix4.CreateScale(0.4f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90.0f)) * Matrix4.CreateTranslation(-6.1f, 1.8f, 0.0f));
-                //Model test = new Model("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\BoomBoxWithAxes\\glTF\\BoomBoxWithAxes.gltf", Matrix4.CreateScale(100.0f));
                 ModelSystem.Add(sponza, lucy, helmet);
+
+                //Model test = new Model(@"C:\Users\stambuk\Downloads\GitClones\BistroExterior\BistroExterior.gltf");
+                //Model test = new Model(@"C:\Users\Julian\Downloads\Models\Skeleton\Skeleton.gltf", Matrix4.CreateScale(0.4f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90.0f)) * Matrix4.CreateTranslation(-6.1f, 1.8f, 0.0f));
+
+                //Model exterior = new Model(@"C:\Users\stambuk\Downloads\GitClones\BistroExterior\BistroExterior.gltf");
+                //Model interior = new Model(@"C:\Users\stambuk\Downloads\GitClones\BistroInterior\BistroInterior.gltf");
+                //ModelSystem.Add(exterior);
 
                 LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
                 LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
@@ -515,7 +523,6 @@ namespace IDKEngine
             }
             else
             {
-                Stopwatch sw = Stopwatch.StartNew();
                 Model a = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
                 a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
@@ -549,13 +556,12 @@ namespace IDKEngine
                 Model b = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
                 Model c = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 Model d = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
-                //Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                Console.WriteLine(sw.ElapsedMilliseconds / 1000.0f);
+                Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
 
-                ModelSystem.Add(a, b, c, d);
+                ModelSystem.Add(a, b, c, d, e);
 
-                //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
-                //LightManager.CreatePointShadowForLight(new PointShadow(512, 1.0f, 60.0f), 0);
+                LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
+                LightManager.CreatePointShadowForLight(new PointShadow(512, 0.1f, 60.0f), 0);
 
                 RenderMode = RenderMode.Rasterizer;
                 RasterizerPipeline.IsVXGI = false;

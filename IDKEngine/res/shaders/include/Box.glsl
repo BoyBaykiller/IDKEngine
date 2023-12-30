@@ -40,4 +40,28 @@ Box BoxTransform(Box box, mat4 matrix)
     return newBox;
 }
 
+Box BoxTransformPerspective(Box box, mat4 matrix, out bool vertexBehindFrustum)
+{
+    Box newBox = box;
+    newBox.Min = vec3(FLOAT_MAX);
+    newBox.Max = vec3(FLOAT_MIN);
+    vertexBehindFrustum = false;
+
+    for (int i = 0; i < 8; i++)
+    {
+        vec3 vertexPos = BoxGetVertexPos(box, i);
+        vec4 clipPos = (matrix * vec4(vertexPos, 1.0));
+        if (clipPos.w <= 0.0)
+        {
+            vertexBehindFrustum = true;
+        }
+
+        vec3 ndc = clipPos.xyz / clipPos.w;
+
+        newBox = BoxGrowToFit(newBox, ndc);
+    }
+
+    return newBox;
+}
+
 #endif

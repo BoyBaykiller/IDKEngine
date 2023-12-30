@@ -15,6 +15,6 @@ namespace IDKEngine
         public int MeshletsStart;
 
         public Vector3 Absorbance;
-        public int MeshletsCount;
+        public int MeshletCount;
     }
 }

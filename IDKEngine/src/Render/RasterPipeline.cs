@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class RasterPipeline : IDisposable
     {
-        private static readonly bool HAS_MESH_SHADER_SUPPORT = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
+        private static readonly bool IS_MESH_SHADER_RENDERING = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
 
         public Vector2i RenderResolution { get; private set; }
         public Vector2i RenderPresentationResolution { get; private set; }
@@ -171,7 +171,7 @@ namespace IDKEngine.Render
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
             ConeTracer = new ConeTracer(width, height);
 
-            if (HAS_MESH_SHADER_SUPPORT)
+            if (IS_MESH_SHADER_RENDERING)
             {
                 gBufferProgram = new ShaderProgram(
                     new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/MeshPath/task.glsl")),
@@ -196,9 +196,9 @@ namespace IDKEngine.Render
 
             hiZGenerateProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Culling/Camera/HiZGenerate/fragment.glsl")));
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/MeshCulling/Camera/HiZGenerate/fragment.glsl")));
             
-            cullProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/Camera/Cull/compute.glsl")));
+            cullProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/Camera/Cull/compute.glsl")));
 
             mergeLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MergeTextures/compute.glsl")));
 
@@ -291,14 +291,14 @@ namespace IDKEngine.Render
                 
                 // Frustum + Occlusion Culling
                 {
-                    //string message = "DebugMarker";
-                    //GL.PushDebugGroup(DebugSourceExternal.DebugSourceApplication, 0, message.Length, message);
+                    string message = "StartDebug";
+                    GL.PushDebugGroup(DebugSourceExternal.DebugSourceApplication, Helper.GL_DEBUG_CALLBACK_APP_MAKER_ID, message.Length, message);
 
                     cullProgram.Use();
                     GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
                     GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
 
-                    //GL.PopDebugGroup();
+                    GL.PopDebugGroup();
                 }
 
                 GL.DepthFunc(DepthFunction.Less);
@@ -315,8 +315,9 @@ namespace IDKEngine.Render
                 gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
                 GL.Viewport(0, 0, RenderResolution.X, RenderResolution.Y);
+
                 gBufferProgram.Use();
-                if (HAS_MESH_SHADER_SUPPORT)
+                if (IS_MESH_SHADER_RENDERING)
                 {
                     modelSystem.MeshDraw();
                 }
@@ -338,8 +339,13 @@ namespace IDKEngine.Render
             {
                 if (IsSSAO)
                 {
+                    string message = "EndDebug";
+                    GL.PushDebugGroup(DebugSourceExternal.DebugSourceApplication, Helper.GL_DEBUG_CALLBACK_APP_MAKER_ID, message.Length, message);
+
                     SSAO.Compute();
                     SSAO.Result.BindToUnit(0);
+
+                    GL.PopDebugGroup();
                 }
                 else
                 {

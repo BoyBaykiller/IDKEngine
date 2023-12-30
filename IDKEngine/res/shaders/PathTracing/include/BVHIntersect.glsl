@@ -7,7 +7,7 @@
 #define USE_TLAS 0
 
 #define MAX_BLAS_TREE_DEPTH 18
-#define MAX_TLAS_TREE_DEPTH 10 // TODO: Fix traversal occasionally using more than CPU side MAX_TLAS_TREE_DEPTH  
+#define MAX_TLAS_TREE_DEPTH 14 // TODO: Fix traversal occasionally using more than CPU side MAX_TLAS_TREE_DEPTH  
 
 AppInclude(include/Ray.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
@@ -29,7 +29,7 @@ vec3 FloatsToVec3(PackedVec3 floats)
     return vec3(floats.x, floats.y, floats.z);
 }
 
-layout(std430, binding = 10) restrict readonly buffer VertexPositions
+layout(std430, binding = 10) restrict readonly buffer VertexPositionsSSBO
 {
     PackedVec3 VertexPositions[];
 } vertexPositionsSSBO;

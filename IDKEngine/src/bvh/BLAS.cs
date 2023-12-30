@@ -34,7 +34,7 @@ namespace IDKEngine
         public int TriangleCount => GeometryInfo.IndexCount / 3;
         public int MaxTreeDepth { get; private set; }
 
-        public GpuDrawElementsCmd GeometryInfo;
+        public readonly GpuDrawElementsCmd GeometryInfo;
         public readonly Vector3[] VertexPositions;
         public readonly IndicesTriplet[] TriangleIndices;
 

@@ -21,7 +21,7 @@ struct Mesh
     float IOR;
     uint MeshletsStart;
     vec3 Absorbance;
-    uint MeshletsCount;
+    uint MeshletCount;
 };
 
 struct MeshInstance
@@ -90,8 +90,8 @@ void main()
 
     vec3 normal = DecompressSR11G11B10(Normal);
 
-    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-    outData.Normal = normalToWorld * normal;
+    mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+    outData.Normal = unitVecToWorld * normal;
     outData.TexCoord = TexCoord;
 
     outData.MaterialIndex = mesh.MaterialIndex;

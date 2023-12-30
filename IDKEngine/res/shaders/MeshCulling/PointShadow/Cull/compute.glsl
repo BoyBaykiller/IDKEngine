@@ -28,7 +28,7 @@ struct Mesh
     float IOR;
     uint MeshletsStart;
     vec3 Absorbance;
-    uint MeshletsCount;
+    uint MeshletCount;
 };
 
 struct MeshInstance
@@ -44,6 +44,12 @@ struct BlasNode
     uint TriStartOrLeftChild;
     vec3 Max;
     uint TriCount;
+};
+
+struct MeshletTaskCmd
+{
+    uint Count;
+    uint First;
 };
 
 struct PointShadow
@@ -65,7 +71,7 @@ layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
     DrawElementsCmd DrawCommands[];
 } drawElementsCmdSSBO;
 
-layout(std430, binding = 1) restrict readonly writeonly buffer MeshSSBO
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
@@ -80,12 +86,17 @@ layout(std430, binding = 5) restrict readonly buffer BlasSSBO
     BlasNode Nodes[];
 } blasSSBO;
 
+layout(std430, binding = 11) restrict writeonly buffer MeshletTaskCmdSSBO
+{
+    MeshletTaskCmd TaskCommands[];
+} meshletTaskCmdSSBO;
+
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
     PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 } shadowDataUBO;
 
-layout(location = 0) uniform int PointShadowIndex;
+layout(location = 0) uniform int ShadowIndex;
 layout(location = 1) uniform int FaceIndex;
 
 void main()
@@ -99,13 +110,16 @@ void main()
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshIndex];
     BlasNode node = blasSSBO.Nodes[drawCmd.BlasRootNodeIndex];
 
-    const uint glInstanceID = 0; // TODO: Derive from built in variables
-    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID].PrevModelMatrix;
-
-    mat4 projView = shadowDataUBO.PointShadows[PointShadowIndex].ProjViewMatrices[FaceIndex];
+    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance].ModelMatrix;
+    mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex];
 
     Frustum frustum = GetFrustum(projView * model);
-    bool isVisible = FrustumBoxIntersect(frustum, node.Min, node.Max);
+    bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
 
     drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = isVisible ? 1 : 0;
+
+    uint meshletCount = meshSSBO.Meshes[meshIndex].MeshletCount;
+    const uint taskShaderWorkGroupSize = 32;
+    uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
+    meshletTaskCmdSSBO.TaskCommands[meshIndex].Count = isVisible ? meshletsWorkGroupCount : 0;
 }
