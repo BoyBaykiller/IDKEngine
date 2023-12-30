@@ -134,9 +134,9 @@ namespace IDKEngine
             Logger.Log(Logger.LogLevel.Info, $"Created Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
         }
 
-        private void AddBlases(BLAS[] blases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
+        private void AddBlases(BLAS[] newBlases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
         {
-            Tlas.AddBlases(blases, drawCommands, meshInstances);
+            Tlas.AddBlases(newBlases, drawCommands, meshInstances);
             SetBlasBuffersContent();
         }
 
@@ -193,9 +193,9 @@ namespace IDKEngine
             Parallel.For(0, blases.Length, i =>
             //for (int i = 0; i < blases.Length; i++)
             {
-                ref readonly GpuDrawElementsCmd cmd = ref drawCommands.Span[i];
+                ref readonly GpuDrawElementsCmd geometryInfo = ref drawCommands.Span[i];
 
-                BLAS blas = new BLAS(vertexPositions, vertexIndices, cmd);
+                BLAS blas = new BLAS(vertexPositions, vertexIndices, geometryInfo);
                 blas.Build();
 
                 blases[i] = blas;

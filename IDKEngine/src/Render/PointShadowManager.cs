@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Collections.Generic;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 
@@ -9,6 +8,7 @@ namespace IDKEngine.Render
     class PointShadowManager : IDisposable
     {
         public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
+        public static readonly bool IS_MESH_SHADER_RENDERING = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
 
         private readonly PointShadow[] pointShadows;
         private readonly ShaderProgram renderProgram;
@@ -18,14 +18,23 @@ namespace IDKEngine.Render
         {
             pointShadows = new PointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
-            Dictionary<string, string> shaderInsertions = new Dictionary<string, string>();
+            if (IS_MESH_SHADER_RENDERING)
+            {
+                renderProgram = new ShaderProgram(
+                    new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/Shadows/PointShadow/MeshPath/task.glsl")),
+                    new Shader((ShaderType)NvMeshShader.MeshShaderNv, File.ReadAllText("res/shaders/Shadows/PointShadow/MeshPath/mesh.glsl")),
+                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadow/fragment.glsl")));
+            }
+            else
+            {
+                renderProgram = new ShaderProgram(
+                    new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadow/VertexPath/vertex.glsl")),
+                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadow/fragment.glsl")));
+            }
 
-            renderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Shadows/PointShadow/vertex.glsl"), shaderInsertions),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Shadows/PointShadow/fragment.glsl")));
 
             cullingProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Culling/PointShadow/Cull/compute.glsl")));
+                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/PointShadow/Cull/compute.glsl")));
 
             pointShadowsBuffer = new BufferObject();
             pointShadowsBuffer.ImmutableAllocate(GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);

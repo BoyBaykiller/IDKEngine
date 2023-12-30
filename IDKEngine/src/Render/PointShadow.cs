@@ -53,6 +53,7 @@ namespace IDKEngine.Render
         public Texture Result;
         
         private readonly Framebuffer framebuffer;
+        private SamplerObject nearestSampler;
         private SamplerObject shadowSampler;
         private GpuPointShadow gpuPointShadow;
         public PointShadow(int size, float nearPlane, float farPlane)
@@ -87,7 +88,14 @@ namespace IDKEngine.Render
                     renderProgram.Use();
                     renderProgram.Upload(1, i);
 
-                    modelSystem.Draw();
+                    if (PointShadowManager.IS_MESH_SHADER_RENDERING)
+                    {
+                        modelSystem.MeshDraw();
+                    }
+                    else
+                    {
+                        modelSystem.Draw();
+                    }
                 }
             }
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
@@ -123,12 +131,17 @@ namespace IDKEngine.Render
             shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
             shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareFunc, (int)All.Less);
 
-            Result = new Texture(TextureTarget2d.TextureCubeMap);
-            Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(size, size, 1, (SizedInternalFormat)PixelInternalFormat.DepthComponent16);
+            nearestSampler = new SamplerObject();
+            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
 
-            gpuPointShadow.Texture = Result.GetTextureHandleARB();
+            Result = new Texture(TextureTarget2d.TextureCubeMap);
+            Result.ImmutableAllocate(size, size, 1, SizedInternalFormat.DepthComponent16);
+
+            gpuPointShadow.Texture = Result.GetTextureHandleARB(nearestSampler);
             gpuPointShadow.ShadowTexture = Result.GetTextureHandleARB(shadowSampler);
 
             framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
@@ -138,6 +151,7 @@ namespace IDKEngine.Render
         private void DisposeBindlessTextures()
         {
             if (shadowSampler != null) { shadowSampler.Dispose(); }
+            if (nearestSampler != null) { nearestSampler.Dispose(); }
             if (Result != null) { Result.Dispose(); }
         }
 

@@ -81,23 +81,27 @@ namespace IDKEngine.Render
                 float mbDrawIndices = (app.ModelSystem.VertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
                 float mbMeshlets = (app.ModelSystem.Meshlets.Length * (nint)sizeof(GpuMeshlet)) / 1000000.0f;
                 float mbMeshletsVertexIndices = (app.ModelSystem.MeshletsVertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
-                float mbMeshletsPrimitiveIndices = (app.ModelSystem.MeshletsPrimitiveIndices.Length * (nint)sizeof(byte)) / 1000000.0f;
-                if (ImGui.TreeNode($"Rasterizer Geometry total = {mbDrawVertices + mbDrawIndices}mb"))
+                float mbMeshletsLocalIndices = (app.ModelSystem.MeshletsLocalIndices.Length * (nint)sizeof(byte)) / 1000000.0f;
+                float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshlets + mbMeshletsVertexIndices + mbMeshletsLocalIndices;
+                if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
                 {
                     ImGui.Text($"  * Vertices ({app.ModelSystem.Vertices.Length}) = {mbDrawVertices}mb");
                     ImGui.Text($"  * Indices ({app.ModelSystem.VertexIndices.Length}) = {mbDrawIndices}mb");
                     ImGui.Text($"  * Meshlets ({app.ModelSystem.Meshlets.Length}) = {mbMeshlets}mb");
                     ImGui.Text($"  * MeshletsVertexIndices ({app.ModelSystem.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
-                    ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelSystem.MeshletsPrimitiveIndices.Length}) = {mbMeshletsPrimitiveIndices}mb");
+                    ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelSystem.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
                     ImGui.TreePop();
                 }
 
                 float mbBlasTrianglesIndices = (app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet)) / 1000000.0f;
                 float mbBlasNodes = (app.ModelSystem.BVH.GetBlasesNodeCount() * (nint)sizeof(GpuBlasNode)) / 1000000.0f;
-                if (ImGui.TreeNode($"BVH total = {mbBlasTrianglesIndices + mbBlasNodes}mb"))
+                float mbBTlasNodes = (app.ModelSystem.BVH.Tlas.Blases.Length * (nint)sizeof(GpuTlasNode)) / 1000000.0f;
+                float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
+                if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
                 {
                     ImGui.Text($"  * Vertex Indices ({app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * 3}) = {mbBlasTrianglesIndices}mb");
                     ImGui.Text($"  * Blas Nodes ({app.ModelSystem.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
+                    ImGui.Text($"  * Tlas Nodes ({app.ModelSystem.BVH.Tlas.Nodes.Length}) = {mbBTlasNodes}mb");
 
                     ImGui.TreePop();
                 }

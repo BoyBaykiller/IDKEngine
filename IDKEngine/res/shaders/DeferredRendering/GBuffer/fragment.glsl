@@ -3,6 +3,7 @@
 
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
+AppInclude(include/Transformations.glsl)
 
 layout(location = 1) out vec4 AlbedoAlpha;
 layout(location = 2) out vec4 NormalSpecular;
@@ -20,7 +21,7 @@ struct Mesh
     float IOR;
     uint MeshletsStart;
     vec3 Absorbance;
-    uint MeshletsCount;
+    uint MeshletCount;
 };
 
 struct Material
@@ -81,13 +82,21 @@ layout(std140, binding = 4) uniform SkyBoxUBO
     samplerCube Albedo;
 } skyBoxUBO;
 
+layout(std140, binding = 6) uniform GBufferDataUBO
+{
+    sampler2D AlbedoAlpha;
+    sampler2D NormalSpecular;
+    sampler2D EmissiveRoughness;
+    sampler2D Velocity;
+    sampler2D Depth;
+} gBufferDataUBO;
+
 in InOutVars
 {
     vec2 TexCoord;
-    vec4 ClipPos;
     vec4 PrevClipPos;
     vec3 Normal;
-    mat3 TBN;
+    vec3 Tangent;
     flat uint MeshID;
 } inData;
 
@@ -103,9 +112,12 @@ void main()
     {
         discard;
     }
-    vec3 emissive = MATERIAL_EMISSIVE_FACTOR * (texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor) + mesh.EmissiveBias * albedoAlpha.rgb;
+
+    mat3 tbn = GetTBN(mat3(1.0), inData.Tangent, inData.Normal);
+
+    vec3 emissive = texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + mesh.EmissiveBias * albedoAlpha.rgb;
     vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
-    normal = inData.TBN * normalize(normal * 2.0 - 1.0);
+    normal = tbn * normalize(normal * 2.0 - 1.0);
     normal = mix(normalize(inData.Normal), normal, mesh.NormalMapStrength);
 
     float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0);
@@ -113,9 +125,12 @@ void main()
 
     AlbedoAlpha = albedoAlpha;
     NormalSpecular = vec4(normal, specular);
-    EmissiveRoughness = vec4(emissive, roughness); 
+    EmissiveRoughness = vec4(emissive, roughness);
 
-    vec2 ndc = inData.ClipPos.xy / inData.ClipPos.w;
-    vec2 prevNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
-    Velocity = (ndc - prevNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out
+    vec2 uv = gl_FragCoord.xy / textureSize(gBufferDataUBO.Velocity, 0);
+    vec2 thisNdc = (uv * 2.0 - 1.0) - taaDataUBO.Jitter;
+
+    vec2 historyNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
+
+    Velocity = (thisNdc - historyNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out
 }

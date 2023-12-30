@@ -28,7 +28,7 @@ struct Mesh
     float IOR;
     uint MeshletsStart;
     vec3 Absorbance;
-    uint MeshletsCount;
+    uint MeshletCount;
 };
 
 struct MeshInstance
@@ -46,12 +46,18 @@ struct BlasNode
     uint TriCount;
 };
 
+struct MeshletTaskCmd
+{
+    uint Count;
+    uint First;
+};
+
 layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
 {
     DrawElementsCmd DrawCommands[];
 } drawElementsCmdSSBO;
 
-layout(std430, binding = 1) restrict readonly writeonly buffer MeshSSBO
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO
 {
     Mesh Meshes[];
 } meshSSBO;
@@ -65,6 +71,11 @@ layout(std430, binding = 5) restrict readonly buffer BlasSSBO
 {
     BlasNode Nodes[];
 } blasSSBO;
+
+layout(std430, binding = 11) restrict writeonly buffer MeshletTaskCmdSSBO
+{
+    MeshletTaskCmd TaskCommands[];
+} meshletTaskCmdSSBO;
 
 layout(std140, binding = 6) uniform GBufferDataUBO
 {
@@ -109,25 +120,24 @@ void main()
 
     bool isVisible = true;
 
+    Box meshLocalBounds = Box(node.Min, node.Max);
+
     Frustum frustum = GetFrustum(basicDataUBO.ProjView * meshInstance.ModelMatrix);
-    isVisible = FrustumBoxIntersect(frustum, node.Min, node.Max);
+    isVisible = FrustumBoxIntersect(frustum, meshLocalBounds);
 
     // Occlusion cull
-    const bool hiZCulling = false;
-    if (isVisible && hiZCulling)
+    const bool doHiZCulling = false;
+    bool vertexBehindFrustum;
+    Box meshletOldNdcBounds = BoxTransformPerspective(meshLocalBounds, basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix, vertexBehindFrustum);
+    if (isVisible && !vertexBehindFrustum && doHiZCulling)
     {
-        Box localBox = Box(node.Min, node.Max);
-        sampler2D samplerHiZ = gBufferDataUBO.Depth;
-        mat4 prevProjViewModel = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix;
-        
-        bool behindFrustum;
-        bool occlusionCullVisible = BoxDepthBufferIntersect(localBox, samplerHiZ, prevProjViewModel, behindFrustum);
-        if (!behindFrustum)
-        {
-            isVisible = occlusionCullVisible;
-        }
+        isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
     }
     
     drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = isVisible ? 1 : 0;
-    // drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = 1;
+    
+    uint meshletCount = meshSSBO.Meshes[meshIndex].MeshletCount;
+    const uint taskShaderWorkGroupSize = 32;
+    uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
+    meshletTaskCmdSSBO.TaskCommands[meshIndex].Count = isVisible ? meshletsWorkGroupCount : 0;
 }

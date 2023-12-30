@@ -131,9 +131,10 @@ namespace IDKEngine
         }
 
         public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;
+        public const uint GL_DEBUG_CALLBACK_APP_MAKER_ID = 0;
         private static void GLDebugCallback(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
         {
-            if (source == DebugSource.DebugSourceApplication)
+            if (source == DebugSource.DebugSourceApplication && id == GL_DEBUG_CALLBACK_APP_MAKER_ID)
             {
                 return;
             }
@@ -147,6 +148,7 @@ namespace IDKEngine
 
                 case DebugSeverity.DebugSeverityMedium:
                     if (id == 0) return; // Shader compile warning, Intel
+                    // if (id == 131186) return; // Buffer object is being copied/moved from VIDEO memory to HOST memory, NVIDIA
                     Logger.Log(Logger.LogLevel.Warn, text);
                     break;
 
@@ -168,7 +170,6 @@ namespace IDKEngine
                     break;
             }
         }
-
 
         public static unsafe T* Malloc<T>(int count = 1) where T : unmanaged
         {

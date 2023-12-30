@@ -23,7 +23,7 @@ void main()
     NormalSpecular = vec4((inData.FragPos - inData.Position) / inData.Radius, 0.0);
     EmissiveRoughness = vec4(FragColor.rgb, 1.0);
     
-    vec2 ndc = inData.ClipPos.xy / inData.ClipPos.w;
-    vec2 prevNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
-    Velocity = (ndc - prevNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out
+    vec2 thisNdc = inData.ClipPos.xy / inData.ClipPos.w;
+    vec2 historyNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
+    Velocity = (thisNdc - historyNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out
 }

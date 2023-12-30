@@ -51,10 +51,9 @@ layout(std140, binding = 3) uniform TaaDataUBO
 out InOutVars
 {
     vec2 TexCoord;
-    vec4 ClipPos;
     vec4 PrevClipPos;
     vec3 Normal;
-    mat3 TBN;
+    vec3 Tangent;
     uint MeshID;
 } outData;
 
@@ -65,29 +64,20 @@ void main()
     vec3 normal = DecompressSR11G11B10(Normal);
     vec3 tangent = DecompressSR11G11B10(Tangent);
 
-    outData.TBN = GetTBN(mat3(meshInstance.ModelMatrix), tangent, normal);
+    mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+
+    outData.Normal = unitVecToWorld * normal;
+    outData.Tangent = unitVecToWorld * tangent;
     outData.TexCoord = TexCoord;
     
-    outData.ClipPos = basicDataUBO.ProjView * meshInstance.ModelMatrix * vec4(Position, 1.0);
+    vec4 clipPos = basicDataUBO.ProjView * meshInstance.ModelMatrix * vec4(Position, 1.0);
     outData.PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(Position, 1.0);
     
-    mat3 normalToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-    outData.Normal = normalToWorld * normal;
     outData.MeshID = gl_DrawID;
 
     // Add jitter independent of perspective by multiplying with w
-    vec4 jitteredClipPos = outData.ClipPos;
+    vec4 jitteredClipPos = clipPos;
     jitteredClipPos.xy += taaDataUBO.Jitter * jitteredClipPos.w;
-
-
-    // Debug lag    
-    // if (gl_DrawID == 63)
-    // {
-    //     for (int i = 0; i < 1000000; i++)
-    //     {
-    //         jitteredClipPos.x += i / 10000000000000000.0;
-    //     }
-    // }
     
     gl_Position = jitteredClipPos;
 }

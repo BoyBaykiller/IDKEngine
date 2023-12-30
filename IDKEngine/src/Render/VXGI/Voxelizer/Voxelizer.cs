@@ -9,8 +9,8 @@ namespace IDKEngine.Render
 {
     class Voxelizer : IDisposable
     {
-        public static readonly bool HAS_ATOMIC_FP16_VECTOR = (Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector"));
         public static readonly bool HAS_CONSERVATIVE_RASTER = (Helper.IsExtensionsAvailable("GL_NV_conservative_raster"));
+        public static readonly bool HAS_ATOMIC_FP16_VECTOR = (Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector"));
         public static readonly bool TAKE_FAST_GEOMETRY_SHADER_PATH = (Helper.IsExtensionsAvailable("GL_NV_geometry_shader_passthrough") && Helper.IsExtensionsAvailable("GL_NV_viewport_swizzle"));
 
         public unsafe Vector3 GridMin
@@ -115,8 +115,8 @@ namespace IDKEngine.Render
 
             fboNoAttachments = new Framebuffer();
 
-            gpuVoxelizerData.GridMax = new Vector3( 1.0e10f);
-            gpuVoxelizerData.GridMin = new Vector3(-1.0e10f);
+            gpuVoxelizerData.GridMax = new Vector3(float.MaxValue);
+            gpuVoxelizerData.GridMin = new Vector3(float.MinValue);
 
             SetSize(width, height, depth);
             GridMin = gridMin;

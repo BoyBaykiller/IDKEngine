@@ -95,7 +95,7 @@ void main()
 }
 
 vec3 IndirectLight(vec3 position, vec3 incomming, vec3 normal, float specularChance, float roughness)
-{
+{    
     vec3 irradiance = vec3(0.0);
     float materialVariance = GetMaterialVariance(specularChance, roughness);
     uint samples = uint(mix(1.0, float(MaxSamples), materialVariance));

@@ -60,6 +60,20 @@ struct MeshletInfo
     float _pad1;
 };
 
+struct PointShadow
+{
+    samplerCube Texture;
+    samplerCubeShadow ShadowTexture;
+
+    mat4 ProjViewMatrices[6];
+
+    vec3 Position;
+    float NearPlane;
+
+    vec3 _pad0;
+    float FarPlane;
+};
+
 layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
 {
     DrawElementsCmd DrawCommands[];
@@ -85,32 +99,11 @@ layout(std430, binding = 13) restrict readonly buffer MeshletInfoSSBO
     MeshletInfo MeshletsInfo[];
 } meshletInfoSSBO;
 
-layout(std140, binding = 0) uniform BasicDataUBO
+layout(std140, binding = 1) uniform ShadowDataUBO
 {
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
+    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
+    int Count;
+} shadowDataUBO;
 
 taskNV out InOutVars
 {
@@ -119,6 +112,9 @@ taskNV out InOutVars
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
 } outData;
+
+layout(location = 0) uniform int ShadowIndex;
+layout(location = 1) uniform int FaceIndex;
 
 void main()
 {
@@ -134,40 +130,14 @@ void main()
     uint workgroupThisMeshlet = workgroupFirstMeshlet + localMeshlet;
 
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance];
     MeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
     
-    bool isVisible = true;
+    mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex];
+    mat4 model = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance].ModelMatrix;
 
-    Box meshletLocalBounds = Box(meshletInfo.Min, meshletInfo.Max);
+    Frustum frustum = GetFrustum(projView * model);
+    bool isVisible = FrustumBoxIntersect(frustum, Box(meshletInfo.Min, meshletInfo.Max));
     
-    // // Subpixel culling
-    // bool vertexBehindFrustum;
-    // Box meshletNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.ProjView * meshInstance.ModelMatrix, vertexBehindFrustum);
-    // // vec2 renderSize = textureSize(gBufferDataUBO.AlbedoAlpha, 0);
-    // // vec3 uvMin = vec3(meshletNdcBounds.Min.xy * 0.5 + 0.5, meshletNdcBounds.Min.z);
-    // // vec3 uvMax = vec3(meshletNdcBounds.Max.xy * 0.5 + 0.5, meshletNdcBounds.Max.z);
-    // // ivec2 size = ivec2(ceil((uvMax.xy - uvMin.xy) * renderSize));
-    // // if (size.x < 1 || size.y < 1)
-    // // {
-    // //     isVisible = false;
-    // // }
-
-    // Frustum Culling
-    if (isVisible)
-    {
-        Frustum frustum = GetFrustum(basicDataUBO.ProjView * meshInstance.ModelMatrix);
-        isVisible = FrustumBoxIntersect(frustum, meshletLocalBounds);
-    }
-
-    // Hi-Z Occlusion Culling
-    bool vertexBehindFrustum;
-    Box meshletOldNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix, vertexBehindFrustum);
-    if (isVisible && !vertexBehindFrustum)
-    {
-        isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
-    }
-
     uvec4 visibleMeshletsBitmask = subgroupBallot(isVisible);
     if (isVisible)
     {

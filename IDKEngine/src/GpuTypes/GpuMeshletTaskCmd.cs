@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine
 {
-    struct GpuMeshTasksCmd
+    struct GpuMeshletTaskCmd
     {
         public int Count;
         public int First;
