@@ -150,8 +150,8 @@ void main()
         vec3 position = vec3(vertexPosition.x, vertexPosition.y, vertexPosition.z);
 
         mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-        outData[meshletVertexID].Normal = unitVecToWorld * normal;
-        outData[meshletVertexID].Tangent = unitVecToWorld * tangent;
+        outData[meshletVertexID].Normal = normalize(unitVecToWorld * normal);
+        outData[meshletVertexID].Tangent = normalize(unitVecToWorld * tangent);
 
         vec4 clipPos = basicDataUBO.ProjView * meshInstance.ModelMatrix * vec4(position, 1.0);
         outData[meshletVertexID].PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(position, 1.0);

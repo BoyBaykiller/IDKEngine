@@ -68,14 +68,18 @@ bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out 
 
 bool FrustumBoxIntersect(Frustum frustum, Box box)
 {
-    float a = 1.0;
-    for (int i = 0; i < 6 && a >= 0.0; i++)
+    for (int i = 0; i < 6; i++)
     {
         vec3 negative = mix(box.Min, box.Max, greaterThan(frustum.Planes[i].xyz, vec3(0.0)));
-        a = dot(vec4(negative, 1.0), frustum.Planes[i]);
+        float a = dot(vec4(negative, 1.0), frustum.Planes[i]);
+
+        if (a < 0.0)
+        {
+            return false;
+        }
     }
 
-    return a >= 0.0;
+    return true;
 }
 
 bool BoxBoxIntersect(Box a, Box b)
@@ -98,7 +102,7 @@ bool BoxDepthBufferIntersect(Box boxNdc, sampler2D samplerHiZ)
     int level = int(ceil(log2(float(max(size.x, size.y)))));
 
     // Source: https://interplayoflight.wordpress.com/2017/11/15/experiments-in-gpu-based-occlusion-culling/
-    // uint lowerLevel = max(level - 1, 1);
+    // int lowerLevel = max(level - 1, 1);
     // float scale = exp2(-float(lowerLevel));
     // ivec2 a = ivec2(floor(boxUvMin * scale));
     // ivec2 b = ivec2(ceil(boxUvMax * scale));

@@ -138,7 +138,7 @@ namespace IDKEngine
             {
                 return;
             }
-
+            
             string text = Marshal.PtrToStringAnsi(message, length);
             switch (severity)
             {
@@ -173,22 +173,22 @@ namespace IDKEngine
 
         public static unsafe T* Malloc<T>(int count = 1) where T : unmanaged
         {
-            return (T*)Marshal.AllocHGlobal(sizeof(T) * count);
+            return (T*)NativeMemory.Alloc((nuint)(sizeof(T) * count));
         }
 
         public static unsafe void Free(void* ptr)
         {
-            Marshal.FreeHGlobal((IntPtr)ptr);
+            NativeMemory.Free(ptr);
         }
 
-        public static unsafe void MemSet(void* ptr, byte value, uint byteCount)
+        public static unsafe void MemSet(void* ptr, byte value, nuint byteCount)
         {
-            Unsafe.InitBlock(ptr, value, byteCount);
+            NativeMemory.Fill(ptr, byteCount, value);
         }
 
-        public static unsafe void MemCpy(void* dest, void* src, uint byteCount)
+        public static unsafe void MemCpy(void* dest, void* src, nuint byteCount)
         {
-            Unsafe.CopyBlock(dest, src, byteCount);
+            NativeMemory.Copy(src, dest, byteCount);
         }
 
         public static uint CompressSR11G11B10(in Vector3 data)

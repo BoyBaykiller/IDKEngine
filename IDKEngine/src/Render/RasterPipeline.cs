@@ -445,18 +445,14 @@ namespace IDKEngine.Render
             DepthTexture.BindToUnit(0);
             hiZDownsampleFBO.Bind();
             hiZGenerateProgram.Use();
-            bool wasEven = false;
             for (int currentWritelod = 1; currentWritelod < DepthTexture.Levels; currentWritelod++)
             {
                 hiZGenerateProgram.Upload(0, currentWritelod - 1);
-                hiZGenerateProgram.Upload(1, wasEven);
                 hiZDownsampleFBO.SetRenderTarget(FramebufferAttachment.DepthAttachment, DepthTexture, currentWritelod);
 
                 Vector3i mipLevelSize = Texture.GetMipMapLevelSize(DepthTexture.Width, DepthTexture.Height, 1, currentWritelod);
                 GL.Viewport(0, 0, mipLevelSize.X, mipLevelSize.Y);
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
-
-                wasEven = (mipLevelSize.X % 2 == 0) && (mipLevelSize.Y % 2 == 0);
             }
         }
 

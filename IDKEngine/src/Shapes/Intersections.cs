@@ -71,7 +71,7 @@ namespace IDKEngine.Shapes
         }
 
         // Source: https://stackoverflow.com/a/4579069/12103839
-        public static bool SphereVsBox(in Sphere sphere, Vector3 c1, Vector3 c2)
+        public static bool SphereVsBox(in Sphere sphere, in Vector3 c1, in Vector3 c2)
         {
             float distSquared = Squared(sphere.Radius);
             if (sphere.Center.X < c1.X) distSquared -= Squared(sphere.Center.X - c1.X);
@@ -326,7 +326,6 @@ namespace IDKEngine.Shapes
 
             return t1 <= t2 && t2 > 0.0f;
         }
-
 
         public static Vector3 ClosestPointOnLineSegment(in Vector3 a, in Vector3 b, in Vector3 point)
         {

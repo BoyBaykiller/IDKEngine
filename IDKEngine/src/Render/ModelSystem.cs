@@ -88,7 +88,7 @@ namespace IDKEngine.Render
             BVH = new BVH();
         }
 
-        public unsafe void Add(params Model[] models)
+        public unsafe void Add(params ModelLoader.Model[] models)
         {
             if (models.Length == 0)
             {
@@ -128,7 +128,7 @@ namespace IDKEngine.Render
                 
                 Helper.ArrayAdd(ref Vertices, models[i].Vertices);
                 Helper.ArrayAdd(ref VertexPositions, models[i].VertexPositions);
-                Helper.ArrayAdd(ref VertexIndices, models[i].Indices);
+                Helper.ArrayAdd(ref VertexIndices, models[i].VertexIndices);
                 
                 Helper.ArrayAdd(ref MeshTasksCmds, models[i].MeshTasksCmds);
                 Helper.ArrayAdd(ref Meshlets, models[i].Meshlets);

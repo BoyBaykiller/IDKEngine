@@ -113,13 +113,15 @@ void main()
         discard;
     }
 
-    mat3 tbn = GetTBN(mat3(1.0), inData.Tangent, inData.Normal);
+    vec3 interpTangent = normalize(inData.Tangent);
+    vec3 interpNormal = normalize(inData.Normal);
 
+    mat3 tbn = GetTBN(interpTangent, interpNormal);
+    vec3 textureNormal = texture(material.Normal, inData.TexCoord).rgb;
+    textureNormal = tbn * normalize(textureNormal * 2.0 - 1.0);
+
+    vec3 normal = mix(interpNormal, textureNormal, mesh.NormalMapStrength);
     vec3 emissive = texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + mesh.EmissiveBias * albedoAlpha.rgb;
-    vec3 normal = texture(material.Normal, inData.TexCoord).rgb;
-    normal = tbn * normalize(normal * 2.0 - 1.0);
-    normal = mix(normalize(inData.Normal), normal, mesh.NormalMapStrength);
-
     float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0);
     float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
 
@@ -129,7 +131,6 @@ void main()
 
     vec2 uv = gl_FragCoord.xy / textureSize(gBufferDataUBO.Velocity, 0);
     vec2 thisNdc = (uv * 2.0 - 1.0) - taaDataUBO.Jitter;
-
     vec2 historyNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
 
     Velocity = (thisNdc - historyNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out

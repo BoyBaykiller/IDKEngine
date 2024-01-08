@@ -78,6 +78,16 @@ void main()
     // Add jitter independent of perspective by multiplying with w
     vec4 jitteredClipPos = clipPos;
     jitteredClipPos.xy += taaDataUBO.Jitter * jitteredClipPos.w;
+
+    // if (gl_DrawID == 67)
+    // {
+    //     uint ass = 0;
+    //     for (int i = 0; i < 500000; i++)
+    //     {
+    //         ass += i;
+    //     }
+    //     jitteredClipPos.x += ass / 1000000000000.0; 
+    // }
     
     gl_Position = jitteredClipPos;
 }

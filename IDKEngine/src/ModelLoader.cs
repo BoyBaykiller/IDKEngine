@@ -17,15 +17,37 @@ using GltfTexture = glTFLoader.Schema.Texture;
 
 namespace IDKEngine
 {
-    class Model
+    public static class ModelLoader
     {
+        public struct Model
+        {
+            public GpuDrawElementsCmd[] DrawCommands;
+            public GpuMesh[] Meshes;
+            public GpuMeshInstance[] MeshInstances;
+            public GpuMaterial[] Materials;
+
+            // Base geometry
+            public GpuVertex[] Vertices;
+            public Vector3[] VertexPositions;
+
+            // Meshlet-rendering specific data
+            public GpuMeshletTaskCmd[] MeshTasksCmds;
+            public GpuMeshlet[] Meshlets;
+            public GpuMeshletInfo[] MeshletsInfo;
+            public uint[] MeshletsVertexIndices;
+            public byte[] MeshletsLocalIndices;
+
+            // Vertex-rendering specific data
+            public uint[] VertexIndices;
+        }
+
         private struct GpuTextureLoadData
         {
             public ImageResult Image;
             public Sampler Sampler;
             public SizedInternalFormat InternalFormat;
         }
-        public struct MaterialDetails
+        private struct MaterialDetails
         {
             public Vector3 EmissiveFactor;
             public uint BaseColorFactor;
@@ -96,47 +118,31 @@ namespace IDKEngine
             public int LocalIndicesLength;
         }
 
-
-        public GpuMesh[] Meshes;
-        public GpuMeshInstance[] MeshInstances;
-        public GpuMaterial[] Materials;
-        public GpuDrawElementsCmd[] DrawCommands;
-        public GpuVertex[] Vertices;
-        public Vector3[] VertexPositions;
-        public uint[] Indices;
-
-        public GpuMeshletTaskCmd[] MeshTasksCmds;
-        public GpuMeshlet[] Meshlets;
-        public GpuMeshletInfo[] MeshletsInfo;
-        public uint[] MeshletsVertexIndices;
-        public byte[] MeshletsLocalIndices;
-
-        private Gltf gltfModel;
-        private string RootDir;
-        public Model(string path)
-            : this(path, Matrix4.Identity)
+        public static Model Load(string path)
         {
+            return Load(path, Matrix4.Identity);
         }
 
-        public Model(string path, Matrix4 rootTransform)
+        public static Model Load(string path, Matrix4 rootTransform)
         {
             if (!File.Exists(path))
             {
                 Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
-                return;
+                return new Model();
             }
 
-            LoadFromFile(path, rootTransform);
+            Model model = LoadFromFile(path, rootTransform);
             Logger.Log(Logger.LogLevel.Info, $"Loaded model {path}");
+
+            return model;
         }
 
-        public unsafe void LoadFromFile(string path, Matrix4 rootTransform)
+        private static Model LoadFromFile(string path, Matrix4 rootTransform)
         {
-            gltfModel = Interface.LoadModel(path);
+            Gltf gltfFile = Interface.LoadModel(path);
+            string rootDir = Path.GetDirectoryName(path);
 
-            RootDir = Path.GetDirectoryName(path);
-
-            GpuMaterialLoadData[] gpuMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfModel.Materials, gltfModel.Textures);
+            GpuMaterialLoadData[] gpuMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfFile, rootDir);
             List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(gpuMaterialsLoadData));
             List<GpuMesh> listMeshes = new List<GpuMesh>();
             List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
@@ -153,36 +159,36 @@ namespace IDKEngine
             Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
 
             // Push all root nodes (of first scene only)
-            for (int i = 0; i < gltfModel.Scenes[0].Nodes.Length; i++)
+            for (int i = 0; i < gltfFile.Scenes[0].Nodes.Length; i++)
             {
-                Node rootNode = gltfModel.Nodes[gltfModel.Scenes[0].Nodes[i]];
+                Node rootNode = gltfFile.Nodes[gltfFile.Scenes[0].Nodes[i]];
                 nodeStack.Push((rootNode, rootTransform));
             }
 
             while (nodeStack.Count > 0)
             {
                 (Node node, Matrix4 globalParentTransform) = nodeStack.Pop();
-                Matrix4 localModelMatrix = GetNodeModelMatrix(node);
-                Matrix4 globalModelMatrix = localModelMatrix * globalParentTransform;
+                Matrix4 localTransform = GetNodeTransform(node);
+                Matrix4 globalTransform = localTransform * globalParentTransform;
 
                 if (node.Children != null)
                 {
                     for (int i = 0; i < node.Children.Length; i++)
                     {
-                        Node childNode = gltfModel.Nodes[node.Children[i]];
-                        nodeStack.Push((childNode, globalModelMatrix));
+                        Node childNode = gltfFile.Nodes[node.Children[i]];
+                        nodeStack.Push((childNode, globalTransform));
                     }
                 }
 
                 if (node.Mesh.HasValue)
                 {
-                    Mesh gltfMesh = gltfModel.Meshes[node.Mesh.Value];
+                    Mesh gltfMesh = gltfFile.Meshes[node.Mesh.Value];
                     for (int i = 0; i < gltfMesh.Primitives.Length; i++)
                     {
                         MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
 
-                        (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfMeshPrimitive);
-                        uint[] meshIndices = LoadGpuIndexData(gltfMeshPrimitive);
+                        (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfFile, gltfMeshPrimitive, rootDir);
+                        uint[] meshIndices = LoadGpuIndexData(gltfFile, gltfMeshPrimitive, rootDir);
 
                         RunMeshOptimizations(ref meshVertices, ref meshVertexPositions, meshIndices);
                         MeshMeshletsData meshMeshletsData = GenerateMeshMeshletData(meshVertexPositions, meshIndices);
@@ -239,7 +245,7 @@ namespace IDKEngine
                         }
 
                         GpuMeshInstance meshInstance = new GpuMeshInstance();
-                        meshInstance.ModelMatrix = globalModelMatrix;
+                        meshInstance.ModelMatrix = globalTransform;
 
                         GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
                         drawCmd.IndexCount = meshIndices.Length;
@@ -267,28 +273,32 @@ namespace IDKEngine
                 }
             }
 
-            Meshes = listMeshes.ToArray();
-            MeshInstances = listMeshInstances.ToArray();
-            Materials = listMaterials.ToArray();
-            DrawCommands = listDrawCommands.ToArray();
-            Vertices = listVertices.ToArray();
-            VertexPositions = listVertexPositions.ToArray();
-            Indices = listIndices.ToArray();
-            MeshTasksCmds = listMeshTasksCmd.ToArray();
-            Meshlets = listMeshlets.ToArray();
-            MeshletsInfo = listMeshletsInfo.ToArray();
-            MeshletsVertexIndices = listMeshletsVertexIndices.ToArray();
-            MeshletsLocalIndices = listMeshletsLocalIndices.ToArray();
+
+            Model model = new Model();
+            model.Meshes = listMeshes.ToArray();
+            model.MeshInstances = listMeshInstances.ToArray();
+            model.Materials = listMaterials.ToArray();
+            model.DrawCommands = listDrawCommands.ToArray();
+            model.Vertices = listVertices.ToArray();
+            model.VertexPositions = listVertexPositions.ToArray();
+            model.VertexIndices = listIndices.ToArray();
+            model.MeshTasksCmds = listMeshTasksCmd.ToArray();
+            model.Meshlets = listMeshlets.ToArray();
+            model.MeshletsInfo = listMeshletsInfo.ToArray();
+            model.MeshletsVertexIndices = listMeshletsVertexIndices.ToArray();
+            model.MeshletsLocalIndices = listMeshletsLocalIndices.ToArray();
+
+            return model;
         }
 
-        private unsafe GpuMaterialLoadData[] GetGpuMaterialLoadDataFromGltf(Material[] materials, GltfTexture[] textures)
+        private static unsafe GpuMaterialLoadData[] GetGpuMaterialLoadDataFromGltf(Gltf gltf, string rootDir)
         {
-            if (materials == null)
+            if (gltf.Materials == null)
             {
                 return Array.Empty<GpuMaterialLoadData>();
             }
 
-            GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[materials.Length];
+            GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[gltf.Materials.Length];
 
             //for (int i = 0; i < materialsLoadData.Length; i++)
             //{
@@ -301,7 +311,7 @@ namespace IDKEngine
                 int materialIndex = i / GpuMaterialLoadData.TEXTURE_COUNT;
                 GpuMaterialLoadData.TextureType textureType = (GpuMaterialLoadData.TextureType)(i % GpuMaterialLoadData.TEXTURE_COUNT);
 
-                Material material = materials[materialIndex];
+                Material material = gltf.Materials[materialIndex];
                 ref GpuMaterialLoadData materialData = ref materialsLoadData[materialIndex];
                 
                 // Let one thread load non image data
@@ -333,10 +343,10 @@ namespace IDKEngine
                     }
                 }
 
-                materialData[textureType] = GetGLTextureLoadData(material, textures, textureType);
+                materialData[textureType] = GetGLTextureLoadData(material, textureType);
             });
 
-            GpuTextureLoadData GetGLTextureLoadData(Material material, GltfTexture[] textures, GpuMaterialLoadData.TextureType textureType)
+            GpuTextureLoadData GetGLTextureLoadData(Material material, GpuMaterialLoadData.TextureType textureType)
             {
                 GpuTextureLoadData glTextureLoadData = new GpuTextureLoadData();
                 GltfTexture imageToLoad = null;
@@ -351,7 +361,7 @@ namespace IDKEngine
                         TextureInfo textureInfo = null;
                         MaterialPbrMetallicRoughness materialPbrMetallicRoughness = material.PbrMetallicRoughness;
                         if (materialPbrMetallicRoughness != null) textureInfo = materialPbrMetallicRoughness.BaseColorTexture;
-                        if (textureInfo != null) imageToLoad = textures[textureInfo.Index];
+                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
                     }
                     else if (textureType == GpuMaterialLoadData.TextureType.MetallicRoughness)
                     {
@@ -361,7 +371,7 @@ namespace IDKEngine
                         TextureInfo textureInfo = null;
                         MaterialPbrMetallicRoughness materialPbrMetallicRoughness = material.PbrMetallicRoughness;
                         if (materialPbrMetallicRoughness != null) textureInfo = materialPbrMetallicRoughness.MetallicRoughnessTexture;
-                        if (textureInfo != null) imageToLoad = textures[textureInfo.Index];
+                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
                     }
                     else if (textureType == GpuMaterialLoadData.TextureType.Normal)
                     {
@@ -369,7 +379,7 @@ namespace IDKEngine
                         imageColorComponents = ColorComponents.RedGreenBlue;
 
                         MaterialNormalTextureInfo textureInfo = material.NormalTexture;
-                        if (textureInfo != null) imageToLoad = textures[textureInfo.Index];
+                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
                     }
                     else if (textureType == GpuMaterialLoadData.TextureType.Emissive)
                     {
@@ -377,7 +387,7 @@ namespace IDKEngine
                         imageColorComponents = ColorComponents.RedGreenBlue;
 
                         TextureInfo textureInfo = material.EmissiveTexture;
-                        if (textureInfo != null) imageToLoad = textures[textureInfo.Index];
+                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
                     }
                 }
 
@@ -398,8 +408,8 @@ namespace IDKEngine
 
                 if (imageToLoad.Source.HasValue)
                 {
-                    Image image = gltfModel.Images[imageToLoad.Source.Value];
-                    string imagePath = Path.Combine(RootDir, image.Uri);
+                    Image image = gltf.Images[imageToLoad.Source.Value];
+                    string imagePath = Path.Combine(rootDir, image.Uri);
 
                     if (!File.Exists(imagePath))
                     {
@@ -413,7 +423,7 @@ namespace IDKEngine
                 
                 if (imageToLoad.Sampler.HasValue)
                 {
-                    glTextureLoadData.Sampler = gltfModel.Samplers[imageToLoad.Sampler.Value];
+                    glTextureLoadData.Sampler = gltf.Samplers[imageToLoad.Sampler.Value];
                 }
 
                 return glTextureLoadData;
@@ -422,7 +432,7 @@ namespace IDKEngine
             return materialsLoadData;
         }
 
-        private unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertexData(MeshPrimitive meshPrimitive)
+        private static unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertexData(Gltf gltf, MeshPrimitive meshPrimitive, string rootDir)
         {
             const string GLTF_POSITION_ATTRIBUTE = "POSITION";
             const string GLTF_NORMAL_ATTRIBUTE = "NORMAL";
@@ -436,11 +446,11 @@ namespace IDKEngine
             {
                 KeyValuePair<string, int> item = myDict.ElementAt(j);
 
-                Accessor accessor = gltfModel.Accessors[item.Value];
-                BufferView bufferView = gltfModel.BufferViews[accessor.BufferView.Value];
-                glTFLoader.Schema.Buffer buffer = gltfModel.Buffers[bufferView.Buffer];
+                Accessor accessor = gltf.Accessors[item.Value];
+                BufferView bufferView = gltf.BufferViews[accessor.BufferView.Value];
+                glTFLoader.Schema.Buffer buffer = gltf.Buffers[bufferView.Buffer];
 
-                using FileStream fileStream = File.OpenRead(Path.Combine(RootDir, buffer.Uri));
+                using FileStream fileStream = File.OpenRead(Path.Combine(rootDir, buffer.Uri));
                 fileStream.Position = accessor.ByteOffset + bufferView.ByteOffset;
 
                 if (vertexPositions == Array.Empty<Vector3>())
@@ -492,13 +502,13 @@ namespace IDKEngine
 
             return (vertices, vertexPositions);
         }
-        private unsafe uint[] LoadGpuIndexData(MeshPrimitive meshPrimitive)
+        private static unsafe uint[] LoadGpuIndexData(Gltf gltf, MeshPrimitive meshPrimitive, string rootDir)
         {
-            Accessor accessor = gltfModel.Accessors[meshPrimitive.Indices.Value];
-            BufferView bufferView = gltfModel.BufferViews[accessor.BufferView.Value];
-            glTFLoader.Schema.Buffer buffer = gltfModel.Buffers[bufferView.Buffer];
+            Accessor accessor = gltf.Accessors[meshPrimitive.Indices.Value];
+            BufferView bufferView = gltf.BufferViews[accessor.BufferView.Value];
+            glTFLoader.Schema.Buffer buffer = gltf.Buffers[bufferView.Buffer];
 
-            using FileStream fileStream = File.OpenRead(Path.Combine(RootDir, buffer.Uri));
+            using FileStream fileStream = File.OpenRead(Path.Combine(rootDir, buffer.Uri));
             fileStream.Position = accessor.ByteOffset + bufferView.ByteOffset;
 
             uint[] indices = new uint[accessor.Count];
@@ -622,15 +632,15 @@ namespace IDKEngine
             sampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)data.Sampler.WrapT);
         }
 
-        private static Matrix4 GetNodeModelMatrix(Node node)
+        private static Matrix4 GetNodeTransform(Node node)
         {
-            Matrix4 modelMatrix = new Matrix4(
+            Matrix4 transform = new Matrix4(
                     node.Matrix[0], node.Matrix[1], node.Matrix[2], node.Matrix[3],
                     node.Matrix[4], node.Matrix[5], node.Matrix[6], node.Matrix[7],
                     node.Matrix[8], node.Matrix[9], node.Matrix[10], node.Matrix[11],
                     node.Matrix[12], node.Matrix[13], node.Matrix[14], node.Matrix[15]);
 
-            if (modelMatrix == Matrix4.Identity)
+            if (transform == Matrix4.Identity)
             {
                 Quaternion rotation = new Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
                 Vector3 scale = new Vector3(1.0f);
@@ -651,10 +661,10 @@ namespace IDKEngine
                     translation = new Vector3(node.Translation[0], node.Translation[1], node.Translation[2]);
                 }
 
-                modelMatrix = Matrix4.CreateScale(scale) * Matrix4.CreateFromQuaternion(rotation) * Matrix4.CreateTranslation(translation);
+                transform = Matrix4.CreateScale(scale) * Matrix4.CreateFromQuaternion(rotation) * Matrix4.CreateTranslation(translation);
             }
 
-            return modelMatrix;
+            return transform;
         }
 
         private static int ComponentTypeToSize(Accessor.ComponentTypeEnum componentType)

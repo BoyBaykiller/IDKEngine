@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class LightManager : IDisposable
     {
-        public const int GPU_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
+        public const int GPU_MAX_UBO_LIGHT_COUNT = 512; // used in shader and client code - keep in sync!
 
         public struct HitInfo
         {

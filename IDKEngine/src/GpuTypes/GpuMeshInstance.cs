@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    struct GpuMeshInstance
+    public struct GpuMeshInstance
     {
         private Matrix4 _modelMatrix;
         public Matrix4 ModelMatrix

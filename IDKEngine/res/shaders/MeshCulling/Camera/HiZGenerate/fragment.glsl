@@ -3,7 +3,6 @@
 layout(binding = 0) uniform sampler2D SamplerDepth;
 
 layout(location = 0) uniform int Lod;
-layout(location = 1) uniform bool WasEven;
 
 in InOutVars
 {
@@ -13,44 +12,45 @@ in InOutVars
 void main()
 {
     ivec2 imgCoord = ivec2(gl_FragCoord.xy);
-    vec2 sampleHiZSize = textureSize(SamplerDepth, Lod);
 
-    float furthestDepth = 0.0;
-    if (WasEven)
+    ivec2 vReadCoord = imgCoord * 2;
+
+    vec4 samples;
+    samples.x = texelFetch(SamplerDepth, vReadCoord + ivec2(0, 0), Lod).r;
+    samples.y = texelFetch(SamplerDepth, vReadCoord + ivec2(1, 0), Lod).r;
+    samples.z = texelFetch(SamplerDepth, vReadCoord + ivec2(0, 1), Lod).r;
+    samples.w = texelFetch(SamplerDepth, vReadCoord + ivec2(1, 1), Lod).r;
+
+    float furthestDepth = max(samples.x, max(samples.y, max(samples.z, samples.w)));
+
+    vec2 srcSize = textureSize(SamplerDepth, Lod);
+    vec2 resultSize = textureSize(SamplerDepth, Lod + 1);
+    vec2 sizeRatio = srcSize / resultSize;
+
+    bool needExtraSampleX = sizeRatio.x > 2;
+    bool needExtraSampleY = sizeRatio.y > 2;
+
+    if (needExtraSampleX)
     {
-        vec2 writeHiZSize = textureSize(SamplerDepth, Lod + 1);
-        vec2 scaled_pos = imgCoord * (sampleHiZSize / writeHiZSize);
+        vec2 additionalSamples;
+        additionalSamples.x = texelFetch(SamplerDepth, vReadCoord + ivec2(2, 0), Lod).r;
+        additionalSamples.y = texelFetch(SamplerDepth, vReadCoord + ivec2(2, 1), Lod).r;
 
-        vec4 depths;// = textureGatherLodAMD(SamplerDepth, uv, Lod);
-        depths.x = texelFetch(SamplerDepth, imgCoord * 2 + ivec2(0, 0), Lod).r;
-        depths.y = texelFetch(SamplerDepth, imgCoord * 2 + ivec2(1, 0), Lod).r;
-        depths.z = texelFetch(SamplerDepth, imgCoord * 2 + ivec2(0, 1), Lod).r;
-        depths.w = texelFetch(SamplerDepth, imgCoord * 2 + ivec2(1, 1), Lod).r;
-
-        furthestDepth = max(max(depths.x, depths.y), max(depths.z, depths.w));
+        furthestDepth = max(furthestDepth, max(additionalSamples.x, additionalSamples.y));
     }
-    else
+    if (needExtraSampleY)
     {
-        ivec2 offsets[] = {
-            ivec2(-1, -1),
-            ivec2( 0, -1),
-            ivec2( 1, -1),
-            ivec2(-1,  0),
-            ivec2( 0,  0),
-            ivec2( 1,  0),
-            ivec2(-1,  1),
-            ivec2( 0,  1),
-            ivec2( 1,  1)
-        };
+        vec2 additionalSamples;
+        additionalSamples.x = texelFetch(SamplerDepth, vReadCoord + ivec2(0, 2), Lod).r;
+        additionalSamples.x = texelFetch(SamplerDepth, vReadCoord + ivec2(1, 2), Lod).r;
 
-        vec2 texelSize = 1.0 / sampleHiZSize;
-        for (int i = 0; i < offsets.length(); i++)
-        {
-            vec2 pos = inData.TexCoord + offsets[i] * texelSize;
-            furthestDepth = max(furthestDepth, texelFetch(SamplerDepth, ivec2(pos * sampleHiZSize), Lod).r);
-        }
+        furthestDepth = max(furthestDepth, max(additionalSamples.x, additionalSamples.y));
     }
-    
+    if (needExtraSampleX && needExtraSampleY)
+    {
+        float additionalSample = texelFetch(SamplerDepth, vReadCoord + ivec2(2, 2), Lod).r;
+        furthestDepth = max(furthestDepth, additionalSample);
+    }
 
     gl_FragDepth = furthestDepth;
 }
