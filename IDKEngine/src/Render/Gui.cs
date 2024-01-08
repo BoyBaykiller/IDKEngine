@@ -808,8 +808,8 @@ namespace IDKEngine.Render
                     }
                     else if (result.Status != NativeFileDialogExtendedSharp.NfdStatus.Cancel)
                     {
-                        Model newModel = new Model(result.Path);
-                        app.ModelSystem.Add(newModel);
+                        ModelLoader.Model newScene = ModelLoader.Load(result.Path);
+                        app.ModelSystem.Add(newScene);
 
                         int newMeshIndex = app.ModelSystem.Meshes.Length - 1;
 

@@ -42,7 +42,7 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 } gBufferDataUBO;
 
 vec3 SSR(vec3 normal, vec3 fragPos);
-void CustomBinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample);
+void BinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample);
 
 uniform int Samples;
 uniform int BinarySearchSamples;
@@ -96,7 +96,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
         float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
         if (projectedSample.z > depth)
         {
-            CustomBinarySearch(samplePoint, deltaStep, projectedSample);
+            BinarySearch(samplePoint, deltaStep, projectedSample);
             return texture(SamplerSrc, projectedSample.xy).rgb; 
         }
 
@@ -106,7 +106,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
     return texture(skyBoxUBO.Albedo, worldSpaceReflectDir).rgb;
 }
 
-void CustomBinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)
+void BinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)
 {
     // Go back one step at the beginning because we know we are to far
     deltaStep *= 0.5;

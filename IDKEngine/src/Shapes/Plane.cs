@@ -13,7 +13,7 @@ namespace IDKEngine.Shapes
 
         public static Vector3 Project(in Vector3 v, in Plane plane)
         {
-            return v - Vector3.Dot(plane.Normal, v) * plane.Normal;
+            return Vector3.Dot(plane.Normal, v) * plane.Normal;
         }
     }
 }

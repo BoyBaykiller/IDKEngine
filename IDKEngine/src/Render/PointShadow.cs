@@ -2,6 +2,7 @@
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.Render
 {
@@ -73,6 +74,8 @@ namespace IDKEngine.Render
 
             for (int i = 0; i < 6; i++)
             {
+                // TODO: Intersect every cameraFrustum plane against each shadow plane or something
+
                 // Culling face i
                 {
                     cullingProgram.Use();

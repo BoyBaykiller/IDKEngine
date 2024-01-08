@@ -265,16 +265,18 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
             vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
 
-            MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
-            mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
-            mat3 TBN = GetTBN(unitVecToWorld, interpTangent, interpNormal);
-
             Mesh mesh = meshSSBO.Meshes[hitInfo.MeshID];
             Material material = materialSSBO.Materials[mesh.MaterialIndex];
+            MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
+
+            mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+            vec3 worldNormal = normalize(unitVecToWorld * interpNormal);
+            vec3 worldTangent = normalize(unitVecToWorld * interpTangent);
+            mat3 TBN = GetTBN(worldTangent, worldNormal);
             
             normal = texture(material.Normal, interpTexCoord).rgb;
             normal = TBN * normalize(normal * 2.0 - 1.0);
-            normal = mix(normalize(unitVecToWorld * interpNormal), normal, mesh.NormalMapStrength);
+            normal = mix(worldNormal, normal, mesh.NormalMapStrength);
 
             ior = mesh.IOR;
             absorbance = mesh.Absorbance;

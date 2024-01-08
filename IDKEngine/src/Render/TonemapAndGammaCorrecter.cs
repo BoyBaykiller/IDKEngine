@@ -5,7 +5,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    unsafe class TonemapAndGammaCorrecter : IDisposable
+    unsafe class TonemapAndGammaCorrect : IDisposable
     {
         private bool _isDithering;
         public bool IsDithering
@@ -33,9 +33,9 @@ namespace IDKEngine.Render
 
         public Texture Result;
         private readonly ShaderProgram tonemapAndGammaCorrecterProgram;
-        public TonemapAndGammaCorrecter(int width, int height, float gamma = 2.2f)
+        public TonemapAndGammaCorrect(int width, int height, float gamma = 2.2f)
         {
-            tonemapAndGammaCorrecterProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TonemapAndGammaCorrecter/compute.glsl")));
+            tonemapAndGammaCorrecterProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TonemapAndGammaCorrect/compute.glsl")));
 
             SetSize(width, height);
             

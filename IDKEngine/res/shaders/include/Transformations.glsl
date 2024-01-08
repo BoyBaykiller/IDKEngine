@@ -52,10 +52,10 @@ vec3 PerspectiveTransformUvDepth(vec3 uvAndDepth, mat4 matrix)
     return PerspectiveTransform(ndc, matrix);
 }
 
-mat3 GetTBN(mat3 matrix, vec3 tangent, vec3 normal)
+mat3 GetTBN(vec3 tangent, vec3 normal)
 {
-    vec3 T = normalize(matrix * tangent);
-    vec3 N = normalize(matrix * normal);
+    vec3 T = tangent;
+    vec3 N = normal;
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
     mat3 TBN = mat3(T, B, N);

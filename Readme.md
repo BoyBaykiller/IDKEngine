@@ -3,7 +3,7 @@
 Feature list:
  - Wavefront Path Tracer
  - Real-Time Voxel Global Illumination
- - Multi Draw Indirect & Bindless Textures + other extensions
+ - Mesh Shaders + Multi Draw Indirect + Bindless Textures + other extensions
  - [AMD FSR2](https://github.com/GPUOpen-Effects/FidelityFX-FSR2) and Temporal Anti Aliasing
  - Camera Collision Detection against arbitrary triangle meshes
  - CoD-Modern-Warfare Bloom
@@ -18,10 +18,6 @@ Feature list:
 
 Required OpenGL: 4.6 + `ARB_bindless_texture`
 
-Known Issues:
-
-- Volumetric Lighting may flicker because I am not undoing the jitter when reprojecting to world space
-- Intel iGPU not supported (rendering artifacts for unknown reasons)
 
 # Controls
 | Key                   | Action               | 
