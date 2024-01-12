@@ -51,7 +51,7 @@ namespace IDKEngine
         {
             Position = position;
             PrevPosition = position;
-            UpVector = new Vector3(0.0f, 1.0f, 0.0f);
+            UpVector = Vector3.Up;
             LookX = lookX;
             LookY = lookY;
 
@@ -109,14 +109,14 @@ namespace IDKEngine
 
             if (Velocity.Length < 9.0f * dT)
             {
-                Velocity = new Vector3(0.0f);
+                Velocity = Vector3.Zero;
             }
 
             const float dragConstant = 0.95f;
             float drag = MathF.Log10(dragConstant) * 144.0f;
             Velocity *= MathF.Exp(drag * dT); // https://stackoverflow.com/questions/61812575/which-formula-to-use-for-drag-simulation-each-frame
 
-            ThisFrameAcceleration = new Vector3(0.0f);
+            ThisFrameAcceleration = Vector3.Zero;
         }
 
         public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
