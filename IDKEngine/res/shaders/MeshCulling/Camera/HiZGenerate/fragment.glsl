@@ -42,7 +42,7 @@ void main()
     {
         vec2 additionalSamples;
         additionalSamples.x = texelFetch(SamplerDepth, vReadCoord + ivec2(0, 2), Lod).r;
-        additionalSamples.x = texelFetch(SamplerDepth, vReadCoord + ivec2(1, 2), Lod).r;
+        additionalSamples.y = texelFetch(SamplerDepth, vReadCoord + ivec2(1, 2), Lod).r;
 
         furthestDepth = max(furthestDepth, max(additionalSamples.x, additionalSamples.y));
     }

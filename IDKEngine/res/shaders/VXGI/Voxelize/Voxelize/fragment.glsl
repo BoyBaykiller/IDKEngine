@@ -57,6 +57,8 @@ struct Light
     float Radius;
     vec3 Color;
     int PointShadowIndex;
+    vec3 PrevPosition;
+    float _pad0;
 };
 
 layout(std430, binding = 3) restrict readonly buffer MaterialSSBO

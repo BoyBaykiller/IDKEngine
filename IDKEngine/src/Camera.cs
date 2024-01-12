@@ -41,16 +41,24 @@ namespace IDKEngine
         public float KeyboardAccelerationSpeed;
         public float MouseSensitivity;
 
-        public Camera(Vector3 position, Vector3 up, float lookX = -90.0f, float lookY = 0.0f)
+        // Projection Params
+        public Vector2i ProjectionSize;
+        public float NearPlane = 0.1f;
+        public float FarPlane = 500.0f;
+        public float FovY = MathHelper.DegreesToRadians(102.0f);
+
+        public Camera(Vector2i size, Vector3 position, float lookX = -90.0f, float lookY = 0.0f)
         {
             Position = position;
             PrevPosition = position;
-            UpVector = up;
+            UpVector = new Vector3(0.0f, 1.0f, 0.0f);
             LookX = lookX;
             LookY = lookY;
 
             MouseSensitivity = 0.05f;
             KeyboardAccelerationSpeed = 30.0f;
+
+            ProjectionSize = size;
         }
 
         public void ProcessInputs(Keyboard keyboard, Mouse mouse)
@@ -119,6 +127,16 @@ namespace IDKEngine
             viewDir.Z = MathF.Sin(MathHelper.DegreesToRadians(lookX)) * MathF.Cos(MathHelper.DegreesToRadians(lookY));
 
             return viewDir;
+        }
+
+        public Matrix4 GetViewMatrix()
+        {
+            return GenerateViewMatrix(Position, ViewDir, UpVector);
+        }
+
+        public Matrix4 GetProjectionMatrix()
+        {
+            return MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(FovY, ProjectionSize.X / (float)ProjectionSize.Y, NearPlane, FarPlane);
         }
 
         public static Matrix4 GenerateViewMatrix(in Vector3 position, in Vector3 viewDir, in Vector3 upVector)

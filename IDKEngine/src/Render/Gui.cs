@@ -137,14 +137,17 @@ namespace IDKEngine.Render
                     ImGui.SliderFloat("Speed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f);
                     ImGui.SliderFloat("Sensitivity", ref app.Camera.MouseSensitivity, 0.0f, 0.1f);
 
-                    tempFloat = MathHelper.RadiansToDegrees(app.CameraFovY);
+                    tempFloat = MathHelper.RadiansToDegrees(app.Camera.FovY);
                     if (ImGui.SliderFloat("FovY", ref tempFloat, 10.0f, 130.0f))
                     {
-                        app.CameraFovY = MathHelper.DegreesToRadians(tempFloat);
+                        app.Camera.FovY = MathHelper.DegreesToRadians(tempFloat);
                     }
 
-                    ImGui.Checkbox("HasGravity", ref app.HasGravity );
-                    if (app.HasGravity)
+                    ImGui.SliderFloat("NearPlane", ref app.Camera.NearPlane, 0.001f, 5.0f);
+                    ImGui.SliderFloat("FarPlane", ref app.Camera.FarPlane, 5.0f, 1000.0f);
+
+                    ImGui.Checkbox("HasGravity", ref app.GravityEnabled );
+                    if (app.GravityEnabled)
                     {
                         ImGui.SliderFloat("Gravity", ref app.GravityDownForce, 0.0f, 100.0f);
                     }

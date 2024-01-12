@@ -7,7 +7,7 @@ namespace IDKEngine.Render
 {
     class PointShadowManager : IDisposable
     {
-        public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 16; // used in shader and client code - keep in sync!
+        public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 128; // used in shader and client code - keep in sync!
         public static readonly bool IS_MESH_SHADER_RENDERING = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
 
         private readonly PointShadow[] pointShadows;
@@ -41,7 +41,7 @@ namespace IDKEngine.Render
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
         }
 
-        public void RenderShadowMaps(ModelSystem modelSystem)
+        public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
         {
             GL.ColorMask(false, false, false, false);
             GL.Disable(EnableCap.CullFace);
@@ -52,9 +52,11 @@ namespace IDKEngine.Render
                 {
                     UploadPointShadow(i);
 
+                    // tell shaders which point shadow we are rendering
                     renderProgram.Upload(0, i);
                     cullingProgram.Upload(0, i);
-                    pointShadow.Render(modelSystem, renderProgram, cullingProgram);
+
+                    pointShadow.Render(modelSystem, renderProgram, cullingProgram, camera);
                 }
             }
             GL.ColorMask(true, true, true, true);

@@ -64,6 +64,8 @@ struct Light
     float Radius;
     vec3 Color;
     int PointShadowIndex;
+    vec3 PrevPosition;
+    float _pad0;
 };
 
 struct PointShadow

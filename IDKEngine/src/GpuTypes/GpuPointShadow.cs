@@ -6,7 +6,7 @@ namespace IDKEngine
 {
     struct GpuPointShadow
     {
-        public enum Matrix : int
+        public enum RenderMatrix : int
         {
             PosX,
             NegX,
@@ -15,19 +15,19 @@ namespace IDKEngine
             PosZ,
             NegZ,
         }
-        public ref Matrix4 this[Matrix matrix]
+        public ref Matrix4 this[RenderMatrix matrix]
         {
             get
             {
                 switch (matrix)
                 {
-                    case Matrix.PosX: return ref Unsafe.AsRef(PosX);
-                    case Matrix.NegX: return ref Unsafe.AsRef(NegX);
-                    case Matrix.PosY: return ref Unsafe.AsRef(PosY);
-                    case Matrix.NegY: return ref Unsafe.AsRef(NegY);
-                    case Matrix.PosZ: return ref Unsafe.AsRef(PosZ);
-                    case Matrix.NegZ: return ref Unsafe.AsRef(NegZ);
-                    default: throw new NotSupportedException($"Unsupported {nameof(Matrix)} {matrix}");
+                    case RenderMatrix.PosX: return ref Unsafe.AsRef(PosX);
+                    case RenderMatrix.NegX: return ref Unsafe.AsRef(NegX);
+                    case RenderMatrix.PosY: return ref Unsafe.AsRef(PosY);
+                    case RenderMatrix.NegY: return ref Unsafe.AsRef(NegY);
+                    case RenderMatrix.PosZ: return ref Unsafe.AsRef(PosZ);
+                    case RenderMatrix.NegZ: return ref Unsafe.AsRef(NegZ);
+                    default: throw new NotSupportedException($"Unsupported {nameof(RenderMatrix)} {matrix}");
                 }
             }
         }

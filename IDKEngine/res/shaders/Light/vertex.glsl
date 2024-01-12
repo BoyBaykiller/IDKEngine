@@ -10,6 +10,8 @@ struct Light
     float Radius;
     vec3 Color;
     int PointShadowIndex;
+    vec3 PrevPosition;
+    float _pad0;
 };
 
 layout(std140, binding = 2) uniform LightsUBO
@@ -57,7 +59,6 @@ out InOutVars
 void main()
 {
     Light light = lightsUBO.Lights[gl_InstanceID];
-
     mat4 model = mat4(
         vec4(light.Radius, 0.0, 0.0, 0.0),
         vec4(0.0, light.Radius, 0.0, 0.0),
@@ -65,10 +66,18 @@ void main()
         vec4(light.Position, 1.0)
     );
 
+    mat4 prevModel = mat4(
+        vec4(light.Radius, 0.0, 0.0, 0.0),
+        vec4(0.0, light.Radius, 0.0, 0.0),
+        vec4(0.0, 0.0, light.Radius, 0.0),
+        vec4(light.PrevPosition, 1.0)
+    );
+
+    // TODO: Add previous world space pos
     outData.LightColor = light.Color;
     outData.FragPos = (model * vec4(Position, 1.0)).xyz;
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
-    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(outData.FragPos, 1.0);
+    outData.PrevClipPos = basicDataUBO.PrevProjView * prevModel * vec4(Position, 1.0);
     outData.Position = light.Position;
     outData.Radius = light.Radius;
 

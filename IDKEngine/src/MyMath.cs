@@ -66,5 +66,27 @@ namespace IDKEngine
             result[3, 2] = -depthNear / (depthFar - depthNear);
             return result;
         }
+
+        public static void GetFrustumPoints(in Matrix4 matrix, Span<Vector3> points)
+        {
+            for (int j = 0; j < 2; j++)
+            {
+                float z = j;
+                Vector4 leftBottom = new Vector4(-1.0f, -1.0f, z, 1.0f) * matrix;
+                Vector4 rightBottom = new Vector4(1.0f, -1.0f, z, 1.0f) * matrix;
+                Vector4 leftUp = new Vector4(-1.0f, 1.0f, z, 1.0f) * matrix;
+                Vector4 rightUp = new Vector4(1.0f, 1.0f, z, 1.0f) * matrix;
+
+                leftBottom /= leftBottom.W;
+                rightBottom /= rightBottom.W;
+                leftUp /= leftUp.W;
+                rightUp /= rightUp.W;
+
+                points[j * 4 + 0] = leftUp.Xyz;
+                points[j * 4 + 1] = rightUp.Xyz;
+                points[j * 4 + 2] = rightBottom.Xyz;
+                points[j * 4 + 3] = leftBottom.Xyz;
+            }
+        }
     }
 }

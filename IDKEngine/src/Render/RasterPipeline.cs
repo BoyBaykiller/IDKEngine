@@ -229,11 +229,11 @@ namespace IDKEngine.Render
             ShadowMode = ShadowTechnique.PcfShadowMap;
         }
 
-        public unsafe void Render(ModelSystem modelSystem, LightManager lightManager, float dT, float nearPlane, float farPlane, float cameraFovY)
+        public unsafe void Render(ModelSystem modelSystem, LightManager lightManager, Camera camera, float dT)
         {
             if (GenerateShadowMaps)
             {
-                lightManager.RenderShadowMaps(modelSystem);
+                lightManager.RenderShadowMaps(modelSystem, camera);
             }
 
             // Update Temporal AntiAliasing related stuff
@@ -319,7 +319,7 @@ namespace IDKEngine.Render
                 gBufferProgram.Use();
                 if (IS_MESH_SHADER_RENDERING)
                 {
-                    modelSystem.MeshDraw();
+                    modelSystem.MeshShaderDrawNV();
                 }
                 else
                 {
@@ -428,7 +428,7 @@ namespace IDKEngine.Render
             }
             else if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
             {
-                FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, resultBeforeTAA, DepthTexture, VelocityTexture, dT * 1000.0f, nearPlane, farPlane, cameraFovY);
+                FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, resultBeforeTAA, DepthTexture, VelocityTexture, dT * 1000.0f, camera.NearPlane, camera.FarPlane, camera.FovY);
 
                 // TODO: This is a hack to fix global UBO bindings modified by FSR2
                 taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);

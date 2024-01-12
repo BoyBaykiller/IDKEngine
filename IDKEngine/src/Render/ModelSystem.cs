@@ -174,7 +174,10 @@ namespace IDKEngine.Render
             GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, sizeof(GpuDrawElementsCmd));
         }
 
-        public unsafe void MeshDraw()
+        /// <summary>
+        /// Requires support for GL_NV_mesh_shader
+        /// </summary>
+        public unsafe void MeshShaderDrawNV()
         {
             meshletTasksCmdsBuffer.Bind(BufferTarget.DrawIndirectBuffer);
             GL.NV.MultiDrawMeshTasksIndirect(IntPtr.Zero, MeshTasksCmds.Length, sizeof(GpuMeshletTaskCmd));
