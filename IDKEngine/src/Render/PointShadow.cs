@@ -52,7 +52,7 @@ namespace IDKEngine.Render
         }
 
         public Texture Result;
-        
+
         private readonly Framebuffer framebuffer;
         private SamplerObject nearestSampler;
         private SamplerObject shadowSampler;
@@ -66,15 +66,35 @@ namespace IDKEngine.Render
             SetSize(size);
         }
 
-        public unsafe void Render(ModelSystem modelSystem, ShaderProgram renderProgram, ShaderProgram cullingProgram)
+        public unsafe void Render(ModelSystem modelSystem, ShaderProgram renderProgram, ShaderProgram cullingProgram, Camera camera)
         {
             GL.Viewport(0, 0, Result.Width, Result.Height);
             framebuffer.Bind();
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
+            Matrix4 cameraProjView = camera.GetViewMatrix() * camera.GetProjectionMatrix();
+            Frustum cameraFrustum = new Frustum(cameraProjView);
+            Span<Vector3> cameraFrustumVertices = stackalloc Vector3[8];
+            MyMath.GetFrustumPoints(Matrix4.Invert(cameraProjView), cameraFrustumVertices);
+
             for (int i = 0; i < 6; i++)
             {
-                // TODO: Intersect every cameraFrustum plane against each shadow plane or something
+                bool frustaIntersect = true;
+                {
+                    Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + i];
+
+                    Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
+                    MyMath.GetFrustumPoints(Matrix4.Invert(faceMatrix), shadowFrustumVertices);
+
+                    Frustum shadowFaceFrustum = new Frustum(faceMatrix);
+
+                    frustaIntersect = Intersections.ConvexSATIntersect(cameraFrustum, shadowFaceFrustum, cameraFrustumVertices, shadowFrustumVertices);
+                }
+
+                if (!frustaIntersect)
+                {
+                    continue;
+                }
 
                 // Culling face i
                 {
@@ -93,7 +113,7 @@ namespace IDKEngine.Render
 
                     if (PointShadowManager.IS_MESH_SHADER_RENDERING)
                     {
-                        modelSystem.MeshDraw();
+                        modelSystem.MeshShaderDrawNV();
                     }
                     else
                     {

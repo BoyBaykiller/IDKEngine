@@ -73,7 +73,7 @@ namespace IDKEngine.Render
             GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
         }
 
-        public void RenderShadowMaps(ModelSystem modelSystem)
+        public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
         {
             for (int i = 0; i < Count; i++)
             {
@@ -84,7 +84,7 @@ namespace IDKEngine.Render
                     associatedPointShadow.Position = light.GpuLight.Position;
                 }
             }
-            pointShadowManager.RenderShadowMaps(modelSystem);
+            pointShadowManager.RenderShadowMaps(modelSystem, camera);
         }
 
         public bool AddLight(Light light)
@@ -166,6 +166,8 @@ namespace IDKEngine.Render
             {
                 Light light = lights[i];
                 lightBufferObject.SubData(i * sizeof(GpuLight), sizeof(GpuLight), light.GpuLight);
+                
+                light.GpuLight.PrevPosition = light.GpuLight.Position;
             }
         }
 

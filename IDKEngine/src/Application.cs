@@ -23,10 +23,6 @@ namespace IDKEngine
         {
         }
 
-        public const float EPSILON = 0.001f;
-        public const float NEAR_PLANE = 0.1f, FAR_PLANE = 500.0f;
-        public float CameraFovY = MathHelper.DegreesToRadians(102.0f);
-
         private float _resolutionScale = 1.0f;
         public float ResolutionScale
         {
@@ -114,7 +110,7 @@ namespace IDKEngine
             EpsilonNormalOffset = 0.001f
         };
 
-        public bool HasGravity = false;
+        public bool GravityEnabled = false;
         public float GravityDownForce = 70.0f;
 
         private int fpsCounter;
@@ -126,13 +122,13 @@ namespace IDKEngine
             {
                 if (RasterizerPipeline.IsConfigureGrid)
                 {
-                    RasterizerPipeline.Render(ModelSystem, LightManager, dT, NEAR_PLANE, FAR_PLANE, CameraFovY);
+                    RasterizerPipeline.Render(ModelSystem, LightManager, Camera, dT);
                     TonemapAndGamma.Combine(RasterizerPipeline.Result);
                     BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
                 {
-                    RasterizerPipeline.Render(ModelSystem, LightManager, dT, NEAR_PLANE, FAR_PLANE, CameraFovY);
+                    RasterizerPipeline.Render(ModelSystem, LightManager, Camera, dT);
 
                     if (IsBloom)
                     {
@@ -222,6 +218,18 @@ namespace IDKEngine
             //    light.GpuLight.Position.Z += (MathF.Cos(GpuBasicData.Time) * 4.0f) * dT;
             //}
 
+            //for (int i = 0; i < LightManager.Count; i++)
+            //{
+            //    LightManager.TryGetLight(i, out Light light);
+
+            //    Random rng = new Random(i);
+
+            //    Vector3 pos = DebugLightPosXConst(light.GpuLight.Position.X, WindowTime, rng.NextSingle() + 1.0f, rng.NextSingle() + 1.0f, rng.NextSingle() * 8.0f + 2.0f, rng.NextSingle() * 6.0f + 2.0f);
+
+            //    light.GpuLight.Position = pos;
+            //    light.GpuLight.Color = Helper.VectorAbs(pos.Normalized()) * 8.5f;
+            //}
+
             // Keyboard Inputs
             {
                 if (KeyboardState[Keys.Escape] == InputState.Pressed)
@@ -265,7 +273,7 @@ namespace IDKEngine
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
                     Camera.ProcessInputs(KeyboardState, MouseState);
-                    if (HasGravity)
+                    if (GravityEnabled)
                     {
                         Camera.ThisFrameAcceleration.Y += -GravityDownForce;
                     }
@@ -289,7 +297,7 @@ namespace IDKEngine
                     if (hit)
                     {
                         Vector3 newVelocity = Plane.Project(Camera.Velocity, hitPlane);
-                        Camera.Velocity = Camera.Velocity - newVelocity;
+                        Camera.Velocity = newVelocity;
 
                         boundingVolume.Center += hitPlane.Normal * (penetrationDepth + CamCollisionSettings.EpsilonNormalOffset);
                         Camera.Position = boundingVolume.Center;
@@ -359,26 +367,34 @@ namespace IDKEngine
                 }
             }
 
-            LightManager.UpdateBufferData();
-
             // Updating global basicData Buffer
             {
-                GpuBasicData.Projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(CameraFovY, RenderPresentationResolution.X / (float)RenderPresentationResolution.Y, NEAR_PLANE, FAR_PLANE);
-                GpuBasicData.InvProjection = GpuBasicData.Projection.Inverted();
-                GpuBasicData.NearPlane = NEAR_PLANE;
-                GpuBasicData.FarPlane = FAR_PLANE;
-                GpuBasicData.DeltaRenderTime = dT;
-                GpuBasicData.PrevProjView = GpuBasicData.ProjView;
+                Camera.ProjectionSize = RenderResolution;
+
                 GpuBasicData.PrevView = GpuBasicData.View;
-                GpuBasicData.View = Camera.GenerateViewMatrix(Camera.Position, Camera.ViewDir, Camera.UpVector);
+                GpuBasicData.PrevProjView = GpuBasicData.ProjView;
+
+                GpuBasicData.Projection = Camera.GetProjectionMatrix();
+                GpuBasicData.InvProjection = GpuBasicData.Projection.Inverted();
+
+                GpuBasicData.View = Camera.GetViewMatrix();
                 GpuBasicData.InvView = GpuBasicData.View.Inverted();
+
                 GpuBasicData.ProjView = GpuBasicData.View * GpuBasicData.Projection;
                 GpuBasicData.InvProjView = GpuBasicData.ProjView.Inverted();
+
                 GpuBasicData.CameraPos = Camera.Position;
+                GpuBasicData.NearPlane = Camera.NearPlane;
+                GpuBasicData.FarPlane = Camera.FarPlane;
+
+                GpuBasicData.DeltaRenderTime = dT;
                 GpuBasicData.Time = WindowTime;
                 GpuBasicData.Frame++;
+
                 basicDataBuffer.SubData(0, sizeof(GpuBasicData), GpuBasicData);
             }
+
+            LightManager.UpdateBufferData();
 
             bool anyMeshInstanceMoved = false;
             // Updating MeshInstance Buffer
@@ -404,6 +420,11 @@ namespace IDKEngine
             }
         }
 
+        private static Vector3 DebugLightPosXConst(float x, float t, float speedY, float speedZ, float scalarY, float scalarZ)
+        {
+            return new Vector3(x, 7.0f + MathF.Sin(t * speedY) * scalarY, MathF.Cos(t * speedZ) * scalarZ);
+        }
+
         private Gui gui;
         private ShaderProgram finalProgram;
 
@@ -411,7 +432,7 @@ namespace IDKEngine
         public ModelSystem ModelSystem;
         public FrameStateRecorder<FrameState> FrameRecorder;
 
-        public VolumetricLighter VolumetricLight;
+        public VolumetricLighting VolumetricLight;
         public Bloom Bloom;
         public TonemapAndGammaCorrect TonemapAndGamma;
         public BoxRenderer BoxRenderer;
@@ -458,8 +479,9 @@ namespace IDKEngine
             finalProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
-            Camera = new Camera(new Vector3(7.63f, 2.71f, 0.8f), new Vector3(0.0f, 1.0f, 0.0f), -165.4f, 7.4f);
-            //camera = new Camera(new Vector3(-8.0f, 2.00f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), -183.5f, 0.5f, 0.1f, 0.25f);
+            Camera = new Camera(RenderResolution, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
+            //Camera = new Camera(RenderResolution, new Vector3(-0.824f, 2.587f, -6.370f), -90.0f, 0.0f);
+            //camera = new Camera(RenderResolution, new Vector3(-8.0f, 2.00f, -0.5f), -183.5f, 0.5f, 0.1f, 0.25f);
 
             SkyBoxManager.Init(new string[]
             {
@@ -472,7 +494,7 @@ namespace IDKEngine
             });
 
             RenderPresentationResolution = WindowFramebufferSize;
-            VolumetricLight = new VolumetricLighter(RenderPresentationResolution.X, RenderPresentationResolution.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
+            VolumetricLight = new VolumetricLighting(RenderPresentationResolution.X, RenderPresentationResolution.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
             Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
             TonemapAndGamma = new TonemapAndGammaCorrect(RenderPresentationResolution.X, RenderPresentationResolution.Y);
             BoxRenderer = new BoxRenderer();
@@ -505,7 +527,7 @@ namespace IDKEngine
                 ModelLoader.Model helmet = ModelLoader.Load("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
                 ModelSystem.Add(sponza, lucy, helmet);
 
-                //ModelLoader.Model test = ModelLoader.Load("C:\\Users\\Julian\\Downloads\\small_city\\small_city.gltf");
+                //ModelLoader.Model test = ModelLoader.Load("C:\\Users\\Julian\\Downloads\\Models\\Temple\\Temple.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
                 //ModelSystem.Add(test);
 
                 LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
@@ -517,6 +539,16 @@ namespace IDKEngine
                     PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
                     LightManager.CreatePointShadowForLight(pointShadow, i);
                 }
+
+                //for (int i = 0; i < 128; i++)
+                //{
+                //    Light light = new Light(0.2f);
+                //    light.GpuLight.Position.X = Helper.RandomFloat(-13.0f, 13.0f);
+                //    LightManager.AddLight(light);
+
+                //    PointShadow pointShadow = new PointShadow(256, 0.5f, 60.0f);
+                //    LightManager.CreatePointShadowForLight(pointShadow, i);
+                //}
 
                 //LightManager.AddLight(new Light(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.7f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);

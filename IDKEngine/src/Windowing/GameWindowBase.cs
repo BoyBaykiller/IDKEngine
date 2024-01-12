@@ -140,10 +140,11 @@ namespace IDKEngine
                 double currentTime = GLFW.GetTime();
                 double runTime = currentTime - lastTime;
                 
-                GLFW.PollEvents();
                 KeyboardState.Update();
                 MouseState.Update();
                 OnRender((float)runTime);
+
+                GLFW.PollEvents();
                 GLFW.SwapBuffers(window);
 
                 lastTime = currentTime;

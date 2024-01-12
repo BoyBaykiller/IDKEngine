@@ -8,7 +8,7 @@
 #define EPSILON 0.001
 
 // These constants are used in shader and client code. Keep in sync!
-#define GPU_MAX_UBO_POINT_SHADOW_COUNT 16
+#define GPU_MAX_UBO_POINT_SHADOW_COUNT 128
 #define GPU_MAX_UBO_LIGHT_COUNT 512
 
 #define TEMPORAL_ANTI_ALIASING_MODE_NO_AA 0

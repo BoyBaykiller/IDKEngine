@@ -5,7 +5,7 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    class VolumetricLighter : IDisposable
+    class VolumetricLighting : IDisposable
     {
         private int _samples;
         public int Samples
@@ -69,7 +69,7 @@ namespace IDKEngine.Render
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        public VolumetricLighter(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance)
+        public VolumetricLighting(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance)
         {
             shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
 

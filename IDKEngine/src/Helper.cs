@@ -279,6 +279,11 @@ namespace IDKEngine
             return min + rng.NextSingle() * (max - min);
         }
 
+        public static Vector3 VectorAbs(in Vector3 v)
+        {
+            return new Vector3(MathF.Abs(v.X), MathF.Abs(v.Y), MathF.Abs(v.Z));
+        }
+
         public static unsafe void TextureToDisk(Texture texture, string path, int quality = 100, bool flipVertically = true)
         {
             StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);

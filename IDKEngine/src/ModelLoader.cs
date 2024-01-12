@@ -179,7 +179,7 @@ namespace IDKEngine
                         nodeStack.Push((childNode, globalTransform));
                     }
                 }
-
+                
                 if (node.Mesh.HasValue)
                 {
                     Mesh gltfMesh = gltfFile.Meshes[node.Mesh.Value];

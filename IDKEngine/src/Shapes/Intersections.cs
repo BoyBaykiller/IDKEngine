@@ -333,5 +333,80 @@ namespace IDKEngine.Shapes
             float t = Vector3.Dot(point - a, ab) / Vector3.Dot(ab, ab);
             return a + Math.Clamp(t, 0.0f, 1.0f) * ab;
         }
+
+        private struct Projection
+        {
+            public float MinScaler;
+            public float MaxScaler;
+        }
+        private static Projection ProjectVerticesOnToAxis(ReadOnlySpan<Vector3> vertices, in Vector3 axis)
+        {
+            Projection projection = new Projection();
+            projection.MinScaler = float.MaxValue;
+            projection.MaxScaler = float.MinValue;
+
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                // full projecton would mean multiplying by axis, but we are not interested in that
+                float projectedScaler = Vector3.Dot(vertices[i], axis);
+
+                projection.MinScaler = MathF.Min(projection.MinScaler, projectedScaler);
+                projection.MaxScaler = MathF.Max(projection.MaxScaler, projectedScaler);
+            }
+
+            return projection;
+        }
+        private static bool ProjectionsIntersect(in Projection projA, in Projection projB)
+        {
+            static bool FloatInRange(float x, in Projection projection)
+            {
+                return projection.MinScaler < x && projection.MaxScaler > x;
+            }
+
+            if (
+                FloatInRange(projB.MinScaler, projA) ||
+                FloatInRange(projB.MaxScaler, projA) ||
+
+                FloatInRange(projA.MinScaler, projB) ||
+                FloatInRange(projA.MaxScaler, projB)
+                )
+            {
+                return true;
+            }
+
+            return false;
+        }
+        public static bool ConvexSATIntersect(in Frustum frustum1, in Frustum frustum2, ReadOnlySpan<Vector3> vertices1, ReadOnlySpan<Vector3> vertices2)
+        {
+            // Uses brute force SAT-test
+
+            for (int i = 0; i < frustum1.Planes.Length; i++)
+            {
+                Vector3 normal = frustum1.Planes[i].Xyz.Normalized();
+
+                Projection projection1 = ProjectVerticesOnToAxis(vertices1, normal);
+                Projection projection2 = ProjectVerticesOnToAxis(vertices2, normal);
+
+                if (!ProjectionsIntersect(projection1, projection2))
+                {
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < frustum2.Planes.Length; i++)
+            {
+                Vector3 normal = frustum2.Planes[i].Xyz.Normalized();
+
+                Projection projection1 = ProjectVerticesOnToAxis(vertices1, normal);
+                Projection projection2 = ProjectVerticesOnToAxis(vertices2, normal);
+
+                if (!ProjectionsIntersect(projection1, projection2))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 }
