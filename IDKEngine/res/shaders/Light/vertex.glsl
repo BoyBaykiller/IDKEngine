@@ -59,25 +59,26 @@ out InOutVars
 void main()
 {
     Light light = lightsUBO.Lights[gl_InstanceID];
-    mat4 model = mat4(
-        vec4(light.Radius, 0.0, 0.0, 0.0),
-        vec4(0.0, light.Radius, 0.0, 0.0),
-        vec4(0.0, 0.0, light.Radius, 0.0),
-        vec4(light.Position, 1.0)
+    mat4x3 modelMatrix = mat4x3(
+        vec3(light.Radius, 0.0, 0.0),
+        vec3(0.0, light.Radius, 0.0),
+        vec3(0.0, 0.0, light.Radius),
+        vec3(light.Position)
+    );
+    // model[0] (row0, matches OpenTK) == vec3(light.Radius, 0.0, 0.0)
+
+    mat4x3 prevModelMatrix = mat4x3(
+        vec3(light.Radius, 0.0, 0.0),
+        vec3(0.0, light.Radius, 0.0),
+        vec3(0.0, 0.0, light.Radius),
+        vec3(light.PrevPosition)
     );
 
-    mat4 prevModel = mat4(
-        vec4(light.Radius, 0.0, 0.0, 0.0),
-        vec4(0.0, light.Radius, 0.0, 0.0),
-        vec4(0.0, 0.0, light.Radius, 0.0),
-        vec4(light.PrevPosition, 1.0)
-    );
-
-    // TODO: Add previous world space pos
     outData.LightColor = light.Color;
-    outData.FragPos = (model * vec4(Position, 1.0)).xyz;
+    outData.FragPos = modelMatrix * vec4(Position, 1.0);
     outData.ClipPos = basicDataUBO.ProjView * vec4(outData.FragPos, 1.0);
-    outData.PrevClipPos = basicDataUBO.PrevProjView * prevModel * vec4(Position, 1.0);
+    outData.PrevClipPos = basicDataUBO.PrevProjView * vec4(prevModelMatrix * vec4(Position, 1.0), 1.0);
+
     outData.Position = light.Position;
     outData.Radius = light.Radius;
 

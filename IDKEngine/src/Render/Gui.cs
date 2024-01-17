@@ -811,7 +811,7 @@ namespace IDKEngine.Render
                     }
                     else if (result.Status != NativeFileDialogExtendedSharp.NfdStatus.Cancel)
                     {
-                        ModelLoader.Model newScene = ModelLoader.Load(result.Path);
+                        ModelLoader.Model newScene = ModelLoader.GltfToEngineFormat(result.Path);
                         app.ModelSystem.Add(newScene);
 
                         int newMeshIndex = app.ModelSystem.Meshes.Length - 1;

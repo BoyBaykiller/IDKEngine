@@ -13,19 +13,13 @@ namespace IDKEngine
         public GpuDrawElementsCmd[] DrawCommands;
         public BLAS[] Blases;
         public GpuTlasNode[] Nodes;
-        public TLAS()
+        public TLAS(BLAS[] blases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
         {
-            Blases = Array.Empty<BLAS>();
-        }
-
-        public void AddBlases(BLAS[] newBlases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
-        {
-            Helper.ArrayAdd(ref Blases, newBlases);
-
+            Blases = blases;
             DrawCommands = drawCommands;
             MeshInstances = meshInstances;
 
-            Array.Resize(ref Nodes, 2 * meshInstances.Length - 1);
+            Nodes = new GpuTlasNode[2 * meshInstances.Length - 1];
             TreeDepth = (int)MathF.Ceiling(MathF.Log2(Nodes.Length));
         }
 

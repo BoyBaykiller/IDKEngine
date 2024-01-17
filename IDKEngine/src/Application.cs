@@ -309,62 +309,6 @@ namespace IDKEngine
                         break;
                     }
                 }
-
-                // We need to use raw pointers here instead of ref & out, because
-                // "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
-                static bool CollisionRoutine(ModelSystem modelSystem, in CameraCollisionDetection settings, Vector3 newPos, Sphere* previousPos, Plane* outHitPlane, float* outPenetrationDepth)
-                {
-                    *outPenetrationDepth = float.MinValue;
-                    *outHitPlane = new Plane();
-
-                    Vector3 cameraStepSize = (newPos - previousPos->Center) / settings.TestSteps;
-                    for (int i = 1; i <= settings.TestSteps; i++)
-                    {
-                        previousPos->Center += cameraStepSize;
-                        Box playerBox = new Box(previousPos->Center - new Vector3(previousPos->Radius), previousPos->Center + new Vector3(previousPos->Radius));
-
-                        float biggestCosTheta = 0.0f;
-                        modelSystem.BVH.Intersect(playerBox, (in BVH.PrimitiveHitInfo hitInfo) =>
-                        {
-                            Triangle triangle = new Triangle(
-                                modelSystem.VertexPositions[hitInfo.TriangleIndices.X],
-                                modelSystem.VertexPositions[hitInfo.TriangleIndices.Y],
-                                modelSystem.VertexPositions[hitInfo.TriangleIndices.Z]
-                            );
-                            Matrix4 model = modelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
-                            Triangle worldSpaceTri = Triangle.Transformed(triangle, model);
-
-                            Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, previousPos->Center);
-                            float distance = Vector3.Distance(closestPointOnTri, previousPos->Center);
-                            float thisPenetrationDepth = previousPos->Radius - distance;
-                            if (thisPenetrationDepth > 0.0f)
-                            {
-                                Plane thisHitPlane = new Plane(worldSpaceTri.Normal);
-
-                                Vector3 hitPointToCameraDir = (previousPos->Center - closestPointOnTri) / distance;
-                                float thisCosTheta = Vector3.Dot(thisHitPlane.Normal, hitPointToCameraDir);
-                                if (thisCosTheta < 0.0f)
-                                {
-                                    thisHitPlane.Normal *= -1.0f;
-                                }
-
-                                if (MathF.Abs(thisCosTheta) > MathF.Abs(biggestCosTheta))
-                                {
-                                    biggestCosTheta = thisCosTheta;
-                                    *outHitPlane = thisHitPlane;
-                                    *outPenetrationDepth = thisPenetrationDepth;
-                                }
-                            }
-                        });
-
-                        if (*outPenetrationDepth != float.MinValue)
-                        {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                }
             }
 
             // Updating global basicData Buffer
@@ -504,7 +448,7 @@ namespace IDKEngine
 
             if (true)
             {
-                ModelLoader.Model sponza = ModelLoader.Load("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
+                ModelLoader.Model sponza = ModelLoader.GltfToEngineFormat("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
                 sponza.Meshes[63].EmissiveBias = 10.0f;
                 sponza.Meshes[70].EmissiveBias = 20.0f;
                 sponza.Meshes[3].EmissiveBias = 12.0f;
@@ -517,17 +461,17 @@ namespace IDKEngine
                 sponza.Meshes[46].SpecularBias = 1.0f;
                 sponza.Meshes[46].RoughnessBias = -0.436f;
 
-                ModelLoader.Model lucy = ModelLoader.Load("res/models/Lucy/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
+                ModelLoader.Model lucy = ModelLoader.GltfToEngineFormat("res/models/Lucy/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
                 lucy.Meshes[0].SpecularBias = -1.0f;
                 lucy.Meshes[0].RefractionChance = 0.98f;
                 lucy.Meshes[0].IOR = 1.174f;
                 lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
-                ModelLoader.Model helmet = ModelLoader.Load("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
+                ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
                 ModelSystem.Add(sponza, lucy, helmet);
 
-                //ModelLoader.Model test = ModelLoader.Load("C:\\Users\\Julian\\Downloads\\Models\\Temple\\Temple.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
+                //ModelLoader.Model test = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\Temple\\Temple.gltf", Matrix4.CreateScale(0.25f));
                 //ModelSystem.Add(test);
 
                 LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
@@ -561,7 +505,7 @@ namespace IDKEngine
             }
             else
             {
-                ModelLoader.Model a = ModelLoader.Load(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
+                ModelLoader.Model a = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
                 a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 a.MeshInstances[271].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
@@ -591,9 +535,9 @@ namespace IDKEngine
                 a.Meshes[324].EmissiveBias = 20.0f;
                 a.Meshes[376].EmissiveBias = 20.0f;
                 a.Meshes[379].EmissiveBias = 20.0f;
-                ModelLoader.Model b = ModelLoader.Load(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-                ModelLoader.Model c = ModelLoader.Load(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                ModelLoader.Model d = ModelLoader.Load(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
+                ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+                ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
 
                 ModelSystem.Add(a, b, c, d);
@@ -638,6 +582,62 @@ namespace IDKEngine
         protected override void OnKeyPress(char key)
         {
             gui.Backend.PressChar(key);
+        }
+
+        // We need to use raw pointers here instead of ref & out, because
+        // "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
+        private static unsafe bool CollisionRoutine(ModelSystem modelSystem, in CameraCollisionDetection settings, in Vector3 newPos, Sphere* previousPos, Plane* outHitPlane, float* outPenetrationDepth)
+        {
+            *outPenetrationDepth = float.MinValue;
+            *outHitPlane = new Plane();
+
+            Vector3 cameraStepSize = (newPos - previousPos->Center) / settings.TestSteps;
+            for (int i = 1; i <= settings.TestSteps; i++)
+            {
+                previousPos->Center += cameraStepSize;
+                Box playerBox = new Box(previousPos->Center - new Vector3(previousPos->Radius), previousPos->Center + new Vector3(previousPos->Radius));
+
+                float biggestCosTheta = 0.0f;
+                modelSystem.BVH.Intersect(playerBox, (in BVH.PrimitiveHitInfo hitInfo) =>
+                {
+                    Triangle triangle = new Triangle(
+                        modelSystem.VertexPositions[hitInfo.TriangleIndices.X],
+                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Y],
+                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Z]
+                    );
+                    Matrix4 modelMatrix = modelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
+                    Triangle worldSpaceTri = Triangle.Transformed(triangle, modelMatrix);
+
+                    Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, previousPos->Center);
+                    float distance = Vector3.Distance(closestPointOnTri, previousPos->Center);
+                    float thisPenetrationDepth = previousPos->Radius - distance;
+                    if (thisPenetrationDepth > 0.0f)
+                    {
+                        Plane thisHitPlane = new Plane(worldSpaceTri.Normal);
+
+                        Vector3 hitPointToCameraDir = (previousPos->Center - closestPointOnTri) / distance;
+                        float thisCosTheta = Vector3.Dot(thisHitPlane.Normal, hitPointToCameraDir);
+                        if (thisCosTheta < 0.0f)
+                        {
+                            thisHitPlane.Normal *= -1.0f;
+                        }
+
+                        if (MathF.Abs(thisCosTheta) > MathF.Abs(biggestCosTheta))
+                        {
+                            biggestCosTheta = thisCosTheta;
+                            *outHitPlane = thisHitPlane;
+                            *outPenetrationDepth = thisPenetrationDepth;
+                        }
+                    }
+                });
+
+                if (*outPenetrationDepth != float.MinValue)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

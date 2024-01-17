@@ -271,7 +271,8 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
             DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[parent.BlasIndex];
 
             uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-            Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+            Ray localRay = RayTransform(ray, invModelMatrix);
 
             if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
             {
@@ -319,7 +320,8 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
         DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
         
         uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-        Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+        mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+        Ray localRay = RayTransform(ray, invModelMatrix);
         if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
         {
             hitInfo.MeshID = i;
@@ -384,7 +386,8 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
             DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[parent.BlasIndex];
 
             uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-            Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+            Ray localRay = RayTransform(ray, invModelMatrix);
 
             if (IntersectBlasAny(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
             {
@@ -435,7 +438,8 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
         DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
         
         uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-        Ray localRay = RayTransform(ray, meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+        mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+        Ray localRay = RayTransform(ray, invModelMatrix);
         if (IntersectBlasAny(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
         {
             hitInfo.MeshID = i;

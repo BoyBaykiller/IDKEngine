@@ -10,7 +10,7 @@ Feature list:
  - Ray Traced Shadows
  - Variable Rate Shading
  - Ray marched Volumetric Lighting
- - GPU Frustum Culling
+ - GPU Frustum + Hi-Z Culling
  - Screen Space Reflections
  - Screen Space Ambient Occlusion
  - Atmospheric Scattering
