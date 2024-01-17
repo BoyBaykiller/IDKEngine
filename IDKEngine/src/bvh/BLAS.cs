@@ -52,12 +52,12 @@ namespace IDKEngine
                 TriangleIndices[i].Y = (uint)geometryInfo.BaseVertex + vertexIndices[geometryInfo.FirstIndex + (i * 3) + 1];
                 TriangleIndices[i].Z = (uint)geometryInfo.BaseVertex + vertexIndices[geometryInfo.FirstIndex + (i * 3) + 2];
             }
-
-            Nodes = new GpuBlasNode[Math.Max(2 * TriangleCount - 1, 3)];
         }
 
         public void Build()
         {
+            Nodes = new GpuBlasNode[Math.Max(2 * TriangleCount - 1, 3)];
+
             uint parentNodeId = 0;
             nodesUsed = parentNodeId;
 

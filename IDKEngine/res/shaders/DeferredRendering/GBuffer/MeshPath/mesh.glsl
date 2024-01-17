@@ -25,9 +25,9 @@ struct DrawElementsCmd
 
 struct MeshInstance
 {
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
+    mat4x3 ModelMatrix;
+    mat4x3 InvModelMatrix;
+    mat4x3 PrevModelMatrix;
 };
 
 struct Vertex
@@ -51,7 +51,7 @@ layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
     DrawElementsCmd DrawCommands[];
 } drawElementsCmdSSBO;
 
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
@@ -145,16 +145,19 @@ void main()
 
         outData[meshletVertexID].TexCoord = meshVertex.TexCoord;
 
+        vec3 position = vec3(vertexPosition.x, vertexPosition.y, vertexPosition.z);
         vec3 normal = DecompressSR11G11B10(meshVertex.Normal);
         vec3 tangent = DecompressSR11G11B10(meshVertex.Tangent);
-        vec3 position = vec3(vertexPosition.x, vertexPosition.y, vertexPosition.z);
+        mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+        mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
+        mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
 
-        mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+        mat3 unitVecToWorld = mat3(transpose(invModelMatrix));
         outData[meshletVertexID].Normal = normalize(unitVecToWorld * normal);
         outData[meshletVertexID].Tangent = normalize(unitVecToWorld * tangent);
+        outData[meshletVertexID].PrevClipPos = basicDataUBO.PrevProjView * prevModelMatrix * vec4(position, 1.0);
 
-        vec4 clipPos = basicDataUBO.ProjView * meshInstance.ModelMatrix * vec4(position, 1.0);
-        outData[meshletVertexID].PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(position, 1.0);
+        vec4 clipPos = basicDataUBO.ProjView * modelMatrix * vec4(position, 1.0);
 
         // Add jitter independent of perspective by multiplying with w
         vec4 jitteredClipPos = clipPos;

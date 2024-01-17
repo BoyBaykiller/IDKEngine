@@ -33,9 +33,9 @@ struct Mesh
 
 struct MeshInstance
 {
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
+    mat4x3 ModelMatrix;
+    mat4x3 InvModelMatrix;
+    mat4x3 PrevModelMatrix;
 };
 
 struct BlasNode
@@ -62,7 +62,7 @@ layout(std430, binding = 1) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
@@ -117,25 +117,32 @@ void main()
 
     const uint glInstanceID = 0; // TODO: Derive from built in variables
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance + glInstanceID];
+    
+    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+    mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
 
     bool isVisible = true;
 
     Box meshLocalBounds = Box(node.Min, node.Max);
 
-    Frustum frustum = GetFrustum(basicDataUBO.ProjView * meshInstance.ModelMatrix);
+    Frustum frustum = GetFrustum(basicDataUBO.ProjView * modelMatrix);
     isVisible = FrustumBoxIntersect(frustum, meshLocalBounds);
 
     // Occlusion cull
     const bool doHiZCulling = false;
     bool vertexBehindFrustum;
-    Box meshletOldNdcBounds = BoxTransformPerspective(meshLocalBounds, basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix, vertexBehindFrustum);
+    Box meshletOldNdcBounds = BoxTransformPerspective(meshLocalBounds, basicDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
     if (isVisible && !vertexBehindFrustum && doHiZCulling)
     {
         isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
     }
-    
+
+    // isVisible = true;
+
+    // For vertex rendering path
     drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = isVisible ? 1 : 0;
     
+    // For mesh shader rendering path
     uint meshletCount = meshSSBO.Meshes[meshIndex].MeshletCount;
     const uint taskShaderWorkGroupSize = 32;
     uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;

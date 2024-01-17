@@ -26,9 +26,9 @@ struct Mesh
 
 struct MeshInstance
 {
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
+    mat4x3 ModelMatrix;
+    mat4x3 InvModelMatrix;
+    mat4x3 PrevModelMatrix;
 };
 
 layout(std430, binding = 1) restrict readonly buffer MeshSSBO
@@ -36,7 +36,7 @@ layout(std430, binding = 1) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
@@ -86,11 +86,14 @@ void main()
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
 
-    outData.FragPos = (meshInstance.ModelMatrix * vec4(Position, 1.0)).xyz;
+    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+    mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
+
+    outData.FragPos = (modelMatrix * vec4(Position, 1.0)).xyz;
 
     vec3 normal = DecompressSR11G11B10(Normal);
 
-    mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+    mat3 unitVecToWorld = mat3(transpose(invModelMatrix));
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.TexCoord = TexCoord;
 

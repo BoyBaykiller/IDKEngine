@@ -118,12 +118,12 @@ namespace IDKEngine
             public int LocalIndicesLength;
         }
 
-        public static Model Load(string path)
+        public static Model GltfToEngineFormat(string path)
         {
-            return Load(path, Matrix4.Identity);
+            return GltfToEngineFormat(path, Matrix4.Identity);
         }
 
-        public static Model Load(string path, Matrix4 rootTransform)
+        public static Model GltfToEngineFormat(string path, Matrix4 rootTransform)
         {
             if (!File.Exists(path))
             {

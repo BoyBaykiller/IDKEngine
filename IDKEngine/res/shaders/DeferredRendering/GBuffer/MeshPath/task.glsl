@@ -37,9 +37,9 @@ struct Mesh
 
 struct MeshInstance
 {
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
+    mat4x3 ModelMatrix;
+    mat4x3 InvModelMatrix;
+    mat4x3 PrevModelMatrix;
 };
 
 struct Meshlet
@@ -70,7 +70,7 @@ layout(std430, binding = 1) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
@@ -136,6 +136,9 @@ void main()
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance];
     MeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
+
+    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+    mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
     
     bool isVisible = true;
 
@@ -144,7 +147,7 @@ void main()
     // // Subpixel culling
     // {
     //     bool vertexBehindFrustum;
-    //     Box meshletNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.ProjView * meshInstance.ModelMatrix, vertexBehindFrustum);
+    //     Box meshletNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.ProjView * modelMatrix, vertexBehindFrustum);
     //     vec2 renderSize = textureSize(gBufferDataUBO.AlbedoAlpha, 0);
     //     vec3 uvMin = vec3(meshletNdcBounds.Min.xy * 0.5 + 0.5, meshletNdcBounds.Min.z);
     //     vec3 uvMax = vec3(meshletNdcBounds.Max.xy * 0.5 + 0.5, meshletNdcBounds.Max.z);
@@ -158,13 +161,13 @@ void main()
     // Frustum Culling
     if (isVisible)
     {
-        Frustum frustum = GetFrustum(basicDataUBO.ProjView * meshInstance.ModelMatrix);
+        Frustum frustum = GetFrustum(basicDataUBO.ProjView * modelMatrix);
         isVisible = FrustumBoxIntersect(frustum, meshletLocalBounds);
     }
 
     // Hi-Z Occlusion Culling
     bool vertexBehindFrustum;
-    Box meshletOldNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix, vertexBehindFrustum);
+    Box meshletOldNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
     if (isVisible && !vertexBehindFrustum)
     {
         isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);

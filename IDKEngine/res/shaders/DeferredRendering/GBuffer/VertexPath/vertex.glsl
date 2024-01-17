@@ -12,12 +12,12 @@ layout(location = 3) in uint Normal;
 
 struct MeshInstance
 {
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
+    mat4x3 ModelMatrix;
+    mat4x3 InvModelMatrix;
+    mat4x3 PrevModelMatrix;
 };
 
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
@@ -63,31 +63,23 @@ void main()
     
     vec3 normal = DecompressSR11G11B10(Normal);
     vec3 tangent = DecompressSR11G11B10(Tangent);
+    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+    mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
+    mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
 
-    mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+    mat3 unitVecToWorld = mat3(transpose(invModelMatrix));
 
     outData.Normal = unitVecToWorld * normal;
     outData.Tangent = unitVecToWorld * tangent;
     outData.TexCoord = TexCoord;
-    
-    vec4 clipPos = basicDataUBO.ProjView * meshInstance.ModelMatrix * vec4(Position, 1.0);
-    outData.PrevClipPos = basicDataUBO.PrevProjView * meshInstance.PrevModelMatrix * vec4(Position, 1.0);
-    
+    outData.PrevClipPos = basicDataUBO.PrevProjView * prevModelMatrix * vec4(Position, 1.0);
     outData.MeshID = gl_DrawID;
+    
+    vec4 clipPos = basicDataUBO.ProjView * modelMatrix * vec4(Position, 1.0);
 
     // Add jitter independent of perspective by multiplying with w
     vec4 jitteredClipPos = clipPos;
     jitteredClipPos.xy += taaDataUBO.Jitter * jitteredClipPos.w;
-
-    // if (gl_DrawID == 67)
-    // {
-    //     uint ass = 0;
-    //     for (int i = 0; i < 500000; i++)
-    //     {
-    //         ass += i;
-    //     }
-    //     jitteredClipPos.x += ass / 1000000000000.0; 
-    // }
     
     gl_Position = jitteredClipPos;
 }

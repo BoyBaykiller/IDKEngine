@@ -28,7 +28,8 @@ namespace IDKEngine
             public int InstanceID;
         }
 
-        public readonly TLAS Tlas;
+        public TLAS Tlas { get; private set; }
+        private BLAS[] blases;
 
         private readonly BufferObject blasBuffer;
         private readonly BufferObject blasTriangleIndicesBuffer;
@@ -44,7 +45,7 @@ namespace IDKEngine
             tlasBuffer = new BufferObject();
             tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
-            Tlas = new TLAS();
+            blases = Array.Empty<BLAS>();
         }
 
         public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMax = float.MaxValue)
@@ -120,24 +121,19 @@ namespace IDKEngine
         /// <param name="meshInstances"></param>
         /// <param name="newMeshesDrawCommands"></param>
         /// <param name="vertexPositions"></param>
-        /// <param name="indices"></param>
-        public void AddMeshesAndBuild(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] indices)
+        /// <param name="vertexIndices"></param>
+        public void AddMeshesAndBuild(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] vertexIndices)
         {
-            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
-            BLAS[] newBlasInstances = CreateBlasesFromGeometry(newMeshesDrawCommands, vertexPositions, indices);
+            BLAS[] newBlases = new BLAS[newMeshesDrawCommands.Length];
+            for (int i = 0; i < newBlases.Length; i++)
+            {
+                newBlases[i] = new BLAS(vertexPositions, vertexIndices, newMeshesDrawCommands.Span[i]);
+            }
+            Helper.ArrayAdd(ref blases, newBlases);
+            BlasesBuild(blases.Length - newBlases.Length, newBlases.Length);
 
-            AddBlases(newBlasInstances, drawCommands, meshInstances);
-            Logger.Log(Logger.LogLevel.Info, $"Created {newBlasInstances.Length} new Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
-
-            sw.Restart();
+            Tlas = new TLAS(blases, drawCommands, meshInstances);
             TlasBuild();
-            Logger.Log(Logger.LogLevel.Info, $"Created Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
-        }
-
-        private void AddBlases(BLAS[] newBlases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
-        {
-            Tlas.AddBlases(newBlases, drawCommands, meshInstances);
-            SetBlasBuffersContent();
         }
 
         public void TlasBuild()
@@ -146,6 +142,23 @@ namespace IDKEngine
             SetTlasBufferContent(Tlas.Nodes);
         }
 
+        public void BlasesBuild()
+        {
+            BlasesBuild(0, blases.Length);
+        }
+
+        public void BlasesBuild(int start, int count)
+        {
+            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+            
+            Parallel.For(start, start + count, i =>
+            {
+                blases[i].Build();
+            });
+            SetBlasBuffersContent();
+
+            Logger.Log(Logger.LogLevel.Info, $"Created {blases.Length} new Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
+        }
 
         private unsafe void SetBlasBuffersContent()
         {
@@ -154,9 +167,9 @@ namespace IDKEngine
 
             nint uploadedBlasNodesCount = 0;
             nint uploadedTriangleIndicesCount = 0;
-            for (int i = 0; i < Tlas.Blases.Length; i++)
+            for (int i = 0; i < blases.Length; i++)
             {
-                BLAS blas = Tlas.Blases[i];
+                BLAS blas = blases[i];
 
                 blasBuffer.SubData(uploadedBlasNodesCount * sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
                 blasTriangleIndicesBuffer.SubData(uploadedTriangleIndicesCount * sizeof(BLAS.IndicesTriplet), blas.TriangleIndices.Length * (nint)sizeof(BLAS.IndicesTriplet), blas.TriangleIndices);
@@ -172,36 +185,18 @@ namespace IDKEngine
 
         public int GetBlasesTriangleIndicesCount()
         {
-            return Tlas.Blases.Sum(blasInstances => blasInstances.TriangleIndices.Length);
+            return blases.Sum(blasInstances => blasInstances.TriangleIndices.Length);
         }
 
         public int GetBlasesNodeCount()
         {
-            return Tlas.Blases.Sum(blas => blas.Nodes.Length);
+            return blases.Sum(blas => blas.Nodes.Length);
         }
 
         public void Dispose()
         {
             blasTriangleIndicesBuffer.Dispose();
             blasBuffer.Dispose();
-        }
-
-        private static BLAS[] CreateBlasesFromGeometry(ReadOnlyMemory<GpuDrawElementsCmd> drawCommands, Vector3[] vertexPositions, uint[] vertexIndices)
-        {
-            BLAS[] blases = new BLAS[drawCommands.Length];
-
-            Parallel.For(0, blases.Length, i =>
-            //for (int i = 0; i < blases.Length; i++)
-            {
-                ref readonly GpuDrawElementsCmd geometryInfo = ref drawCommands.Span[i];
-
-                BLAS blas = new BLAS(vertexPositions, vertexIndices, geometryInfo);
-                blas.Build();
-
-                blases[i] = blas;
-            });
-
-            return blases;
         }
     }
 }

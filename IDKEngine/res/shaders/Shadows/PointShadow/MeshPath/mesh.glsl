@@ -25,9 +25,9 @@ struct DrawElementsCmd
 
 struct MeshInstance
 {
-    mat4 ModelMatrix;
-    mat4 InvModelMatrix;
-    mat4 PrevModelMatrix;
+    mat4x3 ModelMatrix;
+    mat4x3 InvModelMatrix;
+    mat4x3 PrevModelMatrix;
 };
 
 struct Meshlet
@@ -58,7 +58,7 @@ layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
     DrawElementsCmd DrawCommands[];
 } drawElementsCmdSSBO;
 
-layout(std430, binding = 2) restrict readonly buffer MeshInstanceSSBO
+layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
@@ -119,8 +119,8 @@ void main()
         PackedVec3 vertexPosition = vertexPositionsSSBO.VertexPositions[globalVertexID];
         vec3 position = vec3(vertexPosition.x, vertexPosition.y, vertexPosition.z);
 
-        mat4 model = meshInstance.ModelMatrix;
-        vec3 fragPos = vec3(model * vec4(position, 1.0));
+        mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+        vec3 fragPos = vec3(modelMatrix * vec4(position, 1.0));
         vec4 clipPos = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex] * vec4(fragPos, 1.0);
 
         gl_MeshVerticesNV[meshletVertexID].gl_Position = clipPos;
