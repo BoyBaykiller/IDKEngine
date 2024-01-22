@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using IDKEngine.Shapes;
+using IDKEngine.GpuTypes;
 
 namespace IDKEngine
 {
@@ -38,7 +39,7 @@ namespace IDKEngine
                     for (int j = 0; j < cmd.InstanceCount; j++)
                     {
                         GpuTlasNode newNode;
-                        Box worldSpaceBounds = Box.Transformed(GpuTypes.Conversions.ToBox(blas.Root), MeshInstances[cmd.BaseInstance + j].ModelMatrix);
+                        Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), MeshInstances[cmd.BaseInstance + j].ModelMatrix);
                         newNode.Min = worldSpaceBounds.Min;
                         newNode.Max = worldSpaceBounds.Max;
                         newNode.LeftChild = 0;
@@ -53,7 +54,6 @@ namespace IDKEngine
             // Build TLAS from generated child nodes.
             // Technique: Every two nodes with the lowest combined area form a parent node.
             //            Apply this scheme recursivly until only a single root node encompassing the entire scene is left.          
-            //            This exact implementation doesnt run in optimal time complexity but can still be considered real time.    
             {
                 int candidatesSearchCount = MeshInstances.Length;
                 int candidatesSearchCountBackup = candidatesSearchCount;
@@ -75,7 +75,7 @@ namespace IDKEngine
                         ref readonly GpuTlasNode nodeB = ref Nodes[nodeBId];
                         ref readonly GpuTlasNode nodeA = ref Nodes[nodeAId];
 
-                        Box boundsFittingChildren = GpuTypes.Conversions.ToBox(nodeA);
+                        Box boundsFittingChildren = Conversions.ToBox(nodeA);
                         boundsFittingChildren.GrowToFit(nodeB.Min);
                         boundsFittingChildren.GrowToFit(nodeB.Max);
 
@@ -118,7 +118,7 @@ namespace IDKEngine
 
                 ref readonly GpuTlasNode otherNode = ref Nodes[i];
 
-                Box fittingBox = GpuTypes.Conversions.ToBox(node);
+                Box fittingBox = Conversions.ToBox(node);
                 fittingBox.GrowToFit(otherNode.Min);
                 fittingBox.GrowToFit(otherNode.Max);
 
@@ -170,8 +170,8 @@ namespace IDKEngine
                 uint rightChild = leftChild + 1;
                 ref readonly GpuTlasNode leftNode = ref Nodes[leftChild];
                 ref readonly GpuTlasNode rightNode = ref Nodes[rightChild];
-                bool leftChildHit = Intersections.RayVsBox(ray, GpuTypes.Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
-                bool rightChildHit = Intersections.RayVsBox(ray, GpuTypes.Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
+                bool leftChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
+                bool rightChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
 
                 if (leftChildHit || rightChildHit)
                 {

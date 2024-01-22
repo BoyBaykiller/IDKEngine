@@ -38,6 +38,12 @@ namespace IDKEngine
             return extends.X * extends.Y * extends.X;
         }
 
+        public static Vector3 PolarToCartesian(float elevation, float azimuth)
+        {
+            Vector3 pos = new Vector3(MathF.Sin(elevation) * MathF.Cos(azimuth), MathF.Cos(elevation), MathF.Sin(elevation) * MathF.Sin(azimuth));
+            return pos;
+        }
+
         public static Vector3 Lerp(Vector3 x, Vector3 y, float a)
         {
             float xC = MathHelper.Lerp(x.X, y.X, a);

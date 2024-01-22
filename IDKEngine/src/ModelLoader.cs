@@ -7,18 +7,23 @@ using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
-using glTFLoader;
-using glTFLoader.Schema;
+using SharpGLTF.Schema2;
+using SharpGLTF.Materials;
 using Meshoptimizer;
-using IDKEngine.Shapes;
 using IDKEngine.Render.Objects;
+using IDKEngine.Shapes;
+using IDKEngine.GpuTypes;
 using GLTexture = IDKEngine.Render.Objects.Texture;
-using GltfTexture = glTFLoader.Schema.Texture;
+using GltfTexture = SharpGLTF.Schema2.Texture;
+using GltfTextureWrapMode = SharpGLTF.Schema2.TextureWrapMode;
 
 namespace IDKEngine
 {
     public static class ModelLoader
     {
+        // TODO: KHR_materials_transmission almost done, still needs texture support
+        public static readonly string[] SupportedExtensions = new string[] { "KHR_materials_emissive_strength", "KHR_materials_volume", "KHR_materials_ior" };
+
         public struct Model
         {
             public GpuDrawElementsCmd[] DrawCommands;
@@ -44,30 +49,39 @@ namespace IDKEngine
         private struct GpuTextureLoadData
         {
             public ImageResult Image;
-            public Sampler Sampler;
+            public TextureMipMapFilter MinFilter;
+            public TextureInterpolationFilter MagFilter;
+            public GltfTextureWrapMode WrapS;
+            public GltfTextureWrapMode WrapT;
             public SizedInternalFormat InternalFormat;
         }
         private struct MaterialDetails
         {
             public Vector3 EmissiveFactor;
             public uint BaseColorFactor;
-            public float MetallicFactor;
-            public float RoughnessFactor;
+            public float TransmissionFactor;
             public float AlphaCutoff;
+            public float RoughnessFactor;
+            public float MetallicFactor;
+            public Vector3 Absorbance;
+            public float IOR;
 
             public static readonly MaterialDetails Default = new MaterialDetails()
             {
                 EmissiveFactor = new Vector3(0.0f),
                 BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(1.0f)),
-                MetallicFactor = 1.0f,
-                RoughnessFactor = 1.0f,
+                TransmissionFactor = 0.0f,
                 AlphaCutoff = 0.5f,
+                RoughnessFactor = 1.0f,
+                MetallicFactor = 1.0f,
+                Absorbance = new Vector3(0.0f),
+                IOR = 1.0f, // by spec 1.5 IOR would be correct
             };
         }
         private struct GpuMaterialLoadData
         {
             public const int TEXTURE_COUNT = 4;
-            
+
             public enum TextureType : int
             {
                 BaseColor,
@@ -137,12 +151,24 @@ namespace IDKEngine
             return model;
         }
 
-        private static Model LoadFromFile(string path, Matrix4 rootTransform)
+        public static Model LoadFromFile(string path, Matrix4 rootTransform)
         {
-            Gltf gltfFile = Interface.LoadModel(path);
-            string rootDir = Path.GetDirectoryName(path);
+            ModelRoot gltfFile = ModelRoot.Load(path);
 
-            GpuMaterialLoadData[] gpuMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfFile, rootDir);
+            string gltfFilePathName = Path.GetFileName(path);
+            foreach (string ext in gltfFile.ExtensionsUsed)
+            {
+                if (SupportedExtensions.Contains(ext))
+                {
+                    Logger.Log(Logger.LogLevel.Info, $"Model {gltfFilePathName} uses extension {ext}");
+                }
+                else
+                {
+                    Logger.Log(Logger.LogLevel.Warn, $"Model {gltfFilePathName} uses extension {ext} which is not supported");
+                }
+            }
+            
+            GpuMaterialLoadData[] gpuMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfFile);
             List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(gpuMaterialsLoadData));
             List<GpuMesh> listMeshes = new List<GpuMesh>();
             List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
@@ -157,122 +183,117 @@ namespace IDKEngine
             List<byte> listMeshletsLocalIndices = new List<byte>();
 
             Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
-
-            // Push all root nodes (of first scene only)
-            for (int i = 0; i < gltfFile.Scenes[0].Nodes.Length; i++)
+            foreach (Node node in gltfFile.DefaultScene.VisualChildren)
             {
-                Node rootNode = gltfFile.Nodes[gltfFile.Scenes[0].Nodes[i]];
-                nodeStack.Push((rootNode, rootTransform));
+                nodeStack.Push((node, rootTransform));
             }
 
             while (nodeStack.Count > 0)
             {
                 (Node node, Matrix4 globalParentTransform) = nodeStack.Pop();
-                Matrix4 localTransform = GetNodeTransform(node);
+
+                Matrix4 localTransform = node.LocalMatrix.ToOpenTK();
                 Matrix4 globalTransform = localTransform * globalParentTransform;
 
-                if (node.Children != null)
+                foreach (Node child in node.VisualChildren)
                 {
-                    for (int i = 0; i < node.Children.Length; i++)
-                    {
-                        Node childNode = gltfFile.Nodes[node.Children[i]];
-                        nodeStack.Push((childNode, globalTransform));
-                    }
+                    nodeStack.Push((child, globalTransform));
+                }
+
+                Mesh gltfMesh = node.Mesh;
+                if (gltfMesh == null)
+                {
+                    continue;
                 }
                 
-                if (node.Mesh.HasValue)
+                for (int i = 0; i < gltfMesh.Primitives.Count; i++)
                 {
-                    Mesh gltfMesh = gltfFile.Meshes[node.Mesh.Value];
-                    for (int i = 0; i < gltfMesh.Primitives.Length; i++)
+                    MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
+
+                    (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfMeshPrimitive);
+                    uint[] meshIndices = LoadGpuIndexData(gltfMeshPrimitive);
+
+                    RunMeshOptimizations(ref meshVertices, ref meshVertexPositions, meshIndices);
+                    MeshMeshletsData meshMeshletsData = GenerateMeshMeshletData(meshVertexPositions, meshIndices);
+
+                    GpuMeshlet[] meshMeshlets = new GpuMeshlet[meshMeshletsData.MeshletsLength];
+                    GpuMeshletInfo[] meshMeshletsInfo = new GpuMeshletInfo[meshMeshlets.Length];
+                    for (int j = 0; j < meshMeshlets.Length; j++)
                     {
-                        MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
+                        ref GpuMeshlet myMeshlet = ref meshMeshlets[j];
+                        ref readonly Meshopt.Meshlet meshOptMeshlet = ref meshMeshletsData.Meshlets[j];
 
-                        (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfFile, gltfMeshPrimitive, rootDir);
-                        uint[] meshIndices = LoadGpuIndexData(gltfFile, gltfMeshPrimitive, rootDir);
+                        myMeshlet.VertexOffset = meshOptMeshlet.VertexOffset;
+                        myMeshlet.VertexCount = (byte)meshOptMeshlet.VertexCount;
+                        myMeshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
+                        myMeshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
 
-                        RunMeshOptimizations(ref meshVertices, ref meshVertexPositions, meshIndices);
-                        MeshMeshletsData meshMeshletsData = GenerateMeshMeshletData(meshVertexPositions, meshIndices);
-
-                        GpuMeshlet[] meshMeshlets = new GpuMeshlet[meshMeshletsData.MeshletsLength];
-                        GpuMeshletInfo[] meshMeshletsInfo = new GpuMeshletInfo[meshMeshlets.Length];
-                        for (int j = 0; j < meshMeshlets.Length; j++)
+                        Box meshletBoundingBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+                        for (int k = 0; k < myMeshlet.VertexCount; k++)
                         {
-                            ref GpuMeshlet myMeshlet = ref meshMeshlets[j];
-                            ref readonly Meshopt.Meshlet meshOptMeshlet = ref meshMeshletsData.Meshlets[j];
-
-                            myMeshlet.VertexOffset = meshOptMeshlet.VertexOffset;
-                            myMeshlet.VertexCount = (byte)meshOptMeshlet.VertexCount;
-                            myMeshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
-                            myMeshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
-
-                            Box meshletBoundingBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-                            for (int k = 0; k < myMeshlet.VertexCount; k++)
-                            {
-                                uint vertexIndex = meshMeshletsData.VertexIndices[myMeshlet.VertexOffset + k];
-                                Vector3 pos = meshVertexPositions[vertexIndex];
-                                meshletBoundingBox.GrowToFit(pos);
-                            }
-                            meshMeshletsInfo[j].Min = meshletBoundingBox.Min;
-                            meshMeshletsInfo[j].Max = meshletBoundingBox.Max;
-
-                            // Adjust offsets in context of all meshes
-                            myMeshlet.VertexOffset += (uint)listMeshletsVertexIndices.Count;
-                            myMeshlet.IndicesOffset += (uint)listMeshletsLocalIndices.Count;
+                            uint vertexIndex = meshMeshletsData.VertexIndices[myMeshlet.VertexOffset + k];
+                            Vector3 pos = meshVertexPositions[vertexIndex];
+                            meshletBoundingBox.GrowToFit(pos);
                         }
+                        meshMeshletsInfo[j].Min = meshletBoundingBox.Min;
+                        meshMeshletsInfo[j].Max = meshletBoundingBox.Max;
 
-                        GpuMesh mesh = new GpuMesh();
-                        mesh.EmissiveBias = 0.0f;
-                        mesh.SpecularBias = 0.0f;
-                        mesh.RoughnessBias = 0.0f;
-                        mesh.RefractionChance = 0.0f;
-                        mesh.MeshletsStart = listMeshlets.Count;
-                        mesh.MeshletCount = meshMeshlets.Length;
-                        mesh.IOR = 1.0f;
-                        mesh.Absorbance = new Vector3(0.0f);
-                        if (gltfMeshPrimitive.Material.HasValue)
-                        {
-                            bool hasNormalMap = gpuMaterialsLoadData[gltfMeshPrimitive.Material.Value].NormalTexture.Image != null;
-                            mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
-                            mesh.MaterialIndex = gltfMeshPrimitive.Material.Value;
-                        }
-                        else
-                        {
-                            GpuMaterial defaultGpuMaterial = LoadGpuMaterials(new GpuMaterialLoadData[] { GpuMaterialLoadData.Default })[0];
-                            listMaterials.Add(defaultGpuMaterial);
-
-                            mesh.NormalMapStrength = 0.0f;
-                            mesh.MaterialIndex = listMaterials.Count - 1;
-                        }
-
-                        GpuMeshInstance meshInstance = new GpuMeshInstance();
-                        meshInstance.ModelMatrix = globalTransform;
-
-                        GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
-                        drawCmd.IndexCount = meshIndices.Length;
-                        drawCmd.InstanceCount = 1;
-                        drawCmd.FirstIndex = listIndices.Count;
-                        drawCmd.BaseVertex = listVertices.Count;
-                        drawCmd.BaseInstance = listDrawCommands.Count;
-
-                        GpuMeshletTaskCmd meshTaskCmd = new GpuMeshletTaskCmd();
-                        meshTaskCmd.First = 0; // listMeshlets.Count
-                        meshTaskCmd.Count = (int)MathF.Ceiling(meshMeshletsData.Meshlets.Length / 32.0f); // divide by task shader work group size
-
-                        listVertices.AddRange(meshVertices);
-                        listVertexPositions.AddRange(meshVertexPositions);
-                        listIndices.AddRange(meshIndices);
-                        listMeshes.Add(mesh);
-                        listMeshInstances.Add(meshInstance);
-                        listDrawCommands.Add(drawCmd);
-                        listMeshlets.AddRange(meshMeshlets);
-                        listMeshletsInfo.AddRange(meshMeshletsInfo);
-                        listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshMeshletsData.VertexIndices, 0, meshMeshletsData.VertexIndicesLength));
-                        listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshMeshletsData.LocalIndices, 0, meshMeshletsData.LocalIndicesLength));
-                        listMeshTasksCmd.Add(meshTaskCmd);
+                        // Adjust offsets in context of all meshes
+                        myMeshlet.VertexOffset += (uint)listMeshletsVertexIndices.Count;
+                        myMeshlet.IndicesOffset += (uint)listMeshletsLocalIndices.Count;
                     }
+
+                    GpuMesh mesh = new GpuMesh();
+                    mesh.EmissiveBias = 0.0f;
+                    mesh.SpecularBias = 0.0f;
+                    mesh.RoughnessBias = 0.0f;
+                    mesh.TransmissionBias = 0.0f;
+                    mesh.MeshletsStart = listMeshlets.Count;
+                    mesh.MeshletCount = meshMeshlets.Length;
+                    mesh.IORBias = 0.0f;
+                    mesh.AbsorbanceBias = new Vector3(0.0f);
+                    if (gltfMeshPrimitive.Material != null)
+                    {
+                        bool hasNormalMap = gpuMaterialsLoadData[gltfMeshPrimitive.Material.LogicalIndex].NormalTexture.Image != null;
+                        mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
+                        mesh.MaterialIndex = gltfMeshPrimitive.Material.LogicalIndex;
+                    }
+                    else
+                    {
+                        GpuMaterial defaultGpuMaterial = LoadGpuMaterials(new GpuMaterialLoadData[] { GpuMaterialLoadData.Default })[0];
+                        listMaterials.Add(defaultGpuMaterial);
+
+                        mesh.NormalMapStrength = 0.0f;
+                        mesh.MaterialIndex = listMaterials.Count - 1;
+                    }
+
+                    GpuMeshInstance meshInstance = new GpuMeshInstance();
+                    meshInstance.ModelMatrix = globalTransform;
+
+                    GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
+                    drawCmd.IndexCount = meshIndices.Length;
+                    drawCmd.InstanceCount = 1;
+                    drawCmd.FirstIndex = listIndices.Count;
+                    drawCmd.BaseVertex = listVertices.Count;
+                    drawCmd.BaseInstance = listDrawCommands.Count;
+
+                    GpuMeshletTaskCmd meshTaskCmd = new GpuMeshletTaskCmd();
+                    meshTaskCmd.First = 0; // listMeshlets.Count
+                    meshTaskCmd.Count = (int)MathF.Ceiling(meshMeshletsData.Meshlets.Length / 32.0f); // divide by task shader work group size
+
+                    listVertices.AddRange(meshVertices);
+                    listVertexPositions.AddRange(meshVertexPositions);
+                    listIndices.AddRange(meshIndices);
+                    listMeshes.Add(mesh);
+                    listMeshInstances.Add(meshInstance);
+                    listDrawCommands.Add(drawCmd);
+                    listMeshlets.AddRange(meshMeshlets);
+                    listMeshletsInfo.AddRange(meshMeshletsInfo);
+                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshMeshletsData.VertexIndices, 0, meshMeshletsData.VertexIndicesLength));
+                    listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshMeshletsData.LocalIndices, 0, meshMeshletsData.LocalIndicesLength));
+                    listMeshTasksCmd.Add(meshTaskCmd);
                 }
             }
-
 
             Model model = new Model();
             model.Meshes = listMeshes.ToArray();
@@ -291,14 +312,9 @@ namespace IDKEngine
             return model;
         }
 
-        private static unsafe GpuMaterialLoadData[] GetGpuMaterialLoadDataFromGltf(Gltf gltf, string rootDir)
+        private static unsafe GpuMaterialLoadData[] GetGpuMaterialLoadDataFromGltf(ModelRoot gltf)
         {
-            if (gltf.Materials == null)
-            {
-                return Array.Empty<GpuMaterialLoadData>();
-            }
-
-            GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[gltf.Materials.Length];
+            GpuMaterialLoadData[] materialsLoadData = new GpuMaterialLoadData[gltf.LogicalMaterials.Count];
 
             //for (int i = 0; i < materialsLoadData.Length; i++)
             //{
@@ -311,218 +327,174 @@ namespace IDKEngine
                 int materialIndex = i / GpuMaterialLoadData.TEXTURE_COUNT;
                 GpuMaterialLoadData.TextureType textureType = (GpuMaterialLoadData.TextureType)(i % GpuMaterialLoadData.TEXTURE_COUNT);
 
-                Material material = gltf.Materials[materialIndex];
+                Material gltfMaterial = gltf.LogicalMaterials[materialIndex];
                 ref GpuMaterialLoadData materialData = ref materialsLoadData[materialIndex];
-                
+
                 // Let one thread load non image data
                 if (textureType == GpuMaterialLoadData.TextureType.BaseColor)
                 {
                     materialData.MaterialDetails = MaterialDetails.Default;
-                    materialData.MaterialDetails.AlphaCutoff = material.AlphaCutoff;
+                    materialData.MaterialDetails.AlphaCutoff = gltfMaterial.AlphaCutoff;
 
-                    if (material.EmissiveFactor != null)
+                    if (gltf.ExtensionsUsed.Contains("KHR_materials_ior"))
                     {
-                        materialData.MaterialDetails.EmissiveFactor = new Vector3(
-                            material.EmissiveFactor[0],
-                            material.EmissiveFactor[1],
-                            material.EmissiveFactor[2]);
+                        // We could set IOR either way but I don't like the default value of 1.5
+                        materialData.MaterialDetails.IOR = gltfMaterial.IndexOfRefraction;
                     }
-                    if (material.PbrMetallicRoughness != null)
+
+                    MaterialChannel? emissiveChannel = gltfMaterial.FindChannel(KnownChannel.Emissive.ToString());
+                    if (emissiveChannel.HasValue)
                     {
-                        if (material.PbrMetallicRoughness.BaseColorFactor != null)
+                        float emissiveStrength = 1.0f;
+                        foreach (IMaterialParameter param in emissiveChannel.Value.Parameters)
                         {
-                            materialData.MaterialDetails.BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(
-                                material.PbrMetallicRoughness.BaseColorFactor[0],
-                                material.PbrMetallicRoughness.BaseColorFactor[1],
-                                material.PbrMetallicRoughness.BaseColorFactor[2],
-                                material.PbrMetallicRoughness.BaseColorFactor[3]));
+                            if (param.Name == KnownProperty.EmissiveStrength.ToString())
+                            {
+                                emissiveStrength = (float)param.Value;
+                                break;
+                            }
                         }
 
-                        materialData.MaterialDetails.RoughnessFactor = material.PbrMetallicRoughness.RoughnessFactor;
-                        materialData.MaterialDetails.MetallicFactor = material.PbrMetallicRoughness.MetallicFactor;
+                        materialData.MaterialDetails.EmissiveFactor = emissiveChannel.Value.Color.ToOpenTK().Xyz * emissiveStrength;
+                    }
+
+                    MaterialChannel? metallicRoughnessChannel = gltfMaterial.FindChannel(KnownChannel.MetallicRoughness.ToString());
+                    if (metallicRoughnessChannel.HasValue)
+                    {
+                        float roughnessFactor = (float)metallicRoughnessChannel.Value.Parameters.First(x => x.Name == KnownProperty.RoughnessFactor.ToString()).Value;
+                        float metallicFactor = (float)metallicRoughnessChannel.Value.Parameters.First(x => x.Name == KnownProperty.MetallicFactor.ToString()).Value;
+                        materialData.MaterialDetails.RoughnessFactor = roughnessFactor;
+                        materialData.MaterialDetails.MetallicFactor = metallicFactor;
+                    }
+
+                    MaterialChannel? baseColorChannel = gltfMaterial.FindChannel(KnownChannel.BaseColor.ToString());
+                    if (baseColorChannel.HasValue)
+                    {
+                        Vector4 baseColor = baseColorChannel.Value.Color.ToOpenTK();
+                        materialData.MaterialDetails.BaseColorFactor = Helper.CompressUR8G8B8A8(baseColor);
+                    }
+
+                    MaterialChannel? transmissionChannel = gltfMaterial.FindChannel(KnownChannel.Transmission.ToString());
+                    if (transmissionChannel.HasValue)
+                    {
+                        foreach (IMaterialParameter param in transmissionChannel.Value.Parameters)
+                        {
+                            if (param.Name == KnownProperty.TransmissionFactor.ToString())
+                            {
+                                materialData.MaterialDetails.TransmissionFactor = (float)param.Value;
+                                break;
+                            }
+                        }
+                    }
+
+                    MaterialChannel? volumeAttenuationChannel = gltfMaterial.FindChannel(KnownChannel.VolumeAttenuation.ToString());
+                    if (volumeAttenuationChannel.HasValue)
+                    {
+                        float gltfAttenuationDistance = 100000.0f;
+                        Vector3 gltfAttenuationColor = new Vector3(1.0f);
+                        foreach (IMaterialParameter param in volumeAttenuationChannel.Value.Parameters)
+                        {
+                            if (param.Name == KnownProperty.RGB.ToString())
+                            {
+                                gltfAttenuationColor = ((System.Numerics.Vector3)param.Value).ToOpenTK();
+                            }
+                            if (param.Name == KnownProperty.AttenuationDistance.ToString())
+                            {
+                                // 0.0f is SharpGLTF's default
+                                if ((float)param.Value != 0.0f)
+                                {
+                                    gltfAttenuationDistance = (float)param.Value;
+                                }
+                            }
+                        }
+
+                        // Source: https://github.com/DassaultSystemes-Technology/dspbr-pt/blob/e7cfa6e9aab2b99065a90694e1f58564d675c1a4/packages/lib/shader/integrator/pt.glsl#L24
+                        // We can combine glTF Attenuation Color and Distance into a single Absorbance value
+                        float x = -MathF.Log(gltfAttenuationColor.X) / gltfAttenuationDistance;
+                        float y = -MathF.Log(gltfAttenuationColor.Y) / gltfAttenuationDistance;
+                        float z = -MathF.Log(gltfAttenuationColor.Z) / gltfAttenuationDistance;
+                        Vector3 absorbance = new Vector3(x, y, z);
+                        materialData.MaterialDetails.Absorbance = absorbance;
                     }
                 }
 
-                materialData[textureType] = GetGLTextureLoadData(material, textureType);
+                materialData[textureType] = GetGLTextureLoadData(gltfMaterial, textureType);
             });
 
-            GpuTextureLoadData GetGLTextureLoadData(Material material, GpuMaterialLoadData.TextureType textureType)
-            {
-                GpuTextureLoadData glTextureLoadData = new GpuTextureLoadData();
-                GltfTexture imageToLoad = null;
-                ColorComponents imageColorComponents = ColorComponents.RedGreenBlueAlpha;
-                {
-                    if (textureType == GpuMaterialLoadData.TextureType.BaseColor)
-                    {
-                        glTextureLoadData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
-                        //glTextureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
-                        imageColorComponents = ColorComponents.RedGreenBlueAlpha;
-
-                        TextureInfo textureInfo = null;
-                        MaterialPbrMetallicRoughness materialPbrMetallicRoughness = material.PbrMetallicRoughness;
-                        if (materialPbrMetallicRoughness != null) textureInfo = materialPbrMetallicRoughness.BaseColorTexture;
-                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
-                    }
-                    else if (textureType == GpuMaterialLoadData.TextureType.MetallicRoughness)
-                    {
-                        glTextureLoadData.InternalFormat = SizedInternalFormat.R11fG11fB10f;
-                        imageColorComponents = ColorComponents.RedGreenBlue;
-
-                        TextureInfo textureInfo = null;
-                        MaterialPbrMetallicRoughness materialPbrMetallicRoughness = material.PbrMetallicRoughness;
-                        if (materialPbrMetallicRoughness != null) textureInfo = materialPbrMetallicRoughness.MetallicRoughnessTexture;
-                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
-                    }
-                    else if (textureType == GpuMaterialLoadData.TextureType.Normal)
-                    {
-                        glTextureLoadData.InternalFormat = SizedInternalFormat.R11fG11fB10f;
-                        imageColorComponents = ColorComponents.RedGreenBlue;
-
-                        MaterialNormalTextureInfo textureInfo = material.NormalTexture;
-                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
-                    }
-                    else if (textureType == GpuMaterialLoadData.TextureType.Emissive)
-                    {
-                        glTextureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
-                        imageColorComponents = ColorComponents.RedGreenBlue;
-
-                        TextureInfo textureInfo = material.EmissiveTexture;
-                        if (textureInfo != null) imageToLoad = gltf.Textures[textureInfo.Index];
-                    }
-                }
-
-                {
-                    bool shouldReportMissingTexture = textureType == GpuMaterialLoadData.TextureType.BaseColor ||
-                                                      textureType == GpuMaterialLoadData.TextureType.MetallicRoughness ||
-                                                      textureType == GpuMaterialLoadData.TextureType.Normal;
-                    if (shouldReportMissingTexture && (imageToLoad == null || !imageToLoad.Source.HasValue))
-                    {
-                        Logger.Log(Logger.LogLevel.Warn, $"Material {material.Name} has no texture of type {textureType}");
-                    }
-                }
-
-                if (imageToLoad == null)
-                {
-                    return glTextureLoadData; 
-                }
-
-                if (imageToLoad.Source.HasValue)
-                {
-                    Image image = gltf.Images[imageToLoad.Source.Value];
-                    string imagePath = Path.Combine(rootDir, image.Uri);
-
-                    if (!File.Exists(imagePath))
-                    {
-                        Logger.Log(Logger.LogLevel.Error, $"Image \"{imagePath}\" is not found");
-                        return glTextureLoadData;
-                    }
-
-                    using FileStream stream = File.OpenRead(imagePath);
-                    glTextureLoadData.Image = ImageResult.FromStream(stream, imageColorComponents);
-                }
-                
-                if (imageToLoad.Sampler.HasValue)
-                {
-                    glTextureLoadData.Sampler = gltf.Samplers[imageToLoad.Sampler.Value];
-                }
-
-                return glTextureLoadData;
-            }
 
             return materialsLoadData;
         }
-
-        private static unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertexData(Gltf gltf, MeshPrimitive meshPrimitive, string rootDir)
+        private static GpuTextureLoadData GetGLTextureLoadData(Material material, GpuMaterialLoadData.TextureType textureType)
         {
-            const string GLTF_POSITION_ATTRIBUTE = "POSITION";
-            const string GLTF_NORMAL_ATTRIBUTE = "NORMAL";
-            const string GLTF_TEXCOORD_0_ATTRIBUTE = "TEXCOORD_0";
-
-            GpuVertex[] vertices = Array.Empty<GpuVertex>();
-            Vector3[] vertexPositions = Array.Empty<Vector3>();
-
-            Dictionary<string, int> myDict = meshPrimitive.Attributes;
-            for (int j = 0; j < myDict.Count; j++)
+            GpuTextureLoadData glTextureLoadData = new GpuTextureLoadData();
+            ColorComponents imageColorComponents = ColorComponents.Default;
+            MaterialChannel? materialChannel = null;
             {
-                KeyValuePair<string, int> item = myDict.ElementAt(j);
-
-                Accessor accessor = gltf.Accessors[item.Value];
-                BufferView bufferView = gltf.BufferViews[accessor.BufferView.Value];
-                glTFLoader.Schema.Buffer buffer = gltf.Buffers[bufferView.Buffer];
-
-                using FileStream fileStream = File.OpenRead(Path.Combine(rootDir, buffer.Uri));
-                fileStream.Position = accessor.ByteOffset + bufferView.ByteOffset;
-
-                if (vertexPositions == Array.Empty<Vector3>())
+                if (textureType == GpuMaterialLoadData.TextureType.BaseColor)
                 {
-                    vertices = new GpuVertex[accessor.Count];
-                    vertexPositions = new Vector3[accessor.Count];
+                    glTextureLoadData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
+                    //glTextureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
+                    imageColorComponents = ColorComponents.RedGreenBlueAlpha;
+                    materialChannel = material.FindChannel(KnownChannel.BaseColor.ToString());
                 }
-
-                if (item.Key == GLTF_POSITION_ATTRIBUTE)
+                else if (textureType == GpuMaterialLoadData.TextureType.MetallicRoughness)
                 {
-                    for (int i = 0; i < vertices.Length; i++)
-                    {
-                        Vector3 data;
-                        Span<byte> span = new Span<byte>(&data, sizeof(Vector3));
-                        fileStream.Read(span);
-
-                        vertexPositions[i] = data;
-                    }
+                    glTextureLoadData.InternalFormat = SizedInternalFormat.R11fG11fB10f;
+                    imageColorComponents = ColorComponents.RedGreenBlue;
+                    materialChannel = material.FindChannel(KnownChannel.MetallicRoughness.ToString());
                 }
-                else if (item.Key == GLTF_NORMAL_ATTRIBUTE)
+                else if (textureType == GpuMaterialLoadData.TextureType.Normal)
                 {
-                    for (int i = 0; i < vertices.Length; i++)
-                    {
-                        Vector3 data;
-                        Span<byte> span = new Span<byte>(&data, sizeof(Vector3));
-                        fileStream.Read(span);
-
-                        Vector3 normal = data;
-                        vertices[i].Normal = Helper.CompressSR11G11B10(normal);
-
-                        Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
-                        Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
-                        Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
-                        vertices[i].Tangent = Helper.CompressSR11G11B10(tangent);
-                    }
+                    glTextureLoadData.InternalFormat = SizedInternalFormat.R11fG11fB10f;
+                    imageColorComponents = ColorComponents.RedGreenBlue;
+                    materialChannel = material.FindChannel(KnownChannel.Normal.ToString());
                 }
-                else if (item.Key == GLTF_TEXCOORD_0_ATTRIBUTE)
+                else if (textureType == GpuMaterialLoadData.TextureType.Emissive)
                 {
-                    for (int i = 0; i < vertices.Length; i++)
-                    {
-                        Vector2 data;
-                        Span<byte> span = new Span<byte>(&data, sizeof(Vector2));
-                        fileStream.Read(span);
-
-                        vertices[i].TexCoord = data;
-                    }
+                    glTextureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
+                    imageColorComponents = ColorComponents.RedGreenBlue;
+                    materialChannel = material.FindChannel(KnownChannel.Emissive.ToString());
                 }
             }
 
-            return (vertices, vertexPositions);
-        }
-        private static unsafe uint[] LoadGpuIndexData(Gltf gltf, MeshPrimitive meshPrimitive, string rootDir)
-        {
-            Accessor accessor = gltf.Accessors[meshPrimitive.Indices.Value];
-            BufferView bufferView = gltf.BufferViews[accessor.BufferView.Value];
-            glTFLoader.Schema.Buffer buffer = gltf.Buffers[bufferView.Buffer];
-
-            using FileStream fileStream = File.OpenRead(Path.Combine(rootDir, buffer.Uri));
-            fileStream.Position = accessor.ByteOffset + bufferView.ByteOffset;
-
-            uint[] indices = new uint[accessor.Count];
-            int componentSize = ComponentTypeToSize(accessor.ComponentType);
-            for (int j = 0; j < accessor.Count; j++)
+            GltfTexture gltfTexture = null;
+            if (materialChannel.HasValue)
             {
-                uint data;
-                Span<byte> span = new Span<byte>(&data, componentSize);
-                fileStream.Read(span);
-
-                indices[j] = data;
+                gltfTexture = materialChannel.Value.Texture;
             }
 
-            return indices;
+            if (gltfTexture == null)
+            {
+                return glTextureLoadData;
+            }
+
+            using Stream stream = gltfTexture.PrimaryImage.Content.Open();
+            glTextureLoadData.Image = ImageResult.FromStream(stream, imageColorComponents);
+
+            if (gltfTexture.Sampler == null)
+            {
+                glTextureLoadData.WrapS = GltfTextureWrapMode.REPEAT;
+                glTextureLoadData.WrapT = GltfTextureWrapMode.REPEAT;
+                glTextureLoadData.MinFilter = TextureMipMapFilter.LINEAR_MIPMAP_LINEAR;
+                glTextureLoadData.MagFilter = TextureInterpolationFilter.LINEAR;
+            }
+            else
+            {
+                glTextureLoadData.WrapT = gltfTexture.Sampler.WrapT;
+                glTextureLoadData.WrapS = gltfTexture.Sampler.WrapS;
+                glTextureLoadData.MinFilter = gltfTexture.Sampler.MinFilter;
+                glTextureLoadData.MagFilter = gltfTexture.Sampler.MagFilter;
+                if (gltfTexture.Sampler.MinFilter == TextureMipMapFilter.DEFAULT)
+                {
+                    glTextureLoadData.MinFilter = TextureMipMapFilter.LINEAR_MIPMAP_LINEAR;
+                }
+                if (gltfTexture.Sampler.MagFilter == TextureInterpolationFilter.DEFAULT)
+                {
+                    glTextureLoadData.MagFilter = TextureInterpolationFilter.LINEAR;
+                }
+            }
+
+            return glTextureLoadData;
         }
 
         private static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<GpuMaterialLoadData> materialsLoadInfo)
@@ -533,7 +505,7 @@ namespace IDKEngine
             defaultTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB();
 
-            GpuMaterial[] materials = new GpuMaterial[materialsLoadInfo.Length];    
+            GpuMaterial[] materials = new GpuMaterial[materialsLoadInfo.Length];
             for (int i = 0; i < materials.Length; i++)
             {
                 ref GpuMaterial gpuMaterial = ref materials[i];
@@ -541,143 +513,140 @@ namespace IDKEngine
 
                 gpuMaterial.EmissiveFactor = materialLoadData.MaterialDetails.EmissiveFactor;
                 gpuMaterial.BaseColorFactor = materialLoadData.MaterialDetails.BaseColorFactor;
+                gpuMaterial.TransmissionFactor = materialLoadData.MaterialDetails.TransmissionFactor;
+                gpuMaterial.AlphaCutoff = materialLoadData.MaterialDetails.AlphaCutoff;
                 gpuMaterial.RoughnessFactor = materialLoadData.MaterialDetails.RoughnessFactor;
                 gpuMaterial.MetallicFactor = materialLoadData.MaterialDetails.MetallicFactor;
-                gpuMaterial.AlphaCutoff = materialLoadData.MaterialDetails.AlphaCutoff;
+                gpuMaterial.Absorbance = materialLoadData.MaterialDetails.Absorbance;
+                gpuMaterial.IOR = materialLoadData.MaterialDetails.IOR;
 
+                gpuMaterial.BaseColorTextureHandle = defaultTextureHandle;
+                gpuMaterial.MetallicRoughnessTextureHandle = defaultTextureHandle;
+                gpuMaterial.NormalTextureHandle = defaultTextureHandle;
+                gpuMaterial.EmissiveTextureHandle = defaultTextureHandle;
+                
+                if (materialLoadData.BaseColorTexture.Image != null)
                 {
-                    if (materialLoadData.BaseColorTexture.Image == null)
-                    {
-                        gpuMaterial.BaseColorTextureHandle = defaultTextureHandle;
-                    }
-                    else
-                    {
-                        GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
-                        SamplerObject sampler = new SamplerObject();
-                        ConfigureGLTextureAndSampler(materialLoadData.BaseColorTexture, texture, sampler);
-                        gpuMaterial.BaseColorTextureHandle = texture.GetTextureHandleARB(sampler);
-                    }
+                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
+                    SamplerObject sampler = new SamplerObject();
+                    ConfigureGLTextureAndSampler(materialLoadData.BaseColorTexture, texture, sampler);
+                    gpuMaterial.BaseColorTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
+                if (materialLoadData.MetallicRoughnessTexture.Image != null)
                 {
-                    if (materialLoadData.MetallicRoughnessTexture.Image == null)
-                    {
-                        gpuMaterial.MetallicRoughnessTextureHandle = defaultTextureHandle;
-                    }
-                    else
-                    {
-                        GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
-                        SamplerObject sampler = new SamplerObject();
-                        ConfigureGLTextureAndSampler(materialLoadData.MetallicRoughnessTexture, texture, sampler);
-                        texture.SetSwizzleR(All.Blue); // "Move" metallic from Blue into Red channel
-                        gpuMaterial.MetallicRoughnessTextureHandle = texture.GetTextureHandleARB(sampler);
-                    }
+                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
+                    SamplerObject sampler = new SamplerObject();
+                    ConfigureGLTextureAndSampler(materialLoadData.MetallicRoughnessTexture, texture, sampler);
+                    texture.SetSwizzleR(All.Blue); // "Move" metallic from Blue into Red channel
+                    gpuMaterial.MetallicRoughnessTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
+                if (materialLoadData.NormalTexture.Image != null)
                 {
-                    if (materialLoadData.NormalTexture.Image == null)
-                    {
-                        gpuMaterial.NormalTextureHandle = defaultTextureHandle;
-                    }
-                    else
-                    {
-                        GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
-                        SamplerObject sampler = new SamplerObject();
-                        ConfigureGLTextureAndSampler(materialLoadData.NormalTexture, texture, sampler);
-                        gpuMaterial.NormalTextureHandle = texture.GetTextureHandleARB(sampler);
-                    }
+                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
+                    SamplerObject sampler = new SamplerObject();
+                    ConfigureGLTextureAndSampler(materialLoadData.NormalTexture, texture, sampler);
+                    gpuMaterial.NormalTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
+                if (materialLoadData.EmissiveTexture.Image != null)
                 {
-                    if (materialLoadData.EmissiveTexture.Image == null)
-                    {
-                        gpuMaterial.EmissiveTextureHandle = defaultTextureHandle;
-                    }
-                    else
-                    {
-                        GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
-                        SamplerObject sampler = new SamplerObject();
-                        ConfigureGLTextureAndSampler(materialLoadData.EmissiveTexture, texture, sampler);
-                        gpuMaterial.EmissiveTextureHandle = texture.GetTextureHandleARB(sampler);
-                    }
+                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
+                    SamplerObject sampler = new SamplerObject();
+                    ConfigureGLTextureAndSampler(materialLoadData.EmissiveTexture, texture, sampler);
+                    gpuMaterial.EmissiveTextureHandle = texture.GetTextureHandleARB(sampler);
                 }
             }
 
             return materials;
         }
-        private static void ConfigureGLTextureAndSampler(GpuTextureLoadData data, GLTexture texture, SamplerObject sampler)
+        private static void ConfigureGLTextureAndSampler(GpuTextureLoadData configuration, GLTexture texture, SamplerObject sampler)
         {
-            if (data.Sampler == null)
-            {
-                data.Sampler = new Sampler();
-                data.Sampler.WrapT = Sampler.WrapTEnum.REPEAT;
-                data.Sampler.WrapS = Sampler.WrapSEnum.REPEAT;
-                data.Sampler.MinFilter = null;
-                data.Sampler.MagFilter = null;
-            }
-
-            data.Sampler.MinFilter ??= Sampler.MinFilterEnum.LINEAR_MIPMAP_LINEAR;
-            data.Sampler.MagFilter ??= Sampler.MagFilterEnum.LINEAR;
-
-            bool mipmapsRequired = IsMipMapFilter(data.Sampler.MinFilter.Value);
-            int levels = mipmapsRequired ? Math.Max(GLTexture.GetMaxMipmapLevel(data.Image.Width, data.Image.Height, 1), 1) : 1;
-            texture.ImmutableAllocate(data.Image.Width, data.Image.Height, 1, data.InternalFormat, levels);
-            texture.SubTexture2D(data.Image.Width, data.Image.Height, ColorComponentsToPixelFormat(data.Image.Comp), PixelType.UnsignedByte, data.Image.Data);
+            bool mipmapsRequired = IsMipMapFilter(configuration.MinFilter);
+            int levels = mipmapsRequired ? Math.Max(GLTexture.GetMaxMipmapLevel(configuration.Image.Width, configuration.Image.Height, 1), 1) : 1;
+            texture.ImmutableAllocate(configuration.Image.Width, configuration.Image.Height, 1, configuration.InternalFormat, levels);
+            texture.SubTexture2D(configuration.Image.Width, configuration.Image.Height, ColorComponentsToPixelFormat(configuration.Image.Comp), PixelType.UnsignedByte, configuration.Image.Data);
 
             if (mipmapsRequired)
             {
                 sampler.SetSamplerParamter(SamplerParameterName.TextureMaxAnisotropyExt, 4.0f);
                 texture.GenerateMipmap();
             }
-            sampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)data.Sampler.MinFilter);
-            sampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)data.Sampler.MagFilter);
-            sampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)data.Sampler.WrapS);
-            sampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)data.Sampler.WrapT);
+            sampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)configuration.MinFilter);
+            sampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)configuration.MagFilter);
+            sampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)configuration.WrapS);
+            sampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)configuration.WrapT);
         }
 
-        private static Matrix4 GetNodeTransform(Node node)
+        private static unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertexData(MeshPrimitive meshPrimitive)
         {
-            Matrix4 transform = new Matrix4(
-                    node.Matrix[0], node.Matrix[1], node.Matrix[2], node.Matrix[3],
-                    node.Matrix[4], node.Matrix[5], node.Matrix[6], node.Matrix[7],
-                    node.Matrix[8], node.Matrix[9], node.Matrix[10], node.Matrix[11],
-                    node.Matrix[12], node.Matrix[13], node.Matrix[14], node.Matrix[15]);
+            const string GLTF_POSITION_ATTRIBUTE = "POSITION";
+            const string GLTF_NORMAL_ATTRIBUTE = "NORMAL";
+            const string GLTF_TEXCOORD_0_ATTRIBUTE = "TEXCOORD_0";
 
-            if (transform == Matrix4.Identity)
+            Accessor positonAccessor = meshPrimitive.VertexAccessors[GLTF_POSITION_ATTRIBUTE];
+            bool hasNormals = meshPrimitive.VertexAccessors.TryGetValue(GLTF_NORMAL_ATTRIBUTE, out Accessor normalAccessor);
+            bool hasTexCoords = meshPrimitive.VertexAccessors.TryGetValue(GLTF_TEXCOORD_0_ATTRIBUTE, out Accessor texCoordAccessor);
+
+            Vector3[] vertexPositions = new Vector3[positonAccessor.Count];
+            GpuVertex[] vertices = new GpuVertex[positonAccessor.Count];
+
             {
-                Quaternion rotation = new Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
-                Vector3 scale = new Vector3(1.0f);
-                Vector3 translation = new Vector3(0.0f);
-
-                if (node.Rotation.Length == 4)
-                {
-                    rotation = new Quaternion(node.Rotation[0], node.Rotation[1], node.Rotation[2], node.Rotation[3]);
-                }
-
-                if (node.Scale.Length == 3)
-                {
-                    scale = new Vector3(node.Scale[0], node.Scale[1], node.Scale[2]);
-                }
-
-                if (node.Translation.Length == 3)
-                {
-                    translation = new Vector3(node.Translation[0], node.Translation[1], node.Translation[2]);
-                }
-
-                transform = Matrix4.CreateScale(scale) * Matrix4.CreateFromQuaternion(rotation) * Matrix4.CreateTranslation(translation);
+                Span<byte> rawData = positonAccessor.SourceBufferView.Content.AsSpan(positonAccessor.ByteOffset, positonAccessor.ByteLength);
+                Helper.MemCpy(rawData[0], ref vertexPositions[0], (nuint)rawData.Length);
             }
 
-            return transform;
+            if (hasNormals)
+            {
+                Span<Vector3> normals = Helper.SpanReinterpret<Vector3>(normalAccessor.SourceBufferView.Content.AsSpan(normalAccessor.ByteOffset, normalAccessor.ByteLength));
+                for (int i = 0; i < normals.Length; i++)
+                {
+                    Vector3 normal = normals[i];
+                    vertices[i].Normal = Helper.CompressSR11G11B10(normal);
+
+                    Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
+                    Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
+                    Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
+                    vertices[i].Tangent = Helper.CompressSR11G11B10(tangent);
+                }
+            }
+
+            if (hasTexCoords)
+            {
+                Span<Vector2> texCoords = Helper.SpanReinterpret<Vector2>(texCoordAccessor.SourceBufferView.Content.AsSpan(texCoordAccessor.ByteOffset, texCoordAccessor.ByteLength));
+                for (int i = 0; i < texCoords.Length; i++)
+                {
+                    vertices[i].TexCoord = texCoords[i];
+                }
+            }
+
+            return (vertices, vertexPositions);
+        }
+        private static unsafe uint[] LoadGpuIndexData(MeshPrimitive meshPrimitive)
+        {
+            Accessor accessor = meshPrimitive.IndexAccessor;
+            uint[] vertexIndices = new uint[accessor.Count];
+            int componentSize = ComponentTypeToSize(accessor.Encoding);
+
+            Span<byte> rawData = accessor.SourceBufferView.Content.AsSpan(accessor.ByteOffset, accessor.ByteLength);
+            for (int i = 0; i < accessor.Count; i++)
+            {
+                Helper.MemCpy(rawData[componentSize * i], ref vertexIndices[i], (nuint)componentSize);
+            }
+
+            return vertexIndices;
         }
 
-        private static int ComponentTypeToSize(Accessor.ComponentTypeEnum componentType)
+        private static int ComponentTypeToSize(EncodingType componentType)
         {
             int size = componentType switch
             {
-                Accessor.ComponentTypeEnum.UNSIGNED_BYTE or Accessor.ComponentTypeEnum.BYTE => 1,
-                Accessor.ComponentTypeEnum.UNSIGNED_SHORT or Accessor.ComponentTypeEnum.SHORT => 2,
-                Accessor.ComponentTypeEnum.FLOAT or Accessor.ComponentTypeEnum.UNSIGNED_INT => 4,
-                _ => throw new NotSupportedException($"Unsupported {nameof(Accessor.ComponentTypeEnum)} {componentType}"),
+                EncodingType.UNSIGNED_BYTE or EncodingType.BYTE => 1,
+                EncodingType.UNSIGNED_SHORT or EncodingType.SHORT => 2,
+                EncodingType.FLOAT or EncodingType.UNSIGNED_INT => 4,
+                _ => throw new NotSupportedException($"Unsupported {nameof(EncodingType)} {componentType}"),
             };
             return size;
         }
+
         private static PixelFormat ColorComponentsToPixelFormat(ColorComponents colorComponents)
         {
             PixelFormat pixelFormat = colorComponents switch
@@ -690,12 +659,12 @@ namespace IDKEngine
             };
             return pixelFormat;
         }
-        private static bool IsMipMapFilter(Sampler.MinFilterEnum minFilterEnum)
+        private static bool IsMipMapFilter(TextureMipMapFilter minFilterEnum)
         {
-            return minFilterEnum == Sampler.MinFilterEnum.NEAREST_MIPMAP_NEAREST ||
-                   minFilterEnum == Sampler.MinFilterEnum.LINEAR_MIPMAP_NEAREST ||
-                   minFilterEnum == Sampler.MinFilterEnum.NEAREST_MIPMAP_LINEAR ||
-                   minFilterEnum == Sampler.MinFilterEnum.LINEAR_MIPMAP_LINEAR;
+            return minFilterEnum == TextureMipMapFilter.NEAREST_MIPMAP_NEAREST ||
+                   minFilterEnum == TextureMipMapFilter.LINEAR_MIPMAP_NEAREST ||
+                   minFilterEnum == TextureMipMapFilter.NEAREST_MIPMAP_LINEAR ||
+                   minFilterEnum == TextureMipMapFilter.LINEAR_MIPMAP_LINEAR;
         }
 
         private static unsafe void RunMeshOptimizations(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices)

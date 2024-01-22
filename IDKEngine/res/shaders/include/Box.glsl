@@ -34,7 +34,7 @@ Box BoxTransform(Box box, mat4 matrix)
     for (int i = 0; i < 8; i++)
     {
         vec3 vertexPos = BoxGetVertexPos(box, i);
-        newBox = BoxGrowToFit(newBox, (matrix * vec4(vertexPos, 1.0)).xyz);
+        BoxGrowToFit(newBox, (matrix * vec4(vertexPos, 1.0)).xyz);
     }
 
     return newBox;
@@ -58,7 +58,7 @@ Box BoxTransformPerspective(Box box, mat4 matrix, out bool vertexBehindFrustum)
 
         vec3 ndc = clipPos.xyz / clipPos.w;
 
-        newBox = BoxGrowToFit(newBox, ndc);
+        BoxGrowToFit(newBox, ndc);
     }
 
     return newBox;

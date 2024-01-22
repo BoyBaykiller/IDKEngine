@@ -1,7 +1,7 @@
 ﻿using OpenTK.Mathematics;
 using IDKEngine.Render;
 
-namespace IDKEngine
+namespace IDKEngine.GpuTypes
 {
     struct GpuTaaData
     {

@@ -5,6 +5,7 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
+using IDKEngine.GpuTypes;
 
 namespace IDKEngine
 {
@@ -90,7 +91,7 @@ namespace IDKEngine
         public delegate void IntersectFunc(in PrimitiveHitInfo hitInfo);
         public void Intersect(in Box box, IntersectFunc intersectFunc)
         {
-            for (int i = 0; i < Tlas.Blases.Length; i++)
+            for (int i = 0; i < blases.Length; i++)
             {
                 BLAS blas = Tlas.Blases[i];
                 ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
@@ -152,6 +153,7 @@ namespace IDKEngine
             System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
             
             Parallel.For(start, start + count, i =>
+            //for (int i = start; i < start + count; i++)
             {
                 blases[i].Build();
             });
@@ -160,22 +162,44 @@ namespace IDKEngine
             Logger.Log(Logger.LogLevel.Info, $"Created {blases.Length} new Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
         }
 
+        public unsafe void BlasesRefit(int start, int count)
+        {
+            Parallel.For(start, start + count, i =>
+            {
+                blases[i].Refit();
+            });
+
+            int uploadedBlasNodes = 0;
+            for (int i = 0; i < blases.Length; i++)
+            {
+                int blasIndex = start + i;
+                BLAS blas = blases[blasIndex];
+
+                if (blasIndex >= start && blasIndex < start + count)
+                {
+                    blasBuffer.SubData(uploadedBlasNodes * sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
+                }
+
+                uploadedBlasNodes += blas.Nodes.Length;
+            }
+        }
+
         private unsafe void SetBlasBuffersContent()
         {
             blasBuffer.MutableAllocate((nint)sizeof(GpuBlasNode) * GetBlasesNodeCount(), IntPtr.Zero);
             blasTriangleIndicesBuffer.MutableAllocate((nint)sizeof(BLAS.IndicesTriplet) * GetBlasesTriangleIndicesCount(), IntPtr.Zero);
 
-            nint uploadedBlasNodesCount = 0;
-            nint uploadedTriangleIndicesCount = 0;
+            int uploadedBlasNodes = 0;
+            int uploadedTriangleIndices = 0;
             for (int i = 0; i < blases.Length; i++)
             {
                 BLAS blas = blases[i];
 
-                blasBuffer.SubData(uploadedBlasNodesCount * sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
-                blasTriangleIndicesBuffer.SubData(uploadedTriangleIndicesCount * sizeof(BLAS.IndicesTriplet), blas.TriangleIndices.Length * (nint)sizeof(BLAS.IndicesTriplet), blas.TriangleIndices);
+                blasBuffer.SubData(uploadedBlasNodes * (nint)sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
+                blasTriangleIndicesBuffer.SubData(uploadedTriangleIndices * (nint)sizeof(BLAS.IndicesTriplet), blas.TriangleIndices.Length * (nint)sizeof(BLAS.IndicesTriplet), blas.TriangleIndices);
 
-                uploadedBlasNodesCount += blas.Nodes.Length;
-                uploadedTriangleIndicesCount += blas.TriangleIndices.Length;
+                uploadedBlasNodes += blas.Nodes.Length;
+                uploadedTriangleIndices += blas.TriangleIndices.Length;
             }
         }
         private unsafe void SetTlasBufferContent(ReadOnlySpan<GpuTlasNode> tlasNodes)

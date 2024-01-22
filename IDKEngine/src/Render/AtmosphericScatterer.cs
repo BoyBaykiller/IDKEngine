@@ -14,7 +14,7 @@ namespace IDKEngine.Render
             set
             {
                 _iSteps = value;
-                shaderProgram.Upload("ISteps", _iSteps);
+                shaderProgram.Upload("ISteps", ISteps);
             }
 
             get => _iSteps;
@@ -26,22 +26,38 @@ namespace IDKEngine.Render
             set
             {
                 _jSteps = value;
-                shaderProgram.Upload("JSteps", _jSteps);
+                shaderProgram.Upload("JSteps", JSteps);
             }
 
             get => _jSteps;
         }
 
-        private float _time;
-        public float Time
+        private float _elevation;
+        public float Elevation
         {
             set
             {
-                _time = value;
-                shaderProgram.Upload("LightPos", new Vector3(0.0f, MathF.Sin(MathHelper.DegreesToRadians(_time * 360.0f)), MathF.Cos(MathHelper.DegreesToRadians(_time * 360.0f))) * 149600000e3f);
+                _elevation = value;
+
+                Vector3 pos = MyMath.PolarToCartesian(Elevation, Azimuth);
+                shaderProgram.Upload("LightPos", pos);
             }
 
-            get => _time;
+            get => _elevation;
+        }
+
+        private float _azimuth;
+        public float Azimuth
+        {
+            set
+            {
+                _azimuth = value;
+
+                Vector3 pos = MyMath.PolarToCartesian(Elevation, Azimuth);
+                shaderProgram.Upload("LightPos", pos);
+            }
+
+            get => _azimuth;
         }
 
         private float _lightIntensity;
@@ -50,7 +66,7 @@ namespace IDKEngine.Render
             set
             {
                 _lightIntensity = Math.Max(value, 0.0f);
-                shaderProgram.Upload("LightIntensity", _lightIntensity);
+                shaderProgram.Upload("LightIntensity", LightIntensity);
             }
 
             get => _lightIntensity;
@@ -80,7 +96,8 @@ namespace IDKEngine.Render
 
             SetSize(size);
 
-            Time = 0.05f;
+            Elevation = 0.0f;
+            Azimuth = 0.0f;
             ISteps = 40;
             JSteps = 8;
             LightIntensity = 15.0f;

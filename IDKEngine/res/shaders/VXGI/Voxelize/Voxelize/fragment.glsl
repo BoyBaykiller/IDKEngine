@@ -25,10 +25,13 @@ struct Material
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
-    float _pad0;
+    float TransmissionFactor;
     float AlphaCutoff;
     float RoughnessFactor;
     float MetallicFactor;
+
+    vec3 Absorbance;
+    float IOR;
 
     sampler2D BaseColor;
     sampler2D MetallicRoughness;

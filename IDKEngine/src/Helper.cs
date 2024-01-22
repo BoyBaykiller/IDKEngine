@@ -60,6 +60,11 @@ namespace IDKEngine
             return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
         }
 
+        public static Matrix4 ToOpenTK(this System.Numerics.Matrix4x4 matrix4x4)
+        {
+            return Unsafe.As<System.Numerics.Matrix4x4, Matrix4>(ref matrix4x4);
+        }
+
         public enum DepthConvention
         {
             ZeroToOne = ClipDepthMode.ZeroToOne,
@@ -186,9 +191,25 @@ namespace IDKEngine
             NativeMemory.Fill(ptr, byteCount, value);
         }
 
-        public static unsafe void MemCpy(void* dest, void* src, nuint byteCount)
+        public static unsafe void MemCpy<T1, T2>(in T1 src, ref T2 dest, nuint byteCount)
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            fixed (void* srcPtr = &src, destPtr = &dest)
+            {
+                MemCpy(srcPtr, destPtr, byteCount);
+            }
+        }
+
+        public static unsafe void MemCpy(void* src, void* dest, nuint byteCount)
         {
             NativeMemory.Copy(src, dest, byteCount);
+        }
+
+        public static unsafe Span<T> SpanReinterpret<T>(Span<byte> input) where T : unmanaged
+        {
+            ref T reference = ref Unsafe.As<byte, T>(ref MemoryMarshal.GetReference(input));
+            return MemoryMarshal.CreateSpan(ref reference, input.Length / sizeof(T));
         }
 
         public static uint CompressSR11G11B10(in Vector3 data)

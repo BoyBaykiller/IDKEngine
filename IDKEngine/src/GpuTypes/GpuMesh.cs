@@ -1,6 +1,6 @@
 ﻿using OpenTK.Mathematics;
 
-namespace IDKEngine
+namespace IDKEngine.GpuTypes
 {
     public struct GpuMesh
     {
@@ -10,11 +10,11 @@ namespace IDKEngine
         public float SpecularBias;
 
         public float RoughnessBias;
-        public float RefractionChance;
-        public float IOR;
+        public float TransmissionBias;
+        public float IORBias;
         public int MeshletsStart;
 
-        public Vector3 Absorbance;
+        public Vector3 AbsorbanceBias;
         public int MeshletCount;
     }
 }
