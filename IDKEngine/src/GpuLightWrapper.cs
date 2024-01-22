@@ -1,18 +1,18 @@
 ﻿using OpenTK.Mathematics;
 
-namespace IDKEngine
+namespace IDKEngine.GpuTypes
 {
-    class Light
+    class GpuLightWrapper
     {
         public GpuLight GpuLight;
 
-        public Light(float radius)
+        public GpuLightWrapper(float radius)
         {
             GpuLight.Radius = radius;
             GpuLight.PointShadowIndex = -1;
         }
 
-        public Light(Vector3 position, Vector3 color, float radius)
+        public GpuLightWrapper(Vector3 position, Vector3 color, float radius)
         {
             GpuLight.Position = position;
             GpuLight.Color = color;

@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
+using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
 {
@@ -199,6 +200,12 @@ namespace IDKEngine.Render
         {
             if (count == 0) return;
             meshInstanceBuffer.SubData(start * sizeof(GpuMeshInstance), count * sizeof(GpuMeshInstance), MeshInstances[start]);
+        }
+
+        public unsafe void UpdateVertexPositions(int start, int count)
+        {
+            if (count == 0) return;
+            vertexPositionBuffer.SubData(start * sizeof(Vector3), count * sizeof(Vector3), VertexPositions[start]);
         }
 
         public GpuTriangle GetTriangle(int indicesIndex, int baseVertex)

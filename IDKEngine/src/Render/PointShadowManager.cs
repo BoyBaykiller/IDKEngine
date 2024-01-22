@@ -2,6 +2,7 @@
 using System.IO;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
+using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
 {

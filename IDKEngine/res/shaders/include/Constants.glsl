@@ -1,7 +1,7 @@
 #ifndef Constants_H
 #define Constants_H
 
-#define MATERIAL_EMISSIVE_FACTOR 10.0
+#define MATERIAL_EMISSIVE_FACTOR 1.0
 #define PI 3.14159265
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX

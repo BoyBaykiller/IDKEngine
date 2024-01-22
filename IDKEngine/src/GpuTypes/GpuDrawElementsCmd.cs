@@ -1,4 +1,4 @@
-﻿namespace IDKEngine
+﻿namespace IDKEngine.GpuTypes
 {
     public struct GpuDrawElementsCmd
     {

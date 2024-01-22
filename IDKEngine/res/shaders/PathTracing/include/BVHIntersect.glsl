@@ -18,16 +18,16 @@ uvec3 UintsToUVec3(PackedUVec3 uints)
     return uvec3(uints.x, uints.y, uints.z);
 }
 
-layout(std430, binding = 6) restrict readonly buffer BlasTriangleIndicesSSBO
-{
-    PackedUVec3 Indices[];
-} blasTriangleIndicesSSBO;
-
 struct PackedVec3 { float x, y, z; };
 vec3 FloatsToVec3(PackedVec3 floats)
 {
     return vec3(floats.x, floats.y, floats.z);
 }
+
+layout(std430, binding = 6) restrict readonly buffer BlasTriangleIndicesSSBO
+{
+    PackedUVec3 Indices[];
+} blasTriangleIndicesSSBO;
 
 layout(std430, binding = 10) restrict readonly buffer VertexPositionsSSBO
 {

@@ -7,6 +7,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render;
 using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
+using IDKEngine.GpuTypes;
 
 namespace IDKEngine
 {
@@ -170,7 +171,7 @@ namespace IDKEngine
                 }
                 else
                 {
-                    LightManager.TryGetLight(gui.SelectedEntity.Index, out Light abstractLight);
+                    LightManager.TryGetLight(gui.SelectedEntity.Index, out GpuLightWrapper abstractLight);
                     ref GpuLight light = ref abstractLight.GpuLight;
 
                     box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
@@ -284,6 +285,12 @@ namespace IDKEngine
 
             gui.Update(this);
 
+            //for (int i = 0; i < ModelSystem.VertexPositions.Length; i++)
+            //{
+            //    ModelSystem.VertexPositions[i].X += 1.0f * dT;
+            //}
+            //ModelSystem.UpdateVertexPositions(0, ModelSystem.VertexPositions.Length);
+            //ModelSystem.BVH.BlasesRefit(0, ModelSystem.BVH.Tlas.Blases.Length);
             //ModelSystem.BVH.TlasBuild();
 
             if (CamCollisionSettings.IsEnabled)
@@ -463,20 +470,25 @@ namespace IDKEngine
 
                 ModelLoader.Model lucy = ModelLoader.GltfToEngineFormat("res/models/Lucy/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
                 lucy.Meshes[0].SpecularBias = -1.0f;
-                lucy.Meshes[0].RefractionChance = 0.98f;
-                lucy.Meshes[0].IOR = 1.174f;
-                lucy.Meshes[0].Absorbance = new Vector3(0.81f, 0.18f, 0.0f);
+                lucy.Meshes[0].TransmissionBias = 0.98f;
+                lucy.Meshes[0].IORBias = 0.174f;
+                lucy.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
                 ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
+
+                //ModelLoader.Model emissiveTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\EmissiveStrengthTest\\glTF\\EmissiveStrengthTest.gltf");
+                //ModelLoader.Model attenuationTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\AttenuationTest\\glTF\\AttenuationTest.gltf");
+                //ModelLoader.Model transmissionRoughnessTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\TransmissionRoughnessTest\\glTF\\TransmissionRoughnessTest.gltf", Matrix4.CreateScale(10.0f));
+                //ModelLoader.Model dragonAttenuation = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\DragonAttenuation\\glTF\\DragonAttenuation.gltf", Matrix4.CreateScale(1.0f));
+                //ModelLoader.Model transmissionTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\TransmissionTest\\glTF\\TransmissionTest.gltf", Matrix4.CreateScale(10.0f));
+                //ModelSystem.Add(transmissionTest);
+
                 ModelSystem.Add(sponza, lucy, helmet);
 
-                //ModelLoader.Model test = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\Temple\\Temple.gltf", Matrix4.CreateScale(0.25f));
-                //ModelSystem.Add(test);
-
-                LightManager.AddLight(new Light(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-                LightManager.AddLight(new Light(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-                LightManager.AddLight(new Light(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new GpuLightWrapper(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new GpuLightWrapper(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new GpuLightWrapper(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
 
                 for (int i = 0; i < 3; i++)
                 {
@@ -538,8 +550,7 @@ namespace IDKEngine
                 ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
                 ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
-                //Model e = new Model(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-
+                //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
                 ModelSystem.Add(a, b, c, d);
 
                 //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));

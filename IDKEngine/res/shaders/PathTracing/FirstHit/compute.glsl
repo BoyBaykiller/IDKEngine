@@ -25,10 +25,13 @@ struct Material
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
-    float _pad0;
+    float TransmissionFactor;
     float AlphaCutoff;
     float RoughnessFactor;
     float MetallicFactor;
+
+    vec3 Absorbance;
+    float IOR;
 
     HF_SAMPLER_2D BaseColor;
     HF_SAMPLER_2D MetallicRoughness;
@@ -55,10 +58,10 @@ struct Mesh
     float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
-    float RefractionChance;
-    float IOR;
+    float TransmissionBias;
+    float IORBias;
     uint MeshletsStart;
-    vec3 Absorbance;
+    vec3 AbsorbanceBias;
     uint MeshletCount;
 };
 
@@ -199,7 +202,7 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 } skyBoxUBO;
 
 bool TraceRay(inout WavefrontRay wavefrontRay);
-vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
+vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float transmissionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 ivec2 ReorderInvocations(uint n);
 
@@ -274,14 +277,14 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
 
         wavefrontRay.Origin += uncompressedDir * hitInfo.T;
 
-        vec3 albedo;
-        vec3 normal;
-        vec3 emissive;
-        float refractionChance;
-        float specularChance;
-        float roughness;
-        float ior;
-        vec3 absorbance;
+        vec3 albedo = vec3(0.0);
+        vec3 normal = vec3(0.0);
+        vec3 emissive = vec3(0.0);
+        float transmissionChance = 0.0;
+        float specularChance = 0.0;
+        float roughness = 0.0;
+        float ior = 1.0;
+        vec3 absorbance = vec3(1.0);
         
         bool hitLight = hitInfo.VertexIndices == uvec3(0);
         if (!hitLight)
@@ -307,21 +310,21 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             normal = TBN * normalize(normal * 2.0 - 1.0);
             normal = mix(worldNormal, normal, mesh.NormalMapStrength);
 
-            ior = mesh.IOR;
-            absorbance = mesh.Absorbance;
+            ior = max(material.IOR + mesh.IORBias, 1.0);
+            absorbance = max(mesh.AbsorbanceBias + material.Absorbance, vec3(0.0));
             vec4 albedoAlpha = texture(material.BaseColor, interpTexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
             albedo = albedoAlpha.rgb;
             emissive = texture(material.Emissive, interpTexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + mesh.EmissiveBias * albedo;
             
-            refractionChance = clamp((1.0 - albedoAlpha.a) + mesh.RefractionChance, 0.0, 1.0);
+            transmissionChance = clamp(material.TransmissionFactor + mesh.TransmissionBias, 0.0, 1.0);
             roughness = clamp(texture(material.MetallicRoughness, interpTexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
             if (albedoAlpha.a < material.AlphaCutoff)
             {
-                refractionChance = 1.0;
+                transmissionChance = 1.0;
                 roughness = 0.0;
             }
 
-            specularChance = clamp(texture(material.MetallicRoughness, interpTexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - refractionChance);
+            specularChance = clamp(texture(material.MetallicRoughness, interpTexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - transmissionChance);
         }
         else if (IsTraceLights)
         {
@@ -329,14 +332,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             emissive = light.Color;
             albedo = light.Color;
             normal = (wavefrontRay.Origin - light.Position) / light.Radius;
-
-            refractionChance = 0.0;
-            specularChance = 1.0;
-            roughness = 0.0;
-            ior = 1.0;
-            absorbance = vec3(0.0);
         }
-
 
         float cosTheta = dot(-uncompressedDir, normal);
         bool fromInside = cosTheta < 0.0;
@@ -357,7 +353,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         {
             float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, prevIor, ior));
             float chanceMultiplier = (1.0 - newSpecularChance) / (1.0 - specularChance);
-            refractionChance *= chanceMultiplier;
+            transmissionChance *= chanceMultiplier;
             specularChance = newSpecularChance;
         }
 
@@ -365,7 +361,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
 
         float rayProbability, newIor;
         bool newRayRefractive;
-        uncompressedDir = BounceOffMaterial(uncompressedDir, specularChance, roughness, refractionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, newRayRefractive);
+        uncompressedDir = BounceOffMaterial(uncompressedDir, specularChance, roughness, transmissionChance, ior, prevIor, normal, fromInside, rayProbability, newIor, newRayRefractive);
         wavefrontRay.Origin += uncompressedDir * EPSILON;
         wavefrontRay.PreviousIOROrDebugNodeCounter = newIor;
 
@@ -389,7 +385,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
     }
 }
 
-vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float refractionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive)
+vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float transmissionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive)
 {
     isRefractive = false;
     roughness *= roughness;
@@ -405,7 +401,7 @@ vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, fl
         rayProbability = specularChance;
         newIor = prevIor;
     }
-    else if (specularChance + refractionChance > rnd)
+    else if (specularChance + transmissionChance > rnd)
     {
         if (fromInside)
         {
@@ -425,12 +421,12 @@ vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, fl
         }
         refractionRayDir = normalize(mix(refractionRayDir, isRefractive ? -diffuseRayDir : diffuseRayDir, roughness));
         outgoing = refractionRayDir;
-        rayProbability = refractionChance;
+        rayProbability = transmissionChance;
     }
     else
     {
         outgoing = diffuseRayDir;
-        rayProbability = 1.0 - specularChance - refractionChance;
+        rayProbability = 1.0 - specularChance - transmissionChance;
         newIor = prevIor;
     }
     rayProbability = max(rayProbability, EPSILON);

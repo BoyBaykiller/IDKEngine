@@ -24,10 +24,10 @@ struct Mesh
     float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
-    float RefractionChance;
-    float IOR;
+    float TransmissionBias;
+    float IORBias;
     uint MeshletsStart;
-    vec3 Absorbance;
+    vec3 AbsorbanceBias;
     uint MeshletCount;
 };
 

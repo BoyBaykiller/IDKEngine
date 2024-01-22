@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace IDKEngine
+namespace IDKEngine.GpuTypes
 {
     [InlineArray(2)]
     public struct GpuDispatchCmd_2

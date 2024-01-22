@@ -6,6 +6,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.GUI;
 using IDKEngine.Shapes;
+using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
 {
@@ -743,6 +744,28 @@ namespace IDKEngine.Render
 
                     if (!SkyBoxManager.IsExternalSkyBox)
                     {
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.Elevation;
+                        if (ImGui.SliderFloat("Elevation", ref tempFloat, -MathF.PI, MathF.PI))
+                        {
+                            SkyBoxManager.AtmosphericScatterer.Elevation = tempFloat;
+                            shouldUpdateSkyBox = true;
+                        }
+
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.Azimuth;
+                        if (ImGui.SliderFloat("Azimuth", ref tempFloat, -MathF.PI, MathF.PI))
+                        {
+                            SkyBoxManager.AtmosphericScatterer.Azimuth = tempFloat;
+                            shouldUpdateSkyBox = true;
+                        }
+
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.LightIntensity;
+                        if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
+                        {
+                            SkyBoxManager.AtmosphericScatterer.LightIntensity = tempFloat;
+
+                            shouldUpdateSkyBox = true;
+                        }
+
                         tempInt = SkyBoxManager.AtmosphericScatterer.ISteps;
                         if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                         {
@@ -757,20 +780,6 @@ namespace IDKEngine.Render
                             shouldUpdateSkyBox = true;
                         }
 
-                        tempFloat = SkyBoxManager.AtmosphericScatterer.Time;
-                        if (ImGui.DragFloat("Time", ref tempFloat, 0.005f))
-                        {
-                            SkyBoxManager.AtmosphericScatterer.Time = tempFloat;
-                            shouldUpdateSkyBox = true;
-                        }
-
-                        tempFloat = SkyBoxManager.AtmosphericScatterer.LightIntensity;
-                        if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
-                        {
-                            SkyBoxManager.AtmosphericScatterer.LightIntensity = tempFloat;
-
-                            shouldUpdateSkyBox = true;
-                        }
                         if (shouldUpdateSkyBox)
                         {
                             shouldResetPT = true;
@@ -789,7 +798,7 @@ namespace IDKEngine.Render
                     Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new Vector2(0.0f));
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    Light light = new Light(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
+                    GpuLightWrapper light = new GpuLightWrapper(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
                     if (app.LightManager.AddLight(light))
                     {
                         SelectedEntity.Type = EntityType.Light;
@@ -898,23 +907,20 @@ namespace IDKEngine.Render
                         shouldUpdateMesh = true;
                     }
 
-                    if (ImGui.SliderFloat("RefractionChance", ref mesh.RefractionChance, 0.0f, 1.0f))
+                    if (ImGui.SliderFloat("TransmissionBias", ref mesh.TransmissionBias, -1.0f, 1.0f))
                     {
                         shouldUpdateMesh = true;
                     }
 
-                    if (ImGui.SliderFloat("IOR", ref mesh.IOR, 1.0f, 5.0f))
+                    if (ImGui.SliderFloat("IORBias", ref mesh.IORBias, -2.0f, 5.0f))
                     {
                         shouldUpdateMesh = true;
                     }
 
-                    tempVec3 = mesh.Absorbance.ToNumerics();
-                    if (ImGui.InputFloat3("Absorbance", ref tempVec3))
+                    tempVec3 = mesh.AbsorbanceBias.ToNumerics();
+                    if (ImGui.DragFloat3("AbsorbanceBias", ref tempVec3))
                     {
-                        Vector3 temp = tempVec3.ToOpenTK();
-                        temp = Vector3.ComponentMax(temp, Vector3.Zero);
-
-                        mesh.Absorbance = temp;
+                        mesh.AbsorbanceBias = tempVec3.ToOpenTK();
                         shouldUpdateMesh = true;
                     }
 
@@ -928,7 +934,7 @@ namespace IDKEngine.Render
                 {
                     bool shouldUpdateLight = false;
                     
-                    app.LightManager.TryGetLight(SelectedEntity.Index, out Light abstractLight);
+                    app.LightManager.TryGetLight(SelectedEntity.Index, out GpuLightWrapper abstractLight);
                     ref GpuLight light = ref abstractLight.GpuLight;
 
                     if (ImGui.Button("Delete"))

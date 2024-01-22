@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 
-namespace IDKEngine
+namespace IDKEngine.GpuTypes
 {
     struct GpuPointShadow
     {
