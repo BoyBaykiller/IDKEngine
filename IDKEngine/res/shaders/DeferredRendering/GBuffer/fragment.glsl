@@ -37,6 +37,9 @@ struct Material
     vec3 Absorbance;
     float IOR;
 
+    sampler2D Transmission;
+    uvec2 _pad0;
+
     sampler2D BaseColor;
     sampler2D MetallicRoughness;
 

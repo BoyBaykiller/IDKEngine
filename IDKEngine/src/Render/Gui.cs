@@ -76,7 +76,7 @@ namespace IDKEngine.Render
             System.Numerics.Vector3 tempVec3;
 
 
-            ImGui.Begin("Stats");
+            if (ImGui.Begin("Stats"))
             {
                 float mbDrawVertices = (app.ModelSystem.Vertices.Length * ((nint)sizeof(GpuVertex) + sizeof(Vector3))) / 1000000.0f;
                 float mbDrawIndices = (app.ModelSystem.VertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
@@ -106,11 +106,10 @@ namespace IDKEngine.Render
 
                     ImGui.TreePop();
                 }
-
-                ImGui.End();
             }
+            ImGui.End();
 
-            ImGui.Begin("Camera");
+            if (ImGui.Begin("Camera"))
             {
                 if (ImGui.CollapsingHeader("Collision Detection"))
                 {
@@ -153,10 +152,10 @@ namespace IDKEngine.Render
                         ImGui.SliderFloat("Gravity", ref app.GravityDownForce, 0.0f, 100.0f);
                     }
                 }
-                ImGui.End();
             }
+            ImGui.End();
 
-            ImGui.Begin("Frame Recorder");
+            if (ImGui.Begin("Frame Recorder"))
             {
                 if (FrameRecState != FrameRecorderState.Replaying)
                 {
@@ -226,12 +225,10 @@ namespace IDKEngine.Render
                     }
                     ImGui.Separator();
                 }
-
-
-                ImGui.End();
             }
+            ImGui.End();
 
-            ImGui.Begin("Renderer");
+            if (ImGui.Begin("Renderer"))
             {
                 ImGui.Text($"FPS: {app.FPS}");
                 ImGui.Text($"Viewport size: {app.RenderPresentationResolution.X}x{app.RenderPresentationResolution.Y}");
@@ -453,7 +450,7 @@ namespace IDKEngine.Render
                             );
 
                             tempInt = app.RasterizerPipeline.RayTracingSamples;
-                            if (ImGui.SliderInt("Samples##0", ref tempInt, 1, 10))
+                            if (ImGui.SliderInt("Samples##SamplesRayTracing", ref tempInt, 1, 10))
                             {
                                 app.RasterizerPipeline.RayTracingSamples = tempInt;
                             }
@@ -502,7 +499,7 @@ namespace IDKEngine.Render
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
                             );
 
-                            ImGui.SliderInt("Samples##1", ref app.RasterizerPipeline.TAASamples, 1, 36);
+                            ImGui.SliderInt("Samples##SamplesTAA", ref app.RasterizerPipeline.TAASamples, 1, 36);
 
                             if (!app.RasterizerPipeline.TaaResolve.IsNaiveTaa)
                             {
@@ -541,7 +538,7 @@ namespace IDKEngine.Render
                         if (app.IsVolumetricLighting)
                         {
                             tempInt = app.VolumetricLight.Samples;
-                            if (ImGui.SliderInt("Samples##2", ref tempInt, 1, 100))
+                            if (ImGui.SliderInt("Samples##SamplesVolumetricLight", ref tempInt, 1, 100))
                             {
                                 app.VolumetricLight.Samples = tempInt;
                             }
@@ -553,7 +550,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = app.VolumetricLight.Strength;
-                            if (ImGui.SliderFloat("Strength##0", ref tempFloat, 0.0f, 500.0f))
+                            if (ImGui.SliderFloat("Strength##StrengthVolumetricLight", ref tempFloat, 0.0f, 500.0f))
                             {
                                 app.VolumetricLight.Strength = tempFloat;
                             }
@@ -623,7 +620,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsSSAO)
                         {
                             tempInt = app.RasterizerPipeline.SSAO.Samples;
-                            if (ImGui.SliderInt("Samples##3", ref tempInt, 1, 50))
+                            if (ImGui.SliderInt("Samples##SamplesSSAO", ref tempInt, 1, 50))
                             {
                                 app.RasterizerPipeline.SSAO.Samples = tempInt;
                             }
@@ -635,7 +632,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = app.RasterizerPipeline.SSAO.Strength;
-                            if (ImGui.SliderFloat("Strength##1", ref tempFloat, 0.0f, 20.0f))
+                            if (ImGui.SliderFloat("Strength##StrengthSSAO", ref tempFloat, 0.0f, 20.0f))
                             {
                                 app.RasterizerPipeline.SSAO.Strength = tempFloat;
                             }
@@ -648,7 +645,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsSSR)
                         {
                             tempInt = app.RasterizerPipeline.SSR.Samples;
-                            if (ImGui.SliderInt("Samples##4", ref tempInt, 1, 100))
+                            if (ImGui.SliderInt("Samples##SamplesSSR", ref tempInt, 1, 100))
                             {
                                 app.RasterizerPipeline.SSR.Samples = tempInt;
                             }
@@ -682,6 +679,16 @@ namespace IDKEngine.Render
                         {
                             app.PathTracer.IsTraceLights = tempBool;
                         }
+
+                        tempBool = app.PathTracer.IsOnRefractionTintAlbedo;
+                        if (ImGui.Checkbox("IsOnRefractionTintAlbedo", ref tempBool))
+                        {
+                            app.PathTracer.IsOnRefractionTintAlbedo = tempBool;
+                        }
+                        ToolTipForItemAboveHovered(
+                                "This is required for gltF models to work correctly,\n" +
+                                "however it's not what Path Tracers typically do, so disabled by default"
+                            );
 
                         if (!app.PathTracer.IsDebugBVHTraversal)
                         {
@@ -788,10 +795,10 @@ namespace IDKEngine.Render
                     }
                 }
 
-                ImGui.End();
             }
+            ImGui.End();
 
-            ImGui.Begin("Entity Add");
+            if (ImGui.Begin("Entity Add"))
             {
                 if (ImGui.Button("Add light"))
                 {
@@ -820,7 +827,7 @@ namespace IDKEngine.Render
                     }
                     else if (result.Status != NativeFileDialogExtendedSharp.NfdStatus.Cancel)
                     {
-                        ModelLoader.Model newScene = ModelLoader.GltfToEngineFormat(result.Path);
+                        ModelLoader.Model newScene = ModelLoader.GltfToEngineFormat(result.Path, Matrix4.CreateTranslation(app.Camera.Position));
                         app.ModelSystem.Add(newScene);
 
                         int newMeshIndex = app.ModelSystem.Meshes.Length - 1;
@@ -836,8 +843,9 @@ namespace IDKEngine.Render
                     }
                 }
             }
+            ImGui.End();
 
-            ImGui.Begin("Entity Properties");
+            if (ImGui.Begin("Entity Properties"))
             {
                 if (SelectedEntity.Type != EntityType.None)
                 {
@@ -865,7 +873,7 @@ namespace IDKEngine.Render
                     {
                         shouldUpdateMesh = true;
                         Vector3 dif = tempVec3.ToOpenTK() - beforeTranslation;
-                        meshInstance.ModelMatrix *= Matrix4.CreateTranslation(dif);
+                        meshInstance.ModelMatrix = meshInstance.ModelMatrix * Matrix4.CreateTranslation(dif);
                     }
 
                     tempVec3 = meshInstance.ModelMatrix.ExtractScale().ToNumerics();
@@ -882,9 +890,11 @@ namespace IDKEngine.Render
                     {
                         shouldUpdateMesh = true;
                         Vector3 dif = tempVec3.ToOpenTK() - beforeAngles;
-                        meshInstance.ModelMatrix *= Matrix4.CreateRotationZ(dif.Z) *
+
+                        meshInstance.ModelMatrix =  Matrix4.CreateRotationZ(dif.Z) *
                                                     Matrix4.CreateRotationY(dif.Y) *
-                                                    Matrix4.CreateRotationX(dif.X);
+                                                    Matrix4.CreateRotationX(dif.X) *
+                                                    meshInstance.ModelMatrix;
                     }
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
@@ -1014,12 +1024,11 @@ namespace IDKEngine.Render
                 {
                     BothAxisCenteredText("PRESS E TO TOGGLE FREE CAMERA AND SELECT AN ENTITY");
                 }
-
-                ImGui.End();
             }
+            ImGui.End();
 
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(0.0f));
-            ImGui.Begin($"Viewport");
+            if (ImGui.Begin($"Viewport"))
             {
                 System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
                 if (content.X != app.RenderPresentationResolution.X || content.Y != app.RenderPresentationResolution.Y)
@@ -1031,10 +1040,10 @@ namespace IDKEngine.Render
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
                 ImGui.Image(app.TonemapAndGamma.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
-
-                ImGui.End();
-                ImGui.PopStyleVar();
             }
+            ImGui.PopStyleVar();
+            ImGui.End();
+
 
             if (shouldResetPT && app.PathTracer != null)
             {

@@ -100,6 +100,20 @@ namespace IDKEngine.Render
             }
         }
 
+        private bool _onRefractionTintAlbedo;
+        public bool IsOnRefractionTintAlbedo
+        {
+            get => _onRefractionTintAlbedo;
+
+            set
+            {
+                _onRefractionTintAlbedo = value;
+                firstHitProgram.Upload("IsOnRefractionTintAlbedo", IsOnRefractionTintAlbedo);
+                nHitProgram.Upload("IsOnRefractionTintAlbedo", IsOnRefractionTintAlbedo);
+                ResetRenderProcess();
+            }
+        }
+
         public Texture Result;
         private readonly ShaderProgram firstHitProgram;
         private readonly ShaderProgram nHitProgram;
