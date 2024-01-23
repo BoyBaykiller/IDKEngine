@@ -11,6 +11,7 @@ using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
 using StbImageWriteSharp;
 using IDKEngine.Render.Objects;
+using System.Diagnostics;
 
 namespace IDKEngine
 {
@@ -208,6 +209,8 @@ namespace IDKEngine
 
         public static unsafe Span<T> SpanReinterpret<T>(Span<byte> input) where T : unmanaged
         {
+            Debug.Assert(input.Length % sizeof(T) == 0);
+
             ref T reference = ref Unsafe.As<byte, T>(ref MemoryMarshal.GetReference(input));
             return MemoryMarshal.CreateSpan(ref reference, input.Length / sizeof(T));
         }

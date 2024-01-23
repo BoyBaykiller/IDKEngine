@@ -33,6 +33,9 @@ struct Material
     vec3 Absorbance;
     float IOR;
 
+    HF_SAMPLER_2D Transmission;
+    uvec2 _pad0;
+
     HF_SAMPLER_2D BaseColor;
     HF_SAMPLER_2D MetallicRoughness;
 
@@ -208,6 +211,7 @@ ivec2 ReorderInvocations(uint n);
 
 uniform bool IsDebugBVHTraversal;
 uniform bool IsTraceLights;
+uniform bool IsOnRefractionTintAlbedo;
 uniform float FocalLength;
 uniform float LenseRadius;
 
@@ -243,6 +247,7 @@ void main()
 
     wavefrontRay.Throughput = vec3(1.0);
     wavefrontRay.Radiance = vec3(0.0);
+    wavefrontRay.PreviousIOROrDebugNodeCounter = 1.0;
     
     uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
 
@@ -311,20 +316,19 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             normal = mix(worldNormal, normal, mesh.NormalMapStrength);
 
             ior = max(material.IOR + mesh.IORBias, 1.0);
-            absorbance = max(mesh.AbsorbanceBias + material.Absorbance, vec3(0.0));
             vec4 albedoAlpha = texture(material.BaseColor, interpTexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
             albedo = albedoAlpha.rgb;
+            absorbance = max(mesh.AbsorbanceBias + material.Absorbance, vec3(0.0));
             emissive = texture(material.Emissive, interpTexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + mesh.EmissiveBias * albedo;
             
-            transmissionChance = clamp(material.TransmissionFactor + mesh.TransmissionBias, 0.0, 1.0);
+            transmissionChance = clamp(texture(material.Transmission, interpTexCoord).r * material.TransmissionFactor + mesh.TransmissionBias, 0.0, 1.0);
             roughness = clamp(texture(material.MetallicRoughness, interpTexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
+            specularChance = clamp(texture(material.MetallicRoughness, interpTexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - transmissionChance);
             if (albedoAlpha.a < material.AlphaCutoff)
             {
-                transmissionChance = 1.0;
-                roughness = 0.0;
+                wavefrontRay.Origin += uncompressedDir * 0.001;
+                return true;
             }
-
-            specularChance = clamp(texture(material.MetallicRoughness, interpTexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - transmissionChance);
         }
         else if (IsTraceLights)
         {
@@ -369,7 +373,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         wavefrontRay.CompressedDirectionX = compressedDir.x;
         wavefrontRay.CompressedDirectionY = compressedDir.y;
 
-        if (!newRayRefractive)
+        if (!newRayRefractive || IsOnRefractionTintAlbedo)
         {
             wavefrontRay.Throughput *= albedo;
         }

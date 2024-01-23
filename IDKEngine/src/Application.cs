@@ -477,12 +477,13 @@ namespace IDKEngine
 
                 ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
-                //ModelLoader.Model emissiveTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\EmissiveStrengthTest\\glTF\\EmissiveStrengthTest.gltf");
+                //ModelLoader.Model emissiveTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\EmissiveStrengthTest\\glTF\\EmissiveStrengthTest.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-50.0f)) * Matrix4.CreateTranslation(10.0f, 2.0f, -9.0f));
                 //ModelLoader.Model attenuationTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\AttenuationTest\\glTF\\AttenuationTest.gltf");
                 //ModelLoader.Model transmissionRoughnessTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\TransmissionRoughnessTest\\glTF\\TransmissionRoughnessTest.gltf", Matrix4.CreateScale(10.0f));
-                //ModelLoader.Model dragonAttenuation = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\DragonAttenuation\\glTF\\DragonAttenuation.gltf", Matrix4.CreateScale(1.0f));
+                //ModelLoader.Model dragonAttenuation = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\DragonAttenuation\\glTF\\DragonAttenuation.gltf");
                 //ModelLoader.Model transmissionTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\TransmissionTest\\glTF\\TransmissionTest.gltf", Matrix4.CreateScale(10.0f));
-                //ModelSystem.Add(transmissionTest);
+                //ModelLoader.Model aBeautifulGame = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\ABeautifulGame\\glTF\\ABeautifulGame.gltf", Matrix4.CreateScale(10.0f));
+                //ModelSystem.Add(emissiveTest, aBeautifulGame);
 
                 ModelSystem.Add(sponza, lucy, helmet);
 
@@ -547,11 +548,11 @@ namespace IDKEngine
                 a.Meshes[324].EmissiveBias = 20.0f;
                 a.Meshes[376].EmissiveBias = 20.0f;
                 a.Meshes[379].EmissiveBias = 20.0f;
-                ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-                ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                //ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
+                //ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+                //ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelSystem.Add(a, b, c, d);
+                ModelSystem.Add(a);
 
                 //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.1f, 60.0f), 0);

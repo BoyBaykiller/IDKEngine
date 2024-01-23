@@ -37,8 +37,8 @@ Required OpenGL: 4.6 + `ARB_bindless_texture`
 # Path Traced Render Samples
 
 ![Path Traced Temple](Screenshots/Showcase/PTTemple.png?raw=true)
+![Path Traced Chess Board](Screenshots/Showcase/PTChessBoard.png?raw=true)
 ![Path Traced Sponza](Screenshots/Showcase/PTSponza.png?raw=true)
-![Path Traced Horse](Screenshots/Showcase/PTHorse.png?raw=true)
 
 ## Voxel Global Illumination
 

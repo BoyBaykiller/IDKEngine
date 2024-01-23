@@ -101,29 +101,33 @@ namespace IDKEngine.Render
             for (int i = 0; i < models.Length; i++)
             {
                 // Upon deletion these are the properties that need to be adjusted
-                for (int j = 0; j < models[i].Meshes.Length; j++)
+                Helper.ArrayAdd(ref Meshes, models[i].Meshes);
+                for (int j = Meshes.Length - models[i].Meshes.Length; j < Meshes.Length; j++)
                 {
-                    ref GpuMesh mesh = ref models[i].Meshes[j];
+                    ref GpuMesh mesh = ref Meshes[j];
                     mesh.MaterialIndex += Materials.Length;
                     mesh.MeshletsStart += Meshlets.Length;
                 }
-                for (int j = 0; j < models[i].Meshlets.Length; j++)
+
+                Helper.ArrayAdd(ref Meshlets, models[i].Meshlets);
+                for (int j = Meshlets.Length - models[i].Meshlets.Length; j < Meshlets.Length; j++)
                 {
-                    ref GpuMeshlet meshlet = ref models[i].Meshlets[j];
+                    ref GpuMeshlet meshlet = ref Meshlets[j];
                     meshlet.VertexOffset += (uint)MeshletsVertexIndices.Length;
                     meshlet.IndicesOffset += (uint)MeshletsLocalIndices.Length;
                 }
-                for (int j = 0; j < models[i].DrawCommands.Length; j++)
+
+                Helper.ArrayAdd(ref DrawCommands, models[i].DrawCommands);
+                int prevLength = DrawCommands.Length - models[i].DrawCommands.Length;
+                for (int j = prevLength; j < DrawCommands.Length; j++)
                 {
-                    ref GpuDrawElementsCmd drawCmd = ref models[i].DrawCommands[j];
-                    drawCmd.BaseInstance += DrawCommands.Length;
+                    ref GpuDrawElementsCmd drawCmd = ref DrawCommands[j];
+                    drawCmd.BaseInstance += prevLength;
                     drawCmd.BaseVertex += Vertices.Length;
                     drawCmd.FirstIndex += VertexIndices.Length;
                 }
 
 
-                Helper.ArrayAdd(ref DrawCommands, models[i].DrawCommands);
-                Helper.ArrayAdd(ref Meshes, models[i].Meshes);
                 Helper.ArrayAdd(ref MeshInstances, models[i].MeshInstances);
                 Helper.ArrayAdd(ref Materials, models[i].Materials);
                 
@@ -132,7 +136,6 @@ namespace IDKEngine.Render
                 Helper.ArrayAdd(ref VertexIndices, models[i].VertexIndices);
                 
                 Helper.ArrayAdd(ref MeshTasksCmds, models[i].MeshTasksCmds);
-                Helper.ArrayAdd(ref Meshlets, models[i].Meshlets);
                 Helper.ArrayAdd(ref MeshletsInfo, models[i].MeshletsInfo);
                 Helper.ArrayAdd(ref MeshletsVertexIndices, models[i].MeshletsVertexIndices);
                 Helper.ArrayAdd(ref MeshletsLocalIndices, models[i].MeshletsLocalIndices);

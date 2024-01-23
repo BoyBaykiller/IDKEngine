@@ -6,8 +6,8 @@
 // Also does not get rebuild automatically.
 #define USE_TLAS 0
 
-#define MAX_BLAS_TREE_DEPTH 16
-#define MAX_TLAS_TREE_DEPTH 16 // TODO: Fix traversal occasionally using more than CPU side MAX_TLAS_TREE_DEPTH  
+#define MAX_BLAS_TREE_DEPTH 22
+#define MAX_TLAS_TREE_DEPTH 18 // TODO: Fix traversal occasionally using more than CPU side MAX_TLAS_TREE_DEPTH  
 
 AppInclude(include/Ray.glsl)
 AppInclude(include/IntersectionRoutines.glsl)

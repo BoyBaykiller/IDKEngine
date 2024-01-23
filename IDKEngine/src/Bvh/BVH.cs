@@ -6,6 +6,7 @@ using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
+using System.Diagnostics;
 
 namespace IDKEngine
 {
@@ -133,8 +134,10 @@ namespace IDKEngine
             Helper.ArrayAdd(ref blases, newBlases);
             BlasesBuild(blases.Length - newBlases.Length, newBlases.Length);
 
+            Stopwatch sw = Stopwatch.StartNew();
             Tlas = new TLAS(blases, drawCommands, meshInstances);
             TlasBuild();
+            Logger.Log(Logger.LogLevel.Info, $"Created Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
         }
 
         public void TlasBuild()
@@ -150,7 +153,7 @@ namespace IDKEngine
 
         public void BlasesBuild(int start, int count)
         {
-            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+            Stopwatch sw = Stopwatch.StartNew();
             
             Parallel.For(start, start + count, i =>
             //for (int i = start; i < start + count; i++)
