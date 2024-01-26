@@ -276,7 +276,7 @@ void main()
     float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
     FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, alpha);
-    //FragColor = vec4(indirectLight, alpha);
+    // FragColor = vec4(albedo, 1.0);
 }
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight)

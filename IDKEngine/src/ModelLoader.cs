@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -47,41 +49,19 @@ namespace IDKEngine
 
         private struct TextureLoadData
         {
-            public ImageResult Image;
+            public Image EncodedImage;
+            public ColorComponents LoadComponents;
             public TextureMipMapFilter MinFilter;
             public TextureInterpolationFilter MagFilter;
             public GltfTextureWrapMode WrapS;
             public GltfTextureWrapMode WrapT;
             public SizedInternalFormat InternalFormat;
         }
-        private struct MaterialDetails
-        {
-            public Vector3 EmissiveFactor;
-            public uint BaseColorFactor;
-            public float TransmissionFactor;
-            public float AlphaCutoff;
-            public float RoughnessFactor;
-            public float MetallicFactor;
-            public Vector3 Absorbance;
-            public float IOR;
-
-            public static readonly MaterialDetails Default = new MaterialDetails()
-            {
-                EmissiveFactor = new Vector3(0.0f),
-                BaseColorFactor = Helper.CompressUR8G8B8A8(new Vector4(1.0f)),
-                TransmissionFactor = 0.0f,
-                AlphaCutoff = 0.5f,
-                RoughnessFactor = 1.0f,
-                MetallicFactor = 1.0f,
-                Absorbance = new Vector3(0.0f),
-                IOR = 1.0f, // by spec 1.5 IOR would be correct
-            };
-        }
         private struct MaterialLoadData
         {
-            public static readonly int TEXTURE_COUNT = Enum.GetValues<TextureLoadData>().Length;
+            public static readonly int TEXTURE_COUNT = Enum.GetValues<TextureType>().Length;
 
-            public enum TextureLoadData : int
+            public enum TextureType : int
             {
                 BaseColor,
                 MetallicRoughness,
@@ -90,28 +70,29 @@ namespace IDKEngine
                 Transmission,
             }
 
-            public ref ModelLoader.TextureLoadData this[TextureLoadData textureType]
+            public ref TextureLoadData this[TextureType textureType]
             {
                 get
                 {
                     switch (textureType)
                     {
-                        case TextureLoadData.BaseColor: return ref Unsafe.AsRef(BaseColorTexture);
-                        case TextureLoadData.MetallicRoughness: return ref Unsafe.AsRef(MetallicRoughnessTexture);
-                        case TextureLoadData.Normal: return ref Unsafe.AsRef(NormalTexture);
-                        case TextureLoadData.Emissive: return ref Unsafe.AsRef(EmissiveTexture);
-                        case TextureLoadData.Transmission: return ref Unsafe.AsRef(TransmissionTexture);
-                        default: throw new NotSupportedException($"Unsupported {nameof(TextureLoadData)} {textureType}");
+                        case TextureType.BaseColor: return ref Unsafe.AsRef(BaseColorTexture);
+                        case TextureType.MetallicRoughness: return ref Unsafe.AsRef(MetallicRoughnessTexture);
+                        case TextureType.Normal: return ref Unsafe.AsRef(NormalTexture);
+                        case TextureType.Emissive: return ref Unsafe.AsRef(EmissiveTexture);
+                        case TextureType.Transmission: return ref Unsafe.AsRef(TransmissionTexture);
+                        default: throw new NotSupportedException($"Unsupported {nameof(TextureType)} {textureType}");
                     }
                 }
             }
 
-            public ModelLoader.TextureLoadData BaseColorTexture;
-            public ModelLoader.TextureLoadData MetallicRoughnessTexture;
-            public ModelLoader.TextureLoadData NormalTexture;
-            public ModelLoader.TextureLoadData EmissiveTexture;
-            public ModelLoader.TextureLoadData TransmissionTexture;
-            public MaterialDetails MaterialDetails;
+            public MaterialParams MaterialParams;
+
+            public TextureLoadData BaseColorTexture;
+            public TextureLoadData MetallicRoughnessTexture;
+            public TextureLoadData NormalTexture;
+            public TextureLoadData EmissiveTexture;
+            public TextureLoadData TransmissionTexture;
 
             public static readonly MaterialLoadData Default = new MaterialLoadData()
             {
@@ -120,7 +101,30 @@ namespace IDKEngine
                 NormalTexture = { },
                 EmissiveTexture = { },
                 TransmissionTexture = { },
-                MaterialDetails = MaterialDetails.Default,
+                MaterialParams = MaterialParams.Default,
+            };
+        }
+        private struct MaterialParams
+        {
+            public Vector3 EmissiveFactor;
+            public Vector4 BaseColorFactor;
+            public float TransmissionFactor;
+            public float AlphaCutoff;
+            public float RoughnessFactor;
+            public float MetallicFactor;
+            public Vector3 Absorbance;
+            public float IOR;
+
+            public static readonly MaterialParams Default = new MaterialParams()
+            {
+                EmissiveFactor = new Vector3(0.0f),
+                BaseColorFactor = new Vector4(1.0f),
+                TransmissionFactor = 0.0f,
+                AlphaCutoff = 0.5f,
+                RoughnessFactor = 1.0f,
+                MetallicFactor = 1.0f,
+                Absorbance = new Vector3(0.0f),
+                IOR = 1.0f, // by spec 1.5 IOR would be correct
             };
         }
         private struct MeshMeshletsData
@@ -148,13 +152,16 @@ namespace IDKEngine
                 return new Model();
             }
 
+            Stopwatch sw = Stopwatch.StartNew();
+
             Model model = LoadFromFile(path, rootTransform);
-            Logger.Log(Logger.LogLevel.Info, $"Loaded model {path} (VS Triangles = ({model.VertexIndices.Length / 3}) (MS Triangles = ({model.MeshletsLocalIndices.Length / 3})");
+
+            Logger.Log(Logger.LogLevel.Info, $"Loaded {Path.GetFileName(path)} in {sw.ElapsedMilliseconds}ms (VS Triangles = ({model.VertexIndices.Length / 3}) (MS Triangles = ({model.MeshletsLocalIndices.Length / 3})");
 
             return model;
         }
 
-        public static Model LoadFromFile(string path, Matrix4 rootTransform)
+        private static Model LoadFromFile(string path, Matrix4 rootTransform)
         {
             ModelRoot gltfFile = ModelRoot.Load(path, new ReadSettings() { Validation = SharpGLTF.Validation.ValidationMode.Skip });
 
@@ -170,9 +177,10 @@ namespace IDKEngine
                     Logger.Log(Logger.LogLevel.Warn, $"Model {gltfFilePathName} uses extension {ext} which is not supported");
                 }
             }
-            
-            MaterialLoadData[] gpuMaterialsLoadData = GetGpuMaterialLoadDataFromGltf(gltfFile);
-            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(gpuMaterialsLoadData));
+
+            MaterialLoadData[] materialsLoadData = GetMaterialLoadDataFromGltf(gltfFile.LogicalMaterials);
+            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(materialsLoadData));
+
             List<GpuMesh> listMeshes = new List<GpuMesh>();
             List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
             List<GpuDrawElementsCmd> listDrawCommands = new List<GpuDrawElementsCmd>();
@@ -257,7 +265,7 @@ namespace IDKEngine
                     mesh.AbsorbanceBias = new Vector3(0.0f);
                     if (gltfMeshPrimitive.Material != null)
                     {
-                        bool hasNormalMap = gpuMaterialsLoadData[gltfMeshPrimitive.Material.LogicalIndex].NormalTexture.Image != null;
+                        bool hasNormalMap = materialsLoadData[gltfMeshPrimitive.Material.LogicalIndex].NormalTexture.EncodedImage != null;
                         mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
                         mesh.MaterialIndex = gltfMeshPrimitive.Material.LogicalIndex;
                     }
@@ -315,147 +323,183 @@ namespace IDKEngine
             return model;
         }
 
-        private static unsafe MaterialLoadData[] GetGpuMaterialLoadDataFromGltf(ModelRoot gltf)
+        private static unsafe GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadData)
         {
-            MaterialLoadData[] materialsLoadData = new MaterialLoadData[gltf.LogicalMaterials.Count];
+            GLTexture defaultTexture = new GLTexture(TextureTarget2d.Texture2D);
+            defaultTexture.ImmutableAllocate(1, 1, 1, SizedInternalFormat.Rgba16f);
+            defaultTexture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
+            defaultTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB();
 
-            //for (int i = 0; i < materialsLoadData.Length; i++)
-            //{
-            //    materialsLoadData[i] = MaterialLoadData.Default;
-            //}
-            //return materialsLoadData;
-
-            Parallel.For(0, materialsLoadData.Length * MaterialLoadData.TEXTURE_COUNT, i =>
+            GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
+            for (int i = 0; i < gpuMaterials.Length; i++)
             {
-                int materialIndex = i / MaterialLoadData.TEXTURE_COUNT;
-                int textureIndex = i % MaterialLoadData.TEXTURE_COUNT;
+                ref readonly MaterialLoadData materialLoadData = ref materialsLoadData[i];
+                ref GpuMaterial gpuMaterial = ref gpuMaterials[i];
 
-                Material gltfMaterial = gltf.LogicalMaterials[materialIndex];
-                ref MaterialLoadData materialData = ref materialsLoadData[materialIndex];
-
-                // Let one thread load non image data
-                if (textureIndex == 0)
+                MaterialParams materialParams = materialLoadData.MaterialParams;
+                gpuMaterial.EmissiveFactor = materialParams.EmissiveFactor;
+                gpuMaterial.BaseColorFactor = Helper.CompressUR8G8B8A8(materialParams.BaseColorFactor);
+                gpuMaterial.TransmissionFactor = materialParams.TransmissionFactor;
+                gpuMaterial.AlphaCutoff = materialParams.AlphaCutoff;
+                gpuMaterial.RoughnessFactor = materialParams.RoughnessFactor;
+                gpuMaterial.MetallicFactor = materialParams.MetallicFactor;
+                gpuMaterial.Absorbance = materialParams.Absorbance;
+                gpuMaterial.IOR = materialParams.IOR;
+                
+                for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
                 {
-                    materialData.MaterialDetails = MaterialDetails.Default;
-                    materialData.MaterialDetails.AlphaCutoff = gltfMaterial.AlphaCutoff;
-                    if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.OPAQUE)
+                    GpuMaterial.TextureHandle textureType = (GpuMaterial.TextureHandle)j;
+                    TextureLoadData textureLoadData = materialLoadData[(MaterialLoadData.TextureType)textureType];
+                    if (textureLoadData.EncodedImage == null)
                     {
-                        materialData.MaterialDetails.AlphaCutoff = -1.0f;
+                        gpuMaterial[textureType] = defaultTextureHandle;
+                        continue;
                     }
 
-                    MaterialChannel? emissiveChannel = gltfMaterial.FindChannel(KnownChannel.Emissive.ToString());
-                    if (emissiveChannel.HasValue)
+                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
+                    SamplerObject sampler = new SamplerObject();
+                    if (textureType == GpuMaterial.TextureHandle.MetallicRoughness)
                     {
-                        // KHR_materials_emissive_strength
-                        float emissiveStrength = 1.0f;
-                        AssignMaterialParamIfFound(ref emissiveStrength, emissiveChannel.Value, KnownProperty.EmissiveStrength);
-
-                        materialData.MaterialDetails.EmissiveFactor = emissiveChannel.Value.Color.ToOpenTK().Xyz * emissiveStrength;
+                        // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
+                        // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
+                        texture.SetSwizzleR(All.Blue);
                     }
 
-                    MaterialChannel? metallicRoughnessChannel = gltfMaterial.FindChannel(KnownChannel.MetallicRoughness.ToString());
-                    if (metallicRoughnessChannel.HasValue)
+                    bool mipmapsRequired = IsMipMapFilter(textureLoadData.MinFilter);
+                    int rawImageSizeInBytes = 0;
                     {
-                        AssignMaterialParamIfFound(ref materialData.MaterialDetails.RoughnessFactor, metallicRoughnessChannel.Value, KnownProperty.RoughnessFactor);
-                        AssignMaterialParamIfFound(ref materialData.MaterialDetails.MetallicFactor, metallicRoughnessChannel.Value, KnownProperty.MetallicFactor);
-                    }
+                        using Stream imageStream = textureLoadData.EncodedImage.Content.Open();
 
-                    MaterialChannel? baseColorChannel = gltfMaterial.FindChannel(KnownChannel.BaseColor.ToString());
-                    if (baseColorChannel.HasValue)
-                    {
-                        System.Numerics.Vector4 baseColor = new System.Numerics.Vector4();
-                        if (AssignMaterialParamIfFound(ref baseColor, baseColorChannel.Value, KnownProperty.RGBA))
+                        int imageWidth, imageHeight, comp;
+                        StbImage.stbi__info_main(new StbImage.stbi__context(imageStream), &imageWidth, &imageHeight, &comp);
+
+                        int levels = mipmapsRequired ? GLTexture.GetMaxMipmapLevel(imageWidth, imageHeight, 1) : 1;
+                        texture.ImmutableAllocate(imageWidth, imageHeight, 1, textureLoadData.InternalFormat, levels);
+                        if (mipmapsRequired)
                         {
-                            materialData.MaterialDetails.BaseColorFactor = Helper.CompressUR8G8B8A8(baseColor.ToOpenTK());
+                            sampler.SetSamplerParamter(SamplerParameterName.TextureMaxAnisotropyExt, 4.0f);
                         }
+                        sampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)textureLoadData.MinFilter);
+                        sampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)textureLoadData.MagFilter);
+                        sampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)textureLoadData.WrapS);
+                        sampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)textureLoadData.WrapT);
+
+                        gpuMaterial[textureType] = texture.GetTextureHandleARB(sampler);
+
+                        rawImageSizeInBytes = imageWidth * imageHeight * ColorComponentsToNumChannels(textureLoadData.LoadComponents);
                     }
 
-                    MaterialChannel? transmissionChannel = gltfMaterial.FindChannel(KnownChannel.Transmission.ToString());
-                    if (transmissionChannel.HasValue) // KHR_materials_transmission
+                    // AMD driver bug: If you generate a texture handle from a texture with CompressedSrgbAlphaBptcUnorm format
+                    // and generate mipmaps after that it only contains the first mip level when sampling
+
+                    TypedBuffer<byte> stagingBuffer = new TypedBuffer<byte>();
+                    stagingBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.MappedStorage, rawImageSizeInBytes);
+
+                    MainThreadQueue.Enqueue(() =>
                     {
-                        AssignMaterialParamIfFound(ref materialData.MaterialDetails.TransmissionFactor, transmissionChannel.Value, KnownProperty.TransmissionFactor);
+                        // Leave some threads free for rendering
+                        int threadPoolThreads = Math.Max(Environment.ProcessorCount - 2, 1);
+                        ThreadPool.SetMaxThreads(threadPoolThreads, 1);
+                        ThreadPool.SetMinThreads(threadPoolThreads, 1);
 
-                        if (materialData.MaterialDetails.TransmissionFactor > 0.001f)
+                        ThreadPool.QueueUserWorkItem((object state) =>
                         {
-                            // KHR_materials_ior
-                            // This is here because I only want to set IOR for transmissive objects,
-                            // because for opaque objects default value of 1.5 looks bad
-                            materialData.MaterialDetails.IOR = gltfMaterial.IndexOfRefraction; 
-                        }
-                    }
+                            //Thread.Sleep(new Random(Thread.CurrentThread.ManagedThreadId).Next(600, 6000));
 
-                    MaterialChannel? volumeAttenuationChannel = gltfMaterial.FindChannel(KnownChannel.VolumeAttenuation.ToString());
-                    if (volumeAttenuationChannel.HasValue) // KHR_materials_volume
-                    {
-                        Vector3 gltfAttenuationColor = new Vector3(1.0f);
-                        System.Numerics.Vector3 numericsGltfAttenuationColor = new System.Numerics.Vector3();
-                        if (AssignMaterialParamIfFound(ref numericsGltfAttenuationColor, volumeAttenuationChannel.Value, KnownProperty.RGB))
-                        {
-                            gltfAttenuationColor = numericsGltfAttenuationColor.ToOpenTK();
-                        }
+                            int imageWidth;
+                            int imageHeight;
+                            PixelFormat pixelFormat;
+                            {
+                                using Stream imageStream = textureLoadData.EncodedImage.Content.Open();
 
-                        float gltfAttenuationDistance = float.PositiveInfinity;
-                        AssignMaterialParamIfFound(ref gltfAttenuationDistance, volumeAttenuationChannel.Value, KnownProperty.AttenuationDistance);
-                        if (gltfAttenuationDistance == 0.0f)
-                        {
-                            // 0.0f is SharpGLTF's default https://github.com/vpenades/SharpGLTF/issues/215
-                            gltfAttenuationDistance = float.MaxValue;
-                        }
+                                ImageResult imageResult = ImageResult.FromStream(imageStream, textureLoadData.LoadComponents);
+                                Helper.MemCpy(imageResult.Data[0], ref Unsafe.AsRef<byte>(stagingBuffer.MappedMemory), (nuint)imageResult.Data.Length);
 
+                                imageWidth = imageResult.Width;
+                                imageHeight = imageResult.Height;
+                                pixelFormat = ColorComponentsToPixelFormat(imageResult.Comp);
+                            }
 
-                        // Source: https://github.com/DassaultSystemes-Technology/dspbr-pt/blob/e7cfa6e9aab2b99065a90694e1f58564d675c1a4/packages/lib/shader/integrator/pt.glsl#L24
-                        // We can combine glTF Attenuation Color and Distance into a single Absorbance value
-                        float x = -MathF.Log(gltfAttenuationColor.X) / gltfAttenuationDistance;
-                        float y = -MathF.Log(gltfAttenuationColor.Y) / gltfAttenuationDistance;
-                        float z = -MathF.Log(gltfAttenuationColor.Z) / gltfAttenuationDistance;
-                        Vector3 absorbance = new Vector3(x, y, z);
-                        materialData.MaterialDetails.Absorbance = absorbance;
-                    }
+                            MainThreadQueue.Enqueue(() =>
+                            {
+                                stagingBuffer.Bind(BufferTarget.PixelUnpackBuffer);
+                                texture.SubTexture2D(imageWidth, imageHeight, pixelFormat, PixelType.UnsignedByte, IntPtr.Zero);
+                                BufferObject.Unbind(BufferTarget.PixelUnpackBuffer);
+
+                                if (mipmapsRequired)
+                                {
+                                    texture.GenerateMipmap();
+                                }
+
+                                stagingBuffer.Dispose();
+                            });
+                        });
+                    });
+                }
+            };
+
+            return gpuMaterials;
+        }
+
+        private static MaterialLoadData[] GetMaterialLoadDataFromGltf(IReadOnlyList<Material> gltfMaterials)
+        {
+            MaterialLoadData[] materialsLoadData = new MaterialLoadData[gltfMaterials.Count];
+            for (int i = 0; i < gltfMaterials.Count; i++)
+            {
+                Material gltfMaterial = gltfMaterials[i];
+                MaterialLoadData materialLoadData = MaterialLoadData.Default;
+
+                materialLoadData.MaterialParams = GetMaterialParams(gltfMaterial);
+
+                for (int j = 0; j < MaterialLoadData.TEXTURE_COUNT; j++)
+                {
+                    MaterialLoadData.TextureType textureType = MaterialLoadData.TextureType.BaseColor + j;
+                    materialLoadData[textureType] = GetTextureLoadData(gltfMaterial, textureType);
                 }
 
-                MaterialLoadData.TextureLoadData textureType = (MaterialLoadData.TextureLoadData)textureIndex;
-
-                TextureLoadData textureLoadData = GetGLTextureLoadData(gltfMaterial, textureType);
-                materialData[textureType] = textureLoadData;
-            });
-
+                materialsLoadData[i] = materialLoadData;
+                //materialsLoadData[i] = MaterialLoadData.Default;
+            }
 
             return materialsLoadData;
         }
-        private static TextureLoadData GetGLTextureLoadData(Material material, MaterialLoadData.TextureLoadData textureType)
+        private static TextureLoadData GetTextureLoadData(Material material, MaterialLoadData.TextureType textureType)
         {
             TextureLoadData textureLoadData = new TextureLoadData();
-            ColorComponents imageColorComponents = ColorComponents.Default;
             MaterialChannel? materialChannel = null;
-            if (textureType == MaterialLoadData.TextureLoadData.BaseColor)
+
+            if (textureType == MaterialLoadData.TextureType.BaseColor)
             {
                 textureLoadData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
                 //glTextureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
-                imageColorComponents = ColorComponents.RedGreenBlueAlpha;
+                textureLoadData.LoadComponents = ColorComponents.RedGreenBlueAlpha;
                 materialChannel = material.FindChannel(KnownChannel.BaseColor.ToString());
             }
-            else if (textureType == MaterialLoadData.TextureLoadData.MetallicRoughness)
+            else if (textureType == MaterialLoadData.TextureType.MetallicRoughness)
             {
                 textureLoadData.InternalFormat = SizedInternalFormat.R11fG11fB10f;
-                imageColorComponents = ColorComponents.RedGreenBlue;
+                textureLoadData.LoadComponents = ColorComponents.RedGreenBlue;
                 materialChannel = material.FindChannel(KnownChannel.MetallicRoughness.ToString());
             }
-            else if (textureType == MaterialLoadData.TextureLoadData.Normal)
+            else if (textureType == MaterialLoadData.TextureType.Normal)
             {
                 textureLoadData.InternalFormat = SizedInternalFormat.R11fG11fB10f;
-                imageColorComponents = ColorComponents.RedGreenBlue;
+                textureLoadData.LoadComponents = ColorComponents.RedGreenBlue;
                 materialChannel = material.FindChannel(KnownChannel.Normal.ToString());
             }
-            else if (textureType == MaterialLoadData.TextureLoadData.Emissive)
+            else if (textureType == MaterialLoadData.TextureType.Emissive)
             {
-                textureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
-                imageColorComponents = ColorComponents.RedGreenBlue;
+                textureLoadData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
+                //textureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
+
+                textureLoadData.LoadComponents = ColorComponents.RedGreenBlue;
                 materialChannel = material.FindChannel(KnownChannel.Emissive.ToString());
             }
-            else if (textureType == MaterialLoadData.TextureLoadData.Transmission)
+            else if (textureType == MaterialLoadData.TextureType.Transmission)
             {
                 textureLoadData.InternalFormat = SizedInternalFormat.R8;
-                imageColorComponents = ColorComponents.Grey;
+                textureLoadData.LoadComponents = ColorComponents.Grey;
                 materialChannel = material.FindChannel(KnownChannel.Transmission.ToString());
             }
 
@@ -470,8 +514,7 @@ namespace IDKEngine
                 return textureLoadData;
             }
 
-            using Stream stream = gltfTexture.PrimaryImage.Content.Open();
-            textureLoadData.Image = ImageResult.FromStream(stream, imageColorComponents);
+            textureLoadData.EncodedImage = gltfTexture.PrimaryImage;
 
             if (gltfTexture.Sampler == null)
             {
@@ -497,74 +540,6 @@ namespace IDKEngine
             }
 
             return textureLoadData;
-        }
-
-        private static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadInfo)
-        {
-            GLTexture defaultTexture = new GLTexture(TextureTarget2d.Texture2D);
-            defaultTexture.ImmutableAllocate(1, 1, 1, SizedInternalFormat.Rgba16f);
-            defaultTexture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
-            defaultTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB();
-
-            GpuMaterial[] materials = new GpuMaterial[materialsLoadInfo.Length];
-            for (int i = 0; i < materials.Length; i++)
-            {
-                ref GpuMaterial gpuMaterial = ref materials[i];
-                ref readonly MaterialLoadData materialLoadData = ref materialsLoadInfo[i];
-
-                gpuMaterial.EmissiveFactor = materialLoadData.MaterialDetails.EmissiveFactor;
-                gpuMaterial.BaseColorFactor = materialLoadData.MaterialDetails.BaseColorFactor;
-                gpuMaterial.TransmissionFactor = materialLoadData.MaterialDetails.TransmissionFactor;
-                gpuMaterial.AlphaCutoff = materialLoadData.MaterialDetails.AlphaCutoff;
-                gpuMaterial.RoughnessFactor = materialLoadData.MaterialDetails.RoughnessFactor;
-                gpuMaterial.MetallicFactor = materialLoadData.MaterialDetails.MetallicFactor;
-                gpuMaterial.Absorbance = materialLoadData.MaterialDetails.Absorbance;
-                gpuMaterial.IOR = materialLoadData.MaterialDetails.IOR;
-                
-                for (int j = 0; j < MaterialLoadData.TEXTURE_COUNT; j++)
-                {
-                    MaterialLoadData.TextureLoadData textureType = (MaterialLoadData.TextureLoadData)j;
-                    TextureLoadData textureLoadData = materialLoadData[textureType];
-                    if (textureLoadData.Image == null)
-                    {
-                        gpuMaterial[(GpuMaterial.TextureHandle)textureType] = defaultTextureHandle;
-                        continue;
-                    }
-
-                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
-                    SamplerObject sampler = new SamplerObject();
-
-                    if (textureType == MaterialLoadData.TextureLoadData.MetallicRoughness)
-                    {
-                        // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
-                        // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
-                        texture.SetSwizzleR(All.Blue);
-                    }
-
-                    ConfigureGLTextureAndSampler(materialLoadData[textureType], texture, sampler);
-                    gpuMaterial[(GpuMaterial.TextureHandle)textureType] = texture.GetTextureHandleARB(sampler);
-                }
-            }
-
-            return materials;
-        }
-        private static void ConfigureGLTextureAndSampler(TextureLoadData configuration, GLTexture texture, SamplerObject sampler)
-        {
-            bool mipmapsRequired = IsMipMapFilter(configuration.MinFilter);
-            int levels = mipmapsRequired ? Math.Max(GLTexture.GetMaxMipmapLevel(configuration.Image.Width, configuration.Image.Height, 1), 1) : 1;
-            texture.ImmutableAllocate(configuration.Image.Width, configuration.Image.Height, 1, configuration.InternalFormat, levels);
-            texture.SubTexture2D(configuration.Image.Width, configuration.Image.Height, ColorComponentsToPixelFormat(configuration.Image.Comp), PixelType.UnsignedByte, configuration.Image.Data);
-
-            if (mipmapsRequired)
-            {
-                sampler.SetSamplerParamter(SamplerParameterName.TextureMaxAnisotropyExt, 4.0f);
-                texture.GenerateMipmap();
-            }
-            sampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)configuration.MinFilter);
-            sampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)configuration.MagFilter);
-            sampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)configuration.WrapS);
-            sampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)configuration.WrapT);
         }
 
         private static unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertexData(MeshPrimitive meshPrimitive)
@@ -626,6 +601,86 @@ namespace IDKEngine
             return vertexIndices;
         }
 
+        private static MaterialParams GetMaterialParams(Material gltfMaterial)
+        {
+            MaterialParams materialParams = MaterialParams.Default;
+            materialParams.AlphaCutoff = gltfMaterial.AlphaCutoff;
+            if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.OPAQUE)
+            {
+                materialParams.AlphaCutoff = -1.0f;
+            }
+
+            MaterialChannel? emissiveChannel = gltfMaterial.FindChannel(KnownChannel.Emissive.ToString());
+            if (emissiveChannel.HasValue)
+            {
+                // KHR_materials_emissive_strength
+                float emissiveStrength = 1.0f;
+                AssignMaterialParamIfFound(ref emissiveStrength, emissiveChannel.Value, KnownProperty.EmissiveStrength);
+
+                materialParams.EmissiveFactor = emissiveChannel.Value.Color.ToOpenTK().Xyz * emissiveStrength;
+            }
+
+            MaterialChannel? metallicRoughnessChannel = gltfMaterial.FindChannel(KnownChannel.MetallicRoughness.ToString());
+            if (metallicRoughnessChannel.HasValue)
+            {
+                AssignMaterialParamIfFound(ref materialParams.RoughnessFactor, metallicRoughnessChannel.Value, KnownProperty.RoughnessFactor);
+                AssignMaterialParamIfFound(ref materialParams.MetallicFactor, metallicRoughnessChannel.Value, KnownProperty.MetallicFactor);
+            }
+
+            MaterialChannel? baseColorChannel = gltfMaterial.FindChannel(KnownChannel.BaseColor.ToString());
+            if (baseColorChannel.HasValue)
+            {
+                System.Numerics.Vector4 baseColor = new System.Numerics.Vector4();
+                if (AssignMaterialParamIfFound(ref baseColor, baseColorChannel.Value, KnownProperty.RGBA))
+                {
+                    materialParams.BaseColorFactor = baseColor.ToOpenTK();
+                }
+            }
+
+            MaterialChannel? transmissionChannel = gltfMaterial.FindChannel(KnownChannel.Transmission.ToString());
+            if (transmissionChannel.HasValue) // KHR_materials_transmission
+            {
+                AssignMaterialParamIfFound(ref materialParams.TransmissionFactor, transmissionChannel.Value, KnownProperty.TransmissionFactor);
+
+                if (materialParams.TransmissionFactor > 0.001f)
+                {
+                    // KHR_materials_ior
+                    // This is here because I only want to set IOR for transmissive objects,
+                    // because for opaque objects default value of 1.5 looks bad
+                    materialParams.IOR = gltfMaterial.IndexOfRefraction;
+                }
+            }
+
+            MaterialChannel? volumeAttenuationChannel = gltfMaterial.FindChannel(KnownChannel.VolumeAttenuation.ToString());
+            if (volumeAttenuationChannel.HasValue) // KHR_materials_volume
+            {
+                Vector3 gltfAttenuationColor = new Vector3(1.0f);
+                System.Numerics.Vector3 numericsGltfAttenuationColor = new System.Numerics.Vector3();
+                if (AssignMaterialParamIfFound(ref numericsGltfAttenuationColor, volumeAttenuationChannel.Value, KnownProperty.RGB))
+                {
+                    gltfAttenuationColor = numericsGltfAttenuationColor.ToOpenTK();
+                }
+
+                float gltfAttenuationDistance = float.PositiveInfinity;
+                AssignMaterialParamIfFound(ref gltfAttenuationDistance, volumeAttenuationChannel.Value, KnownProperty.AttenuationDistance);
+                if (gltfAttenuationDistance == 0.0f)
+                {
+                    // 0.0f is SharpGLTF's default https://github.com/vpenades/SharpGLTF/issues/215
+                    gltfAttenuationDistance = float.PositiveInfinity;
+                }
+
+
+                // Source: https://github.com/DassaultSystemes-Technology/dspbr-pt/blob/e7cfa6e9aab2b99065a90694e1f58564d675c1a4/packages/lib/shader/integrator/pt.glsl#L24
+                // We can combine glTF Attenuation Color and Distance into a single Absorbance value
+                float x = -MathF.Log(gltfAttenuationColor.X) / gltfAttenuationDistance;
+                float y = -MathF.Log(gltfAttenuationColor.Y) / gltfAttenuationDistance;
+                float z = -MathF.Log(gltfAttenuationColor.Z) / gltfAttenuationDistance;
+                Vector3 absorbance = new Vector3(x, y, z);
+                materialParams.Absorbance = absorbance;
+            }
+
+            return materialParams;
+        }
         private static bool AssignMaterialParamIfFound<T>(ref T result, MaterialChannel materialChannel, KnownProperty property)
         {
             foreach (IMaterialParameter param in materialChannel.Parameters)
@@ -650,6 +705,18 @@ namespace IDKEngine
                 _ => throw new NotSupportedException($"Unsupported {nameof(EncodingType)} {componentType}"),
             };
             return size;
+        }
+        private static int ColorComponentsToNumChannels(ColorComponents colorComponents)
+        {
+            int numChannels = colorComponents switch
+            {
+                ColorComponents.Grey => 1,
+                ColorComponents.GreyAlpha => 2,
+                ColorComponents.RedGreenBlue => 3,
+                ColorComponents.RedGreenBlueAlpha => 4,
+                _ => throw new NotSupportedException($"Unsupported {nameof(ColorComponents)} {colorComponents}"),
+            };
+            return numChannels;
         }
         private static PixelFormat ColorComponentsToPixelFormat(ColorComponents colorComponents)
         {

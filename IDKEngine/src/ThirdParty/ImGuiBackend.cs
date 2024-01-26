@@ -256,8 +256,8 @@ namespace IDKEngine.GUI
             {
                 ImDrawListPtr cmd_list = drawData.CmdLists[i];
 
-                vbo.SubData(0, cmd_list.VtxBuffer.Size * sizeof(ImDrawVert), cmd_list.VtxBuffer.Data);
-                ebo.SubData(0, cmd_list.IdxBuffer.Size * sizeof(ushort), cmd_list.IdxBuffer.Data);
+                vbo.UploadData(0, cmd_list.VtxBuffer.Size * sizeof(ImDrawVert), cmd_list.VtxBuffer.Data);
+                ebo.UploadData(0, cmd_list.IdxBuffer.Size * sizeof(ushort), cmd_list.IdxBuffer.Data);
 
                 int idx_offset = 0;
 

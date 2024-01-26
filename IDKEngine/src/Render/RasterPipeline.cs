@@ -156,10 +156,10 @@ namespace IDKEngine.Render
         private readonly Framebuffer deferredLightingFBO;
         private readonly Framebuffer hiZDownsampleFBO;
 
-        private readonly BufferObject taaDataBuffer;
+        private readonly TypedBuffer<GpuTaaData> taaDataBuffer;
         private GpuTaaData gpuTaaData;
 
-        private readonly BufferObject gBufferData;
+        private readonly TypedBuffer<GpuGBuffer> gBufferData;
         private GpuGBuffer gpuGBufferData;
 
         private int frameIndex;
@@ -203,12 +203,12 @@ namespace IDKEngine.Render
 
             mergeLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MergeTextures/compute.glsl")));
 
-            taaDataBuffer = new BufferObject();
-            taaDataBuffer.ImmutableAllocate(sizeof(GpuTaaData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            taaDataBuffer = new TypedBuffer<GpuTaaData>();
+            taaDataBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
             taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
-            gBufferData = new BufferObject();
-            gBufferData.ImmutableAllocate(sizeof(GpuGBuffer), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            gBufferData = new TypedBuffer<GpuGBuffer>();
+            gBufferData.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
             gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
 
             gBufferFBO = new Framebuffer();
@@ -262,7 +262,7 @@ namespace IDKEngine.Render
                     gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
                 }
                 gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasing;
-                taaDataBuffer.SubData(0, sizeof(GpuTaaData), gpuTaaData);
+                taaDataBuffer.UploadElements(gpuTaaData);
 
                 frameIndex++;
             }
@@ -517,7 +517,7 @@ namespace IDKEngine.Render
             DepthTexture.ImmutableAllocate(renderWidth, renderHeight, 1, SizedInternalFormat.DepthComponent24, Texture.GetMaxMipmapLevel(renderWidth, renderHeight, 1));
             gpuGBufferData.DepthTextureHandle = DepthTexture.GetTextureHandleARB();
 
-            gBufferData.SubData(0, sizeof(GpuGBuffer), gpuGBufferData);
+            gBufferData.UploadElements(gpuGBufferData);
 
             gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, resultBeforeTAA);
             gBufferFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment1, AlbedoAlphaTexture);

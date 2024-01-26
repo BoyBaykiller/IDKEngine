@@ -205,6 +205,8 @@ namespace IDKEngine
 
         private unsafe void Update(float dT)
         {
+            MainThreadQueue.Execute();
+
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
                 FPS = fpsCounter;
@@ -342,7 +344,7 @@ namespace IDKEngine
                 GpuBasicData.Time = WindowTime;
                 GpuBasicData.Frame++;
 
-                basicDataBuffer.SubData(0, sizeof(GpuBasicData), GpuBasicData);
+                basicDataBuffer.UploadElements(GpuBasicData);
             }
 
             LightManager.UpdateBufferData();
@@ -393,7 +395,7 @@ namespace IDKEngine
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
 
-        private BufferObject basicDataBuffer;
+        private TypedBuffer<GpuBasicData> basicDataBuffer;
         public GpuBasicData GpuBasicData;
         protected override unsafe void OnStart()
         {
@@ -422,9 +424,10 @@ namespace IDKEngine
             GL.Enable(EnableCap.ScissorTest);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
+            GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
 
-            basicDataBuffer = new BufferObject();
-            basicDataBuffer.ImmutableAllocate(sizeof(GpuBasicData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            basicDataBuffer = new TypedBuffer<GpuBasicData>();
+            basicDataBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             finalProgram = new ShaderProgram(
@@ -483,7 +486,7 @@ namespace IDKEngine
                 //ModelLoader.Model dragonAttenuation = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\DragonAttenuation\\glTF\\DragonAttenuation.gltf");
                 //ModelLoader.Model transmissionTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\TransmissionTest\\glTF\\TransmissionTest.gltf", Matrix4.CreateScale(10.0f));
                 //ModelLoader.Model aBeautifulGame = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\ABeautifulGame\\glTF\\ABeautifulGame.gltf", Matrix4.CreateScale(10.0f));
-                //ModelSystem.Add(emissiveTest, aBeautifulGame);
+                //ModelSystem.Add(aBeautifulGame);
 
                 ModelSystem.Add(sponza, lucy, helmet);
 
@@ -507,12 +510,8 @@ namespace IDKEngine
                 //    LightManager.CreatePointShadowForLight(pointShadow, i);
                 //}
 
-                //LightManager.AddLight(new Light(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.7f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
+                //LightManager.AddLight(new GpuLightWrapper(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.6f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);
-
-                //Model exterior = new Model(@"C:\Users\Julian\Downloads\Models\BistroExterior\Bistro.gltf");
-                //Model interior = new Model(@"C:\Users\Julian\Downloads\Models\BistroInterior\BistroInterior.gltf");
-                //ModelSystem.Add(exterior, interior);
 
                 RenderMode = RenderMode.Rasterizer;
             }
@@ -548,11 +547,11 @@ namespace IDKEngine
                 a.Meshes[324].EmissiveBias = 20.0f;
                 a.Meshes[376].EmissiveBias = 20.0f;
                 a.Meshes[379].EmissiveBias = 20.0f;
-                //ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-                //ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                //ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
+                ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+                ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelSystem.Add(a);
+                ModelSystem.Add(a, b, c, d);
 
                 //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.1f, 60.0f), 0);

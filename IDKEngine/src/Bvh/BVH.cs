@@ -33,18 +33,18 @@ namespace IDKEngine
         public TLAS Tlas { get; private set; }
         private BLAS[] blases;
 
-        private readonly BufferObject blasBuffer;
-        private readonly BufferObject blasTriangleIndicesBuffer;
-        private readonly BufferObject tlasBuffer;
+        private readonly TypedBuffer<GpuBlasNode> blasBuffer;
+        private readonly TypedBuffer<BLAS.IndicesTriplet> blasTriangleIndicesBuffer;
+        private readonly TypedBuffer<GpuTlasNode> tlasBuffer;
         public BVH()
         {
-            blasBuffer = new BufferObject();
+            blasBuffer = new TypedBuffer<GpuBlasNode>();
             blasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
 
-            blasTriangleIndicesBuffer = new BufferObject();
+            blasTriangleIndicesBuffer = new TypedBuffer<BLAS.IndicesTriplet>();
             blasTriangleIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
 
-            tlasBuffer = new BufferObject();
+            tlasBuffer = new TypedBuffer<GpuTlasNode>();
             tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
             blases = Array.Empty<BLAS>();
@@ -143,7 +143,7 @@ namespace IDKEngine
         public void TlasBuild()
         {
             Tlas.Build();
-            SetTlasBufferContent(Tlas.Nodes);
+            tlasBuffer.MutableAllocate(Tlas.Nodes);
         }
 
         public void BlasesBuild()
@@ -180,7 +180,7 @@ namespace IDKEngine
 
                 if (blasIndex >= start && blasIndex < start + count)
                 {
-                    blasBuffer.SubData(uploadedBlasNodes * sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
+                    blasBuffer.UploadElements(uploadedBlasNodes, blas.Nodes.Length, blas.Nodes[0]);
                 }
 
                 uploadedBlasNodes += blas.Nodes.Length;
@@ -198,16 +198,12 @@ namespace IDKEngine
             {
                 BLAS blas = blases[i];
 
-                blasBuffer.SubData(uploadedBlasNodes * (nint)sizeof(GpuBlasNode), blas.Nodes.Length * (nint)sizeof(GpuBlasNode), blas.Nodes);
-                blasTriangleIndicesBuffer.SubData(uploadedTriangleIndices * (nint)sizeof(BLAS.IndicesTriplet), blas.TriangleIndices.Length * (nint)sizeof(BLAS.IndicesTriplet), blas.TriangleIndices);
+                blasBuffer.UploadElements(uploadedBlasNodes, blas.Nodes.Length, blas.Nodes[0]);
+                blasTriangleIndicesBuffer.UploadElements(uploadedTriangleIndices, blas.TriangleIndices.Length, blas.TriangleIndices[0]);
 
                 uploadedBlasNodes += blas.Nodes.Length;
                 uploadedTriangleIndices += blas.TriangleIndices.Length;
             }
-        }
-        private unsafe void SetTlasBufferContent(ReadOnlySpan<GpuTlasNode> tlasNodes)
-        {
-            tlasBuffer.MutableAllocate(sizeof(GpuTlasNode) * tlasNodes.Length, tlasNodes[0]);
         }
 
         public int GetBlasesTriangleIndicesCount()
