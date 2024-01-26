@@ -132,7 +132,7 @@ namespace IDKEngine
             texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
             for (int i = 0; i < 6; i++)
             {
-                texture.SubTexture3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data, 0, 0, 0, i);
+                texture.SubTexture3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data[0], 0, 0, 0, i);
             }
         }
 

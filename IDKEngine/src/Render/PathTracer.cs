@@ -96,7 +96,7 @@ namespace IDKEngine.Render
             private set
             {
                 _accumulatedSamples = value;
-                wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.AccumulatedSamples)), sizeof(uint), _accumulatedSamples);
+                wavefrontPTBuffer.UploadData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.AccumulatedSamples)), sizeof(uint), _accumulatedSamples);
             }
         }
 
@@ -118,7 +118,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram firstHitProgram;
         private readonly ShaderProgram nHitProgram;
         private readonly ShaderProgram finalDrawProgram;
-        private BufferObject wavefrontRayBuffer;
+        private TypedBuffer<GpuWavefrontRay> wavefrontRayBuffer;
         private BufferObject wavefrontPTBuffer;
         public unsafe PathTracer(int width, int height)
         {
@@ -148,7 +148,7 @@ namespace IDKEngine.Render
                 nHitProgram.Upload(0, pingPongIndex);
                 
                 nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
-                wavefrontPTBuffer.SubData(rayCountsBaseOffset + pingPongIndex * sizeof(uint), sizeof(uint), 0);
+                wavefrontPTBuffer.UploadData(rayCountsBaseOffset + pingPongIndex * sizeof(uint), sizeof(uint), 0);
 
                 nint dispatchCmdsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommands));
                 GL.DispatchComputeIndirect(dispatchCmdsBaseOffset + sizeof(GpuDispatchCmd) * (1 - pingPongIndex));
@@ -164,27 +164,27 @@ namespace IDKEngine.Render
 
         public unsafe void SetSize(int width, int height)
         {
+            float clear = 0.0f;
+
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba32f);
+            Result.Clear(PixelFormat.Red, PixelType.Float, clear);
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
-            wavefrontRayBuffer = new BufferObject();
-            wavefrontRayBuffer.ImmutableAllocate(width * height * sizeof(GpuWavefrontRay), IntPtr.Zero, BufferStorageFlags.None);
+            wavefrontRayBuffer = new TypedBuffer<GpuWavefrontRay>();
+            wavefrontRayBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.None, width * height);
             wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
             wavefrontPTBuffer = new BufferObject();
-            wavefrontPTBuffer.ImmutableAllocate(sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
-            wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommands)), sizeof(GpuDispatchCmd) * 2, new GpuDispatchCmd[2]); // clear header dispatch cmds
-            wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts)), sizeof(Vector2i), new Vector2(0)); // clear header counts
-            wavefrontPTBuffer.SubData(Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.AccumulatedSamples)), sizeof(uint), 0); // clear header counts
+            wavefrontPTBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)), IntPtr.Zero);
+            wavefrontPTBuffer.SimpleClear(0, sizeof(GpuWavefrontPTHeader), (nint)(&clear));
             wavefrontPTBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
 
             ResetRenderProcess();
-
         }
 
         public void ResetRenderProcess()

@@ -14,7 +14,7 @@ namespace IDKEngine.Render
         private readonly PointShadow[] pointShadows;
         private readonly ShaderProgram renderProgram;
         private readonly ShaderProgram cullingProgram;
-        private readonly BufferObject pointShadowsBuffer;
+        private readonly TypedBuffer<GpuPointShadow> pointShadowsBuffer;
         public unsafe PointShadowManager()
         {
             pointShadows = new PointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
@@ -37,8 +37,8 @@ namespace IDKEngine.Render
             cullingProgram = new ShaderProgram(
                 new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/PointShadow/compute.glsl")));
 
-            pointShadowsBuffer = new BufferObject();
-            pointShadowsBuffer.ImmutableAllocate(GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            pointShadowsBuffer = new TypedBuffer<GpuPointShadow>();
+            pointShadowsBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero);
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
         }
 
@@ -103,7 +103,7 @@ namespace IDKEngine.Render
                 return;
             }
 
-            pointShadowsBuffer.SubData(index * sizeof(GpuPointShadow), sizeof(GpuPointShadow), pointShadow.GetGpuData());
+            pointShadowsBuffer.UploadElements(pointShadow.GetGpuData(), index);
         }
 
         public bool TryGetPointShadow(int index, out PointShadow pointShadow)

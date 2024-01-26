@@ -5,8 +5,29 @@ namespace IDKEngine.Render.Objects
 {
     public class BufferObject : IDisposable
     {
+        public enum BufferStorageFlag
+        {
+            // The buffer can only be filled once at the time of buffer creation
+            None = BufferStorageFlags.None,
+        
+            // The buffer may be updated or downloaded from.
+            // Synchronization is taken care of by OpenGL.
+            DynamicStorage = BufferStorageFlags.DynamicStorageBit,
+
+            // The buffer must be read & write by using the mapped memory pointer.
+            // Writes by the DEVICE only become visible to the HOST after a call to glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0).
+            MappedStorage = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapCoherentBit | BufferStorageFlags.MapReadBit | BufferStorageFlags.MapWriteBit,
+
+            // The buffer can be read & write by using the mapped memory pointer.
+            // Writes by the HOST only become visible to the DEVICE after a call to glFlushMappedBufferRange.
+            // Writes by the DEVICE only become visible to the HOST after a call to glMemoryBarrier(CLIENT_MAPPED_BUFFER_BARRIER_BIT)
+            // followed by glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)
+            MappedStorageNoSync = BufferStorageFlags.MapPersistentBit | All.MapFlushExplicitBit | BufferStorageFlags.MapReadBit | BufferStorageFlags.MapWriteBit
+        };
+
         public readonly int ID;
         public nint Size { get; private set; }
+        public IntPtr MappedMemory { get; private set; }
 
         public BufferObject()
         {
@@ -23,31 +44,15 @@ namespace IDKEngine.Render.Objects
             GL.BindBuffer(bufferTarget, ID);
         }
 
-        public void SubData<T>(nint offset, nint size, T[] data) where T : unmanaged
+        public void ImmutableAllocate(BufferStorageFlag bufferStorageFlag, nint size, IntPtr data)
         {
-            SubData(offset, size, data[0]);
-        }
-        public unsafe void SubData<T>(nint offset, nint size, in T data) where T : unmanaged
-        {
-            fixed (void* ptr = &data)
-            {
-                SubData(offset, size, (IntPtr)ptr);
-            }
-        }
-        public void SubData(nint offset, nint size, IntPtr data)
-        {
-            GL.NamedBufferSubData(ID, offset, size, data);
-        }
+            GL.NamedBufferStorage(ID, size, data, (BufferStorageFlags)bufferStorageFlag);
+            Size = size;
 
-        public void MutableAllocate<T>(nint size, T[] data) where T : unmanaged
-        {
-            MutableAllocate(size, data[0]);
-        }
-        public unsafe void MutableAllocate<T>(nint size, in T data) where T : unmanaged
-        {
-            fixed (void* ptr = &data)
+            MappedMemory = IntPtr.Zero;
+            if (bufferStorageFlag == BufferStorageFlag.MappedStorage)
             {
-                MutableAllocate(size, (IntPtr)ptr);
+                MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)bufferStorageFlag);
             }
         }
         public void MutableAllocate(nint size, IntPtr data)
@@ -56,45 +61,117 @@ namespace IDKEngine.Render.Objects
             Size = size;
         }
 
-        public void ImmutableAllocate<T>(nint size, T[] data, BufferStorageFlags bufferStorageFlags) where T : unmanaged
+        public void UploadData(nint offset, nint size, IntPtr data)
         {
-            ImmutableAllocate(size, data[0], bufferStorageFlags);
+            GL.NamedBufferSubData(ID, offset, size, data);
         }
-        public unsafe void ImmutableAllocate<T>(nint size, in T data, BufferStorageFlags bufferStorageFlags) where T : unmanaged
+        public unsafe void UploadData<T>(nint offset, nint size, in T data) where T : unmanaged
         {
             fixed (void* ptr = &data)
             {
-                ImmutableAllocate(size, (IntPtr)ptr, bufferStorageFlags);
+                GL.NamedBufferSubData(ID, offset, size, (nint)ptr);
             }
         }
-        public void ImmutableAllocate(nint size, IntPtr data, BufferStorageFlags bufferStorageFlags)
-        {
-            GL.NamedBufferStorage(ID, size, data, bufferStorageFlags);
-            Size = size;
-        }
-
-        public unsafe void GetSubData<T>(nint offset, out T data) where T : unmanaged
-        {
-            data = new T();
-            GL.GetNamedBufferSubData(ID, offset, sizeof(T), ref data);
-        }
-        public void GetSubData<T>(nint offset, nint size, T[] data) where T : unmanaged
-        {
-            GL.GetNamedBufferSubData(ID, offset, size, data);
-        }
-        public void GetSubData(nint offset, nint size, IntPtr data)
+        public void DownloadData(nint offset, nint size, IntPtr data)
         {
             GL.GetNamedBufferSubData(ID, offset, size, data);
         }
 
-        public unsafe void Clear(nint offset, nint size, uint value)
+        public unsafe void SimpleClear(nint offset, nint size, IntPtr data)
         {
-            GL.ClearNamedBufferSubData(ID, PixelInternalFormat.R32ui, offset, size, PixelFormat.RedInteger, PixelType.UnsignedInt, (nint)(&value));
+            Clear(PixelInternalFormat.R32f, PixelFormat.Red, PixelType.Float, offset, size, data);
+        }
+        public unsafe void Clear(PixelInternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType, nint offset, nint size, IntPtr data)
+        {
+            GL.ClearNamedBufferSubData(ID, internalFormat, offset, size, pixelFormat, pixelType, data);
         }
 
         public void Dispose()
         {
+            if (MappedMemory != IntPtr.Zero)
+            {
+                GL.UnmapNamedBuffer(ID);
+            }
             GL.DeleteBuffer(ID);
+        }
+
+        public static void Unbind(BufferTarget bufferTarget)
+        {
+            GL.BindBuffer(bufferTarget, 0);
+        }
+    }
+
+    public unsafe class TypedBuffer<T> : BufferObject
+        where T : unmanaged
+    {
+
+        public new T* MappedMemory => (T*)base.MappedMemory;
+
+        public TypedBuffer()
+            : base()
+        {
+
+        }
+
+        public void ImmutableAllocate(BufferStorageFlag bufferStorageFlag, ReadOnlySpan<T> data)
+        {
+            ImmutableAllocate(bufferStorageFlag, data.Length, data[0]);
+        }
+        public void ImmutableAllocate(BufferStorageFlag bufferStorageFlag, nint count, in T data)
+        {
+            fixed (void* ptr = &data)
+            {
+                ImmutableAllocate(bufferStorageFlag, sizeof(T) * count, (nint)ptr);
+            }
+        }
+        public void ImmutableAllocate(BufferStorageFlag bufferStorageFlag, nint count)
+        {
+            ImmutableAllocate(bufferStorageFlag, sizeof(T) * count, IntPtr.Zero);
+        }
+
+        public void MutableAllocate(ReadOnlySpan<T> data)
+        {
+            MutableAllocate(data.Length, data[0]);
+        }
+        public void MutableAllocate(nint count, in T data)
+        {
+            fixed (void* ptr = &data)
+            {
+                MutableAllocate(sizeof(T) * count, (nint)ptr);
+            }
+        }
+
+        public void UploadElements(ReadOnlySpan<T> data, nint startIndex = 0)
+        {
+            UploadElements(startIndex, data.Length, data[0]);
+        }
+        public void UploadElements(in T data, nint startIndex = 0)
+        {
+            UploadElements(startIndex, 1, data);
+        }
+        public void UploadElements(nint startIndex, nint count, in T data)
+        {
+            fixed (void* ptr = &data)
+            {
+                UploadData(startIndex * sizeof(T), count * sizeof(T), (nint)ptr);
+            }
+        }
+
+        public void DownloadElements(Span<T> data, nint startIndex = 0)
+        {
+            DownloadElements(startIndex, data.Length, ref data[0]);
+        }
+        public void DownloadElements(nint startIndex, nint count, ref T data)
+        {
+            fixed (void* ptr = &data)
+            {
+                DownloadData(startIndex * sizeof(T), count * sizeof(T), (nint)ptr);
+            }
+        }
+
+        public int GetNumElements()
+        {
+            return (int)(Size / sizeof(T));
         }
     }
 }

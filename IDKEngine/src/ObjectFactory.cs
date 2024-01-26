@@ -5,7 +5,7 @@ using OpenTK.Mathematics;
 
 namespace IDKEngine
 {
-    static class ObjectFactory
+    public static class ObjectFactory
     {
         public struct Vertex
         {

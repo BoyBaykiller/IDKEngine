@@ -22,7 +22,7 @@ namespace IDKEngine.Render
             {
                 gpuVoxelizerData.GridMin = Vector3.ComponentMin(value, gpuVoxelizerData.GridMax - new Vector3(0.1f));
                 gpuVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(gpuVoxelizerData.GridMin.X, gpuVoxelizerData.GridMax.X, gpuVoxelizerData.GridMin.Y, gpuVoxelizerData.GridMax.Y, gpuVoxelizerData.GridMax.Z, gpuVoxelizerData.GridMin.Z);
-                voxelizerDataBuffer.SubData(0, sizeof(GpuVoxelizerData), gpuVoxelizerData);
+                voxelizerDataBuffer.UploadElements(gpuVoxelizerData);
             }
         }
         public unsafe Vector3 GridMax
@@ -33,7 +33,7 @@ namespace IDKEngine.Render
             {
                 gpuVoxelizerData.GridMax = Vector3.ComponentMax(value, gpuVoxelizerData.GridMin + new Vector3(0.1f));
                 gpuVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(gpuVoxelizerData.GridMin.X, gpuVoxelizerData.GridMax.X, gpuVoxelizerData.GridMin.Y, gpuVoxelizerData.GridMax.Y, gpuVoxelizerData.GridMax.Z, gpuVoxelizerData.GridMin.Z);
-                voxelizerDataBuffer.SubData(0, sizeof(GpuVoxelizerData), gpuVoxelizerData);
+                voxelizerDataBuffer.UploadElements(gpuVoxelizerData);
             }
         }
 
@@ -73,7 +73,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram voxelizeProgram;
         private readonly ShaderProgram mipmapProgram;
         private readonly ShaderProgram visualizeDebugProgram;
-        public readonly BufferObject voxelizerDataBuffer;
+        public readonly TypedBuffer<GpuVoxelizerData> voxelizerDataBuffer;
         private GpuVoxelizerData gpuVoxelizerData;
 
         private readonly Framebuffer fboNoAttachments;
@@ -110,8 +110,8 @@ namespace IDKEngine.Render
                 mergeIntermediatesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/MergeIntermediates/compute.glsl")));
             }
 
-            voxelizerDataBuffer = new BufferObject();
-            voxelizerDataBuffer.ImmutableAllocate(sizeof(GpuVoxelizerData), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            voxelizerDataBuffer = new TypedBuffer<GpuVoxelizerData>();
+            voxelizerDataBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
             voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
 
             fboNoAttachments = new Framebuffer();

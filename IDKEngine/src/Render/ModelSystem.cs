@@ -10,58 +10,58 @@ namespace IDKEngine.Render
     class ModelSystem : IDisposable
     {
         public GpuDrawElementsCmd[] DrawCommands = Array.Empty<GpuDrawElementsCmd>();
-        private readonly BufferObject drawCommandBuffer;
+        private readonly TypedBuffer<GpuDrawElementsCmd> drawCommandBuffer;
 
         public GpuMesh[] Meshes = Array.Empty<GpuMesh>();
-        private readonly BufferObject meshBuffer;
+        private readonly TypedBuffer<GpuMesh> meshBuffer;
 
         public GpuMeshInstance[] MeshInstances = Array.Empty<GpuMeshInstance>();
-        private readonly BufferObject meshInstanceBuffer;
+        private readonly TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
 
         public GpuMaterial[] Materials = Array.Empty<GpuMaterial>();
-        private readonly BufferObject materialBuffer;
+        private readonly TypedBuffer<GpuMaterial> materialBuffer;
 
         public GpuVertex[] Vertices = Array.Empty<GpuVertex>();
-        private readonly BufferObject vertexBuffer;
+        private readonly TypedBuffer<GpuVertex> vertexBuffer;
 
         public Vector3[] VertexPositions = Array.Empty<Vector3>();
-        private readonly BufferObject vertexPositionBuffer;
+        private readonly TypedBuffer<Vector3> vertexPositionBuffer;
 
         public uint[] VertexIndices = Array.Empty<uint>();
-        private readonly BufferObject vertexIndicesBuffer;
+        private readonly TypedBuffer<uint> vertexIndicesBuffer;
 
         public GpuMeshletTaskCmd[] MeshTasksCmds = Array.Empty<GpuMeshletTaskCmd>();
-        private readonly BufferObject meshletTasksCmdsBuffer;
+        private readonly TypedBuffer<GpuMeshletTaskCmd> meshletTasksCmdsBuffer;
 
         public GpuMeshlet[] Meshlets = Array.Empty<GpuMeshlet>();
-        private readonly BufferObject meshletBuffer;
+        private readonly TypedBuffer<GpuMeshlet> meshletBuffer;
 
         public GpuMeshletInfo[] MeshletsInfo = Array.Empty<GpuMeshletInfo>();
-        private readonly BufferObject meshletInfoBuffer;
+        private readonly TypedBuffer<GpuMeshletInfo> meshletInfoBuffer;
 
         public uint[] MeshletsVertexIndices = Array.Empty<uint>();
-        private readonly BufferObject meshletsVertexIndicesBuffer;
+        private readonly TypedBuffer<uint> meshletsVertexIndicesBuffer;
 
         public byte[] MeshletsLocalIndices = Array.Empty<byte>();
-        private readonly BufferObject meshletsPrimitiveIndicesBuffer;
+        private readonly TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
 
         public BVH BVH;
 
         private readonly VAO vao;
         public unsafe ModelSystem()
         {
-            drawCommandBuffer = new BufferObject();
-            meshBuffer = new BufferObject();
-            meshInstanceBuffer = new BufferObject();
-            materialBuffer = new BufferObject();
-            vertexBuffer = new BufferObject();
-            vertexIndicesBuffer = new BufferObject();
-            meshletTasksCmdsBuffer = new BufferObject();
-            meshletBuffer = new BufferObject();
-            meshletInfoBuffer = new BufferObject();
-            vertexPositionBuffer = new BufferObject();
-            meshletsVertexIndicesBuffer = new BufferObject();
-            meshletsPrimitiveIndicesBuffer = new BufferObject();
+            drawCommandBuffer = new TypedBuffer<GpuDrawElementsCmd>();
+            meshBuffer = new TypedBuffer<GpuMesh>();
+            meshInstanceBuffer = new TypedBuffer<GpuMeshInstance>();
+            materialBuffer = new TypedBuffer<GpuMaterial>();
+            vertexBuffer = new TypedBuffer<GpuVertex>();
+            vertexPositionBuffer = new TypedBuffer<Vector3>();
+            vertexIndicesBuffer = new TypedBuffer<uint>();
+            meshletTasksCmdsBuffer = new TypedBuffer<GpuMeshletTaskCmd>();
+            meshletBuffer = new TypedBuffer<GpuMeshlet>();
+            meshletInfoBuffer = new TypedBuffer<GpuMeshletInfo>();
+            meshletsVertexIndicesBuffer = new TypedBuffer<uint>();
+            meshletsPrimitiveIndicesBuffer = new TypedBuffer<byte>();
 
             drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
             meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
@@ -155,20 +155,20 @@ namespace IDKEngine.Render
                 }
             }
 
-            drawCommandBuffer.MutableAllocate(DrawCommands.Length * sizeof(GpuDrawElementsCmd), DrawCommands);
-            meshBuffer.MutableAllocate(Meshes.Length * sizeof(GpuMesh), Meshes);
-            meshInstanceBuffer.MutableAllocate(MeshInstances.Length * sizeof(GpuMeshInstance), MeshInstances);
-            materialBuffer.MutableAllocate(Materials.Length * sizeof(GpuMaterial), Materials);
+            drawCommandBuffer.MutableAllocate(DrawCommands);
+            meshBuffer.MutableAllocate(Meshes);
+            meshInstanceBuffer.MutableAllocate(MeshInstances);
+            materialBuffer.MutableAllocate(Materials);
 
-            vertexBuffer.MutableAllocate(Vertices.Length * sizeof(GpuVertex), Vertices);
-            vertexPositionBuffer.MutableAllocate(VertexPositions.Length * sizeof(Vector3), VertexPositions);
-            vertexIndicesBuffer.MutableAllocate(VertexIndices.Length * sizeof(uint), VertexIndices);
+            vertexBuffer.MutableAllocate(Vertices);
+            vertexPositionBuffer.MutableAllocate(VertexPositions);
+            vertexIndicesBuffer.MutableAllocate(VertexIndices);
 
-            meshletTasksCmdsBuffer.MutableAllocate(MeshTasksCmds.Length * sizeof(GpuMeshletTaskCmd), MeshTasksCmds);
-            meshletBuffer.MutableAllocate(Meshlets.Length * sizeof(GpuMeshlet), Meshlets);
-            meshletInfoBuffer.MutableAllocate(MeshletsInfo.Length * sizeof(GpuMeshletInfo), MeshletsInfo);
-            meshletsVertexIndicesBuffer.MutableAllocate(MeshletsVertexIndices.Length * sizeof(uint), MeshletsVertexIndices);
-            meshletsPrimitiveIndicesBuffer.MutableAllocate(MeshletsLocalIndices.Length * sizeof(byte), MeshletsLocalIndices);
+            meshletTasksCmdsBuffer.MutableAllocate(MeshTasksCmds);
+            meshletBuffer.MutableAllocate(Meshlets);
+            meshletInfoBuffer.MutableAllocate(MeshletsInfo);
+            meshletsVertexIndicesBuffer.MutableAllocate(MeshletsVertexIndices);
+            meshletsPrimitiveIndicesBuffer.MutableAllocate(MeshletsLocalIndices);
         }
 
         public unsafe void Draw()
@@ -190,25 +190,25 @@ namespace IDKEngine.Render
         public unsafe void UpdateMeshBuffer(int start, int count)
         {
             if (count == 0) return;
-            meshBuffer.SubData(start * sizeof(GpuMesh), count * sizeof(GpuMesh), Meshes[start]);
+            meshBuffer.UploadElements(start, count, Meshes[start]);
         }
 
         public unsafe void UpdateDrawCommandBuffer(int start, int count)
         {
             if (count == 0) return;
-            drawCommandBuffer.SubData(start * sizeof(GpuDrawElementsCmd), count * sizeof(GpuDrawElementsCmd), DrawCommands[start]);
+            drawCommandBuffer.UploadElements(start, count, DrawCommands[start]);
         }
 
         public unsafe void UpdateMeshInstanceBuffer(int start, int count)
         {
             if (count == 0) return;
-            meshInstanceBuffer.SubData(start * sizeof(GpuMeshInstance), count * sizeof(GpuMeshInstance), MeshInstances[start]);
+            meshInstanceBuffer.UploadElements(start, count, MeshInstances[start]);
         }
 
         public unsafe void UpdateVertexPositions(int start, int count)
         {
             if (count == 0) return;
-            vertexPositionBuffer.SubData(start * sizeof(Vector3), count * sizeof(Vector3), VertexPositions[start]);
+            vertexPositionBuffer.UploadElements(start, count, VertexPositions[start]);
         }
 
         public GpuTriangle GetTriangle(int indicesIndex, int baseVertex)

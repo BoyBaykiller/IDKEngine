@@ -23,7 +23,7 @@ namespace IDKEngine.Render
             private set
             {
                 _count = value;
-                lightBufferObject.SubData(lightBufferObject.Size - sizeof(int), sizeof(int), Count);
+                lightBufferObject.UploadData(lightBufferObject.Size - sizeof(int), sizeof(int), Count);
             }
 
             get => _count;
@@ -32,7 +32,7 @@ namespace IDKEngine.Render
         public readonly int IndicisCount;
         private readonly GpuLightWrapper[] lights;
         
-        private readonly BufferObject lightBufferObject;
+        private readonly TypedBuffer<GpuLight> lightBufferObject;
         private readonly ShaderProgram shaderProgram;
         private readonly PointShadowManager pointShadowManager;
         private readonly VAO vao;
@@ -44,17 +44,17 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
 
-            lightBufferObject = new BufferObject();
-            lightBufferObject.ImmutableAllocate(lights.Length * sizeof(GpuLight) + sizeof(int), IntPtr.Zero, BufferStorageFlags.DynamicStorageBit);
+            lightBufferObject = new TypedBuffer<GpuLight>();
+            lightBufferObject.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, lights.Length * sizeof(GpuLight) + sizeof(int), IntPtr.Zero);
             lightBufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
 
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
-            BufferObject vbo = new BufferObject();
-            vbo.ImmutableAllocate(vertecis.Length * sizeof(ObjectFactory.Vertex), vertecis[0], BufferStorageFlags.None);
+            TypedBuffer<ObjectFactory.Vertex> vbo = new TypedBuffer<ObjectFactory.Vertex>();
+            vbo.ImmutableAllocate(BufferObject.BufferStorageFlag.None, vertecis);
 
             Span<uint> indicis = ObjectFactory.GenerateSmoothSphereIndicis((uint)latitudes, (uint)longitudes);
-            BufferObject ebo = new BufferObject();
-            ebo.ImmutableAllocate(indicis.Length * sizeof(uint), indicis[0], BufferStorageFlags.None);
+            TypedBuffer<uint> ebo = new TypedBuffer<uint>();
+            ebo.ImmutableAllocate(BufferObject.BufferStorageFlag.None, indicis);
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);
@@ -166,7 +166,7 @@ namespace IDKEngine.Render
             for (int i = 0; i < Count; i++)
             {
                 GpuLightWrapper light = lights[i];
-                lightBufferObject.SubData(i * sizeof(GpuLight), sizeof(GpuLight), light.GpuLight);
+                lightBufferObject.UploadElements(light.GpuLight, i);
                 
                 light.GpuLight.PrevPosition = light.GpuLight.Position;
             }

@@ -6,6 +6,8 @@ namespace IDKEngine.GpuTypes
 {
     public struct GpuMaterial
     {
+        public static readonly int TEXTURE_COUNT = Enum.GetValues<TextureHandle>().Length;
+
         public enum TextureHandle : int
         {
             BaseColor,

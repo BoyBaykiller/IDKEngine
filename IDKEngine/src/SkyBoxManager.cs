@@ -41,7 +41,7 @@ namespace IDKEngine
                 }
 
                 SkyBoxTexture.EnableSeamlessCubemapARB_AMD(true);
-                skyBoxTextureBuffer.SubData(0, sizeof(ulong), SkyBoxTexture.GetTextureHandleARB());
+                skyBoxTextureBuffer.UploadElements(SkyBoxTexture.GetTextureHandleARB());
             }
         }
 
@@ -51,12 +51,12 @@ namespace IDKEngine
         public static AtmosphericScatterer AtmosphericScatterer { get; private set; }
 
         private static Texture externalSkyBox;
-        public static BufferObject skyBoxTextureBuffer;
+        public static TypedBuffer<ulong> skyBoxTextureBuffer;
         public static void Init(string[] paths = null)
         {
-            skyBoxTextureBuffer = new BufferObject();
+            skyBoxTextureBuffer = new TypedBuffer<ulong>();
             skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
-            skyBoxTextureBuffer.ImmutableAllocate(sizeof(ulong), 0ul, BufferStorageFlags.DynamicStorageBit);
+            skyBoxTextureBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1, 0ul);
 
             if (paths != null)
             {
