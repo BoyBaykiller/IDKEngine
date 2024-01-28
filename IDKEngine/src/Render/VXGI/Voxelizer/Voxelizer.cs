@@ -111,7 +111,7 @@ namespace IDKEngine.Render
             }
 
             voxelizerDataBuffer = new TypedBuffer<GpuVoxelizerData>();
-            voxelizerDataBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
+            voxelizerDataBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1);
             voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
 
             fboNoAttachments = new Framebuffer();

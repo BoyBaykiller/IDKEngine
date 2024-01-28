@@ -10,7 +10,10 @@ AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
 
 layout(local_size_x = 32) in;
-layout(triangles, max_primitives = MESHLET_MAX_TRIANGLE_COUNT, max_vertices = MESHLET_MAX_VERTEX_COUNT) out;
+// We write out indices in packs of 4 using writePackedPrimitiveIndices4x8NV as an optimization.
+// Because triangle indices count might not be divisble by 4, we need to overshoot written indices to not miss any.
+// To prevent out of bounds access we pad by 1
+layout(triangles, max_primitives = MESHLET_MAX_TRIANGLE_COUNT + 1, max_vertices = MESHLET_MAX_VERTEX_COUNT) out;
 
 struct DrawElementsCmd
 {
@@ -81,7 +84,7 @@ layout(std430, binding = 14) restrict readonly buffer MeshletVertexIndicesSSBO
 
 layout(std430, binding = 15) restrict readonly buffer MeshletLocalIndicesSSBO
 {
-    uint8_t Indices[];
+    uint PackedIndices[];
 } meshletLocalIndicesSSBO;
 
 layout(std140, binding = 1) uniform ShadowDataUBO
@@ -109,7 +112,7 @@ void main()
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance];
     Meshlet meshlet = meshletSSBO.Meshlets[meshletID];
 
-    uint verticesPerInvocationRounded = (MESHLET_MAX_VERTEX_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
+    const uint verticesPerInvocationRounded = (MESHLET_MAX_VERTEX_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
     for (int i = 0; i < verticesPerInvocationRounded; i++)
     {
         uint8_t meshletVertexID = uint8_t(min(gl_LocalInvocationIndex + i * gl_WorkGroupSize.x, meshlet.VertexCount - 1u));
@@ -126,20 +129,15 @@ void main()
         gl_MeshVerticesNV[meshletVertexID].gl_Position = clipPos;
     }
 
-    uint trianglesPerInvocationRounded = (MESHLET_MAX_TRIANGLE_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
-    for (int i = 0; i < trianglesPerInvocationRounded; i++)
+    const uint meshletMaxPackedIndices = MESHLET_MAX_TRIANGLE_COUNT * 3 / 4;
+    const uint packedIndicesPerInvocationRounded = (meshletMaxPackedIndices + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
+    for (uint i = 0; i < packedIndicesPerInvocationRounded; i++)
     {
-        uint8_t meshletTriangleID = uint8_t(min(gl_LocalInvocationIndex + i * gl_WorkGroupSize.x, meshlet.TriangleCount - 1u));
-        u8vec3 indices = u8vec3(
-            meshletLocalIndicesSSBO.Indices[meshlet.IndicesOffset + meshletTriangleID * 3u + 0u],
-            meshletLocalIndicesSSBO.Indices[meshlet.IndicesOffset + meshletTriangleID * 3u + 1u],
-            meshletLocalIndicesSSBO.Indices[meshlet.IndicesOffset + meshletTriangleID * 3u + 2u]
-        );
+        uint packedIndicesID = gl_LocalInvocationIndex + i * gl_WorkGroupSize.x;
+        uint indicesID = min(packedIndicesID * 4, meshlet.TriangleCount * 3u);
 
-        // TODO: Try writePackedPrimitiveIndices4x8NV(i * 4, indices4);
-        gl_PrimitiveIndicesNV[meshletTriangleID * 3u + 0u] = indices.x;
-        gl_PrimitiveIndicesNV[meshletTriangleID * 3u + 1u] = indices.y;
-        gl_PrimitiveIndicesNV[meshletTriangleID * 3u + 2u] = indices.z;
+        uint indices4 = meshletLocalIndicesSSBO.PackedIndices[meshlet.IndicesOffset / 4 + packedIndicesID];
+        writePackedPrimitiveIndices4x8NV(indicesID, indices4);
     }
 
     if (gl_LocalInvocationIndex == 0)

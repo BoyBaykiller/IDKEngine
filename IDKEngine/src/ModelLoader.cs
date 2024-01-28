@@ -3,8 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
@@ -127,7 +127,7 @@ namespace IDKEngine
                 IOR = 1.0f, // by spec 1.5 IOR would be correct
             };
         }
-        private struct MeshMeshletsData
+        private struct MeshletData
         {
             public Meshopt.Meshlet[] Meshlets;
             public int MeshletsLength;
@@ -156,7 +156,7 @@ namespace IDKEngine
 
             Model model = LoadFromFile(path, rootTransform);
 
-            Logger.Log(Logger.LogLevel.Info, $"Loaded {Path.GetFileName(path)} in {sw.ElapsedMilliseconds}ms (VS Triangles = ({model.VertexIndices.Length / 3}) (MS Triangles = ({model.MeshletsLocalIndices.Length / 3})");
+            Logger.Log(Logger.LogLevel.Info, $"Loaded {Path.GetFileName(path)} in {sw.ElapsedMilliseconds}ms (Triangles = {model.VertexIndices.Length / 3})");
 
             return model;
         }
@@ -221,35 +221,18 @@ namespace IDKEngine
                 {
                     MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
 
-                    (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertexData(gltfMeshPrimitive);
-                    uint[] meshIndices = LoadGpuIndexData(gltfMeshPrimitive);
+                    (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertices(gltfMeshPrimitive);
+                    uint[] meshIndices = LoadGpuIndices(gltfMeshPrimitive);
 
-                    RunMeshOptimizations(ref meshVertices, ref meshVertexPositions, meshIndices);
-                    MeshMeshletsData meshMeshletsData = GenerateMeshMeshletData(meshVertexPositions, meshIndices);
+                    OptimizeMesh(ref meshVertices, ref meshVertexPositions, meshIndices);
 
-                    GpuMeshlet[] meshMeshlets = new GpuMeshlet[meshMeshletsData.MeshletsLength];
-                    GpuMeshletInfo[] meshMeshletsInfo = new GpuMeshletInfo[meshMeshlets.Length];
+                    MeshletData meshletData = GenerateMeshlets(meshVertexPositions, meshIndices);
+                    (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexPositions);
                     for (int j = 0; j < meshMeshlets.Length; j++)
                     {
                         ref GpuMeshlet myMeshlet = ref meshMeshlets[j];
-                        ref readonly Meshopt.Meshlet meshOptMeshlet = ref meshMeshletsData.Meshlets[j];
 
-                        myMeshlet.VertexOffset = meshOptMeshlet.VertexOffset;
-                        myMeshlet.VertexCount = (byte)meshOptMeshlet.VertexCount;
-                        myMeshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
-                        myMeshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
-
-                        Box meshletBoundingBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-                        for (int k = 0; k < myMeshlet.VertexCount; k++)
-                        {
-                            uint vertexIndex = meshMeshletsData.VertexIndices[myMeshlet.VertexOffset + k];
-                            Vector3 pos = meshVertexPositions[vertexIndex];
-                            meshletBoundingBox.GrowToFit(pos);
-                        }
-                        meshMeshletsInfo[j].Min = meshletBoundingBox.Min;
-                        meshMeshletsInfo[j].Max = meshletBoundingBox.Max;
-
-                        // Adjust offsets in context of all meshes
+                        // Adjust offsets in context of all meshlets
                         myMeshlet.VertexOffset += (uint)listMeshletsVertexIndices.Count;
                         myMeshlet.IndicesOffset += (uint)listMeshletsLocalIndices.Count;
                     }
@@ -286,11 +269,11 @@ namespace IDKEngine
                     drawCmd.InstanceCount = 1;
                     drawCmd.FirstIndex = listIndices.Count;
                     drawCmd.BaseVertex = listVertices.Count;
-                    drawCmd.BaseInstance = listDrawCommands.Count;
+                    drawCmd.BaseInstance = listMeshInstances.Count;
 
                     GpuMeshletTaskCmd meshTaskCmd = new GpuMeshletTaskCmd();
-                    meshTaskCmd.First = 0; // listMeshlets.Count
-                    meshTaskCmd.Count = (int)MathF.Ceiling(meshMeshletsData.Meshlets.Length / 32.0f); // divide by task shader work group size
+                    meshTaskCmd.First = 0;
+                    meshTaskCmd.Count = (int)MathF.Ceiling(meshletData.Meshlets.Length / 32.0f); // divide by task shader work group size
 
                     listVertices.AddRange(meshVertices);
                     listVertexPositions.AddRange(meshVertexPositions);
@@ -300,8 +283,8 @@ namespace IDKEngine
                     listDrawCommands.Add(drawCmd);
                     listMeshlets.AddRange(meshMeshlets);
                     listMeshletsInfo.AddRange(meshMeshletsInfo);
-                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshMeshletsData.VertexIndices, 0, meshMeshletsData.VertexIndicesLength));
-                    listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshMeshletsData.LocalIndices, 0, meshMeshletsData.LocalIndicesLength));
+                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshletData.VertexIndices, 0, meshletData.VertexIndicesLength));
+                    listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshletData.LocalIndices, 0, meshletData.LocalIndicesLength));
                     listMeshTasksCmd.Add(meshTaskCmd);
                 }
             }
@@ -363,7 +346,7 @@ namespace IDKEngine
                     {
                         // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
                         // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
-                        texture.SetSwizzleR(All.Blue);
+                        texture.SetSwizzleR(TextureSwizzle.Blue);
                     }
 
                     bool mipmapsRequired = IsMipMapFilter(textureLoadData.MinFilter);
@@ -390,11 +373,8 @@ namespace IDKEngine
                         rawImageSizeInBytes = imageWidth * imageHeight * ColorComponentsToNumChannels(textureLoadData.LoadComponents);
                     }
 
-                    // AMD driver bug: If you generate a texture handle from a texture with CompressedSrgbAlphaBptcUnorm format
-                    // and generate mipmaps after that it only contains the first mip level when sampling
-
                     TypedBuffer<byte> stagingBuffer = new TypedBuffer<byte>();
-                    stagingBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.MappedStorage, rawImageSizeInBytes);
+                    stagingBuffer.ImmutableAllocate(BufferObject.BufferStorageType.DeviceLocalHostVisible, rawImageSizeInBytes);
 
                     MainThreadQueue.Enqueue(() =>
                     {
@@ -414,7 +394,7 @@ namespace IDKEngine
                                 using Stream imageStream = textureLoadData.EncodedImage.Content.Open();
 
                                 ImageResult imageResult = ImageResult.FromStream(imageStream, textureLoadData.LoadComponents);
-                                Helper.MemCpy(imageResult.Data[0], ref Unsafe.AsRef<byte>(stagingBuffer.MappedMemory), (nuint)imageResult.Data.Length);
+                                Helper.MemCpy(imageResult.Data[0], ref Unsafe.AsRef<byte>(stagingBuffer.MappedMemory), imageResult.Data.Length);
 
                                 imageWidth = imageResult.Width;
                                 imageHeight = imageResult.Height;
@@ -425,14 +405,12 @@ namespace IDKEngine
                             {
                                 stagingBuffer.Bind(BufferTarget.PixelUnpackBuffer);
                                 texture.SubTexture2D(imageWidth, imageHeight, pixelFormat, PixelType.UnsignedByte, IntPtr.Zero);
-                                BufferObject.Unbind(BufferTarget.PixelUnpackBuffer);
+                                stagingBuffer.Dispose();
 
                                 if (mipmapsRequired)
                                 {
                                     texture.GenerateMipmap();
                                 }
-
-                                stagingBuffer.Dispose();
                             });
                         });
                     });
@@ -490,6 +468,7 @@ namespace IDKEngine
             }
             else if (textureType == MaterialLoadData.TextureType.Emissive)
             {
+                // Can't pick compressed format because https://community.amd.com/t5/opengl-vulkan/opengl-bug-generating-mipmap-after-getting-texturehandle-causes/m-p/661233#M5107
                 textureLoadData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
                 //textureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
 
@@ -542,7 +521,7 @@ namespace IDKEngine
             return textureLoadData;
         }
 
-        private static unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertexData(MeshPrimitive meshPrimitive)
+        private static unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertices(MeshPrimitive meshPrimitive)
         {
             const string GLTF_POSITION_ATTRIBUTE = "POSITION";
             const string GLTF_NORMAL_ATTRIBUTE = "NORMAL";
@@ -556,13 +535,13 @@ namespace IDKEngine
             GpuVertex[] vertices = new GpuVertex[positonAccessor.Count];
 
             {
-                Span<byte> rawData = positonAccessor.SourceBufferView.Content.AsSpan(positonAccessor.ByteOffset, positonAccessor.ByteLength);
-                Helper.MemCpy(rawData[0], ref vertexPositions[0], (nuint)rawData.Length);
+                Span<Vector3> positions = MemoryMarshal.Cast<byte, Vector3>(positonAccessor.SourceBufferView.Content.AsSpan(positonAccessor.ByteOffset, positonAccessor.ByteLength));
+                positions.CopyTo(vertexPositions);
             }
 
             if (hasNormals)
             {
-                Span<Vector3> normals = Helper.SpanReinterpret<Vector3>(normalAccessor.SourceBufferView.Content.AsSpan(normalAccessor.ByteOffset, normalAccessor.ByteLength));
+                Span<Vector3> normals = MemoryMarshal.Cast<byte, Vector3>(normalAccessor.SourceBufferView.Content.AsSpan(normalAccessor.ByteOffset, normalAccessor.ByteLength));
                 for (int i = 0; i < normals.Length; i++)
                 {
                     Vector3 normal = normals[i];
@@ -577,7 +556,7 @@ namespace IDKEngine
 
             if (hasTexCoords)
             {
-                Span<Vector2> texCoords = Helper.SpanReinterpret<Vector2>(texCoordAccessor.SourceBufferView.Content.AsSpan(texCoordAccessor.ByteOffset, texCoordAccessor.ByteLength));
+                Span<Vector2> texCoords = MemoryMarshal.Cast<byte, Vector2>(texCoordAccessor.SourceBufferView.Content.AsSpan(texCoordAccessor.ByteOffset, texCoordAccessor.ByteLength));
                 for (int i = 0; i < texCoords.Length; i++)
                 {
                     vertices[i].TexCoord = texCoords[i];
@@ -586,19 +565,47 @@ namespace IDKEngine
 
             return (vertices, vertexPositions);
         }
-        private static unsafe uint[] LoadGpuIndexData(MeshPrimitive meshPrimitive)
+        private static unsafe uint[] LoadGpuIndices(MeshPrimitive meshPrimitive)
         {
             Accessor accessor = meshPrimitive.IndexAccessor;
             uint[] vertexIndices = new uint[accessor.Count];
             int componentSize = ComponentTypeToSize(accessor.Encoding);
 
             Span<byte> rawData = accessor.SourceBufferView.Content.AsSpan(accessor.ByteOffset, accessor.ByteLength);
-            for (int i = 0; i < accessor.Count; i++)
+            for (int i = 0; i < vertexIndices.Length; i++)
             {
-                Helper.MemCpy(rawData[componentSize * i], ref vertexIndices[i], (nuint)componentSize);
+                Helper.MemCpy(rawData[componentSize * i], ref vertexIndices[i], componentSize);
             }
 
             return vertexIndices;
+        }
+        private static ValueTuple<GpuMeshlet[], GpuMeshletInfo[]> LoadGpuMeshlets(in MeshletData meshMeshletsData, ReadOnlySpan<Vector3> meshVertexPositions)
+        {
+            GpuMeshlet[] gpuMeshlets = new GpuMeshlet[meshMeshletsData.MeshletsLength];
+            GpuMeshletInfo[] gpuMeshletsInfo = new GpuMeshletInfo[gpuMeshlets.Length];
+            for (int i = 0; i < gpuMeshlets.Length; i++)
+            {
+                ref GpuMeshlet gpuMeshlet = ref gpuMeshlets[i];
+                ref GpuMeshletInfo gpuMeshletInfo = ref gpuMeshletsInfo[i];
+                ref readonly Meshopt.Meshlet meshOptMeshlet = ref meshMeshletsData.Meshlets[i];
+
+                gpuMeshlet.VertexOffset = meshOptMeshlet.VertexOffset;
+                gpuMeshlet.VertexCount = (byte)meshOptMeshlet.VertexCount;
+                gpuMeshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
+                gpuMeshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
+
+                Box meshletBoundingBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+                for (uint j = gpuMeshlet.VertexOffset; j < gpuMeshlet.VertexOffset + gpuMeshlet.VertexCount; j++)
+                {
+                    uint vertexIndex = meshMeshletsData.VertexIndices[j];
+                    Vector3 pos = meshVertexPositions[(int)vertexIndex];
+                    meshletBoundingBox.GrowToFit(pos);
+                }
+                gpuMeshletInfo.Min = meshletBoundingBox.Min;
+                gpuMeshletInfo.Max = meshletBoundingBox.Max;
+            }
+
+            return (gpuMeshlets, gpuMeshletsInfo);
         }
 
         private static MaterialParams GetMaterialParams(Material gltfMaterial)
@@ -738,7 +745,7 @@ namespace IDKEngine
                    minFilterEnum == TextureMipMapFilter.LINEAR_MIPMAP_LINEAR;
         }
 
-        private static unsafe void RunMeshOptimizations(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices)
+        private static unsafe void OptimizeMesh(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices)
         {
             const bool VERTEX_REMAP_OPTIMIZATION = false;
             const bool VERTEX_CACHE_OPTIMIZATION = true;
@@ -779,7 +786,7 @@ namespace IDKEngine
                 }
             }
         }
-        private static unsafe MeshMeshletsData GenerateMeshMeshletData(ReadOnlySpan<Vector3> meshVertexPositions, ReadOnlySpan<uint> meshIndices)
+        private static unsafe MeshletData GenerateMeshlets(ReadOnlySpan<Vector3> meshVertexPositions, ReadOnlySpan<uint> meshIndices)
         {
             const float coneWeight = 0.0f;
 
@@ -812,7 +819,7 @@ namespace IDKEngine
             uint meshletsVertexIndicesLength = last.VertexOffset + last.VertexCount;
             uint meshletsLocalIndicesLength = last.TriangleOffset + ((last.TriangleCount * 3u + 3u) & ~3u);
 
-            MeshMeshletsData result;
+            MeshletData result;
             result.Meshlets = meshlets;
             result.MeshletsLength = (int)meshletCount;
 

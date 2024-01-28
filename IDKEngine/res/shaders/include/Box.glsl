@@ -17,12 +17,10 @@ vec3 BoxGetVertexPos(Box box, int index)
     return vec3(isMaxX ? box.Max.x : box.Min.x, isMaxY ? box.Max.y : box.Min.y, isMaxZ ? box.Max.z : box.Min.z);
 }
 
-Box BoxGrowToFit(Box box, vec3 point)
+void BoxGrowToFit(inout Box box, vec3 point)
 {
     box.Min = min(box.Min, point);
     box.Max = max(box.Max, point);
-
-    return box;
 }
 
 Box BoxTransform(Box box, mat4 matrix)
