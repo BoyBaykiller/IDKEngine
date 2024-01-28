@@ -93,19 +93,19 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureWrapR, (int)wrapR);
         }
 
-        public void SetSwizzleR(All swizzle)
+        public void SetSwizzleR(TextureSwizzle swizzle)
         {
             GL.TextureParameter(ID, TextureParameterName.TextureSwizzleR, (int)swizzle);
         }
-        public void SetSwizzleG(All swizzle)
+        public void SetSwizzleG(TextureSwizzle swizzle)
         {
             GL.TextureParameter(ID, TextureParameterName.TextureSwizzleG, (int)swizzle);
         }
-        public void SetSwizzleB(All swizzle)
+        public void SetSwizzleB(TextureSwizzle swizzle)
         {
             GL.TextureParameter(ID, TextureParameterName.TextureSwizzleB, (int)swizzle);
         }
-        public void SetSwizzleA(All swizzle)
+        public void SetSwizzleA(TextureSwizzle swizzle)
         {
             GL.TextureParameter(ID, TextureParameterName.TextureSwizzleA, (int)swizzle);
         }

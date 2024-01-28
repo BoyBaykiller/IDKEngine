@@ -14,9 +14,12 @@ Feature list:
  - Screen Space Reflections
  - Screen Space Ambient Occlusion
  - Atmospheric Scattering
+ - Asynchronous texture loading
  - Camera capture and playback with video output
 
 Required OpenGL: 4.6 + `ARB_bindless_texture`
+
+Note: Crashes on AMD drivers newer than 23.12.1 for unknown reason. 
 
 
 # Controls

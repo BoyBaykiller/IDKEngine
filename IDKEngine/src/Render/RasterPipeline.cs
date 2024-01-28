@@ -171,7 +171,7 @@ namespace IDKEngine.Render
             SSR = new SSR(width, height, 30, 8, 50.0f);
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
             ConeTracer = new ConeTracer(width, height);
-
+            
             if (IS_MESH_SHADER_RENDERING)
             {
                 gBufferProgram = new ShaderProgram(
@@ -204,11 +204,11 @@ namespace IDKEngine.Render
             mergeLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MergeTextures/compute.glsl")));
 
             taaDataBuffer = new TypedBuffer<GpuTaaData>();
-            taaDataBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
+            taaDataBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1);
             taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             gBufferData = new TypedBuffer<GpuGBuffer>();
-            gBufferData.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
+            gBufferData.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1);
             gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
 
             gBufferFBO = new Framebuffer();

@@ -175,12 +175,12 @@ namespace IDKEngine.Render
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
             wavefrontRayBuffer = new TypedBuffer<GpuWavefrontRay>();
-            wavefrontRayBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.None, width * height);
+            wavefrontRayBuffer.ImmutableAllocate(BufferObject.BufferStorageType.DeviceLocal, width * height);
             wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
             wavefrontPTBuffer = new BufferObject();
-            wavefrontPTBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)), IntPtr.Zero);
+            wavefrontPTBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)), IntPtr.Zero);
             wavefrontPTBuffer.SimpleClear(0, sizeof(GpuWavefrontPTHeader), (nint)(&clear));
             wavefrontPTBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
 

@@ -427,7 +427,7 @@ namespace IDKEngine
             GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
 
             basicDataBuffer = new TypedBuffer<GpuBasicData>();
-            basicDataBuffer.ImmutableAllocate(BufferObject.BufferStorageFlag.DynamicStorage, 1);
+            basicDataBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1);
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             finalProgram = new ShaderProgram(
@@ -479,14 +479,6 @@ namespace IDKEngine
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
                 ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
-
-                //ModelLoader.Model emissiveTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\EmissiveStrengthTest\\glTF\\EmissiveStrengthTest.gltf", Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-50.0f)) * Matrix4.CreateTranslation(10.0f, 2.0f, -9.0f));
-                //ModelLoader.Model attenuationTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\AttenuationTest\\glTF\\AttenuationTest.gltf");
-                //ModelLoader.Model transmissionRoughnessTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\TransmissionRoughnessTest\\glTF\\TransmissionRoughnessTest.gltf", Matrix4.CreateScale(10.0f));
-                //ModelLoader.Model dragonAttenuation = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\DragonAttenuation\\glTF\\DragonAttenuation.gltf");
-                //ModelLoader.Model transmissionTest = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\TransmissionTest\\glTF\\TransmissionTest.gltf", Matrix4.CreateScale(10.0f));
-                //ModelLoader.Model aBeautifulGame = ModelLoader.GltfToEngineFormat("C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Models\\2.0\\ABeautifulGame\\glTF\\ABeautifulGame.gltf", Matrix4.CreateScale(10.0f));
-                //ModelSystem.Add(aBeautifulGame);
 
                 ModelSystem.Add(sponza, lucy, helmet);
 

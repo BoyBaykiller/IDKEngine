@@ -187,12 +187,12 @@ namespace IDKEngine
             NativeMemory.Free(ptr);
         }
 
-        public static unsafe void MemSet(void* ptr, byte value, nuint byteCount)
+        public static unsafe void MemSet(void* ptr, byte value, nint byteCount)
         {
-            NativeMemory.Fill(ptr, byteCount, value);
+            NativeMemory.Fill(ptr, (nuint)byteCount, value);
         }
 
-        public static unsafe void MemCpy<T1, T2>(in T1 src, ref T2 dest, nuint byteCount)
+        public static unsafe void MemCpy<T1, T2>(in T1 src, ref T2 dest, nint byteCount)
             where T1 : unmanaged
             where T2 : unmanaged
         {
@@ -202,17 +202,9 @@ namespace IDKEngine
             }
         }
 
-        public static unsafe void MemCpy(void* src, void* dest, nuint byteCount)
+        public static unsafe void MemCpy(void* src, void* dest, nint byteCount)
         {
-            NativeMemory.Copy(src, dest, byteCount);
-        }
-
-        public static unsafe Span<T> SpanReinterpret<T>(Span<byte> input) where T : unmanaged
-        {
-            Debug.Assert(input.Length % sizeof(T) == 0);
-
-            ref T reference = ref Unsafe.As<byte, T>(ref MemoryMarshal.GetReference(input));
-            return MemoryMarshal.CreateSpan(ref reference, input.Length / sizeof(T));
+            NativeMemory.Copy(src, dest, (nuint)byteCount);
         }
 
         public static uint CompressSR11G11B10(in Vector3 data)
