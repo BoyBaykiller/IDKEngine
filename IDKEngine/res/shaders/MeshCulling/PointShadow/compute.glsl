@@ -13,8 +13,6 @@ struct DrawElementsCmd
     uint FirstIndex;
     uint BaseVertex;
     uint BaseInstance;
-
-    uint BlasRootNodeIndex;
 };
 
 struct Mesh
@@ -29,6 +27,9 @@ struct Mesh
     uint MeshletsStart;
     vec3 AbsorbanceBias;
     uint MeshletCount;
+    uint InstanceCount;
+    uint BlasRootNodeIndex;
+    vec2 _pad0;
 };
 
 struct MeshInstance
@@ -36,6 +37,8 @@ struct MeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
+    vec3 _pad0;
+    uint MeshIndex;
 };
 
 struct BlasNode
@@ -81,12 +84,17 @@ layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
 
+layout(std430, binding = 3) restrict writeonly buffer VisibleMeshInstanceSSBO
+{
+    uint MeshInstanceIDs[];
+} visibleMeshInstanceSSBO;
+
 layout(std430, binding = 5) restrict readonly buffer BlasSSBO
 {
     BlasNode Nodes[];
 } blasSSBO;
 
-layout(std430, binding = 11) restrict writeonly buffer MeshletTaskCmdSSBO
+layout(std430, binding = 13) restrict writeonly buffer MeshletTaskCmdSSBO
 {
     MeshletTaskCmd TaskCommands[];
 } meshletTaskCmdSSBO;
@@ -101,27 +109,34 @@ layout(location = 1) uniform int FaceIndex;
 
 void main()
 {
-    uint meshIndex = gl_GlobalInvocationID.x;
-    if (meshIndex >= meshSSBO.Meshes.length())
+    uint meshInstanceIndex = gl_GlobalInvocationID.x;
+    if (meshInstanceIndex >= meshInstanceSSBO.MeshInstances.length())
     {
         return;
     }
 
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceIndex];
+    uint meshIndex = meshInstance.MeshIndex;
+    
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshIndex];
-    BlasNode node = blasSSBO.Nodes[drawCmd.BlasRootNodeIndex];
+    BlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshIndex].BlasRootNodeIndex];
 
     mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex];
-    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance].ModelMatrix);
+    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
 
     Frustum frustum = GetFrustum(projView * modelMatrix);
     bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
 
     // For vertex rendering path
-    drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount = isVisible ? 1 : 0;
+    if (isVisible)
+    {
+        uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount, 1u);
+        visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceIndex;
+    }
 
     // For mesh shader rendering path
-    uint meshletCount = meshSSBO.Meshes[meshIndex].MeshletCount;
     const uint taskShaderWorkGroupSize = 32;
+    uint meshletCount = meshSSBO.Meshes[meshIndex].MeshletCount;
     uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
     meshletTaskCmdSSBO.TaskCommands[meshIndex].Count = isVisible ? meshletsWorkGroupCount : 0;
 }

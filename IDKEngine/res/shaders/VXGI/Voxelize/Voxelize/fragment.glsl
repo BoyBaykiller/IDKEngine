@@ -67,7 +67,7 @@ struct Light
     float _pad0;
 };
 
-layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
+layout(std430, binding = 10) restrict readonly buffer MaterialSSBO
 {
     Material Materials[];
 } materialSSBO;

@@ -80,17 +80,11 @@ namespace IDKEngine.Render
 
             for (int i = 0; i < 6; i++)
             {
-                bool frustaIntersect = true;
-                {
-                    Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + i];
-
-                    Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
-                    MyMath.GetFrustumPoints(Matrix4.Invert(faceMatrix), shadowFrustumVertices);
-
-                    Frustum shadowFaceFrustum = new Frustum(faceMatrix);
-
-                    frustaIntersect = Intersections.ConvexSATIntersect(cameraFrustum, shadowFaceFrustum, cameraFrustumVertices, shadowFrustumVertices);
-                }
+                Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + i];
+                Frustum shadowFaceFrustum = new Frustum(faceMatrix);
+                Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
+                MyMath.GetFrustumPoints(Matrix4.Invert(faceMatrix), shadowFrustumVertices);
+                bool frustaIntersect = Intersections.ConvexSATIntersect(cameraFrustum, shadowFaceFrustum, cameraFrustumVertices, shadowFrustumVertices);
 
                 if (!frustaIntersect)
                 {
@@ -99,9 +93,20 @@ namespace IDKEngine.Render
 
                 // Culling face i
                 {
+                    for (int j = 0; j < modelSystem.DrawCommands.Length; j++)
+                    {
+                        modelSystem.DrawCommands[j].InstanceCount = 0;
+                    }
+                    modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
+                    for (int j = 0; j < modelSystem.DrawCommands.Length; j++)
+                    {
+                        ref readonly GpuMesh mesh = ref modelSystem.Meshes[j];
+                        modelSystem.DrawCommands[j].InstanceCount = mesh.InstanceCount;
+                    }
+
                     cullingProgram.Use();
                     cullingProgram.Upload(1, i);
-                    GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
+                    GL.DispatchCompute((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
                     GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
                 }
 

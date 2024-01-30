@@ -15,6 +15,7 @@ Feature list:
  - Screen Space Ambient Occlusion
  - Atmospheric Scattering
  - Asynchronous texture loading
+ - glTF loader supporting various extensions
  - Camera capture and playback with video output
 
 Required OpenGL: 4.6 + `ARB_bindless_texture`

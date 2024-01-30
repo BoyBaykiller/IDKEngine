@@ -23,7 +23,7 @@ namespace IDKEngine
 {
     public static class ModelLoader
     {
-        public static readonly string[] SupportedExtensions = new string[] { "KHR_materials_emissive_strength", "KHR_materials_volume", "KHR_materials_ior", "KHR_materials_transmission" };
+        public static readonly string[] SupportedExtensions = new string[] { "KHR_materials_emissive_strength", "KHR_materials_volume", "KHR_materials_ior", "KHR_materials_transmission", "EXT_mesh_gpu_instancing" };
 
         public struct Model
         {
@@ -201,14 +201,14 @@ namespace IDKEngine
 
             while (nodeStack.Count > 0)
             {
-                (Node node, Matrix4 globalParentTransform) = nodeStack.Pop();
+                (Node node, Matrix4 parentNodeGlobalTransform) = nodeStack.Pop();
 
-                Matrix4 localTransform = node.LocalMatrix.ToOpenTK();
-                Matrix4 globalTransform = localTransform * globalParentTransform;
-
+                Matrix4 nodeLocalTransform = node.LocalMatrix.ToOpenTK();
+                Matrix4 nodeGlobalTransform = nodeLocalTransform * parentNodeGlobalTransform;
+                
                 foreach (Node child in node.VisualChildren)
                 {
-                    nodeStack.Push((child, globalTransform));
+                    nodeStack.Push((child, nodeGlobalTransform));
                 }
 
                 Mesh gltfMesh = node.Mesh;
@@ -216,7 +216,28 @@ namespace IDKEngine
                 {
                     continue;
                 }
-                
+
+                bool nodeHasGpuInstancing = TryLoadNodeInstances(node, out Matrix4[] nodeInstances);
+                if (!nodeHasGpuInstancing)
+                {
+                    // If node doesn't use EXT_mesh_gpu_instancing to define instances we use standard local transform
+                    nodeInstances = new Matrix4[1];
+                    nodeInstances[0] = nodeLocalTransform;
+                }
+
+                //nodeInstances = new Matrix4[1000];
+                //for (int i = 0; i < nodeInstances.Length; i++)
+                //{
+                //    Vector3 trans = Helper.RandomVec3(-15.0f, 15.0f);
+                //    Vector3 rot = Helper.RandomVec3(0.0f, 2.0f * MathF.PI);
+                //    var test = Matrix4.CreateRotationZ(rot.Z) *
+                //               Matrix4.CreateRotationY(rot.Y) *
+                //               Matrix4.CreateRotationX(rot.X) *
+                //               Matrix4.CreateTranslation(trans);
+
+                //    nodeInstances[i] = test;
+                //}
+
                 for (int i = 0; i < gltfMesh.Primitives.Count; i++)
                 {
                     MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
@@ -238,6 +259,7 @@ namespace IDKEngine
                     }
 
                     GpuMesh mesh = new GpuMesh();
+                    mesh.InstanceCount = nodeInstances.Length;
                     mesh.EmissiveBias = 0.0f;
                     mesh.SpecularBias = 0.0f;
                     mesh.RoughnessBias = 0.0f;
@@ -261,12 +283,18 @@ namespace IDKEngine
                         mesh.MaterialIndex = listMaterials.Count - 1;
                     }
 
-                    GpuMeshInstance meshInstance = new GpuMeshInstance();
-                    meshInstance.ModelMatrix = globalTransform;
+                    GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
+                    for (int j = 0; j < meshInstances.Length; j++)
+                    {
+                        ref GpuMeshInstance meshInstance = ref meshInstances[j];
+
+                        meshInstance.ModelMatrix = nodeInstances[j] * parentNodeGlobalTransform;
+                        meshInstance.MeshIndex = listMeshes.Count;
+                    }
 
                     GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
                     drawCmd.IndexCount = meshIndices.Length;
-                    drawCmd.InstanceCount = 1;
+                    drawCmd.InstanceCount = meshInstances.Length;
                     drawCmd.FirstIndex = listIndices.Count;
                     drawCmd.BaseVertex = listVertices.Count;
                     drawCmd.BaseInstance = listMeshInstances.Count;
@@ -279,7 +307,7 @@ namespace IDKEngine
                     listVertexPositions.AddRange(meshVertexPositions);
                     listIndices.AddRange(meshIndices);
                     listMeshes.Add(mesh);
-                    listMeshInstances.Add(meshInstance);
+                    listMeshInstances.AddRange(meshInstances);
                     listDrawCommands.Add(drawCmd);
                     listMeshlets.AddRange(meshMeshlets);
                     listMeshletsInfo.AddRange(meshMeshletsInfo);
@@ -374,7 +402,7 @@ namespace IDKEngine
                     }
 
                     TypedBuffer<byte> stagingBuffer = new TypedBuffer<byte>();
-                    stagingBuffer.ImmutableAllocate(BufferObject.BufferStorageType.DeviceLocalHostVisible, rawImageSizeInBytes);
+                    stagingBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocalHostVisible, rawImageSizeInBytes);
 
                     MainThreadQueue.Enqueue(() =>
                     {
@@ -521,6 +549,26 @@ namespace IDKEngine
             return textureLoadData;
         }
 
+        private static bool TryLoadNodeInstances(Node node, out Matrix4[] nodeInstances)
+        {
+            nodeInstances = null;
+
+            MeshGpuInstancing gltfGpuInstancing = node.UseGpuInstancing();
+            if (gltfGpuInstancing.Count == 0)
+            {
+                return false;
+            }
+
+            // gets instance defined as part of the EXT_mesh_gpu_instancing extension
+
+            nodeInstances = new Matrix4[gltfGpuInstancing.Count];
+            for (int i = 0; i < nodeInstances.Length; i++)
+            {
+                nodeInstances[i] = gltfGpuInstancing.GetLocalMatrix(i).ToOpenTK();
+            }
+
+            return true;
+        }
         private static unsafe ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertices(MeshPrimitive meshPrimitive)
         {
             const string GLTF_POSITION_ATTRIBUTE = "POSITION";
@@ -670,12 +718,6 @@ namespace IDKEngine
 
                 float gltfAttenuationDistance = float.PositiveInfinity;
                 AssignMaterialParamIfFound(ref gltfAttenuationDistance, volumeAttenuationChannel.Value, KnownProperty.AttenuationDistance);
-                if (gltfAttenuationDistance == 0.0f)
-                {
-                    // 0.0f is SharpGLTF's default https://github.com/vpenades/SharpGLTF/issues/215
-                    gltfAttenuationDistance = float.PositiveInfinity;
-                }
-
 
                 // Source: https://github.com/DassaultSystemes-Technology/dspbr-pt/blob/e7cfa6e9aab2b99065a90694e1f58564d675c1a4/packages/lib/shader/integrator/pt.glsl#L24
                 // We can combine glTF Attenuation Color and Distance into a single Absorbance value

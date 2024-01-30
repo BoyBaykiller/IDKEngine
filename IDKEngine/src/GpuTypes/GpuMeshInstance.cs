@@ -39,6 +39,9 @@ namespace IDKEngine.GpuTypes
         private Matrix3x4 invModelMatrix3x4;
         private Matrix3x4 prevModelMatrix3x4;
 
+        private readonly Vector3 _pad0;
+        public int MeshIndex;
+
         public void SetPrevToCurrentMatrix()
         {
             prevModelMatrix3x4 = modelMatrix3x4;
@@ -46,19 +49,19 @@ namespace IDKEngine.GpuTypes
 
         public bool DidMove()
         {
-            return PrevModelMatrix != ModelMatrix;
+            return prevModelMatrix3x4 != modelMatrix3x4;
         }
 
         public static Matrix3x4 Mat4x4ToMat3x4Transposed(in Matrix4 model)
         {
-            Matrix4x3 newAss = new Matrix4x3(
+            Matrix4x3 fourByThree = new Matrix4x3(
                 model.Row0.Xyz,
                 model.Row1.Xyz,
                 model.Row2.Xyz,
                 model.Row3.Xyz
             );
 
-            Matrix3x4 result = Matrix4x3.Transpose(newAss);
+            Matrix3x4 result = Matrix4x3.Transpose(fourByThree);
 
             return result;
         }

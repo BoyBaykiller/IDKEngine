@@ -17,8 +17,6 @@ struct DrawElementsCmd
     uint FirstIndex;
     uint BaseVertex;
     uint BaseInstance;
-
-    uint BlasRootNodeIndex;
 };
 
 struct Mesh
@@ -33,6 +31,9 @@ struct Mesh
     uint MeshletsStart;
     vec3 AbsorbanceBias;
     uint MeshletCount;
+    uint InstanceCount;
+    uint BlasRootNodeIndex;
+    vec2 _pad0;
 };
 
 struct MeshInstance
@@ -40,6 +41,8 @@ struct MeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
+    vec3 _pad0;
+    uint MeshIndex;
 };
 
 struct Meshlet
@@ -75,12 +78,12 @@ layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
 
-layout(std430, binding = 12) restrict readonly buffer MeshletSSBO
+layout(std430, binding = 14) restrict readonly buffer MeshletSSBO
 {
     Meshlet Meshlets[];
 } meshletSSBO;
 
-layout(std430, binding = 13) restrict readonly buffer MeshletInfoSSBO
+layout(std430, binding = 15) restrict readonly buffer MeshletInfoSSBO
 {
     MeshletInfo MeshletsInfo[];
 } meshletInfoSSBO;
@@ -166,11 +169,14 @@ void main()
     }
 
     // Hi-Z Occlusion Culling
-    bool vertexBehindFrustum;
-    Box meshletOldNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
-    if (isVisible && !vertexBehindFrustum)
+    if (isVisible)
     {
-        isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
+        bool vertexBehindFrustum;
+        Box meshletOldNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
+        if (!vertexBehindFrustum)
+        {
+            isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
+        }
     }
 
     uvec4 visibleMeshletsBitmask = subgroupBallot(isVisible);

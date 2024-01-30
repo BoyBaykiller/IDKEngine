@@ -45,16 +45,16 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
 
             lightBufferObject = new TypedBuffer<GpuLight>();
-            lightBufferObject.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, lights.Length * sizeof(GpuLight) + sizeof(int), IntPtr.Zero);
+            lightBufferObject.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, lights.Length * sizeof(GpuLight) + sizeof(int));
             lightBufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
 
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, latitudes, longitudes);
             TypedBuffer<ObjectFactory.Vertex> vbo = new TypedBuffer<ObjectFactory.Vertex>();
-            vbo.ImmutableAllocate(BufferObject.BufferStorageType.DeviceLocal, vertecis);
+            vbo.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocal, vertecis);
 
             Span<uint> indicis = ObjectFactory.GenerateSmoothSphereIndicis((uint)latitudes, (uint)longitudes);
             TypedBuffer<uint> ebo = new TypedBuffer<uint>();
-            ebo.ImmutableAllocate(BufferObject.BufferStorageType.DeviceLocal, indicis);
+            ebo.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocal, indicis);
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);

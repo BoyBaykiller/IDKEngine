@@ -7,7 +7,5 @@
         public int FirstIndex;
         public int BaseVertex;
         public int BaseInstance;
-
-        public uint BlasRootNodeIndex;
     }
 }

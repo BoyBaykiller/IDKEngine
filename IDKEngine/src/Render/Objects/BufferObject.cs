@@ -44,7 +44,7 @@ namespace IDKEngine.Render.Objects
             GL.BindBuffer(bufferTarget, ID);
         }
 
-        public void ImmutableAllocate(BufferStorageType type, nint size, IntPtr data)
+        public void ImmutableAllocate(BufferStorageType type, nint size, IntPtr data = 0)
         {
             GL.NamedBufferStorage(ID, size, data, (BufferStorageFlags)type);
             Size = size;
@@ -60,7 +60,7 @@ namespace IDKEngine.Render.Objects
                 MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)type);
             }
         }
-        public void MutableAllocate(nint size, IntPtr data)
+        public void MutableAllocate(nint size, IntPtr data = 0)
         {
             GL.NamedBufferData(ID, size, data, BufferUsageHint.StaticDraw);
             Size = size;
@@ -113,32 +113,36 @@ namespace IDKEngine.Render.Objects
 
         }
 
-        public void ImmutableAllocate(BufferStorageType type, ReadOnlySpan<T> data)
+        public void ImmutableAllocateElements(BufferStorageType type, ReadOnlySpan<T> data)
         {
-            ImmutableAllocate(type, data.Length, data[0]);
+            ImmutableAllocateElements(type, data.Length, data[0]);
         }
-        public void ImmutableAllocate(BufferStorageType type, nint count, in T data)
+        public void ImmutableAllocateElements(BufferStorageType type, nint count, in T data)
         {
             fixed (void* ptr = &data)
             {
-                ImmutableAllocate(type, sizeof(T) * count, (nint)ptr);
+                ImmutableAllocateElements(type, count, (nint)ptr);
             }
         }
-        public void ImmutableAllocate(BufferStorageType type, nint count)
+        public void ImmutableAllocateElements(BufferStorageType type, nint count, IntPtr data = 0)
         {
-            ImmutableAllocate(type, sizeof(T) * count, IntPtr.Zero);
+            ImmutableAllocate(type, sizeof(T) * count, data);
         }
 
-        public void MutableAllocate(ReadOnlySpan<T> data)
+        public void MutableAllocateElements(ReadOnlySpan<T> data)
         {
-            MutableAllocate(data.Length, data[0]);
+            MutableAllocateElements(data.Length, data[0]);
         }
-        public void MutableAllocate(nint count, in T data)
+        public void MutableAllocateElements(nint count, in T data)
         {
             fixed (void* ptr = &data)
             {
-                MutableAllocate(sizeof(T) * count, (nint)ptr);
+                MutableAllocateElements(count, (nint)ptr);
             }
+        }
+        public void MutableAllocateElements(nint count, IntPtr data = 0)
+        {
+            MutableAllocate(sizeof(T) * count, data);
         }
 
         public void UploadElements(ReadOnlySpan<T> data, nint startIndex = 0)
