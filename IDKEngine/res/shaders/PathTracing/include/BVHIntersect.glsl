@@ -29,7 +29,7 @@ layout(std430, binding = 6) restrict readonly buffer BlasTriangleIndicesSSBO
     PackedUVec3 Indices[];
 } blasTriangleIndicesSSBO;
 
-layout(std430, binding = 10) restrict readonly buffer VertexPositionsSSBO
+layout(std430, binding = 12) restrict readonly buffer VertexPositionsSSBO
 {
     PackedVec3 VertexPositions[];
 } vertexPositionsSSBO;
@@ -266,18 +266,20 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
         //     continue;
         // }
 
-        if (parent.LeftChild == 0)
+        bool isLeaf = parent.IsLeafAndLeftChildOrInstanceID >> 31 == 1;
+        uint leftChildOrInstanceID = parent.IsLeafAndLeftChildOrInstanceID & ((1u << 31) - 1);
+        if (isLeaf)
         {
             DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[parent.BlasIndex];
+            Mesh mesh = meshSSBO.Meshes[parent.BlasIndex];
 
-            uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[leftChildOrInstanceID].InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
 
-            if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
+            if (IntersectBlas(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
             {
                 hitInfo.MeshID = parent.BlasIndex;
-                hitInfo.InstanceID = glInstanceID;
+                hitInfo.InstanceID = leftChildOrInstanceID;
             }
 
             if (stackPtr == 0) break;
@@ -286,7 +288,7 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
         }
         
 
-        uint leftChild = parent.LeftChild;
+        uint leftChild = leftChildOrInstanceID;
         uint rightChild = leftChild + 1;
         TlasNode leftNode = tlasSSBO.Nodes[leftChild];
         TlasNode rightNode = tlasSSBO.Nodes[rightChild];
@@ -318,14 +320,17 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
     for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
-        
-        uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-        mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
-        Ray localRay = RayTransform(ray, invModelMatrix);
-        if (IntersectBlas(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
+        Mesh mesh = meshSSBO.Meshes[i];
+        for (uint j = 0; j < mesh.InstanceCount; j++)
         {
-            hitInfo.MeshID = i;
-            hitInfo.InstanceID = glInstanceID;
+            uint instanceID = cmd.BaseInstance + j;
+            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[instanceID].InvModelMatrix);
+            Ray localRay = RayTransform(ray, invModelMatrix);
+            if (IntersectBlas(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
+            {
+                hitInfo.MeshID = i;
+                hitInfo.InstanceID = instanceID;
+            }
         }
     }
     #endif
@@ -381,18 +386,20 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
         //     continue;
         // }
 
-        if (parent.LeftChild == 0)
+        bool isLeaf = parent.IsLeafAndLeftChildOrInstanceID >> 31 == 1;
+        uint leftChildOrInstanceID = parent.IsLeafAndLeftChildOrInstanceID & ((1u << 31) - 1);
+        if (isLeaf)
         {
             DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[parent.BlasIndex];
+            Mesh mesh = meshSSBO.Meshes[parent.BlasIndex];
 
-            uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
+            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[leftChildOrInstanceID].InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
 
-            if (IntersectBlasAny(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
+            if (IntersectBlasAny(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
             {
                 hitInfo.MeshID = parent.BlasIndex;
-                hitInfo.InstanceID = glInstanceID;
+                hitInfo.InstanceID = leftChildOrInstanceID;
 
                 return true;
             }
@@ -403,7 +410,7 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
         }
         
 
-        uint leftChild = parent.LeftChild;
+        uint leftChild = leftChildOrInstanceID;
         uint rightChild = leftChild + 1;
         TlasNode leftNode = tlasSSBO.Nodes[leftChild];
         TlasNode rightNode = tlasSSBO.Nodes[rightChild];
@@ -436,15 +443,18 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
     for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
     {
         DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
-        
-        uint glInstanceID = cmd.BaseInstance + 0; // TODO: Work out actual instanceID value
-        mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[glInstanceID].InvModelMatrix);
-        Ray localRay = RayTransform(ray, invModelMatrix);
-        if (IntersectBlasAny(localRay, cmd.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
+        Mesh mesh = meshSSBO.Meshes[i];
+        for (uint j = 0; j < mesh.InstanceCount; j++)
         {
-            hitInfo.MeshID = i;
-            hitInfo.InstanceID = glInstanceID;
-            return true;
+            uint instanceID = cmd.BaseInstance + j;
+            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[instanceID].InvModelMatrix);
+            Ray localRay = RayTransform(ray, invModelMatrix);
+            if (IntersectBlasAny(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
+            {
+                hitInfo.MeshID = i;
+                hitInfo.InstanceID = instanceID;
+                return true;
+            }
         }
     }
     #endif

@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Linq;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
-using System.Diagnostics;
 
 namespace IDKEngine
 {
@@ -48,6 +48,7 @@ namespace IDKEngine
             tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
             blases = Array.Empty<BLAS>();
+            Tlas = new TLAS(blases, Array.Empty<GpuDrawElementsCmd>(), Array.Empty<GpuMeshInstance>());
         }
 
         public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMax = float.MaxValue)
@@ -79,7 +80,7 @@ namespace IDKEngine
                             hitInfo.T = blasHitInfo.T;
 
                             hitInfo.MeshID = i;
-                            hitInfo.InstanceID = j;
+                            hitInfo.InstanceID = instanceID;
                         }
                     }
 
@@ -143,7 +144,7 @@ namespace IDKEngine
         public void TlasBuild()
         {
             Tlas.Build();
-            tlasBuffer.MutableAllocate(Tlas.Nodes);
+            tlasBuffer.MutableAllocateElements(Tlas.Nodes);
         }
 
         public void BlasesBuild()
@@ -189,8 +190,8 @@ namespace IDKEngine
 
         private unsafe void SetBlasBuffersContent()
         {
-            blasBuffer.MutableAllocate((nint)sizeof(GpuBlasNode) * GetBlasesNodeCount(), IntPtr.Zero);
-            blasTriangleIndicesBuffer.MutableAllocate((nint)sizeof(BLAS.IndicesTriplet) * GetBlasesTriangleIndicesCount(), IntPtr.Zero);
+            blasBuffer.MutableAllocateElements(GetBlasesNodeCount());
+            blasTriangleIndicesBuffer.MutableAllocateElements(GetBlasesTriangleIndicesCount());
 
             int uploadedBlasNodes = 0;
             int uploadedTriangleIndices = 0;

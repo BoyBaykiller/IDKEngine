@@ -56,7 +56,7 @@ namespace IDKEngine
         {
             skyBoxTextureBuffer = new TypedBuffer<ulong>();
             skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
-            skyBoxTextureBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1, 0ul);
+            skyBoxTextureBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1, 0ul);
 
             if (paths != null)
             {

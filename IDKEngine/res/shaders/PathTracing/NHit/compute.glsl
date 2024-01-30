@@ -48,8 +48,6 @@ struct DrawElementsCmd
     uint FirstIndex;
     uint BaseVertex;
     uint BaseInstance;
-
-    uint BlasRootNodeIndex;
 };
 
 struct Mesh
@@ -64,6 +62,9 @@ struct Mesh
     uint MeshletsStart;
     vec3 AbsorbanceBias;
     uint MeshletCount;
+    uint InstanceCount;
+    uint BlasRootNodeIndex;
+    vec2 _pad0;
 };
 
 struct MeshInstance
@@ -71,6 +72,8 @@ struct MeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
+    vec3 _pad0;
+    uint MeshIndex;
 };
 
 struct Vertex
@@ -91,7 +94,7 @@ struct BlasNode
 struct TlasNode
 {
     vec3 Min;
-    uint LeftChild;
+    uint IsLeafAndLeftChildOrInstanceID;
     vec3 Max;
     uint BlasIndex;
 };
@@ -140,12 +143,12 @@ layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
 
-layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
+layout(std430, binding = 10) restrict readonly buffer MaterialSSBO
 {
     Material Materials[];
 } materialSSBO;
 
-layout(std430, binding = 4) restrict readonly buffer VertexSSBO
+layout(std430, binding = 11) restrict readonly buffer VertexSSBO
 {
     Vertex Vertices[];
 } vertexSSBO;
@@ -282,10 +285,9 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             vec3 worldNormal = normalize(unitVecToWorld * interpNormal);
             vec3 worldTangent = normalize(unitVecToWorld * interpTangent);
             mat3 TBN = GetTBN(worldTangent, worldNormal);
-            
-            normal = texture(material.Normal, interpTexCoord).rgb;
-            normal = TBN * normalize(normal * 2.0 - 1.0);
-            normal = mix(worldNormal, normal, mesh.NormalMapStrength);
+            vec3 textureWorldNormal = texture(material.Normal, interpTexCoord).rgb;
+            textureWorldNormal = TBN * (textureWorldNormal * 2.0 - 1.0);
+            normal = normalize(mix(worldNormal, textureWorldNormal, mesh.NormalMapStrength));
 
             ior = max(material.IOR + mesh.IORBias, 1.0);
             vec4 albedoAlpha = texture(material.BaseColor, interpTexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);

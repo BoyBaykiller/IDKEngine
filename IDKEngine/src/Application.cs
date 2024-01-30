@@ -157,21 +157,20 @@ namespace IDKEngine
                 TonemapAndGamma.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
-            if (gui.SelectedEntity.Type != Gui.EntityType.None)
+            if (gui.SelectedEntity.EntityType != Gui.EntityType.None)
             {
                 Box box = new Box();
-                if (gui.SelectedEntity.Type == Gui.EntityType.Mesh)
+                if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
                 {
-                    GpuBlasNode node = ModelSystem.BVH.Tlas.Blases[gui.SelectedEntity.Index].Root;
+                    GpuBlasNode node = ModelSystem.BVH.Tlas.Blases[gui.SelectedEntity.EntityID].Root;
                     box.Min = node.Min;
                     box.Max = node.Max;
 
-                    GpuDrawElementsCmd cmd = ModelSystem.DrawCommands[gui.SelectedEntity.Index];
-                    box.Transform(ModelSystem.MeshInstances[cmd.BaseInstance + gui.SelectedEntity.Instance].ModelMatrix);
+                    box.Transform(ModelSystem.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
                 }
                 else
                 {
-                    LightManager.TryGetLight(gui.SelectedEntity.Index, out GpuLightWrapper abstractLight);
+                    LightManager.TryGetLight(gui.SelectedEntity.EntityID, out GpuLightWrapper abstractLight);
                     ref GpuLight light = ref abstractLight.GpuLight;
 
                     box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
@@ -427,7 +426,7 @@ namespace IDKEngine
             GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
 
             basicDataBuffer = new TypedBuffer<GpuBasicData>();
-            basicDataBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1);
+            basicDataBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             finalProgram = new ShaderProgram(
@@ -479,6 +478,7 @@ namespace IDKEngine
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
                 ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
+                //ModelLoader.Model test = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
                 ModelSystem.Add(sponza, lucy, helmet);
 

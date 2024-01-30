@@ -204,11 +204,11 @@ namespace IDKEngine.Render
             mergeLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MergeTextures/compute.glsl")));
 
             taaDataBuffer = new TypedBuffer<GpuTaaData>();
-            taaDataBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1);
+            taaDataBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
             taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             gBufferData = new TypedBuffer<GpuGBuffer>();
-            gBufferData.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, 1);
+            gBufferData.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
             gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
 
             gBufferFBO = new Framebuffer();
@@ -272,7 +272,8 @@ namespace IDKEngine.Render
                 // Reset instance count, don't want to miss meshes when voxelizing
                 for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
                 {
-                    modelSystem.DrawCommands[i].InstanceCount = 1;
+                    ref readonly GpuMesh mesh = ref modelSystem.Meshes[i];
+                    modelSystem.DrawCommands[i].InstanceCount = mesh.InstanceCount;
                 }
                 modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
 
@@ -292,14 +293,20 @@ namespace IDKEngine.Render
                 
                 // Frustum + Occlusion Culling
                 {
-                    string message = "StartDebug";
-                    GL.PushDebugGroup(DebugSourceExternal.DebugSourceApplication, Helper.GL_DEBUG_CALLBACK_APP_MAKER_ID, message.Length, message);
+                    for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
+                    {
+                        modelSystem.DrawCommands[i].InstanceCount = 0;
+                    }
+                    modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
+                    for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
+                    {
+                        ref readonly GpuMesh mesh = ref modelSystem.Meshes[i];
+                        modelSystem.DrawCommands[i].InstanceCount = mesh.InstanceCount;
+                    }
 
                     cullProgram.Use();
-                    GL.DispatchCompute((modelSystem.Meshes.Length + 64 - 1) / 64, 1, 1);
+                    GL.DispatchCompute((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
                     GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
-
-                    GL.PopDebugGroup();
                 }
 
                 GL.DepthFunc(DepthFunction.Less);
@@ -310,7 +317,6 @@ namespace IDKEngine.Render
                     GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
                     GL.Disable(EnableCap.CullFace);
                 }
-
 
                 gBufferFBO.Bind();
                 gBufferFBO.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
@@ -340,13 +346,8 @@ namespace IDKEngine.Render
             {
                 if (IsSSAO)
                 {
-                    string message = "EndDebug";
-                    GL.PushDebugGroup(DebugSourceExternal.DebugSourceApplication, Helper.GL_DEBUG_CALLBACK_APP_MAKER_ID, message.Length, message);
-
                     SSAO.Compute();
                     SSAO.Result.BindToUnit(0);
-
-                    GL.PopDebugGroup();
                 }
                 else
                 {

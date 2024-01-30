@@ -155,6 +155,7 @@ namespace IDKEngine
                 case DebugSeverity.DebugSeverityMedium:
                     if (id == 0) return; // Shader compile warning, Intel
                     // if (id == 131186) return; // Buffer object is being copied/moved from VIDEO memory to HOST memory, NVIDIA
+                    if (id == 131154) return; // Pixel-path performance warning: Pixel transfer is synchronized with 3D rendering, NVIDIA
                     Logger.Log(Logger.LogLevel.Warn, text);
                     break;
 

@@ -20,7 +20,7 @@ namespace IDKEngine
             DrawCommands = drawCommands;
             MeshInstances = meshInstances;
 
-            Nodes = new GpuTlasNode[2 * meshInstances.Length - 1];
+            Nodes = new GpuTlasNode[Math.Max(2 * meshInstances.Length - 1, 1)];
             TreeDepth = (int)MathF.Ceiling(MathF.Log2(Nodes.Length));
         }
 
@@ -38,11 +38,15 @@ namespace IDKEngine
 
                     for (int j = 0; j < cmd.InstanceCount; j++)
                     {
-                        GpuTlasNode newNode;
-                        Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), MeshInstances[cmd.BaseInstance + j].ModelMatrix);
+                        int instanceID = cmd.BaseInstance + j;
+
+                        Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), MeshInstances[instanceID].ModelMatrix);
+
+                        GpuTlasNode newNode = new GpuTlasNode();
                         newNode.Min = worldSpaceBounds.Min;
                         newNode.Max = worldSpaceBounds.Max;
-                        newNode.LeftChild = 0;
+                        newNode.IsLeaf = true;
+                        newNode.LeftChildOrInstanceID = (uint)instanceID;
                         newNode.BlasIndex = (uint)i;
 
                         int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
@@ -80,9 +84,10 @@ namespace IDKEngine
                         boundsFittingChildren.GrowToFit(nodeB.Max);
 
                         GpuTlasNode newNode = new GpuTlasNode();
-                        newNode.LeftChild = (uint)nodeBId;
                         newNode.Min = boundsFittingChildren.Min;
                         newNode.Max = boundsFittingChildren.Max;
+                        newNode.IsLeaf = false;
+                        newNode.LeftChildOrInstanceID = (uint)nodeBId;
 
                         int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
                         Nodes[newNodeIndex] = newNode;
@@ -101,6 +106,16 @@ namespace IDKEngine
                     }
                 }
             }
+        }
+
+
+        public const float TRIANGLE_INTERSECT_COST = 1.1f;
+        public const float NODE_INTERSECT_COST = 1.0f; // Keep it 1 so we effectively only have TRIANGLE_INTERSECT_COST as a paramater
+        public const int SAH_SAMPLES = 8;
+
+        public void BuildNew()
+        {
+
         }
 
         private int FindBestMatch(int start, int count, int nodeIndex)
@@ -139,18 +154,18 @@ namespace IDKEngine
             hitInfo = new BVH.RayHitInfo();
             hitInfo.T = tMax;
 
-            uint stackPtr = 0;
+            int stackPtr = 0;
             uint stackTop = 0;
-            uint* stack = stackalloc uint[TreeDepth];
+            Span<uint> stack = stackalloc uint[TreeDepth];
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref Nodes[stackTop];
-                if (parent.IsLeaf())
+                if (parent.IsLeaf)
                 {
                     BLAS blas = Blases[(int)parent.BlasIndex];
 
-                    int glInstanceID = 0; // TODO: Work out actual instanceID value
-                    Ray localRay = ray.Transformed(MeshInstances[glInstanceID].InvModelMatrix);
+                    uint instanceID = parent.LeftChildOrInstanceID;
+                    Ray localRay = ray.Transformed(MeshInstances[instanceID].InvModelMatrix);
                     if (blas.Intersect(localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                     {
                         hitInfo.TriangleIndices = blasHitInfo.TriangleIndices;
@@ -158,7 +173,7 @@ namespace IDKEngine
                         hitInfo.T = blasHitInfo.T;
 
                         hitInfo.MeshID = (int)parent.BlasIndex;
-                        hitInfo.InstanceID = glInstanceID;
+                        hitInfo.InstanceID = (int)instanceID;
                     }
 
                     if (stackPtr == 0) break;
@@ -166,7 +181,7 @@ namespace IDKEngine
                     continue;
                 }
 
-                uint leftChild = parent.LeftChild;
+                uint leftChild = parent.LeftChildOrInstanceID;
                 uint rightChild = leftChild + 1;
                 ref readonly GpuTlasNode leftNode = ref Nodes[leftChild];
                 ref readonly GpuTlasNode rightNode = ref Nodes[rightChild];

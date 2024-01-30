@@ -16,5 +16,9 @@ namespace IDKEngine.GpuTypes
 
         public Vector3 AbsorbanceBias;
         public int MeshletCount;
+
+        public int InstanceCount;
+        public uint BlasRootNodeIndex;
+        public Vector2 _pad0;
     }
 }

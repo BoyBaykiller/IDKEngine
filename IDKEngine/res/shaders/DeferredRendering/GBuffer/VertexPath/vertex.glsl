@@ -15,12 +15,19 @@ struct MeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
+    vec3 _pad0;
+    uint MeshIndex;
 };
 
 layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
+
+layout(std430, binding = 3) restrict buffer VisibleMeshInstanceSSBO
+{
+    uint MeshInstanceIDs[];
+} visibleMeshInstanceSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
 {
@@ -59,18 +66,18 @@ out InOutVars
 
 void main()
 {
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
+    uint meshInstaneID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstaneID];
     
     vec3 normal = DecompressSR11G11B10(Normal);
     vec3 tangent = DecompressSR11G11B10(Tangent);
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
     mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
-
     mat3 unitVecToWorld = mat3(transpose(invModelMatrix));
 
-    outData.Normal = unitVecToWorld * normal;
-    outData.Tangent = unitVecToWorld * tangent;
+    outData.Normal = normalize(unitVecToWorld * normal);
+    outData.Tangent = normalize(unitVecToWorld * tangent);
     outData.TexCoord = TexCoord;
     outData.PrevClipPos = basicDataUBO.PrevProjView * prevModelMatrix * vec4(Position, 1.0);
     outData.MeshID = gl_DrawID;

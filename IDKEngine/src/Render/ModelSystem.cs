@@ -18,6 +18,9 @@ namespace IDKEngine.Render
         public GpuMeshInstance[] MeshInstances = Array.Empty<GpuMeshInstance>();
         private readonly TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
 
+        public uint[] VisibleMeshInstances = Array.Empty<uint>();
+        private readonly TypedBuffer<uint> visibleMeshInstanceBuffer;
+
         public GpuMaterial[] Materials = Array.Empty<GpuMaterial>();
         private readonly TypedBuffer<GpuMaterial> materialBuffer;
 
@@ -53,6 +56,7 @@ namespace IDKEngine.Render
             drawCommandBuffer = new TypedBuffer<GpuDrawElementsCmd>();
             meshBuffer = new TypedBuffer<GpuMesh>();
             meshInstanceBuffer = new TypedBuffer<GpuMeshInstance>();
+            visibleMeshInstanceBuffer = new TypedBuffer<uint>();
             materialBuffer = new TypedBuffer<GpuMaterial>();
             vertexBuffer = new TypedBuffer<GpuVertex>();
             vertexPositionBuffer = new TypedBuffer<Vector3>();
@@ -66,14 +70,16 @@ namespace IDKEngine.Render
             drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
             meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
             meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
-            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
-            vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
-            vertexPositionBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
-            meshletTasksCmdsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
-            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
-            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
-            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
-            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
+            visibleMeshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
+            // TODO: Buffer 4 free for visibleMeshletInstances
+            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
+            vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
+            vertexPositionBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
+            meshletTasksCmdsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
+            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
+            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
+            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 16);
+            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 17);
 
             vao = new VAO();
             vao.SetElementBuffer(vertexIndicesBuffer);
@@ -101,34 +107,35 @@ namespace IDKEngine.Render
             for (int i = 0; i < models.Length; i++)
             {
                 // Upon deletion these are the properties that need to be adjusted
+                Helper.ArrayAdd(ref DrawCommands, models[i].DrawCommands);
+                for (int j = DrawCommands.Length - models[i].DrawCommands.Length; j < DrawCommands.Length; j++)
+                {
+                    ref GpuDrawElementsCmd newDrawCmd = ref DrawCommands[j];
+                    newDrawCmd.BaseInstance += MeshInstances.Length;
+                    newDrawCmd.BaseVertex += Vertices.Length;
+                    newDrawCmd.FirstIndex += VertexIndices.Length;
+                }
+                Helper.ArrayAdd(ref MeshInstances, models[i].MeshInstances);
+                for (int j = MeshInstances.Length - models[i].MeshInstances.Length; j < MeshInstances.Length; j++)
+                {
+                    ref GpuMeshInstance newMeshInstance = ref MeshInstances[j];
+                    newMeshInstance.MeshIndex += Meshes.Length;
+                }
                 Helper.ArrayAdd(ref Meshes, models[i].Meshes);
                 for (int j = Meshes.Length - models[i].Meshes.Length; j < Meshes.Length; j++)
                 {
-                    ref GpuMesh mesh = ref Meshes[j];
-                    mesh.MaterialIndex += Materials.Length;
-                    mesh.MeshletsStart += Meshlets.Length;
+                    ref GpuMesh newMesh = ref Meshes[j];
+                    newMesh.MaterialIndex += Materials.Length;
+                    newMesh.MeshletsStart += Meshlets.Length;
                 }
-
                 Helper.ArrayAdd(ref Meshlets, models[i].Meshlets);
                 for (int j = Meshlets.Length - models[i].Meshlets.Length; j < Meshlets.Length; j++)
                 {
-                    ref GpuMeshlet meshlet = ref Meshlets[j];
-                    meshlet.VertexOffset += (uint)MeshletsVertexIndices.Length;
-                    meshlet.IndicesOffset += (uint)MeshletsLocalIndices.Length;
+                    ref GpuMeshlet newMeshlet = ref Meshlets[j];
+                    newMeshlet.VertexOffset += (uint)MeshletsVertexIndices.Length;
+                    newMeshlet.IndicesOffset += (uint)MeshletsLocalIndices.Length;
                 }
 
-                Helper.ArrayAdd(ref DrawCommands, models[i].DrawCommands);
-                int prevLength = DrawCommands.Length - models[i].DrawCommands.Length;
-                for (int j = prevLength; j < DrawCommands.Length; j++)
-                {
-                    ref GpuDrawElementsCmd drawCmd = ref DrawCommands[j];
-                    drawCmd.BaseInstance += prevLength;
-                    drawCmd.BaseVertex += Vertices.Length;
-                    drawCmd.FirstIndex += VertexIndices.Length;
-                }
-
-
-                Helper.ArrayAdd(ref MeshInstances, models[i].MeshInstances);
                 Helper.ArrayAdd(ref Materials, models[i].Materials);
                 
                 Helper.ArrayAdd(ref Vertices, models[i].Vertices);
@@ -141,34 +148,34 @@ namespace IDKEngine.Render
                 Helper.ArrayAdd(ref MeshletsLocalIndices, models[i].MeshletsLocalIndices);
             }
 
-            // Handle BVH build
             {
                 ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
                 BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);
 
-                // Caculate root node BVH index for each mesh
+                // Adjust root node index in context of all Nodes
                 uint bvhNodesExclusiveSum = 0;
                 for (int i = 0; i < DrawCommands.Length; i++)
                 {
-                    DrawCommands[i].BlasRootNodeIndex = bvhNodesExclusiveSum;
+                    Meshes[i].BlasRootNodeIndex = bvhNodesExclusiveSum;
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
             }
 
-            drawCommandBuffer.MutableAllocate(DrawCommands);
-            meshBuffer.MutableAllocate(Meshes);
-            meshInstanceBuffer.MutableAllocate(MeshInstances);
-            materialBuffer.MutableAllocate(Materials);
+            drawCommandBuffer.MutableAllocateElements(DrawCommands);
+            meshBuffer.MutableAllocateElements(Meshes);
+            meshInstanceBuffer.MutableAllocateElements(MeshInstances);
+            visibleMeshInstanceBuffer.MutableAllocateElements(MeshInstances.Length);
+            materialBuffer.MutableAllocateElements(Materials);
 
-            vertexBuffer.MutableAllocate(Vertices);
-            vertexPositionBuffer.MutableAllocate(VertexPositions);
-            vertexIndicesBuffer.MutableAllocate(VertexIndices);
+            vertexBuffer.MutableAllocateElements(Vertices);
+            vertexPositionBuffer.MutableAllocateElements(VertexPositions);
+            vertexIndicesBuffer.MutableAllocateElements(VertexIndices);
 
-            meshletTasksCmdsBuffer.MutableAllocate(MeshTasksCmds);
-            meshletBuffer.MutableAllocate(Meshlets);
-            meshletInfoBuffer.MutableAllocate(MeshletsInfo);
-            meshletsVertexIndicesBuffer.MutableAllocate(MeshletsVertexIndices);
-            meshletsPrimitiveIndicesBuffer.MutableAllocate(MeshletsLocalIndices);
+            meshletTasksCmdsBuffer.MutableAllocateElements(MeshTasksCmds);
+            meshletBuffer.MutableAllocateElements(Meshlets);
+            meshletInfoBuffer.MutableAllocateElements(MeshletsInfo);
+            meshletsVertexIndicesBuffer.MutableAllocateElements(MeshletsVertexIndices);
+            meshletsPrimitiveIndicesBuffer.MutableAllocateElements(MeshletsLocalIndices);
         }
 
         public unsafe void Draw()
@@ -225,6 +232,7 @@ namespace IDKEngine.Render
             drawCommandBuffer.Dispose();
             meshBuffer.Dispose();
             meshInstanceBuffer.Dispose();
+            visibleMeshInstanceBuffer.Dispose();
             materialBuffer.Dispose();
             vertexBuffer.Dispose();
             vertexIndicesBuffer.Dispose();

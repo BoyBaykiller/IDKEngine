@@ -38,7 +38,7 @@ namespace IDKEngine.Render
                 new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/PointShadow/compute.glsl")));
 
             pointShadowsBuffer = new TypedBuffer<GpuPointShadow>();
-            pointShadowsBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int), IntPtr.Zero);
+            pointShadowsBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
         }
 

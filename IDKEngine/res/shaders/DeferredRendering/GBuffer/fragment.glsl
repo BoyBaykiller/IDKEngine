@@ -22,6 +22,9 @@ struct Mesh
     uint MeshletsStart;
     vec3 AbsorbanceBias;
     uint MeshletCount;
+    uint InstanceCount;
+    uint BlasRootNodeIndex;
+    vec2 _pad0;
 };
 
 struct Material
@@ -52,7 +55,7 @@ layout(std430, binding = 1) restrict readonly buffer MeshSSBO
     Mesh Meshes[];
 } meshSSBO;
 
-layout(std430, binding = 3) restrict readonly buffer MaterialSSBO
+layout(std430, binding = 10) restrict readonly buffer MaterialSSBO
 {
     Material Materials[];
 } materialSSBO;
@@ -126,7 +129,7 @@ void main()
     vec3 textureNormal = texture(material.Normal, inData.TexCoord).rgb;
     textureNormal = tbn * normalize(textureNormal * 2.0 - 1.0);
 
-    vec3 normal = mix(interpNormal, textureNormal, mesh.NormalMapStrength);
+    vec3 normal = normalize(mix(interpNormal, textureNormal, mesh.NormalMapStrength));
     vec3 emissive = texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + mesh.EmissiveBias * albedoAlpha.rgb;
     float specular = clamp(texture(material.MetallicRoughness, inData.TexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0);
     float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);

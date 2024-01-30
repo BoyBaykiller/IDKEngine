@@ -80,9 +80,9 @@ namespace IDKEngine.GUI
         private unsafe void CreateDeviceResources()
         {
             vbo = new BufferObject();
-            vbo.MutableAllocate(10000, IntPtr.Zero);
+            vbo.MutableAllocate(10000);
             ebo = new BufferObject();
-            ebo.MutableAllocate(2000, IntPtr.Zero);
+            ebo.MutableAllocate(2000);
 
             ImGuiIOPtr io = ImGui.GetIO();
             io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int width, out int height, out _);
@@ -231,14 +231,14 @@ namespace IDKEngine.GUI
                 if (vertexSize > vbo.Size)
                 {
                     int newSize = (int)Math.Max(vbo.Size * 1.5f, vertexSize);
-                    vbo.MutableAllocate(newSize, IntPtr.Zero);
+                    vbo.MutableAllocate(newSize);
                 }
 
                 int indexSize = cmdList.IdxBuffer.Size * sizeof(ushort);
                 if (indexSize > ebo.Size)
                 {
                     int newSize = (int)Math.Max(ebo.Size * 1.5f, indexSize);
-                    ebo.MutableAllocate(newSize, IntPtr.Zero);
+                    ebo.MutableAllocate(newSize);
                 }
             }
 

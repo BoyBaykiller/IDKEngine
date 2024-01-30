@@ -17,8 +17,6 @@ struct DrawElementsCmd
     uint FirstIndex;
     uint BaseVertex;
     uint BaseInstance;
-
-    uint BlasRootNodeIndex;
 };
 
 struct Mesh
@@ -33,6 +31,9 @@ struct Mesh
     uint MeshletsStart;
     vec3 AbsorbanceBias;
     uint MeshletCount;
+    uint InstanceCount;
+    uint BlasRootNodeIndex;
+    vec2 _pad0;
 };
 
 struct MeshInstance
@@ -40,6 +41,8 @@ struct MeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
+    vec3 _pad0;
+    uint MeshIndex;
 };
 
 struct BlasNode
@@ -53,7 +56,7 @@ struct BlasNode
 struct TlasNode
 {
     vec3 Min;
-    uint LeftChild;
+    uint IsLeafAndLeftChildOrInstanceID;
     vec3 Max;
     uint BlasIndex;
 };

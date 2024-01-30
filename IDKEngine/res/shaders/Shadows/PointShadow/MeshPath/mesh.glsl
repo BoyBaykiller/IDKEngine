@@ -22,8 +22,6 @@ struct DrawElementsCmd
     uint FirstIndex;
     uint BaseVertex;
     uint BaseInstance;
-
-    uint BlasRootNodeIndex;
 };
 
 struct MeshInstance
@@ -31,6 +29,8 @@ struct MeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
+    vec3 _pad0;
+    uint MeshIndex;
 };
 
 struct Meshlet
@@ -67,22 +67,22 @@ layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 } meshInstanceSSBO;
 
 struct PackedVec3 { float x, y, z; };
-layout(std430, binding = 10) restrict readonly buffer VertexPositionsSSBO
+layout(std430, binding = 12) restrict readonly buffer VertexPositionsSSBO
 {
     PackedVec3 VertexPositions[];
 } vertexPositionsSSBO;
 
-layout(std430, binding = 12) restrict readonly buffer MeshletSSBO
+layout(std430, binding = 14) restrict readonly buffer MeshletSSBO
 {
     Meshlet Meshlets[];
 } meshletSSBO;
 
-layout(std430, binding = 14) restrict readonly buffer MeshletVertexIndicesSSBO
+layout(std430, binding = 16) restrict readonly buffer MeshletVertexIndicesSSBO
 {
     uint VertexIndices[];
 } meshletVertexIndicesSSBO;
 
-layout(std430, binding = 15) restrict readonly buffer MeshletLocalIndicesSSBO
+layout(std430, binding = 17) restrict readonly buffer MeshletLocalIndicesSSBO
 {
     uint PackedIndices[];
 } meshletLocalIndicesSSBO;
