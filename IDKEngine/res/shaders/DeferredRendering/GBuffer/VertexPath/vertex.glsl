@@ -66,8 +66,8 @@ out InOutVars
 
 void main()
 {
-    uint meshInstaneID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstaneID];
+    uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
     
     vec3 normal = DecompressSR11G11B10(Normal);
     vec3 tangent = DecompressSR11G11B10(Tangent);

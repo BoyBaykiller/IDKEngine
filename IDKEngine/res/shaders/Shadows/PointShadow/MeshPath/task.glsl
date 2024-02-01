@@ -92,12 +92,17 @@ layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
     MeshInstance MeshInstances[];
 } meshInstanceSSBO;
 
-layout(std430, binding = 14) restrict readonly buffer MeshletSSBO
+layout(std430, binding = 3) restrict buffer VisibleMeshInstanceSSBO
+{
+    uint MeshInstanceIDs[];
+} visibleMeshInstanceSSBO;
+
+layout(std430, binding = 15) restrict readonly buffer MeshletSSBO
 {
     Meshlet Meshlets[];
 } meshletSSBO;
 
-layout(std430, binding = 15) restrict readonly buffer MeshletInfoSSBO
+layout(std430, binding = 16) restrict readonly buffer MeshletInfoSSBO
 {
     MeshletInfo MeshletsInfo[];
 } meshletInfoSSBO;
@@ -112,6 +117,7 @@ taskNV out InOutVars
 {
     // interstingly this needs to be passed down, otherwise we get subtle bugs
     uint MeshID;
+    uint InstanceID;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
 } outData;
@@ -121,8 +127,12 @@ layout(location = 1) uniform int FaceIndex;
 
 void main()
 {
-    uint meshID = gl_DrawID;
+    uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_DrawID];
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+
+    uint meshID = meshInstance.MeshIndex;
     Mesh mesh = meshSSBO.Meshes[meshID];
+
     if (gl_GlobalInvocationID.x >= mesh.MeshletCount)
     {
         return;
@@ -136,7 +146,7 @@ void main()
     MeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
     
     mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex];
-    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance].ModelMatrix);
+    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceID].ModelMatrix);
 
     Frustum frustum = GetFrustum(projView * modelMatrix);
     bool isVisible = FrustumBoxIntersect(frustum, Box(meshletInfo.Min, meshletInfo.Max));
@@ -150,8 +160,9 @@ void main()
 
     if (gl_LocalInvocationIndex == 0)
     {
-        outData.MeshletsStart = workgroupFirstMeshlet;
         outData.MeshID = meshID;
+        outData.InstanceID = meshInstanceID;
+        outData.MeshletsStart = workgroupFirstMeshlet;
         
         uint survivingCount = subgroupBallotBitCount(visibleMeshletsBitmask);
         gl_TaskCountNV = survivingCount;

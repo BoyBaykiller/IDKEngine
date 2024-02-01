@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 using IDKEngine.GpuTypes;
@@ -9,7 +10,7 @@ namespace IDKEngine.Render
     class PointShadowManager : IDisposable
     {
         public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 128; // used in shader and client code - keep in sync!
-        public static readonly bool IS_MESH_SHADER_RENDERING = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
+        public static readonly bool TAKE_MESH_SHADER_PATH = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
 
         private readonly PointShadow[] pointShadows;
         private readonly ShaderProgram renderProgram;
@@ -19,7 +20,7 @@ namespace IDKEngine.Render
         {
             pointShadows = new PointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
-            if (IS_MESH_SHADER_RENDERING)
+            if (TAKE_MESH_SHADER_PATH)
             {
                 renderProgram = new ShaderProgram(
                     new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/Shadows/PointShadow/MeshPath/task.glsl")),
@@ -34,8 +35,9 @@ namespace IDKEngine.Render
             }
 
 
-            cullingProgram = new ShaderProgram(
-                new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/PointShadow/compute.glsl")));
+            Dictionary<string, string> cullingShaderInsertions = new Dictionary<string, string>();
+            cullingShaderInsertions.Add(nameof(TAKE_MESH_SHADER_PATH), TAKE_MESH_SHADER_PATH ? "1" : "0");
+            cullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/PointShadow/compute.glsl"), cullingShaderInsertions));
 
             pointShadowsBuffer = new TypedBuffer<GpuPointShadow>();
             pointShadowsBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));

@@ -10,8 +10,8 @@ namespace IDKEngine.Render
 {
     class Voxelizer : IDisposable
     {
-        public static readonly bool HAS_CONSERVATIVE_RASTER = (Helper.IsExtensionsAvailable("GL_NV_conservative_raster"));
-        public static readonly bool HAS_ATOMIC_FP16_VECTOR = (Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector"));
+        public static readonly bool TAKE_CONSERVATIVE_RASTER_PATH = (Helper.IsExtensionsAvailable("GL_NV_conservative_raster"));
+        public static readonly bool TAKE_ATOMIC_FP16_PATH = (Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector"));
         public static readonly bool TAKE_FAST_GEOMETRY_SHADER_PATH = (Helper.IsExtensionsAvailable("GL_NV_geometry_shader_passthrough") && Helper.IsExtensionsAvailable("GL_NV_viewport_swizzle"));
 
         public unsafe Vector3 GridMin
@@ -82,10 +82,10 @@ namespace IDKEngine.Render
             
             {
                 Dictionary<string, string> takeFastGeometryShaderInsertion = new Dictionary<string, string>();
-                takeFastGeometryShaderInsertion.Add("TAKE_FAST_GEOMETRY_SHADER_PATH", TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0");
+                takeFastGeometryShaderInsertion.Add(nameof(TAKE_FAST_GEOMETRY_SHADER_PATH), TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0");
             
                 Dictionary<string, string> takeAtomicFP16PathInsertion = new Dictionary<string, string>();
-                takeAtomicFP16PathInsertion.Add("TAKE_ATOMIC_FP16_PATH", HAS_ATOMIC_FP16_VECTOR ? "1" : "0");
+                takeAtomicFP16PathInsertion.Add(nameof(TAKE_ATOMIC_FP16_PATH), TAKE_ATOMIC_FP16_PATH ? "1" : "0");
 
                 List<Shader> voxelizeProgramShaders = new List<Shader>()
                 {
@@ -104,7 +104,7 @@ namespace IDKEngine.Render
 
             mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Mipmap/compute.glsl")));
             visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/DebugVisualization/compute.glsl")));
-            if (!HAS_ATOMIC_FP16_VECTOR)
+            if (!TAKE_ATOMIC_FP16_PATH)
             {
                 intermediateResultRbg = new Texture[3];
                 mergeIntermediatesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/MergeIntermediates/compute.glsl")));
@@ -136,7 +136,7 @@ namespace IDKEngine.Render
         private void ClearTextures()
         {
             ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
-            if (!HAS_ATOMIC_FP16_VECTOR)
+            if (!TAKE_ATOMIC_FP16_PATH)
             {
                 intermediateResultRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[0].SizedInternalFormat);
                 intermediateResultRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[1].SizedInternalFormat);
@@ -152,7 +152,7 @@ namespace IDKEngine.Render
         {
             fboNoAttachments.Bind();
 
-            if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
+            if (TAKE_CONSERVATIVE_RASTER_PATH && IsConservativeRasterization)
             {
                 GL.Enable((EnableCap)All.ConservativeRasterizationNv);
             }
@@ -174,7 +174,7 @@ namespace IDKEngine.Render
             GL.Disable(EnableCap.CullFace);
 
             ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
-            if (!HAS_ATOMIC_FP16_VECTOR)
+            if (!TAKE_ATOMIC_FP16_PATH)
             {
                 intermediateResultRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
                 intermediateResultRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
@@ -201,12 +201,12 @@ namespace IDKEngine.Render
             GL.Enable(EnableCap.CullFace);
             Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
 
-            if (HAS_CONSERVATIVE_RASTER && IsConservativeRasterization)
+            if (TAKE_CONSERVATIVE_RASTER_PATH && IsConservativeRasterization)
             {
                 GL.Disable((EnableCap)All.ConservativeRasterizationNv);
             }
 
-            if (!HAS_ATOMIC_FP16_VECTOR)
+            if (!TAKE_ATOMIC_FP16_PATH)
             {
                 MergeIntermediateTextures();
             }
@@ -261,7 +261,7 @@ namespace IDKEngine.Render
             ResultVoxelsAlbedo.SetAnisotropy(16.0f);
             ResultVoxelsAlbedo.ImmutableAllocate(width, height, depth, SizedInternalFormat.Rgba16f, Texture.GetMaxMipmapLevel(width, height, depth));
 
-            if (!HAS_ATOMIC_FP16_VECTOR)
+            if (!TAKE_ATOMIC_FP16_PATH)
             {
                 for (int i = 0; i < 3; i++)
                 {
@@ -279,7 +279,7 @@ namespace IDKEngine.Render
         public void Dispose()
         {
             ResultVoxelsAlbedo.Dispose();
-            if (!HAS_ATOMIC_FP16_VECTOR)
+            if (!TAKE_ATOMIC_FP16_PATH)
             {
                 for (int i = 0; i < 3; i++)
                 {

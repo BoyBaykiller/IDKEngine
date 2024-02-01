@@ -405,11 +405,11 @@ namespace IDKEngine.Render
                                 );
                             }
 
-                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
+                            if (!Voxelizer.TAKE_CONSERVATIVE_RASTER_PATH) { ImGui.PushStyleVar(ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f); ImGui.BeginDisabled(); }
                             ImGui.Checkbox("IsConservativeRasterization", ref app.RasterizerPipeline.Voxelizer.IsConservativeRasterization);
-                            if (!Voxelizer.HAS_CONSERVATIVE_RASTER) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
+                            if (!Voxelizer.TAKE_CONSERVATIVE_RASTER_PATH) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
-                            ImGui.Text($"NV_conservative_raster: {Voxelizer.HAS_CONSERVATIVE_RASTER}");
+                            ImGui.Text($"NV_conservative_raster: {Voxelizer.TAKE_CONSERVATIVE_RASTER_PATH}");
                             ToolTipForItemAboveHovered(
                                 "Allows to make the rasterizer invoke the fragment shader even if a pixel is only partially covered.\n" +
                                 "Currently there is some bug with this which causes overly bright voxels."
@@ -421,7 +421,7 @@ namespace IDKEngine.Render
                                 "Regular geometry shaders were even slower which is why I decided to avoided them entirely."
                             );
 
-                            ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.HAS_ATOMIC_FP16_VECTOR}");
+                            ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.TAKE_ATOMIC_FP16_PATH}");
                             ToolTipForItemAboveHovered(
                                 "Allows to perform atomics on fp16 images without having to emulate such behaviour.\n" +
                                 "Most noticeably without this extension voxelizing requires 2.5x times the memory."

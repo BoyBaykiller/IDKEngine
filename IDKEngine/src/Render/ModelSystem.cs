@@ -33,8 +33,10 @@ namespace IDKEngine.Render
         public uint[] VertexIndices = Array.Empty<uint>();
         private readonly TypedBuffer<uint> vertexIndicesBuffer;
 
-        public GpuMeshletTaskCmd[] MeshTasksCmds = Array.Empty<GpuMeshletTaskCmd>();
+        public GpuMeshletTaskCmd[] MeshletTasksCmds = Array.Empty<GpuMeshletTaskCmd>();
         private readonly TypedBuffer<GpuMeshletTaskCmd> meshletTasksCmdsBuffer;
+
+        private readonly TypedBuffer<uint> meshletTasksCountBuffer;
 
         public GpuMeshlet[] Meshlets = Array.Empty<GpuMeshlet>();
         private readonly TypedBuffer<GpuMeshlet> meshletBuffer;
@@ -62,6 +64,7 @@ namespace IDKEngine.Render
             vertexPositionBuffer = new TypedBuffer<Vector3>();
             vertexIndicesBuffer = new TypedBuffer<uint>();
             meshletTasksCmdsBuffer = new TypedBuffer<GpuMeshletTaskCmd>();
+            meshletTasksCountBuffer = new TypedBuffer<uint>();
             meshletBuffer = new TypedBuffer<GpuMeshlet>();
             meshletInfoBuffer = new TypedBuffer<GpuMeshletInfo>();
             meshletsVertexIndicesBuffer = new TypedBuffer<uint>();
@@ -71,15 +74,15 @@ namespace IDKEngine.Render
             meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
             meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
             visibleMeshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
-            // TODO: Buffer 4 free for visibleMeshletInstances
             materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
             vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
             vertexPositionBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
             meshletTasksCmdsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
-            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
-            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
-            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 16);
-            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 17);
+            meshletTasksCountBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
+            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
+            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 16);
+            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 17);
+            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 18);
 
             vao = new VAO();
             vao.SetElementBuffer(vertexIndicesBuffer);
@@ -142,7 +145,7 @@ namespace IDKEngine.Render
                 Helper.ArrayAdd(ref VertexPositions, models[i].VertexPositions);
                 Helper.ArrayAdd(ref VertexIndices, models[i].VertexIndices);
                 
-                Helper.ArrayAdd(ref MeshTasksCmds, models[i].MeshTasksCmds);
+                Helper.ArrayAdd(ref MeshletTasksCmds, models[i].MeshletTasksCmds);
                 Helper.ArrayAdd(ref MeshletsInfo, models[i].MeshletsInfo);
                 Helper.ArrayAdd(ref MeshletsVertexIndices, models[i].MeshletsVertexIndices);
                 Helper.ArrayAdd(ref MeshletsLocalIndices, models[i].MeshletsLocalIndices);
@@ -171,7 +174,8 @@ namespace IDKEngine.Render
             vertexPositionBuffer.MutableAllocateElements(VertexPositions);
             vertexIndicesBuffer.MutableAllocateElements(VertexIndices);
 
-            meshletTasksCmdsBuffer.MutableAllocateElements(MeshTasksCmds);
+            meshletTasksCmdsBuffer.MutableAllocateElements(MeshletTasksCmds);
+            meshletTasksCountBuffer.MutableAllocateElements(1);
             meshletBuffer.MutableAllocateElements(Meshlets);
             meshletInfoBuffer.MutableAllocateElements(MeshletsInfo);
             meshletsVertexIndicesBuffer.MutableAllocateElements(MeshletsVertexIndices);
@@ -191,7 +195,9 @@ namespace IDKEngine.Render
         public unsafe void MeshShaderDrawNV()
         {
             meshletTasksCmdsBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.NV.MultiDrawMeshTasksIndirect(IntPtr.Zero, MeshTasksCmds.Length, sizeof(GpuMeshletTaskCmd));
+            meshletTasksCountBuffer.Bind(BufferTarget.ParameterBuffer);
+            int maxMeshlets = meshletTasksCmdsBuffer.GetNumElements();
+            GL.NV.MultiDrawMeshTasksIndirectCount(IntPtr.Zero, IntPtr.Zero, maxMeshlets, sizeof(GpuMeshletTaskCmd));
         }
 
         public unsafe void UpdateMeshBuffer(int start, int count)
@@ -218,6 +224,26 @@ namespace IDKEngine.Render
             vertexPositionBuffer.UploadElements(start, count, VertexPositions[start]);
         }
 
+        public void ResetInstancesBeforeCulling()
+        {
+            uint bufferInstanceCount = 0;
+
+            // for vertex rendering path
+            for (int i = 0; i < DrawCommands.Length; i++)
+            {
+                DrawCommands[i].InstanceCount = (int)bufferInstanceCount;
+            }
+            UpdateDrawCommandBuffer(0, DrawCommands.Length);
+            for (int i = 0; i < DrawCommands.Length; i++)
+            {
+                ref readonly GpuMesh mesh = ref Meshes[i];
+                DrawCommands[i].InstanceCount = mesh.InstanceCount;
+            }
+
+            // for mesh-shader rendering path
+            meshletTasksCountBuffer.UploadElements(bufferInstanceCount);
+        }
+
         public GpuTriangle GetTriangle(int indicesIndex, int baseVertex)
         {
             GpuTriangle triangle;
@@ -237,6 +263,7 @@ namespace IDKEngine.Render
             vertexBuffer.Dispose();
             vertexIndicesBuffer.Dispose();
             meshletTasksCmdsBuffer.Dispose();
+            meshletTasksCountBuffer.Dispose();
             meshletBuffer.Dispose();
             meshletInfoBuffer.Dispose();
             vertexPositionBuffer.Dispose();
