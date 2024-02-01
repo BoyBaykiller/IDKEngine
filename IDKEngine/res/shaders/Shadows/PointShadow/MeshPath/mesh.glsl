@@ -72,17 +72,17 @@ layout(std430, binding = 12) restrict readonly buffer VertexPositionsSSBO
     PackedVec3 VertexPositions[];
 } vertexPositionsSSBO;
 
-layout(std430, binding = 14) restrict readonly buffer MeshletSSBO
+layout(std430, binding = 15) restrict readonly buffer MeshletSSBO
 {
     Meshlet Meshlets[];
 } meshletSSBO;
 
-layout(std430, binding = 16) restrict readonly buffer MeshletVertexIndicesSSBO
+layout(std430, binding = 17) restrict readonly buffer MeshletVertexIndicesSSBO
 {
     uint VertexIndices[];
 } meshletVertexIndicesSSBO;
 
-layout(std430, binding = 17) restrict readonly buffer MeshletLocalIndicesSSBO
+layout(std430, binding = 18) restrict readonly buffer MeshletLocalIndicesSSBO
 {
     uint PackedIndices[];
 } meshletLocalIndicesSSBO;
@@ -96,6 +96,7 @@ layout(std140, binding = 1) uniform ShadowDataUBO
 taskNV in InOutVars
 {
     uint MeshID;
+    uint InstanceID;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[32];
 } inData;
@@ -106,10 +107,11 @@ layout(location = 1) uniform int FaceIndex;
 void main()
 {
     uint meshID = inData.MeshID;
+    uint instanceID = inData.InstanceID;
     uint meshletID = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x]; 
 
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[drawCmd.BaseInstance];
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[instanceID];
     Meshlet meshlet = meshletSSBO.Meshlets[meshletID];
 
     const uint verticesPerInvocationRounded = (MESHLET_MAX_VERTEX_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;

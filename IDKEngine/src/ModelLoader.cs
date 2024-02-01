@@ -37,7 +37,7 @@ namespace IDKEngine
             public Vector3[] VertexPositions;
 
             // Meshlet-rendering specific data
-            public GpuMeshletTaskCmd[] MeshTasksCmds;
+            public GpuMeshletTaskCmd[] MeshletTasksCmds;
             public GpuMeshlet[] Meshlets;
             public GpuMeshletInfo[] MeshletsInfo;
             public uint[] MeshletsVertexIndices;
@@ -187,7 +187,7 @@ namespace IDKEngine
             List<GpuVertex> listVertices = new List<GpuVertex>();
             List<Vector3> listVertexPositions = new List<Vector3>();
             List<uint> listIndices = new List<uint>();
-            List<GpuMeshletTaskCmd> listMeshTasksCmd = new List<GpuMeshletTaskCmd>();
+            List<GpuMeshletTaskCmd> listMeshetTasksCmd = new List<GpuMeshletTaskCmd>();
             List<GpuMeshlet> listMeshlets = new List<GpuMeshlet>();
             List<GpuMeshletInfo> listMeshletsInfo = new List<GpuMeshletInfo>();
             List<uint> listMeshletsVertexIndices = new List<uint>();
@@ -284,12 +284,18 @@ namespace IDKEngine
                     }
 
                     GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
+                    GpuMeshletTaskCmd[] meshletTaskCmds = new GpuMeshletTaskCmd[mesh.InstanceCount];
                     for (int j = 0; j < meshInstances.Length; j++)
                     {
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
 
                         meshInstance.ModelMatrix = nodeInstances[j] * parentNodeGlobalTransform;
                         meshInstance.MeshIndex = listMeshes.Count;
+
+
+                        ref GpuMeshletTaskCmd meshletTaskCmd = ref meshletTaskCmds[j];
+                        meshletTaskCmd.First = 0;
+                        meshletTaskCmd.Count = (int)MathF.Ceiling(meshMeshlets.Length / 32.0f); // divide by task shader work group size
                     }
 
                     GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
@@ -298,10 +304,6 @@ namespace IDKEngine
                     drawCmd.FirstIndex = listIndices.Count;
                     drawCmd.BaseVertex = listVertices.Count;
                     drawCmd.BaseInstance = listMeshInstances.Count;
-
-                    GpuMeshletTaskCmd meshTaskCmd = new GpuMeshletTaskCmd();
-                    meshTaskCmd.First = 0;
-                    meshTaskCmd.Count = (int)MathF.Ceiling(meshletData.Meshlets.Length / 32.0f); // divide by task shader work group size
 
                     listVertices.AddRange(meshVertices);
                     listVertexPositions.AddRange(meshVertexPositions);
@@ -313,7 +315,7 @@ namespace IDKEngine
                     listMeshletsInfo.AddRange(meshMeshletsInfo);
                     listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshletData.VertexIndices, 0, meshletData.VertexIndicesLength));
                     listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshletData.LocalIndices, 0, meshletData.LocalIndicesLength));
-                    listMeshTasksCmd.Add(meshTaskCmd);
+                    listMeshetTasksCmd.AddRange(meshletTaskCmds);
                 }
             }
 
@@ -325,7 +327,7 @@ namespace IDKEngine
             model.Vertices = listVertices.ToArray();
             model.VertexPositions = listVertexPositions.ToArray();
             model.VertexIndices = listIndices.ToArray();
-            model.MeshTasksCmds = listMeshTasksCmd.ToArray();
+            model.MeshletTasksCmds = listMeshetTasksCmd.ToArray();
             model.Meshlets = listMeshlets.ToArray();
             model.MeshletsInfo = listMeshletsInfo.ToArray();
             model.MeshletsVertexIndices = listMeshletsVertexIndices.ToArray();

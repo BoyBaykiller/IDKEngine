@@ -1,6 +1,7 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
+#define TAKE_MESH_SHADER_PATH AppInsert(TAKE_MESH_SHADER_PATH)
 AppInclude(include/Constants.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
 
@@ -99,6 +100,11 @@ layout(std430, binding = 13) restrict writeonly buffer MeshletTaskCmdSSBO
     MeshletTaskCmd TaskCommands[];
 } meshletTaskCmdSSBO;
 
+layout(std430, binding = 14) restrict writeonly buffer MeshletTasksCountSSBO
+{
+    uint Count;
+} meshletTasksCountSSBO;
+
 layout(std140, binding = 1) uniform ShadowDataUBO
 {
     PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
@@ -109,17 +115,17 @@ layout(location = 1) uniform int FaceIndex;
 
 void main()
 {
-    uint meshInstanceIndex = gl_GlobalInvocationID.x;
-    if (meshInstanceIndex >= meshInstanceSSBO.MeshInstances.length())
+    uint meshInstanceID = gl_GlobalInvocationID.x;
+    if (meshInstanceID >= meshInstanceSSBO.MeshInstances.length())
     {
         return;
     }
 
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceIndex];
-    uint meshIndex = meshInstance.MeshIndex;
+    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    uint meshID = meshInstance.MeshIndex;
     
-    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshIndex];
-    BlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshIndex].BlasRootNodeIndex];
+    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+    BlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeIndex];
 
     mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex];
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
@@ -127,16 +133,23 @@ void main()
     Frustum frustum = GetFrustum(projView * modelMatrix);
     bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
 
-    // For vertex rendering path
     if (isVisible)
     {
-        uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshIndex].InstanceCount, 1u);
-        visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceIndex;
-    }
+    #if TAKE_MESH_SHADER_PATH
 
-    // For mesh shader rendering path
-    const uint taskShaderWorkGroupSize = 32;
-    uint meshletCount = meshSSBO.Meshes[meshIndex].MeshletCount;
-    uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
-    meshletTaskCmdSSBO.TaskCommands[meshIndex].Count = isVisible ? meshletsWorkGroupCount : 0;
+        uint meshletTaskID = atomicAdd(meshletTasksCountSSBO.Count, 1u);
+        visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskID] = meshInstanceID;
+        
+        const uint taskShaderWorkGroupSize = 32;
+        uint meshletCount = meshSSBO.Meshes[meshID].MeshletCount;
+        uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
+        meshletTaskCmdSSBO.TaskCommands[meshletTaskID].Count = meshletsWorkGroupCount;
+
+    #else
+
+        uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshID].InstanceCount, 1u);
+        visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceID;
+
+    #endif
+    }
 }

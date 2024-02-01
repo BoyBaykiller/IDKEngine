@@ -93,16 +93,7 @@ namespace IDKEngine.Render
 
                 // Culling face i
                 {
-                    for (int j = 0; j < modelSystem.DrawCommands.Length; j++)
-                    {
-                        modelSystem.DrawCommands[j].InstanceCount = 0;
-                    }
-                    modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
-                    for (int j = 0; j < modelSystem.DrawCommands.Length; j++)
-                    {
-                        ref readonly GpuMesh mesh = ref modelSystem.Meshes[j];
-                        modelSystem.DrawCommands[j].InstanceCount = mesh.InstanceCount;
-                    }
+                    modelSystem.ResetInstancesBeforeCulling();
 
                     cullingProgram.Use();
                     cullingProgram.Upload(1, i);
@@ -117,7 +108,7 @@ namespace IDKEngine.Render
                     renderProgram.Use();
                     renderProgram.Upload(1, i);
 
-                    if (PointShadowManager.IS_MESH_SHADER_RENDERING)
+                    if (PointShadowManager.TAKE_MESH_SHADER_PATH)
                     {
                         modelSystem.MeshShaderDrawNV();
                     }

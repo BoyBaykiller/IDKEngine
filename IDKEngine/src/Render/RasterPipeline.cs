@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
@@ -9,7 +10,7 @@ namespace IDKEngine.Render
 {
     class RasterPipeline : IDisposable
     {
-        private static readonly bool IS_MESH_SHADER_RENDERING = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
+        private static readonly bool TAKE_MESH_SHADER_PATH = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
 
         public Vector2i RenderResolution { get; private set; }
         public Vector2i RenderPresentationResolution { get; private set; }
@@ -150,7 +151,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram skyBoxProgram;
         private readonly ShaderProgram mergeLightingProgram;
         private readonly ShaderProgram hiZGenerateProgram;
-        private readonly ShaderProgram cullProgram;
+        private readonly ShaderProgram cullingProgram;
 
         private readonly Framebuffer gBufferFBO;
         private readonly Framebuffer deferredLightingFBO;
@@ -172,7 +173,7 @@ namespace IDKEngine.Render
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
             ConeTracer = new ConeTracer(width, height);
             
-            if (IS_MESH_SHADER_RENDERING)
+            if (TAKE_MESH_SHADER_PATH)
             {
                 gBufferProgram = new ShaderProgram(
                     new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/MeshPath/task.glsl")),
@@ -198,8 +199,10 @@ namespace IDKEngine.Render
             hiZGenerateProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/MeshCulling/Camera/HiZGenerate/fragment.glsl")));
-            
-            cullProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/Camera/Cull/compute.glsl")));
+
+            Dictionary<string, string> cullingShaderInsertions = new Dictionary<string, string>();
+            cullingShaderInsertions.Add(nameof(TAKE_MESH_SHADER_PATH), TAKE_MESH_SHADER_PATH ? "1" : "0");
+            cullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/Camera/Cull/compute.glsl"), cullingShaderInsertions));
 
             mergeLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MergeTextures/compute.glsl")));
 
@@ -293,18 +296,9 @@ namespace IDKEngine.Render
                 
                 // Frustum + Occlusion Culling
                 {
-                    for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
-                    {
-                        modelSystem.DrawCommands[i].InstanceCount = 0;
-                    }
-                    modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
-                    for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
-                    {
-                        ref readonly GpuMesh mesh = ref modelSystem.Meshes[i];
-                        modelSystem.DrawCommands[i].InstanceCount = mesh.InstanceCount;
-                    }
+                    modelSystem.ResetInstancesBeforeCulling();
 
-                    cullProgram.Use();
+                    cullingProgram.Use();
                     GL.DispatchCompute((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
                     GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
                 }
@@ -324,7 +318,7 @@ namespace IDKEngine.Render
                 GL.Viewport(0, 0, RenderResolution.X, RenderResolution.Y);
 
                 gBufferProgram.Use();
-                if (IS_MESH_SHADER_RENDERING)
+                if (TAKE_MESH_SHADER_PATH)
                 {
                     modelSystem.MeshShaderDrawNV();
                 }
@@ -558,7 +552,7 @@ namespace IDKEngine.Render
             lightingProgram.Dispose();
             skyBoxProgram.Dispose();
             mergeLightingProgram.Dispose();
-            cullProgram.Dispose();
+            cullingProgram.Dispose();
             hiZGenerateProgram.Dispose();
 
             gBufferFBO.Dispose();
