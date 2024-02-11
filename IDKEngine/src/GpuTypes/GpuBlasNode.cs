@@ -5,7 +5,7 @@ namespace IDKEngine.GpuTypes
     public struct GpuBlasNode
     {
         public Vector3 Min;
-        public uint TriStartOrLeftChild;
+        public uint TriStartOrChild;
         public Vector3 Max;
         public uint TriCount;
 

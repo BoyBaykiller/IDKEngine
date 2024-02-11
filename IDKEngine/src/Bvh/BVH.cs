@@ -125,7 +125,7 @@ namespace IDKEngine
         /// <param name="newMeshesDrawCommands"></param>
         /// <param name="vertexPositions"></param>
         /// <param name="vertexIndices"></param>
-        public void AddMeshesAndBuild(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] vertexIndices)
+        public void AddMeshes(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] vertexIndices)
         {
             BLAS[] newBlases = new BLAS[newMeshesDrawCommands.Length];
             for (int i = 0; i < newBlases.Length; i++)
@@ -168,18 +168,18 @@ namespace IDKEngine
 
         public unsafe void BlasesRefit(int start, int count)
         {
-            Parallel.For(start, start + count, i =>
+            //Parallel.For(start, start + count, i =>
+            for (int i = start; i < start + count; i++)
             {
                 blases[i].Refit();
-            });
+            };
 
             int uploadedBlasNodes = 0;
             for (int i = 0; i < blases.Length; i++)
             {
-                int blasIndex = start + i;
-                BLAS blas = blases[blasIndex];
+                BLAS blas = blases[i];
 
-                if (blasIndex >= start && blasIndex < start + count)
+                if (i >= start && i < start + count)
                 {
                     blasBuffer.UploadElements(uploadedBlasNodes, blas.Nodes.Length, blas.Nodes[0]);
                 }
@@ -221,6 +221,7 @@ namespace IDKEngine
         {
             blasTriangleIndicesBuffer.Dispose();
             blasBuffer.Dispose();
+            tlasBuffer.Dispose();
         }
     }
 }

@@ -35,6 +35,7 @@ namespace IDKEngine
             // Base geometry
             public GpuVertex[] Vertices;
             public Vector3[] VertexPositions;
+            public uint[] VertexIndices;
 
             // Meshlet-rendering specific data
             public GpuMeshletTaskCmd[] MeshletTasksCmds;
@@ -42,9 +43,6 @@ namespace IDKEngine
             public GpuMeshletInfo[] MeshletsInfo;
             public uint[] MeshletsVertexIndices;
             public byte[] MeshletsLocalIndices;
-
-            // Vertex-rendering specific data
-            public uint[] VertexIndices;
         }
 
         private struct TextureLoadData
@@ -139,6 +137,12 @@ namespace IDKEngine
             public int LocalIndicesLength;
         }
 
+        private static Action callbackTextureLoaded = null;
+        public static void SetCallackTextureLoaded(Action callback)
+        {
+            callbackTextureLoaded = callback;
+        }
+
         public static Model GltfToEngineFormat(string path)
         {
             return GltfToEngineFormat(path, Matrix4.Identity);
@@ -230,7 +234,9 @@ namespace IDKEngine
                 //{
                 //    Vector3 trans = Helper.RandomVec3(-15.0f, 15.0f);
                 //    Vector3 rot = Helper.RandomVec3(0.0f, 2.0f * MathF.PI);
-                //    var test = Matrix4.CreateRotationZ(rot.Z) *
+                //    float scale = 1f;
+                //    var test = Matrix4.CreateScale(scale) *
+                //            Matrix4.CreateRotationZ(rot.Z) *
                 //               Matrix4.CreateRotationY(rot.Y) *
                 //               Matrix4.CreateRotationX(rot.X) *
                 //               Matrix4.CreateTranslation(trans);
@@ -413,6 +419,10 @@ namespace IDKEngine
                         ThreadPool.SetMaxThreads(threadPoolThreads, 1);
                         ThreadPool.SetMinThreads(threadPoolThreads, 1);
 
+                        // TODO: If the main thread is in Sleep State (for example when waiting on Parallel.For() to finish)
+                        //       it may end up participating as a worker in the ThreadPool.
+                        //       We want the main thread to only run the render loop only and not some random
+                        //       ThreadPool work (like loading texturs in this case), because it causes frame stutters. Fix!
                         ThreadPool.QueueUserWorkItem((object state) =>
                         {
                             //Thread.Sleep(new Random(Thread.CurrentThread.ManagedThreadId).Next(600, 6000));
@@ -440,6 +450,11 @@ namespace IDKEngine
                                 if (mipmapsRequired)
                                 {
                                     texture.GenerateMipmap();
+                                }
+
+                                if (callbackTextureLoaded != null)
+                                {
+                                    callbackTextureLoaded();
                                 }
                             });
                         });
@@ -480,7 +495,7 @@ namespace IDKEngine
             if (textureType == MaterialLoadData.TextureType.BaseColor)
             {
                 textureLoadData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
-                //glTextureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
+                //textureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
                 textureLoadData.LoadComponents = ColorComponents.RedGreenBlueAlpha;
                 materialChannel = material.FindChannel(KnownChannel.BaseColor.ToString());
             }

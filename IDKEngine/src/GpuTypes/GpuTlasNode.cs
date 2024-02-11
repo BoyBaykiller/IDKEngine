@@ -5,37 +5,34 @@ namespace IDKEngine.GpuTypes
 {
     public struct GpuTlasNode
     {
-        // TODO: Store instance id in here
-
         public Vector3 Min;
-        private uint isLeafAndLeftChildOrInstanceID;
+        private uint isLeafAndChildOrInstanceID;
 
         public Vector3 Max;
-        public uint BlasIndex;
+        private readonly float _pad0;
 
         public bool IsLeaf
         {
-            get => isLeafAndLeftChildOrInstanceID >> 31 == 1;
+            get => isLeafAndChildOrInstanceID >> 31 == 1;
 
             set
             {
                 uint isLeafNum = value ? 1u : 0u;
-                isLeafAndLeftChildOrInstanceID = (isLeafNum << 31) | LeftChildOrInstanceID;
+                isLeafAndChildOrInstanceID = (isLeafNum << 31) | ChildOrInstanceID;
             }
         }
-
-        public uint LeftChildOrInstanceID
+        public uint ChildOrInstanceID
         {
             get
             {
                 const uint mask = (1u << 31) - 1;
-                return isLeafAndLeftChildOrInstanceID & mask;
+                return isLeafAndChildOrInstanceID & mask;
             }
 
             set
             {
                 Debug.Assert(value <= (1u << 31 - 1));
-                isLeafAndLeftChildOrInstanceID |= value;
+                isLeafAndChildOrInstanceID |= value;
             }
         }
     }

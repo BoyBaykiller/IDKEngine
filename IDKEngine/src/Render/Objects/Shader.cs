@@ -15,7 +15,7 @@ namespace IDKEngine.Render.Objects
             AppInclude,
         }
 
-        public const string INCLUDE_PATH_PREFIX = "res/shaders/";
+        public const string BASE_INCLUDE_PATH = "res/shaders/";
 
         public readonly int ID;
         public readonly ShaderType ShaderType;
@@ -86,7 +86,7 @@ namespace IDKEngine.Render.Objects
 
                 if (keyword == Keyword.AppInclude)
                 {
-                    string path = INCLUDE_PATH_PREFIX + userKey;
+                    string path = BASE_INCLUDE_PATH + userKey;
                     if (!File.Exists(path))
                     {
                         Logger.Log(Logger.LogLevel.Error, $"Include file {path} does not exist");
