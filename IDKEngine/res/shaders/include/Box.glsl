@@ -9,6 +9,17 @@ struct Box
     vec3 Max;
 };
 
+vec3 BoxSize(Box box)
+{
+    return box.Max - box.Min;
+}
+
+float BoxArea(Box box)
+{
+    vec3 size = BoxSize(box);
+    return 2.0 * (size.x * size.y + size.x * size.z + size.z * size.y);  
+}
+
 vec3 BoxGetVertexPos(Box box, int index)
 {
     bool isMaxX = (index & 1) != 0;

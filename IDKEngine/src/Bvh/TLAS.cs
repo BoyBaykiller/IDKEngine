@@ -46,8 +46,7 @@ namespace IDKEngine
                         newNode.Min = worldSpaceBounds.Min;
                         newNode.Max = worldSpaceBounds.Max;
                         newNode.IsLeaf = true;
-                        newNode.LeftChildOrInstanceID = (uint)instanceID;
-                        newNode.BlasIndex = (uint)i;
+                        newNode.ChildOrInstanceID = (uint)instanceID;
 
                         int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
                         Nodes[newNodeIndex] = newNode;
@@ -87,7 +86,7 @@ namespace IDKEngine
                         newNode.Min = boundsFittingChildren.Min;
                         newNode.Max = boundsFittingChildren.Max;
                         newNode.IsLeaf = false;
-                        newNode.LeftChildOrInstanceID = (uint)nodeBId;
+                        newNode.ChildOrInstanceID = (uint)nodeBId;
 
                         int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
                         Nodes[newNodeIndex] = newNode;
@@ -106,16 +105,6 @@ namespace IDKEngine
                     }
                 }
             }
-        }
-
-
-        public const float TRIANGLE_INTERSECT_COST = 1.1f;
-        public const float NODE_INTERSECT_COST = 1.0f; // Keep it 1 so we effectively only have TRIANGLE_INTERSECT_COST as a paramater
-        public const int SAH_SAMPLES = 8;
-
-        public void BuildNew()
-        {
-
         }
 
         private int FindBestMatch(int start, int count, int nodeIndex)
@@ -148,7 +137,6 @@ namespace IDKEngine
             return bestNodeIndex;
         }
 
-        public static int debugMaxStack = 0;
         public unsafe bool Intersect(in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
         {
             hitInfo = new BVH.RayHitInfo();
@@ -156,23 +144,23 @@ namespace IDKEngine
 
             int stackPtr = 0;
             uint stackTop = 0;
-            Span<uint> stack = stackalloc uint[TreeDepth];
+            Span<uint> stack = stackalloc uint[22];
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref Nodes[stackTop];
                 if (parent.IsLeaf)
                 {
-                    BLAS blas = Blases[(int)parent.BlasIndex];
+                    uint instanceID = parent.ChildOrInstanceID;
+                    ref readonly GpuMeshInstance meshInstance = ref MeshInstances[instanceID];
+                    BLAS blas = Blases[meshInstance.MeshIndex];
 
-                    uint instanceID = parent.LeftChildOrInstanceID;
                     Ray localRay = ray.Transformed(MeshInstances[instanceID].InvModelMatrix);
                     if (blas.Intersect(localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                     {
                         hitInfo.TriangleIndices = blasHitInfo.TriangleIndices;
                         hitInfo.Bary = blasHitInfo.Bary;
                         hitInfo.T = blasHitInfo.T;
-
-                        hitInfo.MeshID = (int)parent.BlasIndex;
+                        hitInfo.MeshID = meshInstance.MeshIndex;
                         hitInfo.InstanceID = (int)instanceID;
                     }
 
@@ -181,7 +169,7 @@ namespace IDKEngine
                     continue;
                 }
 
-                uint leftChild = parent.LeftChildOrInstanceID;
+                uint leftChild = parent.ChildOrInstanceID;
                 uint rightChild = leftChild + 1;
                 ref readonly GpuTlasNode leftNode = ref Nodes[leftChild];
                 ref readonly GpuTlasNode rightNode = ref Nodes[rightChild];
@@ -194,7 +182,6 @@ namespace IDKEngine
                     {
                         bool leftCloser = tMinLeft < tMinRight;
                         stackTop = leftCloser ? leftChild : rightChild;
-                        debugMaxStack = Helper.InterlockedMax(ref debugMaxStack, (int)(stackPtr));
                         stack[stackPtr++] = leftCloser ? rightChild : leftChild;   
                     }
                     else

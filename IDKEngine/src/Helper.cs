@@ -11,7 +11,6 @@ using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
 using StbImageWriteSharp;
 using IDKEngine.Render.Objects;
-using System.Diagnostics;
 
 namespace IDKEngine
 {
@@ -31,11 +30,18 @@ namespace IDKEngine
             return sum;
         }
 
-        public static void ArrayAdd<T>(ref T[] arr, ReadOnlySpan<T> toAdd)
+        public static void ArrayAdd<T>(ref T[] array, ReadOnlySpan<T> toAdd)
         {
-            int prevLength = arr.Length;
-            Array.Resize(ref arr, prevLength + toAdd.Length);
-            toAdd.CopyTo(new Span<T>(arr, prevLength, toAdd.Length));
+            int prevLength = array.Length;
+            Array.Resize(ref array, prevLength + toAdd.Length);
+            toAdd.CopyTo(new Span<T>(array, prevLength, toAdd.Length));
+        }
+
+        public static void ArrayRemoveRange<T>(ref T[] array, int start, int count)
+        {
+            int end = start + count;
+            Array.Copy(array, end, array, start, array.Length - end);
+            Array.Resize(ref array, array.Length - count);
         }
 
         public static Vector4 ToOpenTK(this System.Numerics.Vector4 vector4)

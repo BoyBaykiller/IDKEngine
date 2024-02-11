@@ -40,14 +40,14 @@ struct Material
     vec3 Absorbance;
     float IOR;
 
-    sampler2D Transmission;
-    uvec2 _pad0;
-
     sampler2D BaseColor;
     sampler2D MetallicRoughness;
 
     sampler2D Normal;
     sampler2D Emissive;
+
+    sampler2D Transmission;
+    uvec2 _pad0;
 };
 
 layout(std430, binding = 1) restrict readonly buffer MeshSSBO

@@ -33,14 +33,14 @@ struct Material
     vec3 Absorbance;
     float IOR;
 
-    HF_SAMPLER_2D Transmission;
-    uvec2 _pad0;
-
     HF_SAMPLER_2D BaseColor;
     HF_SAMPLER_2D MetallicRoughness;
 
     HF_SAMPLER_2D Normal;
     HF_SAMPLER_2D Emissive;
+
+    HF_SAMPLER_2D Transmission;
+    uvec2 _pad0;
 };
 
 struct DrawElementsCmd
@@ -88,7 +88,7 @@ struct Vertex
 struct BlasNode
 {
     vec3 Min;
-    uint TriStartOrLeftChild;
+    uint TriStartOrChild;
     vec3 Max;
     uint TriCount;
 };
@@ -96,7 +96,7 @@ struct BlasNode
 struct TlasNode
 {
     vec3 Min;
-    uint IsLeafAndLeftChildOrInstanceID;
+    uint IsLeafAndChildOrInstanceID;
     vec3 Max;
     uint BlasIndex;
 };
@@ -305,9 +305,9 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
             vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
 
-            Mesh mesh = meshSSBO.Meshes[hitInfo.MeshID];
-            Material material = materialSSBO.Materials[mesh.MaterialIndex];
             MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
+            Mesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+            Material material = materialSSBO.Materials[mesh.MaterialIndex];
 
             mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             vec3 worldNormal = normalize(unitVecToWorld * interpNormal);
@@ -334,7 +334,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         }
         else if (IsTraceLights)
         {
-            Light light = lightsUBO.Lights[hitInfo.MeshID];
+            Light light = lightsUBO.Lights[hitInfo.InstanceID];
             emissive = light.Color;
             albedo = light.Color;
             normal = (wavefrontRay.Origin - light.Position) / light.Radius;

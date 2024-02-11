@@ -33,9 +33,9 @@ namespace IDKEngine
             return area;
         }
 
-        public static float Volume(Vector3 extends)
+        public static float Volume(Vector3 size)
         {
-            return extends.X * extends.Y * extends.X;
+            return size.X * size.Y * size.X;
         }
 
         public static Vector3 PolarToCartesian(float elevation, float azimuth)

@@ -62,7 +62,7 @@ namespace IDKEngine
             int nodesUsed = 0;
 
             ref GpuBlasNode rootNode = ref Nodes[nodesUsed++];
-            rootNode.TriStartOrLeftChild = 0;
+            rootNode.TriStartOrChild = 0;
             rootNode.TriCount = (uint)TriangleCount;
             UpdateNodeBounds(ref rootNode);
 
@@ -86,7 +86,7 @@ namespace IDKEngine
                     Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
                     Box rightBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
 
-                    uint middle = parentNode.TriStartOrLeftChild;
+                    uint middle = parentNode.TriStartOrChild;
                     uint end = middle + parentNode.TriCount;
                     while (middle < end)
                     {
@@ -105,12 +105,12 @@ namespace IDKEngine
                         }
                     }
 
-                    newLeftNode.TriStartOrLeftChild = parentNode.TriStartOrLeftChild;
-                    newLeftNode.TriCount = middle - newLeftNode.TriStartOrLeftChild;
+                    newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
+                    newLeftNode.TriCount = middle - newLeftNode.TriStartOrChild;
                     newLeftNode.Min = leftBox.Min;
                     newLeftNode.Max = leftBox.Max;
 
-                    newRightNode.TriStartOrLeftChild = middle;
+                    newRightNode.TriStartOrChild = middle;
                     newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
                     newRightNode.Min = rightBox.Min;
                     newRightNode.Max = rightBox.Max;
@@ -124,7 +124,7 @@ namespace IDKEngine
                 stackTop = leftNodeId;
                 stack[stackPtr++] = rightNodeId;
 
-                parentNode.TriStartOrLeftChild = (uint)leftNodeId;
+                parentNode.TriStartOrChild = (uint)leftNodeId;
                 parentNode.TriCount = 0;
                 nodesUsed += 2;
 
@@ -138,7 +138,7 @@ namespace IDKEngine
                 ref GpuBlasNode root = ref Nodes[0];
                 Nodes[1] = root;
                 root.TriCount = 0;
-                root.TriStartOrLeftChild = 1;
+                root.TriStartOrChild = 1;
 
                 // Add an other dummy invisible node because the traversal algorithm always tests two nodes at once
                 Nodes[2] = new GpuBlasNode()
@@ -146,7 +146,7 @@ namespace IDKEngine
                     Min = new Vector3(float.MinValue),
                     Max = new Vector3(float.MinValue),
                     TriCount = 1, // mark as leaf
-                    TriStartOrLeftChild = 0,
+                    TriStartOrChild = 0,
                 };
 
                 nodesUsed = 3;
@@ -166,8 +166,8 @@ namespace IDKEngine
                     continue;
                 }
 
-                ref readonly GpuBlasNode leftChild = ref Nodes[parent.TriStartOrLeftChild];
-                ref readonly GpuBlasNode rightChild = ref Nodes[parent.TriStartOrLeftChild + 1];
+                ref readonly GpuBlasNode leftChild = ref Nodes[parent.TriStartOrChild];
+                ref readonly GpuBlasNode rightChild = ref Nodes[parent.TriStartOrChild + 1];
 
                 Box boundsFittingChildren = Conversions.ToBox(leftChild);
                 boundsFittingChildren.GrowToFit(rightChild.Min);
@@ -205,7 +205,7 @@ namespace IDKEngine
                 uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
                 if (triCount > 0)
                 {
-                    uint first = (leftChildHit && leftNode.IsLeaf()) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
+                    uint first = (leftChildHit && leftNode.IsLeaf()) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                     for (uint i = first; i < first + triCount; i++)
                     {
                         ref readonly IndicesTriplet indicesTriplet = ref TriangleIndices[i];
@@ -228,12 +228,12 @@ namespace IDKEngine
                     if (leftChildHit && rightChildHit)
                     {
                         bool leftCloser = tMinLeft < tMinRight;
-                        stackTop = leftCloser ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
-                        stack[stackPtr++] = leftCloser ? rightNode.TriStartOrLeftChild : leftNode.TriStartOrLeftChild;
+                        stackTop = leftCloser ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+                        stack[stackPtr++] = leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild;
                     }
                     else
                     {
-                        stackTop = leftChildHit ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
+                        stackTop = leftChildHit ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                     }
                 }
                 else
@@ -262,7 +262,7 @@ namespace IDKEngine
                 uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
                 if (triCount > 0)
                 {
-                    uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
+                    uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                     for (uint i = first; i < first + triCount; i++)
                     {
                         ref readonly IndicesTriplet indicesTriplet = ref TriangleIndices[i];
@@ -280,10 +280,10 @@ namespace IDKEngine
 
                 if (leftChildHit || rightChildHit)
                 {
-                    stackTop = leftChildHit ? leftNode.TriStartOrLeftChild : rightNode.TriStartOrLeftChild;
+                    stackTop = leftChildHit ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                     if (leftChildHit && rightChildHit)
                     {
-                        stack[stackPtr++] = rightNode.TriStartOrLeftChild;
+                        stack[stackPtr++] = rightNode.TriStartOrChild;
                     }
                 }
                 else
@@ -301,8 +301,8 @@ namespace IDKEngine
                 return CostLeafNode(parentNode.TriCount);
             }
 
-            ref readonly GpuBlasNode leftChild = ref Nodes[parentNode.TriStartOrLeftChild];
-            ref readonly GpuBlasNode rightChild = ref Nodes[parentNode.TriStartOrLeftChild + 1];
+            ref readonly GpuBlasNode leftChild = ref Nodes[parentNode.TriStartOrChild];
+            ref readonly GpuBlasNode rightChild = ref Nodes[parentNode.TriStartOrChild + 1];
 
             float areaParent = MyMath.Area(parentNode.Max - parentNode.Min);
             float probHitLeftChild = Conversions.ToBox(leftChild).Area() / areaParent;
@@ -318,14 +318,14 @@ namespace IDKEngine
             Box areaForSplits = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
             for (int i = 0; i < parentNode.TriCount; i++)
             {
-                Triangle tri = GetTriangle(TriangleIndices[parentNode.TriStartOrLeftChild + i]);
+                Triangle tri = GetTriangle(TriangleIndices[parentNode.TriStartOrChild + i]);
 
                 Vector3 centroid = (tri.Position0 + tri.Position1 + tri.Position2) / 3.0f;
                 areaForSplits.GrowToFit(centroid);
             }
 
             splitAxis = 0;
-            splitPos = 0;
+            splitPos = 0.0f;
             costIfSplit = float.MaxValue;
             for (int i = 0; i < 3; i++)
             {
@@ -362,7 +362,7 @@ namespace IDKEngine
             uint leftBoxCount = 0;
             for (uint i = 0; i < parentNode.TriCount; i++)
             {
-                Triangle tri = GetTriangle(TriangleIndices[parentNode.TriStartOrLeftChild + i]);
+                Triangle tri = GetTriangle(TriangleIndices[parentNode.TriStartOrChild + i]);
 
                 float triSplitPos = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;
                 if (triSplitPos < splitPos)
@@ -406,7 +406,7 @@ namespace IDKEngine
         public void UpdateNodeBounds(ref GpuBlasNode node)
         {
             Box box = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-            for (uint i = node.TriStartOrLeftChild; i < node.TriStartOrLeftChild + node.TriCount; i++)
+            for (uint i = node.TriStartOrChild; i < node.TriStartOrChild + node.TriCount; i++)
             {
                 Triangle tri = GetTriangle(TriangleIndices[i]);
                 box.GrowToFit(tri);
@@ -420,18 +420,18 @@ namespace IDKEngine
             uint veryLeftLeafTriStart;
             while (!nextNode.IsLeaf())
             {
-                nextNode = Nodes[nextNode.TriStartOrLeftChild];
+                nextNode = Nodes[nextNode.TriStartOrChild];
             }
-            veryLeftLeafTriStart = nextNode.TriStartOrLeftChild;
+            veryLeftLeafTriStart = nextNode.TriStartOrChild;
 
 
             nextNode = node;
             uint veryRightLeafTriEnd;
             while (!nextNode.IsLeaf())
             {
-                nextNode = Nodes[nextNode.TriStartOrLeftChild + 1];
+                nextNode = Nodes[nextNode.TriStartOrChild + 1];
             }
-            veryRightLeafTriEnd = nextNode.TriStartOrLeftChild + nextNode.TriCount;
+            veryRightLeafTriEnd = nextNode.TriStartOrChild + nextNode.TriCount;
 
             triStart = veryLeftLeafTriStart;
             triCount = veryRightLeafTriEnd - veryLeftLeafTriStart;

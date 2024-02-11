@@ -48,7 +48,7 @@ struct MeshInstance
 struct BlasNode
 {
     vec3 Min;
-    uint TriStartOrLeftChild;
+    uint TriStartOrChild;
     vec3 Max;
     uint TriCount;
 };
@@ -56,7 +56,7 @@ struct BlasNode
 struct TlasNode
 {
     vec3 Min;
-    uint IsLeafAndLeftChildOrInstanceID;
+    uint IsLeafAndChildOrInstanceID;
     vec3 Max;
     uint BlasIndex;
 };

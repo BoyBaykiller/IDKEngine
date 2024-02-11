@@ -830,8 +830,11 @@ namespace IDKEngine.Render
 
                 if (ImGui.Button("Load model"))
                 {
-                    NativeFileDialogExtendedSharp.NfdFilter[] filters = new NativeFileDialogExtendedSharp.NfdFilter[1];
-                    filters[0] = new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "gltf" };
+                    NativeFileDialogExtendedSharp.NfdFilter[] filters =
+                    {
+                        new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "gltf", Description = "glTF" },
+                        new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "glb", Description = "Binary glTF" }
+                    };
 
                     NativeFileDialogExtendedSharp.NfdDialogResult result = NativeFileDialogExtendedSharp.Nfd.FileOpen(filters);
                     if (result.Status == NativeFileDialogExtendedSharp.NfdStatus.Error)
@@ -955,7 +958,7 @@ namespace IDKEngine.Render
                     app.LightManager.TryGetLight(SelectedEntity.EntityID, out GpuLightWrapper abstractLight);
                     ref GpuLight light = ref abstractLight.GpuLight;
 
-                    if (ImGui.Button("Delete"))
+                    if (ImGui.Button("Remove"))
                     {
                         app.LightManager.RemoveLight(SelectedEntity.EntityID);
                         SelectedEntity = SelectedEntityInfo.None;
@@ -1168,25 +1171,7 @@ namespace IDKEngine.Render
                     return;
                 }
 
-                Ray worldSpaceRay;
-                //TLAS.debugMaxStack = 0;
-                //Stopwatch timer = Stopwatch.StartNew();
-                //System.Threading.Tasks.Parallel.For(0, app.RenderResolution.X * app.RenderResolution.Y, i =>
-                //{
-                //    int y = i / app.RenderResolution.X;
-                //    int x = i % app.RenderResolution.X;
-
-                //    Vector2 ndcDebug = new Vector2((float)x / app.RenderResolution.X, (float)y / app.RenderResolution.Y) * 2.0f - new Vector2(1.0f);
-                //    worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndcDebug);
-
-                //    app.ModelSystem.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo test);
-                //});
-                //timer.Stop();
-                //Console.WriteLine(timer.Elapsed.TotalMilliseconds);
-                //Console.WriteLine($"stack size required: {TLAS.debugMaxStack}");
-                //Console.WriteLine($"actual stack size: {app.ModelSystem.BVH.Tlas.TreeDepth}");
-                worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndc);
-
+                Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndc);
                 bool hitMesh = app.ModelSystem.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
                 bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.HitInfo lightHitInfo);
                 if (app.RenderMode == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;

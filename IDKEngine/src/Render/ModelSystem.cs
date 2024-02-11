@@ -153,7 +153,7 @@ namespace IDKEngine.Render
 
             {
                 ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
-                BVH.AddMeshesAndBuild(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);
+                BVH.AddMeshes(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);
 
                 // Adjust root node index in context of all Nodes
                 uint bvhNodesExclusiveSum = 0;
@@ -164,22 +164,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            drawCommandBuffer.MutableAllocateElements(DrawCommands);
-            meshBuffer.MutableAllocateElements(Meshes);
-            meshInstanceBuffer.MutableAllocateElements(MeshInstances);
-            visibleMeshInstanceBuffer.MutableAllocateElements(MeshInstances.Length);
-            materialBuffer.MutableAllocateElements(Materials);
-
-            vertexBuffer.MutableAllocateElements(Vertices);
-            vertexPositionBuffer.MutableAllocateElements(VertexPositions);
-            vertexIndicesBuffer.MutableAllocateElements(VertexIndices);
-
-            meshletTasksCmdsBuffer.MutableAllocateElements(MeshletTasksCmds);
-            meshletTasksCountBuffer.MutableAllocateElements(1);
-            meshletBuffer.MutableAllocateElements(Meshlets);
-            meshletInfoBuffer.MutableAllocateElements(MeshletsInfo);
-            meshletsVertexIndicesBuffer.MutableAllocateElements(MeshletsVertexIndices);
-            meshletsPrimitiveIndicesBuffer.MutableAllocateElements(MeshletsLocalIndices);
+            ReuploadAllModelData();
         }
 
         public unsafe void Draw()
@@ -242,6 +227,33 @@ namespace IDKEngine.Render
 
             // for mesh-shader rendering path
             meshletTasksCountBuffer.UploadElements(bufferInstanceCount);
+        }
+
+        public void ReuploadAllModelData()
+        {
+            drawCommandBuffer.MutableAllocateElements(DrawCommands);
+            meshBuffer.MutableAllocateElements(Meshes);
+            meshInstanceBuffer.MutableAllocateElements(MeshInstances);
+            visibleMeshInstanceBuffer.MutableAllocateElements(MeshInstances.Length);
+            materialBuffer.MutableAllocateElements(Materials);
+
+            vertexBuffer.MutableAllocateElements(Vertices);
+            vertexPositionBuffer.MutableAllocateElements(VertexPositions);
+            vertexIndicesBuffer.MutableAllocateElements(VertexIndices);
+
+            meshletTasksCmdsBuffer.MutableAllocateElements(MeshletTasksCmds);
+            meshletTasksCountBuffer.MutableAllocateElements(1);
+            meshletBuffer.MutableAllocateElements(Meshlets);
+            meshletInfoBuffer.MutableAllocateElements(MeshletsInfo);
+            meshletsVertexIndicesBuffer.MutableAllocateElements(MeshletsVertexIndices);
+            meshletsPrimitiveIndicesBuffer.MutableAllocateElements(MeshletsLocalIndices);
+        }
+
+        public int GetMeshVertexCount(int meshID)
+        {
+            int baseVertex = DrawCommands[meshID].BaseVertex;
+            int nextBaseVertex = (meshID + 1 == DrawCommands.Length) ? VertexPositions.Length : DrawCommands[meshID + 1].BaseVertex;
+            return nextBaseVertex - baseVertex;
         }
 
         public GpuTriangle GetTriangle(int indicesIndex, int baseVertex)

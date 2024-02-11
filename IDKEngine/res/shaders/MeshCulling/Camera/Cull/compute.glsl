@@ -45,7 +45,7 @@ struct MeshInstance
 struct BlasNode
 {
     vec3 Min;
-    uint TriStartOrLeftChild;
+    uint TriStartOrChild;
     vec3 Max;
     uint TriCount;
 };

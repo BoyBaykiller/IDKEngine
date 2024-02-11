@@ -44,13 +44,13 @@ namespace IDKEngine.GpuTypes
         public Vector3 Absorbance;
         public float IOR;
 
-        public ulong TransmissionTextureHandle;
-        private readonly ulong _pad0;
-
         public ulong BaseColorTextureHandle;
         public ulong MetallicRoughnessTextureHandle;
 
         public ulong NormalTextureHandle;
         public ulong EmissiveTextureHandle;
+
+        public ulong TransmissionTextureHandle;
+        private readonly ulong _pad0;
     }
 }

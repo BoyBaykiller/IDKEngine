@@ -63,26 +63,26 @@ namespace IDKEngine.Shapes
             return (Max + Min) * 0.5f;
         }
 
-        public Vector3 Extends()
+        public Vector3 Size()
         {
             return Max - Min;
         }
 
         public Vector3 HalfSize()
         {
-            return Extends() * 0.5f;
+            return Size() * 0.5f;
         }
 
         public float Volume()
         {
-            Vector3 extends = Extends();
-            return extends.X * extends.Y * extends.Z;
+            Vector3 size = Size();
+            return size.X * size.Y * size.Z;
         }
 
         public float Area()
         {
-            Vector3 extends = Extends();
-            return 2.0f * (extends.X * extends.Y + extends.X * extends.Z + extends.Z * extends.Y);
+            Vector3 size = Size();
+            return 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
         }
 
         public void Transform(in Matrix4 matrix)
@@ -104,12 +104,11 @@ namespace IDKEngine.Shapes
 
         public static Vector3 GetOverlappingExtends(in Box a, in Box b)
         {
-            Vector3 addedExtends = a.Extends() + b.Extends();
-
             Box boundingBox = a;
             boundingBox.GrowToFit(b);
 
-            Vector3 extends = addedExtends - boundingBox.Extends();
+            Vector3 addedSize = a.Size() + b.Size();
+            Vector3 extends = addedSize - boundingBox.Size();
 
             return extends;
         }

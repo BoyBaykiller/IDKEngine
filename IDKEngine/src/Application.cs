@@ -286,13 +286,19 @@ namespace IDKEngine
 
             gui.Update(this);
 
-            //for (int i = 0; i < ModelSystem.VertexPositions.Length; i++)
             //{
-            //    ModelSystem.VertexPositions[i].X += 1.0f * dT;
+            //    int meshID = 71;
+            //    int verticesStart = ModelSystem.DrawCommands[meshID].BaseVertex;
+            //    int verticesCount = ModelSystem.GetMeshVertexCount(meshID);
+            //    for (int i = verticesStart; i < verticesStart + verticesCount; i++)
+            //    {
+            //        ModelSystem.VertexPositions[i].X += 2f * dT;
+            //    }
+
+            //    ModelSystem.UpdateVertexPositions(verticesStart, verticesCount);
+            //    ModelSystem.BVH.BlasesRefit(meshID, 1);
+            //    //ModelSystem.BVH.TlasBuild();
             //}
-            //ModelSystem.UpdateVertexPositions(0, ModelSystem.VertexPositions.Length);
-            //ModelSystem.BVH.BlasesRefit(0, ModelSystem.BVH.Tlas.Blases.Length);
-            //ModelSystem.BVH.TlasBuild();
 
             if (CamCollisionSettings.IsEnabled)
             {
@@ -372,11 +378,6 @@ namespace IDKEngine
             }
         }
 
-        private static Vector3 DebugLightPosXConst(float x, float t, float speedY, float speedZ, float scalarY, float scalarZ)
-        {
-            return new Vector3(x, 7.0f + MathF.Sin(t * speedY) * scalarY, MathF.Cos(t * speedZ) * scalarZ);
-        }
-
         private Gui gui;
         private ShaderProgram finalProgram;
 
@@ -434,7 +435,7 @@ namespace IDKEngine
                 new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
             Camera = new Camera(RenderResolution, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
             //Camera = new Camera(RenderResolution, new Vector3(-0.824f, 2.587f, -6.370f), -90.0f, 0.0f);
-            //camera = new Camera(RenderResolution, new Vector3(-8.0f, 2.00f, -0.5f), -183.5f, 0.5f, 0.1f, 0.25f);
+            //Camera = new Camera(RenderResolution, new Vector3(-13.238f, 4.226f, -0.147f), -360.950f, -14.600f);
 
             SkyBoxManager.Init(new string[]
             {
@@ -454,6 +455,14 @@ namespace IDKEngine
 
             LightManager = new LightManager(12, 12);
             ModelSystem = new ModelSystem();
+
+            ModelLoader.SetCallackTextureLoaded(() =>
+            {
+                if (PathTracer != null)
+                {
+                    PathTracer.ResetRenderProcess();
+                }
+            });
 
             if (true)
             {
@@ -478,8 +487,9 @@ namespace IDKEngine
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
                 ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
-                //ModelLoader.Model test = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
+                //ModelLoader.Model test = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
+                //ModelLoader.Model bistro = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\BistroExterior\Bistro.gltf");
                 ModelSystem.Add(sponza, lucy, helmet);
 
                 LightManager.AddLight(new GpuLightWrapper(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
