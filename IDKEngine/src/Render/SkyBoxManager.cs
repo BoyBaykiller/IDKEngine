@@ -1,8 +1,7 @@
-﻿using IDKEngine.Render;
+﻿using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
-using OpenTK.Graphics.OpenGL4;
 
-namespace IDKEngine
+namespace IDKEngine.Render
 {
     static class SkyBoxManager
     {

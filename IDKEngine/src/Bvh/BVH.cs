@@ -10,7 +10,7 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine
 {
-    class BVH : IDisposable
+    public class BVH : IDisposable
     {
         public const bool CPU_USE_TLAS = false;
 
@@ -23,7 +23,7 @@ namespace IDKEngine
             public int InstanceID;
         }
 
-        public struct PrimitiveHitInfo
+        public struct BoxHitInfo
         {
             public BLAS.IndicesTriplet TriangleIndices;
             public int MeshID;
@@ -90,29 +90,36 @@ namespace IDKEngine
             }
         }
 
-        public delegate void IntersectFunc(in PrimitiveHitInfo hitInfo);
+        public delegate void IntersectFunc(in BoxHitInfo hitInfo);
         public void Intersect(in Box box, IntersectFunc intersectFunc)
         {
-            for (int i = 0; i < blases.Length; i++)
+            if (CPU_USE_TLAS)
             {
-                BLAS blas = Tlas.Blases[i];
-                ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
-
-                for (int j = 0; j < drawCmd.InstanceCount; j++)
+                Tlas.Intersect(box, intersectFunc);
+            }
+            else
+            {
+                for (int i = 0; i < blases.Length; i++)
                 {
-                    int instanceID = drawCmd.BaseInstance + j;
-                    ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
+                    BLAS blas = Tlas.Blases[i];
+                    ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
 
-                    Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
-                    blas.Intersect(localBox, (in BLAS.IndicesTriplet indicesTriplet) =>
+                    for (int j = 0; j < drawCmd.InstanceCount; j++)
                     {
-                        PrimitiveHitInfo hitInfo;
-                        hitInfo.TriangleIndices = indicesTriplet;
-                        hitInfo.MeshID = i;
-                        hitInfo.InstanceID = instanceID;
+                        int instanceID = drawCmd.BaseInstance + j;
+                        ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
 
-                        intersectFunc(hitInfo);
-                    });
+                        Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
+                        blas.Intersect(localBox, (in BLAS.IndicesTriplet indicesTriplet) =>
+                        {
+                            BoxHitInfo hitInfo;
+                            hitInfo.TriangleIndices = indicesTriplet;
+                            hitInfo.MeshID = i;
+                            hitInfo.InstanceID = instanceID;
+
+                            intersectFunc(hitInfo);
+                        });
+                    }
                 }
             }
         }

@@ -7,6 +7,7 @@ using ImGuiNET;
 using IDKEngine.GUI;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
+using IDKEngine.Windowing;
 
 namespace IDKEngine.Render
 {
@@ -140,6 +141,14 @@ namespace IDKEngine.Render
                         app.Camera.Position = tempVec3.ToOpenTK();
                     }
 
+                    tempVec3 = app.Camera.Velocity.ToNumerics();
+                    if (ImGui.DragFloat3("Velocity", ref tempVec3))
+                    {
+                        app.Camera.Velocity = tempVec3.ToOpenTK();
+                    }
+                    ImGui.SameLine();
+                    ImGui.Text($"({app.Camera.Velocity.Length})");
+
                     tempVec2 = new System.Numerics.Vector2(app.Camera.LookX, app.Camera.LookY);
                     if (ImGui.DragFloat2("LookAt", ref tempVec2))
                     {
@@ -147,7 +156,7 @@ namespace IDKEngine.Render
                         app.Camera.LookY = tempVec2.Y;
                     }
 
-                    ImGui.SliderFloat("Speed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f);
+                    ImGui.SliderFloat("AccelerationSpeed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f * Camera.MASS);
                     ImGui.SliderFloat("Sensitivity", ref app.Camera.MouseSensitivity, 0.0f, 0.1f);
 
                     tempFloat = MathHelper.RadiansToDegrees(app.Camera.FovY);
@@ -159,10 +168,10 @@ namespace IDKEngine.Render
                     ImGui.SliderFloat("NearPlane", ref app.Camera.NearPlane, 0.001f, 5.0f);
                     ImGui.SliderFloat("FarPlane", ref app.Camera.FarPlane, 5.0f, 1000.0f);
 
-                    ImGui.Checkbox("HasGravity", ref app.GravityEnabled );
-                    if (app.GravityEnabled)
+                    ImGui.Checkbox("HasGravity", ref app.Camera.IsGravity);
+                    if (app.Camera.IsGravity)
                     {
-                        ImGui.SliderFloat("Gravity", ref app.GravityDownForce, 0.0f, 100.0f);
+                        ImGui.SliderFloat("Gravity", ref app.Camera.GravityDownForce, 0.0f, 100.0f);
                     }
                 }
             }
@@ -244,7 +253,7 @@ namespace IDKEngine.Render
             if (ImGui.Begin("Renderer"))
             {
                 ImGui.Text($"FPS: {app.FPS}");
-                ImGui.Text($"Viewport size: {app.RenderPresentationResolution.X}x{app.RenderPresentationResolution.Y}");
+                ImGui.Text($"Viewport size: {app.PresentationResolution.X}x{app.PresentationResolution.Y}");
                 ImGui.Text($"{Helper.GPU}");
 
                 if (app.RenderMode == RenderMode.PathTracer)
@@ -550,8 +559,14 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsVolumetricLighting", ref app.IsVolumetricLighting);
                         if (app.IsVolumetricLighting)
                         {
+                            tempFloat = app.VolumetricLight.ResolutionScale;
+                            if (ImGui.SliderFloat("ResolutionScale##SamplesVolumetricLight", ref tempFloat, 0.1f, 1.0f))
+                            {
+                                app.VolumetricLight.ResolutionScale = MathF.Max(tempFloat, 0.1f);
+                            }
+
                             tempInt = app.VolumetricLight.Samples;
-                            if (ImGui.SliderInt("Samples##SamplesVolumetricLight", ref tempInt, 1, 100))
+                            if (ImGui.SliderInt("Samples##SamplesVolumetricLight", ref tempInt, 1, 30))
                             {
                                 app.VolumetricLight.Samples = tempInt;
                             }
@@ -563,7 +578,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = app.VolumetricLight.Strength;
-                            if (ImGui.SliderFloat("Strength##StrengthVolumetricLight", ref tempFloat, 0.0f, 500.0f))
+                            if (ImGui.SliderFloat("Strength##StrengthVolumetricLight", ref tempFloat, 0.0f, 40.0f))
                             {
                                 app.VolumetricLight.Strength = tempFloat;
                             }
@@ -818,7 +833,7 @@ namespace IDKEngine.Render
                     Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new Vector2(0.0f));
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    GpuLightWrapper light = new GpuLightWrapper(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
+                    CpuLight light = new CpuLight(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
                     if (app.LightManager.AddLight(light))
                     {
                         float distance = Vector3.Distance(app.Camera.Position, light.GpuLight.Position);
@@ -830,6 +845,12 @@ namespace IDKEngine.Render
 
                 if (ImGui.Button("Load model"))
                 {
+                    if (app.WindowFullscreen)
+                    {
+                        // Need to end fullscreen otherwise file-explorer is not visible
+                        app.WindowFullscreen = false;
+                    }
+
                     NativeFileDialogExtendedSharp.NfdFilter[] filters =
                     {
                         new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "gltf", Description = "glTF" },
@@ -841,7 +862,7 @@ namespace IDKEngine.Render
                     {
                         Logger.Log(Logger.LogLevel.Error, result.Error);
                     }
-                    else if (result.Status != NativeFileDialogExtendedSharp.NfdStatus.Cancel)
+                    else if (result.Status == NativeFileDialogExtendedSharp.NfdStatus.Ok)
                     {
                         ModelLoader.Model newScene = ModelLoader.GltfToEngineFormat(result.Path, Matrix4.CreateTranslation(app.Camera.Position));
                         app.ModelSystem.Add(newScene);
@@ -955,12 +976,12 @@ namespace IDKEngine.Render
                 {
                     bool shouldUpdateLight = false;
                     
-                    app.LightManager.TryGetLight(SelectedEntity.EntityID, out GpuLightWrapper abstractLight);
-                    ref GpuLight light = ref abstractLight.GpuLight;
+                    app.LightManager.TryGetLight(SelectedEntity.EntityID, out CpuLight cpuLight);
+                    ref GpuLight gpuLight = ref cpuLight.GpuLight;
 
-                    if (ImGui.Button("Remove"))
+                    if (ImGui.Button("Delete"))
                     {
-                        app.LightManager.RemoveLight(SelectedEntity.EntityID);
+                        app.LightManager.DeleteLight(SelectedEntity.EntityID);
                         SelectedEntity = SelectedEntityInfo.None;
                         shouldResetPT = true;
                     }
@@ -968,31 +989,37 @@ namespace IDKEngine.Render
                     {
                         if (ImGui.Button("Teleport to camera"))
                         {
-                            light.Position = app.Camera.Position;
-                            shouldUpdateLight = true;
+                            gpuLight.Position = app.Camera.Position;
                         }
 
-                        tempVec3 = light.Position.ToNumerics();
+                        tempVec3 = gpuLight.Position.ToNumerics();
                         if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
                         {
-                            shouldUpdateLight = true;
-                            light.Position = tempVec3.ToOpenTK();
+                            gpuLight.Position = tempVec3.ToOpenTK();
                         }
 
-                        tempVec3 = light.Color.ToNumerics();
+                        tempVec3 = cpuLight.Velocity.ToNumerics();
+                        if (ImGui.DragFloat3("Velocity", ref tempVec3, 0.1f))
+                        {
+                            cpuLight.Velocity = tempVec3.ToOpenTK();
+                        }
+                        ImGui.SameLine();
+                        ImGui.Text($"({cpuLight.Velocity.Length})");
+
+                        tempVec3 = gpuLight.Color.ToNumerics();
                         if (ImGui.DragFloat3("Color", ref tempVec3, 0.1f, 0.0f))
                         {
                             shouldUpdateLight = true;
-                            light.Color = tempVec3.ToOpenTK();
+                            gpuLight.Color = tempVec3.ToOpenTK();
                         }
 
-                        if (ImGui.DragFloat("Radius", ref light.Radius, 0.05f, 0.01f, 7.0f))
+                        if (ImGui.DragFloat("Radius", ref gpuLight.Radius, 0.05f, 0.01f, 7.0f))
                         {
                             shouldUpdateLight = true;
                         }
 
                         ImGui.Separator();
-                        if (abstractLight.HasPointShadow())
+                        if (cpuLight.HasPointShadow())
                         {
                             if (ImGui.Button("Delete PointShadow"))
                             {
@@ -1003,14 +1030,14 @@ namespace IDKEngine.Render
                         {
                             if (ImGui.Button("Create PointShadow"))
                             {
-                                PointShadow pointShadow = new PointShadow(256, 0.5f, 60.0f);
+                                PointShadow pointShadow = new PointShadow(256, new Vector2(gpuLight.Radius, 60.0f));
                                 app.LightManager.CreatePointShadowForLight(pointShadow, SelectedEntity.EntityID);
                             }
                         }
 
-                        if (abstractLight.HasPointShadow())
+                        if (cpuLight.HasPointShadow())
                         {
-                            PointShadow pointShadow = app.LightManager.GetPointShadow(light.PointShadowIndex);
+                            PointShadow pointShadow = app.LightManager.GetPointShadow(gpuLight.PointShadowIndex);
 
                             tempInt = pointShadow.Result.Width;
                             if (ImGui.InputInt("Resolution", ref tempInt))
@@ -1042,9 +1069,9 @@ namespace IDKEngine.Render
             if (ImGui.Begin($"Viewport"))
             {
                 System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
-                if (content.X != app.RenderPresentationResolution.X || content.Y != app.RenderPresentationResolution.Y)
+                if (content.X != app.PresentationResolution.X || content.Y != app.PresentationResolution.Y)
                 {
-                    app.RenderPresentationResolution = new Vector2i((int)content.X, (int)content.Y);
+                    app.PresentationResolution = new Vector2i((int)content.X, (int)content.Y);
                 }
 
                 System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
@@ -1130,8 +1157,8 @@ namespace IDKEngine.Render
             }
 
             if (FrameRecState != FrameRecorderState.Replaying &&
-                app.KeyboardState[Keys.R] == InputState.Touched &&
-                app.KeyboardState[Keys.LeftControl] == InputState.Pressed)
+                app.KeyboardState[Keys.R] == Keyboard.InputState.Touched &&
+                app.KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
             {
                 if (FrameRecState == FrameRecorderState.Recording)
                 {
@@ -1145,8 +1172,8 @@ namespace IDKEngine.Render
             }
 
             if (FrameRecState != FrameRecorderState.Recording && app.FrameRecorder.IsFramesLoaded &&
-                app.KeyboardState[Keys.Space] == InputState.Touched &&
-                app.KeyboardState[Keys.LeftControl] == InputState.Pressed)
+                app.KeyboardState[Keys.Space] == Keyboard.InputState.Touched &&
+                app.KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
             {
                 FrameRecState = FrameRecState == FrameRecorderState.Replaying ? FrameRecorderState.Nothing : FrameRecorderState.Replaying;
                 if (FrameRecState == FrameRecorderState.Replaying)
@@ -1156,7 +1183,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && app.MouseState[MouseButton.Left] == InputState.Touched)
+            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && app.MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
             {
                 Vector2i point = new Vector2i((int)app.MouseState.Position.X, (int)app.MouseState.Position.Y);
                 if (app.RenderGui)

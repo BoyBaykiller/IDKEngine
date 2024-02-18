@@ -33,10 +33,10 @@ namespace IDKEngine.Render
                 gpuPointShadow.NearPlane = MathF.Max(gpuPointShadow.NearPlane, 0.1f);
                 gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, 0.1f);
 
-                gpuPointShadow.NearPlane = MathF.Min(gpuPointShadow.NearPlane, gpuPointShadow.FarPlane - 0.01f);
-                gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, gpuPointShadow.NearPlane + 0.01f);
+                gpuPointShadow.NearPlane = MathF.Min(gpuPointShadow.NearPlane, gpuPointShadow.FarPlane - 0.001f);
+                gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, gpuPointShadow.NearPlane + 0.001f);
 
-                projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, gpuPointShadow.NearPlane, gpuPointShadow.FarPlane);
+                projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(MathHelper.DegreesToRadians(90.0f), 1.0f, gpuPointShadow.NearPlane, gpuPointShadow.FarPlane);
             }
         }
 
@@ -58,12 +58,12 @@ namespace IDKEngine.Render
         private SamplerObject nearestSampler;
         private SamplerObject shadowSampler;
         private GpuPointShadow gpuPointShadow;
-        public PointShadow(int size, float nearPlane, float farPlane)
+        public PointShadow(int size, Vector2 clippingPlanes)
         {
             framebuffer = new Framebuffer();
             framebuffer.SetDrawBuffers([DrawBuffersEnum.None]);
 
-            ClippingPlanes = new Vector2(nearPlane, farPlane);
+            ClippingPlanes = clippingPlanes;
             SetSize(size);
         }
 

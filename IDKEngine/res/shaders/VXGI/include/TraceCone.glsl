@@ -30,6 +30,8 @@ vec4 TraceCone(Ray ray, vec3 normal, float coneAngle, float stepMultiplier, floa
         }
         vec4 newSample = textureLod(SamplerVoxelsAlbedo, sampleUVW, sampleLod);
 
+        // glBlendEquation(mode: GL_FUNC_ADD)
+        // glBlendFunc(sfactor: GL_ONE_MINUS_DST_ALPHA, dfactor: 1.0)
         float weightOfNewSample = (1.0 - accumulatedColor.a);
         accumulatedColor += weightOfNewSample * newSample;
         

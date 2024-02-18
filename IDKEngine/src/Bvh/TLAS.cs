@@ -5,7 +5,7 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine
 {
-    class TLAS
+    public class TLAS
     {
         public GpuTlasNode Root => Nodes[0];
         public int TreeDepth { get; private set; }
@@ -137,7 +137,7 @@ namespace IDKEngine
             return bestNodeIndex;
         }
 
-        public unsafe bool Intersect(in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
+        public bool Intersect(in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
         {
             hitInfo = new BVH.RayHitInfo();
             hitInfo.T = tMax;
@@ -197,6 +197,62 @@ namespace IDKEngine
             }
 
             return hitInfo.T != tMax;
+        }
+
+        public void Intersect(in Box box, BVH.IntersectFunc intersectFunc)
+        {
+            int stackPtr = 0;
+            uint stackTop = 0;
+            Span<uint> stack = stackalloc uint[22];
+            while (true)
+            {
+                ref readonly GpuTlasNode parent = ref Nodes[stackTop];
+                if (parent.IsLeaf)
+                {
+                    uint instanceID = parent.ChildOrInstanceID;
+                    ref readonly GpuMeshInstance meshInstance = ref MeshInstances[instanceID];
+                    BLAS blas = Blases[meshInstance.MeshIndex];
+
+                    // Copy out/ref paramters we access from inside the lambda function this is needed because of "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
+                    int meshIndexCopy = meshInstance.MeshIndex;
+
+                    Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
+                    blas.Intersect(localBox, (in BLAS.IndicesTriplet indicesTriplet) =>
+                    {
+                        BVH.BoxHitInfo hitInfo;
+                        hitInfo.TriangleIndices = indicesTriplet;
+                        hitInfo.MeshID = meshIndexCopy;
+                        hitInfo.InstanceID = (int)instanceID;
+
+                        intersectFunc(hitInfo);
+                    });
+
+                    if (stackPtr == 0) break;
+                    stackTop = stack[--stackPtr];
+                    continue;
+                }
+
+                uint leftChild = parent.ChildOrInstanceID;
+                uint rightChild = leftChild + 1;
+                ref readonly GpuTlasNode leftNode = ref Nodes[leftChild];
+                ref readonly GpuTlasNode rightNode = ref Nodes[rightChild];
+                bool leftChildHit = Intersections.BoxVsBox(Conversions.ToBox(leftNode), box);
+                bool rightChildHit = Intersections.BoxVsBox(Conversions.ToBox(rightNode), box);
+
+                if (leftChildHit || rightChildHit)
+                {
+                    stackTop = leftChildHit ? leftChild : rightChild;
+                    if (leftChildHit && rightChildHit)
+                    {
+                        stack[stackPtr++] = rightChild;
+                    }
+                }
+                else
+                {
+                    if (stackPtr == 0) break;
+                    stackTop = stack[--stackPtr];
+                }
+            }
         }
     }
 }

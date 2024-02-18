@@ -5,9 +5,10 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Render;
-using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
+using IDKEngine.Windowing;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
@@ -32,22 +33,22 @@ namespace IDKEngine
             set
             {
                 _resolutionScale = value;
-                RenderPresentationResolution = RenderPresentationResolution;
+                PresentationResolution = PresentationResolution;
             }
         }
 
-        private Vector2i _renderPresentationResolution;
-        public Vector2i RenderPresentationResolution
+        private Vector2i _presentationResolution;
+        public Vector2i PresentationResolution
         {
-            get => _renderPresentationResolution;
+            get => _presentationResolution;
 
             set
             {
-                _renderPresentationResolution = value;
+                _presentationResolution = value;
 
                 if (RenderMode == RenderMode.Rasterizer)
                 {
-                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y, RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y, PresentationResolution.X, PresentationResolution.Y);
                 }
 
                 if (RenderMode == RenderMode.PathTracer)
@@ -57,9 +58,9 @@ namespace IDKEngine
 
                 if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
                 {
-                    if (VolumetricLight != null) VolumetricLight.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-                    if (Bloom != null) Bloom.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
-                    if (TonemapAndGamma != null) TonemapAndGamma.SetSize(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                    if (VolumetricLight != null) VolumetricLight.SetSize(PresentationResolution.X, PresentationResolution.Y);
+                    if (Bloom != null) Bloom.SetSize(PresentationResolution.X, PresentationResolution.Y);
+                    if (TonemapAndGamma != null) TonemapAndGamma.SetSize(PresentationResolution.X, PresentationResolution.Y);
                 }
             }
         }
@@ -76,7 +77,7 @@ namespace IDKEngine
 
                 if (value == RenderMode.Rasterizer)
                 {
-                    RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y, RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                    RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y, PresentationResolution.X, PresentationResolution.Y);
                 }
 
                 if (value == RenderMode.PathTracer)
@@ -88,31 +89,21 @@ namespace IDKEngine
             }
         }
 
-        public Vector2i RenderResolution => new Vector2i((int)(RenderPresentationResolution.X * ResolutionScale), (int)(RenderPresentationResolution.Y * ResolutionScale));
+        public Vector2i RenderResolution => new Vector2i((int)(PresentationResolution.X * ResolutionScale), (int)(PresentationResolution.Y * ResolutionScale));
         public bool RenderGui { get; private set; }
         public int FPS { get; private set; }
 
         public bool IsBloom = true;
         public bool IsVolumetricLighting = true;
+        public bool RunSimulations = true;
 
-        public struct CameraCollisionDetection
+        public Intersections.CollisionDetectionSettings CamCollisionSettings = new Intersections.CollisionDetectionSettings()
         {
-            public bool IsEnabled;
-            public int TestSteps;
-            public int ResponseSteps;
-            public float EpsilonNormalOffset;
-        }
-
-        public CameraCollisionDetection CamCollisionSettings = new CameraCollisionDetection()
-        {
-            IsEnabled = false,
+            IsEnabled = true,
             TestSteps = 3,
             ResponseSteps = 12,
             EpsilonNormalOffset = 0.001f
         };
-
-        public bool GravityEnabled = false;
-        public float GravityDownForce = 70.0f;
 
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
@@ -170,7 +161,7 @@ namespace IDKEngine
                 }
                 else
                 {
-                    LightManager.TryGetLight(gui.SelectedEntity.EntityID, out GpuLightWrapper abstractLight);
+                    LightManager.TryGetLight(gui.SelectedEntity.EntityID, out CpuLight abstractLight);
                     ref GpuLight light = ref abstractLight.GpuLight;
 
                     box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
@@ -184,6 +175,7 @@ namespace IDKEngine
             GL.Disable(EnableCap.DepthTest);
             GL.Disable(EnableCap.CullFace);
             GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(0, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha);
             GL.Viewport(0, 0, WindowFramebufferSize.X, WindowFramebufferSize.Y);
             if (RenderGui)
             {
@@ -204,7 +196,7 @@ namespace IDKEngine
 
         private unsafe void Update(float dT)
         {
-            MainThreadQueue.Execute();
+            MainThreadQueue.ExecuteOne();
 
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
@@ -212,76 +204,6 @@ namespace IDKEngine
                 WindowTitle = $"IDKEngine FPS: {FPS}";
                 fpsCounter = 0;
                 fpsTimer.Restart();
-            }
-
-            //if (LightManager.TryGetLight(0, out Light light))
-            //{
-            //    light.GpuLight.Position.X += (MathF.Sin(GpuBasicData.Time) * 8.0f) * dT;
-            //    light.GpuLight.Position.Z += (MathF.Cos(GpuBasicData.Time) * 4.0f) * dT;
-            //}
-
-            //for (int i = 0; i < LightManager.Count; i++)
-            //{
-            //    LightManager.TryGetLight(i, out Light light);
-
-            //    Random rng = new Random(i);
-
-            //    Vector3 pos = DebugLightPosXConst(light.GpuLight.Position.X, WindowTime, rng.NextSingle() + 1.0f, rng.NextSingle() + 1.0f, rng.NextSingle() * 8.0f + 2.0f, rng.NextSingle() * 6.0f + 2.0f);
-
-            //    light.GpuLight.Position = pos;
-            //    light.GpuLight.Color = Helper.VectorAbs(pos.Normalized()) * 8.5f;
-            //}
-
-            // Keyboard Inputs
-            {
-                if (KeyboardState[Keys.Escape] == InputState.Pressed)
-                {
-                    ShouldClose();
-                }
-
-                if (KeyboardState[Keys.V] == InputState.Touched)
-                {
-                    WindowVSync = !WindowVSync;
-                }
-                if (KeyboardState[Keys.G] == InputState.Touched)
-                {
-                    RenderGui = !RenderGui;
-                    if (!RenderGui)
-                    {
-                        RenderPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
-                    }
-                }
-                if (KeyboardState[Keys.F11] == InputState.Touched)
-                {
-                    WindowFullscreen = !WindowFullscreen;
-                }
-            }
-
-            if (gui.FrameRecState != Gui.FrameRecorderState.Replaying)
-            {
-                if (KeyboardState[Keys.E] == InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
-                {
-                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorNormal;
-                        Camera.Velocity = Vector3.Zero;
-                    }
-                    else
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
-                    }
-                }
-
-                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                {
-                    Camera.ProcessInputs(KeyboardState, MouseState);
-                    if (GravityEnabled)
-                    {
-                        Camera.ThisFrameAcceleration.Y += -GravityDownForce;
-                    }
-
-                    Camera.AdvanceSimulation(dT);
-                }
             }
 
             gui.Update(this);
@@ -300,32 +222,86 @@ namespace IDKEngine
             //    //ModelSystem.BVH.TlasBuild();
             //}
 
-            if (CamCollisionSettings.IsEnabled)
             {
-                for (int i = 0; i < CamCollisionSettings.ResponseSteps; i++)
+                if (KeyboardState[Keys.Escape] == Keyboard.InputState.Pressed)
                 {
-                    Sphere boundingVolume = new Sphere(Camera.PrevPosition, 0.5f);
-                    Plane hitPlane;
-                    float penetrationDepth;
-                    bool hit = CollisionRoutine(ModelSystem, CamCollisionSettings, Camera.Position, &boundingVolume, &hitPlane, &penetrationDepth);
-                    if (hit)
+                    ShouldClose();
+                }
+                if (KeyboardState[Keys.V] == Keyboard.InputState.Touched)
+                {
+                    WindowVSync = !WindowVSync;
+                }
+                if (KeyboardState[Keys.G] == Keyboard.InputState.Touched)
+                {
+                    RenderGui = !RenderGui;
+                    if (!RenderGui)
                     {
-                        Vector3 newVelocity = Plane.Project(Camera.Velocity, hitPlane);
-                        Camera.Velocity = newVelocity;
+                        PresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                    }
+                }
+                if (KeyboardState[Keys.F11] == Keyboard.InputState.Touched)
+                {
+                    WindowFullscreen = !WindowFullscreen;
+                }
+                if (KeyboardState[Keys.T] == Keyboard.InputState.Touched)
+                {
+                    RunSimulations = !RunSimulations;
+                }
+            }
 
-                        boundingVolume.Center += hitPlane.Normal * (penetrationDepth + CamCollisionSettings.EpsilonNormalOffset);
-                        Camera.Position = boundingVolume.Center;
+            if (gui.FrameRecState != Gui.FrameRecorderState.Replaying)
+            {
+                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                {
+                    if (MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
+                    {
+                        Vector3 force = Camera.ViewDir * 900.0f;
 
-                        Camera.AdvanceSimulation(dT);
+                        CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, Helper.RandomVec3(6.0f, 10.0f), 0.3f);
+                        newLight.Velocity = Camera.Velocity;
+                        newLight.AddForce(force);
+
+                        Camera.AddForce(-force);
+
+                        if (LightManager.AddLight(newLight))
+                        {
+                            int newLightIndex = LightManager.Count - 1;
+                            PointShadow pointShadow = new PointShadow(256, new Vector2(newLight.GpuLight.Radius, 60.0f));
+                            LightManager.CreatePointShadowForLight(pointShadow, newLightIndex);
+                        }
+                    }
+
+                    Camera.ProcessInputs(KeyboardState, MouseState);
+                    Camera.AdvanceSimulation(dT);
+                }
+
+                if (RunSimulations)
+                {
+                    LightManager.AdvanceSimulation(dT, ModelSystem);
+                }
+
+                if (KeyboardState[Keys.E] == Keyboard.InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+                {
+                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                    {
+                        MouseState.CursorMode = CursorModeValue.CursorNormal;
+                        Camera.Velocity = Vector3.Zero;
                     }
                     else
                     {
-                        break;
+                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
                     }
                 }
             }
 
-            // Updating global basicData Buffer
+            Vector3 sphereDestination = Camera.Position;
+            Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
+            Intersections.SceneVsMovingSphereCollisionRoutine(ModelSystem, CamCollisionSettings, ref movingSphere, ref sphereDestination, (in Intersections.SceneHitInfo hitInfo) =>
+            {
+                Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane);
+            });
+            Camera.Position = sphereDestination;
+
             {
                 Camera.ProjectionSize = RenderResolution;
 
@@ -350,31 +326,18 @@ namespace IDKEngine
                 GpuBasicData.Frame++;
 
                 basicDataBuffer.UploadElements(GpuBasicData);
+
+                Camera.SetPrevToCurrentPosition();
             }
 
-            LightManager.UpdateBufferData();
+            LightManager.Update(out bool anyLightMoved);
+            ModelSystem.Update(out bool anyMeshInstanceMoved);
 
-            bool anyMeshInstanceMoved = false;
-            // Updating MeshInstance Buffer
-            {
-                ModelSystem.UpdateMeshInstanceBuffer(0, ModelSystem.MeshInstances.Length);
-                for (int i = 0; i < ModelSystem.MeshInstances.Length; i++)
-                {
-                    if (ModelSystem.MeshInstances[i].DidMove())
-                    {
-                        ModelSystem.MeshInstances[i].SetPrevToCurrentMatrix();
-                        anyMeshInstanceMoved = true;
-                    }
-                }
-            }
 
-            // Resetting Path Tracer if necessary
+            bool cameraMoved = GpuBasicData.PrevProjView != GpuBasicData.ProjView;
+            if ((RenderMode == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
             {
-                bool cameraMoved = GpuBasicData.PrevProjView != GpuBasicData.ProjView;
-                if ((RenderMode == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved))
-                {
-                    PathTracer.ResetRenderProcess();
-                }
+                PathTracer.ResetRenderProcess();
             }
         }
 
@@ -422,7 +385,6 @@ namespace IDKEngine
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.ScissorTest);
-            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
             GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
 
@@ -447,10 +409,10 @@ namespace IDKEngine
                 "res/textures/environmentMap/negz.jpg"
             });
 
-            RenderPresentationResolution = WindowFramebufferSize;
-            VolumetricLight = new VolumetricLighting(RenderPresentationResolution.X, RenderPresentationResolution.Y, 7, 0.758f, 50.0f, 5.0f, new Vector3(0.025f));
-            Bloom = new Bloom(RenderPresentationResolution.X, RenderPresentationResolution.Y, 1.0f, 3.0f);
-            TonemapAndGamma = new TonemapAndGammaCorrect(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+            PresentationResolution = WindowFramebufferSize;
+            VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, 6, 0.758f, 50.0f, 4.0f, new Vector3(0.025f));
+            Bloom = new Bloom(PresentationResolution.X, PresentationResolution.Y, 1.0f, 3.0f);
+            TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution.X, PresentationResolution.Y);
             BoxRenderer = new BoxRenderer();
 
             LightManager = new LightManager(12, 12);
@@ -488,31 +450,36 @@ namespace IDKEngine
 
                 ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/Helmet/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
+                //ModelLoader.Model plane = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\Plane.gltf", Matrix4.CreateScale(30.0f, 1.0f, 30.0f) * Matrix4.CreateRotationZ(MathF.PI) * Matrix4.CreateTranslation(0.0f, 17.0f, 10.0f));
                 //ModelLoader.Model test = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
                 //ModelLoader.Model bistro = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\BistroExterior\Bistro.gltf");
+
                 ModelSystem.Add(sponza, lucy, helmet);
 
-                LightManager.AddLight(new GpuLightWrapper(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-                LightManager.AddLight(new GpuLightWrapper(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-                LightManager.AddLight(new GpuLightWrapper(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
 
                 for (int i = 0; i < 3; i++)
                 {
-                    PointShadow pointShadow = new PointShadow(512, 0.5f, 60.0f);
+                    PointShadow pointShadow = new PointShadow(512, new Vector2(0.5f, 60.0f));
                     LightManager.CreatePointShadowForLight(pointShadow, i);
                 }
 
-                //for (int i = 0; i < 128; i++)
+                //for (int i = 0; i < 12; i++)
                 //{
-                //    Light light = new Light(0.2f);
+                //    CpuLight light = new CpuLight(0.3f);
                 //    light.GpuLight.Position.X = Helper.RandomFloat(-13.0f, 13.0f);
+                //    light.Velocity = Helper.RandomVec3(-1.0f, 1.0f).Normalized() * 7.6f;
+                //    light.GpuLight.Color = Helper.RandomVec3(3.3f, 9.5f);
+
                 //    LightManager.AddLight(light);
 
-                //    PointShadow pointShadow = new PointShadow(256, 0.5f, 60.0f);
-                //    LightManager.CreatePointShadowForLight(pointShadow, i);
+                //    //PointShadow pointShadow = new PointShadow(256, light.GpuLight.Radius, 60.0f);
+                //    //LightManager.CreatePointShadowForLight(pointShadow, i);
                 //}
 
-                //LightManager.AddLight(new GpuLightWrapper(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.6f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
+                //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.6f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);
 
                 RenderMode = RenderMode.Rasterizer;
@@ -588,69 +555,13 @@ namespace IDKEngine
             // if we don't render to the screen via gui always make viewport match window size
             if (!RenderGui)
             {
-                RenderPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                PresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
             }
         }
 
         protected override void OnKeyPress(char key)
         {
             gui.Backend.PressChar(key);
-        }
-
-        // We need to use raw pointers here instead of ref & out, because
-        // "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
-        private static unsafe bool CollisionRoutine(ModelSystem modelSystem, in CameraCollisionDetection settings, in Vector3 newPos, Sphere* previousPos, Plane* outHitPlane, float* outPenetrationDepth)
-        {
-            *outPenetrationDepth = float.MinValue;
-            *outHitPlane = new Plane();
-
-            Vector3 cameraStepSize = (newPos - previousPos->Center) / settings.TestSteps;
-            for (int i = 1; i <= settings.TestSteps; i++)
-            {
-                previousPos->Center += cameraStepSize;
-                Box playerBox = new Box(previousPos->Center - new Vector3(previousPos->Radius), previousPos->Center + new Vector3(previousPos->Radius));
-
-                float biggestCosTheta = 0.0f;
-                modelSystem.BVH.Intersect(playerBox, (in BVH.PrimitiveHitInfo hitInfo) =>
-                {
-                    Triangle triangle = new Triangle(
-                        modelSystem.VertexPositions[hitInfo.TriangleIndices.X],
-                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Y],
-                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Z]
-                    );
-                    Matrix4 modelMatrix = modelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
-                    Triangle worldSpaceTri = Triangle.Transformed(triangle, modelMatrix);
-
-                    Vector3 closestPointOnTri = Intersections.TriangleClosestPoint(worldSpaceTri, previousPos->Center);
-                    float distance = Vector3.Distance(closestPointOnTri, previousPos->Center);
-                    float thisPenetrationDepth = previousPos->Radius - distance;
-                    if (thisPenetrationDepth > 0.0f)
-                    {
-                        Plane thisHitPlane = new Plane(worldSpaceTri.Normal);
-
-                        Vector3 hitPointToCameraDir = (previousPos->Center - closestPointOnTri) / distance;
-                        float thisCosTheta = Vector3.Dot(thisHitPlane.Normal, hitPointToCameraDir);
-                        if (thisCosTheta < 0.0f)
-                        {
-                            thisHitPlane.Normal *= -1.0f;
-                        }
-
-                        if (MathF.Abs(thisCosTheta) > MathF.Abs(biggestCosTheta))
-                        {
-                            biggestCosTheta = thisCosTheta;
-                            *outHitPlane = thisHitPlane;
-                            *outPenetrationDepth = thisPenetrationDepth;
-                        }
-                    }
-                });
-
-                if (*outPenetrationDepth != float.MinValue)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

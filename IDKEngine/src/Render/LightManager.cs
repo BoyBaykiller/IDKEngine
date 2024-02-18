@@ -1,9 +1,10 @@
 ﻿using System;
 using System.IO;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
@@ -30,7 +31,7 @@ namespace IDKEngine.Render
         }
 
         public readonly int IndicisCount;
-        private readonly GpuLightWrapper[] lights;
+        private readonly CpuLight[] lights;
         
         private readonly TypedBuffer<GpuLight> lightBufferObject;
         private readonly ShaderProgram shaderProgram;
@@ -38,7 +39,7 @@ namespace IDKEngine.Render
         private readonly VAO vao;
         public unsafe LightManager(int latitudes, int longitudes)
         {
-            lights = new GpuLightWrapper[GPU_MAX_UBO_LIGHT_COUNT];
+            lights = new CpuLight[GPU_MAX_UBO_LIGHT_COUNT];
 
             shaderProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
@@ -78,7 +79,7 @@ namespace IDKEngine.Render
         {
             for (int i = 0; i < Count; i++)
             {
-                GpuLightWrapper light = lights[i];
+                CpuLight light = lights[i];
                 if (light.HasPointShadow())
                 {
                     pointShadowManager.TryGetPointShadow(light.GpuLight.PointShadowIndex, out PointShadow associatedPointShadow);
@@ -88,11 +89,11 @@ namespace IDKEngine.Render
             pointShadowManager.RenderShadowMaps(modelSystem, camera);
         }
 
-        public bool AddLight(GpuLightWrapper light)
+        public bool AddLight(CpuLight light)
         {
             if (Count == GPU_MAX_UBO_LIGHT_COUNT)
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(GpuLightWrapper)}. Limit of {GPU_MAX_UBO_LIGHT_COUNT} is reached");
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(CpuLight)}. Limit of {GPU_MAX_UBO_LIGHT_COUNT} is reached");
                 return false;
             }
 
@@ -101,17 +102,17 @@ namespace IDKEngine.Render
             return true;
         }
 
-        public void RemoveLight(int index)
+        public void DeleteLight(int index)
         {
-            if (!TryGetLight(index, out GpuLightWrapper light))
+            if (!TryGetLight(index, out CpuLight light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(GpuLightWrapper)} {index} does not exist. Cannot remove it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} does not exist. Cannot delete it");
                 return;
             }
 
             if (light.HasPointShadow())
             {
-                pointShadowManager.RemovePointShadow(light.GpuLight.PointShadowIndex);
+                pointShadowManager.DeletePointShadow(light.GpuLight.PointShadowIndex);
             }
 
             if (Count - 1 >= 0)
@@ -123,15 +124,15 @@ namespace IDKEngine.Render
 
         public bool CreatePointShadowForLight(PointShadow pointShadow, int index)
         {
-            if (!TryGetLight(index, out GpuLightWrapper light))
+            if (!TryGetLight(index, out CpuLight light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(GpuLightWrapper)} {index} does not exist. Cannot attach {nameof(PointShadow)} to it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} does not exist. Cannot attach {nameof(PointShadow)} to it");
                 return false;
             }
 
             if (light.HasPointShadow())
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(GpuLightWrapper)} {index} already has a {nameof(PointShadow)} attached. First you must remove the old one by calling {nameof(DeletePointShadowOfLight)}");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} already has a {nameof(PointShadow)} attached. First you must delete the old one by calling {nameof(DeletePointShadowOfLight)}");
                 return false;
             }
 
@@ -145,34 +146,62 @@ namespace IDKEngine.Render
         
         public void DeletePointShadowOfLight(int index)
         {
-            if (!TryGetLight(index, out GpuLightWrapper light))
+            if (!TryGetLight(index, out CpuLight light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(GpuLightWrapper)} {index} does not exist. Cannot detach {nameof(PointShadow)} from it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} does not exist. Cannot detach {nameof(PointShadow)} from it");
                 return;
             }
 
             if (!light.HasPointShadow())
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(GpuLightWrapper)} {index} has no {nameof(PointShadow)} assigned which could be detached");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} has no {nameof(PointShadow)} assigned which could be detached");
                 return;
             }
 
-            pointShadowManager.RemovePointShadow(light.GpuLight.PointShadowIndex);
+            pointShadowManager.DeletePointShadow(light.GpuLight.PointShadowIndex);
             light.GpuLight.PointShadowIndex = -1;
         }
 
-        public unsafe void UpdateBufferData()
+        public void AdvanceSimulation(float dT, ModelSystem modelSystem)
         {
+            Intersections.CollisionDetectionSettings settings = new Intersections.CollisionDetectionSettings();
+            settings.IsEnabled = true;
+            settings.TestSteps = 1;
+            settings.ResponseSteps = 8;
+            settings.EpsilonNormalOffset = 0.001f;
+
             for (int i = 0; i < Count; i++)
             {
-                GpuLightWrapper light = lights[i];
-                lightBufferObject.UploadElements(light.GpuLight, i);
-                
-                light.GpuLight.PrevPosition = light.GpuLight.Position;
+                CpuLight cpuLight = lights[i];
+                cpuLight.AdvanceSimulation(dT);
+
+                Vector3 sphereDestination = cpuLight.GpuLight.Position;
+                Sphere movingSphere = new Sphere(cpuLight.GpuLight.PrevPosition, 0.5f);
+                Intersections.SceneVsMovingSphereCollisionRoutine(modelSystem, settings, ref movingSphere, ref sphereDestination, (in Intersections.SceneHitInfo hitInfo) =>
+                {
+                    cpuLight.Velocity = Plane.Reflect(cpuLight.Velocity, hitInfo.SlidingPlane);
+                });
+                cpuLight.GpuLight.Position = sphereDestination;
             }
         }
 
-        public bool TryGetLight(int index, out GpuLightWrapper light)
+        public unsafe void Update(out bool anyLightMoved)
+        {
+            anyLightMoved = false;
+            for (int i = 0; i < Count; i++)
+            {
+                CpuLight light = lights[i];
+                lightBufferObject.UploadElements(light.GpuLight, i);
+
+                if (light.GpuLight.DidMove())
+                {
+                    anyLightMoved = true;
+                }
+                light.GpuLight.SetPrevToCurrentPosition();
+            }
+        }
+
+        public bool TryGetLight(int index, out CpuLight light)
         {
             light = null;
             if (index < 0 || index >= Count) return false;
@@ -194,7 +223,7 @@ namespace IDKEngine.Render
 
             for (int i = 0; i < Count; i++)
             {
-                GpuLightWrapper light = lights[i];
+                CpuLight light = lights[i];
                 if (Intersections.RayVsSphere(ray, Conversions.ToSphere(light.GpuLight), out float min, out float max) && max < hitInfo.T)
                 {
                     hitInfo.T = min;

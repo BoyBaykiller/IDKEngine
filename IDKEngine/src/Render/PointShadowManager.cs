@@ -46,7 +46,6 @@ namespace IDKEngine.Render
 
         public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
         {
-            GL.ColorMask(false, false, false, false);
             GL.Disable(EnableCap.CullFace);
             GL.DepthFunc(DepthFunction.Less);
             for (int i = 0; i < GPU_MAX_UBO_POINT_SHADOW_COUNT; i++)
@@ -62,7 +61,6 @@ namespace IDKEngine.Render
                     pointShadow.Render(modelSystem, renderProgram, cullingProgram, camera);
                 }
             }
-            GL.ColorMask(true, true, true, true);
         }
 
         public bool TryAddPointShadow(PointShadow pointShadow, out int index)
@@ -85,11 +83,11 @@ namespace IDKEngine.Render
             return false;
         }
 
-        public void RemovePointShadow(int index)
+        public void DeletePointShadow(int index)
         {
             if (!TryGetPointShadow(index, out _))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Cannot remove {nameof(PointShadow)} {index} as it already is null");
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot delete {nameof(PointShadow)} {index} as it already is null");
                 return;
             }
 
@@ -124,7 +122,7 @@ namespace IDKEngine.Render
             {
                 if (pointShadows[i] != null)
                 {
-                    RemovePointShadow(i);
+                    DeletePointShadow(i);
                 }
             }
 

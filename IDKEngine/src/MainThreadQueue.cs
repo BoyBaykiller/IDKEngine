@@ -18,7 +18,7 @@ namespace IDKEngine
         /// <summary>
         /// Executes one queued up action. This must only be called from the main thread.
         /// </summary>
-        public static void Execute()
+        public static void ExecuteOne()
         {
             if (actionsQueue.TryDequeue(out Action action))
             {

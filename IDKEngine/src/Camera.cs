@@ -1,19 +1,23 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using IDKEngine.Windowing;
 
 namespace IDKEngine
 {
     class Camera
     {
+        public const float MASS = 60.0f; // can easily make more dynamic in future
+
         public Vector3 ViewDir => GetViewDirFromAngles(LookX, LookY);
         public Vector3 PrevPosition { get; private set; }
 
         public Vector3 Position;
         public Vector3 Velocity;
-        public Vector3 ThisFrameAcceleration;
+        private Vector3 thisFrameAcceleration;
 
         public Vector3 UpVector;
+
 
         private float _lookX;
         public float LookX
@@ -41,6 +45,9 @@ namespace IDKEngine
         public float KeyboardAccelerationSpeed;
         public float MouseSensitivity;
 
+        public bool IsGravity;
+        public float GravityDownForce;
+
         // Projection Params
         public Vector2i ProjectionSize;
         public float NearPlane = 0.1f;
@@ -56,9 +63,12 @@ namespace IDKEngine
             LookY = lookY;
 
             MouseSensitivity = 0.05f;
-            KeyboardAccelerationSpeed = 30.0f;
+            KeyboardAccelerationSpeed = 30.0f * MASS; // same "experienced" acceleration regardless of mass
 
             ProjectionSize = size;
+
+            IsGravity = false;
+            GravityDownForce = 70.0f;
         }
 
         public void ProcessInputs(Keyboard keyboard, Mouse mouse)
@@ -67,57 +77,79 @@ namespace IDKEngine
 
             LookX += mouseDelta.X * MouseSensitivity;
             LookY -= mouseDelta.Y * MouseSensitivity;
-            
-            if (keyboard[Keys.W] == InputState.Pressed)
+
+            Vector3 force = new Vector3();
+            if (keyboard[Keys.W] == Keyboard.InputState.Pressed)
             {
-                ThisFrameAcceleration += ViewDir * KeyboardAccelerationSpeed;
+                force += ViewDir * KeyboardAccelerationSpeed;
             }
-            if (keyboard[Keys.S] == InputState.Pressed)
+            if (keyboard[Keys.S] == Keyboard.InputState.Pressed)
             {
-                ThisFrameAcceleration -= ViewDir * KeyboardAccelerationSpeed;
+                force -= ViewDir * KeyboardAccelerationSpeed;
             }
-            if (keyboard[Keys.D] == InputState.Pressed)
+            if (keyboard[Keys.D] == Keyboard.InputState.Pressed)
             {
-                ThisFrameAcceleration += Vector3.Cross(ViewDir, UpVector).Normalized() * KeyboardAccelerationSpeed;
+                force += Vector3.Cross(ViewDir, UpVector).Normalized() * KeyboardAccelerationSpeed;
             }
-            if (keyboard[Keys.A] == InputState.Pressed)
+            if (keyboard[Keys.A] == Keyboard.InputState.Pressed)
             {
-                ThisFrameAcceleration -= Vector3.Cross(ViewDir, UpVector).Normalized() * KeyboardAccelerationSpeed;
+                force -= Vector3.Cross(ViewDir, UpVector).Normalized() * KeyboardAccelerationSpeed;
             }
 
             const float optionalBoost = 5.0f;
-            if (keyboard[Keys.LeftShift] == InputState.Pressed)
+            if (keyboard[Keys.LeftShift] == Keyboard.InputState.Pressed)
             {
-                ThisFrameAcceleration *= optionalBoost;
+                force *= optionalBoost;
             }
-            if (keyboard[Keys.LeftControl] == InputState.Pressed)
+            if (keyboard[Keys.LeftControl] == Keyboard.InputState.Pressed)
             {
-                ThisFrameAcceleration *= (1.0f / optionalBoost);
+                force *= (1.0f / optionalBoost);
             }
 
-            if (keyboard[Keys.Space] == InputState.Pressed)
+            if (keyboard[Keys.Space] == Keyboard.InputState.Pressed)
             {
-                ThisFrameAcceleration.Y += KeyboardAccelerationSpeed * optionalBoost;
+                force.Y += KeyboardAccelerationSpeed * optionalBoost;
             }
+
+            AddForce(force);
         }
 
         public void AdvanceSimulation(float dT)
         {
-            PrevPosition = Position;
-            Position += dT * Velocity + 0.5f * ThisFrameAcceleration * dT * dT;
-            Velocity += ThisFrameAcceleration * dT;
+            if (IsGravity)
+            {
+                thisFrameAcceleration.Y += -GravityDownForce;
+            }
+
+            Position += dT * Velocity + 0.5f * thisFrameAcceleration * dT * dT;
+            Velocity += thisFrameAcceleration * dT;
 
             if (Velocity.Length < 9.0f * dT)
             {
                 Velocity = new Vector3(0.0f);
             }
 
+            // Ideally we would want to have some forces not be effected by drag (such as gravity)
             const float dragConstant = 0.95f;
             float drag = MathF.Log10(dragConstant) * 144.0f;
             Velocity *= MathF.Exp(drag * dT); // https://stackoverflow.com/questions/61812575/which-formula-to-use-for-drag-simulation-each-frame
 
-            ThisFrameAcceleration = new Vector3(0.0f);
+            thisFrameAcceleration = new Vector3(0.0f);
         }
+
+        public void SetPrevToCurrentPosition()
+        {
+            PrevPosition = Position;
+        }
+
+        public void AddForce(Vector3 force)
+        {
+            // f = m * a; a = f/m
+            thisFrameAcceleration += force / MASS;
+        }
+        public void AddForceX(float force) => thisFrameAcceleration.X += force / MASS;
+        public void AddForceY(float force) => thisFrameAcceleration.Y += force / MASS;
+        public void AddForceZ(float force) => thisFrameAcceleration.Z += force / MASS;
 
         public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
         {

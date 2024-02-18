@@ -10,5 +10,15 @@ namespace IDKEngine.GpuTypes
         public int PointShadowIndex;
         public Vector3 PrevPosition;
         private readonly float _pad0;
+
+        public bool DidMove()
+        {
+            return Position != PrevPosition;
+        }
+
+        public void SetPrevToCurrentPosition()
+        {
+            PrevPosition = Position;
+        }
     }
 }

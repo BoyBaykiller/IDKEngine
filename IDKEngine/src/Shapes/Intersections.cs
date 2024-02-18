@@ -62,12 +62,21 @@ namespace IDKEngine.Shapes
             }
         }
 
+        public static bool SphereVsTriangle(in Sphere sphere, in Triangle triangle, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth)
+        {
+            closestPointOnTri = TriangleClosestPoint(triangle, sphere.Center);
+            distance = Vector3.Distance(closestPointOnTri, sphere.Center);
+            penetrationDepth = sphere.Radius - distance;
+
+            return penetrationDepth > 0.0f;
+        }
+
         public static bool SphereVsTriangle(in Sphere sphere, in Triangle triangle)
         {
             Vector3 triangleClosestPoint = TriangleClosestPoint(triangle, sphere.Center);
             float distSquared = Vector3.DistanceSquared(triangleClosestPoint, sphere.Center);
 
-            return distSquared < sphere.RadiusSquared();
+            return distSquared < sphere.RadiusSquared;
         }
 
         // Source: https://stackoverflow.com/a/4579069/12103839
@@ -313,7 +322,7 @@ namespace IDKEngine.Shapes
 
             Vector3 sphereToRay = ray.Origin - sphere.Center;
             float b = Vector3.Dot(ray.Direction, sphereToRay);
-            float c = Vector3.Dot(sphereToRay, sphereToRay) - sphere.RadiusSquared();
+            float c = Vector3.Dot(sphereToRay, sphereToRay) - sphere.RadiusSquared;
             float discriminant = b * b - c;
             if (discriminant < 0.0f)
             {
@@ -334,14 +343,14 @@ namespace IDKEngine.Shapes
             return a + Math.Clamp(t, 0.0f, 1.0f) * ab;
         }
 
-        private struct Projection
+        private struct ScalarProjection
         {
             public float MinScaler;
             public float MaxScaler;
         }
-        private static Projection ProjectVerticesOnToAxis(ReadOnlySpan<Vector3> vertices, in Vector3 axis)
+        private static ScalarProjection ScalarProjectVerticesOnToAxis(ReadOnlySpan<Vector3> vertices, in Vector3 axis)
         {
-            Projection projection = new Projection();
+            ScalarProjection projection = new ScalarProjection();
             projection.MinScaler = float.MaxValue;
             projection.MaxScaler = float.MinValue;
 
@@ -356,9 +365,9 @@ namespace IDKEngine.Shapes
 
             return projection;
         }
-        private static bool ProjectionsIntersect(in Projection projA, in Projection projB)
+        private static bool ProjectionsIntersect(in ScalarProjection projA, in ScalarProjection projB)
         {
-            static bool FloatInRange(float x, in Projection projection)
+            static bool FloatInRange(float x, in ScalarProjection projection)
             {
                 return projection.MinScaler < x && projection.MaxScaler > x;
             }
@@ -384,8 +393,8 @@ namespace IDKEngine.Shapes
             {
                 Vector3 normal = frustum1.Planes[i].Xyz.Normalized();
 
-                Projection projection1 = ProjectVerticesOnToAxis(vertices1, normal);
-                Projection projection2 = ProjectVerticesOnToAxis(vertices2, normal);
+                ScalarProjection projection1 = ScalarProjectVerticesOnToAxis(vertices1, normal);
+                ScalarProjection projection2 = ScalarProjectVerticesOnToAxis(vertices2, normal);
 
                 if (!ProjectionsIntersect(projection1, projection2))
                 {
@@ -397,8 +406,8 @@ namespace IDKEngine.Shapes
             {
                 Vector3 normal = frustum2.Planes[i].Xyz.Normalized();
 
-                Projection projection1 = ProjectVerticesOnToAxis(vertices1, normal);
-                Projection projection2 = ProjectVerticesOnToAxis(vertices2, normal);
+                ScalarProjection projection1 = ScalarProjectVerticesOnToAxis(vertices1, normal);
+                ScalarProjection projection2 = ScalarProjectVerticesOnToAxis(vertices2, normal);
 
                 if (!ProjectionsIntersect(projection1, projection2))
                 {
@@ -407,6 +416,139 @@ namespace IDKEngine.Shapes
             }
 
             return true;
+        }
+
+        public struct CollisionDetectionSettings
+        {
+            public bool IsEnabled;
+            public int TestSteps;
+            public int ResponseSteps;
+            public float EpsilonNormalOffset;
+        }
+        public struct SceneHitInfo
+        {
+            public Plane SlidingPlane;
+            public Vector3 TriNormal;
+            public Vector3 TriCollidingPoint;
+        }
+
+
+        public delegate void IntersectFunc(in SceneHitInfo hitInfo);
+        public static void SceneVsMovingSphereCollisionRoutine(ModelSystem modelSystem, in CollisionDetectionSettings settings, ref Sphere movingSphere, ref Vector3 sphereDestination, IntersectFunc intersectFunc)
+        {
+            if (settings.IsEnabled)
+            {
+                for (int i = 0; i < settings.ResponseSteps; i++)
+                {
+                    Vector3 prevSpherePos = movingSphere.Center;
+                    bool hit = SceneVsMovingSphere(modelSystem, settings.TestSteps, sphereDestination, ref movingSphere, out SceneHitInfo hitInfo);
+                    if (hit)
+                    {
+                        movingSphere.Center += hitInfo.SlidingPlane.Normal * settings.EpsilonNormalOffset;
+
+                        Vector3 deltaStep = sphereDestination - prevSpherePos;
+                        Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
+
+                        sphereDestination = movingSphere.Center + slidedDeltaStep;
+
+                        intersectFunc(hitInfo);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Detects intersection between the scene and a moving sphere, and moves the sphere out of the intersection with minimum distance.
+        /// <paramref name="previousSphere"/> is moved towards <paramref name="sphereDestination"/> in <paramref name="testSteps"/> discrete steps.
+        /// At each step a collision test is performed and true is returned if a collison was detected.
+        /// If after all steps no collision was detected <paramref name="previousSphere"/> position ends up exactly at <paramref name="sphereDestination"/>
+        /// </summary>
+        /// <param name="modelSystem">For accessing the scene and its BVH</param>
+        /// <param name="testSteps">The number of intervals to test collison for</param>
+        /// <param name="sphereDestination">The position the sphere is heading towards</param>
+        /// <param name="movingSphere">The previous position of the sphere and its radius</param>
+        /// <param name="sceneHitInfo">Contains useful hit info data</param>
+        /// <returns></returns>
+        public static bool SceneVsMovingSphere(ModelSystem modelSystem, int testSteps, in Vector3 sphereDestination, ref Sphere movingSphere, out SceneHitInfo sceneHitInfo)
+        {
+            sceneHitInfo = new SceneHitInfo();
+
+            Vector3 stepSize = (sphereDestination - movingSphere.Center) / testSteps;
+            for (int i = 0; i < testSteps; i++)
+            {
+                movingSphere.Center += stepSize;
+                Box hitBox = new Box(movingSphere.Center - new Vector3(movingSphere.Radius), movingSphere.Center + new Vector3(movingSphere.Radius));
+
+                // Copy out/ref paramters we access from inside the lambda function. this is needed because of "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
+                Sphere movingSphereCopy = movingSphere;
+
+                SceneHitInfo thisSceneHitInfo = new SceneHitInfo();
+
+                float bestCosTheta = -1.0f;
+                float bestPenetrationDepth = float.MinValue;
+
+                bool triCollisionDetected = false;
+                modelSystem.BVH.Intersect(hitBox, (in BVH.BoxHitInfo hitInfo) =>
+                {
+                    Triangle triangle = new Triangle(
+                        modelSystem.VertexPositions[hitInfo.TriangleIndices.X],
+                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Y],
+                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Z]
+                    );
+                    Matrix4 modelMatrix = modelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
+                    Triangle worldSpaceTri = Triangle.Transformed(triangle, modelMatrix);
+
+                    bool intersect = SphereVsTriangle(movingSphereCopy, worldSpaceTri, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth);
+                    if (intersect)
+                    {
+                        triCollisionDetected = true;
+
+                        Vector3 triFaceNormal = worldSpaceTri.Normal;
+
+                        Vector3 hitPointToSphereDir;
+                        if (distance == 0.0f)
+                        {
+                            hitPointToSphereDir = triFaceNormal;
+                        }
+                        else
+                        {
+                            hitPointToSphereDir = (movingSphereCopy.Center - closestPointOnTri) / distance;
+                        }
+
+                        float cosTheta = Vector3.Dot(triFaceNormal, hitPointToSphereDir);
+                        if (cosTheta < 0.0f)
+                        {
+                            triFaceNormal *= -1.0f;
+                            cosTheta = MathF.Abs(cosTheta);
+                        }
+
+                        // cosTheta > bestCosTheta or penetrationDepth > bestPenetrationDepth or just choose the first triangle?
+                        if (penetrationDepth > bestPenetrationDepth)
+                        {
+                            thisSceneHitInfo.SlidingPlane = new Plane(hitPointToSphereDir);
+                            thisSceneHitInfo.TriNormal = triFaceNormal;
+                            thisSceneHitInfo.TriCollidingPoint = closestPointOnTri;
+
+                            bestCosTheta = cosTheta;
+                            bestPenetrationDepth = penetrationDepth;
+                        }
+                    }
+                });
+
+                if (triCollisionDetected)
+                {
+                    movingSphere.Center += thisSceneHitInfo.SlidingPlane.Normal * bestPenetrationDepth;
+                    sceneHitInfo = thisSceneHitInfo;
+
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

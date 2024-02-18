@@ -14,6 +14,11 @@ vec3 BoxSize(Box box)
     return box.Max - box.Min;
 }
 
+vec3 BoxCenter(Box box)
+{
+    return (box.Max + box.Min) * 0.5;
+}
+
 float BoxArea(Box box)
 {
     vec3 size = BoxSize(box);

@@ -278,7 +278,7 @@ void main()
     }
     float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
-    FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, alpha);
+    FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, 1.0);
     // FragColor = vec4(albedo, 1.0);
 }
 

@@ -22,18 +22,17 @@ vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary)
     return v0 * bary.x + v1 * bary.y + v2 * bary.z;
 }
 
-// Source: https://github.com/bnpr/Malt/blob/290d2f1169b1367415d3cba7a13ce75c763eeaba/Malt/Shaders/Lighting/Lighting.glsl#L212
+// Source: https://learnopengl.com/Advanced-OpenGL/Depth-testing
 float GetLogarithmicDepth(float near, float far, float viewZ)
 {
-    // TODO: This currently maps to [-1, 1] depth.
-    // Change point shadows to use [0, 1] depth and then adjust this function as well
-
-    float depth = (far + near) / (far - near) - (2.0 * far * near) / (far - near) / viewZ;
+    // https://www.desmos.com/calculator/yexmazn9yq
+    float depth = (1.0 / viewZ - 1.0 / near) / (1.0 / far - 1.0 / near);
     return depth;
 }
 
 float LogarithmicDepthToLinearViewDepth(float near, float far, float ndcZ) 
 {
+    // https://www.desmos.com/calculator/yexmazn9yq
     float depth = (2.0 * near * far) / (far + near - ndcZ * (far - near));
     return depth;
 }
