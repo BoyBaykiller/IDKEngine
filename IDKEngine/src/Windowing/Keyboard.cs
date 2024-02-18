@@ -2,10 +2,18 @@
 using System.Collections.Generic;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
-namespace IDKEngine
+namespace IDKEngine.Windowing
 {
     unsafe class Keyboard
     {
+        public enum InputState : byte
+        {
+            Released = 0,
+            Pressed = 1,
+            Repeating = 2,
+            Touched = 3
+        }
+
         public InputState this[Keys key]
         {
             get => keyStates[key];

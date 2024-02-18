@@ -13,7 +13,7 @@ namespace IDKEngine.Render
         private static readonly bool TAKE_MESH_SHADER_PATH = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
 
         public Vector2i RenderResolution { get; private set; }
-        public Vector2i RenderPresentationResolution { get; private set; }
+        public Vector2i PresentationResolution { get; private set; }
 
         private bool _isVXGI;
         public bool IsVXGI
@@ -56,12 +56,12 @@ namespace IDKEngine.Render
 
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA && TaaResolve == null)
                 {
-                    TaaResolve = new TAAResolve(RenderPresentationResolution.X, RenderPresentationResolution.Y);
+                    TaaResolve = new TAAResolve(PresentationResolution.X, PresentationResolution.Y);
                 }
 
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2 && FSR2Wrapper == null)
                 {
-                    FSR2Wrapper = new FSR2Wrapper(RenderPresentationResolution.X, RenderPresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+                    FSR2Wrapper = new FSR2Wrapper(PresentationResolution.X, PresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
                 }
             }
         }
@@ -252,8 +252,8 @@ namespace IDKEngine.Render
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
-                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, RenderPresentationResolution.X) + FSR2AddMipBias;
-                    gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, RenderPresentationResolution.X);
+                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + FSR2AddMipBias;
+                    gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.None)
                 {
@@ -461,13 +461,13 @@ namespace IDKEngine.Render
             if (DepthTexture != null) { DepthTexture.Dispose(); }
         }
 
-        public unsafe void SetSize(int renderWidth, int renderHeight, int renderPresentationWidth, int renderPresentationHeight)
+        public unsafe void SetSize(int renderWidth, int renderHeight, int presentationWidth, int presentationHeight)
         {
             RenderResolution = new Vector2i(renderWidth, renderHeight);
-            RenderPresentationResolution = new Vector2i(renderPresentationWidth, renderPresentationHeight);
+            PresentationResolution = new Vector2i(presentationWidth, presentationHeight);
 
-            if (TaaResolve != null) TaaResolve.SetSize(renderPresentationWidth, renderPresentationHeight);
-            if (FSR2Wrapper != null) FSR2Wrapper.SetSize(renderPresentationWidth, renderPresentationHeight, renderWidth, renderHeight);
+            if (TaaResolve != null) TaaResolve.SetSize(presentationWidth, presentationHeight);
+            if (FSR2Wrapper != null) FSR2Wrapper.SetSize(renderWidth, renderHeight, presentationWidth, presentationHeight);
 
             SSAO.SetSize(renderWidth, renderHeight);
             SSR.SetSize(renderWidth, renderHeight);

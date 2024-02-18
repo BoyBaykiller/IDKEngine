@@ -62,7 +62,7 @@ namespace IDKEngine.Render
         private FSR2.Context fsr2Context;
         private byte[] fsr2ScratchMemory;
         private bool isFsr2Initialized = false;
-        public unsafe void SetSize(int outputWidth, int outputHeight, int maxInputWidth, int maxInputHeight)
+        public unsafe void SetSize(int inputWidth, int inputHeight, int outputWidth, int outputHeight)
         {
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
@@ -79,7 +79,7 @@ namespace IDKEngine.Render
             FSR2.ContextDescription contextDesc = new FSR2.ContextDescription
             {
                 Flags = FSR2.InitializationFlagBits.EnableHighDynamicRange | FSR2.InitializationFlagBits.EnableAutoExposure | FSR2.InitializationFlagBits.EnableDebugChecking | FSR2.InitializationFlagBits.AllowNullDeviceAndCommandList,
-                MaxRenderSize = new FSR2Types.Dimensions2D() { Width = (uint)maxInputWidth, Height = (uint)maxInputHeight },
+                MaxRenderSize = new FSR2Types.Dimensions2D() { Width = (uint)inputWidth, Height = (uint)inputHeight },
                 DisplaySize = new FSR2Types.Dimensions2D() { Width = (uint)outputWidth, Height = (uint)outputHeight },
                 FpMessage = (delegate* unmanaged<FSR2Interface.MsgType, string, void>)Marshal.GetFunctionPointerForDelegate((FSR2.FpMessageDelegate)Fsr2Message),
             };

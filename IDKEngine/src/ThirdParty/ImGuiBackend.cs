@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using IDKEngine.Render.Objects;
 using ImGuiNET;
+using IDKEngine.Windowing;
+using IDKEngine.Render.Objects;
 
 namespace IDKEngine.GUI
 {
@@ -157,9 +158,9 @@ namespace IDKEngine.GUI
         {
             ImGuiIOPtr io = ImGui.GetIO();
 
-            io.MouseDown[0] = wnd.MouseState[MouseButton.Left] == InputState.Pressed;
-            io.MouseDown[1] = wnd.MouseState[MouseButton.Right] == InputState.Pressed;
-            io.MouseDown[2] = wnd.MouseState[MouseButton.Middle] == InputState.Pressed;
+            io.MouseDown[0] = wnd.MouseState[MouseButton.Left] == Keyboard.InputState.Pressed;
+            io.MouseDown[1] = wnd.MouseState[MouseButton.Right] == Keyboard.InputState.Pressed;
+            io.MouseDown[2] = wnd.MouseState[MouseButton.Middle] == Keyboard.InputState.Pressed;
 
             if (IsIgnoreMouseInput)
                 io.MousePos = new System.Numerics.Vector2(-1.0f);
@@ -174,7 +175,7 @@ namespace IDKEngine.GUI
                 if (Keyboard.KeyValues[i] == Keys.Unknown)
                     continue;
 
-                io.KeysDown[(int)Keyboard.KeyValues[i]] = wnd.KeyboardState[Keyboard.KeyValues[i]] == InputState.Pressed;
+                io.KeysDown[(int)Keyboard.KeyValues[i]] = wnd.KeyboardState[Keyboard.KeyValues[i]] == Keyboard.InputState.Pressed;
             }
 
             for (int i = 0; i < pressedChars.Count; i++)
@@ -184,10 +185,10 @@ namespace IDKEngine.GUI
 
             pressedChars.Clear();
 
-            io.KeyCtrl = wnd.KeyboardState[Keys.LeftControl] == InputState.Pressed || wnd.KeyboardState[Keys.RightControl] == InputState.Pressed;
-            io.KeyAlt = wnd.KeyboardState[Keys.LeftAlt] == InputState.Pressed || wnd.KeyboardState[Keys.RightAlt] == InputState.Pressed;
-            io.KeyShift = wnd.KeyboardState[Keys.LeftShift] == InputState.Pressed || wnd.KeyboardState[Keys.RightShift] == InputState.Pressed;
-            io.KeySuper = wnd.KeyboardState[Keys.LeftSuper] == InputState.Pressed || wnd.KeyboardState[Keys.RightSuper] == InputState.Pressed;
+            io.KeyCtrl = wnd.KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed || wnd.KeyboardState[Keys.RightControl] == Keyboard.InputState.Pressed;
+            io.KeyAlt = wnd.KeyboardState[Keys.LeftAlt] == Keyboard.InputState.Pressed || wnd.KeyboardState[Keys.RightAlt] == Keyboard.InputState.Pressed;
+            io.KeyShift = wnd.KeyboardState[Keys.LeftShift] == Keyboard.InputState.Pressed || wnd.KeyboardState[Keys.RightShift] == Keyboard.InputState.Pressed;
+            io.KeySuper = wnd.KeyboardState[Keys.LeftSuper] == Keyboard.InputState.Pressed || wnd.KeyboardState[Keys.RightSuper] == Keyboard.InputState.Pressed;
         }
 
         public void PressChar(char keyChar)

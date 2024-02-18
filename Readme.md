@@ -24,19 +24,21 @@ Note: Crashes on AMD drivers newer than 23.12.1 for unknown reason.
 
 
 # Controls
-| Key                   | Action               | 
-|-----------------------|----------------------| 
-|  W, A, S, D           | Move                 |
-|  Space                | Move Up              |
-|  Shift                | Move faster          |
-|  G                    | Toggle GUI           |
-|  Control + R          | Toogle Recording     |
-|  Control + Space      | Toogle Replay        |
-|  E                    | Toggle Cursor        |
-|  R-Click              | Select Object        |
-|  V                    | Toggle VSync         |
-|  F11                  | Toggle Fullscreen    |
-|  ESC                  | Exit                 |
+| Key                   | Action                        | 
+|-----------------------|-------------------------------| 
+|  W, A, S, D           | Move                          |
+|  Space                | Move Up                       |
+|  Shift                | Move faster                   |
+|  E                    | Enter/Leave GUI Controls      |
+|  T                    | Resume/Stop Time              |
+|  R-Click in GUI       | Select Object                 |
+|  R-Click in FPS Cam   | Shoot Shadow-Casting Light    |
+|  Control + R          | Toogle Recording              |
+|  Control + Space      | Toogle Replay                 |
+|  G                    | Toggle GUI visibility         |
+|  V                    | Toggle VSync                  |
+|  F11                  | Toggle Fullscreen             |
+|  ESC                  | Exit                          |
 
 # Path Traced Render Samples
 

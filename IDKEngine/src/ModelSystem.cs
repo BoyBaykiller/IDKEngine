@@ -5,12 +5,12 @@ using OpenTK.Mathematics;
 using IDKEngine.Render.Objects;
 using IDKEngine.GpuTypes;
 
-namespace IDKEngine.Render
+namespace IDKEngine
 {
-    class ModelSystem : IDisposable
+    public class ModelSystem : IDisposable
     {
         public GpuDrawElementsCmd[] DrawCommands = Array.Empty<GpuDrawElementsCmd>();
-        private readonly TypedBuffer<GpuDrawElementsCmd> drawCommandBuffer;
+        public readonly TypedBuffer<GpuDrawElementsCmd> drawCommandBuffer;
 
         public GpuMesh[] Meshes = Array.Empty<GpuMesh>();
         private readonly TypedBuffer<GpuMesh> meshBuffer;
@@ -106,7 +106,7 @@ namespace IDKEngine.Render
             }
 
             int prevDrawCommandsLength = DrawCommands.Length;
-            
+
             for (int i = 0; i < models.Length; i++)
             {
                 // Upon deletion these are the properties that need to be adjusted
@@ -140,11 +140,11 @@ namespace IDKEngine.Render
                 }
 
                 Helper.ArrayAdd(ref Materials, models[i].Materials);
-                
+
                 Helper.ArrayAdd(ref Vertices, models[i].Vertices);
                 Helper.ArrayAdd(ref VertexPositions, models[i].VertexPositions);
                 Helper.ArrayAdd(ref VertexIndices, models[i].VertexIndices);
-                
+
                 Helper.ArrayAdd(ref MeshletTasksCmds, models[i].MeshletTasksCmds);
                 Helper.ArrayAdd(ref MeshletsInfo, models[i].MeshletsInfo);
                 Helper.ArrayAdd(ref MeshletsVertexIndices, models[i].MeshletsVertexIndices);
@@ -171,7 +171,7 @@ namespace IDKEngine.Render
         {
             vao.Bind();
             drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, sizeof(GpuDrawElementsCmd));
+            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, nint.Zero, Meshes.Length, sizeof(GpuDrawElementsCmd));
         }
 
         /// <summary>
@@ -182,7 +182,22 @@ namespace IDKEngine.Render
             meshletTasksCmdsBuffer.Bind(BufferTarget.DrawIndirectBuffer);
             meshletTasksCountBuffer.Bind(BufferTarget.ParameterBuffer);
             int maxMeshlets = meshletTasksCmdsBuffer.GetNumElements();
-            GL.NV.MultiDrawMeshTasksIndirectCount(IntPtr.Zero, IntPtr.Zero, maxMeshlets, sizeof(GpuMeshletTaskCmd));
+            GL.NV.MultiDrawMeshTasksIndirectCount(nint.Zero, nint.Zero, maxMeshlets, sizeof(GpuMeshletTaskCmd));
+        }
+
+        public void Update(out bool anyMeshInstanceMoved)
+        {
+            anyMeshInstanceMoved = false;
+
+            UpdateMeshInstanceBuffer(0, MeshInstances.Length);
+            for (int i = 0; i < MeshInstances.Length; i++)
+            {
+                if (MeshInstances[i].DidMove())
+                {
+                    anyMeshInstanceMoved = true;
+                }
+                MeshInstances[i].SetPrevToCurrentMatrix();
+            }
         }
 
         public unsafe void UpdateMeshBuffer(int start, int count)
@@ -252,7 +267,7 @@ namespace IDKEngine.Render
         public int GetMeshVertexCount(int meshID)
         {
             int baseVertex = DrawCommands[meshID].BaseVertex;
-            int nextBaseVertex = (meshID + 1 == DrawCommands.Length) ? VertexPositions.Length : DrawCommands[meshID + 1].BaseVertex;
+            int nextBaseVertex = meshID + 1 == DrawCommands.Length ? VertexPositions.Length : DrawCommands[meshID + 1].BaseVertex;
             return nextBaseVertex - baseVertex;
         }
 

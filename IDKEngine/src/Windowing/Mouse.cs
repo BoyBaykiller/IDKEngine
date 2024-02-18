@@ -1,11 +1,11 @@
 ﻿using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
-namespace IDKEngine
+namespace IDKEngine.Windowing
 {
     unsafe class Mouse
     {
-        private enum ScrollUpdateState : int
+        private enum ScrollState : int
         {
             Unchanged,
             Changed,
@@ -42,17 +42,17 @@ namespace IDKEngine
         public double ScrollX { get; private set; }
         public double ScrollY { get; private set; }
 
-        public InputState this[MouseButton button]
+        public Keyboard.InputState this[MouseButton button]
         {
             get => buttonStates[(int)button];
         }
 
         private readonly Window* window;
-        private readonly InputState[] buttonStates;
+        private readonly Keyboard.InputState[] buttonStates;
         public Mouse(Window* window)
         {
             this.window = window;
-            buttonStates = new InputState[8];
+            buttonStates = new Keyboard.InputState[8];
 
             windowScrollFuncPtr = WindowScrollCallback;
             GLFW.SetScrollCallback(window, windowScrollFuncPtr);
@@ -61,33 +61,33 @@ namespace IDKEngine
             Position = new Vector2((float)x, (float)y);
         }
 
-        private ScrollUpdateState scrollUpdateState = ScrollUpdateState.Unchanged;
+        private ScrollState scrollUpdateState = ScrollState.Unchanged;
         public unsafe void Update()
         {
             for (int i = 0; i < buttonStates.Length; i++)
             {
                 InputAction action = GLFW.GetMouseButton(window, (MouseButton)i);
-                if (action == InputAction.Press && buttonStates[i] == InputState.Released)
+                if (action == InputAction.Press && buttonStates[i] == Keyboard.InputState.Released)
                 {
-                    buttonStates[i] = InputState.Touched;
+                    buttonStates[i] = Keyboard.InputState.Touched;
                 }
                 else
                 {
-                    buttonStates[i] = (InputState)action;
+                    buttonStates[i] = (Keyboard.InputState)action;
                 }
             }
             GLFW.GetCursorPos(window, out double x, out double y);
             Position = new Vector2((float)x, (float)y);
 
-            if (scrollUpdateState == ScrollUpdateState.Unchanged)
+            if (scrollUpdateState == ScrollState.Unchanged)
             {
                 ScrollX = 0.0;
                 ScrollY = 0.0;
             }
 
-            if (scrollUpdateState == ScrollUpdateState.Changed)
+            if (scrollUpdateState == ScrollState.Changed)
             {
-                scrollUpdateState = ScrollUpdateState.Unchanged;
+                scrollUpdateState = ScrollState.Unchanged;
             }
         }
 
@@ -96,7 +96,7 @@ namespace IDKEngine
         {
             ScrollX += x;
             ScrollX += y;
-            scrollUpdateState = ScrollUpdateState.Changed;
+            scrollUpdateState = ScrollState.Changed;
         }
     }
 }

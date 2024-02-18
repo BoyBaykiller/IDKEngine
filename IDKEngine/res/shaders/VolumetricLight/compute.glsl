@@ -8,6 +8,7 @@ AppInclude(include/Transformations.glsl)
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
+layout(binding = 1) restrict writeonly uniform image2D ImgResultDepth;
 
 struct Light
 {
@@ -105,7 +106,8 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec3 ndc = vec3(uv * 2.0 - 1.0, texture(gBufferDataUBO.Depth, uv).r);
+    float depth = texture(gBufferDataUBO.Depth, uv).r;
+    vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), basicDataUBO.InvProjView);
     vec3 viewToFrag = unjitteredFragPos - basicDataUBO.ViewPos;
 
@@ -134,6 +136,7 @@ void main()
     }
 
     imageStore(ImgResult, imgCoord, vec4(scattered * Strength, 1.0));
+    imageStore(ImgResultDepth, imgCoord, vec4(depth));
 }
 
 vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep)

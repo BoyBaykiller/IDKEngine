@@ -2,7 +2,7 @@
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
-namespace IDKEngine
+namespace IDKEngine.Windowing
 {
     abstract unsafe class GameWindowBase : IDisposable
     {

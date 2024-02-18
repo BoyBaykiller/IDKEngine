@@ -8,7 +8,7 @@ namespace IDKEngine
     public class BLAS
     {
         public const float TRIANGLE_INTERSECT_COST = 1.1f;
-        public const float NODE_INTERSECT_COST = 1.0f; // Keep it 1 so we effectively only have TRIANGLE_INTERSECT_COST as a paramater
+        public const float NODE_INTERSECT_COST = 1.0f;
 
         public const int SAH_SAMPLES = 8;
 

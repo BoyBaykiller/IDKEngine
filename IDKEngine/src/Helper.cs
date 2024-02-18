@@ -286,19 +286,22 @@ namespace IDKEngine
             return initialValue;
         }
 
-        private static readonly Random rng = new Random();
-        public static Vector3 RandomVec3(float min, float max)
+        private static readonly Random globalRng = new Random();
+        public static Vector3 RandomVec3(float min, float max, Random generator = null)
         {
+            Random rng = generator == null ? globalRng : generator;
             return new Vector3(min) + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
         }
 
-        public static Vector3 RandomVec3(in Vector3 min, in Vector3 max)
+        public static Vector3 RandomVec3(in Vector3 min, in Vector3 max, Random generator = null)
         {
+            Random rng = generator == null ? globalRng : generator;
             return min + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
         }
 
-        public static float RandomFloat(float min, float max)
+        public static float RandomFloat(float min, float max, Random generator = null)
         {
+            Random rng = generator == null ? globalRng : generator;
             return min + rng.NextSingle() * (max - min);
         }
 

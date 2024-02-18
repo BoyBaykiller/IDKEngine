@@ -15,7 +15,7 @@ namespace IDKEngine.Render
             set
             {
                 _samples = value;
-                shaderProgram.Upload("Samples", _samples);
+                volumetricLightingProgram.Upload("Samples", _samples);
             }
         }
 
@@ -27,7 +27,7 @@ namespace IDKEngine.Render
             set
             {
                 _scattering = value;
-                shaderProgram.Upload("Scattering", _scattering);
+                volumetricLightingProgram.Upload("Scattering", _scattering);
             }
         }
 
@@ -39,7 +39,7 @@ namespace IDKEngine.Render
             set
             {
                 _maxDist = value;
-                shaderProgram.Upload("MaxDist", _maxDist);
+                volumetricLightingProgram.Upload("MaxDist", _maxDist);
             }
         }
 
@@ -51,7 +51,7 @@ namespace IDKEngine.Render
             set
             {
                 _absorbance = value;
-                shaderProgram.Upload("Absorbance", _absorbance);
+                volumetricLightingProgram.Upload("Absorbance", _absorbance);
             }
         }
 
@@ -63,16 +63,37 @@ namespace IDKEngine.Render
             set
             {
                 _strength = value;
-                shaderProgram.Upload("Strength", _strength);
+                volumetricLightingProgram.Upload("Strength", _strength);
+            }
+        }
+
+        public Vector2i RenderResolution { get; private set; }
+        public Vector2i PresentationResolution { get; private set; }
+
+        private float _resolutionScale;
+        public float ResolutionScale
+        {
+            get => _resolutionScale;
+
+            set
+            {
+                _resolutionScale = value;
+                SetSize(PresentationResolution.X, PresentationResolution.Y);
             }
         }
 
         public Texture Result;
-        private readonly ShaderProgram shaderProgram;
-        public VolumetricLighting(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance)
-        {
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
+        private Texture depthTexture;
+        private Texture volumetricLightingTexture;
 
+        private readonly ShaderProgram volumetricLightingProgram;
+        private readonly ShaderProgram upscaleProgram;
+        public VolumetricLighting(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance, float resolutionScale = 0.6f)
+        {
+            volumetricLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
+            upscaleProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/Upscale/compute.glsl")));
+
+            _resolutionScale = resolutionScale;
             SetSize(width, height);
 
             Samples = samples;
@@ -84,26 +105,49 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, Result.SizedInternalFormat);
+            volumetricLightingTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, volumetricLightingTexture.SizedInternalFormat);
+            depthTexture.BindToImageUnit(1, 0, false, 0, TextureAccess.WriteOnly, depthTexture.SizedInternalFormat);
+            volumetricLightingProgram.Use();
+            GL.DispatchCompute((volumetricLightingTexture.Width + 8 - 1) / 8, (volumetricLightingTexture.Height + 8 - 1) / 8, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
 
-            shaderProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+            volumetricLightingTexture.BindToUnit(0);
+            depthTexture.BindToUnit(1);
+            upscaleProgram.Use();
+            GL.DispatchCompute((PresentationResolution.X + 8 - 1) / 8, (PresentationResolution.Y + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
         public void SetSize(int width, int height)
         {
+            PresentationResolution = new Vector2i(width, height);
+            RenderResolution = (Vector2i)((Vector2)PresentationResolution * ResolutionScale);
+
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+            Result.ImmutableAllocate(PresentationResolution.X, PresentationResolution.Y, 1, SizedInternalFormat.Rgba16f);
+
+            if (volumetricLightingTexture != null) volumetricLightingTexture.Dispose();
+            volumetricLightingTexture = new Texture(TextureTarget2d.Texture2D);
+            volumetricLightingTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            volumetricLightingTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            volumetricLightingTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, SizedInternalFormat.Rgba16f);
+
+            if (depthTexture != null) depthTexture.Dispose();
+            depthTexture = new Texture(TextureTarget2d.Texture2D);
+            depthTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            depthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            depthTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, SizedInternalFormat.R32f);
         }
 
         public void Dispose()
         {
-            Result.Dispose();
-            shaderProgram.Dispose();
+            volumetricLightingTexture.Dispose();
+            volumetricLightingProgram.Dispose();
+            upscaleProgram.Dispose();
         }
     }
 }

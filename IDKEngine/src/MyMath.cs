@@ -44,7 +44,7 @@ namespace IDKEngine
             return pos;
         }
 
-        public static Vector3 Lerp(Vector3 x, Vector3 y, float a)
+        public static Vector3 Mix(Vector3 x, Vector3 y, float a)
         {
             float xC = MathHelper.Lerp(x.X, y.X, a);
             float yC = MathHelper.Lerp(x.Y, y.Y, a);

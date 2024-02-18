@@ -49,7 +49,7 @@ namespace IDKEngine.GpuTypes
 
         public bool DidMove()
         {
-            return prevModelMatrix3x4 != modelMatrix3x4;
+            return modelMatrix3x4 != prevModelMatrix3x4;
         }
 
         public static Matrix3x4 Mat4x4ToMat3x4Transposed(in Matrix4 model)
