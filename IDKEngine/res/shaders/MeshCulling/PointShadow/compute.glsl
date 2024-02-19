@@ -111,7 +111,8 @@ layout(std140, binding = 1) uniform ShadowDataUBO
 } shadowDataUBO;
 
 layout(location = 0) uniform int ShadowIndex;
-layout(location = 1) uniform int FaceIndex;
+layout(location = 1) uniform int NumVisibleFaces;
+layout(location = 2) uniform uint VisibleFaces;
 
 void main()
 {
@@ -127,29 +128,36 @@ void main()
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
     BlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeIndex];
 
-    mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex];
-    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
-
-    Frustum frustum = GetFrustum(projView * modelMatrix);
-    bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
-
-    if (isVisible)
+    for (int i = 0; i < NumVisibleFaces; i++)
     {
-    #if TAKE_MESH_SHADER_PATH
+        uint faceID = (VisibleFaces >> (i * 3)) & ((1u << 3) - 1);
 
-        uint meshletTaskID = atomicAdd(meshletTasksCountSSBO.Count, 1u);
-        visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskID] = meshInstanceID;
-        
-        const uint taskShaderWorkGroupSize = 32;
-        uint meshletCount = meshSSBO.Meshes[meshID].MeshletCount;
-        uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
-        meshletTaskCmdSSBO.TaskCommands[meshletTaskID].Count = meshletsWorkGroupCount;
+        mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceID];
+        mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
 
-    #else
+        Frustum frustum = GetFrustum(projView * modelMatrix);
+        bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
 
-        uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshID].InstanceCount, 1u);
-        visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceID;
+        uint faceAndMeshInstanceID = (faceID << 29) | meshInstanceID; // 3bits | 29bits
 
-    #endif
+        if (isVisible)
+        {
+        #if TAKE_MESH_SHADER_PATH
+
+            uint meshletTaskID = atomicAdd(meshletTasksCountSSBO.Count, 1u);
+            visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskID] = faceAndMeshInstanceID;
+            
+            const uint taskShaderWorkGroupSize = 32;
+            uint meshletCount = meshSSBO.Meshes[meshID].MeshletCount;
+            uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
+            meshletTaskCmdSSBO.TaskCommands[meshletTaskID].Count = meshletsWorkGroupCount;
+
+        #else
+
+            uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshID].InstanceCount, 1u);
+            visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance * 6 + index] = faceAndMeshInstanceID;
+
+        #endif
+        }
     }
 }

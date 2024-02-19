@@ -78,47 +78,41 @@ namespace IDKEngine.Render
             Span<Vector3> cameraFrustumVertices = stackalloc Vector3[8];
             MyMath.GetFrustumPoints(Matrix4.Invert(cameraProjView), cameraFrustumVertices);
 
-            for (int i = 0; i < 6; i++)
+            int numVisibleFaces = 0;
+            uint visibleFaces = 0;
+            for (uint i = 0; i < 6; i++)
             {
-                Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + i];
+                // We don't need to render a shadow face if it doesn't collide with the cameras frustum
+
+                Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + (int)i];
                 Frustum shadowFaceFrustum = new Frustum(faceMatrix);
                 Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
                 MyMath.GetFrustumPoints(Matrix4.Invert(faceMatrix), shadowFrustumVertices);
                 bool frustaIntersect = Intersections.ConvexSATIntersect(cameraFrustum, shadowFaceFrustum, cameraFrustumVertices, shadowFrustumVertices);
 
-                if (!frustaIntersect)
+                if (frustaIntersect)
                 {
-                    continue;
-                }
-
-                // Culling face i
-                {
-                    modelSystem.ResetInstancesBeforeCulling();
-
-                    cullingProgram.Use();
-                    cullingProgram.Upload(1, i);
-                    GL.DispatchCompute((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
-                    GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
-                }
-
-                // Rendering face i
-                {
-                    framebuffer.SetRenderTargetLayer(FramebufferAttachment.DepthAttachment, Result, i);
-
-                    renderProgram.Use();
-                    renderProgram.Upload(1, i);
-
-                    if (PointShadowManager.TAKE_MESH_SHADER_PATH)
-                    {
-                        modelSystem.MeshShaderDrawNV();
-                    }
-                    else
-                    {
-                        modelSystem.Draw();
-                    }
+                    visibleFaces |= (i << numVisibleFaces * 3);
+                    numVisibleFaces++;
                 }
             }
-            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
+            cullingProgram.Upload(1, numVisibleFaces);
+            cullingProgram.Upload(2, visibleFaces);
+
+            modelSystem.ResetInstancesBeforeCulling();
+            cullingProgram.Use();
+            GL.DispatchCompute((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
+
+            renderProgram.Use();
+            if (PointShadowManager.TAKE_MESH_SHADER_PATH)
+            {
+                modelSystem.MeshShaderDrawNV();
+            }
+            else
+            {
+                modelSystem.Draw();
+            }
         }
 
         private void UpdateViewMatrices()

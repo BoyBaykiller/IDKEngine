@@ -115,19 +115,21 @@ layout(std140, binding = 1) uniform ShadowDataUBO
 
 taskNV out InOutVars
 {
-    // interstingly this needs to be passed down, otherwise we get subtle bugs
-    uint MeshID;
+    uint MeshID; // interestingly this needs to be passed down, otherwise we get subtle bugs
     uint InstanceID;
+    uint8_t FaceID;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
 } outData;
 
 layout(location = 0) uniform int ShadowIndex;
-layout(location = 1) uniform int FaceIndex;
 
 void main()
 {
-    uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_DrawID];
+    uint faceAndMeshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_DrawID];
+    uint8_t faceID = uint8_t(faceAndMeshInstanceID >> 29);
+    uint meshInstanceID = faceAndMeshInstanceID & ((1u << 29) - 1);
+
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
 
     uint meshID = meshInstance.MeshIndex;
@@ -145,7 +147,7 @@ void main()
     DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
     MeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
     
-    mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex];
+    mat4 projView = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceID];
     mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceID].ModelMatrix);
 
     Frustum frustum = GetFrustum(projView * modelMatrix);
@@ -162,6 +164,7 @@ void main()
     {
         outData.MeshID = meshID;
         outData.InstanceID = meshInstanceID;
+        outData.FaceID = faceID;
         outData.MeshletsStart = workgroupFirstMeshlet;
         
         uint survivingCount = subgroupBallotBitCount(visibleMeshletsBitmask);

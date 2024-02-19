@@ -255,7 +255,7 @@ namespace IDKEngine
                 {
                     if (MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
                     {
-                        Vector3 force = Camera.ViewDir * 900.0f;
+                        Vector3 force = Camera.ViewDir * 6.0f / dT;
 
                         CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, Helper.RandomVec3(6.0f, 10.0f), 0.3f);
                         newLight.Velocity = Camera.Velocity;
@@ -269,6 +269,7 @@ namespace IDKEngine
                             PointShadow pointShadow = new PointShadow(256, new Vector2(newLight.GpuLight.Radius, 60.0f));
                             LightManager.CreatePointShadowForLight(pointShadow, newLightIndex);
                         }
+
                     }
 
                     Camera.ProcessInputs(KeyboardState, MouseState);
@@ -466,7 +467,7 @@ namespace IDKEngine
                     LightManager.CreatePointShadowForLight(pointShadow, i);
                 }
 
-                //for (int i = 0; i < 12; i++)
+                //for (int i = 0; i < 128; i++)
                 //{
                 //    CpuLight light = new CpuLight(0.3f);
                 //    light.GpuLight.Position.X = Helper.RandomFloat(-13.0f, 13.0f);
@@ -475,8 +476,8 @@ namespace IDKEngine
 
                 //    LightManager.AddLight(light);
 
-                //    //PointShadow pointShadow = new PointShadow(256, light.GpuLight.Radius, 60.0f);
-                //    //LightManager.CreatePointShadowForLight(pointShadow, i);
+                //    PointShadow pointShadow = new PointShadow(256, new Vector2(light.GpuLight.Radius, 60.0f));
+                //    LightManager.CreatePointShadowForLight(pointShadow, i);
                 //}
 
                 //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.6f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)

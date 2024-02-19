@@ -51,7 +51,7 @@ namespace IDKEngine
         // Projection Params
         public Vector2i ProjectionSize;
         public float NearPlane = 0.1f;
-        public float FarPlane = 500.0f;
+        public float FarPlane = 250.0f;
         public float FovY = MathHelper.DegreesToRadians(102.0f);
 
         public Camera(Vector2i size, Vector3 position, float lookX = -90.0f, float lookY = 0.0f)

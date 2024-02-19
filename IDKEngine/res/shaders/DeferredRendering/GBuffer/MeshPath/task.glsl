@@ -122,8 +122,7 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 
 taskNV out InOutVars
 {
-    // interstingly this needs to be passed down, otherwise we get subtle bugs
-    uint MeshID;
+    uint MeshID; // interestingly this needs to be passed down, otherwise we get subtle bugs
     uint InstanceID;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
