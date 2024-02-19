@@ -18,7 +18,7 @@ Feature list:
  - glTF loader supporting various extensions
  - Camera capture and playback with video output
 
-Required OpenGL: 4.6 + `ARB_bindless_texture`
+Required OpenGL: 4.6 + `ARB_bindless_texture` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
 
 Note: Crashes on AMD drivers newer than 23.12.1 for unknown reason. 
 
@@ -279,13 +279,12 @@ layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
 const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
 shared float Average[TILE_SIZE * TILE_SIZE];
-void main()
-{
+
+void main() {
     Average[gl_LocalInvocationIndex] = GetSpeed() * AVG_MULTIPLIER;
-    for (int cutoff = (TILE_SIZE * TILE_SIZE) / 2; cutoff > 0; cutoff /= 2)
-    {
-        if (gl_LocalInvocationIndex < cutoff)
-        {
+
+    for (int cutoff = (TILE_SIZE * TILE_SIZE) / 2; cutoff > 0; cutoff /= 2) {
+        if (gl_LocalInvocationIndex < cutoff) {
             Average[gl_LocalInvocationIndex] += Average[cutoff + gl_LocalInvocationIndex];
         }
         barrier();
@@ -323,15 +322,13 @@ layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
 const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
 
-void main()
-{
+void main() {
     float pixelLuminance = GetLuminance();
 
     float tileAvgLuminance = ParallelSum(pixelLuminance * AVG_MULTIPLIER);
     float tileLuminanceVariance = ParallelSum(pow(pixelLuminance - tileAvgLuminance, 2.0) * AVG_MULTIPLIER);
 
-    if (gl_LocalInvocationIndex == 0)
-    {
+    if (gl_LocalInvocationIndex == 0) {
         float stdDev = sqrt(tileLuminanceVariance);
         float coeffOfVariation = stdDev / tileAvgLuminance;
 
@@ -361,23 +358,19 @@ Using this knowledge, my optimized version of a workgroup wide sum looks like th
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 shared float SharedSums[gl_WorkGroupSize.x / SUBGROUP_SIZE];
-void main()
-{
+void main() {
     float subgroupSum = subgroupAdd(GetValueToAdd());
 
     // single invocation of the subgroup should write result
     // into shared mem for further workgroup wide processing
-    if (subgroupElect())
-    {
+    if (subgroupElect()) {
         SharedSums[gl_SubgroupID] = subgroupSum;
     }
     barrier();
 
     // finally add up all sums previously computed by the subgroups in this workgroup
-    for (int cutoff = gl_NumSubgroups / 2; cutoff > 0; cutoff /= 2)
-    {
-        if (gl_LocalInvocationIndex < cutoff)
-        {
+    for (int cutoff = gl_NumSubgroups / 2; cutoff > 0; cutoff /= 2) {
+        if (gl_LocalInvocationIndex < cutoff) {
             SharedSums[gl_LocalInvocationIndex] += SharedSums[cutoff + gl_LocalInvocationIndex];
         }
         barrier();
@@ -393,27 +386,22 @@ However in the for loop it now only has to iterate through `log2(gl_NumSubgroups
 
 ### 1.0 Rendering
 
-In core OpenGL geometry shaders are the only stage where you can write to `gl_Layer`. This variable specifies which layer of the framebuffer attachment to render to.
-There is a common approach to point shadow rendering where
-instead of: 
+In core OpenGL, geometry shaders are the only stage where you can write to `gl_Layer`. This variable specifies which layer of the framebuffer attachment to render to.
+There is a common approach to point shadow rendering where instead of: 
 ```cs
-for (int face = 0; face < 6; face++)
-{
+for (int face = 0; face < 6; face++) {
     NamedFramebufferTextureLayer(fbo, attachment, cubemap, level, face);
     // Render Scene into <face>th face of cubemap
     RenderScene();
 }
 ```
 you do:
-
 ```cs
 RenderScene();
 ```
 ```glsl
-void main()
-{
-    for (int face = 0; face < 6; face++)
-    {
+void main() {
+    for (int face = 0; face < 6; face++) {
         gl_Layer = face;
         OutputTriangle();
     }
@@ -421,23 +409,17 @@ void main()
 ```
 Notice how instead of calling `NamedFramebufferTextureLayer` from the CPU we set `gl_Layer` inside a geometry shader saving us 5 draw calls and driver overhead.
 
-So this should be faster right?
-
-No. At least not on my RX 580 and RX 5700 XT. And I assume its not much different on NVIDIA since geometry shaders are slow except on Intel.
-
-There are multiple extensions which allow you to set `gl_Layer` from a vertex shader.
-`ARB_shader_viewport_layer_array` for example reads:
+So this should be faster right? - No. Geometry shaders are known to have a huge performance penalty on both AMD and NVIDIA. I don't have any measurements now, but I implemented both and simply doing 6 draw calls was way faster than the geometry shader method on RX 5700 XT. However we can do better. There are multiple extensions which allow you to set `gl_Layer` from the vertex shader!
+[`ARB_shader_viewport_layer_array`](https://registry.khronos.org/OpenGL/extensions/ARB/ARB_shader_viewport_layer_array.txt) for example reads:
 > In order to use any viewport or attachment layer other than zero, a
-> geometry shader must be present. Geometry shaders introduce processing
-> overhead and potential performance issues. The `AMD_vertex_shader_layer`
-> and `AMD_vertex_shader_viewport_index` extensions allowed the `gl_Layer`
-> and `gl_ViewportIndex` outputs to be written directly from the vertex shader
+> geometry shader must be present. **Geometry shaders introduce processing
+> overhead and potential performance issues**. The AMD_vertex_shader_layer
+> and AMD_vertex_shader_viewport_index extensions allowed the **gl_Layer**
+> and gl_ViewportIndex outputs to be written directly from the vertex shader
 > with no geometry shader present.
 > This extension effectively merges ...
 
-So what I ended up doing is either use vertex layered rendering if any of the required extensions is available and otherwise just do 6 draw calls without invoking any geometry shader since that is slower.
-
-The way you might do vertex layered rendering looks like this:
+Using any of these extensions, the way you do single-draw-call point shadow rendering might look like this:
 ```cs
 RenderSceneInstanced(count: 6);
 ```
@@ -446,10 +428,9 @@ RenderSceneInstanced(count: 6);
 #extension GL_ARB_shader_viewport_layer_array : enable
 #extension GL_AMD_vertex_shader_layer : enable
 #extension GL_NV_viewport_array2 : enable
-#define HAS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_NV_viewport_array2 || GL_AMD_vertex_shader_layer)
+#define HAS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array2)
 
-void main()
-{
+void main() {
 #if HAS_VERTEX_LAYERED_RENDERING
     gl_Layer = gl_InstanceID;
     gl_Position = PointShadow.FaceMatrices[gl_Layer] * Positon;
@@ -458,7 +439,8 @@ void main()
 #endif
 }
 ```
-Since vertex shaders can't generate vertices like geometry shader we'll use a instanced draw command to tell OpenGL to render every vertex 6 times. Inside the shader we can then use the current instance (`gl_InstanceID`) as the face to render to.
+Since vertex shaders can't generate vertices like geometry shaders, instanced rendering is used to tell OpenGL to render every vertex 6 times (once for each face). Inside the shader we can then use `gl_InstanceID` as the face to render to.
+It gets a bit more complicated when you also support actual instancing or culling, but the idea stays the same.
 
 ### 2.0 Sampling
 
@@ -477,8 +459,7 @@ And sample it in glsl like that:
 ```glsl
 layout(binding = 0) uniform samplerCubeShadow ShadowTexture;
 
-void main()
-{
+void main() {
     float fragDepth = GetDepthRange0_1(); 
     float visibility = texture(ShadowTexture, vec3(coords, fragDepth));
 }
@@ -545,13 +526,11 @@ GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0, buffer);
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
-layout(std430, binding = 0) restrict readonly buffer TextureSSBO
-{
+layout(std430, binding = 0) restrict readonly buffer TextureSSBO {
     sampler2D Textures[];
 } textureSSBO;
 
-void main()
-{
+void main() {
     sampler2D myTexture = textureSSBO.Textures[0];
     vec4 color = texture(myTexture, coords);
 }
@@ -567,18 +546,15 @@ the process of fetching each mesh's texture would look something like this:
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
-layout(std430, binding = 0) restrict readonly buffer MaterialSSBO
-{
+layout(std430, binding = 0) restrict readonly buffer MaterialSSBO {
     Material Materials[];
 } materialSSBO;
 
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
+layout(std430, binding = 1) restrict readonly buffer MeshSSBO {
     Mesh Meshes[];
 } meshSSBO;
 
-void main()
-{
+void main() {
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     Material material = materialSSBO.Materials[mesh.MaterialIndex];
 
@@ -593,7 +569,7 @@ There is one caveat (not exclusive to bindless textures), which is that they mus
 ### 3.0 Frustum Culling
 
 Frustum culling is the process of identifying objects outside a camera frustum and then avoiding unnecessary computations for them.
-I find the following implementation to be quite elegant and low overhead because it fits perfectly into the whole GPU driven rendering thing.
+The following implementation fits perfectly into the whole GPU driven rendering thing.
 
 The ingredients needed to get started are:
 - A projection + view matrix
@@ -633,8 +609,7 @@ Let's get to the culling shader:
 #version 460 core
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-struct DrawElementsCmd
-{
+struct DrawElementsCmd {
     uint Count;
     uint InstanceCount;
     uint FirstIndex;
@@ -642,13 +617,11 @@ struct DrawElementsCmd
     uint BaseInstance;
 };
 
-layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO
-{
+layout(std430, binding = 0) restrict writeonly buffer DrawCommandsSSBO {
     DrawCommand DrawCommands[];
 } drawCommandSSBO;
 
-void main()
-{
+void main() {
     uint meshIndex = gl_GlobalInvocationID.x;
     if (meshIndex >= meshSSBO.Meshes.length())
         return;

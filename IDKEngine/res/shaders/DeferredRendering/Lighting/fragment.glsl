@@ -314,6 +314,7 @@ vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, 
     return vec3(0.0);
 }
 
+// TODO: Use better sampling method in general
 // Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
 const vec3 ShadowSampleOffsets[] =
 {

@@ -97,12 +97,12 @@ taskNV in InOutVars
 {
     uint MeshID;
     uint InstanceID;
+    uint8_t FaceID;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[32];
 } inData;
 
 layout(location = 0) uniform int ShadowIndex;
-layout(location = 1) uniform int FaceIndex;
 
 void main()
 {
@@ -126,7 +126,7 @@ void main()
 
         mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
         vec3 fragPos = vec3(modelMatrix * vec4(position, 1.0));
-        vec4 clipPos = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex] * vec4(fragPos, 1.0);
+        vec4 clipPos = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[inData.FaceID] * vec4(fragPos, 1.0);
 
         gl_MeshVerticesNV[meshletVertexID].gl_Position = clipPos;
     }
@@ -140,6 +140,14 @@ void main()
 
         uint indices4 = meshletLocalIndicesSSBO.PackedIndices[meshlet.IndicesOffset / 4 + packedIndicesID];
         writePackedPrimitiveIndices4x8NV(indicesID, indices4);
+    }
+
+    const uint trianglesPerInvocationRounded = (MESHLET_MAX_TRIANGLE_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
+    for (int i = 0; i < trianglesPerInvocationRounded; i++)
+    {
+        uint8_t meshletTriangleID = uint8_t(min(gl_LocalInvocationIndex + i * gl_WorkGroupSize.x, meshlet.TriangleCount - 1u));
+
+        gl_MeshPrimitivesNV[meshletTriangleID].gl_Layer = int(inData.FaceID);
     }
 
     if (gl_LocalInvocationIndex == 0)

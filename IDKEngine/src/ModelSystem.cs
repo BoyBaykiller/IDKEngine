@@ -171,7 +171,7 @@ namespace IDKEngine
         {
             vao.Bind();
             drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, nint.Zero, Meshes.Length, sizeof(GpuDrawElementsCmd));
+            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, sizeof(GpuDrawElementsCmd));
         }
 
         /// <summary>
@@ -182,7 +182,7 @@ namespace IDKEngine
             meshletTasksCmdsBuffer.Bind(BufferTarget.DrawIndirectBuffer);
             meshletTasksCountBuffer.Bind(BufferTarget.ParameterBuffer);
             int maxMeshlets = meshletTasksCmdsBuffer.GetNumElements();
-            GL.NV.MultiDrawMeshTasksIndirectCount(nint.Zero, nint.Zero, maxMeshlets, sizeof(GpuMeshletTaskCmd));
+            GL.NV.MultiDrawMeshTasksIndirectCount(IntPtr.Zero, IntPtr.Zero, maxMeshlets, sizeof(GpuMeshletTaskCmd));
         }
 
         public void Update(out bool anyMeshInstanceMoved)
@@ -226,12 +226,10 @@ namespace IDKEngine
 
         public void ResetInstancesBeforeCulling()
         {
-            uint bufferInstanceCount = 0;
-
             // for vertex rendering path
             for (int i = 0; i < DrawCommands.Length; i++)
             {
-                DrawCommands[i].InstanceCount = (int)bufferInstanceCount;
+                DrawCommands[i].InstanceCount = 0;
             }
             UpdateDrawCommandBuffer(0, DrawCommands.Length);
             for (int i = 0; i < DrawCommands.Length; i++)
@@ -241,7 +239,7 @@ namespace IDKEngine
             }
 
             // for mesh-shader rendering path
-            meshletTasksCountBuffer.UploadElements(bufferInstanceCount);
+            meshletTasksCountBuffer.UploadElements(0);
         }
 
         public void ReuploadAllModelData()
@@ -249,14 +247,15 @@ namespace IDKEngine
             drawCommandBuffer.MutableAllocateElements(DrawCommands);
             meshBuffer.MutableAllocateElements(Meshes);
             meshInstanceBuffer.MutableAllocateElements(MeshInstances);
-            visibleMeshInstanceBuffer.MutableAllocateElements(MeshInstances.Length);
+            visibleMeshInstanceBuffer.MutableAllocateElements(MeshInstances.Length * 6); // * 6 for PointShadow cubemap culling
             materialBuffer.MutableAllocateElements(Materials);
 
             vertexBuffer.MutableAllocateElements(Vertices);
             vertexPositionBuffer.MutableAllocateElements(VertexPositions);
             vertexIndicesBuffer.MutableAllocateElements(VertexIndices);
 
-            meshletTasksCmdsBuffer.MutableAllocateElements(MeshletTasksCmds);
+            meshletTasksCmdsBuffer.MutableAllocateElements(MeshletTasksCmds.Length * 6); // * 6 for PointShadow cubemap culling
+            meshletTasksCmdsBuffer.UploadElements(MeshletTasksCmds);
             meshletTasksCountBuffer.MutableAllocateElements(1);
             meshletBuffer.MutableAllocateElements(Meshlets);
             meshletInfoBuffer.MutableAllocateElements(MeshletsInfo);

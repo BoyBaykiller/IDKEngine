@@ -118,7 +118,7 @@ out InOutVars
     vec3 Normal;
     vec3 Tangent;
     perprimitiveNV uint MeshID;
-} outData[];
+} outData[MESHLET_MAX_VERTEX_COUNT];
 
 taskNV in InOutVars
 {
@@ -171,14 +171,6 @@ void main()
         gl_MeshVerticesNV[meshletVertexID].gl_Position = jitteredClipPos;
     }
 
-    const uint trianglesPerInvocationRounded = (MESHLET_MAX_TRIANGLE_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
-    for (int i = 0; i < trianglesPerInvocationRounded; i++)
-    {
-        uint8_t meshletTriangleID = uint8_t(min(gl_LocalInvocationIndex + i * gl_WorkGroupSize.x, meshlet.TriangleCount - 1u));
-
-        outData[meshletTriangleID].MeshID = meshID;
-    }
-
     const uint meshletMaxPackedIndices = MESHLET_MAX_TRIANGLE_COUNT * 3 / 4;
     const uint packedIndicesPerInvocationRounded = (meshletMaxPackedIndices + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
     for (int i = 0; i < packedIndicesPerInvocationRounded; i++)
@@ -188,6 +180,14 @@ void main()
 
         uint indices4 = meshletLocalIndicesSSBO.PackedIndices[meshlet.IndicesOffset / 4 + packedIndicesID];
         writePackedPrimitiveIndices4x8NV(indicesID, indices4);
+    }
+
+    const uint trianglesPerInvocationRounded = (MESHLET_MAX_TRIANGLE_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
+    for (int i = 0; i < trianglesPerInvocationRounded; i++)
+    {
+        uint8_t meshletTriangleID = uint8_t(min(gl_LocalInvocationIndex + i * gl_WorkGroupSize.x, meshlet.TriangleCount - 1u));
+
+        outData[meshletTriangleID].MeshID = meshID;
     }
 
     if (gl_LocalInvocationIndex == 0)

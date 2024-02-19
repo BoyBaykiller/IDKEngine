@@ -1,5 +1,13 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
+#extension GL_ARB_shader_viewport_layer_array : enable
+#extension GL_AMD_vertex_shader_layer : enable
+#extension GL_NV_viewport_array2 : enable
+#define HAS_VERTEX_LAYERED_RENDERING (GL_ARB_shader_viewport_layer_array || GL_AMD_vertex_shader_layer || GL_NV_viewport_array2)
+
+#if !HAS_VERTEX_LAYERED_RENDERING
+#error "PointShadow vertex shader shader is missing extension support."
+#endif
 
 AppInclude(include/Constants.glsl)
 
@@ -45,12 +53,15 @@ layout(std140, binding = 1) uniform ShadowDataUBO
 } shadowDataUBO;
 
 layout(location = 0) uniform int ShadowIndex;
-layout(location = 1) uniform int FaceIndex;
 
 void main()
 {
-    uint meshInstaneID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
-    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstaneID].ModelMatrix);
+    uint faceAndMeshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance * 6];
+    uint faceID = faceAndMeshInstanceID >> 29;
+    uint meshInstanceID = faceAndMeshInstanceID & ((1u << 29) - 1);
+    
+    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceID].ModelMatrix);
     vec3 fragPos = vec3(modelMatrix * vec4(Position, 1.0));
-    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[FaceIndex] * vec4(fragPos, 1.0);
+    gl_Position = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceID] * vec4(fragPos, 1.0);
+    gl_Layer = int(faceID);
 }
