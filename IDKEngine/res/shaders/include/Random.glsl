@@ -10,10 +10,11 @@ void InitializeRandomSeed(uint value)
     Random_RNGSeed = value;
 }
 
-// Faster and much more random than Wang Hash
-// Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
 uint GetPCGHash(inout uint seed)
 {
+    // Faster and much more random than Wang Hash
+    // Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
+
     seed = seed * 747796405u + 2891336453u;
     uint word = ((seed >> ((seed >> 28u) + 4u)) ^ seed) * 277803737u;
     return (word >> 22u) ^ word;
@@ -24,9 +25,10 @@ float GetRandomFloat01()
     return float(GetPCGHash(Random_RNGSeed)) / 4294967296.0;
 }
 
-// Source: https://www.shadertoy.com/view/WsfBDf
 float InterleavedGradientNoise(vec2 imgCoord, uint index)
 {
+    // Source: https://www.shadertoy.com/view/WsfBDf
+    
     imgCoord += float(index) * 5.588238;
     return fract(52.9829189 * fract(0.06711056 * imgCoord.x + 0.00583715 * imgCoord.y));
 }
@@ -66,9 +68,10 @@ vec3 UniformSampleHemisphere(vec3 normal)
     return UniformSampleHemisphere(normal, GetRandomFloat01(), GetRandomFloat01());
 }
 
-// Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
 vec3 CosineSampleHemisphere(vec3 normal)
 {
+    // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
+    
     return normalize(normal + UniformSampleSphere());
 }
 
@@ -95,9 +98,10 @@ vec2 UniformSampleDisk()
     return UniformSampleDisk(GetRandomFloat01(), GetRandomFloat01());
 }
 
-// Source: https://github.com/LWJGL/lwjgl3-demos/blob/main/res/org/lwjgl/demo/opengl/raytracing/randomCommon.glsl#L14
 vec3 UniformSampleDisk(vec3 normal, float rnd0, float rnd1)
 {
+    // Source: https://github.com/LWJGL/lwjgl3-demos/blob/main/res/org/lwjgl/demo/opengl/raytracing/randomCommon.glsl#L14
+    
     vec2 diskSample = UniformSampleDisk(rnd0, rnd1);
 
     vec3 tangent = vec3(1.0, 0.0, 0.0);

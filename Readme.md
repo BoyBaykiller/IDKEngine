@@ -20,7 +20,7 @@ Feature list:
 
 Required OpenGL: 4.6 + `ARB_bindless_texture` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
 
-Note: Crashes on AMD drivers newer than 23.12.1 for unknown reason. 
+Note: Crashes on AMD drivers newer than 23.12.1 because of [driver bug](https://community.amd.com/t5/opengl-vulkan/opengl-bug-imagesize-causes-crash-when-using-gl-arb-bindless/m-p/668942#M5125)
 
 
 # Controls

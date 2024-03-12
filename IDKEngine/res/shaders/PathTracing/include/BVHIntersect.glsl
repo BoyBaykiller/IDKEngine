@@ -239,7 +239,7 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
             Light light = lightsUBO.Lights[i];
             if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
             {
-                hitInfo.T = tMin;
+                hitInfo.T = tMin < 0.0 ? tMax : tMin;
                 hitInfo.InstanceID = i;
             }
         }
@@ -356,7 +356,7 @@ bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDis
             Light light = lightsUBO.Lights[i];
             if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
             {
-                hitInfo.T = tMin;
+                hitInfo.T = tMin < 0.0 ? tMax : tMin;
                 hitInfo.InstanceID = i;
 
                 return true;

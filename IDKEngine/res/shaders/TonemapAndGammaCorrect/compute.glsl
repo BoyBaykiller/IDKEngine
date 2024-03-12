@@ -54,9 +54,10 @@ vec3 LinearToSrgb(vec3 rgb, float gamma)
     return pow(rgb, vec3(1.0 / gamma));
 }
 
-// Source: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 vec3 ACESFilm(vec3 x)
 {
+    // Source: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+    
     const float a = 2.51;
     const float b = 0.03;
     const float c = 2.43;

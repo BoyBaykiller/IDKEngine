@@ -25,7 +25,8 @@ uniform mat4 InvProjection;
 void main()
 {
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
-    vec2 ndc = vec2(imgCoord.xy) / imageSize(ImgResult) * 2.0 - 1.0;
+    vec2 uv = (imgCoord.xy + 0.5) / imageSize(ImgResult);
+    vec2 ndc = uv * 2.0 - 1.0;
     
     vec3 toCubemap = GetWorldSpaceDirection(InvProjection, InvViews[imgCoord.z], ndc);
 

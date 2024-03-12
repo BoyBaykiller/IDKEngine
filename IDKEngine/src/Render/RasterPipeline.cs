@@ -164,11 +164,11 @@ namespace IDKEngine.Render
         private GpuGBuffer gpuGBufferData;
 
         private int frameIndex;
-        public unsafe RasterPipeline(int width, int height, int renderPresentationWidth, int renderPresentationHeight)
+        public RasterPipeline(int width, int height, int renderPresentationWidth, int renderPresentationHeight)
         {
             LightingVRS = new LightingShadingRateClassifier(width, height, 0.025f, 0.2f);
 
-            SSAO = new SSAO(width, height, 10, 0.1f, 2.0f);
+            SSAO = new SSAO(width, height, 10, 0.2f, 1.3f);
             SSR = new SSR(width, height, 30, 8, 50.0f);
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
             ConeTracer = new ConeTracer(width, height);
@@ -176,21 +176,21 @@ namespace IDKEngine.Render
             if (TAKE_MESH_SHADER_PATH)
             {
                 gBufferProgram = new ShaderProgram(
-                    new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/MeshPath/task.glsl")),
-                    new Shader((ShaderType)NvMeshShader.MeshShaderNv, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/MeshPath/mesh.glsl")),
-                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/fragment.glsl")));
+                    new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/GBuffer/MeshPath/task.glsl")),
+                    new Shader((ShaderType)NvMeshShader.MeshShaderNv, File.ReadAllText("res/shaders/GBuffer/MeshPath/mesh.glsl")),
+                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/GBuffer/fragment.glsl")));
             }
             else
             {
                 gBufferProgram = new ShaderProgram(
-                    new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/VertexPath/vertex.glsl")),
-                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/GBuffer/fragment.glsl")));
+                    new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/GBuffer/VertexPath/vertex.glsl")),
+                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/GBuffer/fragment.glsl")));
             }
 
 
             lightingProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredRendering/Lighting/fragment.glsl")));
+                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredLighting/fragment.glsl")));
 
             skyBoxProgram = new ShaderProgram(
                 new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/SkyBox/vertex.glsl")),
@@ -424,7 +424,7 @@ namespace IDKEngine.Render
             }
             else if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
             {
-                FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, resultBeforeTAA, DepthTexture, VelocityTexture, dT * 1000.0f, camera.NearPlane, camera.FarPlane, camera.FovY);
+                FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, resultBeforeTAA, DepthTexture, VelocityTexture, camera, dT * 1000.0f);
 
                 // TODO: This is a hack to fix global UBO bindings modified by FSR2
                 taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);

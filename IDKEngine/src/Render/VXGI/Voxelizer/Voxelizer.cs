@@ -268,7 +268,7 @@ namespace IDKEngine.Render
                     if (intermediateResultRbg[i] != null) intermediateResultRbg[i].Dispose();
                     intermediateResultRbg[i] = new Texture(TextureTarget3d.Texture3D);
                     intermediateResultRbg[i].SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, SizedInternalFormat.R32ui);
+                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, SizedInternalFormat.R32f);
                 }
             }
 

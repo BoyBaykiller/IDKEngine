@@ -142,14 +142,16 @@ namespace IDKEngine
             PrevPosition = Position;
         }
 
+        public void AddImpulse(Vector3 impulse)
+        {
+            Velocity += impulse / MASS;
+        }
+
         public void AddForce(Vector3 force)
         {
             // f = m * a; a = f/m
             thisFrameAcceleration += force / MASS;
         }
-        public void AddForceX(float force) => thisFrameAcceleration.X += force / MASS;
-        public void AddForceY(float force) => thisFrameAcceleration.Y += force / MASS;
-        public void AddForceZ(float force) => thisFrameAcceleration.Z += force / MASS;
 
         public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
         {

@@ -1,13 +1,21 @@
 ﻿using System;
+using OpenTK.Graphics.ES11;
 using OpenTK.Mathematics;
 
 namespace IDKEngine.Shapes
 {
     public static class Intersections
     {
-        // Source: https://github.com/efryscok/OpenGL-Basic-Collision-Detection/blob/master/Project1_efryscok/TheMain.cpp#L276
+        public static Vector3 ClosestPointOnLineSegment(in Vector3 a, in Vector3 b, in Vector3 point)
+        {
+            Vector3 ab = b - a;
+            float t = Vector3.Dot(point - a, ab) / Vector3.Dot(ab, ab);
+            return a + Math.Clamp(t, 0.0f, 1.0f) * ab;
+        }
         public static Vector3 TriangleClosestPoint(in Triangle triangle, in Vector3 point)
         {
+            // Source: https://github.com/efryscok/OpenGL-Basic-Collision-Detection/blob/master/Project1_efryscok/TheMain.cpp#L276
+
             // Check if P in vertex region outside A
             Vector3 ab = triangle.P1 - triangle.P0;
             Vector3 ac = triangle.P2 - triangle.P0;
@@ -62,26 +70,30 @@ namespace IDKEngine.Shapes
             }
         }
 
-        public static bool SphereVsTriangle(in Sphere sphere, in Triangle triangle, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth)
+        public static bool SphereVsSphere(in Sphere sphereA, in Sphere sphereB, out float distance, out float penetrationDepth)
         {
-            closestPointOnTri = TriangleClosestPoint(triangle, sphere.Center);
-            distance = Vector3.Distance(closestPointOnTri, sphere.Center);
-            penetrationDepth = sphere.Radius - distance;
+            distance = Vector3.Distance(sphereA.Center, sphereB.Center);
+            if (distance < sphereA.Radius)
+            {
+                // sphereB is in sphereA
 
-            return penetrationDepth > 0.0f;
+                float distToShell = sphereA.Radius - distance;
+                penetrationDepth = sphereB.Radius - distToShell;
+                return penetrationDepth > 0.0f;
+            }
+            else
+            {
+                // sphereB is outside sphereA
+
+                float distToShell = distance - sphereA.Radius;
+                penetrationDepth = sphereB.Radius - distToShell;
+                return penetrationDepth > 0.0f;
+            }
         }
-
-        public static bool SphereVsTriangle(in Sphere sphere, in Triangle triangle)
-        {
-            Vector3 triangleClosestPoint = TriangleClosestPoint(triangle, sphere.Center);
-            float distSquared = Vector3.DistanceSquared(triangleClosestPoint, sphere.Center);
-
-            return distSquared < sphere.RadiusSquared;
-        }
-
-        // Source: https://stackoverflow.com/a/4579069/12103839
         public static bool SphereVsBox(in Sphere sphere, in Vector3 c1, in Vector3 c2)
         {
+            // Source: https://stackoverflow.com/a/4579069/12103839
+
             float distSquared = Squared(sphere.Radius);
             if (sphere.Center.X < c1.X) distSquared -= Squared(sphere.Center.X - c1.X);
             else if (sphere.Center.X > c2.X) distSquared -= Squared(sphere.Center.X - c2.X);
@@ -96,6 +108,22 @@ namespace IDKEngine.Shapes
                 return x * x;
             }
         }        
+        public static bool SphereVsTriangle(in Sphere sphere, in Triangle triangle, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth)
+        {
+            closestPointOnTri = TriangleClosestPoint(triangle, sphere.Center);
+            distance = Vector3.Distance(closestPointOnTri, sphere.Center);
+            penetrationDepth = sphere.Radius - distance;
+
+            return penetrationDepth > 0.0f;
+        }
+        public static bool SphereVsTriangle(in Sphere sphere, in Triangle triangle)
+        {
+            Vector3 triangleClosestPoint = TriangleClosestPoint(triangle, sphere.Center);
+            float distSquared = Vector3.DistanceSquared(triangleClosestPoint, sphere.Center);
+
+            return distSquared < sphere.RadiusSquared;
+        }
+
 
         public static bool BoxVsBox(in Box a, in Box b)
         {
@@ -107,10 +135,10 @@ namespace IDKEngine.Shapes
                    a.Max.Y > b.Min.Y &&
                    a.Max.Z > b.Min.Z;
         }
-        
-        // Source: "Real-Time Collision Detection" by Christer Ericson, page 169
         public static bool BoxVsTriangle(in Box box, in Triangle triangle)
         {
+            // Source: "Real-Time Collision Detection" by Christer Ericson, page 169
+
             // Translate triangle as conceptually moving Box to origin
             var v0 = (triangle.P0 - box.Center());
             var v1 = (triangle.P1 - box.Center());
@@ -275,11 +303,59 @@ namespace IDKEngine.Shapes
                 return MathF.Max(a, MathF.Max(b, c));
             }
         }
-
         
-        // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
+        public static bool RayVsSphere(in Ray ray, in Sphere sphere, out float t1, out float t2)
+        {
+            // Source: https://antongerdelan.net/opengl/raycasting.html
+
+            t1 = float.MaxValue;
+            t2 = float.MaxValue;
+
+            Vector3 sphereToRay = ray.Origin - sphere.Center;
+            const float a = 1.0f; // assume Vector3.Dot(ray.Direction, ray.Direction) == 1. (ray.Direction normalized) 
+            float b = Vector3.Dot(ray.Direction, sphereToRay);
+            float c = Vector3.Dot(sphereToRay, sphereToRay) - sphere.RadiusSquared;
+
+            // Exit if r’s origin outside s (c > 0) and r pointing away from s (b > 0) 
+            //if (c > 0.0f && b > 0.0f)
+            //{
+            //    return false;
+            //}
+
+            float discriminant = b * b - a * c;
+            if (discriminant < 0.0f)
+            {
+                return false;
+            }
+
+            float squareRoot = MathF.Sqrt(discriminant);
+            t1 = (-b - squareRoot) / a;
+            t2 = (-b + squareRoot) / a;
+
+            return t1 <= t2 && t2 > 0.0f;
+        }
+        public static bool RayVsBox(in Ray ray, in Box box, out float t1, out float t2)
+        {
+            // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
+
+            t1 = float.MinValue;
+            t2 = float.MaxValue;
+
+            Vector3 t0s = (box.Min - ray.Origin) / ray.Direction;
+            Vector3 t1s = (box.Max - ray.Origin) / ray.Direction;
+
+            Vector3 tsmaller = Vector3.ComponentMin(t0s, t1s);
+            Vector3 tbigger = Vector3.ComponentMax(t0s, t1s);
+
+            t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, tsmaller.Z)));
+            t2 = MathF.Min(t2, MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z)));
+
+            return t1 <= t2 && t2 > 0.0f;
+        }
         public static bool RayVsTriangle(in Ray ray, in Triangle triangle, out Vector3 bary, out float t)
         {
+            // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
+
             Vector3 v1v0 = triangle.P1 - triangle.P0;
             Vector3 v2v0 = triangle.P2 - triangle.P0;
             Vector3 rov0 = ray.Origin - triangle.P0;
@@ -295,52 +371,27 @@ namespace IDKEngine.Shapes
 
             return bary.X >= 0.0f && bary.Y >= 0.0f && bary.Z >= 0.0f && t > 0.0f;
         }
-
-        // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
-        public static bool RayVsBox(in Ray ray, in Box box, out float t1, out float t2)
+        public static bool MovingSphereVsSphere(in Sphere sphereA, in Vector3 sphereAPrevPos, in Sphere sphereB, in Vector3 sphereBPrevPos, out float t1, out float t2, out float tScale)
         {
-            t1 = float.MinValue;
-            t2 = float.MaxValue;
+            t1 = 0.0f;
+            t2 = 0.0f;
+            tScale = 0.0f;
 
-            Vector3 t0s = (box.Min - ray.Origin) / ray.Direction;
-            Vector3 t1s = (box.Max - ray.Origin) / ray.Direction;
+            Vector3 lightRealVelocity = sphereA.Center - sphereAPrevPos;
+            Vector3 otherLightRealVelocity = sphereB.Center - sphereBPrevPos;
 
-            Vector3 tsmaller = Vector3.ComponentMin(t0s, t1s);
-            Vector3 tbigger = Vector3.ComponentMax(t0s, t1s);
-
-            t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, tsmaller.Z)));
-            t2 = MathF.Min(t2, MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z)));
-
-            return t1 <= t2 && t2 > 0.0f;
-        }
-
-        // Source: https://antongerdelan.net/opengl/raycasting.html
-        public static bool RayVsSphere(in Ray ray, in Sphere sphere, out float t1, out float t2)
-        {
-            t1 = float.MaxValue;
-            t2 = float.MaxValue;
-
-            Vector3 sphereToRay = ray.Origin - sphere.Center;
-            float b = Vector3.Dot(ray.Direction, sphereToRay);
-            float c = Vector3.Dot(sphereToRay, sphereToRay) - sphere.RadiusSquared;
-            float discriminant = b * b - c;
-            if (discriminant < 0.0f)
+            Vector3 path = lightRealVelocity - otherLightRealVelocity;
+            float squaredLen = Vector3.Dot(path, path);
+            if (squaredLen == 0.0f)
             {
                 return false;
             }
 
-            float squareRoot = MathF.Sqrt(discriminant);
-            t1 = -b - squareRoot;
-            t2 = -b + squareRoot;
+            tScale = MathF.Sqrt(squaredLen);
+            Ray ray = new Ray(sphereAPrevPos, path / tScale);
 
-            return t1 <= t2 && t2 > 0.0f;
-        }
-
-        public static Vector3 ClosestPointOnLineSegment(in Vector3 a, in Vector3 b, in Vector3 point)
-        {
-            Vector3 ab = b - a;
-            float t = Vector3.Dot(point - a, ab) / Vector3.Dot(ab, ab);
-            return a + Math.Clamp(t, 0.0f, 1.0f) * ab;
+            float combinedRadius = sphereA.Radius + sphereB.Radius;
+            return RayVsSphere(ray, new Sphere(sphereBPrevPos, combinedRadius), out t1, out t2);
         }
 
         private struct ScalarProjection
@@ -418,11 +469,12 @@ namespace IDKEngine.Shapes
             return true;
         }
 
+
         public struct CollisionDetectionSettings
         {
             public bool IsEnabled;
             public int TestSteps;
-            public int ResponseSteps;
+            public int RecursiveSteps;
             public float EpsilonNormalOffset;
         }
         public struct SceneHitInfo
@@ -432,25 +484,17 @@ namespace IDKEngine.Shapes
             public Vector3 TriCollidingPoint;
         }
 
-
-        public delegate void IntersectFunc(in SceneHitInfo hitInfo);
-        public static void SceneVsMovingSphereCollisionRoutine(ModelSystem modelSystem, in CollisionDetectionSettings settings, ref Sphere movingSphere, ref Vector3 sphereDestination, IntersectFunc intersectFunc)
+        public delegate void FuncIntersect(in SceneHitInfo hitInfo);
+        public static void SceneVsMovingSphereCollisionRoutine(ModelSystem modelSystem, in CollisionDetectionSettings settings, ref Sphere movingSphere, in Vector3 sphereDestination, FuncIntersect intersectFunc)
         {
             if (settings.IsEnabled)
             {
-                for (int i = 0; i < settings.ResponseSteps; i++)
+                for (int i = 0; i < settings.RecursiveSteps; i++)
                 {
-                    Vector3 prevSpherePos = movingSphere.Center;
                     bool hit = SceneVsMovingSphere(modelSystem, settings.TestSteps, sphereDestination, ref movingSphere, out SceneHitInfo hitInfo);
                     if (hit)
                     {
                         movingSphere.Center += hitInfo.SlidingPlane.Normal * settings.EpsilonNormalOffset;
-
-                        Vector3 deltaStep = sphereDestination - prevSpherePos;
-                        Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
-
-                        sphereDestination = movingSphere.Center + slidedDeltaStep;
-
                         intersectFunc(hitInfo);
                     }
                     else
@@ -483,13 +527,12 @@ namespace IDKEngine.Shapes
                 movingSphere.Center += stepSize;
                 Box hitBox = new Box(movingSphere.Center - new Vector3(movingSphere.Radius), movingSphere.Center + new Vector3(movingSphere.Radius));
 
-                // Copy out/ref paramters we access from inside the lambda function. this is needed because of "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
+                // Copy out/ref paramters for access from inside the lambda function. This is needed because of "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
                 Sphere movingSphereCopy = movingSphere;
-
                 SceneHitInfo thisSceneHitInfo = new SceneHitInfo();
 
-                float bestCosTheta = -1.0f;
-                float bestPenetrationDepth = float.MinValue;
+                float bestTriDistance = float.MaxValue;
+                float bestPenetrationDepth = 0.0f;
 
                 bool triCollisionDetected = false;
                 modelSystem.BVH.Intersect(hitBox, (in BVH.BoxHitInfo hitInfo) =>
@@ -503,40 +546,32 @@ namespace IDKEngine.Shapes
                     Triangle worldSpaceTri = Triangle.Transformed(triangle, modelMatrix);
 
                     bool intersect = SphereVsTriangle(movingSphereCopy, worldSpaceTri, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth);
-                    if (intersect)
+                    if (!intersect || distance >= bestTriDistance)
                     {
-                        triCollisionDetected = true;
-
-                        Vector3 triFaceNormal = worldSpaceTri.Normal;
-
-                        Vector3 hitPointToSphereDir;
-                        if (distance == 0.0f)
-                        {
-                            hitPointToSphereDir = triFaceNormal;
-                        }
-                        else
-                        {
-                            hitPointToSphereDir = (movingSphereCopy.Center - closestPointOnTri) / distance;
-                        }
-
-                        float cosTheta = Vector3.Dot(triFaceNormal, hitPointToSphereDir);
-                        if (cosTheta < 0.0f)
-                        {
-                            triFaceNormal *= -1.0f;
-                            cosTheta = MathF.Abs(cosTheta);
-                        }
-
-                        // cosTheta > bestCosTheta or penetrationDepth > bestPenetrationDepth or just choose the first triangle?
-                        if (penetrationDepth > bestPenetrationDepth)
-                        {
-                            thisSceneHitInfo.SlidingPlane = new Plane(hitPointToSphereDir);
-                            thisSceneHitInfo.TriNormal = triFaceNormal;
-                            thisSceneHitInfo.TriCollidingPoint = closestPointOnTri;
-
-                            bestCosTheta = cosTheta;
-                            bestPenetrationDepth = penetrationDepth;
-                        }
+                        return;
                     }
+                    if (distance == 0.0f) // handle edge case
+                    {
+                        return;
+                    }
+
+                    triCollisionDetected = true;
+
+                    Vector3 triFaceNormal = worldSpaceTri.Normal;
+                    Vector3 hitPointToSphereDir = (movingSphereCopy.Center - closestPointOnTri) / distance;
+
+                    float cosTheta = Vector3.Dot(triFaceNormal, hitPointToSphereDir);
+                    if (cosTheta < 0.0f)
+                    {
+                        triFaceNormal *= -1.0f;
+                        cosTheta = MathF.Abs(cosTheta);
+                    }
+
+                    thisSceneHitInfo.SlidingPlane = new Plane(hitPointToSphereDir);
+                    thisSceneHitInfo.TriNormal = triFaceNormal;
+                    thisSceneHitInfo.TriCollidingPoint = closestPointOnTri;
+                    bestTriDistance = distance;
+                    bestPenetrationDepth = penetrationDepth;
                 });
 
                 if (triCollisionDetected)

@@ -97,11 +97,11 @@ namespace IDKEngine
         public bool IsVolumetricLighting = true;
         public bool RunSimulations = true;
 
-        public Intersections.CollisionDetectionSettings CamCollisionSettings = new Intersections.CollisionDetectionSettings()
+        public Intersections.CollisionDetectionSettings SceneVsCamCollisionSettings = new Intersections.CollisionDetectionSettings()
         {
             IsEnabled = true,
             TestSteps = 3,
-            ResponseSteps = 12,
+            RecursiveSteps = 12,
             EpsilonNormalOffset = 0.001f
         };
 
@@ -150,25 +150,25 @@ namespace IDKEngine
 
             if (gui.SelectedEntity.EntityType != Gui.EntityType.None)
             {
-                Box box = new Box();
+                Box selectedEntityBox = new Box();
                 if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
                 {
                     GpuBlasNode node = ModelSystem.BVH.Tlas.Blases[gui.SelectedEntity.EntityID].Root;
-                    box.Min = node.Min;
-                    box.Max = node.Max;
+                    selectedEntityBox.Min = node.Min;
+                    selectedEntityBox.Max = node.Max;
 
-                    box.Transform(ModelSystem.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
+                    selectedEntityBox.Transform(ModelSystem.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
                 }
                 else
                 {
-                    LightManager.TryGetLight(gui.SelectedEntity.EntityID, out CpuLight abstractLight);
-                    ref GpuLight light = ref abstractLight.GpuLight;
+                    LightManager.TryGetLight(gui.SelectedEntity.EntityID, out CpuLight cpuLight);
+                    ref GpuLight light = ref cpuLight.GpuLight;
 
-                    box.Min = new Vector3(light.Position) - new Vector3(light.Radius);
-                    box.Max = new Vector3(light.Position) + new Vector3(light.Radius);
+                    selectedEntityBox.Min = new Vector3(light.Position) - new Vector3(light.Radius);
+                    selectedEntityBox.Max = new Vector3(light.Position) + new Vector3(light.Radius);
                 }
 
-                BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, box);
+                BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, selectedEntityBox);
             }
 
             Framebuffer.Bind(0);
@@ -255,13 +255,13 @@ namespace IDKEngine
                 {
                     if (MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
                     {
-                        Vector3 force = Camera.ViewDir * 6.0f / dT;
+                        Vector3 force = Camera.ViewDir * 5.0f;
 
                         CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, Helper.RandomVec3(6.0f, 10.0f), 0.3f);
                         newLight.Velocity = Camera.Velocity;
-                        newLight.AddForce(force);
+                        newLight.AddImpulse(force);
 
-                        Camera.AddForce(-force);
+                        Camera.AddImpulse(-force);
 
                         if (LightManager.AddLight(newLight))
                         {
@@ -269,7 +269,6 @@ namespace IDKEngine
                             PointShadow pointShadow = new PointShadow(256, new Vector2(newLight.GpuLight.Radius, 60.0f));
                             LightManager.CreatePointShadowForLight(pointShadow, newLightIndex);
                         }
-
                     }
 
                     Camera.ProcessInputs(KeyboardState, MouseState);
@@ -295,13 +294,18 @@ namespace IDKEngine
                 }
             }
 
-            Vector3 sphereDestination = Camera.Position;
             Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
-            Intersections.SceneVsMovingSphereCollisionRoutine(ModelSystem, CamCollisionSettings, ref movingSphere, ref sphereDestination, (in Intersections.SceneHitInfo hitInfo) =>
+            Vector3 prevSpherePos = movingSphere.Center;
+            Intersections.SceneVsMovingSphereCollisionRoutine(ModelSystem, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
             {
-                Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane);
+                Vector3 deltaStep = Camera.Position - prevSpherePos;
+                Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
+                Camera.Position = movingSphere.Center + slidedDeltaStep;
+
+                Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane); 
+
+                prevSpherePos = movingSphere.Center;
             });
-            Camera.Position = sphereDestination;
 
             {
                 Camera.ProjectionSize = RenderResolution;
@@ -327,13 +331,11 @@ namespace IDKEngine
                 GpuBasicData.Frame++;
 
                 basicDataBuffer.UploadElements(GpuBasicData);
-
-                Camera.SetPrevToCurrentPosition();
             }
 
+            Camera.SetPrevToCurrentPosition();
             LightManager.Update(out bool anyLightMoved);
             ModelSystem.Update(out bool anyMeshInstanceMoved);
-
 
             bool cameraMoved = GpuBasicData.PrevProjView != GpuBasicData.ProjView;
             if ((RenderMode == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
@@ -400,7 +402,7 @@ namespace IDKEngine
             //Camera = new Camera(RenderResolution, new Vector3(-0.824f, 2.587f, -6.370f), -90.0f, 0.0f);
             //Camera = new Camera(RenderResolution, new Vector3(-13.238f, 4.226f, -0.147f), -360.950f, -14.600f);
 
-            SkyBoxManager.Init(new string[]
+            SkyBoxManager.Init(SkyBoxManager.SkyBoxMode.ExternalAsset, new string[]
             {
                 "res/textures/environmentMap/posx.jpg",
                 "res/textures/environmentMap/negx.jpg",
@@ -411,7 +413,7 @@ namespace IDKEngine
             });
 
             PresentationResolution = WindowFramebufferSize;
-            VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, 6, 0.758f, 50.0f, 4.0f, new Vector3(0.025f));
+            VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, 5, 0.758f, 50.0f, 4.0f, new Vector3(0.025f));
             Bloom = new Bloom(PresentationResolution.X, PresentationResolution.Y, 1.0f, 3.0f);
             TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution.X, PresentationResolution.Y);
             BoxRenderer = new BoxRenderer();
@@ -459,26 +461,21 @@ namespace IDKEngine
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-                LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), /*new Vector3(-4.0f, 0.0f, 0.0f), */new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+
+                //LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
+                //LightManager.AddLight(new CpuLight(new Vector3(-3.9f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
+                //LightManager.AddLight(new CpuLight(new Vector3(-3.3f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
+                //LightManager.AddLight(new CpuLight(new Vector3(-2.7f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
 
                 for (int i = 0; i < 3; i++)
                 {
-                    PointShadow pointShadow = new PointShadow(512, new Vector2(0.5f, 60.0f));
-                    LightManager.CreatePointShadowForLight(pointShadow, i);
+                    if (LightManager.TryGetLight(i, out CpuLight light))
+                    {
+                        PointShadow pointShadow = new PointShadow(512, new Vector2(light.GpuLight.Radius, 60.0f));
+                        LightManager.CreatePointShadowForLight(pointShadow, i);
+                    }
                 }
-
-                //for (int i = 0; i < 128; i++)
-                //{
-                //    CpuLight light = new CpuLight(0.3f);
-                //    light.GpuLight.Position.X = Helper.RandomFloat(-13.0f, 13.0f);
-                //    light.Velocity = Helper.RandomVec3(-1.0f, 1.0f).Normalized() * 7.6f;
-                //    light.GpuLight.Color = Helper.RandomVec3(3.3f, 9.5f);
-
-                //    LightManager.AddLight(light);
-
-                //    PointShadow pointShadow = new PointShadow(256, new Vector2(light.GpuLight.Radius, 60.0f));
-                //    LightManager.CreatePointShadowForLight(pointShadow, i);
-                //}
 
                 //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.6f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);

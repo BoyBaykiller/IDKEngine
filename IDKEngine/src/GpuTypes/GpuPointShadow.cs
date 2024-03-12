@@ -42,7 +42,6 @@ namespace IDKEngine.GpuTypes
         public Matrix4 PosZ;
         public Matrix4 NegZ;
 
-
         public Vector3 Position;
         public float NearPlane;
 

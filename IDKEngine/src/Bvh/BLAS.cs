@@ -246,8 +246,8 @@ namespace IDKEngine
             return hitInfo.T != tMaxDist;
         }
 
-        public delegate void BoxIntersectFunc(in IndicesTriplet indicesTriplet);
-        public void Intersect(in Box box, BoxIntersectFunc intersectFunc)
+        public delegate void FuncIntersectLeafNode(in IndicesTriplet leafNodeTriangle);
+        public void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
         {
             int stackPtr = 0;
             uint stackTop = 1;
@@ -266,12 +266,7 @@ namespace IDKEngine
                     for (uint i = first; i < first + triCount; i++)
                     {
                         ref readonly IndicesTriplet indicesTriplet = ref TriangleIndices[i];
-                        Triangle triangle = GetTriangle(indicesTriplet);
-
-                        if (Intersections.BoxVsTriangle(box, Conversions.ToTriangle(triangle)))
-                        {
-                            intersectFunc(indicesTriplet);
-                        }
+                        intersectFunc(indicesTriplet);
                     }
 
                     leftChildHit = leftChildHit && !leftNode.IsLeaf();
@@ -397,11 +392,11 @@ namespace IDKEngine
 
         public Triangle GetTriangle(in IndicesTriplet indices)
         {
-            ref readonly Vector3 v0 = ref VertexPositions[indices.X];
-            ref readonly Vector3 v1 = ref VertexPositions[indices.Y];
+            ref readonly Vector3 p0 = ref VertexPositions[indices.X];
+            ref readonly Vector3 p1 = ref VertexPositions[indices.Y];
             ref readonly Vector3 v2 = ref VertexPositions[indices.Z];
 
-            return new Triangle() { Position0 = v0, Position1 = v1, Position2 = v2 };
+            return new Triangle() { Position0 = p0, Position1 = p1, Position2 = v2 };
         }
         public void UpdateNodeBounds(ref GpuBlasNode node)
         {

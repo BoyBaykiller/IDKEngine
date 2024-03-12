@@ -88,7 +88,8 @@ namespace IDKEngine
             HashSet<string> extensions = new HashSet<string>(GL.GetInteger(GetPName.NumExtensions));
             for (int i = 0; i < GL.GetInteger(GetPName.NumExtensions); i++)
             {
-                extensions.Add(GL.GetString(StringNameIndexed.Extensions, i));
+                string extension = GL.GetString(StringNameIndexed.Extensions, i);
+                extensions.Add(extension);
             }
 
             return extensions;
@@ -103,35 +104,40 @@ namespace IDKEngine
         {
             return (APIVersion >= first) || IsExtensionsAvailable(extension);
         }
-        public static unsafe void ParallelLoadCubemap(Texture texture, string[] paths, SizedInternalFormat sizedInternalFormat)
+        public static unsafe bool LoadCubemap(Texture texture, string[] imagePaths, SizedInternalFormat sizedInternalFormat)
         {
+            if (imagePaths == null)
+            {
+                Logger.Log(Logger.LogLevel.Error, $"Cubemap imagePaths is null");
+                return false;
+            }
             if (texture.Target != TextureTarget.TextureCubeMap)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Texture must be of type {TextureTarget.TextureCubeMap}");
-                return;
+                return false;
             }
-            if (paths.Length != 6)
+            if (imagePaths.Length != 6)
             {
                 Logger.Log(Logger.LogLevel.Error, "Number of cubemap images must be equal to six");
-                return;
+                return false;
             }
-            if (!paths.All(p => File.Exists(p)))
+            if (!imagePaths.All(p => File.Exists(p)))
             {
                 Logger.Log(Logger.LogLevel.Error, "At least one of the specified cubemap image paths is not found");
-                return;
+                return false;
             }
 
             ImageResult[] images = new ImageResult[6];
             Parallel.For(0, images.Length, i =>
             {
-                using FileStream stream = File.OpenRead(paths[i]);
+                using FileStream stream = File.OpenRead(imagePaths[i]);
                 images[i] = ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlue);
             });
             
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
             {
                 Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and each texture must be of the same size");
-                return;
+                return false;
             }
             int size = images[0].Width;
 
@@ -140,6 +146,8 @@ namespace IDKEngine
             {
                 texture.SubTexture3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data[0], 0, 0, 0, i);
             }
+
+            return true;
         }
 
         public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;

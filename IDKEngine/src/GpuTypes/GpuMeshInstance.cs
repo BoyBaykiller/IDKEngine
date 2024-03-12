@@ -4,6 +4,14 @@ namespace IDKEngine.GpuTypes
 {
     public struct GpuMeshInstance
     {
+        // In a typical 4x4 matrix the W component is useless:
+        // (x, y, z, 0.0)
+        // (x, y, z, 0.0)
+        // (x, y, z, 0.0)
+        // (x, y, z, 1.0)
+        // We can't store Matrix4x3 as GLSL-std430 requires vec4 alignment (vec3s would add padding). For that reason we store a Matrix3x4.
+        // We get this Matrix3x4 by taking the Matrix4x4, constructing a Matrix4x3 by removing the useless W and then transposing.
+
         public Matrix4 ModelMatrix
         {
             get => Mat3x4ToMat4x4Tranposed(modelMatrix3x4);
@@ -24,14 +32,7 @@ namespace IDKEngine.GpuTypes
 
             set
             {
-                if (_modelMatrixPacked == Matrix3x4.Zero)
-                {
-                    _modelMatrixPacked = value;
-                }
-
-                prevModelMatrix3x4 = _modelMatrixPacked;
                 _modelMatrixPacked = value;
-
                 invModelMatrix3x4 = Matrix3x4.Invert(_modelMatrixPacked);
             }
         }

@@ -22,9 +22,10 @@ vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary)
     return v0 * bary.x + v1 * bary.y + v2 * bary.z;
 }
 
-// Source: https://learnopengl.com/Advanced-OpenGL/Depth-testing
 float GetLogarithmicDepth(float near, float far, float viewZ)
 {
+    // Source: https://learnopengl.com/Advanced-OpenGL/Depth-testing
+    
     // https://www.desmos.com/calculator/yexmazn9yq
     float depth = (1.0 / viewZ - 1.0 / near) / (1.0 / far - 1.0 / near);
     return depth;

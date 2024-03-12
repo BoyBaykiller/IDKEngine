@@ -27,13 +27,13 @@ namespace IDKEngine
             return result;
         }
 
-        public static float Area(Vector3 size)
+        public static float Area(in Vector3 size)
         {
             float area = 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
             return area;
         }
 
-        public static float Volume(Vector3 size)
+        public static float Volume(in Vector3 size)
         {
             return size.X * size.Y * size.X;
         }
@@ -42,15 +42,6 @@ namespace IDKEngine
         {
             Vector3 pos = new Vector3(MathF.Sin(elevation) * MathF.Cos(azimuth), MathF.Cos(elevation), MathF.Sin(elevation) * MathF.Sin(azimuth));
             return pos;
-        }
-
-        public static Vector3 Mix(Vector3 x, Vector3 y, float a)
-        {
-            float xC = MathHelper.Lerp(x.X, y.X, a);
-            float yC = MathHelper.Lerp(x.Y, y.Y, a);
-            float zC = MathHelper.Lerp(x.Z, y.Z, a);
-
-            return new Vector3(xC, yC, zC);
         }
 
         public static Matrix4 CreatePerspectiveFieldOfViewDepthZeroToOne(float fovY, float aspect, float depthNear, float depthFar)

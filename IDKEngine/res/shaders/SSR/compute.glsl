@@ -61,7 +61,8 @@ void main()
     }
 
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
-    vec3 fragPos = PerspectiveTransform(vec3(uv, depth) * 2.0 - 1.0, basicDataUBO.InvProjection);
+    
+    vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), basicDataUBO.InvProjection);
     vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
     mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
     normal = normalToView * normal;
@@ -87,7 +88,9 @@ vec3 SSR(vec3 normal, vec3 fragPos)
     {
         samplePoint += deltaStep;
 
-        vec3 projectedSample = PerspectiveTransform(samplePoint, basicDataUBO.Projection) * 0.5 + 0.5;
+        vec3 projectedSample = PerspectiveTransform(samplePoint, basicDataUBO.Projection);
+        projectedSample.xy = projectedSample.xy * 0.5 + 0.5;
+
         if (any(greaterThanEqual(projectedSample.xy, vec2(1.0))) || any(lessThan(projectedSample.xy, vec2(0.0))) || projectedSample.z > 1.0)
         {
             return vec3(0.0);
@@ -113,7 +116,9 @@ void BinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)
     samplePoint -= deltaStep * 0.5;
     for (int i = 1; i < BinarySearchSamples; i++)
     {
-        projectedSample = PerspectiveTransform(samplePoint, basicDataUBO.Projection) * 0.5 + 0.5;
+        projectedSample = PerspectiveTransform(samplePoint, basicDataUBO.Projection);
+        projectedSample.xy = projectedSample.xy * 0.5 + 0.5;
+
         float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
 
         deltaStep *= 0.5;
