@@ -5,7 +5,7 @@
         private static void Main()
         {
             Application application = new Application(1280, 720, "IDKEngine");
-            application.Start();
+            application.Run();
         }
     }
 }

@@ -26,7 +26,7 @@ void main()
 
 #else
 
-    bool isNotEmpty = bool(imageLoad(ImgResult, imgCoord).a);
+    bool isNotEmpty = imageLoad(ImgResult, imgCoord).a > 0.0;
     if (isNotEmpty)
     {
         imageStore(ImgResultR, imgCoord, uvec4(0));

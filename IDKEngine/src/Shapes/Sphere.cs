@@ -9,7 +9,7 @@ namespace IDKEngine.Shapes
         public Vector3 Center;
         public float Radius;
 
-        public Sphere(Vector3 center, float radius)
+        public Sphere(in Vector3 center, float radius)
         {
             Center = center;
             Radius = radius;

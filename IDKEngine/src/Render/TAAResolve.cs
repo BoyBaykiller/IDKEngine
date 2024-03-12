@@ -54,7 +54,7 @@ namespace IDKEngine.Render
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             PrevResult.BindToUnit(0);
             color.BindToUnit(1);
-            
+
             taaResolveProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);

@@ -26,7 +26,7 @@ namespace IDKEngine.Render
 
         public bool IsSharpening;
         public float Sharpness = 0.5f;
-        public void RunFSR2(Vector2 jitter, Texture color, Texture depth, Texture velocity, float deltaMilliseconds, float cameraNear, float cameraFar, float cameraFovAngleVertical)
+        public void RunFSR2(Vector2 jitter, Texture color, Texture depth, Texture velocity, Camera camera, float deltaMilliseconds)
         {
             Vector2i renderSize = new Vector2i(color.Width, color.Height);
 
@@ -48,11 +48,10 @@ namespace IDKEngine.Render
                 FrameTimeDelta = deltaMilliseconds,
                 PreExposure = 1.0f,
                 Reset = 0,
-                CameraNear = cameraNear,
-                CameraFar = cameraFar,
-                CameraFovAngleVertical = cameraFovAngleVertical,
+                CameraNear = camera.NearPlane,
+                CameraFar = camera.FarPlane,
+                CameraFovAngleVertical = camera.FovY,
                 ViewSpaceToMetersFactor = 1,
-                DeviceDepthNegativeOneToOne = 0,
             };
             FSR2.ContextDispatch(ref fsr2Context, dispatchDesc);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);

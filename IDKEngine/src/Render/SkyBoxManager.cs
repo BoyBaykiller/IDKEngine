@@ -5,69 +5,76 @@ namespace IDKEngine.Render
 {
     static class SkyBoxManager
     {
-        private static bool _isExternalSkyBox;
-        public static bool IsExternalSkyBox
+        public enum SkyBoxMode
         {
-            get => _isExternalSkyBox;
-
-            set
-            {
-                if (_isExternalSkyBox == value) return;
-                _isExternalSkyBox = value;
-
-                if (_isExternalSkyBox)
-                {
-                    if (AtmosphericScatterer != null)
-                    {
-                        AtmosphericScatterer.Dispose();
-                        AtmosphericScatterer = null;
-                    }
-
-                    externalSkyBox = new Texture(TextureTarget2d.TextureCubeMap);
-                    externalSkyBox.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-                    Helper.ParallelLoadCubemap(externalSkyBox, Paths, SizedInternalFormat.Srgb8);
-                }
-                else
-                {
-                    if (externalSkyBox != null)
-                    {
-                        externalSkyBox.Dispose();
-                        externalSkyBox = null;
-                    }
-
-                    AtmosphericScatterer = new AtmosphericScatterer(128);
-                    AtmosphericScatterer.Compute();
-                }
-
-                SkyBoxTexture.EnableSeamlessCubemapARB_AMD(true);
-                skyBoxTextureBuffer.UploadElements(SkyBoxTexture.GetTextureHandleARB());
-            }
+            ExternalAsset,
+            InternalAtmosphericScattering,
         }
 
-        public static Texture SkyBoxTexture => AtmosphericScatterer != null ? AtmosphericScatterer.Result : externalSkyBox;
-
         public static string[] Paths;
+        public static Texture SkyBoxTexture => AtmosphericScatterer != null ? AtmosphericScatterer.Result : externalSkyBoxTexture;
         public static AtmosphericScatterer AtmosphericScatterer { get; private set; }
 
-        private static Texture externalSkyBox;
+
+        private static Texture externalSkyBoxTexture;
         public static TypedBuffer<ulong> skyBoxTextureBuffer;
-        public static void Init(string[] paths = null)
+        public static void Init(SkyBoxMode skyBoxMode, string[] paths = null)
         {
             skyBoxTextureBuffer = new TypedBuffer<ulong>();
             skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
             skyBoxTextureBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1, 0ul);
 
-            if (paths != null)
+            Paths = paths;
+            SetSkyBoxMode(skyBoxMode);
+        }
+
+        private static SkyBoxMode _skyBoxMode;
+        public static void SetSkyBoxMode(SkyBoxMode skyBoxMode)
+        {
+            if (skyBoxMode == SkyBoxMode.ExternalAsset)
             {
-                Paths = paths;
-                IsExternalSkyBox = true;
+                if (AtmosphericScatterer != null)
+                {
+                    AtmosphericScatterer.Dispose();
+                    AtmosphericScatterer = null;
+                }
+
+                externalSkyBoxTexture = new Texture(TextureTarget2d.TextureCubeMap);
+                externalSkyBoxTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+
+                if (!Helper.LoadCubemap(externalSkyBoxTexture, Paths, SizedInternalFormat.Srgb8))
+                {
+                    skyBoxMode = SkyBoxMode.InternalAtmosphericScattering;
+                }
             }
+
+            if (skyBoxMode == SkyBoxMode.InternalAtmosphericScattering)
+            {
+                if (externalSkyBoxTexture != null)
+                {
+                    externalSkyBoxTexture.Dispose();
+                    externalSkyBoxTexture = null;
+                }
+
+                AtmosphericScatterer = new AtmosphericScatterer(128);
+                AtmosphericScatterer.Compute();
+            }
+
+            SkyBoxTexture.EnableSeamlessCubemapARB_AMD(true);
+            skyBoxTextureBuffer.UploadElements(SkyBoxTexture.GetTextureHandleARB());
+
+            _skyBoxMode = skyBoxMode;
+        }
+
+        public static SkyBoxMode GetSkyBoxMode()
+        {
+            return _skyBoxMode;
         }
 
         public static void Dispose()
         {
             if (AtmosphericScatterer != null) AtmosphericScatterer.Dispose();
-            if (externalSkyBox != null) externalSkyBox.Dispose();
+            if (externalSkyBoxTexture != null) externalSkyBoxTexture.Dispose();
             if (skyBoxTextureBuffer != null) skyBoxTextureBuffer.Dispose();
         }
     }

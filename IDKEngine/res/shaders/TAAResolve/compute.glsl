@@ -85,9 +85,10 @@ void main()
 // 1. Return color at the image coordinates 
 // 2. Return best uv for accessing aliased history textures such as velocity
 // 3. Return min/max colors in a 3x3 radius
-// Source: https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
 void GetResolveData(ivec2 imgCoord, out vec4 currentColor, out vec2 neighborhoodBestUv, out vec4 neighborhoodMin, out vec4 neighborhoodMax)
 {
+    // Source: https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
+    
     float minDepth = FLOAT_MAX;
     neighborhoodMin = vec4(FLOAT_MAX);
     neighborhoodMax = vec4(FLOAT_MIN);

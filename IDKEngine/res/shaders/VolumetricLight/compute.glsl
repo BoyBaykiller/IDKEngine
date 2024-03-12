@@ -186,9 +186,10 @@ float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
     return depth;
 }
 
-// Mie scaterring approximated with Henyey-Greenstein phase function
-// Source: http://www.alexandre-pestana.com/volumetric-lights/
 float ComputeScattering(float cosTheta)
 {
+    // Mie scaterring approximated with Henyey-Greenstein phase function
+    // Source: http://www.alexandre-pestana.com/volumetric-lights/
+    
     return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * cosTheta, 1.5));
 }

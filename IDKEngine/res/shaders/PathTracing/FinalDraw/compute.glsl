@@ -97,9 +97,10 @@ void main()
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 }
 
-// Source: https://www.shadertoy.com/view/ls2Bz1
 vec3 SpectralJet(float a)
 {
+    // Source: https://www.shadertoy.com/view/ls2Bz1
+    
     vec3 c;
     if (a < 0.25)
     {

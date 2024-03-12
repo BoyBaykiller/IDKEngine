@@ -448,10 +448,11 @@ float FresnelSchlick(float cosTheta, float n1, float n2)
     return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }
 
-// Source: https://youtu.be/HgisCS30yAI
-// Info: https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/
 ivec2 ReorderInvocations(uint n)
 {
+    // Source: https://youtu.be/HgisCS30yAI
+    // Info: https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/
+    
     uint idx = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
 
     uint columnSize = gl_NumWorkGroups.y * n;

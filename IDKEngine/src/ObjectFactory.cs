@@ -14,9 +14,10 @@ namespace IDKEngine
             public Vector3 Normal;
         }
 
-        // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
         public static Span<Vertex> GenerateSmoothSphere(float radius, int latitudes, int longitudes)
         {
+            // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
+
             if (longitudes < 3)
                 longitudes = 3;
             if (latitudes < 2)
@@ -58,9 +59,10 @@ namespace IDKEngine
             return CollectionsMarshal.AsSpan(vertecis);
         }
 
-        // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
         public static Span<uint> GenerateSmoothSphereIndicis(uint latitudes, uint longitudes)
         {
+            // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
+            
             List<uint> indicis = new List<uint>((int)(latitudes * longitudes));
             uint k1, k2;
             for (uint i = 0; i < latitudes; i++)

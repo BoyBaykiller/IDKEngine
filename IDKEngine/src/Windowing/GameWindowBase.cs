@@ -123,14 +123,14 @@ namespace IDKEngine.Windowing
             OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
 
             {
-                // Set black loading screen
+                // Set black loading screen (calling SwapBuffers here irritates diagnostic tools like renderdoc)
                 Vector4 clearColor = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
                 OpenTK.Graphics.OpenGL4.GL.ClearNamedFramebuffer(0, OpenTK.Graphics.OpenGL4.ClearBuffer.Color, 0, ref clearColor.X);
                 GLFW.SwapBuffers(window);
             }
         }
 
-        public void Start()
+        public void Run()
         {
             OnStart();
             double lastTime = 0.0;

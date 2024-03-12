@@ -26,6 +26,14 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
+layout(std140, binding = 3) uniform TaaDataUBO
+{
+    vec2 Jitter;
+    int Samples;
+    float MipmapBias;
+    int TemporalAntiAliasingMode;
+} taaDataUBO;
+
 layout(std140, binding = 6) uniform GBufferDataUBO
 {
     sampler2D AlbedoAlpha;
@@ -35,56 +43,60 @@ layout(std140, binding = 6) uniform GBufferDataUBO
     sampler2D Depth;
 } gBufferDataUBO;
 
-float SSAO(vec3 fragPos, vec3 normal);
-
 uniform int Samples;
 uniform float Radius;
 uniform float Strength;
 
+float SSAO(vec3 fragPos, vec3 normal);
+
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
-
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
         return;
     }
-    InitializeRandomSeed(imgCoord.y * 4096 + imgCoord.x);
 
+    vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
     vec3 normal = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb;
-
-    vec3 fragPos = PerspectiveTransform(vec3(uv, depth) * 2.0 - 1.0, basicDataUBO.InvProjection);
-    mat3 normalToView = mat3(transpose(basicDataUBO.InvView));
-    normal = normalToView * normal;
+    vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), basicDataUBO.InvProjView);
 
     float occlusion = SSAO(fragPos, normal);
 
-    imageStore(ImgResult, imgCoord, vec4(vec3(occlusion), 1.0));
+    imageStore(ImgResult, imgCoord, vec4(occlusion));
 }
 
 float SSAO(vec3 fragPos, vec3 normal)
 {
-    fragPos += normal * 0.01;
+    fragPos += normal * 0.04;
 
     float occlusion = 0.0;
-    float samples = Samples;
+
+    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
+    uint noiseIndex = taaEnabled ? (basicDataUBO.Frame % taaDataUBO.Samples) * (Samples * 3) : 0u;
     for (int i = 0; i < Samples; i++)
     {
-        float progress = i / float(Samples);
-        vec3 samplePos = fragPos + CosineSampleHemisphere(normal, progress, GetRandomFloat01()) * Radius * mix(0.1, 1.0, progress * progress);
+        float rnd0 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
+        float rnd1 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
+        float rnd2 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
+
+        vec3 samplePos = fragPos + CosineSampleHemisphere(normal, rnd0, rnd1) * Radius * rnd2;
         
-        vec3 projectedSample = PerspectiveTransform(samplePos, basicDataUBO.Projection) * 0.5 + 0.5;
+        vec3 projectedSample = PerspectiveTransform(samplePos, basicDataUBO.ProjView);
+        projectedSample.xy = projectedSample.xy * 0.5 + 0.5;
+
         float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
-    
-        float weight = length(fragPos - samplePos) / Radius;
-        occlusion += int(projectedSample.z >= depth) * weight;
+        if (projectedSample.z > depth)
+        {
+            vec3 sampleToFrag = fragPos - samplePos;
+            float weight = dot(sampleToFrag, sampleToFrag) / (Radius * Radius);
+            occlusion += weight;
+        }
     }
-    occlusion /= samples;
+    occlusion /= float(Samples);
     occlusion *= Strength;
 
    return occlusion;
 }
-

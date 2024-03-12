@@ -106,7 +106,7 @@ namespace IDKEngine.Render.Objects
 
         private static int AdvanceToNextKeyword(string srcCode, int startIndex, out Keyword keyword)
         {
-            // TODO: If wee add more Keywords then we should generalize and optimize this function
+            // TODO: If wee add more Keywords then we should generalize and optimize this function, also use Regex?
 
             keyword = Keyword.NoKeyword;
 

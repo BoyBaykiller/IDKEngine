@@ -161,7 +161,7 @@ layout(std430, binding = 7) restrict readonly buffer TlasSSBO
     TlasNode Nodes[];
 } tlasSSBO;
 
-vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight);
+vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight, float ambientOcclusion);
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
 
@@ -206,6 +206,7 @@ void main()
     float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
     vec3 emissive = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).rgb;
     float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
+    float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
     vec3 viewDir = normalize(fragPos - basicDataUBO.ViewPos);
 
@@ -215,7 +216,7 @@ void main()
         Light light = lightsUBO.Lights[i];
 
         vec3 sampleToLight = light.Position - fragPos;
-        vec3 contribution = GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight);
+        vec3 contribution = GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight, ambientOcclusion);
         
         if (contribution != vec3(0.0))
         {
@@ -274,15 +275,15 @@ void main()
     }
     else
     {
-        indirectLight = vec3(0.03) * albedo;
+        const vec3 ambient = vec3(0.03);
+        indirectLight = ambient * albedo;
     }
-    float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
-    FragColor = vec4((directLighting + indirectLight) * ambientOcclusion + emissive, 1.0);
+    FragColor = vec4((directLighting + indirectLight) + emissive, 1.0);
     // FragColor = vec4(albedo, 1.0);
 }
 
-vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight)
+vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight, float ambientOcclusion)
 {
     float fragToLightLength = length(sampleToLight);
 
@@ -290,7 +291,7 @@ vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, 
     float cosTerm = dot(normal, lightDir);
     if (cosTerm > 0.0)
     {
-        vec3 diffuseContrib = light.Color * cosTerm * albedo;  
+        vec3 diffuseContrib = light.Color * cosTerm * albedo * ambientOcclusion;  
     
         // TODO: Implement not shit lighting that doesnt break under some conditions
         vec3 specularContrib = vec3(0.0);
@@ -314,20 +315,20 @@ vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, 
     return vec3(0.0);
 }
 
-// TODO: Use better sampling method in general
-// Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
-const vec3 ShadowSampleOffsets[] =
-{
-    vec3( 0.0,  0.0,  0.0 ),
-    vec3( 1.0,  1.0,  1.0 ), vec3(  1.0, -1.0,  1.0 ), vec3( -1.0, -1.0,  1.0 ), vec3( -1.0,  1.0,  1.0 ), 
-    vec3( 1.0,  1.0, -1.0 ), vec3(  1.0, -1.0, -1.0 ), vec3( -1.0, -1.0, -1.0 ), vec3( -1.0,  1.0, -1.0 ),
-    vec3( 1.0,  1.0,  0.0 ), vec3(  1.0, -1.0,  0.0 ), vec3( -1.0, -1.0,  0.0 ), vec3( -1.0,  1.0,  0.0 ),
-    vec3( 1.0,  0.0,  1.0 ), vec3( -1.0,  0.0,  1.0 ), vec3(  1.0,  0.0, -1.0 ), vec3( -1.0,  0.0, -1.0 ),
-    vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
-};
-
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample)
 {
+    // TODO: Use overall better sampling method
+    // Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
+    const vec3 ShadowSampleOffsets[] =
+    {
+        vec3( 0.0,  0.0,  0.0 ),
+        vec3( 1.0,  1.0,  1.0 ), vec3(  1.0, -1.0,  1.0 ), vec3( -1.0, -1.0,  1.0 ), vec3( -1.0,  1.0,  1.0 ), 
+        vec3( 1.0,  1.0, -1.0 ), vec3(  1.0, -1.0, -1.0 ), vec3( -1.0, -1.0, -1.0 ), vec3( -1.0,  1.0, -1.0 ),
+        vec3( 1.0,  1.0,  0.0 ), vec3(  1.0, -1.0,  0.0 ), vec3( -1.0, -1.0,  0.0 ), vec3( -1.0,  1.0,  0.0 ),
+        vec3( 1.0,  0.0,  1.0 ), vec3( -1.0,  0.0,  1.0 ), vec3(  1.0,  0.0, -1.0 ), vec3( -1.0,  0.0, -1.0 ),
+        vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
+    };
+    
     const float bias = 0.018;
     const float sampleDiskRadius = 0.04;
 

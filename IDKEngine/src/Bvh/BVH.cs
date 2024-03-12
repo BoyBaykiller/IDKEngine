@@ -90,8 +90,8 @@ namespace IDKEngine
             }
         }
 
-        public delegate void IntersectFunc(in BoxHitInfo hitInfo);
-        public void Intersect(in Box box, IntersectFunc intersectFunc)
+        public delegate void FuncIntersectLeafNode(in BoxHitInfo hitInfo);
+        public void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
         {
             if (CPU_USE_TLAS)
             {
@@ -110,10 +110,10 @@ namespace IDKEngine
                         ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
 
                         Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
-                        blas.Intersect(localBox, (in BLAS.IndicesTriplet indicesTriplet) =>
+                        blas.Intersect(localBox, (in BLAS.IndicesTriplet hitTriangle) =>
                         {
                             BoxHitInfo hitInfo;
-                            hitInfo.TriangleIndices = indicesTriplet;
+                            hitInfo.TriangleIndices = hitTriangle;
                             hitInfo.MeshID = i;
                             hitInfo.InstanceID = instanceID;
 

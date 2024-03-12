@@ -199,7 +199,7 @@ namespace IDKEngine
             return hitInfo.T != tMax;
         }
 
-        public void Intersect(in Box box, BVH.IntersectFunc intersectFunc)
+        public void Intersect(in Box box, BVH.FuncIntersectLeafNode intersectFunc)
         {
             int stackPtr = 0;
             uint stackTop = 0;
@@ -213,14 +213,14 @@ namespace IDKEngine
                     ref readonly GpuMeshInstance meshInstance = ref MeshInstances[instanceID];
                     BLAS blas = Blases[meshInstance.MeshIndex];
 
-                    // Copy out/ref paramters we access from inside the lambda function this is needed because of "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
+                    // Copy out/ref paramters for access from inside the lambda function. This is needed because of "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
                     int meshIndexCopy = meshInstance.MeshIndex;
 
                     Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
-                    blas.Intersect(localBox, (in BLAS.IndicesTriplet indicesTriplet) =>
+                    blas.Intersect(localBox, (in BLAS.IndicesTriplet leafNodeTriangle) =>
                     {
                         BVH.BoxHitInfo hitInfo;
-                        hitInfo.TriangleIndices = indicesTriplet;
+                        hitInfo.TriangleIndices = leafNodeTriangle;
                         hitInfo.MeshID = meshIndexCopy;
                         hitInfo.InstanceID = (int)instanceID;
 

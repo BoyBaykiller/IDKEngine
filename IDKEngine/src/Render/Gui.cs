@@ -123,17 +123,9 @@ namespace IDKEngine.Render
             }
             ImGui.End();
 
-            if (ImGui.Begin("Camera"))
+            if (ImGui.Begin("Physics"))
             {
-                if (ImGui.CollapsingHeader("Collision Detection"))
-                {
-                    ImGui.Checkbox("IsEnabled", ref app.CamCollisionSettings.IsEnabled);
-                    ImGui.SliderInt("TestSteps", ref app.CamCollisionSettings.TestSteps, 1, 20);
-                    ImGui.SliderInt("ResponseSteps", ref app.CamCollisionSettings.ResponseSteps, 1, 20);
-                    ImGui.SliderFloat("NormalOffset", ref app.CamCollisionSettings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
-                }
-
-                if (ImGui.CollapsingHeader("Controls"))
+                if (ImGui.CollapsingHeader("Camera"))
                 {
                     tempVec3 = app.Camera.Position.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref tempVec3))
@@ -168,10 +160,34 @@ namespace IDKEngine.Render
                     ImGui.SliderFloat("NearPlane", ref app.Camera.NearPlane, 0.001f, 5.0f);
                     ImGui.SliderFloat("FarPlane", ref app.Camera.FarPlane, 5.0f, 1000.0f);
 
+                    ImGui.Separator();
+
+                    ImGui.Checkbox("CollisionDetection", ref app.SceneVsCamCollisionSettings.IsEnabled);
+                    if (app.SceneVsCamCollisionSettings.IsEnabled)
+                    {
+                        ImGui.SliderInt("TestSteps", ref app.SceneVsCamCollisionSettings.TestSteps, 1, 20);
+                        ImGui.SliderInt("RecursiveSteps", ref app.SceneVsCamCollisionSettings.RecursiveSteps, 1, 20);
+                        ImGui.SliderFloat("NormalOffset", ref app.SceneVsCamCollisionSettings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
+                    }
+
+                    ImGui.Separator();
+
                     ImGui.Checkbox("HasGravity", ref app.Camera.IsGravity);
                     if (app.Camera.IsGravity)
                     {
                         ImGui.SliderFloat("Gravity", ref app.Camera.GravityDownForce, 0.0f, 100.0f);
+                    }
+                }
+
+
+                if (ImGui.CollapsingHeader("Lights"))
+                {
+                    ImGui.Checkbox("CollisionDetection", ref app.LightManager.SceneVsSphereCollisionSettings.IsEnabled);
+                    if (app.SceneVsCamCollisionSettings.IsEnabled)
+                    {
+                        ImGui.SliderInt("TestSteps", ref app.LightManager.SceneVsSphereCollisionSettings.TestSteps, 1, 20);
+                        ImGui.SliderInt("ResponseSteps", ref app.LightManager.SceneVsSphereCollisionSettings.RecursiveSteps, 1, 20);
+                        ImGui.SliderFloat("NormalOffset", ref app.LightManager.SceneVsSphereCollisionSettings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
                     }
                 }
             }
@@ -648,7 +664,7 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsSSAO)
                         {
                             tempInt = app.RasterizerPipeline.SSAO.Samples;
-                            if (ImGui.SliderInt("Samples##SamplesSSAO", ref tempInt, 1, 50))
+                            if (ImGui.SliderInt("Samples##SamplesSSAO", ref tempInt, 1, 20))
                             {
                                 app.RasterizerPipeline.SSAO.Samples = tempInt;
                             }
@@ -660,7 +676,7 @@ namespace IDKEngine.Render
                             }
 
                             tempFloat = app.RasterizerPipeline.SSAO.Strength;
-                            if (ImGui.SliderFloat("Strength##StrengthSSAO", ref tempFloat, 0.0f, 20.0f))
+                            if (ImGui.SliderFloat("Strength##StrengthSSAO", ref tempFloat, 0.0f, 10.0f))
                             {
                                 app.RasterizerPipeline.SSAO.Strength = tempFloat;
                             }
@@ -770,14 +786,15 @@ namespace IDKEngine.Render
                 {
                     bool shouldUpdateSkyBox = false;
 
-                    tempBool = SkyBoxManager.IsExternalSkyBox;
+                    tempBool = SkyBoxManager.GetSkyBoxMode() == SkyBoxManager.SkyBoxMode.ExternalAsset;
                     if (ImGui.Checkbox("IsExternalSkyBox", ref tempBool))
                     {
-                        SkyBoxManager.IsExternalSkyBox = tempBool;
+                        SkyBoxManager.SetSkyBoxMode(tempBool ? SkyBoxManager.SkyBoxMode.ExternalAsset : SkyBoxManager.SkyBoxMode.InternalAtmosphericScattering);
+
                         shouldResetPT = true;
                     }
 
-                    if (!SkyBoxManager.IsExternalSkyBox)
+                    if (SkyBoxManager.GetSkyBoxMode() == SkyBoxManager.SkyBoxMode.InternalAtmosphericScattering)
                     {
                         tempFloat = SkyBoxManager.AtmosphericScatterer.Elevation;
                         if (ImGui.SliderFloat("Elevation", ref tempFloat, -MathF.PI, MathF.PI))
@@ -833,11 +850,15 @@ namespace IDKEngine.Render
                     Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new Vector2(0.0f));
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    CpuLight light = new CpuLight(spawnPoint, new Vector3(Helper.RandomVec3(5.0f, 7.0f)), 0.3f);
-                    if (app.LightManager.AddLight(light))
+                    CpuLight newLight = new CpuLight(spawnPoint, new Vector3(Helper.RandomVec3(6.0f, 10.0f)), 0.3f);
+                    if (app.LightManager.AddLight(newLight))
                     {
-                        float distance = Vector3.Distance(app.Camera.Position, light.GpuLight.Position);
-                        SelectedEntity = new SelectedEntityInfo(EntityType.Light, app.LightManager.Count - 1, 0, distance);
+                        int newLightIndex = app.LightManager.Count - 1;
+                        PointShadow pointShadow = new PointShadow(256, new Vector2(newLight.GpuLight.Radius, 60.0f));
+                        app.LightManager.CreatePointShadowForLight(pointShadow, newLightIndex);
+
+                        float distance = Vector3.Distance(app.Camera.Position, newLight.GpuLight.Position);
+                        SelectedEntity = new SelectedEntityInfo(EntityType.Light, newLightIndex, 0, distance);
 
                         shouldResetPT = true;
                     }
@@ -853,8 +874,7 @@ namespace IDKEngine.Render
 
                     NativeFileDialogExtendedSharp.NfdFilter[] filters =
                     {
-                        new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "gltf", Description = "glTF" },
-                        new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "glb", Description = "Binary glTF" }
+                        new NativeFileDialogExtendedSharp.NfdFilter() { Specification = "gltf,glb", Description = "glTF" },
                     };
 
                     NativeFileDialogExtendedSharp.NfdDialogResult result = NativeFileDialogExtendedSharp.Nfd.FileOpen(filters);
@@ -1013,7 +1033,7 @@ namespace IDKEngine.Render
                             gpuLight.Color = tempVec3.ToOpenTK();
                         }
 
-                        if (ImGui.DragFloat("Radius", ref gpuLight.Radius, 0.05f, 0.01f, 7.0f))
+                        if (ImGui.DragFloat("Radius", ref gpuLight.Radius, 0.05f, 0.01f, 30.0f))
                         {
                             shouldUpdateLight = true;
                         }
@@ -1178,7 +1198,7 @@ namespace IDKEngine.Render
                 FrameRecState = FrameRecState == FrameRecorderState.Replaying ? FrameRecorderState.Nothing : FrameRecorderState.Replaying;
                 if (FrameRecState == FrameRecorderState.Replaying)
                 {
-                    app.CamCollisionSettings.IsEnabled = false;
+                    app.SceneVsCamCollisionSettings.IsEnabled = false;
                     app.MouseState.CursorMode = CursorModeValue.CursorNormal;
                 }
             }

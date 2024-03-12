@@ -88,7 +88,7 @@ namespace IDKEngine.Render
 
         private readonly ShaderProgram volumetricLightingProgram;
         private readonly ShaderProgram upscaleProgram;
-        public VolumetricLighting(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance, float resolutionScale = 0.6f)
+        public VolumetricLighting(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance, float resolutionScale = 0.5f)
         {
             volumetricLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
             upscaleProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/Upscale/compute.glsl")));

@@ -7,7 +7,7 @@ namespace IDKEngine.Shapes
         public Vector3 Origin;
         public Vector3 Direction;
 
-        public Ray(Vector3 origin, Vector3 direction)
+        public Ray(in Vector3 origin, in Vector3 direction)
         {
             Origin = origin;
             Direction = direction;
@@ -18,7 +18,7 @@ namespace IDKEngine.Shapes
             return Origin + Direction * t;
         }
 
-        public Ray Transformed(Matrix4 invModel)
+        public Ray Transformed(in Matrix4 invModel)
         {
             Ray ray = new Ray();
             ray.Origin = (new Vector4(Origin, 1.0f) * invModel).Xyz;
@@ -27,7 +27,7 @@ namespace IDKEngine.Shapes
             return ray;
         }
 
-        public static Ray GetWorldSpaceRay(Vector3 origin, Matrix4 inverseProj, Matrix4 inverseView, Vector2 ndc)
+        public static Ray GetWorldSpaceRay(in Vector3 origin, in Matrix4 inverseProj, in Matrix4 inverseView, in Vector2 ndc)
         {
             Vector4 rayView = new Vector4(0.0f);
             rayView.Xy = ndc * new Matrix2(inverseProj.Row0.Xy, inverseProj.Row1.Xy);
