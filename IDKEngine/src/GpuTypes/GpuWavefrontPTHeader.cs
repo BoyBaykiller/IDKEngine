@@ -1,17 +1,10 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace IDKEngine.GpuTypes
+﻿namespace IDKEngine.GpuTypes
 {
-    [InlineArray(2)]
-    public struct GpuDispatchCmd_2
-    {
-        private GpuDispatchCmd _element0;
-    }
-
     unsafe struct GpuWavefrontPTHeader
     {
-        public GpuDispatchCmd_2 DispatchCommands;
+        public GpuDispatchCmd DispatchCommand;
         public fixed uint Counts[2];
+        public uint PingPongIndex;
         public uint AccumulatedSamples;
     }
 }

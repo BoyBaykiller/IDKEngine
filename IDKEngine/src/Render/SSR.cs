@@ -6,57 +6,43 @@ namespace IDKEngine.Render
 {
     class SSR : IDisposable
     {
-        private int _samples;
-        public int Samples
+        public struct GpuSettings
         {
-            get => _samples;
+            public int SampleCount;
+            public int BinarySearchCount;
+            public float MaxDist;
 
-            set
+            public static GpuSettings Default = new GpuSettings()
             {
-                _samples = value;
-                shaderProgram.Upload("Samples", _samples);
-            }
+                SampleCount = 30,
+                BinarySearchCount = 8,
+                MaxDist = 50.0f
+            };
         }
 
-        private int _binarySearchSamples;
-        public int BinarySearchSamples
-        {
-            get => _binarySearchSamples;
+        public GpuSettings Settings;
 
-            set
-            {
-                _binarySearchSamples = value;
-                shaderProgram.Upload("BinarySearchSamples", _binarySearchSamples);
-            }
-        }
-
-        private float _maxDist;
-        public float MaxDist
-        {
-            get => _maxDist;
-
-            set
-            {
-                _maxDist = value;
-                shaderProgram.Upload("MaxDist", _maxDist);
-            }
-        }
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        public SSR(int width, int height, int samples, int binarySearchSamples, float maxDist)
+        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
+        public SSR(int width, int height, in GpuSettings settings)
         {
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/SSR/compute.glsl")));
+            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "SSR/compute.glsl"));
+
+            bufferGpuSettings = new TypedBuffer<GpuSettings>();
+            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
             SetSize(width, height);
 
-            Samples = samples;
-            BinarySearchSamples = binarySearchSamples;
-            MaxDist = maxDist;
+            Settings = settings;
         }
 
         public void Compute(Texture colorTexture)
         {
+            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            bufferGpuSettings.UploadElements(Settings);
+
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             colorTexture.BindToUnit(0);
 
@@ -78,6 +64,7 @@ namespace IDKEngine.Render
         {
             Result.Dispose();
             shaderProgram.Dispose();
+            bufferGpuSettings.Dispose();
         }
     }
 }

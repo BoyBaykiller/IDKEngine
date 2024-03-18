@@ -4,6 +4,7 @@
 AppInclude(include/Random.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/Pbr.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -67,7 +68,7 @@ layout(std140, binding = 2) uniform LightsUBO
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
-    int Samples;
+    int SampleCount;
     float MipmapBias;
     int TemporalAntiAliasingMode;
 } taaDataUBO;
@@ -81,18 +82,21 @@ layout(std140, binding = 6) uniform GBufferDataUBO
     sampler2D Depth;
 } gBufferDataUBO;
 
-vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep);
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    vec3 Absorbance;
+    int SampleCount;
+    float Scattering;
+    float MaxDist;
+    float Strength;
+} settingsUBO;
+
+vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep, int sampleCount);
 bool Shadow(PointShadow pointShadow, vec3 lightToSample);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
-float ComputeScattering(float cosTheta);
+float ComputeScattering(float cosTheta, float scaterring);
 
-uniform int Samples;
-uniform float Scattering;
-uniform float MaxDist;
-uniform float Strength;
-uniform vec3 Absorbance;
-
-// From: http://www.alexandre-pestana.com/volumetric-lights/
+// Source: http://www.alexandre-pestana.com/volumetric-lights/
 const float DitherPattern[4][4] = 
 {
     { 0.0, 0.5, 0.125, 0.625 },
@@ -114,12 +118,12 @@ void main()
     float viewToFragLen = length(viewToFrag);
     vec3 viewDir = viewToFrag / viewToFragLen;
     
-    if (viewToFragLen > MaxDist)
+    if (viewToFragLen > settingsUBO.MaxDist)
     {
-        viewToFrag = viewDir * MaxDist;
+        viewToFrag = viewDir * settingsUBO.MaxDist;
     }
 
-    vec3 deltaStep = viewToFrag / Samples;
+    vec3 deltaStep = viewToFrag / settingsUBO.SampleCount;
     float randomJitter = DitherPattern[imgCoord.x % DitherPattern[0].length()][imgCoord.y % DitherPattern.length()];
     vec3 origin = basicDataUBO.ViewPos + deltaStep * randomJitter;
 
@@ -131,39 +135,40 @@ void main()
         if (light.PointShadowIndex >= 0)
         {
             PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
-            scattered += UniformScatter(light, pointShadow, origin, viewDir, deltaStep);
+            scattered += UniformScatter(light, pointShadow, origin, viewDir, deltaStep, settingsUBO.SampleCount);
         }
     }
 
-    imageStore(ImgResult, imgCoord, vec4(scattered * Strength, 1.0));
+    imageStore(ImgResult, imgCoord, vec4(scattered * settingsUBO.Strength, 1.0));
     imageStore(ImgResultDepth, imgCoord, vec4(depth));
 }
 
-vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep)
+vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep, int sampleCount)
 {
     vec3 scattered = vec3(0.0);
     vec3 samplePoint = origin;
-    for (int i = 0; i < Samples; i++)
+    for (int i = 0; i < sampleCount; i++)
     {
         vec3 lightToSample = samplePoint - light.Position;
         if (!Shadow(pointShadow, lightToSample))
         {
             float lengthToLight = length(lightToSample);
-            vec3 power = light.Color / (4.0 * PI * dot(lightToSample, lightToSample));
+            float attenuation = GetAttenuationFactor(lengthToLight * lengthToLight, light.Radius);
+            
+            vec3 absorbed = exp(-settingsUBO.Absorbance * lengthToLight);
             
             vec3 lightDir = lightToSample / lengthToLight;
-            vec3 absorbed = exp(-Absorbance * lengthToLight);
             float cosTheta = dot(lightDir, -viewDir);
             
-            scattered += ComputeScattering(cosTheta) * power * absorbed;
+            scattered += light.Color * ComputeScattering(cosTheta, settingsUBO.Scattering) * attenuation * absorbed;
         }
 
         samplePoint += deltaStep;
     }
-    scattered /= Samples;
+    scattered /= sampleCount;
 
     // Apply Beers's law, Absorbance is constant so we can have it outside the loop
-    vec3 absorbed = exp(-Absorbance * length(origin - samplePoint));
+    vec3 absorbed = exp(-settingsUBO.Absorbance * length(origin - samplePoint));
     scattered *= absorbed;
     
     return scattered;
@@ -186,10 +191,9 @@ float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
     return depth;
 }
 
-float ComputeScattering(float cosTheta)
+float ComputeScattering(float cosTheta, float scaterring)
 {
     // Mie scaterring approximated with Henyey-Greenstein phase function
     // Source: http://www.alexandre-pestana.com/volumetric-lights/
-    
-    return (1.0 - Scattering * Scattering) / (4.0 * PI * pow(1.0 + Scattering * Scattering - 2.0 * Scattering * cosTheta, 1.5));
+    return (1.0 - scaterring * scaterring) / (4.0 * PI * pow(1.0 + scaterring * scaterring - 2.0 * scaterring * cosTheta, 1.5));
 }

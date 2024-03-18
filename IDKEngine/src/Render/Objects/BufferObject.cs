@@ -82,11 +82,11 @@ namespace IDKEngine.Render.Objects
             GL.GetNamedBufferSubData(ID, offset, size, data);
         }
 
-        public unsafe void SimpleClear(nint offset, nint size, IntPtr data)
+        public void SimpleClear(nint offset, nint size, IntPtr data)
         {
             Clear(PixelInternalFormat.R32f, PixelFormat.Red, PixelType.Float, offset, size, data);
         }
-        public unsafe void Clear(PixelInternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType, nint offset, nint size, IntPtr data)
+        public void Clear(PixelInternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType, nint offset, nint size, IntPtr data)
         {
             GL.ClearNamedBufferSubData(ID, internalFormat, offset, size, pixelFormat, pixelType, data);
         }

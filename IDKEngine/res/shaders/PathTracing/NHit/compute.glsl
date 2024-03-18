@@ -18,6 +18,14 @@ AppInclude(PathTracing/include/Constants.glsl)
 
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
+struct HitInfo
+{
+    vec3 Bary;
+    float T;
+    uvec3 VertexIndices;
+    uint InstanceID;
+};
+
 struct Material
 {
     vec3 EmissiveFactor;
@@ -96,7 +104,7 @@ struct TlasNode
     vec3 Min;
     uint IsLeafAndChildOrInstanceID;
     vec3 Max;
-    uint BlasIndex;
+    float _pad0;
 };
 
 struct WavefrontRay
@@ -113,9 +121,9 @@ struct WavefrontRay
 
 struct DispatchCommand
 {
-    uint NumGroupsX;
-    uint NumGroupsY;
-    uint NumGroupsZ;
+    int NumGroupsX;
+    int NumGroupsY;
+    int NumGroupsZ;
 };
 
 struct Light
@@ -170,10 +178,11 @@ layout(std430, binding = 8) restrict buffer WavefrontRaySSBO
 
 layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
 {
-    DispatchCommand DispatchCommands[2];
+    DispatchCommand DispatchCommand;
     uint Counts[2];
+    uint PingPongIndex;
     uint AccumulatedSamples;
-    uint Indices[];
+    uint AliveRayIndices[];
 } wavefrontPTSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -209,7 +218,6 @@ bool TraceRay(inout WavefrontRay wavefrontRay);
 vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float transmissionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 
-layout(location = 0) uniform int PingPongIndex;
 uniform bool IsTraceLights;
 uniform bool IsOnRefractionTintAlbedo;
 
@@ -218,19 +226,21 @@ AppInclude(PathTracing/include/RussianRoulette.glsl)
 
 void main()
 {
-    if (gl_GlobalInvocationID.x > wavefrontPTSSBO.Counts[1 - PingPongIndex])
+    uint pingPongIndex = wavefrontPTSSBO.PingPongIndex;
+    if (gl_GlobalInvocationID.x >= wavefrontPTSSBO.Counts[pingPongIndex])
     {
         return;
     }
 
     if (gl_GlobalInvocationID.x == 0)
     {
-        wavefrontPTSSBO.DispatchCommands[1 - PingPongIndex].NumGroupsX = 0u;
+        // reset the arguments that were used to launch this compute shader
+        atomicAdd(wavefrontPTSSBO.DispatchCommand.NumGroupsX, -int(gl_NumWorkGroups.x));
     }
 
     InitializeRandomSeed(gl_GlobalInvocationID.x * 4096 + wavefrontPTSSBO.AccumulatedSamples);
 
-    uint rayIndex = wavefrontPTSSBO.Indices[gl_GlobalInvocationID.x];
+    uint rayIndex = wavefrontPTSSBO.AliveRayIndices[gl_GlobalInvocationID.x];
     WavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
     
     bool continueRay = TraceRay(wavefrontRay);
@@ -238,12 +248,12 @@ void main()
 
     if (continueRay)
     {
-        uint index = atomicAdd(wavefrontPTSSBO.Counts[PingPongIndex], 1u);
-        wavefrontPTSSBO.Indices[index] = rayIndex;
+        uint index = atomicAdd(wavefrontPTSSBO.Counts[1 - pingPongIndex], 1u);
+        wavefrontPTSSBO.AliveRayIndices[index] = rayIndex;
 
         if (index % N_HIT_PROGRAM_LOCAL_SIZE_X == 0)
         {
-            atomicAdd(wavefrontPTSSBO.DispatchCommands[PingPongIndex].NumGroupsX, 1u);
+            atomicAdd(wavefrontPTSSBO.DispatchCommand.NumGroupsX, 1);
         }
     }
 }
@@ -253,7 +263,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
     vec3 uncompressedDir = DecompressOctahedron(vec2(wavefrontRay.CompressedDirectionX, wavefrontRay.CompressedDirectionY));
 
     HitInfo hitInfo;
-    if (BVHRayTrace(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, IsTraceLights, FLOAT_MAX))
+    if (TraceRay(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, IsTraceLights, FLOAT_MAX))
     {
         wavefrontRay.Origin += uncompressedDir * hitInfo.T;
 
@@ -304,7 +314,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
                 return true;
             }
         }
-        else if (IsTraceLights)
+        else
         {
             Light light = lightsUBO.Lights[hitInfo.InstanceID];
             emissive = light.Color;

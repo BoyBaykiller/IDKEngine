@@ -11,6 +11,7 @@
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/Pbr.glsl)
 
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 
@@ -130,7 +131,7 @@ void main()
         directLighting += contrib;
     }
 
-    const float ambient = 0.03;
+    const float ambient = 0.015;
     directLighting += albedoAlpha.rgb * ambient;
     directLighting += emissive;
 
@@ -151,14 +152,14 @@ void main()
 
 vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight)
 {
-    float sampleToLightLength = length(sampleToLight);
+    float dist = length(sampleToLight);
 
-    vec3 lightDir = sampleToLight / sampleToLightLength;
+    vec3 lightDir = sampleToLight / dist;
     float cosTerm = dot(normalize(inData.Normal), lightDir);
     if (cosTerm > 0.0)
     {
         vec3 diffuse = light.Color * cosTerm * albedo;
-        vec3 attenuation = light.Color / (4.0 * PI * sampleToLightLength * sampleToLightLength);
+        float attenuation = GetAttenuationFactor(dist * dist, light.Radius);
 
         return diffuse * attenuation;
     }

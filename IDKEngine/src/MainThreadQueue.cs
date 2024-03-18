@@ -5,22 +5,28 @@ namespace IDKEngine
 {
     public static class MainThreadQueue
     {
-        private static readonly ConcurrentQueue<Action> actionsQueue = new ConcurrentQueue<Action>();
+        private static readonly ConcurrentQueue<Action> lazyActionsQueue = new ConcurrentQueue<Action>();
+        private static readonly ConcurrentQueue<Action> hastyActionsQueue = new ConcurrentQueue<Action>();
 
-        /// <summary>
-        /// Queues up an action for execution on the main thread.
-        /// </summary>
-        public static void Enqueue(Action action)
+
+        public static void AddToHastyQueue(Action action)
         {
-            actionsQueue.Enqueue(action);
+            hastyActionsQueue.Enqueue(action);
         }
 
-        /// <summary>
-        /// Executes one queued up action. This must only be called from the main thread.
-        /// </summary>
-        public static void ExecuteOne()
+        public static void AddToLazyQueue(Action action)
         {
-            if (actionsQueue.TryDequeue(out Action action))
+            lazyActionsQueue.Enqueue(action);
+        }
+
+        public static void Execute()
+        {
+            if (lazyActionsQueue.TryDequeue(out Action action))
+            {
+                action();
+            }
+
+            while (hastyActionsQueue.TryDequeue(out action))
             {
                 action();
             }

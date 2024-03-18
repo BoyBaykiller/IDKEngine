@@ -1,7 +1,5 @@
 ﻿using System;
-using System.IO;
 using System.Runtime.InteropServices;
-using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Render.Objects;
 using IDKEngine.GpuTypes;
@@ -89,7 +87,7 @@ namespace IDKEngine.Render
         }
 
         private uint _accumulatedSamples;
-        public unsafe uint AccumulatedSamples
+        public uint AccumulatedSamples
         {
             get => _accumulatedSamples;
 
@@ -120,11 +118,11 @@ namespace IDKEngine.Render
         private readonly ShaderProgram finalDrawProgram;
         private TypedBuffer<GpuWavefrontRay> wavefrontRayBuffer;
         private BufferObject wavefrontPTBuffer;
-        public unsafe PathTracer(int width, int height)
+        public PathTracer(int width, int height)
         {
-            firstHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FirstHit/compute.glsl")));
-            nHitProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/NHit/compute.glsl")));
-            finalDrawProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/PathTracing/FinalDraw/compute.glsl")));
+            firstHitProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "PathTracing/FirstHit/compute.glsl"));
+            nHitProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "PathTracing/NHit/compute.glsl"));
+            finalDrawProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "PathTracing/FinalDraw/compute.glsl"));
 
             SetSize(width, height);
 
@@ -133,7 +131,7 @@ namespace IDKEngine.Render
             LenseRadius = 0.01f;
         }
 
-        public unsafe void Compute()
+        public void Compute()
         {
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, Result.SizedInternalFormat);
             firstHitProgram.Use();
@@ -144,14 +142,15 @@ namespace IDKEngine.Render
             nHitProgram.Use();
             for (int j = 1; j < RayDepth; j++)
             {
-                int pingPongIndex = 1 - (j % 2);
-                nHitProgram.Upload(0, pingPongIndex);
-                
-                nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
-                wavefrontPTBuffer.UploadData(rayCountsBaseOffset + pingPongIndex * sizeof(uint), sizeof(uint), 0);
+                int pingPongIndex = j % 2;
 
-                nint dispatchCmdsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommands));
-                GL.DispatchComputeIndirect(dispatchCmdsBaseOffset + sizeof(GpuDispatchCmd) * (1 - pingPongIndex));
+                nint pingPongIndexOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.PingPongIndex));
+                wavefrontPTBuffer.UploadData(pingPongIndexOffset, sizeof(uint), pingPongIndex);
+
+                nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
+                wavefrontPTBuffer.UploadData(rayCountsBaseOffset + (1 - pingPongIndex) * sizeof(uint), sizeof(uint), 0);
+
+                GL.DispatchComputeIndirect(0);
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
             }
 

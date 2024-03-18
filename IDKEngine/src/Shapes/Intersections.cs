@@ -1,5 +1,4 @@
 ﻿using System;
-using OpenTK.Graphics.ES11;
 using OpenTK.Mathematics;
 
 namespace IDKEngine.Shapes

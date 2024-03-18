@@ -6,6 +6,14 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
 
+struct HitInfo
+{
+    vec3 Bary;
+    float T;
+    uvec3 VertexIndices;
+    uint InstanceID;
+};
+
 struct WavefrontRay
 {
     vec3 Origin;
@@ -20,9 +28,9 @@ struct WavefrontRay
 
 struct DispatchCommand
 {
-    uint NumGroupsX;
-    uint NumGroupsY;
-    uint NumGroupsZ;
+    int NumGroupsX;
+    int NumGroupsY;
+    int NumGroupsZ;
 };
 
 layout(std430, binding = 8) restrict readonly buffer WavefrontRaySSBO
@@ -32,10 +40,11 @@ layout(std430, binding = 8) restrict readonly buffer WavefrontRaySSBO
 
 layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
 {
-    DispatchCommand DispatchCommands[2];
+    DispatchCommand DispatchCommand;
     uint Counts[2];
+    uint PingPongIndex;
     uint AccumulatedSamples;
-    uint Indices[];
+    uint AliveRayIndices[];
 } wavefrontPTSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -62,25 +71,9 @@ uniform bool IsDebugBVHTraversal;
 
 void main()
 {
-    ivec2 imgResultSize = imageSize(ImgResult);
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    // Reset global memory for next frame
-    if (gl_GlobalInvocationID.x == 0)
-    {
-        wavefrontPTSSBO.DispatchCommands[0].NumGroupsX = 0u;
-        wavefrontPTSSBO.DispatchCommands[0].NumGroupsY = 1u;
-        wavefrontPTSSBO.DispatchCommands[0].NumGroupsZ = 1u;
-
-        wavefrontPTSSBO.DispatchCommands[1].NumGroupsX = 0u;
-        wavefrontPTSSBO.DispatchCommands[1].NumGroupsY = 1u;
-        wavefrontPTSSBO.DispatchCommands[1].NumGroupsZ = 1u;
-        
-        wavefrontPTSSBO.Counts[0] = 0u;
-        wavefrontPTSSBO.Counts[1] = 0u;
-    }
-
-    uint rayIndex = imgCoord.y * imgResultSize.x + imgCoord.x;
+    uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
     WavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
 
     vec3 irradiance = wavefrontRay.Radiance;
@@ -95,6 +88,17 @@ void main()
     vec3 lastFrameIrradiance = imageLoad(ImgResult, imgCoord).rgb;
     irradiance = mix(lastFrameIrradiance, irradiance, 1.0 / (float(wavefrontPTSSBO.AccumulatedSamples) + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
+
+    // Reset global memory for next frame
+    if (gl_GlobalInvocationID.x == 0)
+    {
+        wavefrontPTSSBO.DispatchCommand.NumGroupsX = 0;
+        wavefrontPTSSBO.DispatchCommand.NumGroupsY = 1;
+        wavefrontPTSSBO.DispatchCommand.NumGroupsZ = 1;
+        
+        wavefrontPTSSBO.Counts[0] = 0u;
+        wavefrontPTSSBO.Counts[1] = 0u;
+    }
 }
 
 vec3 SpectralJet(float a)

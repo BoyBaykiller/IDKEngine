@@ -1,7 +1,6 @@
 // Implementation of: http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare, Slides: 145-162
 
 #version 460 core
-#define EPSILON 0.0001
 #define DOWNSAMPLE_STAGE 0
 #define UPSAMPLE_STAGE 1
 
@@ -11,16 +10,18 @@ layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerDownsample;
 layout(binding = 1) uniform sampler2D SamplerUpsample;
 
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    float Threshold;
+    float MaxColor;
+} settingsUBO;
+
 vec3 Downsample(sampler2D srcTexture, vec2 uv, float lod);
 vec3 Upsample(sampler2D srcTexture, vec2 uv, float lod);
-vec3 Prefilter(vec3 color);
+vec3 Prefilter(vec3 color, float maxColor, float threshold);
 
 layout(location = 0) uniform int Lod;
 layout(location = 1) uniform int Stage;
-
-uniform float Threshold;
-uniform float Clamp;
-uniform float Radius;
 
 void main()
 {
@@ -39,7 +40,7 @@ void main()
         result = Downsample(SamplerDownsample, uv, Lod);
         if (Lod == 0)
         {
-            result = Prefilter(result);
+            result = Prefilter(result, settingsUBO.MaxColor, settingsUBO.Threshold);
         }
     }
     else if (Stage == UPSAMPLE_STAGE)
@@ -105,17 +106,17 @@ vec3 Upsample(sampler2D src, vec2 uv, float lod)
     return result / 16.0;
 }
 
-vec3 Prefilter(vec3 color)
+vec3 Prefilter(vec3 color, float maxColor, float threshold)
 {
     const float Knee = 0.2;
-    color = min(vec3(Clamp), color);
+    color = min(vec3(maxColor), color);
 
     float brightness = max(max(color.r, color.g), color.b);
 
-    vec3 curve = vec3(Threshold - Knee, Knee * 2.0, 0.25 / Knee);
+    vec3 curve = vec3(threshold - Knee, Knee * 2.0, 0.25 / Knee);
     float rq = clamp(brightness - curve.x, 0.0, curve.y);
     rq = (rq * rq) * curve.z;
-    color *= max(rq, brightness - Threshold) / max(brightness, EPSILON);
+    color *= max(rq, brightness - threshold) / max(brightness, 0.0001);
     
     return color;
 }

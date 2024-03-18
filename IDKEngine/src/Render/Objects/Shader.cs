@@ -1,7 +1,9 @@
 ﻿using System;
 using System.IO;
 using System.Text;
+using System.Diagnostics;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using OpenTK.Graphics.OpenGL4;
 
 namespace IDKEngine.Render.Objects
@@ -15,21 +17,36 @@ namespace IDKEngine.Render.Objects
             AppInclude,
         }
 
-        public const string BASE_INCLUDE_PATH = "res/shaders/";
+        public const string SHADER_PATH = "res/shaders/";
 
         public readonly int ID;
         public readonly ShaderType ShaderType;
-        public static string debugShaderString;
-        public Shader(ShaderType shaderType, string srcCode, Dictionary<string, string> shaderInsertions = null)
+
+        public static Shader ShaderFromFile(ShaderType shaderType, string localShaderPath, Dictionary<string, string> shaderInsertions = null)
+        {
+            string path = Path.Combine(SHADER_PATH, localShaderPath);
+            string srcCode = File.ReadAllText(path);
+            string name = path;
+            Shader shader = new Shader(
+                shaderType,
+                srcCode,
+                name,
+                shaderInsertions
+            );
+
+            return shader;
+        }
+
+        public Shader(ShaderType shaderType, string srcCode, string srcName, Dictionary<string, string> shaderInsertions = null)
         {
             ShaderType = shaderType;
 
             ID = GL.CreateShader(shaderType);
 
-            srcCode = PreProcess(srcCode, shaderInsertions);
-            debugShaderString = srcCode;
+            srcName ??= shaderType.ToString();
+            string preprocessed = PreProcess(srcCode, shaderInsertions, srcName);
 
-            GL.ShaderSource(ID, srcCode);
+            GL.ShaderSource(ID, preprocessed);
             GL.CompileShader(ID);
 
             bool compiled = GetCompileStatus();
@@ -47,112 +64,130 @@ namespace IDKEngine.Render.Objects
             return success == 1;
         }
 
-        private static string PreProcess(string src, Dictionary<string, string> shaderInsertions)
+        public void Dispose()
         {
-            StringBuilder result = new StringBuilder(src.Length);
+            GL.DeleteShader(ID);
+        }
 
-            int startIndex = 0;
-            while (true)
+        public const bool REPORT_SHADER_ERRORS_WITH_NAME = false; // for debugging only (requires GL_GOOGLE_cpp_style_line_directive)
+        private static string PreProcess(string source, Dictionary<string, string> shaderInsertions, string sourceName)
+        {
+            StringBuilder result = ResolveKeywords(source, shaderInsertions, sourceName);
+
+            if (REPORT_SHADER_ERRORS_WITH_NAME)
             {
-                // Advance to the next keyword and append all text leading up to it
-
-                int oldStartIndex = startIndex;
-                startIndex = AdvanceToNextKeyword(src, startIndex, out Keyword keyword);
-
-                result.Append(src, oldStartIndex, startIndex - oldStartIndex);
-
-                if (keyword == Keyword.NoKeyword)
-                {
-                    break;
-                }
-
-                startIndex += keyword.ToString().Length + 1;
-                int endIndex = src.IndexOf(')', startIndex);
-
-                string userKey = src.Substring(startIndex, endIndex - startIndex); // this gets the userKey between the parentheses, for example MY_VALUE in AppInsert(MY_VALUE)
-                startIndex += userKey.Length + 1; // account for user key name and ending ")"
+                string copy = result.ToString();
                 
-                if (keyword == Keyword.AppInsert)
-                {
-                    if (shaderInsertions == null || !shaderInsertions.TryGetValue(userKey, out string userValue))
-                    {
-                        const string defaultFallbackValue = "0";
-                        Logger.Log(Logger.LogLevel.Warn, $"The application does not provide a glsl {keyword} value for {userKey}. {defaultFallbackValue} as fallback is inserted");
-                        userValue = defaultFallbackValue;
-                    }
+                Match match = Regex.Match(copy, "#version .*\n*"); // detect GLSL version statement up to line break
+                int afterVersionStatement = match.Index + match.Length; // 0 if not found
 
-                    result.Append(userValue);
-                }
+                int lineCountVersionStatement = CountLines(copy, afterVersionStatement);
 
-                if (keyword == Keyword.AppInclude)
-                {
-                    string path = BASE_INCLUDE_PATH + userKey;
-                    if (!File.Exists(path))
-                    {
-                        Logger.Log(Logger.LogLevel.Error, $"Include file {path} does not exist");
-                        continue;
-                    }
+                string toInsert =
+                    $"""
+                    #extension GL_GOOGLE_cpp_style_line_directive : require
+                    #line {lineCountVersionStatement + 1} "{sourceName}"
 
-                    int lineCount = CountLines(src, startIndex);
-                    string includeSrc = File.ReadAllText(path);
+                    """;
 
-                    result.AppendLine("#line 1");
-                    result.AppendLine(PreProcess(includeSrc, shaderInsertions));
-                    result.AppendLine($"#line {lineCount + 1}");
-                }
+                result = result.Insert(afterVersionStatement, toInsert);
             }
+
             return result.ToString();
+
+            static StringBuilder ResolveKeywords(string source, Dictionary<string, string> shaderInsertions, string sourceName)
+            {
+                StringBuilder result = new StringBuilder(source.Length);
+
+                int currentIndex = 0;
+                while (true)
+                {
+                    int oldStartIndex = currentIndex;
+                    currentIndex = AdvanceToNextKeyword(source, currentIndex, out int expressionLength, out Keyword keyword, out string userKey);
+
+                    result.Append(source, oldStartIndex, currentIndex - oldStartIndex);
+
+                    if (keyword == Keyword.NoKeyword)
+                    {
+                        break;
+                    }
+
+                    if (keyword == Keyword.AppInsert)
+                    {
+                        if (shaderInsertions == null || !shaderInsertions.TryGetValue(userKey, out string userValue))
+                        {
+                            const string defaultFallbackValue = "0";
+                            userValue = defaultFallbackValue;
+
+                            Logger.Log(Logger.LogLevel.Error, $"The application does not provide a glsl {keyword} value for {userKey}. {defaultFallbackValue} as fallback is inserted");
+                        }
+
+                        result.Append(userValue);
+                    }
+                    else if (keyword == Keyword.AppInclude)
+                    {
+                        string path = SHADER_PATH + userKey;
+                        if (!File.Exists(path))
+                        {
+                            Logger.Log(Logger.LogLevel.Error, $"Include file {path} does not exist");
+                            continue;
+                        }
+
+                        int lineCount = CountLines(source, currentIndex);
+                        string includedText = File.ReadAllText(path);
+
+                        string newLine = "#line 1";
+                        if (REPORT_SHADER_ERRORS_WITH_NAME) newLine += $"\"{path}\"";
+                        result.AppendLine(newLine);
+
+                        result.Append(ResolveKeywords(includedText, shaderInsertions, path));
+                        result.Append('\n');
+
+                        string origionalLine = $"#line {lineCount + 1}";
+                        if (REPORT_SHADER_ERRORS_WITH_NAME) origionalLine += $"\"{sourceName}\"";
+                        result.AppendLine(origionalLine);
+                    }
+                    else
+                    {
+                        throw new UnreachableException();
+                    }
+
+                    currentIndex += expressionLength;
+                }
+                return result;
+            }
         }
 
-        private static int AdvanceToNextKeyword(string srcCode, int startIndex, out Keyword keyword)
+        private static int AdvanceToNextKeyword(string source, int startIndex, out int expressionLength, out Keyword keyword, out string value)
         {
-            // TODO: If wee add more Keywords then we should generalize and optimize this function, also use Regex?
-
+            expressionLength = 0;
             keyword = Keyword.NoKeyword;
+            value = null;
 
-            int appInsertIndex = srcCode.IndexOf(Keyword.AppInsert.ToString(), startIndex);
-            int appIncludeIndex = srcCode.IndexOf(Keyword.AppInclude.ToString(), startIndex);
-
-            if (appInsertIndex == -1 && appIncludeIndex == -1)
+            Regex regex = new Regex($"({Keyword.AppInsert}|{Keyword.AppInclude})\\((.*?)\\)");
+            Match match = regex.Match(source, startIndex);
+            if (match.Success)
             {
-                return srcCode.Length;
-            }
+                expressionLength = match.Groups[0].Length;
+                keyword = Enum.Parse<Keyword>(match.Groups[1].Value);
+                value = match.Groups[2].Value;
 
-            if (appIncludeIndex == -1)
+                return match.Index;
+            }
+            else
             {
-                keyword = Keyword.AppInsert;
-                return appInsertIndex;
+                return source.Length;
             }
-
-            if (appInsertIndex == -1)
-            {
-                keyword = Keyword.AppInclude;
-                return appIncludeIndex;
-            }
-
-            if (appInsertIndex < appIncludeIndex)
-            {
-                keyword = Keyword.AppInsert;
-                return appInsertIndex;
-            }
-
-            if (appIncludeIndex < appInsertIndex)
-            {
-                keyword = Keyword.AppInclude;
-                return appIncludeIndex;
-            }
-
-            return -1;
         }
-        private static int CountLines(string src, int max)
+        private static int CountLines(string searchString, int count, int startIndex = 0)
         {
             int lineCount = 0;
 
-            int startIndex = 0;
+            int end = startIndex + count;
             while (true)
             {
-                startIndex = src.IndexOf('\n', startIndex + 1);
-                if (startIndex == -1 || startIndex > max)
+                startIndex = searchString.IndexOf('\n', startIndex + 1);
+                if (startIndex == -1 || startIndex > end)
                 {
                     break;
                 }
@@ -161,11 +196,6 @@ namespace IDKEngine.Render.Objects
             }
 
             return lineCount;
-        }
-
-        public void Dispose()
-        {
-            GL.DeleteShader(ID);
         }
     }
 }

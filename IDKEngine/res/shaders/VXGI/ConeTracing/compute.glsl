@@ -31,7 +31,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
-    int Samples;
+    int SampleCount;
     float MipmapBias;
     int TemporalAntiAliasingMode;
 } taaDataUBO;
@@ -101,7 +101,7 @@ vec3 IndirectLight(vec3 position, vec3 incomming, vec3 normal, float specularCha
     uint samples = uint(mix(1.0, float(MaxSamples), materialVariance));
 
     bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
-    uint noiseIndex = (IsTemporalAccumulation && taaEnabled) ? (basicDataUBO.Frame % taaDataUBO.Samples) * MaxSamples : 0u;
+    uint noiseIndex = (IsTemporalAccumulation && taaEnabled) ? (basicDataUBO.Frame % taaDataUBO.SampleCount) * MaxSamples : 0u;
     for (uint i = 0; i < samples; i++)
     {
         float rnd0 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex + 0);

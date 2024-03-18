@@ -104,7 +104,7 @@ namespace IDKEngine
         {
             return (APIVersion >= first) || IsExtensionsAvailable(extension);
         }
-        public static unsafe bool LoadCubemap(Texture texture, string[] imagePaths, SizedInternalFormat sizedInternalFormat)
+        public static bool LoadCubemap(Texture texture, string[] imagePaths, SizedInternalFormat sizedInternalFormat)
         {
             if (imagePaths == null)
             {
@@ -214,6 +214,15 @@ namespace IDKEngine
             fixed (void* srcPtr = &src, destPtr = &dest)
             {
                 MemCpy(srcPtr, destPtr, byteCount);
+            }
+        }
+
+        public static unsafe void MemCpy<T1>(in T1 src, T1* dest, nint byteCount)
+            where T1 : unmanaged
+        {
+            fixed (void* srcPtr = &src)
+            {
+                MemCpy(srcPtr, dest, byteCount);
             }
         }
 

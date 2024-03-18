@@ -7,64 +7,22 @@ namespace IDKEngine.Render
 {
     class VolumetricLighting : IDisposable
     {
-        private int _samples;
-        public int Samples
+        public struct GpuSettings
         {
-            get => _samples;
+            public Vector3 Absorbance;
+            public int SampleCount;
+            public float Scattering;
+            public float MaxDist;
+            public float Strength;
 
-            set
+            public static GpuSettings Default = new GpuSettings()
             {
-                _samples = value;
-                volumetricLightingProgram.Upload("Samples", _samples);
-            }
-        }
-
-        private float _scattering;
-        public float Scattering
-        {
-            get => _scattering;
-
-            set
-            {
-                _scattering = value;
-                volumetricLightingProgram.Upload("Scattering", _scattering);
-            }
-        }
-
-        private float _maxDist;
-        public float MaxDist
-        {
-            get => _maxDist;
-
-            set
-            {
-                _maxDist = value;
-                volumetricLightingProgram.Upload("MaxDist", _maxDist);
-            }
-        }
-
-        private Vector3 _absorbance;
-        public Vector3 Absorbance
-        {
-            get => _absorbance;
-
-            set
-            {
-                _absorbance = value;
-                volumetricLightingProgram.Upload("Absorbance", _absorbance);
-            }
-        }
-
-        private float _strength;
-        public float Strength
-        {
-            get => _strength;
-
-            set
-            {
-                _strength = value;
-                volumetricLightingProgram.Upload("Strength", _strength);
-            }
+                Absorbance = new Vector3(0.025f),
+                SampleCount = 5,
+                Scattering = 0.758f,
+                MaxDist = 50.0f,
+                Strength = 0.1f
+            };
         }
 
         public Vector2i RenderResolution { get; private set; }
@@ -82,29 +40,34 @@ namespace IDKEngine.Render
             }
         }
 
+        public GpuSettings Settings;
+
         public Texture Result;
         private Texture depthTexture;
         private Texture volumetricLightingTexture;
 
         private readonly ShaderProgram volumetricLightingProgram;
         private readonly ShaderProgram upscaleProgram;
-        public VolumetricLighting(int width, int height, int samples, float scattering, float maxDist, float strength, Vector3 absorbance, float resolutionScale = 0.5f)
+        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
+        public VolumetricLighting(int width, int height, in GpuSettings settings, float resolutionScale = 0.5f)
         {
-            volumetricLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/compute.glsl")));
-            upscaleProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, System.IO.File.ReadAllText("res/shaders/VolumetricLight/Upscale/compute.glsl")));
+            volumetricLightingProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VolumetricLight/compute.glsl"));
+            upscaleProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VolumetricLight/Upscale/compute.glsl"));
+
+            bufferGpuSettings = new TypedBuffer<GpuSettings>();
+            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
             _resolutionScale = resolutionScale;
             SetSize(width, height);
 
-            Samples = samples;
-            Scattering = scattering;
-            MaxDist = maxDist;
-            Strength = strength;
-            Absorbance = absorbance;
+            Settings = settings;
         }
 
         public void Compute()
         {
+            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            bufferGpuSettings.UploadElements(Settings);
+
             volumetricLightingTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, volumetricLightingTexture.SizedInternalFormat);
             depthTexture.BindToImageUnit(1, 0, false, 0, TextureAccess.WriteOnly, depthTexture.SizedInternalFormat);
             volumetricLightingProgram.Use();
@@ -148,6 +111,7 @@ namespace IDKEngine.Render
             volumetricLightingTexture.Dispose();
             volumetricLightingProgram.Dispose();
             upscaleProgram.Dispose();
+            bufferGpuSettings.Dispose();
         }
     }
 }

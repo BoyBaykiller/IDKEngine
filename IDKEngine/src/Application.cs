@@ -72,24 +72,60 @@ namespace IDKEngine
 
             set
             {
+                // (Re-)Create all rendering ressources for the selected RenderMode.
+
+                _renderMode = value;
+
                 if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
                 if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
 
-                if (value == RenderMode.Rasterizer)
+                if (RenderMode == RenderMode.Rasterizer)
                 {
                     RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y, PresentationResolution.X, PresentationResolution.Y);
                 }
-
-                if (value == RenderMode.PathTracer)
+                
+                if (RenderMode == RenderMode.PathTracer)
                 {
                     PathTracer = new PathTracer(RenderResolution.X, RenderResolution.Y);
                 }
 
-                _renderMode = value;
+                if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
+                {
+                    if (TonemapAndGamma == null)
+                    {
+                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution.X, PresentationResolution.Y, TonemapAndGammaCorrect.GpuSettings.Default);
+                    }
+                    else
+                    {
+                        TonemapAndGamma.Dispose();
+                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution.X, PresentationResolution.Y, TonemapAndGamma.Settings);
+                    }
+
+                    if (Bloom == null)
+                    {
+                        Bloom = new Bloom(PresentationResolution.X, PresentationResolution.Y, Bloom.GpuSettings.Default);
+                    }
+                    else
+                    {
+                        Bloom.Dispose();
+                        Bloom = new Bloom(PresentationResolution.X, PresentationResolution.Y, Bloom.Settings);
+                    }
+
+                    if (VolumetricLight == null)
+                    {
+                        VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, VolumetricLighting.GpuSettings.Default);
+                    }
+                    else
+                    {
+                        VolumetricLight.Dispose();
+                        VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, VolumetricLight.Settings);
+                    }
+                }
             }
         }
 
         public Vector2i RenderResolution => new Vector2i((int)(PresentationResolution.X * ResolutionScale), (int)(PresentationResolution.Y * ResolutionScale));
+
         public bool RenderGui { get; private set; }
         public int FPS { get; private set; }
 
@@ -107,7 +143,7 @@ namespace IDKEngine
 
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        protected override unsafe void OnRender(float dT)
+        protected override void OnRender(float dT)
         {
             Update(dT);
             if (RenderMode == RenderMode.Rasterizer)
@@ -194,9 +230,9 @@ namespace IDKEngine
             fpsCounter++;
         }
 
-        private unsafe void Update(float dT)
+        private void Update(float dT)
         {
-            MainThreadQueue.ExecuteOne();
+            MainThreadQueue.Execute();
 
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
@@ -257,7 +293,7 @@ namespace IDKEngine
                     {
                         Vector3 force = Camera.ViewDir * 5.0f;
 
-                        CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, Helper.RandomVec3(6.0f, 10.0f), 0.3f);
+                        CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, Helper.RandomVec3(32.0f, 88.0f), 0.3f);
                         newLight.Velocity = Camera.Velocity;
                         newLight.AddImpulse(force);
 
@@ -363,10 +399,11 @@ namespace IDKEngine
 
         private TypedBuffer<GpuBasicData> basicDataBuffer;
         public GpuBasicData GpuBasicData;
-        protected override unsafe void OnStart()
+        protected override void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
             Logger.Log(Logger.LogLevel.Info, $"GPU: {Helper.GPU}");
+            Logger.Log(Logger.LogLevel.Info, $"{nameof(Shader.REPORT_SHADER_ERRORS_WITH_NAME)} = {Shader.REPORT_SHADER_ERRORS_WITH_NAME}");
 
             if (Helper.APIVersion < 4.6)
             {
@@ -382,12 +419,10 @@ namespace IDKEngine
             GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, IntPtr.Zero);
-            GL.PointSize(1.3f);
             Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
             GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DepthTest);
-            GL.Enable(EnableCap.ScissorTest);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
             GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
 
@@ -396,8 +431,9 @@ namespace IDKEngine
             basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             finalProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/fragment.glsl")));
+                Shader.ShaderFromFile(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
+                Shader.ShaderFromFile(ShaderType.FragmentShader, "ToScreen/fragment.glsl")
+            );
             Camera = new Camera(RenderResolution, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
             //Camera = new Camera(RenderResolution, new Vector3(-0.824f, 2.587f, -6.370f), -90.0f, 0.0f);
             //Camera = new Camera(RenderResolution, new Vector3(-13.238f, 4.226f, -0.147f), -360.950f, -14.600f);
@@ -413,14 +449,10 @@ namespace IDKEngine
             });
 
             PresentationResolution = WindowFramebufferSize;
-            VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, 5, 0.758f, 50.0f, 4.0f, new Vector3(0.025f));
-            Bloom = new Bloom(PresentationResolution.X, PresentationResolution.Y, 1.0f, 3.0f);
-            TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution.X, PresentationResolution.Y);
             BoxRenderer = new BoxRenderer();
-
             LightManager = new LightManager(12, 12);
             ModelSystem = new ModelSystem();
-
+            
             ModelLoader.SetCallackTextureLoaded(() =>
             {
                 if (PathTracer != null)
@@ -431,6 +463,8 @@ namespace IDKEngine
 
             if (true)
             {
+                RenderMode = RenderMode.Rasterizer;
+
                 ModelLoader.Model sponza = ModelLoader.GltfToEngineFormat("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
                 sponza.Meshes[63].EmissiveBias = 10.0f;
                 sponza.Meshes[70].EmissiveBias = 20.0f;
@@ -459,9 +493,9 @@ namespace IDKEngine
 
                 ModelSystem.Add(sponza, lucy, helmet);
 
-                LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(3.5f, 0.8f, 0.9f) * 6.3f, 0.3f));
-                LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(0.5f, 3.8f, 0.9f) * 6.3f, 0.3f));
-                LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), /*new Vector3(-4.0f, 0.0f, 0.0f), */new Vector3(0.5f, 0.8f, 3.9f) * 6.3f, 0.3f));
+                LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
+                LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));
+                LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), /*new Vector3(-4.0f, 0.0f, 0.0f), */new Vector3(8.773416f, 22.459948f, 533.77466f), 0.3f));
 
                 //LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
                 //LightManager.AddLight(new CpuLight(new Vector3(-3.9f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
@@ -477,13 +511,13 @@ namespace IDKEngine
                     }
                 }
 
-                //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(50.4f, 35.8f, 25.2f) * 0.6f, 1.0f)); // alt Color: new Vector3(50.4f, 35.8f, 25.2f)
-                //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.5f, 60.0f), LightManager.Count - 1);
-
-                RenderMode = RenderMode.Rasterizer;
+                //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(72.77023f, 36.716278f, 18.192558f) * 0.6f, 1.0f));
+                //LightManager.CreatePointShadowForLight(new PointShadow(512, new Vector2(0.5f, 60.0f)), LightManager.Count - 1);
             }
             else
             {
+                RenderMode = RenderMode.Rasterizer;
+
                 ModelLoader.Model a = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
                 a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
@@ -523,13 +557,12 @@ namespace IDKEngine
                 //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.1f, 60.0f), 0);
 
-                RenderMode = RenderMode.Rasterizer;
                 RasterizerPipeline.IsVXGI = false;
                 RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
                 RasterizerPipeline.ConeTracer.MaxSamples = 4;
 
-                VolumetricLight.Strength = 10.0f;
+                VolumetricLight.Settings.Strength = 10.0f;
             }
 
             RenderGui = true;

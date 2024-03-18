@@ -4,11 +4,20 @@
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/Random.glsl)
+AppInclude(include/Pbr.glsl)
 
 layout(location = 0) out vec4 FragColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
+
+struct HitInfo
+{
+    vec3 Bary;
+    float T;
+    uvec3 VertexIndices;
+    uint InstanceID;
+};
 
 struct DrawElementsCmd
 {
@@ -58,7 +67,7 @@ struct TlasNode
     vec3 Min;
     uint IsLeafAndChildOrInstanceID;
     vec3 Max;
-    uint BlasIndex;
+    float _pad0;
 };
 
 struct Light
@@ -117,7 +126,7 @@ layout(std140, binding = 2) uniform LightsUBO
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
-    int Samples;
+    int SampleCount;
     float MipmapBias;
     int TemporalAntiAliasingMode;
 } taaDataUBO;
@@ -254,7 +263,7 @@ void main()
                     ray.Direction = (lightSamplePoint - offsetedPos) / dist;
 
                     HitInfo hitInfo;
-                    if (BVHRayTraceAny(ray, hitInfo, false, dist - 0.001))
+                    if (TraceRayAny(ray, hitInfo, false, dist - 0.001))
                     {
                         shadow += 1.0;
                     }
@@ -275,7 +284,7 @@ void main()
     }
     else
     {
-        const vec3 ambient = vec3(0.03);
+        const vec3 ambient = vec3(0.015);
         indirectLight = ambient * albedo;
     }
 
@@ -285,9 +294,9 @@ void main()
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight, float ambientOcclusion)
 {
-    float fragToLightLength = length(sampleToLight);
+    float dist = length(sampleToLight);
 
-    vec3 lightDir = sampleToLight / fragToLightLength;
+    vec3 lightDir = sampleToLight / dist;
     float cosTerm = dot(normal, lightDir);
     if (cosTerm > 0.0)
     {
@@ -308,7 +317,7 @@ vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, 
             }
         }
         
-        vec3 attenuation = light.Color / (4.0 * PI * fragToLightLength * fragToLightLength);
+        float attenuation = GetAttenuationFactor(dist * dist, light.Radius);
 
         return (diffuseContrib + specularContrib) * attenuation;
     }

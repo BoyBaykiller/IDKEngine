@@ -17,47 +17,27 @@ namespace IDKEngine.Render
             LuminanceVariance,
         }
 
-        private DebugMode _debugValue;
-        public DebugMode DebugValue
+        public struct GpuSettings
         {
-            get => _debugValue;
+            public DebugMode DebugValue;
+            public float SpeedFactor;
+            public float LumVarianceFactor;
 
-            set
+            public static GpuSettings Default = new GpuSettings()
             {
-                _debugValue = value;
-                shaderProgram.Upload("DebugMode", (int)_debugValue);
-                debugProgram.Upload("DebugMode", (int)_debugValue);
-            }
+                DebugValue = DebugMode.NoDebug,
+                SpeedFactor = 0.2f,
+                LumVarianceFactor = 0.025f,
+            };
         }
 
-        private float _speedFactor;
-        public float SpeedFactor
-        {
-            get => _speedFactor;
-
-            set
-            {
-                _speedFactor = value;
-                shaderProgram.Upload("SpeedFactor", SpeedFactor);
-            }
-        }
-
-        private float _lumVarianceFactor;
-        public float LumVarianceFactor
-        {
-            get => _lumVarianceFactor;
-
-            set
-            {
-                _lumVarianceFactor = value;
-                shaderProgram.Upload("LumVarianceFactor", LumVarianceFactor);
-            }
-        }
+        public GpuSettings Settings;
 
         private Texture debugTexture;
         private readonly ShaderProgram shaderProgram;
         private readonly ShaderProgram debugProgram;
-        public LightingShadingRateClassifier(int width, int height, float lumVarianceFactor, float speedFactor)
+        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
+        public LightingShadingRateClassifier(int width, int height, in GpuSettings settings)
             : base(width, height, new NvShadingRateImage[]
             {
                 NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
@@ -67,17 +47,22 @@ namespace IDKEngine.Render
                 NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
             })
         {
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/compute.glsl")));
-            debugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/ShadingRateClassification/debugCompute.glsl")));
+            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "ShadingRateClassification/compute.glsl"));
+            debugProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "ShadingRateClassification/debugCompute.glsl"));
+
+            bufferGpuSettings = new TypedBuffer<GpuSettings>();
+            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
             SetSize(width, height);
 
-            LumVarianceFactor = lumVarianceFactor;
-            SpeedFactor = speedFactor;
+            Settings = settings;
         }
 
         public void Compute(Texture shaded)
         {
+            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            bufferGpuSettings.UploadElements(Settings);
+
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
             debugTexture.BindToImageUnit(1, 0, false, 0, TextureAccess.WriteOnly, debugTexture.SizedInternalFormat);
             shaded.BindToUnit(0);
@@ -88,14 +73,17 @@ namespace IDKEngine.Render
 
         public void DebugRender(Texture dest)
         {
-            if (DebugValue == DebugMode.NoDebug)
+            if (Settings.DebugValue == DebugMode.NoDebug)
             {
                 return;
             }
 
+            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            bufferGpuSettings.UploadElements(Settings);
+
             dest.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, dest.SizedInternalFormat);
             dest.BindToUnit(0);
-            if (DebugValue != DebugMode.ShadingRate)
+            if (Settings.DebugValue != DebugMode.ShadingRate)
             {
                 debugTexture.BindToUnit(1);
             }
@@ -125,6 +113,7 @@ namespace IDKEngine.Render
             debugTexture.Dispose();
             shaderProgram.Dispose();
             debugProgram.Dispose();
+            bufferGpuSettings.Dispose();
         }
     }
 }

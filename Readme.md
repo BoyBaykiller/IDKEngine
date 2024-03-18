@@ -461,7 +461,7 @@ layout(binding = 0) uniform samplerCubeShadow ShadowTexture;
 
 void main() {
     float fragDepth = GetDepthRange0_1(); 
-    float visibility = texture(ShadowTexture, vec3(coords, fragDepth));
+    float visibility = texture(ShadowTexture, vec4(coords, fragDepth));
 }
 ```
 

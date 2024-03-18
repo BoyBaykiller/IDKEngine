@@ -39,12 +39,15 @@ layout(std140, binding = 6) uniform GBufferDataUBO
     sampler2D Depth;
 } gBufferDataUBO;
 
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    int DebugMode;
+    float SpeedFactor;
+    float LumVarianceFactor;
+} settingsUBO;
+
 void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanLuminance, out float luminanceVariance);
 float GetLuminance(vec3 color);
-
-uniform float SpeedFactor;
-uniform float LumVarianceFactor;
-uniform int DebugMode;
 
 #if !GL_KHR_shader_subgroup_arithmetic
 #define MIN_EFFECTIVE_SUBGROUP_SIZE 1 // effectively 1 if we can't use subgroup arithmetic
@@ -90,8 +93,8 @@ void main()
             float stdDev = sqrt(luminanceVariance);
             coeffOfVariation = stdDev / meanLuminance;
 
-            float velocityShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, meanSpeed * SpeedFactor);
-            float varianceShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, LumVarianceFactor / coeffOfVariation);
+            float velocityShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, meanSpeed * settingsUBO.SpeedFactor);
+            float varianceShadingRate = mix(SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, settingsUBO.LumVarianceFactor / coeffOfVariation);
             
             float combinedShadingRate = velocityShadingRate + varianceShadingRate;
             finalShadingRate = clamp(uint(round(combinedShadingRate)), SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV);
@@ -99,15 +102,15 @@ void main()
 
         imageStore(ImgResult, ivec2(gl_WorkGroupID.xy), uvec4(finalShadingRate));
 
-        if (DebugMode == DEBUG_MODE_SPEED)
+        if (settingsUBO.DebugMode == DEBUG_MODE_SPEED)
         {
             imageStore(ImgDebug, ivec2(gl_WorkGroupID.xy), vec4(meanSpeed));
         }
-        else if (DebugMode == DEBUG_MODE_LUMINANCE)
+        else if (settingsUBO.DebugMode == DEBUG_MODE_LUMINANCE)
         {
             imageStore(ImgDebug, ivec2(gl_WorkGroupID.xy), vec4(meanLuminance));
         }
-        else if (DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
+        else if (settingsUBO.DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
         {
             imageStore(ImgDebug, ivec2(gl_WorkGroupID.xy), vec4(coeffOfVariation));
         }

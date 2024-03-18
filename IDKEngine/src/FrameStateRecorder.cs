@@ -103,7 +103,7 @@ namespace IDKEngine
             ReplayFrameIndex = 0;
         }
 
-        public unsafe void SaveToFile(string path)
+        public void SaveToFile(string path)
         {
             if (recordedFrames == null || recordedFrames.Length == 0)
             {

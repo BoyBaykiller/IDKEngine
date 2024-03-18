@@ -20,6 +20,14 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict readonly writeonly uniform image2D ImgResult;
 
+struct HitInfo
+{
+    vec3 Bary;
+    float T;
+    uvec3 VertexIndices;
+    uint InstanceID;
+};
+
 struct Material
 {
     vec3 EmissiveFactor;
@@ -98,7 +106,7 @@ struct TlasNode
     vec3 Min;
     uint IsLeafAndChildOrInstanceID;
     vec3 Max;
-    uint BlasIndex;
+    float _pad0;
 };
 
 struct WavefrontRay
@@ -115,9 +123,9 @@ struct WavefrontRay
 
 struct DispatchCommand
 {
-    uint NumGroupsX;
-    uint NumGroupsY;
-    uint NumGroupsZ;
+    int NumGroupsX;
+    int NumGroupsY;
+    int NumGroupsZ;
 };
 
 struct Light
@@ -172,10 +180,11 @@ layout(std430, binding = 8) restrict writeonly buffer WavefrontRaySSBO
 
 layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
 {
-    DispatchCommand DispatchCommands[2];
+    DispatchCommand DispatchCommand;
     uint Counts[2];
+    uint PingPongIndex;
     uint AccumulatedSamples;
-    uint Indices[];
+    uint AliveRayIndices[];
 } wavefrontPTSSBO;
 
 layout(std140, binding = 0) uniform BasicDataUBO
@@ -260,11 +269,11 @@ void main()
     if (continueRay)
     {
         uint index = atomicAdd(wavefrontPTSSBO.Counts[1], 1u);
-        wavefrontPTSSBO.Indices[index] = rayIndex;
+        wavefrontPTSSBO.AliveRayIndices[index] = rayIndex;
 
         if (index % N_HIT_PROGRAM_LOCAL_SIZE_X == 0)
         {
-            atomicAdd(wavefrontPTSSBO.DispatchCommands[1].NumGroupsX, 1u);
+            atomicAdd(wavefrontPTSSBO.DispatchCommand.NumGroupsX, 1);
         }
     }
 }
@@ -275,7 +284,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
 
     HitInfo hitInfo;
     uint debugNodeCounter = 0;
-    if (BVHRayTrace(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, debugNodeCounter, IsTraceLights, FLOAT_MAX))
+    if (TraceRay(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, debugNodeCounter, IsTraceLights, FLOAT_MAX))
     {
         if (IsDebugBVHTraversal)
         {

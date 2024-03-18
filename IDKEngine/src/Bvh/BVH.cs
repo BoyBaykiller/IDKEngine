@@ -162,18 +162,20 @@ namespace IDKEngine
         public void BlasesBuild(int start, int count)
         {
             Stopwatch sw = Stopwatch.StartNew();
-            
+
             Parallel.For(start, start + count, i =>
             //for (int i = start; i < start + count; i++)
             {
                 blases[i].Build();
+                //blases[i].BuildBVH4();
             });
             SetBlasBuffersContent();
+
 
             Logger.Log(Logger.LogLevel.Info, $"Created {blases.Length} new Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
         }
 
-        public unsafe void BlasesRefit(int start, int count)
+        public void BlasesRefit(int start, int count)
         {
             //Parallel.For(start, start + count, i =>
             for (int i = start; i < start + count; i++)
@@ -195,7 +197,7 @@ namespace IDKEngine
             }
         }
 
-        private unsafe void SetBlasBuffersContent()
+        private void SetBlasBuffersContent()
         {
             blasBuffer.MutableAllocateElements(GetBlasesNodeCount());
             blasTriangleIndicesBuffer.MutableAllocateElements(GetBlasesTriangleIndicesCount());

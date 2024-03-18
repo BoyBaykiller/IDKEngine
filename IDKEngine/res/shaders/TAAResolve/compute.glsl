@@ -12,7 +12,7 @@ layout(binding = 1) uniform sampler2D SamplerCurrentColor;
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
-    int Samples;
+    int SampleCount;
     float MipmapBias;
     int TemporalAntiAliasingMode;
 } taaDataUBO;
@@ -45,7 +45,7 @@ void main()
         vec3 currentColor = texture(SamplerCurrentColor, uv).rgb;
         vec3 historyColor = texture(SamplerHistoryColor, historyUV).rgb;
 
-        float blend = 1.0 / taaDataUBO.Samples;
+        float blend = 1.0 / taaDataUBO.SampleCount;
 
         vec3 color = mix(historyColor, currentColor, blend);
         imageStore(ImgResult, imgCoord, vec4(color, 1.0));
@@ -67,7 +67,7 @@ void main()
     vec4 historyColor = SampleTextureCatmullRom(SamplerHistoryColor, historyUV);
     historyColor = clamp(historyColor, neighborhoodMin, neighborhoodMax);
 
-    float blend = 1.0 / taaDataUBO.Samples;
+    float blend = 1.0 / taaDataUBO.SampleCount;
 
     vec2 localPixelPos = fract(historyUV * textureSize(SamplerHistoryColor, 0));
     float pixelCenterDistance = abs(0.5 - localPixelPos.x) + abs(0.5 - localPixelPos.y);

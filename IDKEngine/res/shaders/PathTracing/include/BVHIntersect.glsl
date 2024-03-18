@@ -41,13 +41,6 @@ uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
 shared uint BlasTraversalStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
 #endif
 
-struct HitInfo
-{
-    vec3 Bary;
-    float T;
-    uvec3 VertexIndices;
-    uint InstanceID;
-};
 
 bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex, inout HitInfo hitInfo, inout uint debugNodeCounter)
 {
@@ -75,11 +68,11 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
 
-        uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
-        if (triCount > 0)
+        uint summedTriCount = int(leftChildHit) * leftNode.TriCount + int(rightChildHit) * rightNode.TriCount;
+        if (summedTriCount > 0)
         {
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-            for (uint j = first; j < first + triCount; j++)
+            for (uint j = first; j < first + summedTriCount; j++)
             {
                 uvec3 indices = UintsToUVec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
 
@@ -97,9 +90,13 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
                     hitInfo.T = hitT;
                 }
             }
+            // if (IntersectWithTriangles(ray, blasFirstTriangleIndex, first, summedTriCount, hitInfo))
+            // {
+            //     hit = true;
+            // }
 
-            leftChildHit = leftChildHit && (leftNode.TriCount == 0);
-            rightChildHit = rightChildHit && (rightNode.TriCount == 0);
+            if (leftNode.TriCount > 0) leftChildHit = false;
+            if (rightNode.TriCount > 0) rightChildHit = false;
         }
 
         if (leftChildHit || rightChildHit)
@@ -162,11 +159,11 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
 
-        uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
-        if (triCount > 0)
+        uint summedTriCount = int(leftChildHit) * leftNode.TriCount + int(rightChildHit) * rightNode.TriCount;
+        if (summedTriCount > 0)
         {
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-            for (uint j = first; j < first + triCount; j++)
+            for (uint j = first; j < first + summedTriCount; j++)
             {
                 uvec3 indices = UintsToUVec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
                 vec3 v0 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
@@ -185,8 +182,8 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
                 }
             }
 
-            leftChildHit = leftChildHit && (leftNode.TriCount == 0);
-            rightChildHit = rightChildHit && (rightNode.TriCount == 0);
+            if (leftNode.TriCount > 0) leftChildHit = false;
+            if (rightNode.TriCount > 0) rightChildHit = false;
         }
 
         if (leftChildHit || rightChildHit)
@@ -224,7 +221,7 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
     return false;
 }
 
-bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool traceLights, float maxDist)
+bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool traceLights, float maxDist)
 {
     hitInfo.T = maxDist;
     hitInfo.VertexIndices = uvec3(0);
@@ -336,13 +333,13 @@ bool BVHRayTrace(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool t
     return hitInfo.T != maxDist;
 }
 
-bool BVHRayTrace(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
+bool TraceRay(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 {
     uint debugNodeCounter;
-    return BVHRayTrace(ray, hitInfo, debugNodeCounter, traceLights, maxDist);
+    return TraceRay(ray, hitInfo, debugNodeCounter, traceLights, maxDist);
 }
 
-bool BVHRayTraceAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
+bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 {
     hitInfo.T = maxDist;
     hitInfo.VertexIndices = uvec3(0);

@@ -9,7 +9,7 @@ namespace IDKEngine.Render
 {
     class PointShadow : IDisposable
     {
-        public unsafe Vector3 Position
+        public Vector3 Position
         {
             get => gpuPointShadow.Position;
 
@@ -67,7 +67,7 @@ namespace IDKEngine.Render
             SetSize(size);
         }
 
-        public unsafe void Render(ModelSystem modelSystem, ShaderProgram renderProgram, ShaderProgram cullingProgram, Camera camera)
+        public void Render(ModelSystem modelSystem, ShaderProgram renderProgram, ShaderProgram cullingProgram, Camera camera)
         {
             GL.Viewport(0, 0, Result.Width, Result.Height);
             framebuffer.Bind();

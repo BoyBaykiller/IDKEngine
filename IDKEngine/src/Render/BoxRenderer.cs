@@ -14,8 +14,8 @@ namespace IDKEngine.Render
         public BoxRenderer()
         {
             shaderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Box/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Box/fragment.glsl")));
+                Shader.ShaderFromFile(ShaderType.VertexShader, "Box/vertex.glsl"),
+                Shader.ShaderFromFile(ShaderType.FragmentShader, "Box/fragment.glsl"));
 
             fbo = new Framebuffer();
         }

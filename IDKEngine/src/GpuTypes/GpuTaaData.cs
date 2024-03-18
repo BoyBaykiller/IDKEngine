@@ -6,7 +6,7 @@ namespace IDKEngine.GpuTypes
     struct GpuTaaData
     {
         public Vector2 Jitter;
-        public int Samples;
+        public int SampleCount;
         public float MipmapBias;
         public RasterPipeline.TemporalAntiAliasingMode TemporalAntiAliasingMode;
     }
