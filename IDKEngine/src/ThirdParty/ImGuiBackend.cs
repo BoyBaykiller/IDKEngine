@@ -135,7 +135,10 @@ namespace IDKEngine.GUI
                     FragColor = inData.Color * texture(SamplerFontTexture, inData.TexCoord);
                 }";
 
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.VertexShader, vertexSource), new Shader(ShaderType.FragmentShader, fragmentSource));
+            shaderProgram = new ShaderProgram(
+                new Shader(ShaderType.VertexShader, vertexSource, "ImGui Backend Vertex Shader"),
+                new Shader(ShaderType.FragmentShader, fragmentSource, "ImGui Backend Fragment Shader")
+            );
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);

@@ -7,7 +7,7 @@
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
     <StartupObject></StartupObject>
-    <PublishAOT>true</PublishAOT>
+    <!-- <PublishAOT>true</PublishAOT> -->
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

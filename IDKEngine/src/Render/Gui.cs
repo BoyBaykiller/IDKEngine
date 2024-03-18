@@ -101,7 +101,7 @@ namespace IDKEngine.Render
                 if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
                 {
                     ImGui.Text($"  * Vertices ({app.ModelSystem.Vertices.Length}) = {mbDrawVertices}mb");
-                    ImGui.Text($"  * Indices ({app.ModelSystem.VertexIndices.Length}) = {mbDrawIndices}mb");
+                    ImGui.Text($"  * TriangleIndices ({app.ModelSystem.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
                     ImGui.Text($"  * Meshlets ({app.ModelSystem.Meshlets.Length}) = {mbMeshlets}mb");
                     ImGui.Text($"  * MeshletsVertexIndices ({app.ModelSystem.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
                     ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelSystem.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
@@ -277,11 +277,8 @@ namespace IDKEngine.Render
                     ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
                 }
 
-                tempFloat = app.TonemapAndGamma.Gamma;
-                if (ImGui.SliderFloat("Gamma", ref tempFloat, 0.1f, 3.0f))
-                {
-                    app.TonemapAndGamma.Gamma = tempFloat;
-                }
+                ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.01f, 4.0f);
+                ImGui.SliderFloat("Saturation", ref app.TonemapAndGamma.Settings.Saturation, 0.0f, 1.5f);
 
                 tempFloat = app.ResolutionScale;
                 if (ImGui.SliderFloat("ResolutionScale", ref tempFloat, 0.1f, 1.0f))
@@ -581,30 +578,16 @@ namespace IDKEngine.Render
                                 app.VolumetricLight.ResolutionScale = MathF.Max(tempFloat, 0.1f);
                             }
 
-                            tempInt = app.VolumetricLight.Samples;
-                            if (ImGui.SliderInt("Samples##SamplesVolumetricLight", ref tempInt, 1, 30))
-                            {
-                                app.VolumetricLight.Samples = tempInt;
-                            }
+                            ImGui.SliderInt("Samples##SamplesVolumetricLight", ref app.VolumetricLight.Settings.SampleCount, 1, 30);
+                            ImGui.SliderFloat("Scattering", ref app.VolumetricLight.Settings.Scattering, 0.0f, 1.0f);
+                            ImGui.SliderFloat("Strength##StrengthVolumetricLight", ref app.VolumetricLight.Settings.Strength, 0.0f, 1.0f);
 
-                            tempFloat = app.VolumetricLight.Scattering;
-                            if (ImGui.SliderFloat("Scattering", ref tempFloat, 0.0f, 1.0f))
-                            {
-                                app.VolumetricLight.Scattering = tempFloat;
-                            }
-
-                            tempFloat = app.VolumetricLight.Strength;
-                            if (ImGui.SliderFloat("Strength##StrengthVolumetricLight", ref tempFloat, 0.0f, 40.0f))
-                            {
-                                app.VolumetricLight.Strength = tempFloat;
-                            }
-
-                            System.Numerics.Vector3 tempVec = app.VolumetricLight.Absorbance.ToNumerics();
+                            System.Numerics.Vector3 tempVec = app.VolumetricLight.Settings.Absorbance.ToNumerics();
                             if (ImGui.InputFloat3("Absorbance", ref tempVec))
                             {
                                 Vector3 temp = tempVec.ToOpenTK();
                                 temp = Vector3.ComponentMax(temp, Vector3.Zero);
-                                app.VolumetricLight.Absorbance = temp;
+                                app.VolumetricLight.Settings.Absorbance = temp;
                             }
                         }
                     }
@@ -622,7 +605,7 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading);
                         if (!VariableRateShading.HAS_VARIABLE_RATE_SHADING) { ImGui.EndDisabled(); ImGui.PopStyleVar(); }
 
-                        string current = app.RasterizerPipeline.LightingVRS.DebugValue.ToString();
+                        string current = app.RasterizerPipeline.LightingVRS.Settings.DebugValue.ToString();
                         if (ImGui.BeginCombo("DebugMode", current))
                         {
                             LightingShadingRateClassifier.DebugMode[] debugModes = Enum.GetValues<LightingShadingRateClassifier.DebugMode>();
@@ -634,7 +617,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
                                     current = enumName;
-                                    app.RasterizerPipeline.LightingVRS.DebugValue = (LightingShadingRateClassifier.DebugMode)i;
+                                    app.RasterizerPipeline.LightingVRS.Settings.DebugValue = (LightingShadingRateClassifier.DebugMode)i;
                                 }
 
                                 if (isSelected)
@@ -645,17 +628,8 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        tempFloat = app.RasterizerPipeline.LightingVRS.SpeedFactor;
-                        if (ImGui.SliderFloat("SpeedFactor", ref tempFloat, 0.0f, 1.0f))
-                        {
-                            app.RasterizerPipeline.LightingVRS.SpeedFactor = tempFloat;
-                        }
-
-                        tempFloat = app.RasterizerPipeline.LightingVRS.LumVarianceFactor;
-                        if (ImGui.SliderFloat("LumVarianceFactor", ref tempFloat, 0.0f, 0.3f))
-                        {
-                            app.RasterizerPipeline.LightingVRS.LumVarianceFactor = tempFloat;
-                        }
+                        ImGui.SliderFloat("SpeedFactor", ref app.RasterizerPipeline.LightingVRS.Settings.SpeedFactor, 0.0f, 1.0f);
+                        ImGui.SliderFloat("LumVarianceFactor", ref app.RasterizerPipeline.LightingVRS.Settings.LumVarianceFactor, 0.0f, 0.3f);
                     }
 
                     if (ImGui.CollapsingHeader("SSAO"))
@@ -663,23 +637,9 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsSSAO", ref app.RasterizerPipeline.IsSSAO);
                         if (app.RasterizerPipeline.IsSSAO)
                         {
-                            tempInt = app.RasterizerPipeline.SSAO.Samples;
-                            if (ImGui.SliderInt("Samples##SamplesSSAO", ref tempInt, 1, 20))
-                            {
-                                app.RasterizerPipeline.SSAO.Samples = tempInt;
-                            }
-
-                            tempFloat = app.RasterizerPipeline.SSAO.Radius;
-                            if (ImGui.SliderFloat("Radius", ref tempFloat, 0.0f, 0.5f))
-                            {
-                                app.RasterizerPipeline.SSAO.Radius = tempFloat;
-                            }
-
-                            tempFloat = app.RasterizerPipeline.SSAO.Strength;
-                            if (ImGui.SliderFloat("Strength##StrengthSSAO", ref tempFloat, 0.0f, 10.0f))
-                            {
-                                app.RasterizerPipeline.SSAO.Strength = tempFloat;
-                            }
+                            ImGui.SliderInt("Samples##SamplesSSAO", ref app.RasterizerPipeline.SSAO.Settings.SampleCount, 1, 20);
+                            ImGui.SliderFloat("Radius", ref app.RasterizerPipeline.SSAO.Settings.Radius, 0.0f, 0.5f);
+                            ImGui.SliderFloat("Strength##StrengthSSAO", ref app.RasterizerPipeline.SSAO.Settings.Strength, 0.0f, 10.0f);
                         }
                     }
 
@@ -688,23 +648,9 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsSSR", ref app.RasterizerPipeline.IsSSR);
                         if (app.RasterizerPipeline.IsSSR)
                         {
-                            tempInt = app.RasterizerPipeline.SSR.Samples;
-                            if (ImGui.SliderInt("Samples##SamplesSSR", ref tempInt, 1, 100))
-                            {
-                                app.RasterizerPipeline.SSR.Samples = tempInt;
-                            }
-
-                            tempInt = app.RasterizerPipeline.SSR.BinarySearchSamples;
-                            if (ImGui.SliderInt("BinarySearchSamples", ref tempInt, 0, 40))
-                            {
-                                app.RasterizerPipeline.SSR.BinarySearchSamples = tempInt;
-                            }
-
-                            tempFloat = app.RasterizerPipeline.SSR.MaxDist;
-                            if (ImGui.SliderFloat("MaxDist", ref tempFloat, 1, 100))
-                            {
-                                app.RasterizerPipeline.SSR.MaxDist = tempFloat;
-                            }
+                            ImGui.SliderInt("Samples##SamplesSSR", ref app.RasterizerPipeline.SSR.Settings.SampleCount, 1, 100);
+                            ImGui.SliderInt("BinarySearchSamples", ref app.RasterizerPipeline.SSR.Settings.BinarySearchCount, 0, 40);
+                            ImGui.SliderFloat("MaxDist", ref app.RasterizerPipeline.SSR.Settings.MaxDist, 1, 100);
                         }
                     }
                 }
@@ -762,17 +708,8 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("IsBloom", ref app.IsBloom);
                     if (app.IsBloom)
                     {
-                        tempFloat = app.Bloom.Threshold;
-                        if (ImGui.SliderFloat("Threshold", ref tempFloat, 0.0f, 10.0f))
-                        {
-                            app.Bloom.Threshold = tempFloat;
-                        }
-
-                        tempFloat = app.Bloom.Clamp;
-                        if (ImGui.SliderFloat("Clamp", ref tempFloat, 0.0f, 100.0f))
-                        {
-                            app.Bloom.Clamp = tempFloat;
-                        }
+                        ImGui.SliderFloat("Threshold", ref app.Bloom.Settings.Threshold, 0.0f, 10.0f);
+                        ImGui.SliderFloat("MaxColor", ref app.Bloom.Settings.MaxColor, 0.0f, 20.0f);
 
                         tempInt = app.Bloom.MinusLods;
                         if (ImGui.SliderInt("MinusLods", ref tempInt, 0, 10))
@@ -850,7 +787,7 @@ namespace IDKEngine.Render
                     Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new Vector2(0.0f));
                     Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    CpuLight newLight = new CpuLight(spawnPoint, new Vector3(Helper.RandomVec3(6.0f, 10.0f)), 0.3f);
+                    CpuLight newLight = new CpuLight(spawnPoint, new Vector3(Helper.RandomVec3(32.0f, 88.0f)), 0.3f);
                     if (app.LightManager.AddLight(newLight))
                     {
                         int newLightIndex = app.LightManager.Count - 1;

@@ -40,7 +40,7 @@ namespace IDKEngine.Render
         private int frame;
         public TAAResolve(int width, int height, float favourAliasingOverBlurAmount = 0.25f)
         {
-            taaResolveProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TAAResolve/compute.glsl")));
+            taaResolveProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "TAAResolve/compute.glsl"));
 
             SetSize(width, height);
 

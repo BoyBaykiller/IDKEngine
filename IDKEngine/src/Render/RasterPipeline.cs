@@ -166,45 +166,45 @@ namespace IDKEngine.Render
         private int frameIndex;
         public RasterPipeline(int width, int height, int renderPresentationWidth, int renderPresentationHeight)
         {
-            LightingVRS = new LightingShadingRateClassifier(width, height, 0.025f, 0.2f);
+            LightingVRS = new LightingShadingRateClassifier(width, height, LightingShadingRateClassifier.GpuSettings.Default);
 
-            SSAO = new SSAO(width, height, 10, 0.2f, 1.3f);
-            SSR = new SSR(width, height, 30, 8, 50.0f);
+            SSAO = new SSAO(width, height, SSAO.GpuSettings.Default);
+            SSR = new SSR(width, height, SSR.GpuSettings.Default);
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
             ConeTracer = new ConeTracer(width, height);
             
             if (TAKE_MESH_SHADER_PATH)
             {
                 gBufferProgram = new ShaderProgram(
-                    new Shader((ShaderType)NvMeshShader.TaskShaderNv, File.ReadAllText("res/shaders/GBuffer/MeshPath/task.glsl")),
-                    new Shader((ShaderType)NvMeshShader.MeshShaderNv, File.ReadAllText("res/shaders/GBuffer/MeshPath/mesh.glsl")),
-                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/GBuffer/fragment.glsl")));
+                    Shader.ShaderFromFile((ShaderType)NvMeshShader.TaskShaderNv, "GBuffer/MeshPath/task.glsl"),
+                    Shader.ShaderFromFile((ShaderType)NvMeshShader.MeshShaderNv, "GBuffer/MeshPath/mesh.glsl"),
+                    Shader.ShaderFromFile(ShaderType.FragmentShader, "GBuffer/fragment.glsl"));
             }
             else
             {
                 gBufferProgram = new ShaderProgram(
-                    new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/GBuffer/VertexPath/vertex.glsl")),
-                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/GBuffer/fragment.glsl")));
+                    Shader.ShaderFromFile(ShaderType.VertexShader, "GBuffer/VertexPath/vertex.glsl"),
+                    Shader.ShaderFromFile(ShaderType.FragmentShader, "GBuffer/fragment.glsl"));
             }
 
 
             lightingProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/DeferredLighting/fragment.glsl")));
+                Shader.ShaderFromFile(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
+                Shader.ShaderFromFile(ShaderType.FragmentShader, "DeferredLighting/fragment.glsl"));
 
             skyBoxProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/SkyBox/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/SkyBox/fragment.glsl")));
+                Shader.ShaderFromFile(ShaderType.VertexShader, "SkyBox/vertex.glsl"),
+                Shader.ShaderFromFile(ShaderType.FragmentShader, "SkyBox/fragment.glsl"));
 
             hiZGenerateProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/MeshCulling/Camera/HiZGenerate/fragment.glsl")));
+                Shader.ShaderFromFile(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
+                Shader.ShaderFromFile(ShaderType.FragmentShader, "MeshCulling/Camera/HiZGenerate/fragment.glsl"));
 
             Dictionary<string, string> cullingShaderInsertions = new Dictionary<string, string>();
             cullingShaderInsertions.Add(nameof(TAKE_MESH_SHADER_PATH), TAKE_MESH_SHADER_PATH ? "1" : "0");
-            cullingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MeshCulling/Camera/Cull/compute.glsl"), cullingShaderInsertions));
+            cullingProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "MeshCulling/Camera/Cull/compute.glsl", cullingShaderInsertions));
 
-            mergeLightingProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/MergeTextures/compute.glsl")));
+            mergeLightingProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new TypedBuffer<GpuTaaData>();
             taaDataBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
@@ -233,7 +233,7 @@ namespace IDKEngine.Render
             ShadowMode = ShadowTechnique.PcfShadowMap;
         }
 
-        public unsafe void Render(ModelSystem modelSystem, LightManager lightManager, Camera camera, float dT)
+        public void Render(ModelSystem modelSystem, LightManager lightManager, Camera camera, float dT)
         {
             if (GenerateShadowMaps)
             {
@@ -248,12 +248,12 @@ namespace IDKEngine.Render
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
                 {
-                    gpuTaaData.Samples = TAASamples;
+                    gpuTaaData.SampleCount = TAASamples;
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
                     gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + FSR2AddMipBias;
-                    gpuTaaData.Samples = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
+                    gpuTaaData.SampleCount = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.None)
                 {
@@ -261,7 +261,7 @@ namespace IDKEngine.Render
                 }
                 else
                 {
-                    Vector2 jitter = MyMath.GetHalton2D(frameIndex % gpuTaaData.Samples, 2, 3);
+                    Vector2 jitter = MyMath.GetHalton2D(frameIndex % gpuTaaData.SampleCount, 2, 3);
                     gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
                 }
                 gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasing;
@@ -396,7 +396,7 @@ namespace IDKEngine.Render
                 VariableRateShading.Deactivate();
             }
 
-            if (IsVariableRateShading || LightingVRS.DebugValue != LightingShadingRateClassifier.DebugMode.NoDebug)
+            if (IsVariableRateShading || LightingVRS.Settings.DebugValue != LightingShadingRateClassifier.DebugMode.NoDebug)
             {
                 LightingVRS.Compute(resultBeforeTAA);
             }
@@ -461,7 +461,7 @@ namespace IDKEngine.Render
             if (DepthTexture != null) { DepthTexture.Dispose(); }
         }
 
-        public unsafe void SetSize(int renderWidth, int renderHeight, int presentationWidth, int presentationHeight)
+        public void SetSize(int renderWidth, int renderHeight, int presentationWidth, int presentationHeight)
         {
             RenderResolution = new Vector2i(renderWidth, renderHeight);
             PresentationResolution = new Vector2i(presentationWidth, presentationHeight);

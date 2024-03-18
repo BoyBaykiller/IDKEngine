@@ -5,7 +5,6 @@ using OpenTK.Graphics.OpenGL4;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 using IDKEngine.Render.Objects;
-using System.Diagnostics;
 
 namespace IDKEngine.Render
 {
@@ -52,8 +51,8 @@ namespace IDKEngine.Render
             lights = new CpuLight[GPU_MAX_UBO_LIGHT_COUNT];
 
             shaderProgram = new ShaderProgram(
-                new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/Light/vertex.glsl")),
-                new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/Light/fragment.glsl")));
+                Shader.ShaderFromFile(ShaderType.VertexShader, "Light/vertex.glsl"),
+                Shader.ShaderFromFile(ShaderType.FragmentShader, "Light/fragment.glsl"));
 
             lightBufferObject = new TypedBuffer<GpuLight>();
             lightBufferObject.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, lights.Length * sizeof(GpuLight) + sizeof(int));
@@ -284,6 +283,8 @@ namespace IDKEngine.Render
                         }
 
                         {
+                            // Source: https://physics.stackexchange.com/questions/296767/multiple-colliding-balls, https://en.wikipedia.org/wiki/Coefficient_of_restitution
+
                             float coeffOfRestitution = 1.0f;
                             float light1Mass = CpuLight.MASS;
                             float light2Mass = CpuLight.MASS;
@@ -306,7 +307,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public unsafe void Update(out bool anyLightMoved)
+        public void Update(out bool anyLightMoved)
         {
             anyLightMoved = false;
             for (int i = 0; i < Count; i++)

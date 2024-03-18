@@ -44,9 +44,12 @@ layout(std140, binding = 6) uniform GBufferDataUBO
 vec3 SSR(vec3 normal, vec3 fragPos);
 void BinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample);
 
-uniform int Samples;
-uniform int BinarySearchSamples;
-uniform float MaxDist;
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    int SampleCount;
+    int BinarySearchCount;
+    float MaxDist;
+} settingsUBO;
 
 void main()
 {
@@ -80,11 +83,11 @@ vec3 SSR(vec3 normal, vec3 fragPos)
     // Viewpos is origin in view space 
     const vec3 VIEW_POS = vec3(0.0);
     vec3 reflectDir = reflect(normalize(fragPos - VIEW_POS), normal);
-    vec3 maxReflectPoint = fragPos + reflectDir * MaxDist;
-    vec3 deltaStep = (maxReflectPoint - fragPos) / Samples;
+    vec3 maxReflectPoint = fragPos + reflectDir * settingsUBO.MaxDist;
+    vec3 deltaStep = (maxReflectPoint - fragPos) / settingsUBO.SampleCount;
 
     vec3 samplePoint = fragPos;
-    for (int i = 0; i < Samples; i++)
+    for (int i = 0; i < settingsUBO.SampleCount; i++)
     {
         samplePoint += deltaStep;
 
@@ -114,7 +117,7 @@ void BinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)
     // Go back one step at the beginning because we know we are to far
     deltaStep *= 0.5;
     samplePoint -= deltaStep * 0.5;
-    for (int i = 1; i < BinarySearchSamples; i++)
+    for (int i = 1; i < settingsUBO.BinarySearchCount; i++)
     {
         projectedSample = PerspectiveTransform(samplePoint, basicDataUBO.Projection);
         projectedSample.xy = projectedSample.xy * 0.5 + 0.5;

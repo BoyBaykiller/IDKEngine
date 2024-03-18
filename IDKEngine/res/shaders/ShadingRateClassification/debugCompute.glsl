@@ -27,7 +27,12 @@ layout(std140, binding = 0) uniform BasicDataUBO
     float Time;
 } basicDataUBO;
 
-uniform int DebugMode;
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    int DebugMode;
+    float SpeedFactor;
+    float LumVarianceFactor;
+} settingsUBO;
 
 void main()
 {
@@ -38,7 +43,7 @@ void main()
     vec2 scaledUv = ivec2(uv * imgSize) / vec2(imgSize); 
 
     vec3 debugColor = vec3(0.0);
-    if (DebugMode == DEBUG_MODE_SHADING_RATES)
+    if (settingsUBO.DebugMode == DEBUG_MODE_SHADING_RATES)
     {
         uint shadingRate = texture(SamplerDebugShadingRate, scaledUv).r;
         vec3 srcColor = texelFetch(SamplerSrc, imgCoord, 0).rgb;
@@ -68,17 +73,17 @@ void main()
             debugColor = mix(debugColor, srcColor, vec3(0.5));
         }
     }
-    else if (DebugMode == DEBUG_MODE_LUMINANCE)
+    else if (settingsUBO.DebugMode == DEBUG_MODE_LUMINANCE)
     {
         float meanLuminance = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(meanLuminance);
     }
-    else if (DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
+    else if (settingsUBO.DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
     {
         float coeffOfVariation = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(coeffOfVariation) * 0.2;
     }
-    else if (DebugMode == DEBUG_MODE_SPEED)
+    else if (settingsUBO.DebugMode == DEBUG_MODE_SPEED)
     {
         float meanSpeed = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(meanSpeed);

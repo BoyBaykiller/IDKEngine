@@ -66,7 +66,7 @@ namespace IDKEngine
             rootNode.TriCount = (uint)TriangleCount;
             UpdateNodeBounds(ref rootNode);
 
-            int maxTraversalDepth = 0;
+            int maxTraversalDepth = 1;
             int stackTop = 0;
             int stackPtr = 0;
             Span<int> stack = stackalloc int[128];
@@ -150,17 +150,19 @@ namespace IDKEngine
                 };
 
                 nodesUsed = 3;
+                maxTraversalDepth = 2;
             }
 
             Array.Resize(ref Nodes, nodesUsed);
             MaxTreeDepth = maxTraversalDepth;
         }
+
         public void Refit()
         {
             for (int i = unpaddedNodesUsed - 1; i >= 0; i--)
             {
                 ref GpuBlasNode parent = ref Nodes[i];
-                if (parent.IsLeaf())
+                if (parent.IsLeaf)
                 {
                     UpdateNodeBounds(ref parent);
                     continue;
@@ -192,8 +194,8 @@ namespace IDKEngine
                 }
             }
 
-            int stackPtr = 0;
             uint stackTop = 1;
+            int stackPtr = 0;
             Span<uint> stack = stackalloc uint[MaxTreeDepth];
             while (true)
             {
@@ -202,11 +204,11 @@ namespace IDKEngine
                 bool leftChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
                 bool rightChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
-                uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
-                if (triCount > 0)
+                uint summedTriCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
+                if (summedTriCount > 0)
                 {
-                    uint first = (leftChildHit && leftNode.IsLeaf()) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-                    for (uint i = first; i < first + triCount; i++)
+                    uint first = (leftChildHit && leftNode.IsLeaf) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+                    for (uint i = first; i < first + summedTriCount; i++)
                     {
                         ref readonly IndicesTriplet indicesTriplet = ref TriangleIndices[i];
                         Triangle triangle = GetTriangle(indicesTriplet);
@@ -219,8 +221,8 @@ namespace IDKEngine
                         }
                     }
 
-                    leftChildHit = leftChildHit && !leftNode.IsLeaf();
-                    rightChildHit = rightChildHit && !rightNode.IsLeaf();
+                    if (leftNode.IsLeaf) leftChildHit = false;
+                    if (rightNode.IsLeaf) rightChildHit = false;
                 }
 
                 if (leftChildHit || rightChildHit)
@@ -259,18 +261,18 @@ namespace IDKEngine
                 bool leftChildHit = Intersections.BoxVsBox(Conversions.ToBox(leftNode), box);
                 bool rightChildHit = Intersections.BoxVsBox(Conversions.ToBox(rightNode), box);
 
-                uint triCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
-                if (triCount > 0)
+                uint summedTriCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
+                if (summedTriCount > 0)
                 {
                     uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-                    for (uint i = first; i < first + triCount; i++)
+                    for (uint i = first; i < first + summedTriCount; i++)
                     {
                         ref readonly IndicesTriplet indicesTriplet = ref TriangleIndices[i];
                         intersectFunc(indicesTriplet);
                     }
 
-                    leftChildHit = leftChildHit && !leftNode.IsLeaf();
-                    rightChildHit = rightChildHit && !rightNode.IsLeaf();
+                    if (leftNode.IsLeaf) leftChildHit = false;
+                    if (rightNode.IsLeaf) rightChildHit = false;
                 }
 
                 if (leftChildHit || rightChildHit)
@@ -291,7 +293,7 @@ namespace IDKEngine
 
         public float ComputeCostOfNode(in GpuBlasNode parentNode)
         {
-            if (parentNode.IsLeaf())
+            if (parentNode.IsLeaf)
             {
                 return CostLeafNode(parentNode.TriCount);
             }
@@ -413,7 +415,7 @@ namespace IDKEngine
         {
             GpuBlasNode nextNode = node;
             uint veryLeftLeafTriStart;
-            while (!nextNode.IsLeaf())
+            while (!nextNode.IsLeaf)
             {
                 nextNode = Nodes[nextNode.TriStartOrChild];
             }
@@ -422,7 +424,7 @@ namespace IDKEngine
 
             nextNode = node;
             uint veryRightLeafTriEnd;
-            while (!nextNode.IsLeaf())
+            while (!nextNode.IsLeaf)
             {
                 nextNode = Nodes[nextNode.TriStartOrChild + 1];
             }

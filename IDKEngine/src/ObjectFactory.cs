@@ -91,7 +91,7 @@ namespace IDKEngine
             return CollectionsMarshal.AsSpan(indicis);
         }
 
-        public static unsafe Span<Vector3> GeneratePlane(float width, float depth, int subdivideX, int subdivideZ)
+        public static Span<Vector3> GeneratePlane(float width, float depth, int subdivideX, int subdivideZ)
         {
             List<Vector3> positions = new List<Vector3>();
             float stepX = width / subdivideX;

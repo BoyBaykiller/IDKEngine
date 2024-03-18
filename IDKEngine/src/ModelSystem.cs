@@ -98,7 +98,7 @@ namespace IDKEngine
             BVH = new BVH();
         }
 
-        public unsafe void Add(params ModelLoader.Model[] models)
+        public void Add(params ModelLoader.Model[] models)
         {
             if (models.Length == 0)
             {
@@ -200,25 +200,25 @@ namespace IDKEngine
             }
         }
 
-        public unsafe void UpdateMeshBuffer(int start, int count)
+        public void UpdateMeshBuffer(int start, int count)
         {
             if (count == 0) return;
             meshBuffer.UploadElements(start, count, Meshes[start]);
         }
 
-        public unsafe void UpdateDrawCommandBuffer(int start, int count)
+        public void UpdateDrawCommandBuffer(int start, int count)
         {
             if (count == 0) return;
             drawCommandBuffer.UploadElements(start, count, DrawCommands[start]);
         }
 
-        public unsafe void UpdateMeshInstanceBuffer(int start, int count)
+        public void UpdateMeshInstanceBuffer(int start, int count)
         {
             if (count == 0) return;
             meshInstanceBuffer.UploadElements(start, count, MeshInstances[start]);
         }
 
-        public unsafe void UpdateVertexPositions(int start, int count)
+        public void UpdateVertexPositions(int start, int count)
         {
             if (count == 0) return;
             vertexPositionBuffer.UploadElements(start, count, VertexPositions[start]);

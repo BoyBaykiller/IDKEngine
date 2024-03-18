@@ -76,7 +76,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram shaderProgram;
         public AtmosphericScatterer(int size)
         {
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/AtmosphericScattering/compute.glsl")));
+            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "AtmosphericScattering/compute.glsl"));
 
             Matrix4[] invViewsAndInvprojecion = new Matrix4[]
             {

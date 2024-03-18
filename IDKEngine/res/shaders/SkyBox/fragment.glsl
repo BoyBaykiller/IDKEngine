@@ -10,7 +10,7 @@ layout(location = 4) out vec2 Velocity;
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
-    int Samples;
+    int SampleCount;
     float MipmapBias;
     int TemporalAntiAliasingMode;
 } taaDataUBO;

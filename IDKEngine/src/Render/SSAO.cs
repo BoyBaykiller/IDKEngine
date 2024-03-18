@@ -7,58 +7,42 @@ namespace IDKEngine.Render
 {
     class SSAO : IDisposable
     {
-        private int _samples;
-        public int Samples
+        public struct GpuSettings
         {
-            get => _samples;
+            public int SampleCount;
+            public float Radius;
+            public float Strength;
 
-            set
+            public static GpuSettings Default = new GpuSettings()
             {
-                _samples = value;
-                shaderProgram.Upload("Samples", _samples);
-            }
+                SampleCount = 10,
+                Radius = 0.2f,
+                Strength = 1.3f
+            };
         }
 
-        private float _radius;
-        public float Radius
-        {
-            get => _radius;
-
-            set
-            {
-                _radius = value;
-                shaderProgram.Upload("Radius", _radius);
-            }
-        }
-
-        private float _strength;
-        public float Strength
-        {
-            get => _strength;
-
-            set
-            {
-                _strength = value;
-                shaderProgram.Upload("Strength", _strength);
-            }
-        }
-
+        public GpuSettings Settings;
 
         public Texture Result;
         private readonly ShaderProgram shaderProgram;
-        public SSAO(int width, int height, int samples, float radius, float strength)
+        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
+        public SSAO(int width, int height, in GpuSettings settings)
         {
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/SSAO/compute.glsl")));
+            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "SSAO/compute.glsl"));
+
+            bufferGpuSettings = new TypedBuffer<GpuSettings>();
+            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
             SetSize(width, height);
 
-            Samples = samples;
-            Radius = radius;
-            Strength = strength;
+            Settings = settings;
         }
 
         public void Compute()
         {
+            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            bufferGpuSettings.UploadElements(Settings);
+
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
 
             shaderProgram.Use();
@@ -79,6 +63,7 @@ namespace IDKEngine.Render
         {
             Result.Dispose();
             shaderProgram.Dispose();
+            bufferGpuSettings.Dispose();
         }
     }
 }

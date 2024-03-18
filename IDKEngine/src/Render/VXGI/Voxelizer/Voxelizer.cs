@@ -14,7 +14,7 @@ namespace IDKEngine.Render
         public static readonly bool TAKE_ATOMIC_FP16_PATH = (Helper.IsExtensionsAvailable("GL_NV_shader_atomic_fp16_vector"));
         public static readonly bool TAKE_FAST_GEOMETRY_SHADER_PATH = (Helper.IsExtensionsAvailable("GL_NV_geometry_shader_passthrough") && Helper.IsExtensionsAvailable("GL_NV_viewport_swizzle"));
 
-        public unsafe Vector3 GridMin
+        public Vector3 GridMin
         {
             get => gpuVoxelizerData.GridMin;
 
@@ -25,7 +25,7 @@ namespace IDKEngine.Render
                 voxelizerDataBuffer.UploadElements(gpuVoxelizerData);
             }
         }
-        public unsafe Vector3 GridMax
+        public Vector3 GridMax
         {
             get => gpuVoxelizerData.GridMax;
 
@@ -77,7 +77,7 @@ namespace IDKEngine.Render
         private GpuVoxelizerData gpuVoxelizerData;
 
         private readonly Framebuffer fboNoAttachments;
-        public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
+        public Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
         {
             
             {
@@ -89,25 +89,25 @@ namespace IDKEngine.Render
 
                 List<Shader> voxelizeProgramShaders = new List<Shader>()
                 {
-                    new Shader(ShaderType.VertexShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/vertex.glsl"), takeFastGeometryShaderInsertion),
-                    new Shader(ShaderType.FragmentShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/fragment.glsl"), takeAtomicFP16PathInsertion)
+                    Shader.ShaderFromFile(ShaderType.VertexShader, "VXGI/Voxelize/Voxelize/vertex.glsl", takeFastGeometryShaderInsertion),
+                    Shader.ShaderFromFile(ShaderType.FragmentShader, "VXGI/Voxelize/Voxelize/fragment.glsl", takeAtomicFP16PathInsertion)
                 };
                 if (TAKE_FAST_GEOMETRY_SHADER_PATH)
                 {
-                    voxelizeProgramShaders.Add(new Shader(ShaderType.GeometryShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Voxelize/geometry.glsl")));
+                    voxelizeProgramShaders.Add(Shader.ShaderFromFile(ShaderType.GeometryShader, "VXGI/Voxelize/Voxelize/geometry.glsl"));
                 }
 
                 voxelizeProgram = new ShaderProgram(voxelizeProgramShaders.ToArray());
                 
-                clearTexturesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Clear/compute.glsl"), takeAtomicFP16PathInsertion));
+                clearTexturesProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/Clear/compute.glsl", takeAtomicFP16PathInsertion));
             }
 
-            mipmapProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/Mipmap/compute.glsl")));
-            visualizeDebugProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/DebugVisualization/compute.glsl")));
+            mipmapProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/Mipmap/compute.glsl"));
+            visualizeDebugProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
             if (!TAKE_ATOMIC_FP16_PATH)
             {
                 intermediateResultRbg = new Texture[3];
-                mergeIntermediatesProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/Voxelize/MergeIntermediates/compute.glsl")));
+                mergeIntermediatesProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
             }
 
             voxelizerDataBuffer = new TypedBuffer<GpuVoxelizerData>();

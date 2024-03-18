@@ -50,7 +50,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
-    int Samples;
+    int SampleCount;
     float MipmapBias;
     int TemporalAntiAliasingMode;
 } taaDataUBO;

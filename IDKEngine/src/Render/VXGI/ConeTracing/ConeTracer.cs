@@ -83,7 +83,7 @@ namespace IDKEngine.Render
         private readonly ShaderProgram shaderProgram;
         public ConeTracer(int width, int height)
         {
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/VXGI/ConeTracing/compute.glsl")));
+            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/ConeTracing/compute.glsl"));
 
             SetSize(width, height);
 

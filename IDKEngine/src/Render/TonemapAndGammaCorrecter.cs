@@ -5,46 +5,48 @@ using IDKEngine.Render.Objects;
 
 namespace IDKEngine.Render
 {
-    unsafe class TonemapAndGammaCorrect : IDisposable
+    class TonemapAndGammaCorrect : IDisposable
     {
-        private bool _isDithering;
-        public bool IsDithering
+        public struct GpuSettings
         {
-            get => _isDithering;
+            public float Exposure;
+            public float Saturation;
+            public float Linear;
+            public float Peak;
+            public float Compression;
 
-            set
+            public static GpuSettings Default = new GpuSettings()
             {
-                _isDithering = value;
-                tonemapAndGammaCorrecterProgram.Upload("IsDithering", _isDithering);
-            }
+                Exposure = 0.45f,
+                Saturation = 1.06f,
+                Linear = 0.18f,
+                Peak = 1.0f,
+                Compression = 0.10f
+            };
         }
 
-        private float _gamma;
-        public float Gamma
-        {
-            get => _gamma;
-
-            set
-            {
-                _gamma = value;
-                tonemapAndGammaCorrecterProgram.Upload("Gamma", _gamma);
-            }
-        }
+        public GpuSettings Settings;
 
         public Texture Result;
         private readonly ShaderProgram tonemapAndGammaCorrecterProgram;
-        public TonemapAndGammaCorrect(int width, int height, float gamma = 2.2f)
+        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
+        public TonemapAndGammaCorrect(int width, int height, in GpuSettings settings)
         {
-            tonemapAndGammaCorrecterProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/TonemapAndGammaCorrect/compute.glsl")));
+            tonemapAndGammaCorrecterProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "TonemapAndGammaCorrect/compute.glsl"));
+
+            bufferGpuSettings = new TypedBuffer<GpuSettings>();
+            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
             SetSize(width, height);
-            
-            IsDithering = true;
-            Gamma = gamma;
+
+            Settings = settings;
         }
 
         public void Combine(Texture texture0 = null, Texture texture1 = null, Texture texture2 = null)
         {
+            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            bufferGpuSettings.UploadElements(Settings);
+
             Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
 
             if (texture0 != null) texture0.BindToUnit(0);
@@ -74,6 +76,7 @@ namespace IDKEngine.Render
         {
             Result.Dispose();
             tonemapAndGammaCorrecterProgram.Dispose();
+            bufferGpuSettings.Dispose();
         }
     }
 }

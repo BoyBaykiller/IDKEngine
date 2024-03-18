@@ -62,7 +62,7 @@ namespace IDKEngine.Windowing
         }
 
         private ScrollState scrollUpdateState = ScrollState.Unchanged;
-        public unsafe void Update()
+        public void Update()
         {
             for (int i = 0; i < buttonStates.Length; i++)
             {

@@ -14,28 +14,16 @@ namespace IDKEngine.Render
             Upsample,
         }
 
-        private float _threshold;
-        public float Threshold
+        public struct GpuSettings
         {
-            get => _threshold;
+            public float Threshold;
+            public float MaxColor;
 
-            set
+            public static GpuSettings Default = new GpuSettings()
             {
-                _threshold = value;
-                shaderProgram.Upload("Threshold", _threshold);
-            }
-        }
-
-        private float _clamp;
-        public float Clamp
-        {
-            get => _clamp;
-
-            set
-            {
-                _clamp = value;
-                shaderProgram.Upload("Clamp", _clamp);
-            }
+                Threshold = 1.0f,
+                MaxColor = 2.8f
+            };
         }
 
         private int _minusLods;
@@ -51,24 +39,32 @@ namespace IDKEngine.Render
             }
         }
 
+        public GpuSettings Settings;
+
         public Texture Result => upsampleTexture;
 
         private Texture downscaleTexture;
         private Texture upsampleTexture;
         private readonly ShaderProgram shaderProgram;
-        public Bloom(int width, int height, float threshold, float clamp, int minusLods = 3)
+        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
+        public Bloom(int width, int height, in GpuSettings settings, int minusLods = 3)
         {
-            shaderProgram = new ShaderProgram(new Shader(ShaderType.ComputeShader, File.ReadAllText("res/shaders/Bloom/compute.glsl")));
+            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "Bloom/compute.glsl"));
+
+            bufferGpuSettings = new TypedBuffer<GpuSettings>();
+            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
             SetSize(width, height);
 
             MinusLods = minusLods;
-            Threshold = threshold;
-            Clamp = clamp;
+            Settings = settings;
         }
 
         public void Compute(Texture src)
         {
+            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            bufferGpuSettings.UploadElements(Settings);
+
             shaderProgram.Use();
             int currentWriteLod = 0;
 
@@ -153,6 +149,7 @@ namespace IDKEngine.Render
             downscaleTexture.Dispose();
             upsampleTexture.Dispose();
             shaderProgram.Dispose();
+            bufferGpuSettings.Dispose();
         }
     }
 }

@@ -29,7 +29,7 @@ layout(std140, binding = 0) uniform BasicDataUBO
 layout(std140, binding = 3) uniform TaaDataUBO
 {
     vec2 Jitter;
-    int Samples;
+    int SampleCount;
     float MipmapBias;
     int TemporalAntiAliasingMode;
 } taaDataUBO;
@@ -43,9 +43,12 @@ layout(std140, binding = 6) uniform GBufferDataUBO
     sampler2D Depth;
 } gBufferDataUBO;
 
-uniform int Samples;
-uniform float Radius;
-uniform float Strength;
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    int SampleCount;
+    float Radius;
+    float Strength;
+} settingsUBO;
 
 float SSAO(vec3 fragPos, vec3 normal);
 
@@ -75,14 +78,14 @@ float SSAO(vec3 fragPos, vec3 normal)
     float occlusion = 0.0;
 
     bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
-    uint noiseIndex = taaEnabled ? (basicDataUBO.Frame % taaDataUBO.Samples) * (Samples * 3) : 0u;
-    for (int i = 0; i < Samples; i++)
+    uint noiseIndex = taaEnabled ? (basicDataUBO.Frame % taaDataUBO.SampleCount) * (settingsUBO.SampleCount * 3) : 0u;
+    for (int i = 0; i < settingsUBO.SampleCount; i++)
     {
         float rnd0 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
         float rnd1 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
         float rnd2 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
 
-        vec3 samplePos = fragPos + CosineSampleHemisphere(normal, rnd0, rnd1) * Radius * rnd2;
+        vec3 samplePos = fragPos + CosineSampleHemisphere(normal, rnd0, rnd1) * settingsUBO.Radius * rnd2;
         
         vec3 projectedSample = PerspectiveTransform(samplePos, basicDataUBO.ProjView);
         projectedSample.xy = projectedSample.xy * 0.5 + 0.5;
@@ -91,12 +94,12 @@ float SSAO(vec3 fragPos, vec3 normal)
         if (projectedSample.z > depth)
         {
             vec3 sampleToFrag = fragPos - samplePos;
-            float weight = dot(sampleToFrag, sampleToFrag) / (Radius * Radius);
+            float weight = dot(sampleToFrag, sampleToFrag) / (settingsUBO.Radius * settingsUBO.Radius);
             occlusion += weight;
         }
     }
-    occlusion /= float(Samples);
-    occlusion *= Strength;
+    occlusion /= float(settingsUBO.SampleCount);
+    occlusion *= settingsUBO.Strength;
 
    return occlusion;
 }
