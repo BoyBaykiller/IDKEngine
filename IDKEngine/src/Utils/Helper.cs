@@ -10,9 +10,9 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
 using StbImageWriteSharp;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
-namespace IDKEngine
+namespace IDKEngine.Utils
 {
     static class Helper
     {
@@ -102,7 +102,7 @@ namespace IDKEngine
         }
         public static bool IsCoreExtensionAvailable(string extension, double first)
         {
-            return (APIVersion >= first) || IsExtensionsAvailable(extension);
+            return APIVersion >= first || IsExtensionsAvailable(extension);
         }
         public static bool LoadCubemap(Texture texture, string[] imagePaths, SizedInternalFormat sizedInternalFormat)
         {
@@ -133,7 +133,7 @@ namespace IDKEngine
                 using FileStream stream = File.OpenRead(imagePaths[i]);
                 images[i] = ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlue);
             });
-            
+
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
             {
                 Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and each texture must be of the same size");
@@ -152,13 +152,13 @@ namespace IDKEngine
 
         public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;
         public const uint GL_DEBUG_CALLBACK_APP_MAKER_ID = 0;
-        private static void GLDebugCallback(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
+        private static void GLDebugCallback(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, nint message, nint userParam)
         {
             if (source == DebugSource.DebugSourceApplication && id == GL_DEBUG_CALLBACK_APP_MAKER_ID)
             {
                 return;
             }
-            
+
             string text = Marshal.PtrToStringAnsi(message, length);
             switch (severity)
             {
@@ -246,19 +246,19 @@ namespace IDKEngine
             uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
             uint b = (uint)MathF.Round(data.Z * ((1u << 10) - 1));
 
-            uint compressed = (b << 22) | (g << 11) | (r << 0);
+            uint compressed = b << 22 | g << 11 | r << 0;
 
             return compressed;
         }
         public static Vector3 DecompressUR11G11B10(uint data)
         {
-            float r = (data >> 0) & ((1u << 11) - 1);
-            float g = (data >> 11) & ((1u << 11) - 1);
-            float b = (data >> 22) & ((1u << 10) - 1);
+            float r = data >> 0 & (1u << 11) - 1;
+            float g = data >> 11 & (1u << 11) - 1;
+            float b = data >> 22 & (1u << 10) - 1;
 
-            r *= (1.0f / ((1u << 11) - 1));
-            g *= (1.0f / ((1u << 11) - 1));
-            b *= (1.0f / ((1u << 10) - 1));
+            r *= 1.0f / ((1u << 11) - 1);
+            g *= 1.0f / ((1u << 11) - 1);
+            b *= 1.0f / ((1u << 10) - 1);
 
             return new Vector3(r, g, b);
         }
@@ -270,23 +270,9 @@ namespace IDKEngine
             uint b = (uint)MathF.Round(data.Z * ((1u << 8) - 1));
             uint a = (uint)MathF.Round(data.W * ((1u << 8) - 1));
 
-            uint compressed = (a << 24) | (b << 16) | (g << 8) | (r << 0);
+            uint compressed = a << 24 | b << 16 | g << 8 | r << 0;
 
             return compressed;
-        }
-
-        public delegate void FuncRunParallel(int i);
-        public static Thread InParallel(int start, int endExclusive, FuncRunParallel func)
-        {
-            Thread thread = new Thread(() =>
-            {
-                Parallel.For(0, endExclusive, i =>
-                {
-                    func(start + i);
-                });
-            });
-            thread.Start();
-            return thread;
         }
 
         public static int InterlockedMax(ref int location1, int value)
@@ -299,7 +285,7 @@ namespace IDKEngine
                 newValue = Math.Max(initialValue, value);
             }
             while (Interlocked.CompareExchange(ref location1, newValue, initialValue) != initialValue);
-            
+
             return initialValue;
         }
 
@@ -327,17 +313,17 @@ namespace IDKEngine
             return new Vector3(MathF.Abs(v.X), MathF.Abs(v.Y), MathF.Abs(v.Z));
         }
 
-        public static unsafe void TextureToDisk(Texture texture, string path, int quality = 100, bool flipVertically = true)
+        public static unsafe void TextureToDiskJpg(Texture texture, string path, int quality = 100, bool flipVertically = true)
         {
             StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
 
             byte* pixels = Malloc<byte>(texture.Width * texture.Height * 3);
-            texture.GetImageData(PixelFormat.Rgb, PixelType.UnsignedByte, (IntPtr)pixels, texture.Width * texture.Height * 3 * sizeof(byte));
+            texture.GetImageData(PixelFormat.Rgb, PixelType.UnsignedByte, (nint)pixels, texture.Width * texture.Height * 3 * sizeof(byte));
 
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
             ImageWriter imageWriter = new ImageWriter();
             imageWriter.WriteJpg(pixels, texture.Width, texture.Height, StbImageWriteSharp.ColorComponents.RedGreenBlue, fileStream, quality);
-            
+
             Free(pixels);
         }
     }

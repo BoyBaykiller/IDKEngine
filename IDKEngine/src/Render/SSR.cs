@@ -1,6 +1,7 @@
 ﻿using System;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -24,26 +25,26 @@ namespace IDKEngine.Render
 
 
         public Texture Result;
-        private readonly ShaderProgram shaderProgram;
-        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
-        public SSR(int width, int height, in GpuSettings settings)
+        private readonly AbstractShaderProgram shaderProgram;
+        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public SSR(Vector2i size, in GpuSettings settings)
         {
-            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "SSR/compute.glsl"));
+            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "SSR/compute.glsl"));
 
-            bufferGpuSettings = new TypedBuffer<GpuSettings>();
-            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
-            SetSize(width, height);
+            SetSize(size);
 
             Settings = settings;
         }
 
         public void Compute(Texture colorTexture)
         {
-            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            bufferGpuSettings.UploadElements(Settings);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(Settings);
 
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.SizedInternalFormat);
             colorTexture.BindToUnit(0);
 
             shaderProgram.Use();
@@ -51,20 +52,20 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
-        public void SetSize(int width, int height)
+        public void SetSize(Vector2i size)
         {
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba16f);
         }
 
         public void Dispose()
         {
             Result.Dispose();
             shaderProgram.Dispose();
-            bufferGpuSettings.Dispose();
+            gpuSettingsBuffer.Dispose();
         }
     }
 }

@@ -2,7 +2,8 @@
 using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine
@@ -74,15 +75,15 @@ namespace IDKEngine
             meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
             meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
             visibleMeshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
-            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
-            vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
-            vertexPositionBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
-            meshletTasksCmdsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
-            meshletTasksCountBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
-            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
-            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 16);
-            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 17);
-            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 18);
+            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
+            vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
+            vertexPositionBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
+            meshletTasksCmdsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
+            meshletTasksCountBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
+            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
+            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
+            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 16);
+            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 17);
 
             vao = new VAO();
             vao.SetElementBuffer(vertexIndicesBuffer);
@@ -162,9 +163,11 @@ namespace IDKEngine
                     Meshes[i].BlasRootNodeIndex = bvhNodesExclusiveSum;
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
+
+                AbstractShaderProgram.ShaderInsertions["MAX_BLAS_TREE_DEPTH"] = BVH.MaxBlasTreeDepth.ToString();
             }
 
-            ReuploadAllModelData();
+            UploadAllModelData();
         }
 
         public unsafe void Draw()
@@ -242,7 +245,7 @@ namespace IDKEngine
             meshletTasksCountBuffer.UploadElements(0);
         }
 
-        public void ReuploadAllModelData()
+        public void UploadAllModelData()
         {
             drawCommandBuffer.MutableAllocateElements(DrawCommands);
             meshBuffer.MutableAllocateElements(Meshes);

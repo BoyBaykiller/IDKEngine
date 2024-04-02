@@ -1,9 +1,9 @@
 ﻿using System;
-using System.IO;
 using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -37,77 +37,52 @@ namespace IDKEngine.Render
             }
         }
 
-        private float _debugStepMultiplier;
-        public float DebugStepMultiplier
-        {
-            get => _debugStepMultiplier;
-
-            set
-            {
-                _debugStepMultiplier = value;
-                visualizeDebugProgram.Upload(0, _debugStepMultiplier);
-            }
-        }
-
-        private float _debugConeAngle;
-        public float DebugConeAngle
-        {
-            get => _debugConeAngle;
-
-            set
-            {
-                _debugConeAngle = value;
-                visualizeDebugProgram.Upload(1, _debugConeAngle);
-            }
-        }
+        public float DebugStepMultiplier;
+        public float DebugConeAngle;
 
         /// <summary>
         /// GL_NV_conservative_raster must be available for this to have an effect
         /// </summary>
         public bool IsConservativeRasterization;
 
-        public Texture ResultVoxelsAlbedo;
+        public Texture ResultVoxels;
         private readonly Texture[] intermediateResultRbg; // only used if no support for GL_NV_shader_atomic_fp16_vector
-        private readonly ShaderProgram mergeIntermediatesProgram; // only used if no support for GL_NV_shader_atomic_fp16_vector
-        private readonly ShaderProgram clearTexturesProgram;
-        private readonly ShaderProgram voxelizeProgram;
-        private readonly ShaderProgram mipmapProgram;
-        private readonly ShaderProgram visualizeDebugProgram;
+        private readonly AbstractShaderProgram mergeIntermediatesProgram; // only used if no support for GL_NV_shader_atomic_fp16_vector
+        private readonly AbstractShaderProgram clearTexturesProgram;
+        private readonly AbstractShaderProgram voxelizeProgram;
+        private readonly AbstractShaderProgram mipmapProgram;
+        private readonly AbstractShaderProgram visualizeDebugProgram;
         public readonly TypedBuffer<GpuVoxelizerData> voxelizerDataBuffer;
         private GpuVoxelizerData gpuVoxelizerData;
 
         private readonly Framebuffer fboNoAttachments;
         public Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
         {
+            AbstractShaderProgram.ShaderInsertions[nameof(TAKE_ATOMIC_FP16_PATH)] = TAKE_ATOMIC_FP16_PATH ? "1" : "0";
+            AbstractShaderProgram.ShaderInsertions[nameof(TAKE_FAST_GEOMETRY_SHADER_PATH)] = TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0";
             
             {
-                Dictionary<string, string> takeFastGeometryShaderInsertion = new Dictionary<string, string>();
-                takeFastGeometryShaderInsertion.Add(nameof(TAKE_FAST_GEOMETRY_SHADER_PATH), TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0");
-            
-                Dictionary<string, string> takeAtomicFP16PathInsertion = new Dictionary<string, string>();
-                takeAtomicFP16PathInsertion.Add(nameof(TAKE_ATOMIC_FP16_PATH), TAKE_ATOMIC_FP16_PATH ? "1" : "0");
-
-                List<Shader> voxelizeProgramShaders = new List<Shader>()
+                List<AbstractShader> voxelizeProgramShaders = new List<AbstractShader>()
                 {
-                    Shader.ShaderFromFile(ShaderType.VertexShader, "VXGI/Voxelize/Voxelize/vertex.glsl", takeFastGeometryShaderInsertion),
-                    Shader.ShaderFromFile(ShaderType.FragmentShader, "VXGI/Voxelize/Voxelize/fragment.glsl", takeAtomicFP16PathInsertion)
+                    new AbstractShader(ShaderType.VertexShader, "VXGI/Voxelize/Voxelize/vertex.glsl"),
+                    new AbstractShader(ShaderType.FragmentShader, "VXGI/Voxelize/Voxelize/fragment.glsl")
                 };
                 if (TAKE_FAST_GEOMETRY_SHADER_PATH)
                 {
-                    voxelizeProgramShaders.Add(Shader.ShaderFromFile(ShaderType.GeometryShader, "VXGI/Voxelize/Voxelize/geometry.glsl"));
+                    voxelizeProgramShaders.Add(new AbstractShader(ShaderType.GeometryShader, "VXGI/Voxelize/Voxelize/geometry.glsl"));
                 }
 
-                voxelizeProgram = new ShaderProgram(voxelizeProgramShaders.ToArray());
+                voxelizeProgram = new AbstractShaderProgram(voxelizeProgramShaders.ToArray());
                 
-                clearTexturesProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/Clear/compute.glsl", takeAtomicFP16PathInsertion));
+                clearTexturesProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VXGI/Voxelize/Clear/compute.glsl"));
             }
 
-            mipmapProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/Mipmap/compute.glsl"));
-            visualizeDebugProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
+            mipmapProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VXGI/Voxelize/Mipmap/compute.glsl"));
+            visualizeDebugProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
             if (!TAKE_ATOMIC_FP16_PATH)
             {
                 intermediateResultRbg = new Texture[3];
-                mergeIntermediatesProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
+                mergeIntermediatesProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
             }
 
             voxelizerDataBuffer = new TypedBuffer<GpuVoxelizerData>();
@@ -135,16 +110,16 @@ namespace IDKEngine.Render
 
         private void ClearTextures()
         {
-            ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
+            ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true);
             if (!TAKE_ATOMIC_FP16_PATH)
             {
-                intermediateResultRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[0].SizedInternalFormat);
-                intermediateResultRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[1].SizedInternalFormat);
-                intermediateResultRbg[2].BindToImageUnit(3, 0, true, 0, TextureAccess.ReadWrite, intermediateResultRbg[2].SizedInternalFormat);
+                intermediateResultRbg[0].BindToImageUnit(1, intermediateResultRbg[0].SizedInternalFormat, 0, true);
+                intermediateResultRbg[1].BindToImageUnit(2, intermediateResultRbg[1].SizedInternalFormat, 0, true);
+                intermediateResultRbg[2].BindToImageUnit(3, intermediateResultRbg[2].SizedInternalFormat, 0, true);
             }
 
             clearTexturesProgram.Use();
-            GL.DispatchCompute((ResultVoxelsAlbedo.Width + 4 - 1) / 4, (ResultVoxelsAlbedo.Height + 4 - 1) / 4, (ResultVoxelsAlbedo.Depth + 4 - 1) / 4);
+            GL.DispatchCompute((ResultVoxels.Width + 4 - 1) / 4, (ResultVoxels.Height + 4 - 1) / 4, (ResultVoxels.Depth + 4 - 1) / 4);
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
         }
 
@@ -160,9 +135,9 @@ namespace IDKEngine.Render
             if (TAKE_FAST_GEOMETRY_SHADER_PATH)
             {
                 Span<Vector4> viewports = stackalloc Vector4[3];
-                viewports[0] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
-                viewports[1] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
-                viewports[2] = new Vector4(0.0f, 0.0f, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
+                viewports[0] = new Vector4(0.0f, 0.0f, ResultVoxels.Width, ResultVoxels.Height);
+                viewports[1] = new Vector4(0.0f, 0.0f, ResultVoxels.Width, ResultVoxels.Height);
+                viewports[2] = new Vector4(0.0f, 0.0f, ResultVoxels.Width, ResultVoxels.Height);
                 GL.ViewportArray(0, viewports.Length, ref viewports[0].X);
 
                 GL.NV.ViewportSwizzle(1, All.ViewportSwizzlePositiveXNv, All.ViewportSwizzlePositiveZNv, All.ViewportSwizzlePositiveYNv, All.ViewportSwizzlePositiveWNv); // xyzw -> xzyw
@@ -170,15 +145,15 @@ namespace IDKEngine.Render
             }
 
             Helper.SetDepthConvention(Helper.DepthConvention.NegativeOneToOne);
-            GL.Viewport(0, 0, ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height);
+            GL.Viewport(0, 0, ResultVoxels.Width, ResultVoxels.Height);
             GL.Disable(EnableCap.CullFace);
 
-            ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
+            ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true);
             if (!TAKE_ATOMIC_FP16_PATH)
             {
-                intermediateResultRbg[0].BindToImageUnit(1, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
-                intermediateResultRbg[1].BindToImageUnit(2, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
-                intermediateResultRbg[2].BindToImageUnit(3, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
+                intermediateResultRbg[0].BindToImageUnit(1, SizedInternalFormat.R32ui, 0, true);
+                intermediateResultRbg[1].BindToImageUnit(2, SizedInternalFormat.R32ui, 0, true);
+                intermediateResultRbg[2].BindToImageUnit(3, SizedInternalFormat.R32ui, 0, true);
             }
 
             voxelizeProgram.Use();
@@ -214,28 +189,28 @@ namespace IDKEngine.Render
 
         private void MergeIntermediateTextures()
         {
-            ResultVoxelsAlbedo.BindToImageUnit(0, 0, true, 0, TextureAccess.ReadWrite, ResultVoxelsAlbedo.SizedInternalFormat);
+            ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true);
 
             intermediateResultRbg[0].BindToUnit(0);
             intermediateResultRbg[1].BindToUnit(1);
             intermediateResultRbg[2].BindToUnit(2);
 
             mergeIntermediatesProgram.Use();
-            GL.DispatchCompute((ResultVoxelsAlbedo.Width + 4 - 1) / 4, (ResultVoxelsAlbedo.Height + 4 - 1) / 4, (ResultVoxelsAlbedo.Depth + 4 - 1) / 4);
+            GL.DispatchCompute((ResultVoxels.Width + 4 - 1) / 4, (ResultVoxels.Height + 4 - 1) / 4, (ResultVoxels.Depth + 4 - 1) / 4);
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit | MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
         private void Mipmap()
         {
-            ResultVoxelsAlbedo.BindToUnit(0);
+            ResultVoxels.BindToUnit(0);
             mipmapProgram.Use();
 
-            int levels = Texture.GetMaxMipmapLevel(ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height, ResultVoxelsAlbedo.Depth);
+            int levels = Texture.GetMaxMipmapLevel(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth);
             for (int i = 1; i < levels; i++)
             {
-                ResultVoxelsAlbedo.BindToImageUnit(0, i, true, 0, TextureAccess.WriteOnly, ResultVoxelsAlbedo.SizedInternalFormat);
+                ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true, i);
 
-                Vector3i size = Texture.GetMipMapLevelSize(ResultVoxelsAlbedo.Width, ResultVoxelsAlbedo.Height, ResultVoxelsAlbedo.Depth, i);
+                Vector3i size = Texture.GetMipMapLevelSize(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth, i);
 
                 mipmapProgram.Upload(0, i - 1);
                 GL.DispatchCompute((size.X + 4 - 1) / 4, (size.Y + 4 - 1) / 4, (size.Z + 4 - 1) / 4);
@@ -245,8 +220,11 @@ namespace IDKEngine.Render
 
         public void DebugRender(Texture debugResult)
         {
-            debugResult.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, debugResult.SizedInternalFormat);
-            ResultVoxelsAlbedo.BindToUnit(0);
+            visualizeDebugProgram.Upload(0, DebugStepMultiplier);
+            visualizeDebugProgram.Upload(1, DebugConeAngle);
+
+            debugResult.BindToImageUnit(0, debugResult.SizedInternalFormat);
+            ResultVoxels.BindToUnit(0);
             visualizeDebugProgram.Use();
             GL.DispatchCompute((debugResult.Width + 8 - 1) / 8, (debugResult.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
@@ -254,12 +232,12 @@ namespace IDKEngine.Render
 
         public void SetSize(int width, int height, int depth)
         {
-            if (ResultVoxelsAlbedo != null) ResultVoxelsAlbedo.Dispose();
-            ResultVoxelsAlbedo = new Texture(TextureTarget3d.Texture3D);
-            ResultVoxelsAlbedo.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
-            ResultVoxelsAlbedo.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            ResultVoxelsAlbedo.SetAnisotropy(16.0f);
-            ResultVoxelsAlbedo.ImmutableAllocate(width, height, depth, SizedInternalFormat.Rgba16f, Texture.GetMaxMipmapLevel(width, height, depth));
+            if (ResultVoxels != null) ResultVoxels.Dispose();
+            ResultVoxels = new Texture(TextureTarget3d.Texture3D);
+            ResultVoxels.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
+            ResultVoxels.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
+            ResultVoxels.SetAnisotropy(16.0f);
+            ResultVoxels.ImmutableAllocate(width, height, depth, SizedInternalFormat.Rgba16f, Texture.GetMaxMipmapLevel(width, height, depth));
 
             if (!TAKE_ATOMIC_FP16_PATH)
             {
@@ -278,7 +256,7 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
-            ResultVoxelsAlbedo.Dispose();
+            ResultVoxels.Dispose();
             if (!TAKE_ATOMIC_FP16_PATH)
             {
                 for (int i = 0; i < 3; i++)

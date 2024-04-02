@@ -2,75 +2,76 @@
 using System.IO;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using IDKEngine.Utils;
 
 namespace IDKEngine
 {
-    class FrameStateRecorder<T> where T : unmanaged
+    class StateRecorder<T> where T : unmanaged
     {
         public ref readonly T this[int index]
         {
             get
             {
-                Debug.Assert(index < FrameCount);
-                return ref recordedFrames[index];
+                Debug.Assert(index < StatesCount);
+                return ref recordedStates[index];
             }
         }
 
-        private int _replayFrame;
-        public int ReplayFrameIndex
+        private int _replayStateIndex;
+        public int ReplayStateIndex
         {
-            get => _replayFrame;
+            get => _replayStateIndex;
             set
             {
-                if (FrameCount == 0)
+                if (StatesCount == 0)
                 {
-                    _replayFrame = 0;
+                    _replayStateIndex = 0;
                     return;
                 }
-                _replayFrame = value % FrameCount;
+                _replayStateIndex = value % StatesCount;
             }
         }
 
-        public bool IsFramesLoaded => FrameCount > 0;
+        public bool AreStatesLoaded => StatesCount > 0;
 
-        public int FrameCount { get; private set; }
+        public int StatesCount { get; private set; }
 
-        private T[] recordedFrames;
-        public FrameStateRecorder()
+        private T[] recordedStates;
+        public StateRecorder()
         {
             
         }
 
         public void Record(T state)
         {
-            if (recordedFrames == null)
+            if (recordedStates == null)
             {
-                recordedFrames = new T[240];
-                recordedFrames[FrameCount++] = state;
+                recordedStates = new T[240];
+                recordedStates[StatesCount++] = state;
                 return;
             }
 
-            if (FrameCount >= recordedFrames.Length)
+            if (StatesCount >= recordedStates.Length)
             {
-                Array.Resize(ref recordedFrames, (int)(recordedFrames.Length * 1.5f));
+                Array.Resize(ref recordedStates, (int)(recordedStates.Length * 1.5f));
             }
-            recordedFrames[FrameCount++] = state;
+            recordedStates[StatesCount++] = state;
         }
 
         public T Replay()
         {
-            if (FrameCount == 0)
+            if (StatesCount == 0)
             {
-                Logger.Log(Logger.LogLevel.Warn, "Cannot replay anything, because there is no frame data loaded");
+                Logger.Log(Logger.LogLevel.Warn, "Cannot replay anything, because there is no state data loaded");
                 return new T();
             }
-            return recordedFrames[ReplayFrameIndex++];
+            return recordedStates[ReplayStateIndex++];
         }
 
         public void Clear()
         {
-            ReplayFrameIndex = 0;
-            FrameCount = 0;
+            ReplayStateIndex = 0;
+            StatesCount = 0;
         }
 
         public unsafe void Load(string path)
@@ -90,22 +91,22 @@ namespace IDKEngine
 
             if (fileStream.Length == 0)
             {
-                Logger.Log(Logger.LogLevel.Info, $"\"{path}\" is an empty file");
+                Logger.Log(Logger.LogLevel.Warn, $"\"{path}\" is an empty file");
                 return;
             }
 
-            recordedFrames = new T[fileStream.Length / sizeof(T)];
+            recordedStates = new T[fileStream.Length / sizeof(T)];
             
-            Span<byte> data = MemoryMarshal.AsBytes<T>(recordedFrames);
+            Span<byte> data = MemoryMarshal.AsBytes<T>(recordedStates);
             fileStream.Read(data);
 
-            FrameCount = recordedFrames.Length;
-            ReplayFrameIndex = 0;
+            StatesCount = recordedStates.Length;
+            ReplayStateIndex = 0;
         }
 
         public void SaveToFile(string path)
         {
-            if (recordedFrames == null || recordedFrames.Length == 0)
+            if (recordedStates == null || recordedStates.Length == 0)
             {
                 return;
             }
@@ -115,7 +116,7 @@ namespace IDKEngine
             }
 
             using FileStream file = File.OpenWrite(path);
-            ReadOnlySpan<byte> data = MemoryMarshal.AsBytes(new ReadOnlySpan<T>(recordedFrames, 0, FrameCount));
+            ReadOnlySpan<byte> data = MemoryMarshal.AsBytes(new ReadOnlySpan<T>(recordedStates, 0, StatesCount));
             file.Write(data);
         }
     }

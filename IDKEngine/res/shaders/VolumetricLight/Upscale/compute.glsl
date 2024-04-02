@@ -1,7 +1,7 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
 AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -9,39 +9,12 @@ layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerVolumetric;
 layout(binding = 1) uniform sampler2D SamplerDepth;
 
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
-
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    float highResDepth = LogarithmicDepthToLinearViewDepth(basicDataUBO.NearPlane, basicDataUBO.FarPlane, texture(gBufferDataUBO.Depth, uv).r) / basicDataUBO.FarPlane;
+    float highResDepth = LogarithmicDepthToLinearViewDepth(perFrameDataUBO.NearPlane, perFrameDataUBO.FarPlane, texture(gBufferDataUBO.Depth, uv).r) / perFrameDataUBO.FarPlane;
 
     vec3 color = vec3(0.0);
 
@@ -63,7 +36,7 @@ void main()
         vec2 sampleUv = (curPixel + 0.5) / imageSize(ImgResult);
 
         vec3 downscaledColor = texture(SamplerVolumetric, sampleUv).rgb;
-        float lowResDepth = LogarithmicDepthToLinearViewDepth(basicDataUBO.NearPlane, basicDataUBO.FarPlane, texture(SamplerDepth, uv).r) / basicDataUBO.FarPlane;
+        float lowResDepth = LogarithmicDepthToLinearViewDepth(perFrameDataUBO.NearPlane, perFrameDataUBO.FarPlane, texture(SamplerDepth, uv).r) / perFrameDataUBO.FarPlane;
 
         float currentWeight = max(0.0, 1.0 - 0.05 * abs(lowResDepth - highResDepth));
 

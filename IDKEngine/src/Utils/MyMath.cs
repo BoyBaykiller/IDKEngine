@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 
-namespace IDKEngine
+namespace IDKEngine.Utils
 {
     public static class MyMath
     {

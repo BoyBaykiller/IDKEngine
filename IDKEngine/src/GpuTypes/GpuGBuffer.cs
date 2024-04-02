@@ -2,10 +2,10 @@
 {
     public struct GpuGBuffer
     {
-        public ulong AlbedoAlphaTextureHandle;
-        public ulong NormalSpecularTextureHandle;
-        public ulong EmissiveRoughnessTextureHandle;
-        public ulong VelocityTextureHandle;
-        public ulong DepthTextureHandle;
+        public long AlbedoAlphaTextureHandle;
+        public long NormalSpecularTextureHandle;
+        public long EmissiveRoughnessTextureHandle;
+        public long VelocityTextureHandle;
+        public long DepthTextureHandle;
     }
 }

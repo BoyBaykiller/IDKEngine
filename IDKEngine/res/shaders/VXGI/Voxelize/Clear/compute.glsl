@@ -8,7 +8,7 @@
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
-layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
+layout(binding = 0) restrict uniform image3D ImgResult;
 
 #if !TAKE_ATOMIC_FP16_PATH
 layout(binding = 1) restrict writeonly uniform uimage3D ImgResultR;

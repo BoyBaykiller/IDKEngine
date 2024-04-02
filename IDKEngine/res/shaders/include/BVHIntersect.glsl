@@ -1,46 +1,30 @@
-#ifndef PathTracing_BVHIntersect_H
-#define PathTracing_BVHIntersect_H
+#define USE_TLAS AppInsert(USE_TLAS)
 
-// Needs more optimization.
-// Currently only pays of on scenes with many BLAS'es.
-// Also does not get rebuild automatically.
-#define USE_TLAS 0
+#define MAX_BLAS_TREE_DEPTH AppInsert(MAX_BLAS_TREE_DEPTH) - 1
+#define MAX_TLAS_TREE_DEPTH 20
 
-#define MAX_BLAS_TREE_DEPTH 22
-#define MAX_TLAS_TREE_DEPTH 18 // TODO: Fix traversal occasionally using more than CPU side MAX_TLAS_TREE_DEPTH  
+#define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
+AppInclude(include/StaticStorageBuffers.glsl)
 
-AppInclude(include/Ray.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
-struct PackedUVec3 { uint x, y, z; };
-uvec3 UintsToUVec3(PackedUVec3 uints)
+struct HitInfo
 {
-    return uvec3(uints.x, uints.y, uints.z);
-}
+    vec3 Bary;
+    float T;
+    uvec3 VertexIndices;
+    uint InstanceID;
+};
 
-struct PackedVec3 { float x, y, z; };
-vec3 FloatsToVec3(PackedVec3 floats)
-{
-    return vec3(floats.x, floats.y, floats.z);
-}
-
-layout(std430, binding = 6) restrict readonly buffer BlasTriangleIndicesSSBO
-{
-    PackedUVec3 Indices[];
-} blasTriangleIndicesSSBO;
-
-layout(std430, binding = 12) restrict readonly buffer VertexPositionsSSBO
-{
-    PackedVec3 VertexPositions[];
-} vertexPositionsSSBO;
-
-
-#ifdef TRAVERSAL_STACK_DONT_USE_SHARED_MEM
-uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
+#ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
+shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][MAX_BLAS_TREE_DEPTH];
 #else
-shared uint BlasTraversalStack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][MAX_BLAS_TREE_DEPTH];
+uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
 #endif
 
+void StackPush(inout uint stackPtr, uint newEntry);
+uint StackPop(inout uint stackPtr);
 
 bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex, inout HitInfo hitInfo, inout uint debugNodeCounter)
 {
@@ -74,11 +58,11 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
             for (uint j = first; j < first + summedTriCount; j++)
             {
-                uvec3 indices = UintsToUVec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
+                uvec3 indices = PackedUintsToUvec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
 
-                vec3 v0 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 v1 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 v2 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
+                vec3 v0 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 v1 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 v2 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
 
                 vec3 bary;
                 float hitT;
@@ -90,11 +74,7 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
                     hitInfo.T = hitT;
                 }
             }
-            // if (IntersectWithTriangles(ray, blasFirstTriangleIndex, first, summedTriCount, hitInfo))
-            // {
-            //     hit = true;
-            // }
-
+            
             if (leftNode.TriCount > 0) leftChildHit = false;
             if (rightNode.TriCount > 0) rightChildHit = false;
         }
@@ -106,13 +86,7 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
                 bool leftCloser = tMinLeft < tMinRight;
                 stackTop = leftCloser ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                 
-                #ifdef TRAVERSAL_STACK_DONT_USE_SHARED_MEM
-                BlasTraversalStack[stackPtr] = leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild;
-                #else
-                BlasTraversalStack[gl_LocalInvocationIndex][stackPtr] = leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild;
-                #endif
-                
-                stackPtr++;
+                StackPush(stackPtr, leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild);
             }
             else
             {
@@ -122,13 +96,7 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
         else
         {
             if (stackPtr == 0) break;
-            stackPtr--;
-
-            #ifdef TRAVERSAL_STACK_DONT_USE_SHARED_MEM
-            stackTop = BlasTraversalStack[stackPtr];
-            #else
-            stackTop = BlasTraversalStack[gl_LocalInvocationIndex][stackPtr];
-            #endif
+            stackTop = StackPop(stackPtr);
         }
     }
 
@@ -165,10 +133,10 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
             for (uint j = first; j < first + summedTriCount; j++)
             {
-                uvec3 indices = UintsToUVec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
-                vec3 v0 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 v1 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 v2 = FloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
+                uvec3 indices = PackedUintsToUvec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
+                vec3 v0 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 v1 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 v2 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
 
                 vec3 bary;
                 float hitT;
@@ -192,13 +160,7 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
             {
                 stackTop = leftNode.TriStartOrChild;
 
-                #ifdef TRAVERSAL_STACK_DONT_USE_SHARED_MEM
-                BlasTraversalStack[stackPtr] = rightNode.TriStartOrChild;
-                #else
-                BlasTraversalStack[gl_LocalInvocationIndex][stackPtr] = rightNode.TriStartOrChild;
-                #endif
-                
-                stackPtr++;
+                StackPush(stackPtr, rightNode.TriStartOrChild);
             }
             else
             {
@@ -208,13 +170,7 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
         else
         {
             if (stackPtr == 0) break;
-            stackPtr--;
-
-            #ifdef TRAVERSAL_STACK_DONT_USE_SHARED_MEM
-            stackTop = BlasTraversalStack[stackPtr];
-            #else
-            stackTop = BlasTraversalStack[gl_LocalInvocationIndex][stackPtr];
-            #endif
+            stackTop = StackPop(stackPtr);
         }
     }
 
@@ -298,7 +254,6 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
             {
                 bool leftCloser = tMinLeft < tMinRight;
                 stackTop = leftCloser ? leftChild : rightChild;
-                if (stackPtr >= MAX_TLAS_TREE_DEPTH) { break; }
                 stack[stackPtr++] = leftCloser ? rightChild : leftChild;
             }
             else
@@ -419,7 +374,6 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
             {
                 bool leftCloser = tMinLeft < tMinRight;
                 stackTop = leftCloser ? leftChild : rightChild;
-                if (stackPtr >= MAX_TLAS_TREE_DEPTH) { break; }
                 stack[stackPtr++] = leftCloser ? rightChild : leftChild;
             }
             else
@@ -456,5 +410,21 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
     return false;
 }
 
-
+void StackPush(inout uint stackPtr, uint newEntry)
+{
+#ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
+    BlasTraversalStack[gl_LocalInvocationIndex][stackPtr++] = newEntry;
+#else
+    BlasTraversalStack[stackPtr++] = newEntry;
 #endif
+}
+
+
+uint StackPop(inout uint stackPtr)
+{
+#ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
+    return BlasTraversalStack[gl_LocalInvocationIndex][--stackPtr];
+#else
+    return BlasTraversalStack[--stackPtr];
+#endif
+}

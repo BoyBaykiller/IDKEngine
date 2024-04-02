@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenTK.Graphics.OpenGL4;
 
-namespace IDKEngine.Render.Objects
+namespace IDKEngine.OpenGL
 {
     public class BufferObject : IDisposable
     {
@@ -27,7 +27,7 @@ namespace IDKEngine.Render.Objects
 
         public readonly int ID;
         public nint Size { get; private set; }
-        public IntPtr MappedMemory { get; private set; }
+        public nint MappedMemory { get; private set; }
 
         public BufferObject()
         {
@@ -44,13 +44,13 @@ namespace IDKEngine.Render.Objects
             GL.BindBuffer(bufferTarget, ID);
         }
 
-        public void ImmutableAllocate(BufferStorageType type, nint size, IntPtr data = 0)
+        public void ImmutableAllocate(BufferStorageType type, nint size, nint data = 0)
         {
             GL.NamedBufferStorage(ID, size, data, (BufferStorageFlags)type);
             Size = size;
 
-            MappedMemory = IntPtr.Zero;
-            
+            MappedMemory = nint.Zero;
+
             if (type == BufferStorageType.DeviceLocalHostVisible)
             {
                 MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)type | BufferAccessMask.MapFlushExplicitBit);
@@ -60,13 +60,13 @@ namespace IDKEngine.Render.Objects
                 MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)type);
             }
         }
-        public void MutableAllocate(nint size, IntPtr data = 0)
+        public void MutableAllocate(nint size, nint data = 0)
         {
             GL.NamedBufferData(ID, size, data, BufferUsageHint.StaticDraw);
             Size = size;
         }
 
-        public void UploadData(nint offset, nint size, IntPtr data)
+        public void UploadData(nint offset, nint size, nint data)
         {
             GL.NamedBufferSubData(ID, offset, size, data);
         }
@@ -77,23 +77,23 @@ namespace IDKEngine.Render.Objects
                 GL.NamedBufferSubData(ID, offset, size, (nint)ptr);
             }
         }
-        public void DownloadData(nint offset, nint size, IntPtr data)
+        public void DownloadData(nint offset, nint size, nint data)
         {
             GL.GetNamedBufferSubData(ID, offset, size, data);
         }
 
-        public void SimpleClear(nint offset, nint size, IntPtr data)
+        public void SimpleClear(nint offset, nint size, nint data)
         {
             Clear(PixelInternalFormat.R32f, PixelFormat.Red, PixelType.Float, offset, size, data);
         }
-        public void Clear(PixelInternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType, nint offset, nint size, IntPtr data)
+        public void Clear(PixelInternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType, nint offset, nint size, nint data)
         {
             GL.ClearNamedBufferSubData(ID, internalFormat, offset, size, pixelFormat, pixelType, data);
         }
 
         public void Dispose()
         {
-            if (MappedMemory != IntPtr.Zero)
+            if (MappedMemory != nint.Zero)
             {
                 GL.UnmapNamedBuffer(ID);
             }
@@ -124,7 +124,7 @@ namespace IDKEngine.Render.Objects
                 ImmutableAllocateElements(type, count, (nint)ptr);
             }
         }
-        public void ImmutableAllocateElements(BufferStorageType type, nint count, IntPtr data = 0)
+        public void ImmutableAllocateElements(BufferStorageType type, nint count, nint data = 0)
         {
             ImmutableAllocate(type, sizeof(T) * count, data);
         }
@@ -140,7 +140,7 @@ namespace IDKEngine.Render.Objects
                 MutableAllocateElements(count, (nint)ptr);
             }
         }
-        public void MutableAllocateElements(nint count, IntPtr data = 0)
+        public void MutableAllocateElements(nint count, nint data = 0)
         {
             MutableAllocate(sizeof(T) * count, data);
         }

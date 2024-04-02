@@ -4,8 +4,9 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
 using IDKEngine.Shapes;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine
@@ -13,6 +14,18 @@ namespace IDKEngine
     public class BVH : IDisposable
     {
         public const bool CPU_USE_TLAS = false;
+
+        private bool _gpuUseTlas;
+        public bool GpuUseTlas
+        {
+            get => _gpuUseTlas;
+
+            set
+            {
+                _gpuUseTlas = value;
+                AbstractShaderProgram.ShaderInsertions["USE_TLAS"] = value ? "1" : "0";
+            }
+        }
 
         public struct RayHitInfo
         {
@@ -30,6 +43,8 @@ namespace IDKEngine
             public int InstanceID;
         }
 
+        public int MaxBlasTreeDepth { get; private set; }
+
         public TLAS Tlas { get; private set; }
         private BLAS[] blases;
 
@@ -39,16 +54,21 @@ namespace IDKEngine
         public BVH()
         {
             blasBuffer = new TypedBuffer<GpuBlasNode>();
-            blasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
+            blasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
 
             blasTriangleIndicesBuffer = new TypedBuffer<BLAS.IndicesTriplet>();
-            blasTriangleIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
+            blasTriangleIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
 
             tlasBuffer = new TypedBuffer<GpuTlasNode>();
-            tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
+            tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
 
             blases = Array.Empty<BLAS>();
             Tlas = new TLAS(blases, Array.Empty<GpuDrawElementsCmd>(), Array.Empty<GpuMeshInstance>());
+
+
+            // Needs more optimization. Currently only pays of on scenes with many BLAS'es.
+            // Also does not get rebuild automatically.
+            GpuUseTlas = false;
         }
 
         public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMax = float.MaxValue)
@@ -163,16 +183,18 @@ namespace IDKEngine
         {
             Stopwatch sw = Stopwatch.StartNew();
 
+            int maxTreeDepth = MaxBlasTreeDepth;
+
             Parallel.For(start, start + count, i =>
             //for (int i = start; i < start + count; i++)
             {
                 blases[i].Build();
-                //blases[i].BuildBVH4();
+                Helper.InterlockedMax(ref maxTreeDepth, blases[i].MaxTreeDepth);
             });
             SetBlasBuffersContent();
+            Logger.Log(Logger.LogLevel.Info, $"Created {count} new Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
 
-
-            Logger.Log(Logger.LogLevel.Info, $"Created {blases.Length} new Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
+            MaxBlasTreeDepth = maxTreeDepth;
         }
 
         public void BlasesRefit(int start, int count)

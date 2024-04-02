@@ -5,111 +5,19 @@
 
 #pragma optionNV(unroll all)
 
+#define DECLARE_MESHLET_STORAGE_BUFFERS
+AppInclude(include/StaticStorageBuffers.glsl)
+
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 32) in;
 // We write out indices in packs of 4 using writePackedPrimitiveIndices4x8NV as an optimization.
 // Because triangle indices count might not be divisble by 4, we need to overshoot written indices to not miss any.
 // To prevent out of bounds access we pad by 1
 layout(triangles, max_primitives = MESHLET_MAX_TRIANGLE_COUNT + 1, max_vertices = MESHLET_MAX_VERTEX_COUNT) out;
-
-struct DrawElementsCmd
-{
-    uint IndexCount;
-    uint InstanceCount;
-    uint FirstIndex;
-    uint BaseVertex;
-    uint BaseInstance;
-};
-
-struct MeshInstance
-{
-    mat4x3 ModelMatrix;
-    mat4x3 InvModelMatrix;
-    mat4x3 PrevModelMatrix;
-    vec3 _pad0;
-    uint MeshIndex;
-};
-
-struct Vertex
-{
-    vec2 TexCoord;
-    uint Tangent;
-    uint Normal;
-};
-
-struct Meshlet
-{
-    uint VertexOffset;
-    uint IndicesOffset;
-
-    uint8_t VertexCount;
-    uint8_t TriangleCount;
-};
-
-layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
-{
-    DrawElementsCmd DrawCommands[];
-} drawElementsCmdSSBO;
-
-layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
-layout(std430, binding = 11) restrict readonly buffer VertexSSBO
-{
-    Vertex Vertices[];
-} vertexSSBO;
-
-struct PackedVec3 { float x, y, z; };
-layout(std430, binding = 12) restrict readonly buffer VertexPositionsSSBO
-{
-    PackedVec3 VertexPositions[];
-} vertexPositionsSSBO;
-
-layout(std430, binding = 15) restrict readonly buffer MeshletSSBO
-{
-    Meshlet Meshlets[];
-} meshletSSBO;
-
-layout(std430, binding = 17) restrict readonly buffer MeshletVertexIndicesSSBO
-{
-    uint VertexIndices[];
-} meshletVertexIndicesSSBO;
-
-layout(std430, binding = 18) restrict readonly buffer MeshletLocalIndicesSSBO
-{
-    uint PackedIndices[];
-} meshletLocalIndicesSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    vec2 Jitter;
-    int SampleCount;
-    float MipmapBias;
-    int TemporalAntiAliasingMode;
-} taaDataUBO;
 
 out InOutVars
 {
@@ -160,9 +68,9 @@ void main()
 
         outData[meshletVertexID].Normal = normalize(unitVecToWorld * normal);
         outData[meshletVertexID].Tangent = normalize(unitVecToWorld * tangent);
-        outData[meshletVertexID].PrevClipPos = basicDataUBO.PrevProjView * prevModelMatrix * vec4(position, 1.0);
+        outData[meshletVertexID].PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(position, 1.0);
 
-        vec4 clipPos = basicDataUBO.ProjView * modelMatrix * vec4(position, 1.0);
+        vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(position, 1.0);
 
         // Add jitter independent of perspective by multiplying with w
         vec4 jitteredClipPos = clipPos;

@@ -1,5 +1,6 @@
 ﻿using System;
 using OpenTK.Mathematics;
+using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 
@@ -41,7 +42,7 @@ namespace IDKEngine
         public readonly Vector3[] VertexPositions;
         public readonly IndicesTriplet[] TriangleIndices;
 
-        private int unpaddedNodesUsed;
+        private int unpaddedNodesCount;
         public GpuBlasNode[] Nodes;
         public BLAS(Vector3[] vertexPositions, ReadOnlySpan<uint> vertexIndices, GpuDrawElementsCmd geometryInfo)
         {
@@ -66,12 +67,15 @@ namespace IDKEngine
             rootNode.TriCount = (uint)TriangleCount;
             UpdateNodeBounds(ref rootNode);
 
-            int maxTraversalDepth = 1;
+            int treeDepth = 0;
+
             int stackTop = 0;
             int stackPtr = 0;
             Span<int> stack = stackalloc int[128];
             while (true)
             {
+                treeDepth = Math.Max(stackPtr + 1, treeDepth);
+
                 ref GpuBlasNode parentNode = ref Nodes[stackTop];
                 if (!ShouldSplitNode(parentNode, out int splitAxis, out float splitPos, out _))
                 {
@@ -80,8 +84,8 @@ namespace IDKEngine
                     continue;
                 }
 
-                GpuBlasNode newLeftNode;
-                GpuBlasNode newRightNode;
+                GpuBlasNode newLeftNode = new GpuBlasNode();
+                GpuBlasNode newRightNode = new GpuBlasNode();
                 {
                     Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
                     Box rightBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
@@ -127,12 +131,10 @@ namespace IDKEngine
                 parentNode.TriStartOrChild = (uint)leftNodeId;
                 parentNode.TriCount = 0;
                 nodesUsed += 2;
-
-                maxTraversalDepth = Math.Max(stackPtr, maxTraversalDepth);
             }
 
-            unpaddedNodesUsed = nodesUsed;
-            if (nodesUsed == 1)
+            unpaddedNodesCount = nodesUsed;
+            if (nodesUsed < 3)
             {
                 // Handle edge case of the root node being a leaf by creating an artificial child node
                 ref GpuBlasNode root = ref Nodes[0];
@@ -150,16 +152,16 @@ namespace IDKEngine
                 };
 
                 nodesUsed = 3;
-                maxTraversalDepth = 2;
+                treeDepth = 2;
             }
 
             Array.Resize(ref Nodes, nodesUsed);
-            MaxTreeDepth = maxTraversalDepth;
+            MaxTreeDepth = treeDepth;
         }
 
         public void Refit()
         {
-            for (int i = unpaddedNodesUsed - 1; i >= 0; i--)
+            for (int i = unpaddedNodesCount - 1; i >= 0; i--)
             {
                 ref GpuBlasNode parent = ref Nodes[i];
                 if (parent.IsLeaf)
@@ -232,6 +234,10 @@ namespace IDKEngine
                         bool leftCloser = tMinLeft < tMinRight;
                         stackTop = leftCloser ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                         stack[stackPtr++] = leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild;
+                        if (stackPtr - 1 >= MaxTreeDepth)
+                        {
+                            Console.WriteLine("penis");
+                        }
                     }
                     else
                     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace IDKEngine
+namespace IDKEngine.Utils
 {
     static class Logger
     {
@@ -29,10 +29,26 @@ namespace IDKEngine
             string preText = $"{DateTime.Now.ToString(DATE_TIME_FORMAT)} [{level.ToString().ToUpper()}] ";
             text = Indent(text, preText.Length);
             string formated = $"{preText}{text}";
-            
+
+            Console.ForegroundColor = LogLevelToColor(level);
             Console.WriteLine(formated);
+            Console.ForegroundColor = ConsoleColor.Gray;
+
             outText.WriteLine(formated);
             outText.Flush();
+        }
+
+        private static ConsoleColor LogLevelToColor(LogLevel level)
+        {
+            ConsoleColor consoleColor = level switch
+            {
+                LogLevel.Info => ConsoleColor.Gray,
+                LogLevel.Warn => ConsoleColor.DarkYellow,
+                LogLevel.Error => ConsoleColor.Red,
+                LogLevel.Fatal => ConsoleColor.DarkRed,
+                _ => throw new NotImplementedException($"Can not convert {nameof(level)} = {level} to {nameof(consoleColor)}"),
+            };
+            return consoleColor;
         }
 
         private static string Indent(string text, int spaces)

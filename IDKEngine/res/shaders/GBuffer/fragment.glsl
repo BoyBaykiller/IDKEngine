@@ -1,6 +1,7 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
@@ -9,96 +10,6 @@ layout(location = 1) out vec4 AlbedoAlpha;
 layout(location = 2) out vec4 NormalSpecular;
 layout(location = 3) out vec4 EmissiveRoughness;
 layout(location = 4) out vec2 Velocity;
-
-struct Mesh
-{
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float TransmissionBias;
-    float IORBias;
-    uint MeshletsStart;
-    vec3 AbsorbanceBias;
-    uint MeshletCount;
-    uint InstanceCount;
-    uint BlasRootNodeIndex;
-    vec2 _pad0;
-};
-
-struct Material
-{
-    vec3 EmissiveFactor;
-    uint BaseColorFactor;
-
-    float TransmissionFactor;
-    float AlphaCutoff;
-    float RoughnessFactor;
-    float MetallicFactor;
-
-    vec3 Absorbance;
-    float IOR;
-
-    sampler2D BaseColor;
-    sampler2D MetallicRoughness;
-
-    sampler2D Normal;
-    sampler2D Emissive;
-
-    sampler2D Transmission;
-    uvec2 _pad0;
-};
-
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
-
-layout(std430, binding = 10) restrict readonly buffer MaterialSSBO
-{
-    Material Materials[];
-} materialSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    vec2 Jitter;
-    int SampleCount;
-    float MipmapBias;
-    int TemporalAntiAliasingMode;
-} taaDataUBO;
-
-layout(std140, binding = 4) uniform SkyBoxUBO
-{
-    samplerCube Albedo;
-} skyBoxUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
 
 in InOutVars
 {
@@ -115,7 +26,6 @@ void main()
     Material material = materialSSBO.Materials[mesh.MaterialIndex];
     
     float lod = textureQueryLod(material.BaseColor, inData.TexCoord).y;
-
     vec4 albedoAlpha = textureLod(material.BaseColor, inData.TexCoord, lod + taaDataUBO.MipmapBias) * DecompressUR8G8B8A8(material.BaseColorFactor);
     if (albedoAlpha.a < material.AlphaCutoff)
     {

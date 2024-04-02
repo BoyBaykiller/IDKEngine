@@ -1,24 +1,12 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
+
+AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 AlbedoAlpha;
 layout(location = 2) out vec4 NormalSpecular;
 layout(location = 3) out vec4 EmissiveRoughness;
 layout(location = 4) out vec2 Velocity;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    vec2 Jitter;
-    int SampleCount;
-    float MipmapBias;
-    int TemporalAntiAliasingMode;
-} taaDataUBO;
-
-layout(std140, binding = 4) uniform SkyBoxUBO
-{
-    samplerCube Albedo;
-} skyBoxUBO;
 
 in InOutVars
 {

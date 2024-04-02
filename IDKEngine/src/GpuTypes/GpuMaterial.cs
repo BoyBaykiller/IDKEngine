@@ -17,7 +17,7 @@ namespace IDKEngine.GpuTypes
             Transmission,
         }
 
-        public ref ulong this[TextureHandle textureType]
+        public ref long this[TextureHandle textureType]
         {
             get
             {
@@ -44,13 +44,13 @@ namespace IDKEngine.GpuTypes
         public Vector3 Absorbance;
         public float IOR;
 
-        public ulong BaseColorTextureHandle;
-        public ulong MetallicRoughnessTextureHandle;
+        public long BaseColorTextureHandle;
+        public long MetallicRoughnessTextureHandle;
 
-        public ulong NormalTextureHandle;
-        public ulong EmissiveTextureHandle;
+        public long NormalTextureHandle;
+        public long EmissiveTextureHandle;
 
-        public ulong TransmissionTextureHandle;
-        private readonly ulong _pad0;
+        public long TransmissionTextureHandle;
+        private readonly long _pad0;
     }
 }

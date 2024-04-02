@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 
-namespace IDKEngine
+namespace IDKEngine.Utils
 {
     public static class ObjectFactory
     {
@@ -62,7 +62,7 @@ namespace IDKEngine
         public static Span<uint> GenerateSmoothSphereIndicis(uint latitudes, uint longitudes)
         {
             // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
-            
+
             List<uint> indicis = new List<uint>((int)(latitudes * longitudes));
             uint k1, k2;
             for (uint i = 0; i < latitudes; i++)
@@ -79,7 +79,7 @@ namespace IDKEngine
                         indicis.Add(k1 + 1);
                     }
 
-                    if (i != (latitudes - 1))
+                    if (i != latitudes - 1)
                     {
                         indicis.Add(k1 + 1);
                         indicis.Add(k2);

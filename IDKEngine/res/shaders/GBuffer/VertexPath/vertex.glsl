@@ -1,6 +1,7 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
@@ -9,51 +10,6 @@ layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
 layout(location = 2) in uint Tangent;
 layout(location = 3) in uint Normal;
-
-struct MeshInstance
-{
-    mat4x3 ModelMatrix;
-    mat4x3 InvModelMatrix;
-    mat4x3 PrevModelMatrix;
-    vec3 _pad0;
-    uint MeshIndex;
-};
-
-layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
-layout(std430, binding = 3) restrict buffer VisibleMeshInstanceSSBO
-{
-    uint MeshInstanceIDs[];
-} visibleMeshInstanceSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 3) uniform TaaDataUBO
-{
-    vec2 Jitter;
-    int SampleCount;
-    float MipmapBias;
-    int TemporalAntiAliasingMode;
-} taaDataUBO;
 
 out InOutVars
 {
@@ -79,10 +35,10 @@ void main()
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.Tangent = normalize(unitVecToWorld * tangent);
     outData.TexCoord = TexCoord;
-    outData.PrevClipPos = basicDataUBO.PrevProjView * prevModelMatrix * vec4(Position, 1.0);
+    outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(Position, 1.0);
     outData.MeshID = gl_DrawID;
     
-    vec4 clipPos = basicDataUBO.ProjView * modelMatrix * vec4(Position, 1.0);
+    vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(Position, 1.0);
 
     // Add jitter independent of perspective by multiplying with w
     vec4 jitteredClipPos = clipPos;

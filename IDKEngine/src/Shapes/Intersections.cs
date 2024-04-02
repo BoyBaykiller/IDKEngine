@@ -469,7 +469,7 @@ namespace IDKEngine.Shapes
         }
 
 
-        public struct CollisionDetectionSettings
+        public struct SceneVsMovingSphereSettings
         {
             public bool IsEnabled;
             public int TestSteps;
@@ -484,7 +484,7 @@ namespace IDKEngine.Shapes
         }
 
         public delegate void FuncIntersect(in SceneHitInfo hitInfo);
-        public static void SceneVsMovingSphereCollisionRoutine(ModelSystem modelSystem, in CollisionDetectionSettings settings, ref Sphere movingSphere, in Vector3 sphereDestination, FuncIntersect intersectFunc)
+        public static void SceneVsMovingSphereCollisionRoutine(ModelSystem modelSystem, in SceneVsMovingSphereSettings settings, ref Sphere movingSphere, in Vector3 sphereDestination, FuncIntersect intersectFunc)
         {
             if (settings.IsEnabled)
             {

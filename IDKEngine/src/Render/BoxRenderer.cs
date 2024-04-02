@@ -1,21 +1,20 @@
 ﻿using System;
-using System.IO;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
     class BoxRenderer : IDisposable
     {
-        private readonly ShaderProgram shaderProgram;
+        private readonly AbstractShaderProgram shaderProgram;
         private readonly Framebuffer fbo;
         public BoxRenderer()
         {
-            shaderProgram = new ShaderProgram(
-                Shader.ShaderFromFile(ShaderType.VertexShader, "Box/vertex.glsl"),
-                Shader.ShaderFromFile(ShaderType.FragmentShader, "Box/fragment.glsl"));
+            shaderProgram = new AbstractShaderProgram(
+                new AbstractShader(ShaderType.VertexShader, "Box/vertex.glsl"),
+                new AbstractShader(ShaderType.FragmentShader, "Box/fragment.glsl"));
 
             fbo = new Framebuffer();
         }

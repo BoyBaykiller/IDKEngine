@@ -5,9 +5,9 @@ using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
 using IDKEngine.Windowing;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
-namespace IDKEngine.GUI
+namespace IDKEngine.ThirdParty
 {
     class ImGuiBackend : IDisposable
     {
@@ -49,10 +49,10 @@ namespace IDKEngine.GUI
             frameBegun = true;
         }
 
-        public void SetSize(int width, int height)
+        public void SetSize(Vector2i size)
         {
-            Width = width;
-            Height = height;
+            Width = size.X;
+            Height = size.Y;
         }
 
         public void Render()

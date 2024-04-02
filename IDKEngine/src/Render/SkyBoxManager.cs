@@ -1,5 +1,6 @@
 ﻿using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -17,12 +18,12 @@ namespace IDKEngine.Render
 
 
         private static Texture externalSkyBoxTexture;
-        public static TypedBuffer<ulong> skyBoxTextureBuffer;
+        public static TypedBuffer<long> skyBoxTextureBuffer;
         public static void Init(SkyBoxMode skyBoxMode, string[] paths = null)
         {
-            skyBoxTextureBuffer = new TypedBuffer<ulong>();
+            skyBoxTextureBuffer = new TypedBuffer<long>();
             skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
-            skyBoxTextureBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1, 0ul);
+            skyBoxTextureBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1, 0);
 
             Paths = paths;
             SetSkyBoxMode(skyBoxMode);

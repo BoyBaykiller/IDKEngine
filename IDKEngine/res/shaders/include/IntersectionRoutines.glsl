@@ -1,9 +1,3 @@
-#ifndef IntersectionRoutines_H
-#define IntersectionRoutines_H
-
-#define IntersectionRoutines_FLOAT_MAX 3.4028235e+38
-#define IntersectionRoutines_FLOAT_MIN -IntersectionRoutines_FLOAT_MAX
-
 AppInclude(include/Ray.glsl)
 AppInclude(include/Box.glsl)
 AppInclude(include/Frustum.glsl)
@@ -31,8 +25,8 @@ bool RayBoxIntersect(Ray ray, Box box, out float t1, out float t2)
 {
     // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
 
-    t1 = IntersectionRoutines_FLOAT_MIN;
-    t2 = IntersectionRoutines_FLOAT_MAX;
+    t1 = FLOAT_MIN;
+    t2 = FLOAT_MAX;
 
     vec3 t0s = (box.Min - ray.Origin) / ray.Direction;
     vec3 t1s = (box.Max - ray.Origin) / ray.Direction;
@@ -50,8 +44,8 @@ bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out 
 {
     // Source: https://antongerdelan.net/opengl/raycasting.html
     
-    t1 = IntersectionRoutines_FLOAT_MAX;
-    t2 = IntersectionRoutines_FLOAT_MAX;
+    t1 = FLOAT_MAX;
+    t2 = FLOAT_MAX;
 
     vec3 sphereToRay = ray.Origin - position;
     float b = dot(ray.Direction, sphereToRay);
@@ -128,5 +122,3 @@ bool BoxDepthBufferIntersect(Box boxNdc, sampler2D samplerHiZ)
 
     return isVisible;
 }
-
-#endif

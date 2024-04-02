@@ -1,15 +1,13 @@
-#ifndef TraceCone_H
-#define TraceCone_H
-
 AppInclude(include/Ray.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
-vec4 TraceCone(Ray ray, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
+vec4 TraceCone(sampler3D samplerVoxels, Ray ray, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
 {
     vec3 voxelGridWorldSpaceSize = voxelizerDataUBO.GridMax - voxelizerDataUBO.GridMin;
-    vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(SamplerVoxelsAlbedo, 0);
+    vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(samplerVoxels, 0);
     float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
     float voxelMinLength = min(voxelWorldSpaceSize.x, min(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
-    uint maxLevel = textureQueryLevels(SamplerVoxelsAlbedo) - 1;
+    uint maxLevel = textureQueryLevels(samplerVoxels) - 1;
     vec4 accumulatedColor = vec4(0.0);
 
     ray.Origin += normal * voxelMaxLength * normalRayOffset;
@@ -28,7 +26,7 @@ vec4 TraceCone(Ray ray, vec3 normal, float coneAngle, float stepMultiplier, floa
         {
             break;
         }
-        vec4 newSample = textureLod(SamplerVoxelsAlbedo, sampleUVW, sampleLod);
+        vec4 newSample = textureLod(samplerVoxels, sampleUVW, sampleLod);
 
         // glBlendEquation(mode: GL_FUNC_ADD)
         // glBlendFunc(sfactor: GL_ONE_MINUS_DST_ALPHA, dfactor: 1.0)
@@ -41,11 +39,9 @@ vec4 TraceCone(Ray ray, vec3 normal, float coneAngle, float stepMultiplier, floa
     return accumulatedColor;
 }
 
-vec4 TraceCone(Ray ray, float coneAngle, float stepMultiplier)
+vec4 TraceCone(sampler3D samplerVoxels, Ray ray, float coneAngle, float stepMultiplier)
 {
     const vec3 normal = vec3(0.0);
     const float normalRayOffset = 0.0;
-    return TraceCone(ray, normal, coneAngle, stepMultiplier, normalRayOffset, 1.0);
+    return TraceCone(samplerVoxels, ray, normal, coneAngle, stepMultiplier, normalRayOffset, 1.0);
 }
-
-#endif

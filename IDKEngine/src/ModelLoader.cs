@@ -12,12 +12,13 @@ using StbImageSharp;
 using SharpGLTF.Schema2;
 using SharpGLTF.Materials;
 using Meshoptimizer;
-using IDKEngine.Render.Objects;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
-using GLTexture = IDKEngine.Render.Objects.Texture;
+using GLTexture = IDKEngine.OpenGL.Texture;
 using GltfTexture = SharpGLTF.Schema2.Texture;
 using GltfTextureWrapMode = SharpGLTF.Schema2.TextureWrapMode;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine
 {
@@ -228,19 +229,19 @@ namespace IDKEngine
                     nodeTransformations = new Matrix4[1] { nodeLocalTransform };
                 }
 
-                //transformations = new Matrix4[1000];
-                //for (int i = 0; i < transformations.Length; i++)
+                //nodeTransformations = new Matrix4[5];
+                //for (int i = 0; i < nodeTransformations.Length; i++)
                 //{
                 //    Vector3 trans = Helper.RandomVec3(-15.0f, 15.0f);
                 //    Vector3 rot = Helper.RandomVec3(0.0f, 2.0f * MathF.PI);
-                //    float scale = 1f;
+                //    float scale = 0.01f;
                 //    var test = Matrix4.CreateScale(scale) *
                 //            Matrix4.CreateRotationZ(rot.Z) *
                 //               Matrix4.CreateRotationY(rot.Y) *
                 //               Matrix4.CreateRotationX(rot.X) *
                 //               Matrix4.CreateTranslation(trans);
 
-                //    transformations[i] = test;
+                //    nodeTransformations[i] = test;
                 //}
 
                 for (int i = 0; i < gltfMesh.Primitives.Count; i++)
@@ -293,10 +294,8 @@ namespace IDKEngine
                     for (int j = 0; j < meshInstances.Length; j++)
                     {
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
-
                         meshInstance.ModelMatrix = nodeTransformations[j] * parentNodeGlobalTransform;
                         meshInstance.MeshIndex = listMeshes.Count;
-
 
                         ref GpuMeshletTaskCmd meshletTaskCmd = ref meshletTaskCmds[j];
                         meshletTaskCmd.First = 0;
@@ -347,7 +346,7 @@ namespace IDKEngine
             defaultTexture.ImmutableAllocate(1, 1, 1, SizedInternalFormat.Rgba16f);
             defaultTexture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
             defaultTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB();
+            long defaultTextureHandle = defaultTexture.GetTextureHandleARB();
 
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
             for (int i = 0; i < gpuMaterials.Length; i++)
@@ -392,6 +391,7 @@ namespace IDKEngine
                         // Need to copy because of "CS1686: Local variable or its members cannot have their address taken and be used inside an anonymous method or lambda expression."
                         int copyWidth, copyHeight, copyChannels;
                         StbImage.stbi__info_main(new StbImage.stbi__context(imageStream), &copyWidth, &copyHeight, &copyChannels);
+                        
                         imageWidth = copyWidth;
                         imageHeight = copyHeight;
                         imageChannels = copyChannels;
@@ -522,7 +522,7 @@ namespace IDKEngine
                 textureLoadData.InternalFormat = SizedInternalFormat.Srgb8Alpha8;
                 //textureLoadData.InternalFormat = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm;
 
-                // BaseColorTexture is allowed to have either 3 or 4 components. As an optimization adjust image components.
+                // BaseColorTexture is allowed to have either 3 or 4 components. As an optimization adjust image components to load.
                 // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_material_pbrmetallicroughness_basecolortexture
                 textureLoadData.LoadComponents = (baseColorImageChannels == 3) ? ColorComponents.RedGreenBlue : ColorComponents.RedGreenBlueAlpha;
             }
@@ -863,7 +863,7 @@ namespace IDKEngine
             const uint MESHLET_MAX_VERTEX_COUNT = 128;
 
             // (252 * 3) + 4(hardware reserved) = 760bytes. Which almost perfectly fits NVIDIA-Turing 128 byte allocation granularity.
-            // Note that meshoptimizer also requires this to be divisible by 4
+            // Note: Meshoptimizer also requires this to be divisible by 4
             const uint MESHLET_MAX_TRIANGLE_COUNT = 252;
 
             nuint maxMeshlets = Meshopt.BuildMeshletsBound((nuint)meshIndices.Length, MESHLET_MAX_VERTEX_COUNT, MESHLET_MAX_TRIANGLE_COUNT);

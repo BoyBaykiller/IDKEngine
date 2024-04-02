@@ -1,7 +1,7 @@
 ﻿using System;
-using System.IO;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -34,11 +34,11 @@ namespace IDKEngine.Render
         public GpuSettings Settings;
 
         private Texture debugTexture;
-        private readonly ShaderProgram shaderProgram;
-        private readonly ShaderProgram debugProgram;
-        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
-        public LightingShadingRateClassifier(int width, int height, in GpuSettings settings)
-            : base(width, height, new NvShadingRateImage[]
+        private readonly AbstractShaderProgram shaderProgram;
+        private readonly AbstractShaderProgram debugProgram;
+        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public LightingShadingRateClassifier(Vector2i size, in GpuSettings settings)
+            : base(size, new NvShadingRateImage[]
             {
                 NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
                 NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
@@ -47,24 +47,24 @@ namespace IDKEngine.Render
                 NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
             })
         {
-            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "ShadingRateClassification/compute.glsl"));
-            debugProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "ShadingRateClassification/debugCompute.glsl"));
+            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadingRateClassification/compute.glsl"));
+            debugProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadingRateClassification/debugCompute.glsl"));
 
-            bufferGpuSettings = new TypedBuffer<GpuSettings>();
-            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
-            SetSize(width, height);
+            SetSize(size);
 
             Settings = settings;
         }
 
         public void Compute(Texture shaded)
         {
-            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            bufferGpuSettings.UploadElements(Settings);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(Settings);
 
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
-            debugTexture.BindToImageUnit(1, 0, false, 0, TextureAccess.WriteOnly, debugTexture.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.SizedInternalFormat);
+            debugTexture.BindToImageUnit(1, debugTexture.SizedInternalFormat);
             shaded.BindToUnit(0);
 
             shaderProgram.Use();
@@ -78,10 +78,10 @@ namespace IDKEngine.Render
                 return;
             }
 
-            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            bufferGpuSettings.UploadElements(Settings);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(Settings);
 
-            dest.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, dest.SizedInternalFormat);
+            dest.BindToImageUnit(0, dest.SizedInternalFormat);
             dest.BindToUnit(0);
             if (Settings.DebugValue != DebugMode.ShadingRate)
             {
@@ -96,9 +96,9 @@ namespace IDKEngine.Render
             GL.DispatchCompute((dest.Width + TILE_SIZE - 1) / TILE_SIZE, (dest.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
         }
 
-        public new void SetSize(int width, int height)
+        public new void SetSize(Vector2i size)
         {
-            base.SetSize(width, height);
+            base.SetSize(size);
 
             if (debugTexture != null) debugTexture.Dispose();
             debugTexture = new Texture(TextureTarget2d.Texture2D);
@@ -113,7 +113,7 @@ namespace IDKEngine.Render
             debugTexture.Dispose();
             shaderProgram.Dispose();
             debugProgram.Dispose();
-            bufferGpuSettings.Dispose();
+            gpuSettingsBuffer.Dispose();
         }
     }
 }

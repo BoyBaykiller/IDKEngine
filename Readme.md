@@ -5,7 +5,7 @@ Feature list:
  - Real-Time Voxel Global Illumination
  - Mesh Shaders + Multi Draw Indirect + Bindless Textures + other extensions
  - [AMD FSR2](https://github.com/GPUOpen-Effects/FidelityFX-FSR2) and Temporal Anti Aliasing
- - Camera Collision Detection against arbitrary triangle meshes
+ - Lights & Camera Collision Detection against arbitrary triangle meshes
  - CoD-Modern-Warfare Bloom
  - Ray Traced Shadows
  - Variable Rate Shading
@@ -18,9 +18,11 @@ Feature list:
  - glTF loader supporting various extensions
  - Camera capture and playback with video output
 
-Required OpenGL: 4.6 + `ARB_bindless_texture` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
+Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
 
-Note: Crashes on AMD drivers newer than 23.12.1 because of [driver bug](https://community.amd.com/t5/opengl-vulkan/opengl-bug-imagesize-causes-crash-when-using-gl-arb-bindless/m-p/668942#M5125)
+Notes:
+ * Crashes on AMD drivers newer than 23.12.1 because of [driver bug](https://community.amd.com/t5/opengl-vulkan/opengl-bug-imagesize-causes-crash-when-using-gl-arb-bindless/m-p/668942#M5125)
+ * I am forced to rely on undefined behaviour (writing a read-only bindless image) when using Ray Traced shadows, as a workarround to an AMD driver bug. Nothing is guaranteed :)
 
 
 # Controls

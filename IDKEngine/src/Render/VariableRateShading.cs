@@ -1,6 +1,8 @@
 ﻿using System;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -38,21 +40,21 @@ namespace IDKEngine.Render
         
         public Texture Result;
         public NvShadingRateImage[] ShadingRatePalette;
-        public VariableRateShading(int width, int height, NvShadingRateImage[] shadingRatePalette)
+        public VariableRateShading(Vector2i size, NvShadingRateImage[] shadingRatePalette)
         {
             ShadingRatePalette = shadingRatePalette;
-            SetSize(width, height);
+            SetSize(size);
         }
 
-        public void SetSize(int width, int height)
+        public void SetSize(Vector2i size)
         {
-            width = (int)MathF.Ceiling((float)width / TILE_SIZE);
-            height = (int)MathF.Ceiling((float)height / TILE_SIZE);
+            size.X = (int)MathF.Ceiling((float)size.X / TILE_SIZE);
+            size.Y = (int)MathF.Ceiling((float)size.Y / TILE_SIZE);
 
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.R8ui);
+            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.R8ui);
         }
 
         public void Dispose()

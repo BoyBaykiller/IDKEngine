@@ -1,8 +1,7 @@
 ﻿using System;
-using System.IO;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -35,7 +34,7 @@ namespace IDKEngine.Render
             {
                 _minusLods = value;
                 // Multiply with 2 to get size of original src texture
-                SetSize(Result.Width * 2, Result.Height * 2);
+                SetSize(new Vector2i(Result.Width, Result.Height) * 2);
             }
         }
 
@@ -45,16 +44,16 @@ namespace IDKEngine.Render
 
         private Texture downscaleTexture;
         private Texture upsampleTexture;
-        private readonly ShaderProgram shaderProgram;
-        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
-        public Bloom(int width, int height, in GpuSettings settings, int minusLods = 3)
+        private readonly AbstractShaderProgram shaderProgram;
+        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public Bloom(Vector2i size, in GpuSettings settings, int minusLods = 3)
         {
-            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "Bloom/compute.glsl"));
+            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "Bloom/compute.glsl"));
 
-            bufferGpuSettings = new TypedBuffer<GpuSettings>();
-            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
-            SetSize(width, height);
+            SetSize(size);
 
             MinusLods = minusLods;
             Settings = settings;
@@ -62,8 +61,8 @@ namespace IDKEngine.Render
 
         public void Compute(Texture src)
         {
-            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            bufferGpuSettings.UploadElements(Settings);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(Settings);
 
             shaderProgram.Use();
             int currentWriteLod = 0;
@@ -75,7 +74,7 @@ namespace IDKEngine.Render
             
                 {
                     shaderProgram.Upload(0, currentWriteLod);
-                    downscaleTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, downscaleTexture.SizedInternalFormat);
+                    downscaleTexture.BindToImageUnit(0, downscaleTexture.SizedInternalFormat);
                 
                     Vector3i mipLevelSize = Texture.GetMipMapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, currentWriteLod);
                     GL.DispatchCompute((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
@@ -87,7 +86,7 @@ namespace IDKEngine.Render
                 for (; currentWriteLod < downscaleTexture.Levels; currentWriteLod++)
                 {
                     shaderProgram.Upload(0, currentWriteLod - 1);
-                    downscaleTexture.BindToImageUnit(0, currentWriteLod, false, 0, TextureAccess.WriteOnly, downscaleTexture.SizedInternalFormat);
+                    downscaleTexture.BindToImageUnit(0, downscaleTexture.SizedInternalFormat, 0, false, currentWriteLod);
 
                     Vector3i mipLevelSize = Texture.GetMipMapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, currentWriteLod);
                     GL.DispatchCompute((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
@@ -103,7 +102,7 @@ namespace IDKEngine.Render
 
                 {
                     shaderProgram.Upload(0, currentWriteLod + 1);
-                    upsampleTexture.BindToImageUnit(0, currentWriteLod, false, 0, TextureAccess.WriteOnly, upsampleTexture.SizedInternalFormat);
+                    upsampleTexture.BindToImageUnit(0, upsampleTexture.SizedInternalFormat, 0,false, currentWriteLod);
                     
                     Vector3i mipLevelSize = Texture.GetMipMapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, currentWriteLod);
                     GL.DispatchCompute((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
@@ -115,7 +114,7 @@ namespace IDKEngine.Render
                 for (; currentWriteLod >= 0; currentWriteLod--)
                 {
                     shaderProgram.Upload(0, currentWriteLod + 1);
-                    upsampleTexture.BindToImageUnit(0, currentWriteLod, false, 0, TextureAccess.WriteOnly, upsampleTexture.SizedInternalFormat);
+                    upsampleTexture.BindToImageUnit(0, upsampleTexture.SizedInternalFormat, 0, false, currentWriteLod);
 
                     Vector3i mipLevelSize = Texture.GetMipMapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, currentWriteLod);
                     GL.DispatchCompute((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
@@ -124,24 +123,24 @@ namespace IDKEngine.Render
             }
         }
 
-        public void SetSize(int width, int height)
+        public void SetSize(Vector2i size)
         {
-            width = (int)MathF.Ceiling(width / 2);
-            height = (int)MathF.Ceiling(height / 2);
+            size.X = (int)MathF.Ceiling(size.X / 2);
+            size.Y = (int)MathF.Ceiling(size.Y / 2);
 
-            int levels = Math.Max(Texture.GetMaxMipmapLevel(width, height, 1) - MinusLods, 2);
+            int levels = Math.Max(Texture.GetMaxMipmapLevel(size.X, size.Y, 1) - MinusLods, 2);
 
             if (downscaleTexture != null) downscaleTexture.Dispose();
             downscaleTexture = new Texture(TextureTarget2d.Texture2D);
             downscaleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
             downscaleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            downscaleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, levels);
+            downscaleTexture.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba16f, levels);
 
             if (upsampleTexture != null) upsampleTexture.Dispose();
             upsampleTexture = new Texture(TextureTarget2d.Texture2D);
             upsampleTexture.SetFilter(TextureMinFilter.LinearMipmapNearest, TextureMagFilter.Linear);
             upsampleTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            upsampleTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f, levels - 1);
+            upsampleTexture.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba16f, levels - 1);
         }
 
         public void Dispose()
@@ -149,7 +148,7 @@ namespace IDKEngine.Render
             downscaleTexture.Dispose();
             upsampleTexture.Dispose();
             shaderProgram.Dispose();
-            bufferGpuSettings.Dispose();
+            gpuSettingsBuffer.Dispose();
         }
     }
 }

@@ -1,10 +1,12 @@
 #version 460 core
 
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0, rgba32f) restrict uniform image2D ImgResult;
+layout(binding = 0) restrict uniform image2D ImgResult;
 
 struct HitInfo
 {
@@ -14,60 +16,16 @@ struct HitInfo
     uint InstanceID;
 };
 
-struct WavefrontRay
+layout(std140, binding = 7) uniform SettingsUBO
 {
-    vec3 Origin;
-    float PreviousIOROrDebugNodeCounter;
-
-    vec3 Throughput;
-    float CompressedDirectionX;
-
-    vec3 Radiance;
-    float CompressedDirectionY;
-};
-
-struct DispatchCommand
-{
-    int NumGroupsX;
-    int NumGroupsY;
-    int NumGroupsZ;
-};
-
-layout(std430, binding = 8) restrict readonly buffer WavefrontRaySSBO
-{
-    WavefrontRay Rays[];
-} wavefrontRaySSBO;
-
-layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
-{
-    DispatchCommand DispatchCommand;
-    uint Counts[2];
-    uint PingPongIndex;
-    uint AccumulatedSamples;
-    uint AliveRayIndices[];
-} wavefrontPTSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
+    float FocalLength;
+    float LenseRadius;
+    bool IsDebugBVHTraversal;
+    bool IsTraceLights;
+    bool IsAlwaysTintWithAlbedo;
+} settingsUBO;
 
 vec3 SpectralJet(float a);
-
-uniform bool IsDebugBVHTraversal;
 
 void main()
 {
@@ -77,7 +35,7 @@ void main()
     WavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
 
     vec3 irradiance = wavefrontRay.Radiance;
-    if (IsDebugBVHTraversal)
+    if (settingsUBO.IsDebugBVHTraversal)
     {
         // use visible light spectrum as heatmap
         float a = min(wavefrontRay.PreviousIOROrDebugNodeCounter / 150.0, 1.0);

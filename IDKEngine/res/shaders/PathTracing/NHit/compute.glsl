@@ -1,228 +1,43 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 #extension GL_AMD_gpu_shader_half_float : enable
 #extension GL_AMD_gpu_shader_half_float_fetch : enable // requires GL_AMD_gpu_shader_half_float
 
 #if GL_AMD_gpu_shader_half_float_fetch
-#define HF_SAMPLER_2D f16sampler2D
+#define MATERIAL_SAMPLER_2D_TYPE f16sampler2D
 #else
-#define HF_SAMPLER_2D sampler2D
+#define MATERIAL_SAMPLER_2D_TYPE sampler2D
 #endif
 
+#define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
+AppInclude(include/StaticStorageBuffers.glsl)
+
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Random.glsl)
 AppInclude(include/Ray.glsl)
+
 AppInclude(PathTracing/include/Constants.glsl)
+
+#define TRAVERSAL_STACK_USE_SHARED_STACK_SIZE N_HIT_PROGRAM_LOCAL_SIZE_X
+AppInclude(include/BVHIntersect.glsl)
 
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
-struct HitInfo
+layout(std140, binding = 7) uniform SettingsUBO
 {
-    vec3 Bary;
-    float T;
-    uvec3 VertexIndices;
-    uint InstanceID;
-};
-
-struct Material
-{
-    vec3 EmissiveFactor;
-    uint BaseColorFactor;
-
-    float TransmissionFactor;
-    float AlphaCutoff;
-    float RoughnessFactor;
-    float MetallicFactor;
-
-    vec3 Absorbance;
-    float IOR;
-
-    HF_SAMPLER_2D BaseColor;
-    HF_SAMPLER_2D MetallicRoughness;
-
-    HF_SAMPLER_2D Normal;
-    HF_SAMPLER_2D Emissive;
-
-    HF_SAMPLER_2D Transmission;
-    uvec2 _pad0;
-};
-
-struct DrawElementsCmd
-{
-    uint IndexCount;
-    uint InstanceCount;
-    uint FirstIndex;
-    uint BaseVertex;
-    uint BaseInstance;
-};
-
-struct Mesh
-{
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float TransmissionBias;
-    float IORBias;
-    uint MeshletsStart;
-    vec3 AbsorbanceBias;
-    uint MeshletCount;
-    uint InstanceCount;
-    uint BlasRootNodeIndex;
-    vec2 _pad0;
-};
-
-struct MeshInstance
-{
-    mat4x3 ModelMatrix;
-    mat4x3 InvModelMatrix;
-    mat4x3 PrevModelMatrix;
-    vec3 _pad0;
-    uint MeshIndex;
-};
-
-struct Vertex
-{
-    vec2 TexCoord;
-    uint Tangent;
-    uint Normal;
-};
-
-struct BlasNode
-{
-    vec3 Min;
-    uint TriStartOrChild;
-    vec3 Max;
-    uint TriCount;
-};
-
-struct TlasNode
-{
-    vec3 Min;
-    uint IsLeafAndChildOrInstanceID;
-    vec3 Max;
-    float _pad0;
-};
-
-struct WavefrontRay
-{
-    vec3 Origin;
-    float PreviousIOROrDebugNodeCounter;
-
-    vec3 Throughput;
-    float CompressedDirectionX;
-
-    vec3 Radiance;
-    float CompressedDirectionY;
-};
-
-struct DispatchCommand
-{
-    int NumGroupsX;
-    int NumGroupsY;
-    int NumGroupsZ;
-};
-
-struct Light
-{
-    vec3 Position;
-    float Radius;
-    vec3 Color;
-    int PointShadowIndex;
-    vec3 PrevPosition;
-    float _pad0;
-};
-
-layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
-{
-    DrawElementsCmd DrawCommands[];
-} drawElementsCmdSSBO;
-
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
-
-layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
-layout(std430, binding = 10) restrict readonly buffer MaterialSSBO
-{
-    Material Materials[];
-} materialSSBO;
-
-layout(std430, binding = 11) restrict readonly buffer VertexSSBO
-{
-    Vertex Vertices[];
-} vertexSSBO;
-
-layout(std430, binding = 5) restrict readonly buffer BlasSSBO
-{
-    BlasNode Nodes[];
-} blasSSBO;
-
-layout(std430, binding = 7) restrict readonly buffer TlasSSBO
-{
-    TlasNode Nodes[];
-} tlasSSBO;
-
-layout(std430, binding = 8) restrict buffer WavefrontRaySSBO
-{
-    WavefrontRay Rays[];
-} wavefrontRaySSBO;
-
-layout(std430, binding = 9) restrict buffer WavefrontPTSSBO
-{
-    DispatchCommand DispatchCommand;
-    uint Counts[2];
-    uint PingPongIndex;
-    uint AccumulatedSamples;
-    uint AliveRayIndices[];
-} wavefrontPTSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 2) uniform LightsUBO
-{
-    Light Lights[GPU_MAX_UBO_LIGHT_COUNT];
-    int Count;
-} lightsUBO;
-
-layout(std140, binding = 4) uniform SkyBoxUBO
-{
-    samplerCube Albedo;
-} skyBoxUBO;
+    float FocalLength;
+    float LenseRadius;
+    bool IsDebugBVHTraversal;
+    bool IsTraceLights;
+    bool IsAlwaysTintWithAlbedo;
+} settingsUBO;
 
 bool TraceRay(inout WavefrontRay wavefrontRay);
-vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float transmissionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive);
-float FresnelSchlick(float cosTheta, float n1, float n2);
 
-uniform bool IsTraceLights;
-uniform bool IsOnRefractionTintAlbedo;
-
-AppInclude(PathTracing/include/BVHIntersect.glsl)
 AppInclude(PathTracing/include/RussianRoulette.glsl)
+AppInclude(PathTracing/include/Shading.glsl)
 
 void main()
 {
@@ -263,7 +78,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
     vec3 uncompressedDir = DecompressOctahedron(vec2(wavefrontRay.CompressedDirectionX, wavefrontRay.CompressedDirectionY));
 
     HitInfo hitInfo;
-    if (TraceRay(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, IsTraceLights, FLOAT_MAX))
+    if (TraceRay(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, settingsUBO.IsTraceLights, FLOAT_MAX))
     {
         wavefrontRay.Origin += uncompressedDir * hitInfo.T;
 
@@ -314,7 +129,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
                 return true;
             }
         }
-        else
+        else if (settingsUBO.IsTraceLights)
         {
             Light light = lightsUBO.Lights[hitInfo.InstanceID];
             emissive = light.Color;
@@ -330,37 +145,44 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             normal *= -1.0;
             cosTheta *= -1.0;
 
-            wavefrontRay.Throughput *= exp(-absorbance * hitInfo.T);
+            wavefrontRay.Throughput = ApplyAbsorption(wavefrontRay.Throughput, absorbance, hitInfo.T);
         }
 
-        if (specularChance > 0.0) // adjust specular chance based on view angle
-        {
-            float newSpecularChance = mix(specularChance, 1.0, FresnelSchlick(cosTheta, wavefrontRay.PreviousIOROrDebugNodeCounter, ior));
-            float chanceMultiplier = (1.0 - newSpecularChance) / (1.0 - specularChance);
-            transmissionChance *= chanceMultiplier;
-            specularChance = newSpecularChance;
-        }
-        
         wavefrontRay.Radiance += emissive * wavefrontRay.Throughput;
 
-        float rayProbability, newIor;
-        bool newRayRefractive;
-        uncompressedDir = BounceOffMaterial(uncompressedDir, specularChance, roughness, transmissionChance, ior, wavefrontRay.PreviousIOROrDebugNodeCounter, normal, fromInside, rayProbability, newIor, newRayRefractive);
-        wavefrontRay.Origin += uncompressedDir * EPSILON;
-        wavefrontRay.PreviousIOROrDebugNodeCounter = newIor;
+        // specularChance = 0.0;
+        // roughness = 0.0;
+        // transmissionChance = 0.0;
 
-        vec2 compressedDir = CompressOctahedron(uncompressedDir);
-        wavefrontRay.CompressedDirectionX = compressedDir.x;
-        wavefrontRay.CompressedDirectionY = compressedDir.y;
+        float diffuseChance = 1.0 - specularChance - transmissionChance;
+        specularChance = SpecularBasedOnViewAngle(specularChance, cosTheta, wavefrontRay.PreviousIOROrDebugNodeCounter, ior);
+        transmissionChance = 1.0 - diffuseChance - specularChance; // normalize again to (diff + spec + trans == 1.0)
 
-        if (!newRayRefractive || IsOnRefractionTintAlbedo)
+        NewRayProperties result = SampleMaterial(uncompressedDir, specularChance, roughness, transmissionChance, ior, wavefrontRay.PreviousIOROrDebugNodeCounter, normal, fromInside);
+
+        if (result.RayType != RAY_TYPE_REFRACTIVE || settingsUBO.IsAlwaysTintWithAlbedo)
         {
-            wavefrontRay.Throughput *= albedo;
+            vec3 brdf = albedo / PI;
+            float pdf = max(cosTheta / PI, 0.0001);
+            wavefrontRay.Throughput *= cosTheta * brdf / pdf;
+            // wavefrontRay.Throughput *= albedo;
         }
-        wavefrontRay.Throughput /= rayProbability;
+        
+        wavefrontRay.Throughput /= result.RayTypeProbability;
 
         bool terminateRay = RussianRouletteTerminateRay(wavefrontRay.Throughput);
-        return !terminateRay;
+        if (terminateRay)
+        {
+            return false;
+        }
+
+        wavefrontRay.Origin += result.Direction * 0.001;
+        wavefrontRay.PreviousIOROrDebugNodeCounter = result.Ior;
+
+        vec2 compressedDir = CompressOctahedron(result.Direction);
+        wavefrontRay.CompressedDirectionX = compressedDir.x;
+        wavefrontRay.CompressedDirectionY = compressedDir.y;
+        return true;
     }
     else
     {
@@ -368,61 +190,3 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         return false;
     }
 }
-
-vec3 BounceOffMaterial(vec3 incomming, float specularChance, float roughness, float transmissionChance, float ior, float prevIor, vec3 normal, bool fromInside, out float rayProbability, out float newIor, out bool isRefractive)
-{
-    isRefractive = false;
-    roughness *= roughness;
-
-    float rnd = GetRandomFloat01();
-    vec3 diffuseRayDir = CosineSampleHemisphere(normal);
-    vec3 outgoing;
-    if (specularChance > rnd)
-    {
-        vec3 reflectionRayDir = reflect(incomming, normal);
-        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, roughness));
-        outgoing = reflectionRayDir;
-        rayProbability = specularChance;
-        newIor = prevIor;
-    }
-    else if (specularChance + transmissionChance > rnd)
-    {
-        if (fromInside)
-        {
-            // we don't actually know wheter the next mesh we hit has ior 1.0
-            newIor = 1.0;
-        }
-        else
-        {
-            newIor = ior;
-        }
-        vec3 refractionRayDir = refract(incomming, normal, prevIor / newIor);
-        isRefractive = refractionRayDir != vec3(0.0);
-        if (!isRefractive) // Total Internal Reflection
-        {
-            refractionRayDir = reflect(incomming, normal);
-            newIor = prevIor;
-        }
-        refractionRayDir = normalize(mix(refractionRayDir, isRefractive ? -diffuseRayDir : diffuseRayDir, roughness));
-        outgoing = refractionRayDir;
-        rayProbability = transmissionChance;
-    }
-    else
-    {
-        outgoing = diffuseRayDir;
-        rayProbability = 1.0 - specularChance - transmissionChance;
-        newIor = prevIor;
-    }
-    rayProbability = max(rayProbability, EPSILON);
-
-    return outgoing;
-}
-
-float FresnelSchlick(float cosTheta, float n1, float n2)
-{
-    float r0 = (n1 - n2) / (n1 + n2);
-    r0 *= r0;
-
-    return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
-}
-

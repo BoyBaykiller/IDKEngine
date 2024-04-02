@@ -1,7 +1,7 @@
 ﻿using System;
-using System.IO;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -28,26 +28,26 @@ namespace IDKEngine.Render
         public GpuSettings Settings;
 
         public Texture Result;
-        private readonly ShaderProgram tonemapAndGammaCorrecterProgram;
-        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
-        public TonemapAndGammaCorrect(int width, int height, in GpuSettings settings)
+        private readonly AbstractShaderProgram tonemapAndGammaCorrecterProgram;
+        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public TonemapAndGammaCorrect(Vector2i size, in GpuSettings settings)
         {
-            tonemapAndGammaCorrecterProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "TonemapAndGammaCorrect/compute.glsl"));
+            tonemapAndGammaCorrecterProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "TonemapAndGammaCorrect/compute.glsl"));
 
-            bufferGpuSettings = new TypedBuffer<GpuSettings>();
-            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
-            SetSize(width, height);
+            SetSize(size);
 
             Settings = settings;
         }
 
         public void Combine(Texture texture0 = null, Texture texture1 = null, Texture texture2 = null)
         {
-            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            bufferGpuSettings.UploadElements(Settings);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(Settings);
 
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.SizedInternalFormat);
 
             if (texture0 != null) texture0.BindToUnit(0);
             else Texture.UnbindFromUnit(0);
@@ -63,20 +63,20 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
-        public void SetSize(int width, int height)
+        public void SetSize(Vector2i size)
         {
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
+            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba8);
         }
         
         public void Dispose()
         {
             Result.Dispose();
             tonemapAndGammaCorrecterProgram.Dispose();
-            bufferGpuSettings.Dispose();
+            gpuSettingsBuffer.Dispose();
         }
     }
 }

@@ -1,31 +1,62 @@
 ﻿using System;
-using System.IO;
-using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
 {
     class RasterPipeline : IDisposable
     {
-        private static readonly bool TAKE_MESH_SHADER_PATH = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
-
-        public Vector2i RenderResolution { get; private set; }
-        public Vector2i PresentationResolution { get; private set; }
-
-        private bool _isVXGI;
-        public bool IsVXGI
+        private bool _takeMeshShaderPathCamera;
+        public bool TakeMeshShaderPath
         {
-            get => _isVXGI;
+            get => _takeMeshShaderPathCamera;
 
             set
             {
-                _isVXGI = value;
-                lightingProgram.Upload("IsVXGI", _isVXGI);
+                _takeMeshShaderPathCamera = value;
+
+                if (_takeMeshShaderPathCamera && !Helper.IsExtensionsAvailable("GL_NV_mesh_shader"))
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Mesh shader path requires GL_NV_mesh_shader");
+                    _takeMeshShaderPathCamera = false;
+                }
+
+                if (gBufferProgram != null) gBufferProgram.Dispose();
+                AbstractShaderProgram.ShaderInsertions["TAKE_MESH_SHADER_PATH_CAMERA"] = TakeMeshShaderPath ? "1" : "0";
+
+                if (TakeMeshShaderPath)
+                {
+                    gBufferProgram = new AbstractShaderProgram(
+                        new AbstractShader((ShaderType)NvMeshShader.TaskShaderNv, "GBuffer/MeshPath/task.glsl"),
+                        new AbstractShader((ShaderType)NvMeshShader.MeshShaderNv, "GBuffer/MeshPath/mesh.glsl"),
+                        new AbstractShader(ShaderType.FragmentShader, "GBuffer/fragment.glsl"));
+                }
+                else
+                {
+                    gBufferProgram = new AbstractShaderProgram(
+                        new AbstractShader(ShaderType.VertexShader, "GBuffer/VertexPath/vertex.glsl"),
+                        new AbstractShader(ShaderType.FragmentShader, "GBuffer/fragment.glsl"));
+                }
             }
         }
+
+        private bool _isHiZCulling;
+        public bool IsHiZCulling
+        {
+            get => _isHiZCulling;
+
+            set
+            {
+                _isHiZCulling = value;
+                AbstractShaderProgram.ShaderInsertions["IS_HI_Z_CULLING"] = IsHiZCulling ? "1" : "0";
+            }
+        }
+
+        public Vector2i RenderResolution { get; private set; }
+        public Vector2i PresentationResolution { get; private set; }
         
         public enum TemporalAntiAliasingMode : int
         {
@@ -56,12 +87,12 @@ namespace IDKEngine.Render
 
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA && TaaResolve == null)
                 {
-                    TaaResolve = new TAAResolve(PresentationResolution.X, PresentationResolution.Y);
+                    TaaResolve = new TAAResolve(PresentationResolution);
                 }
 
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2 && FSR2Wrapper == null)
                 {
-                    FSR2Wrapper = new FSR2Wrapper(PresentationResolution.X, PresentationResolution.Y, RenderResolution.X, RenderResolution.Y);
+                    FSR2Wrapper = new FSR2Wrapper(RenderResolution, PresentationResolution);
                 }
             }
         }
@@ -73,37 +104,18 @@ namespace IDKEngine.Render
             RayTraced
         }
 
-        private ShadowTechnique _shadowMode;
-        public ShadowTechnique ShadowMode
-        {
-            get => _shadowMode;
-
-            set
-            {
-                _shadowMode = value;
-                lightingProgram.Upload("ShadowMode", (int)ShadowMode);
-            }
-        }
-
-        private int _rayTracingSampes;
-        public int RayTracingSamples
-        {
-            get => _rayTracingSampes;
-
-            set
-            {
-                _rayTracingSampes = value;
-                lightingProgram.Upload("RayTracingSamples", RayTracingSamples);
-            }
-        }
+        public ShadowTechnique ShadowMode;
 
         public bool IsWireframe;
+        public bool IsVXGI;
         public bool IsSSAO;
         public bool IsSSR;
         public bool IsVariableRateShading;
-        public bool IsConfigureGrid;
+        public bool IsConfigureGridMode;
         public bool GenerateShadowMaps;
         public bool ShouldReVoxelize;
+
+        public int RayTracingSamples;
 
         public int TAASamples = 6;
         public float FSR2AddMipBias = 0.25f;
@@ -146,12 +158,12 @@ namespace IDKEngine.Render
         public Texture VelocityTexture;
         public Texture DepthTexture;
 
-        private readonly ShaderProgram gBufferProgram;
-        private readonly ShaderProgram lightingProgram;
-        private readonly ShaderProgram skyBoxProgram;
-        private readonly ShaderProgram mergeLightingProgram;
-        private readonly ShaderProgram hiZGenerateProgram;
-        private readonly ShaderProgram cullingProgram;
+        private AbstractShaderProgram gBufferProgram;
+        private readonly AbstractShaderProgram lightingProgram;
+        private readonly AbstractShaderProgram skyBoxProgram;
+        private readonly AbstractShaderProgram mergeLightingProgram;
+        private readonly AbstractShaderProgram hiZGenerateProgram;
+        private readonly AbstractShaderProgram cullingProgram;
 
         private readonly Framebuffer gBufferFBO;
         private readonly Framebuffer deferredLightingFBO;
@@ -164,47 +176,26 @@ namespace IDKEngine.Render
         private GpuGBuffer gpuGBufferData;
 
         private int frameIndex;
-        public RasterPipeline(int width, int height, int renderPresentationWidth, int renderPresentationHeight)
+        public RasterPipeline(Vector2i renderSize, Vector2i renderPresentationSize)
         {
-            LightingVRS = new LightingShadingRateClassifier(width, height, LightingShadingRateClassifier.GpuSettings.Default);
+            TakeMeshShaderPath = false;
+            IsHiZCulling = false;
 
-            SSAO = new SSAO(width, height, SSAO.GpuSettings.Default);
-            SSR = new SSR(width, height, SSR.GpuSettings.Default);
-            Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
-            ConeTracer = new ConeTracer(width, height);
-            
-            if (TAKE_MESH_SHADER_PATH)
-            {
-                gBufferProgram = new ShaderProgram(
-                    Shader.ShaderFromFile((ShaderType)NvMeshShader.TaskShaderNv, "GBuffer/MeshPath/task.glsl"),
-                    Shader.ShaderFromFile((ShaderType)NvMeshShader.MeshShaderNv, "GBuffer/MeshPath/mesh.glsl"),
-                    Shader.ShaderFromFile(ShaderType.FragmentShader, "GBuffer/fragment.glsl"));
-            }
-            else
-            {
-                gBufferProgram = new ShaderProgram(
-                    Shader.ShaderFromFile(ShaderType.VertexShader, "GBuffer/VertexPath/vertex.glsl"),
-                    Shader.ShaderFromFile(ShaderType.FragmentShader, "GBuffer/fragment.glsl"));
-            }
+            lightingProgram = new AbstractShaderProgram(
+                new AbstractShader(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
+                new AbstractShader(ShaderType.FragmentShader, "DeferredLighting/fragment.glsl"));
 
+            skyBoxProgram = new AbstractShaderProgram(
+                new AbstractShader(ShaderType.VertexShader, "SkyBox/vertex.glsl"),
+                new AbstractShader(ShaderType.FragmentShader, "SkyBox/fragment.glsl"));
 
-            lightingProgram = new ShaderProgram(
-                Shader.ShaderFromFile(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
-                Shader.ShaderFromFile(ShaderType.FragmentShader, "DeferredLighting/fragment.glsl"));
+            hiZGenerateProgram = new AbstractShaderProgram(
+                new AbstractShader(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
+                new AbstractShader(ShaderType.FragmentShader, "MeshCulling/Camera/HiZGenerate/fragment.glsl"));
 
-            skyBoxProgram = new ShaderProgram(
-                Shader.ShaderFromFile(ShaderType.VertexShader, "SkyBox/vertex.glsl"),
-                Shader.ShaderFromFile(ShaderType.FragmentShader, "SkyBox/fragment.glsl"));
+            cullingProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "MeshCulling/Camera/Cull/compute.glsl"));
 
-            hiZGenerateProgram = new ShaderProgram(
-                Shader.ShaderFromFile(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
-                Shader.ShaderFromFile(ShaderType.FragmentShader, "MeshCulling/Camera/HiZGenerate/fragment.glsl"));
-
-            Dictionary<string, string> cullingShaderInsertions = new Dictionary<string, string>();
-            cullingShaderInsertions.Add(nameof(TAKE_MESH_SHADER_PATH), TAKE_MESH_SHADER_PATH ? "1" : "0");
-            cullingProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "MeshCulling/Camera/Cull/compute.glsl", cullingShaderInsertions));
-
-            mergeLightingProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "MergeTextures/compute.glsl"));
+            mergeLightingProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new TypedBuffer<GpuTaaData>();
             taaDataBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
@@ -218,6 +209,12 @@ namespace IDKEngine.Render
             deferredLightingFBO = new Framebuffer();
             hiZDownsampleFBO = new Framebuffer();
 
+            SSAO = new SSAO(renderSize, SSAO.GpuSettings.Default);
+            SSR = new SSR(renderSize, SSR.GpuSettings.Default);
+            LightingVRS = new LightingShadingRateClassifier(renderSize, LightingShadingRateClassifier.GpuSettings.Default);
+            Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
+            ConeTracer = new ConeTracer(renderSize, ConeTracer.GpuSettings.Default);
+
             IsWireframe = false;
             IsSSAO = true;
             IsSSR = false;
@@ -226,21 +223,15 @@ namespace IDKEngine.Render
             GenerateShadowMaps = true;
             ShouldReVoxelize = true;
             RayTracingSamples = 1;
-
-            SetSize(width, height, renderPresentationWidth, renderPresentationHeight);
-
-            TemporalAntiAliasing = TemporalAntiAliasingMode.TAA;
             ShadowMode = ShadowTechnique.PcfShadowMap;
+
+            SetSize(renderSize, renderPresentationSize);
+            TemporalAntiAliasing = TemporalAntiAliasingMode.TAA;
         }
 
         public void Render(ModelSystem modelSystem, LightManager lightManager, Camera camera, float dT)
         {
-            if (GenerateShadowMaps)
-            {
-                lightManager.RenderShadowMaps(modelSystem, camera);
-            }
-
-            // Update Temporal AntiAliasing related stuff
+            // Update Temporal AntiAliasing stuff
             {
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.None || TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
                 {
@@ -261,13 +252,16 @@ namespace IDKEngine.Render
                 }
                 else
                 {
-                    Vector2 jitter = MyMath.GetHalton2D(frameIndex % gpuTaaData.SampleCount, 2, 3);
+                    Vector2 jitter = MyMath.GetHalton2D(frameIndex++ % gpuTaaData.SampleCount, 2, 3);
                     gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
                 }
                 gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasing;
                 taaDataBuffer.UploadElements(gpuTaaData);
+            }
 
-                frameIndex++;
+            if (GenerateShadowMaps)
+            {
+                lightManager.RenderShadowMaps(modelSystem, camera);
             }
 
             if (IsVXGI && ShouldReVoxelize)
@@ -281,10 +275,10 @@ namespace IDKEngine.Render
                 modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
 
                 Voxelizer.Render(modelSystem);
-                Voxelizer.ResultVoxelsAlbedo.BindToUnit(1);
+                Voxelizer.ResultVoxels.BindToUnit(1);
             }
 
-            if (IsConfigureGrid)
+            if (IsConfigureGridMode)
             {
                 Voxelizer.DebugRender(Result);
                 return;
@@ -318,7 +312,7 @@ namespace IDKEngine.Render
                 GL.Viewport(0, 0, RenderResolution.X, RenderResolution.Y);
 
                 gBufferProgram.Use();
-                if (TAKE_MESH_SHADER_PATH)
+                if (TakeMeshShaderPath)
                 {
                     modelSystem.MeshShaderDrawNV();
                 }
@@ -333,11 +327,17 @@ namespace IDKEngine.Render
                 }
             }
 
-            // only needed because of broken amd drivers
+            // Note: Only needed because of broken AMD drivers (should open bug ticket one day)
+            // See discussion https://discord.com/channels/318590007881236480/318783155744145411/1070453712021098548
             GL.Flush();
 
-            // Compute stuff from G Buffer that is needed later when Shading, like SSAO
+            // Compute stuff from G Buffer that is needed later when Shading
             {
+                if (ShadowMode == ShadowTechnique.RayTraced)
+                {
+                    lightManager.ComputeRayTracedShadows(RayTracingSamples);
+                }
+
                 if (IsSSAO)
                 {
                     SSAO.Compute();
@@ -350,7 +350,7 @@ namespace IDKEngine.Render
 
                 if (IsVXGI)
                 {
-                    ConeTracer.Compute(Voxelizer.ResultVoxelsAlbedo);
+                    ConeTracer.Compute(Voxelizer.ResultVoxels);
                     ConeTracer.Result.BindToUnit(1);
                 }
                 else
@@ -368,6 +368,9 @@ namespace IDKEngine.Render
             {
                 GL.Viewport(0, 0, RenderResolution.X, RenderResolution.Y);
 
+                lightingProgram.Upload("ShadowMode", (int)ShadowMode);
+                lightingProgram.Upload("IsVXGI", IsVXGI);
+
                 deferredLightingFBO.Bind();
                 lightingProgram.Use();
                 GL.Disable(EnableCap.DepthTest);
@@ -375,15 +378,12 @@ namespace IDKEngine.Render
                 GL.Enable(EnableCap.DepthTest);
             }
 
-            // Forward rendering
+            // Forward lighting
             {
                 GL.Viewport(0, 0, RenderResolution.X, RenderResolution.Y);
 
                 gBufferFBO.Bind();
-                if (lightManager != null)
-                {
-                    lightManager.Draw();
-                }
+                lightManager.Draw();
 
                 GL.Disable(EnableCap.CullFace);
                 GL.DepthFunc(DepthFunction.Lequal);
@@ -406,17 +406,7 @@ namespace IDKEngine.Render
                 SSR.Compute(resultBeforeTAA);
             }
 
-            {
-                resultBeforeTAA.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, resultBeforeTAA.SizedInternalFormat);
-                resultBeforeTAA.BindToUnit(0);
-
-                if (IsSSR) SSR.Result.BindToUnit(1);
-                else Texture.UnbindFromUnit(1);
-
-                mergeLightingProgram.Use();
-                GL.DispatchCompute((RenderResolution.X + 8 - 1) / 8, (RenderResolution.Y + 8 - 1) / 8, 1);
-                GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
-            }
+            MergeTextures(resultBeforeTAA, resultBeforeTAA, IsSSR ? SSR.Result : null);
 
             if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
             {
@@ -426,7 +416,7 @@ namespace IDKEngine.Render
             {
                 FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, resultBeforeTAA, DepthTexture, VelocityTexture, camera, dT * 1000.0f);
 
-                // TODO: This is a hack to fix global UBO bindings modified by FSR2
+                // Note: This is a hack to fix global UBO bindings modified by FSR2
                 taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
                 SkyBoxManager.skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
                 Voxelizer.voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
@@ -452,64 +442,70 @@ namespace IDKEngine.Render
             }
         }
 
-        private void DisposeBindlessTextures()
+        public void MergeTextures(Texture result, Texture a, Texture b)
         {
-            if (AlbedoAlphaTexture != null) { AlbedoAlphaTexture.Dispose(); }
-            if (NormalSpecularTexture != null) {  NormalSpecularTexture.Dispose(); }
-            if (EmissiveRoughnessTexture != null) { EmissiveRoughnessTexture.Dispose(); }
-            if (VelocityTexture != null) { VelocityTexture.Dispose(); }
-            if (DepthTexture != null) { DepthTexture.Dispose(); }
+            result.BindToImageUnit(0, result.SizedInternalFormat);
+
+            if (a != null) resultBeforeTAA.BindToUnit(0);
+            else Texture.UnbindFromUnit(0);
+
+            if (b != null) SSR.Result.BindToUnit(1);
+            else Texture.UnbindFromUnit(1);
+
+            mergeLightingProgram.Use();
+            GL.DispatchCompute((RenderResolution.X + 8 - 1) / 8, (RenderResolution.Y + 8 - 1) / 8, 1);
+            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
-        public void SetSize(int renderWidth, int renderHeight, int presentationWidth, int presentationHeight)
+        public void SetSize(Vector2i renderSize, Vector2i renderPresentationSize)
         {
-            RenderResolution = new Vector2i(renderWidth, renderHeight);
-            PresentationResolution = new Vector2i(presentationWidth, presentationHeight);
+            RenderResolution = renderSize;
+            PresentationResolution = renderPresentationSize;
 
-            if (TaaResolve != null) TaaResolve.SetSize(presentationWidth, presentationHeight);
-            if (FSR2Wrapper != null) FSR2Wrapper.SetSize(renderWidth, renderHeight, presentationWidth, presentationHeight);
+            if (TaaResolve != null) TaaResolve.SetSize(renderPresentationSize);
+            if (FSR2Wrapper != null) FSR2Wrapper.SetSize(renderSize, renderPresentationSize);
 
-            SSAO.SetSize(renderWidth, renderHeight);
-            SSR.SetSize(renderWidth, renderHeight);
-            LightingVRS.SetSize(renderWidth, renderHeight);
-            ConeTracer.SetSize(renderWidth, renderHeight);
+            SSAO.SetSize(renderSize);
+            SSR.SetSize(renderSize);
+            LightingVRS.SetSize(renderSize);
+            ConeTracer.SetSize(renderSize);
 
             if (resultBeforeTAA != null) resultBeforeTAA.Dispose();
             resultBeforeTAA = new Texture(TextureTarget2d.Texture2D);
             resultBeforeTAA.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             resultBeforeTAA.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            resultBeforeTAA.ImmutableAllocate(renderWidth, renderHeight, 1, SizedInternalFormat.Rgba16f);
+            resultBeforeTAA.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba16f);
 
-            DisposeBindlessTextures();
+            DisposeBindlessGBufferTextures();
 
             AlbedoAlphaTexture = new Texture(TextureTarget2d.Texture2D);
             AlbedoAlphaTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             AlbedoAlphaTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            AlbedoAlphaTexture.ImmutableAllocate(renderWidth, renderHeight, 1, SizedInternalFormat.Rgba8);
+            AlbedoAlphaTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba8);
             gpuGBufferData.AlbedoAlphaTextureHandle = AlbedoAlphaTexture.GetTextureHandleARB();
 
             NormalSpecularTexture = new Texture(TextureTarget2d.Texture2D);
             NormalSpecularTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             NormalSpecularTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            NormalSpecularTexture.ImmutableAllocate(renderWidth, renderHeight, 1, SizedInternalFormat.Rgba8Snorm);
+            NormalSpecularTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba8Snorm);
             gpuGBufferData.NormalSpecularTextureHandle = NormalSpecularTexture.GetTextureHandleARB();
 
             EmissiveRoughnessTexture = new Texture(TextureTarget2d.Texture2D);
             EmissiveRoughnessTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             EmissiveRoughnessTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            EmissiveRoughnessTexture.ImmutableAllocate(renderWidth, renderHeight, 1, SizedInternalFormat.Rgba16f);
+            EmissiveRoughnessTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba16f);
             gpuGBufferData.EmissiveRoughnessTextureHandle = EmissiveRoughnessTexture.GetTextureHandleARB();
 
             VelocityTexture = new Texture(TextureTarget2d.Texture2D);
             VelocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             VelocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            VelocityTexture.ImmutableAllocate(renderWidth, renderHeight, 1, SizedInternalFormat.Rg16f);
+            VelocityTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rg16f);
             gpuGBufferData.VelocityTextureHandle = VelocityTexture.GetTextureHandleARB();
 
             DepthTexture = new Texture(TextureTarget2d.Texture2D);
             DepthTexture.SetFilter(TextureMinFilter.NearestMipmapNearest, TextureMagFilter.Nearest);
             DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            DepthTexture.ImmutableAllocate(renderWidth, renderHeight, 1, SizedInternalFormat.DepthComponent24, Texture.GetMaxMipmapLevel(renderWidth, renderHeight, 1));
+            DepthTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.DepthComponent32f, Texture.GetMaxMipmapLevel(renderSize.X, renderSize.Y, 1));
             gpuGBufferData.DepthTextureHandle = DepthTexture.GetTextureHandleARB();
 
             gBufferData.UploadElements(gpuGBufferData);
@@ -523,6 +519,15 @@ namespace IDKEngine.Render
             gBufferFBO.SetDrawBuffers([DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3, DrawBuffersEnum.ColorAttachment4]);
 
             deferredLightingFBO.SetRenderTarget(FramebufferAttachment.ColorAttachment0, resultBeforeTAA);
+        }
+
+        private void DisposeBindlessGBufferTextures()
+        {
+            if (AlbedoAlphaTexture != null) AlbedoAlphaTexture.Dispose();
+            if (NormalSpecularTexture != null) NormalSpecularTexture.Dispose();
+            if (EmissiveRoughnessTexture != null) EmissiveRoughnessTexture.Dispose();
+            if (VelocityTexture != null) VelocityTexture.Dispose();
+            if (DepthTexture != null) DepthTexture.Dispose();
         }
 
         public void Dispose()
@@ -546,7 +551,7 @@ namespace IDKEngine.Render
 
             resultBeforeTAA.Dispose();
 
-            DisposeBindlessTextures();
+            DisposeBindlessGBufferTextures();
 
             gBufferProgram.Dispose();
             lightingProgram.Dispose();

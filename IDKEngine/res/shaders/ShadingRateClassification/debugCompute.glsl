@@ -1,5 +1,6 @@
 #version 460 core
 
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(ShadingRateClassification/include/Constants.glsl)
 
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
@@ -8,24 +9,6 @@ layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerSrc;
 layout(binding = 1) uniform usampler2D SamplerDebugShadingRate;
 layout(binding = 1) uniform sampler2D SamplerDebugOtherData; // speed, luminance, or coefficient of variation of luminance 
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
 
 layout(std140, binding = 7) uniform SettingsUBO
 {

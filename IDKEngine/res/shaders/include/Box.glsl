@@ -1,6 +1,3 @@
-#ifndef Box_H
-#define Box_H
-
 AppInclude(include/Constants.glsl)
 
 struct Box
@@ -77,5 +74,3 @@ Box BoxTransformPerspective(Box box, mat4 matrix, out bool vertexBehindFrustum)
 
     return newBox;
 }
-
-#endif

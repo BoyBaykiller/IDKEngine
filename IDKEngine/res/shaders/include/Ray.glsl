@@ -1,6 +1,3 @@
-#ifndef Ray_H
-#define Ray_H
-
 struct Ray
 {
     vec3 Origin;
@@ -13,5 +10,3 @@ Ray RayTransform(Ray ray, mat4 model)
     vec3 newDirection = (model * vec4(ray.Direction, 0.0)).xyz;
     return Ray(newOrigin, newDirection);
 }
-
-#endif

@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenTK.Graphics.OpenGL4;
 
-namespace IDKEngine.Render.Objects
+namespace IDKEngine.OpenGL
 {
     class TimerQuery : IDisposable
     {

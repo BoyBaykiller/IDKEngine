@@ -1,103 +1,55 @@
 ﻿using System;
-using System.IO;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
     class ConeTracer : IDisposable
     {
-        private float _normalRayOffset;
-        public float NormalRayOffset
+        public struct GpuSettings
         {
-            get => _normalRayOffset;
+            public int MaxSamples;
+            public float StepMultiplier;
+            public float GIBoost;
+            public float GISkyBoxBoost;
+            public float NormalRayOffset;
+            public bool IsTemporalAccumulation;
 
-            set
+            public static GpuSettings Default = new GpuSettings()
             {
-                _normalRayOffset = value;
-                shaderProgram.Upload("NormalRayOffset", _normalRayOffset);
-            }
+                NormalRayOffset = 1.0f,
+                MaxSamples = 4,
+                GIBoost = 2.0f,
+                GISkyBoxBoost = 1.0f / 2.0f,
+                StepMultiplier = 0.16f,
+                IsTemporalAccumulation = true
+            };
         }
 
-        private int _maxSamples;
-        public int MaxSamples
-        {
-            get => _maxSamples;
-
-            set
-            {
-                _maxSamples = value;
-                shaderProgram.Upload("MaxSamples", _maxSamples);
-            }
-        }
-
-        private float _giBoost;
-        public float GIBoost
-        {
-            get => _giBoost;
-
-            set
-            {
-                _giBoost = value;
-                shaderProgram.Upload("GIBoost", _giBoost);
-            }
-        }
-
-        private float _giSkyBoxBoost;
-        public float GISkyBoxBoost
-        {
-            get => _giSkyBoxBoost;
-
-            set
-            {
-                _giSkyBoxBoost = value;
-                shaderProgram.Upload("GISkyBoxBoost", _giSkyBoxBoost);
-            }
-        }
-
-        private float _stepMultiplier;
-        public float StepMultiplier
-        {
-            get => _stepMultiplier;
-
-            set
-            {
-                _stepMultiplier = value;
-                shaderProgram.Upload("StepMultiplier", _stepMultiplier);
-            }
-        }
-
-        private bool _isTemporalAccumulation;
-        public bool IsTemporalAccumulation
-        {
-            get => _isTemporalAccumulation;
-
-            set
-            {
-                _isTemporalAccumulation = value;
-                shaderProgram.Upload("IsTemporalAccumulation", _isTemporalAccumulation);
-            }
-        }
+        public GpuSettings Settings;
 
         public Texture Result;
-        private readonly ShaderProgram shaderProgram;
-        public ConeTracer(int width, int height)
+        private readonly AbstractShaderProgram shaderProgram;
+        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public ConeTracer(Vector2i size, in GpuSettings settings)
         {
-            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VXGI/ConeTracing/compute.glsl"));
+            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VXGI/ConeTracing/compute.glsl"));
 
-            SetSize(width, height);
+            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
-            NormalRayOffset = 1.0f;
-            MaxSamples = 4;
-            GIBoost = 2.0f;
-            GISkyBoxBoost = 1.0f / GIBoost;
-            StepMultiplier = 0.16f;
-            IsTemporalAccumulation = true;
+            SetSize(size);
+
+            Settings = settings;
         }
 
         public void Compute(Texture voxelsAlbedo)
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(Settings);
+
+            Result.BindToImageUnit(0, Result.SizedInternalFormat);
             voxelsAlbedo.BindToUnit(0);
 
             shaderProgram.Use();
@@ -105,18 +57,19 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
-        public void SetSize(int width, int height)
+        public void SetSize(Vector2i size)
         {
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba16f);
+            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba16f);
         }
 
         public void Dispose()
         {
             Result.Dispose();
             shaderProgram.Dispose();
+            gpuSettingsBuffer.Dispose();
         }
     }
 }

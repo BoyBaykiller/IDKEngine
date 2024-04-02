@@ -1,8 +1,8 @@
 ﻿using System;
-using System.IO;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -73,10 +73,10 @@ namespace IDKEngine.Render
         }
 
         public Texture Result;
-        private readonly ShaderProgram shaderProgram;
+        private readonly AbstractShaderProgram shaderProgram;
         public AtmosphericScatterer(int size)
         {
-            shaderProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "AtmosphericScattering/compute.glsl"));
+            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "AtmosphericScattering/compute.glsl"));
 
             Matrix4[] invViewsAndInvprojecion = new Matrix4[]
             {
@@ -105,7 +105,7 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            Result.BindToImageUnit(0, 0, true, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.SizedInternalFormat, 0, true);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Width + 8 - 1) / 8, 6);

@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using IDKEngine.Utils;
 using IDKEngine.Windowing;
 
 namespace IDKEngine

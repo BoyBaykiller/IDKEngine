@@ -3,10 +3,9 @@
 // In this case the voxelizer atomically writes to 3 seperate r32ui textures
 // instead of only one rgba16f texture. Here we merge them together into one.
 
-
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
-layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
+layout(binding = 0) restrict uniform image3D ImgResult;
 
 layout(binding = 0) uniform sampler3D SamplerVoxelsR;
 layout(binding = 1) uniform sampler3D SamplerVoxelsG;

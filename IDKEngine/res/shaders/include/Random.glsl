@@ -1,6 +1,3 @@
-#ifndef Random_H
-#define Random_H
-
 AppInclude(include/Constants.glsl)
 
 uint Random_RNGSeed;
@@ -33,7 +30,41 @@ float InterleavedGradientNoise(vec2 imgCoord, uint index)
     return fract(52.9829189 * fract(0.06711056 * imgCoord.x + 0.00583715 * imgCoord.y));
 }
 
-// -------------------------------------------- //
+vec3 SampleCone(vec3 normal, float phi, float sinTheta, float cosTheta)
+{
+    // Source: https://www.shadertoy.com/view/4sSXWt
+    
+    vec3 w = normal;
+    vec3 u = normalize(cross(w.yzx, w));
+    vec3 v = cross(w, u);
+    return (u * cos(phi) + v * sin(phi)) * sinTheta + w * cosTheta;
+}
+
+vec3 SampleLight(vec3 toSphere, float sphereRadius, float rnd0, float rnd1, out float distanceToSphere, out float solidAnglePdf)
+{
+    // Source: https://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources#x2-SamplingSpheres
+
+    float radiusSq = sphereRadius * sphereRadius;
+    float distanceSq = dot(toSphere, toSphere);
+    float sinThetaMaxSq = radiusSq / distanceSq;
+    float cosThetaMax = sqrt(max(0.0, 1.0 - sinThetaMaxSq));
+
+    vec3 dir = normalize(toSphere);
+    float cosTheta = mix(cosThetaMax, 1.0, max(rnd0, 0.001));
+    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+    float phi = 2.0 * PI * rnd1;
+    
+    solidAnglePdf = 1.0 / (2.0 * PI * (1.0 - cosThetaMax));
+    distanceToSphere = length(toSphere) * cosTheta - sqrt(radiusSq - distanceSq * sinTheta * sinTheta);
+    vec3 dirInCone = SampleCone(dir, phi, sinTheta, cosTheta);
+
+    return dirInCone;
+}
+
+vec3 SampleLight(vec3 toSphere, float sphereRadius, out float distanceToSphere, out float solidAnglePdf)
+{
+    return SampleLight(toSphere, sphereRadius, GetRandomFloat01(), GetRandomFloat01(), distanceToSphere, solidAnglePdf);
+}
 
 vec3 UniformSampleSphere()
 {
@@ -110,5 +141,3 @@ vec3 UniformSampleDisk(vec3 normal, float rnd0, float rnd1)
 
     return tangent * diskSample.x + bitangent * diskSample.y;
 }
-
-#endif

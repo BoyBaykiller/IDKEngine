@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Windowing
 {
@@ -92,7 +93,7 @@ namespace IDKEngine.Windowing
             window = GLFW.CreateWindow(_framebufferSize.X, _framebufferSize.Y, _title, null, null);
             if (window == null)
             {
-                Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed. Make sure you have OpenGL {openglMajor}.{openglMinor} support. Press Enter to exit");
+                Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed. Make sure the primary GPU has OpenGL {openglMajor}.{openglMinor} support");
                 Environment.Exit(0);
             }
 
@@ -162,7 +163,7 @@ namespace IDKEngine.Windowing
         protected abstract void OnRender(float dT);
         protected abstract void OnStart();
         protected abstract void OnEnd();
-        protected abstract void OnResize();
+        protected abstract void OnWindowResize();
         protected abstract void OnKeyPress(char key);
 
 
@@ -184,7 +185,7 @@ namespace IDKEngine.Windowing
             {
                 _framebufferSize.X = width;
                 _framebufferSize.Y = height;
-                OnResize();
+                OnWindowResize();
             }
         }
 

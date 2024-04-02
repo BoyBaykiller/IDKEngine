@@ -1,6 +1,3 @@
-#ifndef Pbr_H
-#define Pbr_H
-
 float GetAttenuationFactor(float squareDist, float lightRadius)
 {
     float lightInvRadius = 1.0 / max(lightRadius, 0.0001);
@@ -10,5 +7,3 @@ float GetAttenuationFactor(float squareDist, float lightRadius)
 
     return factor;
 }
-
-#endif

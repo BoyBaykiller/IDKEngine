@@ -1,9 +1,9 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_AMD_gcn_shader : enable
 
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(ShadingRateClassification/include/Constants.glsl)
 
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
@@ -11,33 +11,6 @@ layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 layout(binding = 0) restrict writeonly uniform uimage2D ImgResult;
 layout(binding = 1) restrict writeonly uniform image2D ImgDebug;
 layout(binding = 0) uniform sampler2D SamplerShaded;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
 
 layout(std140, binding = 7) uniform SettingsUBO
 {
@@ -78,7 +51,7 @@ void main()
 
     if (gl_LocalInvocationIndex == 0)
     {
-        meanSpeed /= basicDataUBO.DeltaRenderTime;
+        meanSpeed /= perFrameDataUBO.DeltaRenderTime;
                 
         uint finalShadingRate;
         float coeffOfVariation;

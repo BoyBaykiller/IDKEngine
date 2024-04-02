@@ -1,14 +1,52 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
 using IDKEngine.Shapes;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
 {
     class PointShadow : IDisposable
     {
+        private static bool _takeMeshShaderPath;
+        public static bool TakeMeshShaderPath
+        {
+            get => _takeMeshShaderPath;
+
+            set
+            {
+                if (_takeMeshShaderPath == value && renderShadowMapProgram != null)
+                {
+                    return;
+                }
+                _takeMeshShaderPath = value;
+
+                if (TakeMeshShaderPath && !Helper.IsExtensionsAvailable("GL_NV_mesh_shader"))
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Mesh shader path requires GL_NV_mesh_shader");
+                    TakeMeshShaderPath = false;
+                }
+
+                if (renderShadowMapProgram != null) renderShadowMapProgram.Dispose();
+                AbstractShaderProgram.ShaderInsertions["TAKE_MESH_SHADER_PATH_SHADOW"] = TakeMeshShaderPath ? "1" : "0";
+                if (TakeMeshShaderPath)
+                {
+                    renderShadowMapProgram = new AbstractShaderProgram(
+                        new AbstractShader((ShaderType)NvMeshShader.TaskShaderNv, "Shadows/PointShadow/MeshPath/task.glsl"),
+                        new AbstractShader((ShaderType)NvMeshShader.MeshShaderNv, "Shadows/PointShadow/MeshPath/mesh.glsl"),
+                        new AbstractShader(ShaderType.FragmentShader, "Shadows/PointShadow/fragment.glsl"));
+                }
+                else
+                {
+                    renderShadowMapProgram = new AbstractShaderProgram(
+                        new AbstractShader(ShaderType.VertexShader, "Shadows/PointShadow/VertexPath/vertex.glsl"),
+                        new AbstractShader(ShaderType.FragmentShader, "Shadows/PointShadow/fragment.glsl"));
+                }
+            }
+        }
+
         public Vector3 Position
         {
             get => gpuPointShadow.Position;
@@ -52,24 +90,41 @@ namespace IDKEngine.Render
             }
         }
 
-        public Texture Result;
+        public Texture ShadowMap;
+        public Texture RayTracedShadowMap;
 
         private readonly Framebuffer framebuffer;
         private SamplerObject nearestSampler;
         private SamplerObject shadowSampler;
         private GpuPointShadow gpuPointShadow;
-        public PointShadow(int size, Vector2 clippingPlanes)
+
+        private static bool isLazyInitialized = false;
+        private static AbstractShaderProgram renderShadowMapProgram;
+        private static AbstractShaderProgram cullingProgram;
+
+        public PointShadow(int shadowMapSize, Vector2i rayTracedShadowMapSize, Vector2 clippingPlanes)
         {
+            if (!isLazyInitialized)
+            {
+                TakeMeshShaderPath = false;
+                cullingProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "MeshCulling/PointShadow/compute.glsl"));
+                isLazyInitialized = true;
+            }
+
             framebuffer = new Framebuffer();
             framebuffer.SetDrawBuffers([DrawBuffersEnum.None]);
 
             ClippingPlanes = clippingPlanes;
-            SetSize(size);
+            SetSizeShadowMap(shadowMapSize);
+            SetSizeRayTracedShadowMap(rayTracedShadowMapSize);
         }
 
-        public void Render(ModelSystem modelSystem, ShaderProgram renderProgram, ShaderProgram cullingProgram, Camera camera)
+        public void RenderShadowMap(ModelSystem modelSystem, Camera camera, int gpuPointShadowIndex)
         {
-            GL.Viewport(0, 0, Result.Width, Result.Height);
+            renderShadowMapProgram.Upload(0, gpuPointShadowIndex);
+            cullingProgram.Upload(0, gpuPointShadowIndex);
+
+            GL.Viewport(0, 0, ShadowMap.Width, ShadowMap.Height);
             framebuffer.Bind();
             framebuffer.Clear(ClearBufferMask.DepthBufferBit);
 
@@ -104,8 +159,8 @@ namespace IDKEngine.Render
             GL.DispatchCompute((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
 
-            renderProgram.Use();
-            if (PointShadowManager.TAKE_MESH_SHADER_PATH)
+            renderShadowMapProgram.Use();
+            if (TakeMeshShaderPath)
             {
                 modelSystem.MeshShaderDrawNV();
             }
@@ -125,16 +180,23 @@ namespace IDKEngine.Render
             gpuPointShadow.NegZ = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
         }
 
-        public ref readonly GpuPointShadow GetGpuData()
+        public ref readonly GpuPointShadow GetGpuPointShadow()
         {
             return ref gpuPointShadow;
         }
 
-        public void SetSize(int size)
+        public void SetReferencingLightIndex(int lightIndex)
+        {
+            gpuPointShadow.LightIndex = lightIndex;
+        }
+
+        public void SetSizeShadowMap(int size)
         {
             size = Math.Max(size, 1);
 
-            DisposeBindlessTextures();
+            if (shadowSampler != null) { shadowSampler.Dispose(); }
+            if (nearestSampler != null) { nearestSampler.Dispose(); }
+            if (ShadowMap != null) { ShadowMap.Dispose(); }
 
             shadowSampler = new SamplerObject();
             shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -152,27 +214,39 @@ namespace IDKEngine.Render
             nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
 
-            Result = new Texture(TextureTarget2d.TextureCubeMap);
-            Result.ImmutableAllocate(size, size, 1, SizedInternalFormat.DepthComponent16);
+            ShadowMap = new Texture(TextureTarget2d.TextureCubeMap);
+            ShadowMap.ImmutableAllocate(size, size, 1, SizedInternalFormat.DepthComponent16);
 
-            gpuPointShadow.Texture = Result.GetTextureHandleARB(nearestSampler);
-            gpuPointShadow.ShadowTexture = Result.GetTextureHandleARB(shadowSampler);
+            gpuPointShadow.Texture = ShadowMap.GetTextureHandleARB(nearestSampler);
+            gpuPointShadow.ShadowTexture = ShadowMap.GetTextureHandleARB(shadowSampler);
 
-            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, Result);
+            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, ShadowMap);
             framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
         }
 
-        private void DisposeBindlessTextures()
+        public void SetSizeRayTracedShadowMap(Vector2i size)
         {
-            if (shadowSampler != null) { shadowSampler.Dispose(); }
-            if (nearestSampler != null) { nearestSampler.Dispose(); }
-            if (Result != null) { Result.Dispose(); }
+            /// We only create the ressources and not handle computation for <see cref="RayTracedShadowMap"/>
+            /// as this can be done more efficiently in <see cref="PointShadowManager"/>
+
+            if (RayTracedShadowMap != null) RayTracedShadowMap.Dispose();
+
+            RayTracedShadowMap = new Texture(TextureTarget2d.Texture2D);
+            RayTracedShadowMap.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.R8);
+            RayTracedShadowMap.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+
+            gpuPointShadow.RayTracedShadowTexture = RayTracedShadowMap.GetImageHandleARB(RayTracedShadowMap.SizedInternalFormat);
         }
 
         public void Dispose()
         {
             framebuffer.Dispose();
-            DisposeBindlessTextures();
+
+            RayTracedShadowMap.Dispose();
+
+            shadowSampler.Dispose();
+            nearestSampler.Dispose();
+            ShadowMap.Dispose();
         }
     }
 }

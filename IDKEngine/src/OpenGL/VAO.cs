@@ -1,12 +1,10 @@
 ﻿using System;
 using OpenTK.Graphics.OpenGL4;
 
-namespace IDKEngine.Render.Objects
+namespace IDKEngine.OpenGL
 {
     class VAO : IDisposable
     {
-        private static int lastBindedID = 0;
-
         public readonly int ID;
         public VAO()
         {
@@ -49,29 +47,17 @@ namespace IDKEngine.Render.Objects
 
         public void Bind()
         {
-            if (lastBindedID != ID)
-            {
-                GL.BindVertexArray(ID);
-                lastBindedID = ID;
-            }
+            GL.BindVertexArray(ID);
         }
 
         public static void Bind(int id)
         {
-            if (lastBindedID != id)
-            {
-                GL.BindVertexArray(id);
-                lastBindedID = id;
-            }
+            GL.BindVertexArray(id);
         }
 
         public void Dispose()
         {
             GL.DeleteVertexArray(ID);
-            if (ID == lastBindedID)
-            {
-                lastBindedID = 0;
-            }
         }
     }
 }

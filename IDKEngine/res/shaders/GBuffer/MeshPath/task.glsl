@@ -1,124 +1,17 @@
 #version 460 core
 #extension GL_NV_mesh_shader : require
 #extension GL_NV_gpu_shader5 : require
-#extension GL_ARB_bindless_texture : require
 #extension GL_KHR_shader_subgroup_ballot : require
+
+#define DECLARE_MESHLET_STORAGE_BUFFERS
+AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Constants.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
 #define MESHLETS_PER_WORKGROUP 32
 layout(local_size_x = MESHLETS_PER_WORKGROUP) in;
-
-struct DrawElementsCmd
-{
-    uint IndexCount;
-    uint InstanceCount;
-    uint FirstIndex;
-    uint BaseVertex;
-    uint BaseInstance;
-};
-
-struct Mesh
-{
-    int MaterialIndex;
-    float NormalMapStrength;
-    float EmissiveBias;
-    float SpecularBias;
-    float RoughnessBias;
-    float TransmissionBias;
-    float IORBias;
-    uint MeshletsStart;
-    vec3 AbsorbanceBias;
-    uint MeshletCount;
-    uint InstanceCount;
-    uint BlasRootNodeIndex;
-    vec2 _pad0;
-};
-
-struct MeshInstance
-{
-    mat4x3 ModelMatrix;
-    mat4x3 InvModelMatrix;
-    mat4x3 PrevModelMatrix;
-    vec3 _pad0;
-    uint MeshIndex;
-};
-
-struct Meshlet
-{
-    uint VertexOffset;
-    uint IndicesOffset;
-
-    uint8_t VertexCount;
-    uint8_t TriangleCount;
-};
-
-struct MeshletInfo
-{
-    vec3 Min;
-    float _pad0;
-
-    vec3 Max;
-    float _pad1;
-};
-
-layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
-{
-    DrawElementsCmd DrawCommands[];
-} drawElementsCmdSSBO;
-
-layout(std430, binding = 1) restrict readonly buffer MeshSSBO
-{
-    Mesh Meshes[];
-} meshSSBO;
-
-layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
-layout(std430, binding = 3) restrict buffer VisibleMeshInstanceSSBO
-{
-    uint MeshInstanceIDs[];
-} visibleMeshInstanceSSBO;
-
-layout(std430, binding = 15) restrict readonly buffer MeshletSSBO
-{
-    Meshlet Meshlets[];
-} meshletSSBO;
-
-layout(std430, binding = 16) restrict readonly buffer MeshletInfoSSBO
-{
-    MeshletInfo MeshletsInfo[];
-} meshletInfoSSBO;
-
-layout(std140, binding = 0) uniform BasicDataUBO
-{
-    mat4 ProjView;
-    mat4 View;
-    mat4 InvView;
-    mat4 PrevView;
-    vec3 ViewPos;
-    uint Frame;
-    mat4 Projection;
-    mat4 InvProjection;
-    mat4 InvProjView;
-    mat4 PrevProjView;
-    float NearPlane;
-    float FarPlane;
-    float DeltaRenderTime;
-    float Time;
-} basicDataUBO;
-
-layout(std140, binding = 6) uniform GBufferDataUBO
-{
-    sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
-    sampler2D Velocity;
-    sampler2D Depth;
-} gBufferDataUBO;
 
 taskNV out InOutVars
 {
@@ -158,7 +51,7 @@ void main()
     // // Subpixel culling
     // {
     //     bool vertexBehindFrustum;
-    //     Box meshletNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.ProjView * modelMatrix, vertexBehindFrustum);
+    //     Box meshletNdcBounds = BoxTransformPerspective(meshletLocalBounds, perFrameDataUBO.ProjView * modelMatrix, vertexBehindFrustum);
     //     vec2 renderSize = textureSize(gBufferDataUBO.AlbedoAlpha, 0);
     //     vec3 uvMin = vec3(meshletNdcBounds.Min.xy * 0.5 + 0.5, meshletNdcBounds.Min.z);
     //     vec3 uvMax = vec3(meshletNdcBounds.Max.xy * 0.5 + 0.5, meshletNdcBounds.Max.z);
@@ -172,7 +65,7 @@ void main()
     // Frustum Culling
     if (isVisible)
     {
-        Frustum frustum = GetFrustum(basicDataUBO.ProjView * modelMatrix);
+        Frustum frustum = GetFrustum(perFrameDataUBO.ProjView * modelMatrix);
         isVisible = FrustumBoxIntersect(frustum, meshletLocalBounds);
     }
 
@@ -180,7 +73,7 @@ void main()
     if (isVisible)
     {
         bool vertexBehindFrustum;
-        Box meshletOldNdcBounds = BoxTransformPerspective(meshletLocalBounds, basicDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
+        Box meshletOldNdcBounds = BoxTransformPerspective(meshletLocalBounds, perFrameDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
         if (!vertexBehindFrustum)
         {
             isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);

@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -36,7 +36,7 @@ namespace IDKEngine.Render
             set
             {
                 _resolutionScale = value;
-                SetSize(PresentationResolution.X, PresentationResolution.Y);
+                SetSize(PresentationResolution);
             }
         }
 
@@ -46,35 +46,35 @@ namespace IDKEngine.Render
         private Texture depthTexture;
         private Texture volumetricLightingTexture;
 
-        private readonly ShaderProgram volumetricLightingProgram;
-        private readonly ShaderProgram upscaleProgram;
-        private readonly TypedBuffer<GpuSettings> bufferGpuSettings;
-        public VolumetricLighting(int width, int height, in GpuSettings settings, float resolutionScale = 0.5f)
+        private readonly AbstractShaderProgram volumetricLightingProgram;
+        private readonly AbstractShaderProgram upscaleProgram;
+        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
         {
-            volumetricLightingProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VolumetricLight/compute.glsl"));
-            upscaleProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "VolumetricLight/Upscale/compute.glsl"));
+            volumetricLightingProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VolumetricLight/compute.glsl"));
+            upscaleProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VolumetricLight/Upscale/compute.glsl"));
 
-            bufferGpuSettings = new TypedBuffer<GpuSettings>();
-            bufferGpuSettings.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
 
             _resolutionScale = resolutionScale;
-            SetSize(width, height);
+            SetSize(size);
 
             Settings = settings;
         }
 
         public void Compute()
         {
-            bufferGpuSettings.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            bufferGpuSettings.UploadElements(Settings);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(Settings);
 
-            volumetricLightingTexture.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, volumetricLightingTexture.SizedInternalFormat);
-            depthTexture.BindToImageUnit(1, 0, false, 0, TextureAccess.WriteOnly, depthTexture.SizedInternalFormat);
+            volumetricLightingTexture.BindToImageUnit(0, volumetricLightingTexture.SizedInternalFormat);
+            depthTexture.BindToImageUnit(1, depthTexture.SizedInternalFormat);
             volumetricLightingProgram.Use();
             GL.DispatchCompute((volumetricLightingTexture.Width + 8 - 1) / 8, (volumetricLightingTexture.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
 
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.WriteOnly, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.SizedInternalFormat);
             volumetricLightingTexture.BindToUnit(0);
             depthTexture.BindToUnit(1);
             upscaleProgram.Use();
@@ -82,9 +82,9 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
         }
 
-        public void SetSize(int width, int height)
+        public void SetSize(Vector2i size)
         {
-            PresentationResolution = new Vector2i(width, height);
+            PresentationResolution = new Vector2i(size.X, size.Y);
             RenderResolution = (Vector2i)((Vector2)PresentationResolution * ResolutionScale);
 
             if (Result != null) Result.Dispose();
@@ -111,7 +111,7 @@ namespace IDKEngine.Render
             volumetricLightingTexture.Dispose();
             volumetricLightingProgram.Dispose();
             upscaleProgram.Dispose();
-            bufferGpuSettings.Dispose();
+            gpuSettingsBuffer.Dispose();
         }
     }
 }

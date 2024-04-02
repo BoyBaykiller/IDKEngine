@@ -1,6 +1,3 @@
-#ifndef Transformations_H
-#define Transformations_H
-
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedDeviceCoords)
 {   
     vec4 rayView;
@@ -67,4 +64,10 @@ float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMi
     return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
 }
 
-#endif
+vec3 GetTriangleNormal(vec3 p0, vec3 p1, vec3 p2)
+{
+    vec3 p0p1 = p1 - p0;
+    vec3 p0p2 = p2 - p0;
+    vec3 triNormal = normalize(cross(p0p1, p0p2));
+    return triNormal;
+}

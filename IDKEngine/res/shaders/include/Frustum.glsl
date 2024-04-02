@@ -1,6 +1,3 @@
-#ifndef Frustum_H
-#define Frustum_H
-
 struct Frustum
 {
     vec4 Planes[6];
@@ -22,5 +19,3 @@ Frustum GetFrustum(mat4 matrix)
     }
     return frustum;
 }
-
-#endif

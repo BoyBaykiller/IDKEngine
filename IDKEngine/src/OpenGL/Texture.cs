@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using System.Collections.Generic;
+using IDKEngine.Utils;
 
-namespace IDKEngine.Render.Objects
+namespace IDKEngine.OpenGL
 {
     class Texture : IDisposable
     {
@@ -26,7 +27,8 @@ namespace IDKEngine.Render.Objects
 
         public SizedInternalFormat SizedInternalFormat { get; private set; }
 
-        private readonly List<ulong> associatedTextureHandles = new List<ulong>(0);
+        private readonly List<long> associatedTextureHandles = new List<long>(0);
+        private readonly List<long> associatedImageHandles = new List<long>(0);
 
         private static readonly int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
         private static int GetDummyTexture(TextureTarget textureTarget)
@@ -125,6 +127,16 @@ namespace IDKEngine.Render.Objects
             GL.TextureParameter(ID, TextureParameterName.TextureCompareFunc, (int)textureCompareFunc);
         }
 
+        public unsafe void SetBorderColor(Vector4 color)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureBorderColor, &color.X);
+        }
+
+        public void SetMipmapLodBias(float bias)
+        {
+            GL.TextureParameter(ID, TextureParameterName.TextureLodBias, bias);
+        }
+
         /// <summary>
         /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture must be available for this to take effect
         /// </summary>
@@ -137,24 +149,14 @@ namespace IDKEngine.Render.Objects
             }
         }
 
-        public unsafe void SetBorderColor(Vector4 color)
-        {
-            GL.TextureParameter(ID, TextureParameterName.TextureBorderColor, &color.X);
-        }
-
-        public void SetMipmapLodBias(float bias)
-        {
-            GL.TextureParameter(ID, TextureParameterName.TextureLodBias, bias);
-        }
-
         public void Bind()
         {
             GL.BindTexture(Target, ID);
         }
 
-        public void BindToImageUnit(int unit, int level, bool layered, int layer, TextureAccess textureAccess, SizedInternalFormat sizedInternalFormat)
+        public void BindToImageUnit(int unit, SizedInternalFormat sizedInternalFormat, int layer = 0, bool layered = false, int level = 0)
         {
-            GL.BindImageTexture(unit, ID, level, layered, layer, textureAccess, sizedInternalFormat);
+            GL.BindImageTexture(unit, ID, level, layered, layer, TextureAccess.ReadWrite, sizedInternalFormat);
         }
         public void BindToUnit(int unit)
         {
@@ -184,10 +186,10 @@ namespace IDKEngine.Render.Objects
         {
             fixed (void* ptr = &pixels)
             {
-                SubTexture3D(width, height, depth, pixelFormat, pixelType, (IntPtr)ptr, level, xOffset, yOffset, zOffset);
+                SubTexture3D(width, height, depth, pixelFormat, pixelType, (nint)ptr, level, xOffset, yOffset, zOffset);
             }
         }
-        public void SubTexture3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
+        public void SubTexture3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
         {
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, pixelFormat, pixelType, pixels);
         }
@@ -200,10 +202,10 @@ namespace IDKEngine.Render.Objects
         {
             fixed (void* ptr = &pixels)
             {
-                SubTexture2D(width, height, pixelFormat, pixelType, (IntPtr)ptr, level, xOffset, yOffset);
+                SubTexture2D(width, height, pixelFormat, pixelType, (nint)ptr, level, xOffset, yOffset);
             }
         }
-        public void SubTexture2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0, int yOffset = 0)
+        public void SubTexture2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0)
         {
             GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, pixelFormat, pixelType, pixels);
         }
@@ -216,15 +218,15 @@ namespace IDKEngine.Render.Objects
         {
             fixed (void* ptr = &pixels)
             {
-                SubTexture1D(width, pixelFormat, pixelType, (IntPtr)ptr, level, xOffset);
+                SubTexture1D(width, pixelFormat, pixelType, (nint)ptr, level, xOffset);
             }
         }
-        public void SubTexture1D(int width, PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int level = 0, int xOffset = 0)
+        public void SubTexture1D(int width, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0)
         {
             GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
         }
 
-        public void GetImageData(PixelFormat pixelFormat, PixelType pixelType, IntPtr pixels, int bufSize, int level = 0)
+        public void GetImageData(PixelFormat pixelFormat, PixelType pixelType, nint pixels, int bufSize, int level = 0)
         {
             GL.GetTextureImage(ID, level, pixelFormat, pixelType, bufSize, pixels);
         }
@@ -233,10 +235,10 @@ namespace IDKEngine.Render.Objects
         {
             fixed (void* ptr = &value)
             {
-                Clear(pixelFormat, pixelType, (IntPtr)ptr, level);
+                Clear(pixelFormat, pixelType, (nint)ptr, level);
             }
         }
-        public void Clear(PixelFormat pixelFormat, PixelType pixelType, IntPtr value, int level = 0)
+        public void Clear(PixelFormat pixelFormat, PixelType pixelType, nint value, int level = 0)
         {
             GL.ClearTexImage(ID, level, pixelFormat, pixelType, value);
         }
@@ -289,9 +291,9 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong GetTextureHandleARB()
+        public long GetTextureHandleARB()
         {
-            ulong textureHandle = (ulong)GL.Arb.GetTextureHandle(ID);
+            long textureHandle = GL.Arb.GetTextureHandle(ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
             associatedTextureHandles.Add(textureHandle);
             return textureHandle;
@@ -301,9 +303,9 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public ulong GetTextureHandleARB(SamplerObject samplerObject)
+        public long GetTextureHandleARB(SamplerObject samplerObject)
         {
-            ulong textureHandle = (ulong)GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
+            long textureHandle = GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
             associatedTextureHandles.Add(textureHandle);
             return textureHandle;
@@ -313,9 +315,41 @@ namespace IDKEngine.Render.Objects
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        private static void UnmakeTextureHandleARB(ulong textureHandle)
+        public unsafe long GetImageHandleARB(SizedInternalFormat sizedInternalFormat, int layer = 0, bool layered = false, int level = 0)
+        {
+            long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
+
+            if (true)
+            {
+                // Workarround for AMD driver bug when using GL_READ_WRITE or GL_WRITE_ONLY.
+                // You'd think having GL_READ_ONLY would create other problems since we write to the them,
+                // but it works and is the best we can do until the bug is fixed.
+                GL.Arb.MakeImageHandleResident(imageHandle, All.ReadOnly);
+            }
+            else
+            {
+                GL.Arb.MakeImageHandleResident(imageHandle, All.ReadWrite);
+            }
+            associatedImageHandles.Add(imageHandle);
+            return imageHandle;
+        }
+
+        /// <summary>
+        /// GL_ARB_bindless_texture must be available
+        /// </summary>
+        /// <returns></returns>
+        private static void UnmakeTextureHandleARB(long textureHandle)
         {
             GL.Arb.MakeTextureHandleNonResident(textureHandle);
+        }
+
+        /// <summary>
+        /// GL_ARB_bindless_texture must be available
+        /// </summary>
+        /// <returns></returns>
+        private static void UnmakeImageHandleARB(long imageHandle)
+        {
+            GL.Arb.MakeImageHandleNonResident(imageHandle);
         }
 
         public void GetSizeMipmap(out int width, out int height, out int depth, int level = 0)
@@ -332,6 +366,13 @@ namespace IDKEngine.Render.Objects
                 UnmakeTextureHandleARB(associatedTextureHandles[i]);
             }
             associatedTextureHandles.Clear();
+
+            for (int i = 0; i < associatedImageHandles.Count; i++)
+            {
+                UnmakeImageHandleARB(associatedImageHandles[i]);
+            }
+            associatedImageHandles.Clear();
+
             GL.DeleteTexture(ID);
         }
     }

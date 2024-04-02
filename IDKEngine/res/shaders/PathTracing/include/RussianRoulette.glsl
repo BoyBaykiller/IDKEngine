@@ -1,6 +1,3 @@
-#ifndef RussianRoulette_H
-#define RussianRoulette_H
-
 AppInclude(include/Random.glsl)
 
 bool RussianRouletteTerminateRay(inout vec3 throughput)
@@ -13,5 +10,3 @@ bool RussianRouletteTerminateRay(inout vec3 throughput)
     throughput /= p;
     return false;
 }
-
-#endif

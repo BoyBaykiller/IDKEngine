@@ -1,8 +1,8 @@
 ﻿using System;
-using System.IO;
-using System.Collections.Generic;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -10,89 +10,102 @@ namespace IDKEngine.Render
     class PointShadowManager : IDisposable
     {
         public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 128; // used in shader and client code - keep in sync!
-        public static readonly bool TAKE_MESH_SHADER_PATH = false; // Helper.IsExtensionsAvailable("GL_NV_mesh_shader")
+
+        private int _count;
+        public int Count
+        {
+            private set
+            {
+                _count = value;
+                pointShadowsBuffer.UploadData(pointShadowsBuffer.Size - sizeof(int), sizeof(int), Count);
+            }
+
+            get => _count;
+        }
 
         private readonly PointShadow[] pointShadows;
-        private readonly ShaderProgram renderProgram;
-        private readonly ShaderProgram cullingProgram;
+        private readonly AbstractShaderProgram rayTracedShadowsProgram;
         private readonly TypedBuffer<GpuPointShadow> pointShadowsBuffer;
         public unsafe PointShadowManager()
         {
             pointShadows = new PointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
-            if (TAKE_MESH_SHADER_PATH)
-            {
-                renderProgram = new ShaderProgram(
-                    Shader.ShaderFromFile((ShaderType)NvMeshShader.TaskShaderNv, "Shadows/PointShadow/MeshPath/task.glsl"),
-                    Shader.ShaderFromFile((ShaderType)NvMeshShader.MeshShaderNv, "Shadows/PointShadow/MeshPath/mesh.glsl"),
-                    Shader.ShaderFromFile(ShaderType.FragmentShader, "Shadows/PointShadow/fragment.glsl"));
-            }
-            else
-            {
-                renderProgram = new ShaderProgram(
-                    Shader.ShaderFromFile(ShaderType.VertexShader, "Shadows/PointShadow/VertexPath/vertex.glsl"),
-                    Shader.ShaderFromFile(ShaderType.FragmentShader, "Shadows/PointShadow/fragment.glsl"));
-            }
-
-
-            Dictionary<string, string> cullingShaderInsertions = new Dictionary<string, string>();
-            cullingShaderInsertions.Add(nameof(TAKE_MESH_SHADER_PATH), TAKE_MESH_SHADER_PATH ? "1" : "0");
-            cullingProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "MeshCulling/PointShadow/compute.glsl", cullingShaderInsertions));
+            rayTracedShadowsProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadowsRayTraced/compute.glsl"));
 
             pointShadowsBuffer = new TypedBuffer<GpuPointShadow>();
             pointShadowsBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
-            pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
+            pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
         }
 
         public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
         {
             GL.Disable(EnableCap.CullFace);
             GL.DepthFunc(DepthFunction.Less);
-            for (int i = 0; i < GPU_MAX_UBO_POINT_SHADOW_COUNT; i++)
+            for (int i = 0; i < Count; i++)
             {
-                if (TryGetPointShadow(i, out PointShadow pointShadow))
-                {
-                    UploadPointShadow(i);
+                UploadPointShadow(i);
 
-                    // tell shaders which point shadow we are rendering
-                    renderProgram.Upload(0, i);
-                    cullingProgram.Upload(0, i);
-
-                    pointShadow.Render(modelSystem, renderProgram, cullingProgram, camera);
-                }
+                pointShadows[i].RenderShadowMap(modelSystem, camera, i);
             }
         }
 
-        public bool TryAddPointShadow(PointShadow pointShadow, out int index)
+        public void ComputeRayTracedShadowMaps(int samples)
         {
-            index = -1;
-            for (int i = 0; i < pointShadows.Length; i++)
+            if (Count == 0)
             {
-                ref PointShadow it = ref pointShadows[i];
-                if (it == null)
+                return;
+            }
+
+            Vector2i commonSize = new Vector2i();
+            for (int i = 0; i < Count; i++)
+            {
+                PointShadow pointShadow = pointShadows[i];
+                Vector2i size = new Vector2i(pointShadow.RayTracedShadowMap.Width, pointShadow.RayTracedShadowMap.Height);
+                if (i == 0)
                 {
-                    it = pointShadow;
-                    UploadPointShadow(i);
-                    
-                    index = i;
-                    return true;
+                    commonSize = size;
+                }
+                if (commonSize != size)
+                {
+                    Logger.Log(Logger.LogLevel.Error, "Current implementation of ray traced shadows requires all ray traced shadow maps to be of the same size");
+                    return;
                 }
             }
 
-            Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(PointShadow)}. Limit of {GPU_MAX_UBO_POINT_SHADOW_COUNT} is reached");
-            return false;
+            rayTracedShadowsProgram.Upload(0, samples);
+
+            rayTracedShadowsProgram.Use();
+            GL.DispatchCompute((commonSize.X + 8 - 1) / 8, (commonSize.Y + 8 - 1) / 8, Count);
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+        }
+
+        public bool AddPointShadow(PointShadow newPointShadow)
+        {
+            if (Count == GPU_MAX_UBO_POINT_SHADOW_COUNT)
+            {
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(PointShadow)}. Limit of {GPU_MAX_UBO_POINT_SHADOW_COUNT} is reached");
+                return false;
+            }
+
+            pointShadows[Count++] = newPointShadow;
+
+            return true;
         }
 
         public void DeletePointShadow(int index)
         {
-            if (!TryGetPointShadow(index, out _))
+            if (!TryGetPointShadow(index, out PointShadow pointShadow))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Cannot delete {nameof(PointShadow)} {index} as it already is null");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(pointShadow)} {pointShadow} does not exist. Cannot delete it");
                 return;
             }
 
-            pointShadows[index].Dispose();
-            pointShadows[index] = null;
+            pointShadow.Dispose();
+
+            if (Count > 0)
+            {
+                pointShadows[index] = pointShadows[--Count];
+            }
         }
 
         private void UploadPointShadow(int index)
@@ -103,21 +116,31 @@ namespace IDKEngine.Render
                 return;
             }
 
-            pointShadowsBuffer.UploadElements(pointShadow.GetGpuData(), index);
+            pointShadowsBuffer.UploadElements(pointShadow.GetGpuPointShadow(), index);
         }
 
         public bool TryGetPointShadow(int index, out PointShadow pointShadow)
         {
-            pointShadow = null;
-            if (index < 0 || index >= GPU_MAX_UBO_POINT_SHADOW_COUNT) return false;
+            if (index >= 0 && index < Count)
+            {
+                pointShadow = pointShadows[index];
+                return true;
+            }
 
-            pointShadow = pointShadows[index];
-            return pointShadow != null;
+            pointShadow = null;
+            return false;
+        }
+
+        public void SetSizeRayTracedShadows(Vector2i size)
+        {
+            for (int i = 0; i < Count; i++)
+            {
+                pointShadows[i].SetSizeRayTracedShadowMap(size);
+            }
         }
 
         public void Dispose()
         {
-            pointShadowsBuffer.Dispose();
             for (int i = 0; i < pointShadows.Length; i++)
             {
                 if (pointShadows[i] != null)
@@ -126,8 +149,9 @@ namespace IDKEngine.Render
                 }
             }
 
-            renderProgram.Dispose();
-            cullingProgram.Dispose();
+            rayTracedShadowsProgram.Dispose();
+
+            pointShadowsBuffer.Dispose();
         }
     }
 }

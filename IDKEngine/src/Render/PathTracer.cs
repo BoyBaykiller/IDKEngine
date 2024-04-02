@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Render.Objects;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -21,71 +22,6 @@ namespace IDKEngine.Render
             }
         }
 
-        private bool _isDebugBVHTraversal;
-        public bool IsDebugBVHTraversal
-        {
-            get => _isDebugBVHTraversal;
-
-            set
-            {
-                _isDebugBVHTraversal = value;
-                finalDrawProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
-                firstHitProgram.Upload("IsDebugBVHTraversal", _isDebugBVHTraversal);
-                if (_isDebugBVHTraversal)
-                {
-                    firstHitProgram.Upload("ApertureDiameter", 0.0f);
-                    cachedRayDepth = RayDepth;
-                    RayDepth = 1;
-                }
-                else
-                {
-                    LenseRadius = _lenseRadius;
-                    RayDepth = cachedRayDepth;
-                }
-                ResetRenderProcess();
-            }
-        }
-
-        private bool _isTraceLights;
-        public bool IsTraceLights
-        {
-            get => _isTraceLights;
-
-            set
-            {
-                _isTraceLights = value;
-                firstHitProgram.Upload("IsTraceLights", _isTraceLights);
-                nHitProgram.Upload("IsTraceLights", _isTraceLights);
-                ResetRenderProcess();
-            }
-        }
-
-        private float _focalLength;
-        public float FocalLength
-        {
-            get => _focalLength;
-
-            set
-            {
-                _focalLength = value;
-                firstHitProgram.Upload("FocalLength", value);
-                ResetRenderProcess();
-            }
-        }
-
-        private float _lenseRadius;
-        public float LenseRadius
-        {
-            get => _lenseRadius;
-
-            set
-            {
-                _lenseRadius = value;
-                firstHitProgram.Upload("LenseRadius", value);
-                ResetRenderProcess();
-            }
-        }
-
         private uint _accumulatedSamples;
         public uint AccumulatedSamples
         {
@@ -98,42 +34,120 @@ namespace IDKEngine.Render
             }
         }
 
-        private bool _onRefractionTintAlbedo;
-        public bool IsOnRefractionTintAlbedo
+        public bool IsDebugBVHTraversal
         {
-            get => _onRefractionTintAlbedo;
+            get => gpuSettings.IsDebugBVHTraversal == 1;
 
             set
             {
-                _onRefractionTintAlbedo = value;
-                firstHitProgram.Upload("IsOnRefractionTintAlbedo", IsOnRefractionTintAlbedo);
-                nHitProgram.Upload("IsOnRefractionTintAlbedo", IsOnRefractionTintAlbedo);
+                gpuSettings.IsDebugBVHTraversal = value ? 1 : 0;
+
+                if (value)
+                {
+                    cachedRayDepth = RayDepth;
+                    RayDepth = 1;
+                }
+                else
+                {
+                    RayDepth = cachedRayDepth;
+                }
                 ResetRenderProcess();
             }
         }
 
+        public bool IsTraceLights
+        {
+            get => gpuSettings.IsTraceLights == 1;
+
+            set
+            {
+                gpuSettings.IsTraceLights = value ? 1 : 0;
+                ResetRenderProcess();
+            }
+        }
+
+        public float FocalLength
+        {
+            get => gpuSettings.FocalLength;
+
+            set
+            {
+                gpuSettings.FocalLength = value;
+                ResetRenderProcess();
+            }
+        }
+
+        public float LenseRadius
+        {
+            get => gpuSettings.LenseRadius;
+
+            set
+            {
+                gpuSettings.LenseRadius = value;
+                ResetRenderProcess();
+            }
+        }
+        public bool IsAlwaysTintWithAlbedo
+        {
+            get => gpuSettings.IsAlwaysTintWithAlbedo == 1;
+
+            set
+            {
+                gpuSettings.IsAlwaysTintWithAlbedo = value ? 1 : 0;
+                ResetRenderProcess();
+            }
+        }
+
+        public struct GpuSettings
+        {
+            public float FocalLength;
+            public float LenseRadius;
+            public int IsDebugBVHTraversal;
+            public int IsTraceLights;
+            public int IsAlwaysTintWithAlbedo;
+
+            public static GpuSettings Default = new GpuSettings()
+            {
+                FocalLength = 8.0f,
+                LenseRadius = 0.01f,
+                IsDebugBVHTraversal = 0,
+                IsTraceLights = 0,
+                IsAlwaysTintWithAlbedo = 0
+            };
+        }
+
+        private GpuSettings gpuSettings;
+
         public Texture Result;
-        private readonly ShaderProgram firstHitProgram;
-        private readonly ShaderProgram nHitProgram;
-        private readonly ShaderProgram finalDrawProgram;
+        private readonly AbstractShaderProgram firstHitProgram;
+        private readonly AbstractShaderProgram nHitProgram;
+        private readonly AbstractShaderProgram finalDrawProgram;
+        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
         private TypedBuffer<GpuWavefrontRay> wavefrontRayBuffer;
         private BufferObject wavefrontPTBuffer;
-        public PathTracer(int width, int height)
+        public PathTracer(Vector2i size, in GpuSettings settings)
         {
-            firstHitProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "PathTracing/FirstHit/compute.glsl"));
-            nHitProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "PathTracing/NHit/compute.glsl"));
-            finalDrawProgram = new ShaderProgram(Shader.ShaderFromFile(ShaderType.ComputeShader, "PathTracing/FinalDraw/compute.glsl"));
+            firstHitProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "PathTracing/FirstHit/compute.glsl"));
 
-            SetSize(width, height);
+            nHitProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "PathTracing/NHit/compute.glsl"));
+            finalDrawProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "PathTracing/FinalDraw/compute.glsl"));
+
+            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+
+            SetSize(size);
+
+            gpuSettings = settings;
 
             RayDepth = 7;
-            FocalLength = 8.0f;
-            LenseRadius = 0.01f;
         }
 
         public void Compute()
         {
-            Result.BindToImageUnit(0, 0, false, 0, TextureAccess.ReadWrite, Result.SizedInternalFormat);
+            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.UploadElements(gpuSettings);
+
+            Result.BindToImageUnit(0, Result.SizedInternalFormat);
             firstHitProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
@@ -161,7 +175,7 @@ namespace IDKEngine.Render
             AccumulatedSamples++;
         }
 
-        public unsafe void SetSize(int width, int height)
+        public unsafe void SetSize(Vector2i size)
         {
             float clear = 0.0f;
 
@@ -169,19 +183,19 @@ namespace IDKEngine.Render
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba32f);
+            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba32f);
             Result.Clear(PixelFormat.Red, PixelType.Float, clear);
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
             wavefrontRayBuffer = new TypedBuffer<GpuWavefrontRay>();
-            wavefrontRayBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocal, width * height);
-            wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
+            wavefrontRayBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocal, size.X * size.Y);
+            wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
             if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
             wavefrontPTBuffer = new BufferObject();
-            wavefrontPTBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)));
+            wavefrontPTBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
             wavefrontPTBuffer.SimpleClear(0, sizeof(GpuWavefrontPTHeader), (nint)(&clear));
-            wavefrontPTBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
+            wavefrontPTBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 
             ResetRenderProcess();
         }
@@ -191,6 +205,11 @@ namespace IDKEngine.Render
             AccumulatedSamples = 0;
         }
 
+        public ref readonly GpuSettings GetGpuSettings()
+        {
+            return ref gpuSettings;
+        }
+
         public void Dispose()
         {
             Result.Dispose();
@@ -198,7 +217,9 @@ namespace IDKEngine.Render
             firstHitProgram.Dispose();
             nHitProgram.Dispose();
             finalDrawProgram.Dispose();
-            
+
+            gpuSettingsBuffer.Dispose();
+
             wavefrontRayBuffer.Dispose();
             wavefrontPTBuffer.Dispose();
         }

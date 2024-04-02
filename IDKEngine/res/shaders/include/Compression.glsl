@@ -1,6 +1,3 @@
-#ifndef Compression_H
-#define Compression_H
-
 uint CompressUR11G11B10(vec3 data)
 {
     uint r = uint(round(data.x * ((1u << 11) - 1)));
@@ -58,5 +55,3 @@ vec3 DecompressOctahedron(vec2 e)
     if (v.z < 0) v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
     return normalize(v);
 }
-
-#endif

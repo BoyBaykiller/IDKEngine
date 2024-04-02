@@ -32,8 +32,8 @@ namespace IDKEngine.GpuTypes
             }
         }
 
-        public ulong Texture;
-        public ulong ShadowTexture;
+        public long Texture;
+        public long ShadowTexture;
 
         public Matrix4 PosX;
         public Matrix4 NegX;
@@ -45,7 +45,8 @@ namespace IDKEngine.GpuTypes
         public Vector3 Position;
         public float NearPlane;
 
-        private readonly Vector3 _pad0;
+        public long RayTracedShadowTexture;
         public float FarPlane;
+        public int LightIndex;
     }
 }

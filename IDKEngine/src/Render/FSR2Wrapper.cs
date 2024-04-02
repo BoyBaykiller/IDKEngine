@@ -4,7 +4,8 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using FFX_FSR2;
-using IDKEngine.Render.Objects;
+using IDKEngine.Utils;
+using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -12,8 +13,11 @@ namespace IDKEngine.Render
     {
         public static readonly bool IS_FSR2_SUPPORTED = OperatingSystem.IsWindows();
 
+        public bool IsSharpening;
+        public float Sharpness = 0.5f;
+
         public Texture Result;
-        public FSR2Wrapper(int outputWidth, int outputHeight, int maxInputWidth, int maxInputHeight)
+        public FSR2Wrapper(Vector2i maxInputSize, Vector2i outputSize)
         {
             if (!IS_FSR2_SUPPORTED)
             {
@@ -21,11 +25,9 @@ namespace IDKEngine.Render
                 Environment.Exit(0);
             }
 
-            SetSize(outputWidth, outputHeight, maxInputWidth, maxInputHeight);
+            SetSize(maxInputSize, outputSize);
         }
 
-        public bool IsSharpening;
-        public float Sharpness = 0.5f;
         public void RunFSR2(Vector2 jitter, Texture color, Texture depth, Texture velocity, Camera camera, float deltaMilliseconds)
         {
             Vector2i renderSize = new Vector2i(color.Width, color.Height);
@@ -61,13 +63,13 @@ namespace IDKEngine.Render
         private FSR2.Context fsr2Context;
         private byte[] fsr2ScratchMemory;
         private bool isFsr2Initialized = false;
-        public unsafe void SetSize(int inputWidth, int inputHeight, int outputWidth, int outputHeight)
+        public unsafe void SetSize(Vector2i inputSize, Vector2i outputSize)
         {
             if (Result != null) Result.Dispose();
             Result = new Texture(TextureTarget2d.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(outputWidth, outputHeight, 1, SizedInternalFormat.Rgba16f);
+            Result.ImmutableAllocate(outputSize.X, outputSize.Y, 1, SizedInternalFormat.Rgba16f);
 
 
             if (isFsr2Initialized)
@@ -78,8 +80,8 @@ namespace IDKEngine.Render
             FSR2.ContextDescription contextDesc = new FSR2.ContextDescription
             {
                 Flags = FSR2.InitializationFlagBits.EnableHighDynamicRange | FSR2.InitializationFlagBits.EnableAutoExposure | FSR2.InitializationFlagBits.EnableDebugChecking | FSR2.InitializationFlagBits.AllowNullDeviceAndCommandList,
-                MaxRenderSize = new FSR2Types.Dimensions2D() { Width = (uint)inputWidth, Height = (uint)inputHeight },
-                DisplaySize = new FSR2Types.Dimensions2D() { Width = (uint)outputWidth, Height = (uint)outputHeight },
+                MaxRenderSize = new FSR2Types.Dimensions2D() { Width = (uint)inputSize.X, Height = (uint)inputSize.Y },
+                DisplaySize = new FSR2Types.Dimensions2D() { Width = (uint)outputSize.X, Height = (uint)outputSize.Y },
                 FpMessage = (delegate* unmanaged<FSR2Interface.MsgType, string, void>)Marshal.GetFunctionPointerForDelegate((FSR2.FpMessageDelegate)Fsr2Message),
             };
             fsr2ScratchMemory = new byte[FSR2.GL.GetScratchMemorySize()];
@@ -106,7 +108,7 @@ namespace IDKEngine.Render
 
         private static void Fsr2Message(FSR2Interface.MsgType type, string message)
         {
-            Logger.Log(Logger.LogLevel.Info, $"FSR2: {type} {message}");
+            Logger.Log(Logger.LogLevel.Warn, $"FSR2: {type} {message}");
         }
     }
 }

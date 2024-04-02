@@ -1,14 +1,14 @@
 ﻿using System;
-using System.IO;
 using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using IDKEngine.Utils;
 using IDKEngine.Render;
 using IDKEngine.Shapes;
+using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 using IDKEngine.Windowing;
-using IDKEngine.Render.Objects;
 
 namespace IDKEngine
 {
@@ -33,9 +33,12 @@ namespace IDKEngine
             set
             {
                 _resolutionScale = value;
+
+                // trigger ressource re-creation (with new resolution scale)
                 PresentationResolution = PresentationResolution;
             }
         }
+        public Vector2i RenderResolution => new Vector2i((int)(PresentationResolution.X * ResolutionScale), (int)(PresentationResolution.Y * ResolutionScale));
 
         private Vector2i _presentationResolution;
         public Vector2i PresentationResolution
@@ -44,23 +47,28 @@ namespace IDKEngine
 
             set
             {
+                // Having this here enables resizing on AMD drivers without occasional crashing.
+                // Normally this shouldnt be necessary and its probably an other driver bug.
+                GL.Finish();
+
                 _presentationResolution = value;
 
                 if (RenderMode == RenderMode.Rasterizer)
                 {
-                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution.X, RenderResolution.Y, PresentationResolution.X, PresentationResolution.Y);
+                    if (RasterizerPipeline != null) RasterizerPipeline.SetSize(RenderResolution, PresentationResolution);
                 }
 
                 if (RenderMode == RenderMode.PathTracer)
                 {
-                    if (PathTracer != null) PathTracer.SetSize(RenderResolution.X, RenderResolution.Y);
+                    if (PathTracer != null) PathTracer.SetSize(RenderResolution);
                 }
 
                 if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
                 {
-                    if (VolumetricLight != null) VolumetricLight.SetSize(PresentationResolution.X, PresentationResolution.Y);
-                    if (Bloom != null) Bloom.SetSize(PresentationResolution.X, PresentationResolution.Y);
-                    if (TonemapAndGamma != null) TonemapAndGamma.SetSize(PresentationResolution.X, PresentationResolution.Y);
+                    if (VolumetricLight != null) VolumetricLight.SetSize(PresentationResolution);
+                    if (Bloom != null) Bloom.SetSize(PresentationResolution);
+                    if (TonemapAndGamma != null) TonemapAndGamma.SetSize(PresentationResolution);
+                    if (LightManager != null) LightManager.SetSizeRayTracedShadows(RenderResolution);
                 }
             }
         }
@@ -76,64 +84,71 @@ namespace IDKEngine
 
                 _renderMode = value;
 
-                if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
-                if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
-
                 if (RenderMode == RenderMode.Rasterizer)
                 {
-                    RasterizerPipeline = new RasterPipeline(RenderResolution.X, RenderResolution.Y, PresentationResolution.X, PresentationResolution.Y);
+                    if (RasterizerPipeline != null) RasterizerPipeline.Dispose(); RasterizerPipeline = null;
+                    RasterizerPipeline = new RasterPipeline(RenderResolution, PresentationResolution);
                 }
                 
                 if (RenderMode == RenderMode.PathTracer)
                 {
-                    PathTracer = new PathTracer(RenderResolution.X, RenderResolution.Y);
+                    if (PathTracer == null)
+                    {
+                        PathTracer = new PathTracer(RenderResolution, PathTracer.GpuSettings.Default);
+                    }
+                    else
+                    {
+                        PathTracer.Dispose();
+                        PathTracer = new PathTracer(RenderResolution, PathTracer.GetGpuSettings());
+                    }
                 }
 
                 if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
                 {
+                    if (BoxRenderer != null) { BoxRenderer.Dispose(); BoxRenderer = null; }
+                    BoxRenderer = new BoxRenderer();
+
                     if (TonemapAndGamma == null)
                     {
-                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution.X, PresentationResolution.Y, TonemapAndGammaCorrect.GpuSettings.Default);
+                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution, TonemapAndGammaCorrect.GpuSettings.Default);
                     }
                     else
                     {
                         TonemapAndGamma.Dispose();
-                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution.X, PresentationResolution.Y, TonemapAndGamma.Settings);
+                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution, TonemapAndGamma.Settings);
                     }
 
                     if (Bloom == null)
                     {
-                        Bloom = new Bloom(PresentationResolution.X, PresentationResolution.Y, Bloom.GpuSettings.Default);
+                        Bloom = new Bloom(PresentationResolution, Bloom.GpuSettings.Default);
                     }
                     else
                     {
                         Bloom.Dispose();
-                        Bloom = new Bloom(PresentationResolution.X, PresentationResolution.Y, Bloom.Settings);
+                        Bloom = new Bloom(PresentationResolution, Bloom.Settings);
                     }
 
                     if (VolumetricLight == null)
                     {
-                        VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, VolumetricLighting.GpuSettings.Default);
+                        VolumetricLight = new VolumetricLighting(PresentationResolution, VolumetricLighting.GpuSettings.Default);
                     }
                     else
                     {
                         VolumetricLight.Dispose();
-                        VolumetricLight = new VolumetricLighting(PresentationResolution.X, PresentationResolution.Y, VolumetricLight.Settings);
+                        VolumetricLight = new VolumetricLighting(PresentationResolution, VolumetricLight.Settings);
                     }
                 }
             }
         }
 
-        public Vector2i RenderResolution => new Vector2i((int)(PresentationResolution.X * ResolutionScale), (int)(PresentationResolution.Y * ResolutionScale));
-
-        public bool RenderGui { get; private set; }
         public int FPS { get; private set; }
 
+        public bool RenderGui;
         public bool IsBloom = true;
         public bool IsVolumetricLighting = true;
         public bool RunSimulations = true;
 
-        public Intersections.CollisionDetectionSettings SceneVsCamCollisionSettings = new Intersections.CollisionDetectionSettings()
+        public Intersections.SceneVsMovingSphereSettings SceneVsCamCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
         {
             IsEnabled = true,
             TestSteps = 3,
@@ -148,16 +163,14 @@ namespace IDKEngine
             Update(dT);
             if (RenderMode == RenderMode.Rasterizer)
             {
-                if (RasterizerPipeline.IsConfigureGrid)
+                RasterizerPipeline.Render(ModelSystem, LightManager, Camera, dT);
+                if (RasterizerPipeline.IsConfigureGridMode)
                 {
-                    RasterizerPipeline.Render(ModelSystem, LightManager, Camera, dT);
                     TonemapAndGamma.Combine(RasterizerPipeline.Result);
                     BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
                 {
-                    RasterizerPipeline.Render(ModelSystem, LightManager, Camera, dT);
-
                     if (IsBloom)
                     {
                         Bloom.Compute(RasterizerPipeline.Result);
@@ -302,8 +315,11 @@ namespace IDKEngine
                         if (LightManager.AddLight(newLight))
                         {
                             int newLightIndex = LightManager.Count - 1;
-                            PointShadow pointShadow = new PointShadow(256, new Vector2(newLight.GpuLight.Radius, 60.0f));
-                            LightManager.CreatePointShadowForLight(pointShadow, newLightIndex);
+                            PointShadow pointShadow = new PointShadow(256, RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
+                            if (!LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
+                            {
+                                pointShadow.Dispose();
+                            }
                         }
                     }
 
@@ -329,7 +345,7 @@ namespace IDKEngine
                     }
                 }
             }
-
+            
             Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
             Vector3 prevSpherePos = movingSphere.Center;
             Intersections.SceneVsMovingSphereCollisionRoutine(ModelSystem, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
@@ -366,7 +382,7 @@ namespace IDKEngine
                 GpuBasicData.Time = WindowTime;
                 GpuBasicData.Frame++;
 
-                basicDataBuffer.UploadElements(GpuBasicData);
+                gpuPerFrameBuffer.UploadElements(GpuBasicData);
             }
 
             Camera.SetPrevToCurrentPosition();
@@ -381,11 +397,11 @@ namespace IDKEngine
         }
 
         private Gui gui;
-        private ShaderProgram finalProgram;
+        private AbstractShaderProgram finalProgram;
 
         public Camera Camera;
         public ModelSystem ModelSystem;
-        public FrameStateRecorder<FrameState> FrameRecorder;
+        public StateRecorder<FrameState> FrameStateRecorder;
 
         public VolumetricLighting VolumetricLight;
         public Bloom Bloom;
@@ -397,46 +413,50 @@ namespace IDKEngine
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
 
-        private TypedBuffer<GpuBasicData> basicDataBuffer;
-        public GpuBasicData GpuBasicData;
+        private TypedBuffer<GpuPerFrameData> gpuPerFrameBuffer;
+        public GpuPerFrameData GpuBasicData;
         protected override void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
             Logger.Log(Logger.LogLevel.Info, $"GPU: {Helper.GPU}");
-            Logger.Log(Logger.LogLevel.Info, $"{nameof(Shader.REPORT_SHADER_ERRORS_WITH_NAME)} = {Shader.REPORT_SHADER_ERRORS_WITH_NAME}");
+            Logger.Log(Logger.LogLevel.Info, $"{nameof(AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)} = {AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH}");
 
             if (Helper.APIVersion < 4.6)
             {
-                Logger.Log(Logger.LogLevel.Fatal, "Your system does not support OpenGL 4.6. Press Enter to exit");
+                Logger.Log(Logger.LogLevel.Fatal, "Your system does not support OpenGL 4.6");
                 Environment.Exit(0);
             }
             if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
             {
-                Logger.Log(Logger.LogLevel.Fatal, "Your system does not support GL_ARB_bindless_texture. Press Enter to exit");
+                Logger.Log(Logger.LogLevel.Fatal, "Your system does not support GL_ARB_bindless_texture");
                 Environment.Exit(0);
             }
+            if (!Helper.IsExtensionsAvailable("GL_EXT_shader_image_load_formatted"))
+            {
+                Logger.Log(Logger.LogLevel.Fatal, 
+                    "Your system does not support GL_EXT_shader_image_load_formatted.\n" +
+                    "Execution is still continued because some AMD drivers have a bug to not report this extension even though its there.\n" +
+                    "https://community.amd.com/t5/opengl-vulkan/opengl-bug-gl-ext-shader-image-load-formatted-not-reported-even/m-p/676326#M5140\n" +
+                    "If the extension is indeed not supported the app may behave incorrectly"
+                );
+            }
 
-            GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
             GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, IntPtr.Zero);
-            Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
             GL.Disable(EnableCap.Multisample);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
-            GL.Enable(EnableCap.DepthTest);
             GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
             GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
+            Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
 
-            basicDataBuffer = new TypedBuffer<GpuBasicData>();
-            basicDataBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
-            basicDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
+            gpuPerFrameBuffer = new TypedBuffer<GpuPerFrameData>();
+            gpuPerFrameBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuPerFrameBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
-            finalProgram = new ShaderProgram(
-                Shader.ShaderFromFile(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
-                Shader.ShaderFromFile(ShaderType.FragmentShader, "ToScreen/fragment.glsl")
+            finalProgram = new AbstractShaderProgram(
+                new AbstractShader(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
+                new AbstractShader(ShaderType.FragmentShader, "ToScreen/fragment.glsl")
             );
-            Camera = new Camera(RenderResolution, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
-            //Camera = new Camera(RenderResolution, new Vector3(-0.824f, 2.587f, -6.370f), -90.0f, 0.0f);
-            //Camera = new Camera(RenderResolution, new Vector3(-13.238f, 4.226f, -0.147f), -360.950f, -14.600f);
 
             SkyBoxManager.Init(SkyBoxManager.SkyBoxMode.ExternalAsset, new string[]
             {
@@ -449,10 +469,8 @@ namespace IDKEngine
             });
 
             PresentationResolution = WindowFramebufferSize;
-            BoxRenderer = new BoxRenderer();
-            LightManager = new LightManager(12, 12);
             ModelSystem = new ModelSystem();
-            
+
             ModelLoader.SetCallackTextureLoaded(() =>
             {
                 if (PathTracer != null)
@@ -461,10 +479,9 @@ namespace IDKEngine
                 }
             });
 
+            Camera = new Camera(RenderResolution, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
             if (true)
             {
-                RenderMode = RenderMode.Rasterizer;
-
                 ModelLoader.Model sponza = ModelLoader.GltfToEngineFormat("res/models/Sponza/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
                 sponza.Meshes[63].EmissiveBias = 10.0f;
                 sponza.Meshes[70].EmissiveBias = 20.0f;
@@ -493,74 +510,73 @@ namespace IDKEngine
 
                 ModelSystem.Add(sponza, lucy, helmet);
 
+                RenderMode = RenderMode.Rasterizer;
+
+                LightManager = new LightManager();
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), /*new Vector3(-4.0f, 0.0f, 0.0f), */new Vector3(8.773416f, 22.459948f, 533.77466f), 0.3f));
-
-                //LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
-                //LightManager.AddLight(new CpuLight(new Vector3(-3.9f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
-                //LightManager.AddLight(new CpuLight(new Vector3(-3.3f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
-                //LightManager.AddLight(new CpuLight(new Vector3(-2.7f, 5.7f, -0.5f), Helper.RandomVec3(2.0f, 4.0f), 0.3f));
 
                 for (int i = 0; i < 3; i++)
                 {
                     if (LightManager.TryGetLight(i, out CpuLight light))
                     {
-                        PointShadow pointShadow = new PointShadow(512, new Vector2(light.GpuLight.Radius, 60.0f));
+                        PointShadow pointShadow = new PointShadow(512, RenderResolution, new Vector2(light.GpuLight.Radius, 60.0f));
                         LightManager.CreatePointShadowForLight(pointShadow, i);
                     }
                 }
 
-                //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(72.77023f, 36.716278f, 18.192558f) * 0.6f, 1.0f));
-                //LightManager.CreatePointShadowForLight(new PointShadow(512, new Vector2(0.5f, 60.0f)), LightManager.Count - 1);
+                //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(72.77023f, 36.716278f, 18.192558f) * (0.6f / 0.09f), 0.3f));
+                //LightManager.CreatePointShadowForLight(new PointShadow(512, RenderResolution, new Vector2(0.5f, 60.0f)), LightManager.Count - 1);
             }
             else
             {
-                RenderMode = RenderMode.Rasterizer;
-
                 ModelLoader.Model a = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
-                a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
-                a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
-                a.MeshInstances[271].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
-                a.Meshes[288].SpecularBias = 1.0f;
-                a.Meshes[288].RoughnessBias = -0.64f;
-                a.Meshes[288].NormalMapStrength = 0.0f;
-                a.Meshes[272].SpecularBias = 1.0f;
-                a.Meshes[272].RoughnessBias = -0.82f;
-                a.Meshes[93].EmissiveBias = 20.0f;
-                a.Meshes[96].EmissiveBias = 20.0f;
-                a.Meshes[99].EmissiveBias = 20.0f;
-                a.Meshes[102].EmissiveBias = 20.0f;
-                a.Meshes[105].EmissiveBias = 20.0f;
-                a.Meshes[108].EmissiveBias = 20.0f;
-                a.Meshes[111].EmissiveBias = 20.0f;
-                a.Meshes[246].EmissiveBias = 20.0f;
-                a.Meshes[291].EmissiveBias = 20.0f;
-                a.Meshes[294].EmissiveBias = 20.0f;
-                a.Meshes[297].EmissiveBias = 20.0f;
-                a.Meshes[300].EmissiveBias = 20.0f;
-                a.Meshes[303].EmissiveBias = 20.0f;
-                a.Meshes[306].EmissiveBias = 20.0f;
-                a.Meshes[312].EmissiveBias = 20.0f;
-                a.Meshes[315].EmissiveBias = 20.0f;
-                a.Meshes[318].EmissiveBias = 20.0f;
-                a.Meshes[321].EmissiveBias = 20.0f;
-                a.Meshes[324].EmissiveBias = 20.0f;
-                a.Meshes[376].EmissiveBias = 20.0f;
-                a.Meshes[379].EmissiveBias = 20.0f;
+                //a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
+                //a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
+                //a.MeshInstances[271].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
+                //a.Meshes[288].SpecularBias = 1.0f;
+                //a.Meshes[288].RoughnessBias = -0.64f;
+                //a.Meshes[288].NormalMapStrength = 0.0f;
+                //a.Meshes[272].SpecularBias = 1.0f;
+                //a.Meshes[272].RoughnessBias = -0.82f;
+                //a.Meshes[93].EmissiveBias = 20.0f;
+                //a.Meshes[96].EmissiveBias = 20.0f;
+                //a.Meshes[99].EmissiveBias = 20.0f;
+                //a.Meshes[102].EmissiveBias = 20.0f;
+                //a.Meshes[105].EmissiveBias = 20.0f;
+                //a.Meshes[108].EmissiveBias = 20.0f;
+                //a.Meshes[111].EmissiveBias = 20.0f;
+                //a.Meshes[246].EmissiveBias = 20.0f;
+                //a.Meshes[291].EmissiveBias = 20.0f;
+                //a.Meshes[294].EmissiveBias = 20.0f;
+                //a.Meshes[297].EmissiveBias = 20.0f;
+                //a.Meshes[300].EmissiveBias = 20.0f;
+                //a.Meshes[303].EmissiveBias = 20.0f;
+                //a.Meshes[306].EmissiveBias = 20.0f;
+                //a.Meshes[312].EmissiveBias = 20.0f;
+                //a.Meshes[315].EmissiveBias = 20.0f;
+                //a.Meshes[318].EmissiveBias = 20.0f;
+                //a.Meshes[321].EmissiveBias = 20.0f;
+                //a.Meshes[324].EmissiveBias = 20.0f;
+                //a.Meshes[376].EmissiveBias = 20.0f;
+                //a.Meshes[379].EmissiveBias = 20.0f;
                 ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
                 ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                //ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelSystem.Add(a, b, c, d);
+                ModelSystem.Add(a, b, c);
 
+                LightManager = new LightManager();
                 //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
                 //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.1f, 60.0f), 0);
+
+                RenderMode = RenderMode.Rasterizer;
 
                 RasterizerPipeline.IsVXGI = false;
                 RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
-                RasterizerPipeline.ConeTracer.MaxSamples = 4;
+                RasterizerPipeline.ConeTracer.Settings.MaxSamples = 4;
 
                 VolumetricLight.Settings.Strength = 10.0f;
             }
@@ -568,7 +584,7 @@ namespace IDKEngine
             RenderGui = true;
             WindowVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorNormal;
-            FrameRecorder = new FrameStateRecorder<FrameState>();
+            FrameStateRecorder = new StateRecorder<FrameState>();
             gui = new Gui(WindowFramebufferSize.X, WindowFramebufferSize.Y);
 
             GC.Collect();
@@ -579,14 +595,13 @@ namespace IDKEngine
 
         }
 
-        protected override void OnResize()
+        protected override void OnWindowResize()
         {
-            gui.Backend.SetSize(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+            gui.Backend.SetSize(WindowFramebufferSize);
 
-            // if we don't render to the screen via gui always make viewport match window size
             if (!RenderGui)
             {
-                PresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                PresentationResolution = WindowFramebufferSize;
             }
         }
 

@@ -1,11 +1,14 @@
 #version 460 core
 #extension GL_NV_mesh_shader : require
 #extension GL_NV_gpu_shader5 : require
-#extension GL_ARB_bindless_texture : require
 #extension GL_KHR_shader_subgroup_ballot : require
 
 #pragma optionNV(unroll all)
 
+#define DECLARE_MESHLET_STORAGE_BUFFERS
+AppInclude(include/StaticStorageBuffers.glsl)
+
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
 
@@ -14,84 +17,6 @@ layout(local_size_x = 32) in;
 // Because triangle indices count might not be divisble by 4, we need to overshoot written indices to not miss any.
 // To prevent out of bounds access we pad by 1
 layout(triangles, max_primitives = MESHLET_MAX_TRIANGLE_COUNT + 1, max_vertices = MESHLET_MAX_VERTEX_COUNT) out;
-
-struct DrawElementsCmd
-{
-    uint IndexCount;
-    uint InstanceCount;
-    uint FirstIndex;
-    uint BaseVertex;
-    uint BaseInstance;
-};
-
-struct MeshInstance
-{
-    mat4x3 ModelMatrix;
-    mat4x3 InvModelMatrix;
-    mat4x3 PrevModelMatrix;
-    vec3 _pad0;
-    uint MeshIndex;
-};
-
-struct Meshlet
-{
-    uint VertexOffset;
-    uint IndicesOffset;
-
-    uint8_t VertexCount;
-    uint8_t TriangleCount;
-};
-
-struct PointShadow
-{
-    samplerCube Texture;
-    samplerCubeShadow ShadowTexture;
-
-    mat4 ProjViewMatrices[6];
-
-    vec3 Position;
-    float NearPlane;
-
-    vec3 _pad0;
-    float FarPlane;
-};
-
-layout(std430, binding = 0) restrict readonly buffer DrawElementsCmdSSBO
-{
-    DrawElementsCmd DrawCommands[];
-} drawElementsCmdSSBO;
-
-layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
-{
-    MeshInstance MeshInstances[];
-} meshInstanceSSBO;
-
-struct PackedVec3 { float x, y, z; };
-layout(std430, binding = 12) restrict readonly buffer VertexPositionsSSBO
-{
-    PackedVec3 VertexPositions[];
-} vertexPositionsSSBO;
-
-layout(std430, binding = 15) restrict readonly buffer MeshletSSBO
-{
-    Meshlet Meshlets[];
-} meshletSSBO;
-
-layout(std430, binding = 17) restrict readonly buffer MeshletVertexIndicesSSBO
-{
-    uint VertexIndices[];
-} meshletVertexIndicesSSBO;
-
-layout(std430, binding = 18) restrict readonly buffer MeshletLocalIndicesSSBO
-{
-    uint PackedIndices[];
-} meshletLocalIndicesSSBO;
-
-layout(std140, binding = 1) uniform ShadowDataUBO
-{
-    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
-    int Count;
-} shadowDataUBO;
 
 taskNV in InOutVars
 {
@@ -126,7 +51,7 @@ void main()
 
         mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
         vec3 fragPos = vec3(modelMatrix * vec4(position, 1.0));
-        vec4 clipPos = shadowDataUBO.PointShadows[ShadowIndex].ProjViewMatrices[inData.FaceID] * vec4(fragPos, 1.0);
+        vec4 clipPos = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[inData.FaceID] * vec4(fragPos, 1.0);
 
         gl_MeshVerticesNV[meshletVertexID].gl_Position = clipPos;
     }

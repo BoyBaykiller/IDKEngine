@@ -1,5 +1,4 @@
 #version 460 core
-#extension GL_ARB_bindless_texture : require
 
 #define TAKE_ATOMIC_FP16_PATH AppInsert(TAKE_ATOMIC_FP16_PATH)
 
@@ -8,6 +7,8 @@
     #extension GL_NV_gpu_shader5 : require
 #endif
 
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
@@ -20,78 +21,6 @@ layout(binding = 1, r32ui) restrict uniform uimage3D ImgResultR;
 layout(binding = 2, r32ui) restrict uniform uimage3D ImgResultG;
 layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
 #endif
-
-struct Material
-{
-    vec3 EmissiveFactor;
-    uint BaseColorFactor;
-
-    float TransmissionFactor;
-    float AlphaCutoff;
-    float RoughnessFactor;
-    float MetallicFactor;
-
-    vec3 Absorbance;
-    float IOR;
-
-    sampler2D BaseColor;
-    sampler2D MetallicRoughness;
-
-    sampler2D Normal;
-    sampler2D Emissive;
-
-    sampler2D Transmission;
-    uvec2 _pad0;
-};
-
-struct PointShadow
-{
-    samplerCube Texture;
-    samplerCubeShadow ShadowTexture;
-
-    mat4 ProjViewMatrices[6];
-
-    vec3 Position;
-    float NearPlane;
-
-    vec3 _pad0;
-    float FarPlane;
-};
-
-struct Light
-{
-    vec3 Position;
-    float Radius;
-    vec3 Color;
-    int PointShadowIndex;
-    vec3 PrevPosition;
-    float _pad0;
-};
-
-layout(std430, binding = 10) restrict readonly buffer MaterialSSBO
-{
-    Material Materials[];
-} materialSSBO;
-
-layout(std140, binding = 1) uniform ShadowDataUBO
-{
-    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
-} shadowDataUBO;
-
-layout(std140, binding = 2) uniform LightsUBO
-{
-    Light Lights[GPU_MAX_UBO_LIGHT_COUNT];
-    int Count;
-} lightsUBO;
-
-layout(std140, binding = 5) uniform VoxelizerDataUBO
-{
-    mat4 OrthoProjection;
-    vec3 GridMin;
-    float _pad0;
-    vec3 GridMax;
-    float _pad1;
-} voxelizerDataUBO;
 
 in InOutVars
 {
@@ -124,7 +53,7 @@ void main()
         vec3 contrib = GetDirectLighting(light, albedoAlpha.rgb, sampleToLight);
         if (light.PointShadowIndex >= 0)
         {
-            PointShadow pointShadow = shadowDataUBO.PointShadows[light.PointShadowIndex];
+            PointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
             contrib *= Visibility(pointShadow, -sampleToLight);
         }
 
@@ -173,7 +102,7 @@ float Visibility(PointShadow pointShadow, vec3 lightToSample)
     const float sampleDiskRadius = 0.08;
 
     float depth = GetLightSpaceDepth(pointShadow, lightToSample * (1.0 - bias));
-    float visibilityFactor = texture(pointShadow.ShadowTexture, vec4(lightToSample, depth));
+    float visibilityFactor = texture(pointShadow.PcfShadowTexture, vec4(lightToSample, depth));
 
     return visibilityFactor;
 }
