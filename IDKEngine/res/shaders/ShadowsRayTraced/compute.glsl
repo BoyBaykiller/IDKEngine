@@ -47,7 +47,7 @@ void main()
     bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
     uint noiseIndex = taaEnabled ? (perFrameDataUBO.Frame % taaDataUBO.SampleCount) * RayTracingSamples : 0u;
     float shadow = 0.0;
-    for (int j = 0; j < RayTracingSamples; j++)
+    for (int i = 0; i < RayTracingSamples; i++)
     {
         vec3 biasedPosition = unjitteredFragPos + normal * 0.01;
 

@@ -8,18 +8,15 @@ namespace IDKEngine.OpenGL
 {
     class Texture : IDisposable
     {
-        public enum TextureDimension : int
+        public enum TextureDimensions : int
         {
-            Undefined,
-            One,
             Two,
             Three,
         }
 
-
         public readonly int ID;
         public readonly TextureTarget Target;
-        public readonly TextureDimension Dimension;
+        public readonly TextureDimensions Dimension;
         public int Width { get; private set; }
         public int Height { get; private set; }
         public int Depth { get; private set; }
@@ -40,7 +37,7 @@ namespace IDKEngine.OpenGL
         public Texture(TextureTarget3d textureTarget3D)
         {
             Target = (TextureTarget)textureTarget3D;
-            Dimension = TextureDimension.Three;
+            Dimension = TextureDimensions.Three;
 
             GL.CreateTextures(Target, 1, out ID);
         }
@@ -48,26 +45,9 @@ namespace IDKEngine.OpenGL
         public Texture(TextureTarget2d textureTarget2D)
         {
             Target = (TextureTarget)textureTarget2D;
-            Dimension = TextureDimension.Two;
+            Dimension = TextureDimensions.Two;
 
             GL.CreateTextures(Target, 1, out ID);
-        }
-
-        public Texture(TextureTarget1d textureTarget1D)
-        {
-            Target = (TextureTarget)textureTarget1D;
-            Dimension = TextureDimension.One;
-
-            GL.CreateTextures(Target, 1, out ID);
-        }
-
-        public Texture(TextureBufferTarget textureBufferTarget, BufferObject bufferObject, SizedInternalFormat sizedInternalFormat)
-        {
-            Target = (TextureTarget)textureBufferTarget;
-            Dimension = TextureDimension.Undefined;
-
-            GL.CreateTextures(Target, 1, out ID);
-            GL.TextureBuffer(ID, sizedInternalFormat, bufferObject.ID);
         }
 
         public void SetFilter(TextureMinFilter minFilter, TextureMagFilter magFilter)
@@ -168,62 +148,34 @@ namespace IDKEngine.OpenGL
             GL.BindTextureUnit(unit, dummyTexture);
         }
 
-        public static void MultiBindToUnit(int first, int[] textures)
-        {
-            GL.BindTextures(first, textures.Length, textures);
-        }
-
-        public static unsafe void MultiBindToUnit(int first, int length, int* textures)
-        {
-            GL.BindTextures(first, length, textures);
-        }
-
-        public void SubTexture3D<T>(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, ReadOnlySpan<T> pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : unmanaged
-        {
-            SubTexture3D(width, height, depth, pixelFormat, pixelType, pixels[0], level, xOffset, yOffset, zOffset);
-        }
-        public unsafe void SubTexture3D<T>(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : unmanaged
+        public unsafe void Upload3D<T>(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : unmanaged
         {
             fixed (void* ptr = &pixels)
             {
-                SubTexture3D(width, height, depth, pixelFormat, pixelType, (nint)ptr, level, xOffset, yOffset, zOffset);
+                Upload3D(width, height, depth, pixelFormat, pixelType, (nint)ptr, level, xOffset, yOffset, zOffset);
             }
         }
-        public void SubTexture3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
+        public void Upload3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
         {
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, pixelFormat, pixelType, pixels);
         }
 
-        public void SubTexture2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, ReadOnlySpan<T> pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
-        {
-            SubTexture2D(width, height, pixelFormat, pixelType, pixels[0], level, xOffset, yOffset);
-        }
-        public unsafe void SubTexture2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
+        public unsafe void Upload2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
         {
             fixed (void* ptr = &pixels)
             {
-                SubTexture2D(width, height, pixelFormat, pixelType, (nint)ptr, level, xOffset, yOffset);
+                Upload2D(width, height, pixelFormat, pixelType, (nint)ptr, level, xOffset, yOffset);
             }
         }
-        public void SubTexture2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0)
+        public void Upload2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0)
         {
             GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, pixelFormat, pixelType, pixels);
         }
 
-        public void SubTexture1D<T>(int width, PixelFormat pixelFormat, PixelType pixelType, ReadOnlySpan<T> pixels, int level = 0, int xOffset = 0) where T : unmanaged
+        public void UploadCompressed2D(int width, int height, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0)
         {
-            SubTexture1D(width, pixelFormat, pixelType, pixels[0], level, xOffset);
-        }
-        public unsafe void SubTexture1D<T>(int width, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0) where T : unmanaged
-        {
-            fixed (void* ptr = &pixels)
-            {
-                SubTexture1D(width, pixelFormat, pixelType, (nint)ptr, level, xOffset);
-            }
-        }
-        public void SubTexture1D(int width, PixelFormat pixelFormat, PixelType pixelType, nint pixels, int level = 0, int xOffset = 0)
-        {
-            GL.TextureSubImage1D(ID, level, xOffset, width, pixelFormat, pixelType, pixels);
+            int imageSize = GetBlockCompressedImageSize(SizedInternalFormat, width, height, 1);
+            GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (PixelFormat)SizedInternalFormat, imageSize, pixels);
         }
 
         public void GetImageData(PixelFormat pixelFormat, PixelType pixelType, nint pixels, int bufSize, int level = 0)
@@ -248,34 +200,17 @@ namespace IDKEngine.OpenGL
             GL.GenerateTextureMipmap(ID);
         }
 
-        public static int GetMaxMipmapLevel(int width, int height, int depth)
-        {
-            return MathF.ILogB(Math.Max(width, Math.Max(height, depth))) + 1;
-        }
-
-        public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)
-        {
-            Vector3i size = new Vector3i(width, height, depth) / (1 << level);
-            return Vector3i.ComponentMax(size, new Vector3i(1));
-        }
-
         public void ImmutableAllocate(int width, int height, int depth, SizedInternalFormat sizedInternalFormat, int levels = 1)
         {
             switch (Dimension)
             {
-                case TextureDimension.One:
-                    GL.TextureStorage1D(ID, levels, sizedInternalFormat, width);
-                    Width = width; Height = 1; Depth = 1;
-                    Levels = levels;
-                    break;
-
-                case TextureDimension.Two:
+                case TextureDimensions.Two:
                     GL.TextureStorage2D(ID, levels, sizedInternalFormat, width, height);
                     Width = width; Height = height; Depth = 1;
                     Levels = levels;
                     break;
 
-                case TextureDimension.Three:
+                case TextureDimensions.Three:
                     GL.TextureStorage3D(ID, levels, sizedInternalFormat, width, height, depth);
                     Width = width; Height = height; Depth = depth;
                     Levels = levels;
@@ -303,7 +238,7 @@ namespace IDKEngine.OpenGL
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long GetTextureHandleARB(SamplerObject samplerObject)
+        public long GetTextureHandleARB(Sampler samplerObject)
         {
             long textureHandle = GL.Arb.GetTextureSamplerHandle(ID, samplerObject.ID);
             GL.Arb.MakeTextureHandleResident(textureHandle);
@@ -315,7 +250,7 @@ namespace IDKEngine.OpenGL
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public unsafe long GetImageHandleARB(SizedInternalFormat sizedInternalFormat, int layer = 0, bool layered = false, int level = 0)
+        public long GetImageHandleARB(SizedInternalFormat sizedInternalFormat, int layer = 0, bool layered = false, int level = 0)
         {
             long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
 
@@ -352,13 +287,6 @@ namespace IDKEngine.OpenGL
             GL.Arb.MakeImageHandleNonResident(imageHandle);
         }
 
-        public void GetSizeMipmap(out int width, out int height, out int depth, int level = 0)
-        {
-            GL.GetTextureLevelParameter(ID, level, GetTextureParameter.TextureWidth, out width);
-            GL.GetTextureLevelParameter(ID, level, GetTextureParameter.TextureHeight, out height);
-            GL.GetTextureLevelParameter(ID, level, GetTextureParameter.TextureDepth, out depth);
-        }
-
         public void Dispose()
         {
             for (int i = 0; i < associatedTextureHandles.Count; i++)
@@ -374,6 +302,58 @@ namespace IDKEngine.OpenGL
             associatedImageHandles.Clear();
 
             GL.DeleteTexture(ID);
+        }
+
+        public static int GetMaxMipmapLevel(int width, int height, int depth)
+        {
+            return MathF.ILogB(Math.Max(width, Math.Max(height, depth))) + 1;
+        }
+
+        public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)
+        {
+            Vector3i size = new Vector3i(width, height, depth) / (1 << level);
+            return Vector3i.ComponentMax(size, new Vector3i(1));
+        }
+
+        public static int GetBlockCompressedImageSize(SizedInternalFormat internalFormat, int width, int height, int depth)
+        {
+            // Returns same as KTX2.GetImageSize()
+
+            // Source: https://github.com/JuanDiegoMontoya/Fwog/blob/a26365764fbcca77dfdef0184f1aaff1825c605f/src/Texture.cpp#L22
+
+            // BCn formats store 4x4 blocks of pixels, even if the dimensions aren't a multiple of 4
+            // We round up to the nearest multiple of 4 for width and height, but not depth, since
+            // 3D BCn images are just multiple 2D images stacked
+            width = (width + 4 - 1) & -4;
+            height = (height + 4 - 1) & -4;
+
+            switch (internalFormat)
+            {
+                // BC1 and BC4 store 4x4 blocks with 64 bits (8 bytes)
+                case SizedInternalFormat.CompressedRgbS3tcDxt1Ext:
+                case SizedInternalFormat.CompressedRgbaS3tcDxt1Ext:
+                case SizedInternalFormat.CompressedSrgbS3tcDxt1Ext:
+                case SizedInternalFormat.CompressedSrgbAlphaS3tcDxt1Ext:
+                case SizedInternalFormat.CompressedRedRgtc1:
+                case SizedInternalFormat.CompressedSignedRedRgtc1:
+                    return width * height * depth / 2;
+
+                // BC3, BC5, BC6, and BC7 store 4x4 blocks with 128 bits (16 bytes)
+                case SizedInternalFormat.CompressedRgbaS3tcDxt3Ext:
+                case SizedInternalFormat.CompressedSrgbAlphaS3tcDxt3Ext:
+                case SizedInternalFormat.CompressedRgbaS3tcDxt5Ext:
+                case SizedInternalFormat.CompressedSrgbAlphaS3tcDxt5Ext:
+                case SizedInternalFormat.CompressedRgRgtc2:
+                case SizedInternalFormat.CompressedSignedRgRgtc2:
+                case SizedInternalFormat.CompressedRgbBptcUnsignedFloat:
+                case SizedInternalFormat.CompressedRgbBptcSignedFloat:
+                case SizedInternalFormat.CompressedRgbaBptcUnorm:
+                case SizedInternalFormat.CompressedSrgbAlphaBptcUnorm:
+                    return width * height * depth;
+
+                default:
+                    throw new NotSupportedException($"{nameof(internalFormat)} = {internalFormat} not known");
+            }
         }
     }
 }

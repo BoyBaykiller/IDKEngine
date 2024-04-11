@@ -1,3 +1,21 @@
+struct PackedVec3
+{
+    float x, y, z;
+};
+vec3 PackedFloatsToVec3(PackedVec3 floats)
+{
+    return vec3(floats.x, floats.y, floats.z);
+}
+
+struct PackedUVec3
+{
+    uint x, y, z;
+};
+uvec3 PackedUintsToUvec3(PackedUVec3 uints)
+{
+    return uvec3(uints.x, uints.y, uints.z);
+}
+
 struct DrawElementsCmd
 {
     uint IndexCount;
@@ -172,21 +190,3 @@ struct MeshletInfo
     float _pad1;
 };
 #endif
-
-struct PackedVec3
-{
-    float x, y, z;
-};
-vec3 PackedFloatsToVec3(PackedVec3 floats)
-{
-    return vec3(floats.x, floats.y, floats.z);
-}
-
-struct PackedUVec3
-{
-    uint x, y, z;
-};
-uvec3 PackedUintsToUvec3(PackedUVec3 uints)
-{
-    return uvec3(uints.x, uints.y, uints.z);
-}

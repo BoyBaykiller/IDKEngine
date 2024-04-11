@@ -92,7 +92,7 @@ namespace IDKEngine.ThirdParty
             fontTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             fontTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             fontTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
-            fontTexture.SubTexture2D(width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
+            fontTexture.Upload2D(width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
 
             io.Fonts.SetTexID(fontTexture.ID);
             io.Fonts.ClearTexData();

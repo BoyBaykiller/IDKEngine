@@ -86,57 +86,37 @@ namespace IDKEngine
 
                 if (RenderMode == RenderMode.Rasterizer)
                 {
-                    if (RasterizerPipeline != null) RasterizerPipeline.Dispose(); RasterizerPipeline = null;
+                    if (RasterizerPipeline != null) RasterizerPipeline.Dispose();
                     RasterizerPipeline = new RasterPipeline(RenderResolution, PresentationResolution);
                 }
-                
+                else
+                {
+                    if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null;  }
+                }
+
                 if (RenderMode == RenderMode.PathTracer)
                 {
-                    if (PathTracer == null)
-                    {
-                        PathTracer = new PathTracer(RenderResolution, PathTracer.GpuSettings.Default);
-                    }
-                    else
-                    {
-                        PathTracer.Dispose();
-                        PathTracer = new PathTracer(RenderResolution, PathTracer.GetGpuSettings());
-                    }
+                    if (PathTracer != null) PathTracer.Dispose();
+                    PathTracer = new PathTracer(RenderResolution, PathTracer == null ? PathTracer.GpuSettings.Default : PathTracer.GetGpuSettings());
+                }
+                else
+                {
+                    if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
                 }
 
                 if (RenderMode == RenderMode.Rasterizer || RenderMode == RenderMode.PathTracer)
                 {
-                    if (BoxRenderer != null) { BoxRenderer.Dispose(); BoxRenderer = null; }
+                    if (BoxRenderer != null) BoxRenderer.Dispose();
                     BoxRenderer = new BoxRenderer();
 
-                    if (TonemapAndGamma == null)
-                    {
-                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution, TonemapAndGammaCorrect.GpuSettings.Default);
-                    }
-                    else
-                    {
-                        TonemapAndGamma.Dispose();
-                        TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution, TonemapAndGamma.Settings);
-                    }
+                    if (TonemapAndGamma != null) TonemapAndGamma.Dispose();
+                    TonemapAndGamma = new TonemapAndGammaCorrect(PresentationResolution, TonemapAndGamma == null ? TonemapAndGammaCorrect.GpuSettings.Default : TonemapAndGamma.Settings);
 
-                    if (Bloom == null)
-                    {
-                        Bloom = new Bloom(PresentationResolution, Bloom.GpuSettings.Default);
-                    }
-                    else
-                    {
-                        Bloom.Dispose();
-                        Bloom = new Bloom(PresentationResolution, Bloom.Settings);
-                    }
+                    if (Bloom != null) Bloom.Dispose();
+                    Bloom = new Bloom(PresentationResolution, Bloom == null ? Bloom.GpuSettings.Default : Bloom.Settings);
 
-                    if (VolumetricLight == null)
-                    {
-                        VolumetricLight = new VolumetricLighting(PresentationResolution, VolumetricLighting.GpuSettings.Default);
-                    }
-                    else
-                    {
-                        VolumetricLight.Dispose();
-                        VolumetricLight = new VolumetricLighting(PresentationResolution, VolumetricLight.Settings);
-                    }
+                    if (VolumetricLight != null) VolumetricLight.Dispose();
+                    VolumetricLight = new VolumetricLighting(PresentationResolution, VolumetricLight == null ? VolumetricLighting.GpuSettings.Default : VolumetricLight.Settings);
                 }
             }
         }
@@ -295,6 +275,10 @@ namespace IDKEngine
                 if (KeyboardState[Keys.T] == Keyboard.InputState.Touched)
                 {
                     RunSimulations = !RunSimulations;
+                }
+                if (KeyboardState[Keys.D1] == Keyboard.InputState.Touched)
+                {
+                    AbstractShaderProgram.RecompileAll();
                 }
             }
 
@@ -531,7 +515,7 @@ namespace IDKEngine
             }
             else
             {
-                ModelLoader.Model a = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf");
+                ModelLoader.Model a = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\BaseCompressed\NewSponza_Main_glTF_002.gltf");
                 //a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 //a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 //a.MeshInstances[271].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
@@ -561,15 +545,15 @@ namespace IDKEngine
                 //a.Meshes[324].EmissiveBias = 20.0f;
                 //a.Meshes[376].EmissiveBias = 20.0f;
                 //a.Meshes[379].EmissiveBias = 20.0f;
-                ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf");
-                ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+                ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\CurtainsCompressed\NewSponza_Curtains_glTF.gltf");
+                //ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 //ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelSystem.Add(a, b, c);
+                ModelSystem.Add(a, b);
 
                 LightManager = new LightManager();
-                //LightManager.AddLight(new Light(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(30.46f, 25.17f, 25.75f), 0.3f));
-                //LightManager.CreatePointShadowForLight(new PointShadow(512, 0.1f, 60.0f), 0);
+                LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
+                LightManager.CreatePointShadowForLight(new PointShadow(512, RenderResolution, new Vector2(0.1f, 60.0f)), 0);
 
                 RenderMode = RenderMode.Rasterizer;
 
@@ -577,8 +561,6 @@ namespace IDKEngine
                 RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
                 RasterizerPipeline.ConeTracer.Settings.MaxSamples = 4;
-
-                VolumetricLight.Settings.Strength = 10.0f;
             }
 
             RenderGui = true;

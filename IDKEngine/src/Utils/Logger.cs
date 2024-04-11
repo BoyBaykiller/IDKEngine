@@ -32,7 +32,7 @@ namespace IDKEngine.Utils
 
             Console.ForegroundColor = LogLevelToColor(level);
             Console.WriteLine(formated);
-            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.ResetColor();
 
             outText.WriteLine(formated);
             outText.Flush();

@@ -23,6 +23,7 @@ Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted
 Notes:
  * Crashes on AMD drivers newer than 23.12.1 because of [driver bug](https://community.amd.com/t5/opengl-vulkan/opengl-bug-imagesize-causes-crash-when-using-gl-arb-bindless/m-p/668942#M5125)
  * I am forced to rely on undefined behaviour (writing a read-only bindless image) when using Ray Traced shadows, as a workarround to an AMD driver bug. Nothing is guaranteed :)
+ * For KTX texture compression and more glTFs can be run through `gltfpack -noq -mi -tc -i old.gltf -o new.gltf` 
 
 
 # Controls
@@ -41,6 +42,7 @@ Notes:
 |  V                    | Toggle VSync                  |
 |  F11                  | Toggle Fullscreen             |
 |  ESC                  | Exit                          |
+|  1                    | Recompile all shaders         |
 
 # Path Traced Render Samples
 

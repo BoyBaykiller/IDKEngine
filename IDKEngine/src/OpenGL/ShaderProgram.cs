@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Diagnostics;
 using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
@@ -284,15 +285,9 @@ namespace IDKEngine.OpenGL
 
                         if (programIncludesAppInsertionKey)
                         {
-                            AbstractShader[] recompiledShaders = new AbstractShader[shaderProgram.Shaders.Length];
-                            for (int j = 0; j < recompiledShaders.Length; j++)
-                            {
-                                AbstractShader existingShader = shaderProgram.Shaders[j];
-                                recompiledShaders[j] = new AbstractShader(existingShader.ShaderType, existingShader.LocalShaderPath);
-                            }
-                            shaderProgram.Link(recompiledShaders);
+                            Recompile(shaderProgram);
 
-                            recompiledShadersNames += $"[{string.Join(", ", recompiledShaders.Select(shader => $"{shader.Name}"))}]";
+                            recompiledShadersNames += $"[{string.Join(", ", shaderProgram.Shaders.Select(shader => $"{shader.Name}"))}]";
                         }
                     }
 
@@ -307,5 +302,30 @@ namespace IDKEngine.OpenGL
             }
         }
         public static readonly ShaderInsertionsSingleton ShaderInsertions = new ShaderInsertionsSingleton();
+
+        public static void RecompileAll()
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            for (int i = 0; i < globalInstances.Count; i++)
+            {
+                AbstractShaderProgram shaderProgram = globalInstances[i];
+                Recompile(shaderProgram);
+            }
+            sw.Stop();
+
+            int numShaders = globalInstances.Sum(it => it.Shaders.Length);
+            Logger.Log(Logger.LogLevel.Info, $"Parsed and recompiled {numShaders} shaders in {sw.ElapsedMilliseconds} milliseconds");
+        }
+
+        public static void Recompile(AbstractShaderProgram shaderProgram)
+        {
+            AbstractShader[] recompiledShaders = new AbstractShader[shaderProgram.Shaders.Length];
+            for (int i = 0; i < recompiledShaders.Length; i++)
+            {
+                AbstractShader existingShader = shaderProgram.Shaders[i];
+                recompiledShaders[i] = new AbstractShader(existingShader.ShaderType, existingShader.LocalShaderPath);
+            }
+            shaderProgram.Link(recompiledShaders);
+        }
     }
 }

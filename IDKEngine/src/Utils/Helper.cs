@@ -144,7 +144,7 @@ namespace IDKEngine.Utils
             texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
             for (int i = 0; i < 6; i++)
             {
-                texture.SubTexture3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data[0], 0, 0, 0, i);
+                texture.Upload3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data[0], 0, 0, 0, i);
             }
 
             return true;
@@ -213,7 +213,7 @@ namespace IDKEngine.Utils
         {
             fixed (void* srcPtr = &src, destPtr = &dest)
             {
-                MemCpy(srcPtr, destPtr, byteCount);
+                MemCpy(srcPtr, destPtr, (nuint)byteCount);
             }
         }
 
@@ -222,13 +222,13 @@ namespace IDKEngine.Utils
         {
             fixed (void* srcPtr = &src)
             {
-                MemCpy(srcPtr, dest, byteCount);
+                MemCpy(srcPtr, dest, (nuint)byteCount);
             }
         }
 
-        public static unsafe void MemCpy(void* src, void* dest, nint byteCount)
+        public static unsafe void MemCpy(void* src, void* dest, nuint byteCount)
         {
-            NativeMemory.Copy(src, dest, (nuint)byteCount);
+            NativeMemory.Copy(src, dest, byteCount);
         }
 
         public static uint CompressSR11G11B10(in Vector3 data)

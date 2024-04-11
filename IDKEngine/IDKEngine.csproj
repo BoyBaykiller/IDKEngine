@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <Platforms>AnyCPU;x64;x86</Platforms>
+    <Platforms>AnyCPU;x64</Platforms>
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
     <StartupObject></StartupObject>
@@ -42,6 +42,7 @@
   <ItemGroup>
     <PackageReference Include="FFX_FSR2" Version="1.0.2" />
     <PackageReference Include="ImGui.NET" Version="1.89.9.4" />
+    <PackageReference Include="Ktx2.NET" Version="1.0.1" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.3" />
     <PackageReference Include="NativeFileDialogExtendedSharp" Version="0.1.0" />
     <PackageReference Include="OpenTK.GraphicsFork" Version="4.8.2" />

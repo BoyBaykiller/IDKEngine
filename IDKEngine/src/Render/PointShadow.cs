@@ -94,8 +94,8 @@ namespace IDKEngine.Render
         public Texture RayTracedShadowMap;
 
         private readonly Framebuffer framebuffer;
-        private SamplerObject nearestSampler;
-        private SamplerObject shadowSampler;
+        private Sampler nearestSampler;
+        private Sampler shadowSampler;
         private GpuPointShadow gpuPointShadow;
 
         private static bool isLazyInitialized = false;
@@ -198,21 +198,20 @@ namespace IDKEngine.Render
             if (nearestSampler != null) { nearestSampler.Dispose(); }
             if (ShadowMap != null) { ShadowMap.Dispose(); }
 
-            shadowSampler = new SamplerObject();
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
-            shadowSampler.SetSamplerParamter(SamplerParameterName.TextureCompareFunc, (int)All.Less);
+            shadowSampler = new Sampler(new Sampler.State()
+            {
+                MinFilter = Sampler.MinFilter.Linear,
+                MagFilter = Sampler.MagFilter.Linear,
 
-            nearestSampler = new SamplerObject();
-            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
-            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            nearestSampler.SetSamplerParamter(SamplerParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
+                CompareMode = Sampler.CompareMode.CompareRefToTexture,
+                CompareFunc = Sampler.CompareFunc.Less,
+            });
+
+            nearestSampler = new Sampler(new Sampler.State()
+            {
+                MinFilter = Sampler.MinFilter.Nearest,
+                MagFilter = Sampler.MagFilter.Nearest,
+            });
 
             ShadowMap = new Texture(TextureTarget2d.TextureCubeMap);
             ShadowMap.ImmutableAllocate(size, size, 1, SizedInternalFormat.DepthComponent16);
