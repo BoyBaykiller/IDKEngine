@@ -23,11 +23,11 @@ namespace IDKEngine.GpuTypes
             {
                 switch (textureType)
                 {
-                    case TextureHandle.BaseColor: return ref Unsafe.AsRef(BaseColorTextureHandle);
-                    case TextureHandle.MetallicRoughness: return ref Unsafe.AsRef(MetallicRoughnessTextureHandle);
-                    case TextureHandle.Normal: return ref Unsafe.AsRef(NormalTextureHandle);
-                    case TextureHandle.Emissive: return ref Unsafe.AsRef(EmissiveTextureHandle);
-                    case TextureHandle.Transmission: return ref Unsafe.AsRef(TransmissionTextureHandle);
+                    case TextureHandle.BaseColor: return ref Unsafe.AsRef(ref BaseColorTextureHandle);
+                    case TextureHandle.MetallicRoughness: return ref Unsafe.AsRef(ref MetallicRoughnessTextureHandle);
+                    case TextureHandle.Normal: return ref Unsafe.AsRef(ref NormalTextureHandle);
+                    case TextureHandle.Emissive: return ref Unsafe.AsRef(ref EmissiveTextureHandle);
+                    case TextureHandle.Transmission: return ref Unsafe.AsRef(ref TransmissionTextureHandle);
                     default: throw new NotSupportedException($"Unsupported {nameof(TextureHandle)} {textureType}");
                 }
             }

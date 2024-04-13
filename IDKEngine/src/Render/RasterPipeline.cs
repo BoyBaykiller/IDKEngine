@@ -444,7 +444,7 @@ namespace IDKEngine.Render
 
         public void MergeTextures(Texture result, Texture a, Texture b)
         {
-            result.BindToImageUnit(0, result.SizedInternalFormat);
+            result.BindToImageUnit(0, result.TextureFormat);
 
             if (a != null) resultBeforeTAA.BindToUnit(0);
             else Texture.UnbindFromUnit(0);
@@ -471,41 +471,41 @@ namespace IDKEngine.Render
             ConeTracer.SetSize(renderSize);
 
             if (resultBeforeTAA != null) resultBeforeTAA.Dispose();
-            resultBeforeTAA = new Texture(TextureTarget2d.Texture2D);
+            resultBeforeTAA = new Texture(Texture.Type.Texture2D);
             resultBeforeTAA.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             resultBeforeTAA.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            resultBeforeTAA.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba16f);
+            resultBeforeTAA.ImmutableAllocate(renderSize.X, renderSize.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
 
             DisposeBindlessGBufferTextures();
 
-            AlbedoAlphaTexture = new Texture(TextureTarget2d.Texture2D);
+            AlbedoAlphaTexture = new Texture(Texture.Type.Texture2D);
             AlbedoAlphaTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             AlbedoAlphaTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            AlbedoAlphaTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba8);
+            AlbedoAlphaTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, Texture.InternalFormat.R8G8B8A8Unorm);
             gpuGBufferData.AlbedoAlphaTextureHandle = AlbedoAlphaTexture.GetTextureHandleARB();
 
-            NormalSpecularTexture = new Texture(TextureTarget2d.Texture2D);
+            NormalSpecularTexture = new Texture(Texture.Type.Texture2D);
             NormalSpecularTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             NormalSpecularTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            NormalSpecularTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba8Snorm);
+            NormalSpecularTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, Texture.InternalFormat.R8G8B8A8Snorm);
             gpuGBufferData.NormalSpecularTextureHandle = NormalSpecularTexture.GetTextureHandleARB();
 
-            EmissiveRoughnessTexture = new Texture(TextureTarget2d.Texture2D);
+            EmissiveRoughnessTexture = new Texture(Texture.Type.Texture2D);
             EmissiveRoughnessTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             EmissiveRoughnessTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            EmissiveRoughnessTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rgba16f);
+            EmissiveRoughnessTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
             gpuGBufferData.EmissiveRoughnessTextureHandle = EmissiveRoughnessTexture.GetTextureHandleARB();
 
-            VelocityTexture = new Texture(TextureTarget2d.Texture2D);
+            VelocityTexture = new Texture(Texture.Type.Texture2D);
             VelocityTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             VelocityTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            VelocityTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.Rg16f);
+            VelocityTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, Texture.InternalFormat.R16G16Float);
             gpuGBufferData.VelocityTextureHandle = VelocityTexture.GetTextureHandleARB();
 
-            DepthTexture = new Texture(TextureTarget2d.Texture2D);
+            DepthTexture = new Texture(Texture.Type.Texture2D);
             DepthTexture.SetFilter(TextureMinFilter.NearestMipmapNearest, TextureMagFilter.Nearest);
             DepthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            DepthTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, SizedInternalFormat.DepthComponent32f, Texture.GetMaxMipmapLevel(renderSize.X, renderSize.Y, 1));
+            DepthTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, Texture.InternalFormat.D32Float, Texture.GetMaxMipmapLevel(renderSize.X, renderSize.Y, 1));
             gpuGBufferData.DepthTextureHandle = DepthTexture.GetTextureHandleARB();
 
             gBufferData.UploadElements(gpuGBufferData);

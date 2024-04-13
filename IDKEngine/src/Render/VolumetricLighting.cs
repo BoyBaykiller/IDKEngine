@@ -68,13 +68,13 @@ namespace IDKEngine.Render
             gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
             gpuSettingsBuffer.UploadElements(Settings);
 
-            volumetricLightingTexture.BindToImageUnit(0, volumetricLightingTexture.SizedInternalFormat);
-            depthTexture.BindToImageUnit(1, depthTexture.SizedInternalFormat);
+            volumetricLightingTexture.BindToImageUnit(0, volumetricLightingTexture.TextureFormat);
+            depthTexture.BindToImageUnit(1, depthTexture.TextureFormat);
             volumetricLightingProgram.Use();
             GL.DispatchCompute((volumetricLightingTexture.Width + 8 - 1) / 8, (volumetricLightingTexture.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
 
-            Result.BindToImageUnit(0, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.TextureFormat);
             volumetricLightingTexture.BindToUnit(0);
             depthTexture.BindToUnit(1);
             upscaleProgram.Use();
@@ -88,22 +88,22 @@ namespace IDKEngine.Render
             RenderResolution = (Vector2i)((Vector2)PresentationResolution * ResolutionScale);
 
             if (Result != null) Result.Dispose();
-            Result = new Texture(TextureTarget2d.Texture2D);
+            Result = new Texture(Texture.Type.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(PresentationResolution.X, PresentationResolution.Y, 1, SizedInternalFormat.Rgba16f);
+            Result.ImmutableAllocate(PresentationResolution.X, PresentationResolution.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
 
             if (volumetricLightingTexture != null) volumetricLightingTexture.Dispose();
-            volumetricLightingTexture = new Texture(TextureTarget2d.Texture2D);
+            volumetricLightingTexture = new Texture(Texture.Type.Texture2D);
             volumetricLightingTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             volumetricLightingTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            volumetricLightingTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, SizedInternalFormat.Rgba16f);
+            volumetricLightingTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
 
             if (depthTexture != null) depthTexture.Dispose();
-            depthTexture = new Texture(TextureTarget2d.Texture2D);
+            depthTexture = new Texture(Texture.Type.Texture2D);
             depthTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             depthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            depthTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, SizedInternalFormat.R32f);
+            depthTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, Texture.InternalFormat.R32Float);
         }
 
         public void Dispose()

@@ -21,12 +21,12 @@ namespace IDKEngine.GpuTypes
             {
                 switch (matrix)
                 {
-                    case RenderMatrix.PosX: return ref Unsafe.AsRef(PosX);
-                    case RenderMatrix.NegX: return ref Unsafe.AsRef(NegX);
-                    case RenderMatrix.PosY: return ref Unsafe.AsRef(PosY);
-                    case RenderMatrix.NegY: return ref Unsafe.AsRef(NegY);
-                    case RenderMatrix.PosZ: return ref Unsafe.AsRef(PosZ);
-                    case RenderMatrix.NegZ: return ref Unsafe.AsRef(NegZ);
+                    case RenderMatrix.PosX: return ref Unsafe.AsRef(ref PosX);
+                    case RenderMatrix.NegX: return ref Unsafe.AsRef(ref NegX);
+                    case RenderMatrix.PosY: return ref Unsafe.AsRef(ref PosY);
+                    case RenderMatrix.NegY: return ref Unsafe.AsRef(ref NegY);
+                    case RenderMatrix.PosZ: return ref Unsafe.AsRef(ref PosZ);
+                    case RenderMatrix.NegZ: return ref Unsafe.AsRef(ref NegZ);
                     default: throw new NotSupportedException($"Unsupported {nameof(RenderMatrix)} {matrix}");
                 }
             }

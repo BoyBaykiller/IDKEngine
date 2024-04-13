@@ -52,9 +52,9 @@ namespace IDKEngine.Render
             size.Y = (int)MathF.Ceiling((float)size.Y / TILE_SIZE);
 
             if (Result != null) Result.Dispose();
-            Result = new Texture(TextureTarget2d.Texture2D);
+            Result = new Texture(Texture.Type.Texture2D);
             Result.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.R8ui);
+            Result.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R8Uint);
         }
 
         public void Dispose()

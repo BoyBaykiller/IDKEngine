@@ -49,7 +49,7 @@ namespace IDKEngine.Render
             gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
             gpuSettingsBuffer.UploadElements(Settings);
 
-            Result.BindToImageUnit(0, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.TextureFormat);
             voxelsAlbedo.BindToUnit(0);
 
             shaderProgram.Use();
@@ -60,9 +60,9 @@ namespace IDKEngine.Render
         public void SetSize(Vector2i size)
         {
             if (Result != null) Result.Dispose();
-            Result = new Texture(TextureTarget2d.Texture2D);
+            Result = new Texture(Texture.Type.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba16f);
+            Result.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
         }
 
         public void Dispose()

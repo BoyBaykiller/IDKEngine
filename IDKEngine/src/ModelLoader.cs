@@ -75,11 +75,11 @@ namespace IDKEngine
                 {
                     switch (textureType)
                     {
-                        case TextureType.BaseColor: return ref Unsafe.AsRef(BaseColorTexture);
-                        case TextureType.MetallicRoughness: return ref Unsafe.AsRef(MetallicRoughnessTexture);
-                        case TextureType.Normal: return ref Unsafe.AsRef(NormalTexture);
-                        case TextureType.Emissive: return ref Unsafe.AsRef(EmissiveTexture);
-                        case TextureType.Transmission: return ref Unsafe.AsRef(TransmissionTexture);
+                        case TextureType.BaseColor: return ref Unsafe.AsRef(ref BaseColorTexture);
+                        case TextureType.MetallicRoughness: return ref Unsafe.AsRef(ref MetallicRoughnessTexture);
+                        case TextureType.Normal: return ref Unsafe.AsRef(ref NormalTexture);
+                        case TextureType.Emissive: return ref Unsafe.AsRef(ref EmissiveTexture);
+                        case TextureType.Transmission: return ref Unsafe.AsRef(ref TransmissionTexture);
                         default: throw new NotSupportedException($"Unsupported {nameof(TextureType)} {textureType}");
                     }
                 }
@@ -342,8 +342,8 @@ namespace IDKEngine
 
         private unsafe static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadData)
         {
-            GLTexture defaultTexture = new GLTexture(TextureTarget2d.Texture2D);
-            defaultTexture.ImmutableAllocate(1, 1, 1, SizedInternalFormat.Rgba16f);
+            GLTexture defaultTexture = new GLTexture(GLTexture.Type.Texture2D);
+            defaultTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
             defaultTexture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
             long defaultTextureHandle = defaultTexture.GetTextureHandleARB(new GLSampler(new GLSampler.State()));
 
@@ -376,7 +376,7 @@ namespace IDKEngine
                         continue;
                     }
 
-                    GLTexture texture = new GLTexture(TextureTarget2d.Texture2D);
+                    GLTexture texture = new GLTexture(GLTexture.Type.Texture2D);
                     if (textureType == GpuMaterial.TextureHandle.MetallicRoughness)
                     {
                         // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
@@ -391,7 +391,7 @@ namespace IDKEngine
                     {
                         using Stream imageStream = gltfTexture.PrimaryImage.Content.Open();
 
-                        SizedInternalFormat internalFormat;
+                        GLTexture.InternalFormat internalFormat;
                         if (gltfTexture.PrimaryImage.Content.IsPng || gltfTexture.PrimaryImage.Content.IsJpg)
                         {
                             // Need to copy because of "CS1686: Local variable or its members cannot have their address taken and be used inside an anonymous method or lambda expression."
@@ -405,11 +405,11 @@ namespace IDKEngine
 
                             internalFormat = textureType switch
                             {
-                                GpuMaterial.TextureHandle.BaseColor => SizedInternalFormat.Srgb8Alpha8,
-                                GpuMaterial.TextureHandle.Emissive => SizedInternalFormat.Srgb8Alpha8,
-                                GpuMaterial.TextureHandle.MetallicRoughness => SizedInternalFormat.R11fG11fB10f, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
-                                GpuMaterial.TextureHandle.Normal => SizedInternalFormat.R11fG11fB10f,
-                                GpuMaterial.TextureHandle.Transmission => SizedInternalFormat.R8,
+                                GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.R8G8B8A8Srgb,
+                                GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.R8G8B8A8Srgb,
+                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
+                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.R11G11B10Float,
+                                GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.R8Unorm,
                                 _ => throw new NotSupportedException($"{nameof(MaterialLoadData.TextureType)} = {textureType} not supported")
                             };
                         }
@@ -436,12 +436,12 @@ namespace IDKEngine
 
                             internalFormat = textureType switch
                             {
-                                GpuMaterial.TextureHandle.BaseColor => SizedInternalFormat.CompressedSrgbAlphaBptcUnorm,
-                                GpuMaterial.TextureHandle.Emissive => SizedInternalFormat.CompressedSrgbAlphaBptcUnorm,
-                                GpuMaterial.TextureHandle.MetallicRoughness => SizedInternalFormat.CompressedRgbS3tcDxt1Ext, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
-                                GpuMaterial.TextureHandle.Normal => SizedInternalFormat.CompressedRgbS3tcDxt1Ext,
-                                GpuMaterial.TextureHandle.Transmission => SizedInternalFormat.CompressedRedRgtc1,
-                                _ => throw new NotSupportedException($"{nameof(MaterialLoadData.TextureType)} = {textureType} not supported")
+                                GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.Bc7RgbaSrgb,
+                                GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.Bc7RgbaSrgb,
+                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.Bc1RgbUnorm, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
+                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.Bc1RgbUnorm,
+                                GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.Bc4RUnorm,
+                                _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
                             };
                         }
                         else
@@ -475,12 +475,12 @@ namespace IDKEngine
                          * 3. Copy from staging buffer to texture on main thread
                          */
 
+                        int threadPoolThreads = Math.Max(Environment.ProcessorCount / 2, 1);
+                        ThreadPool.SetMinThreads(threadPoolThreads, 1);
+                        ThreadPool.SetMaxThreads(threadPoolThreads, 1);
+
                         if (isKtxCompressed)
                         {
-                            int threadPoolThreads = Math.Max(Environment.ProcessorCount / 2, 1);
-                            ThreadPool.SetMinThreads(threadPoolThreads, 1);
-                            ThreadPool.SetMaxThreads(threadPoolThreads, 1);
-
                             // TODO: If the main thread is in Sleep State (for example when waiting on Parallel.For() to finish)
                             //       it may end up participating as a worker in the ThreadPool.
                             //       We want the main thread to only run the render loop only and not some random
@@ -488,7 +488,7 @@ namespace IDKEngine
                             Task.Run(() =>
                             {
                                 // For Basis Supercompression the 'uncompressed' size cannot be known until the data is transcoded.
-                                Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxTranscodeFormat(texture.SizedInternalFormat), Ktx2.TranscodeFlagBits.HighQuality);
+                                Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxTranscodeFormat(texture.TextureFormat), Ktx2.TranscodeFlagBits.HighQuality);
                                 if (errorCode != Ktx2.ErrorCode.Success)
                                 {
                                     Logger.Log(Logger.LogLevel.Error, $"Ktx {nameof(Ktx2.TranscodeBasis)} returned {errorCode}");
@@ -627,7 +627,7 @@ namespace IDKEngine
                 state.WrapModeS = (GLSampler.WrapMode)sampler.WrapS;
                 state.MinFilter = (GLSampler.MinFilter)sampler.MinFilter;
                 state.MagFilter = (GLSampler.MagFilter)sampler.MagFilter;
-                
+
                 if (sampler.MinFilter == TextureMipMapFilter.DEFAULT)
                 {
                     state.MinFilter = GLSampler.MinFilter.LinearMipmapLinear;
@@ -826,18 +826,18 @@ namespace IDKEngine
             throw new UnreachableException($"{nameof(property)} = {property} is not a part of the {nameof(materialChannel)}");
         }
 
-        private static Ktx2.TranscodeFormat GLFormatToKtxTranscodeFormat(SizedInternalFormat internalFormat)
+        private static Ktx2.TranscodeFormat GLFormatToKtxTranscodeFormat(GLTexture.InternalFormat internalFormat)
         {
             switch (internalFormat)
             {
-                case SizedInternalFormat.CompressedRgbS3tcDxt1Ext:
+                case GLTexture.InternalFormat.Bc1RgbUnorm:
                     return Ktx2.TranscodeFormat.Bc1Rgb;
 
-                case SizedInternalFormat.CompressedRedRgtc1:
+                case GLTexture.InternalFormat.Bc4RUnorm:
                     return Ktx2.TranscodeFormat.Bc4R;
 
-                case SizedInternalFormat.CompressedRgbaBptcUnorm:
-                case SizedInternalFormat.CompressedSrgbAlphaBptcUnorm:
+                case GLTexture.InternalFormat.Bc7RgbaUnorm:
+                case GLTexture.InternalFormat.Bc7RgbaSrgb:
                     return Ktx2.TranscodeFormat.Bc7Rgba;
 
                 default:

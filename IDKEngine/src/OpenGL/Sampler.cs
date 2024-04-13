@@ -64,9 +64,9 @@ namespace IDKEngine.OpenGL
             {
                 MinFilter = MinFilter.Nearest;
                 MagFilter = MagFilter.Nearest;
-                WrapModeS = WrapMode.Repeat;
-                WrapModeT = WrapMode.Repeat;
-                WrapModeR = WrapMode.Repeat;
+                WrapModeS = WrapMode.ClampToEdge;
+                WrapModeT = WrapMode.ClampToEdge;
+                WrapModeR = WrapMode.ClampToEdge;
                 Anisotropy = Anisotropy.Samples1x;
                 CompareMode = CompareMode.None;
                 CompareFunc = CompareFunc.Always;
@@ -87,8 +87,8 @@ namespace IDKEngine.OpenGL
             GL.SamplerParameter(ID, SamplerParameterName.TextureMagFilter, (int)state.MagFilter);
 
             GL.SamplerParameter(ID, SamplerParameterName.TextureWrapS, (int)state.WrapModeS);
-            GL.SamplerParameter(ID, SamplerParameterName.TextureWrapS, (int)state.WrapModeT);
-            GL.SamplerParameter(ID, SamplerParameterName.TextureWrapS, (int)state.WrapModeR);
+            GL.SamplerParameter(ID, SamplerParameterName.TextureWrapT, (int)state.WrapModeT);
+            GL.SamplerParameter(ID, SamplerParameterName.TextureWrapR, (int)state.WrapModeR);
 
             GL.SamplerParameter(ID, SamplerParameterName.TextureMaxAnisotropyExt, (float)state.Anisotropy);
 

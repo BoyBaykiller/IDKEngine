@@ -44,7 +44,7 @@
     <PackageReference Include="ImGui.NET" Version="1.89.9.4" />
     <PackageReference Include="Ktx2.NET" Version="1.0.1" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.3" />
-    <PackageReference Include="NativeFileDialogExtendedSharp" Version="0.1.0" />
+    <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
     <PackageReference Include="OpenTK.GraphicsFork" Version="4.8.2" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.8.2" />
     <PackageReference Include="SharpGLTF.Core" Version="1.0.0-alpha0031" />

@@ -77,7 +77,6 @@ namespace IDKEngine.Utils
             ZeroToOne = ClipDepthMode.ZeroToOne,
             NegativeOneToOne = ClipDepthMode.NegativeOneToOne,
         }
-
         public static void SetDepthConvention(DepthConvention mode)
         {
             GL.ClipControl(ClipOrigin.LowerLeft, (ClipDepthMode)mode);
@@ -104,51 +103,6 @@ namespace IDKEngine.Utils
         {
             return APIVersion >= first || IsExtensionsAvailable(extension);
         }
-        public static bool LoadCubemap(Texture texture, string[] imagePaths, SizedInternalFormat sizedInternalFormat)
-        {
-            if (imagePaths == null)
-            {
-                Logger.Log(Logger.LogLevel.Error, $"Cubemap imagePaths is null");
-                return false;
-            }
-            if (texture.Target != TextureTarget.TextureCubeMap)
-            {
-                Logger.Log(Logger.LogLevel.Error, $"Texture must be of type {TextureTarget.TextureCubeMap}");
-                return false;
-            }
-            if (imagePaths.Length != 6)
-            {
-                Logger.Log(Logger.LogLevel.Error, "Number of cubemap images must be equal to six");
-                return false;
-            }
-            if (!imagePaths.All(p => File.Exists(p)))
-            {
-                Logger.Log(Logger.LogLevel.Error, "At least one of the specified cubemap image paths is not found");
-                return false;
-            }
-
-            ImageResult[] images = new ImageResult[6];
-            Parallel.For(0, images.Length, i =>
-            {
-                using FileStream stream = File.OpenRead(imagePaths[i]);
-                images[i] = ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlue);
-            });
-
-            if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
-            {
-                Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and each texture must be of the same size");
-                return false;
-            }
-            int size = images[0].Width;
-
-            texture.ImmutableAllocate(size, size, 1, sizedInternalFormat);
-            for (int i = 0; i < 6; i++)
-            {
-                texture.Upload3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data[0], 0, 0, 0, i);
-            }
-
-            return true;
-        }
 
         public static DebugProc GLDebugCallbackFuncPtr = GLDebugCallback;
         public const uint GL_DEBUG_CALLBACK_APP_MAKER_ID = 0;
@@ -168,6 +122,7 @@ namespace IDKEngine.Utils
 
                 case DebugSeverity.DebugSeverityMedium:
                     if (id == 0) return; // Shader compile warning, Intel
+                    if (id == 2) return; // using glNamedBufferSubData(buffer 35, offset 0, size 1668) to update a GL_STATIC_DRAW buffer, AMD radeonsi
                     // if (id == 131186) return; // Buffer object is being copied/moved from VIDEO memory to HOST memory, NVIDIA
                     if (id == 131154) return; // Pixel-path performance warning: Pixel transfer is synchronized with 3D rendering, NVIDIA
                     Logger.Log(Logger.LogLevel.Warn, text);

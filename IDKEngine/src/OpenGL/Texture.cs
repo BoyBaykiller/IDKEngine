@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
@@ -8,51 +9,70 @@ namespace IDKEngine.OpenGL
 {
     class Texture : IDisposable
     {
-        public enum TextureDimensions : int
+        public enum Type : int
         {
-            Two,
-            Three,
+            Cubemap = TextureTarget2d.TextureCubeMap,
+            Texture2D = TextureTarget2d.Texture2D,
+            Texture3D = TextureTarget.Texture3D,
+        }
+        public enum InternalFormat : int
+        {
+            // UNorm = [0, 1]  range
+            // SNorm = [-1, 1] range
+            // Float = float range
+            // Uint  = uint range
+            // D     = depth formats
+
+            R8Unorm = SizedInternalFormat.R8,
+            R8Uint = SizedInternalFormat.R8ui,
+
+            R16Float = SizedInternalFormat.R16f,
+
+            R32Float = SizedInternalFormat.R32f,
+            R32Uint = SizedInternalFormat.R32ui,
+
+            R16G16Float = SizedInternalFormat.Rg16f,
+
+            R11G11B10Float = SizedInternalFormat.R11fG11fB10f,
+
+            R8G8B8A8Unorm = SizedInternalFormat.Rgba8,
+            R8G8B8A8Snorm = SizedInternalFormat.Rgba8Snorm,
+            R8G8B8A8Srgb = SizedInternalFormat.Srgb8Alpha8,
+
+            R8G8B8SRgba = SizedInternalFormat.Srgb8,
+            R16G16B16A16Float = SizedInternalFormat.Rgba16f,
+            R32G32B32A32Float = SizedInternalFormat.Rgba32f,
+
+            Bc1RgbUnorm = SizedInternalFormat.CompressedRgbS3tcDxt1Ext,
+
+            Bc4RUnorm = SizedInternalFormat.CompressedRedRgtc1,
+
+            Bc7RgbaUnorm = SizedInternalFormat.CompressedRgbaBptcUnorm,
+            Bc7RgbaSrgb = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm,
+
+            D16Unorm = SizedInternalFormat.DepthComponent16,
+            D32Float = SizedInternalFormat.DepthComponent32f,
         }
 
         public readonly int ID;
-        public readonly TextureTarget Target;
-        public readonly TextureDimensions Dimension;
+        public readonly Type TextureType;
+        public InternalFormat TextureFormat { get; private set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
         public int Depth { get; private set; }
         public int Levels { get; private set; }
 
-        public SizedInternalFormat SizedInternalFormat { get; private set; }
-
         private readonly List<long> associatedTextureHandles = new List<long>(0);
         private readonly List<long> associatedImageHandles = new List<long>(0);
 
-        private static readonly int dummyTexture = GetDummyTexture(TextureTarget.Texture2D);
-        private static int GetDummyTexture(TextureTarget textureTarget)
+        public Texture(Type textureType)
         {
-            GL.CreateTextures(textureTarget, 1, out int id);
-            return id;
-        }
-
-        public Texture(TextureTarget3d textureTarget3D)
-        {
-            Target = (TextureTarget)textureTarget3D;
-            Dimension = TextureDimensions.Three;
-
-            GL.CreateTextures(Target, 1, out ID);
-        }
-
-        public Texture(TextureTarget2d textureTarget2D)
-        {
-            Target = (TextureTarget)textureTarget2D;
-            Dimension = TextureDimensions.Two;
-
-            GL.CreateTextures(Target, 1, out ID);
+            GL.CreateTextures((TextureTarget)textureType, 1, out ID);
+            TextureType = textureType;
         }
 
         public void SetFilter(TextureMinFilter minFilter, TextureMagFilter magFilter)
         {
-            /// Explanation for Mipmap filters from https://learnopengl.com/Getting-started/Textures:
             /// GL_NEAREST_MIPMAP_NEAREST: takes the nearest mipmap to match the pixel size and uses nearest neighbor interpolation for texture sampling.
             /// GL_LINEAR_MIPMAP_NEAREST: takes the nearest mipmap level and samples that level using linear interpolation.
             /// GL_NEAREST_MIPMAP_LINEAR: linearly interpolates between the two mipmaps that most closely match the size of a pixel and samples the interpolated level via nearest neighbor interpolation.
@@ -97,16 +117,6 @@ namespace IDKEngine.OpenGL
             GL.TextureParameter(ID, TextureParameterName.TextureMaxAnisotropy, value);
         }
 
-        public void SetCompareMode(TextureCompareMode textureCompareMode)
-        {
-            GL.TextureParameter(ID, TextureParameterName.TextureCompareMode, (int)textureCompareMode);
-        }
-
-        public void SetCompareFunc(All textureCompareFunc)
-        {
-            GL.TextureParameter(ID, TextureParameterName.TextureCompareFunc, (int)textureCompareFunc);
-        }
-
         public unsafe void SetBorderColor(Vector4 color)
         {
             GL.TextureParameter(ID, TextureParameterName.TextureBorderColor, &color.X);
@@ -129,14 +139,9 @@ namespace IDKEngine.OpenGL
             }
         }
 
-        public void Bind()
+        public void BindToImageUnit(int unit, InternalFormat format, int layer = 0, bool layered = false, int level = 0)
         {
-            GL.BindTexture(Target, ID);
-        }
-
-        public void BindToImageUnit(int unit, SizedInternalFormat sizedInternalFormat, int layer = 0, bool layered = false, int level = 0)
-        {
-            GL.BindImageTexture(unit, ID, level, layered, layer, TextureAccess.ReadWrite, sizedInternalFormat);
+            GL.BindImageTexture(unit, ID, level, layered, layer, TextureAccess.ReadWrite, (SizedInternalFormat)format);
         }
         public void BindToUnit(int unit)
         {
@@ -145,7 +150,7 @@ namespace IDKEngine.OpenGL
 
         public static void UnbindFromUnit(int unit)
         {
-            GL.BindTextureUnit(unit, dummyTexture);
+            GL.BindTextureUnit(unit, 0);
         }
 
         public unsafe void Upload3D<T>(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0) where T : unmanaged
@@ -174,8 +179,8 @@ namespace IDKEngine.OpenGL
 
         public void UploadCompressed2D(int width, int height, nint pixels, int level = 0, int xOffset = 0, int yOffset = 0)
         {
-            int imageSize = GetBlockCompressedImageSize(SizedInternalFormat, width, height, 1);
-            GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (PixelFormat)SizedInternalFormat, imageSize, pixels);
+            int imageSize = GetBlockCompressedImageSize(TextureFormat, width, height, 1);
+            GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (PixelFormat)TextureFormat, imageSize, pixels);
         }
 
         public void GetImageData(PixelFormat pixelFormat, PixelType pixelType, nint pixels, int bufSize, int level = 0)
@@ -200,26 +205,27 @@ namespace IDKEngine.OpenGL
             GL.GenerateTextureMipmap(ID);
         }
 
-        public void ImmutableAllocate(int width, int height, int depth, SizedInternalFormat sizedInternalFormat, int levels = 1)
+        public void ImmutableAllocate(int width, int height, int depth, InternalFormat format, int levels = 1)
         {
-            switch (Dimension)
+            switch (TextureType)
             {
-                case TextureDimensions.Two:
-                    GL.TextureStorage2D(ID, levels, sizedInternalFormat, width, height);
+                case Type.Texture2D:
+                case Type.Cubemap:
+                    GL.TextureStorage2D(ID, levels, (SizedInternalFormat)format, width, height);
                     Width = width; Height = height; Depth = 1;
                     Levels = levels;
                     break;
 
-                case TextureDimensions.Three:
-                    GL.TextureStorage3D(ID, levels, sizedInternalFormat, width, height, depth);
+                case Type.Texture3D:
+                    GL.TextureStorage3D(ID, levels, (SizedInternalFormat)format, width, height, depth);
                     Width = width; Height = height; Depth = depth;
                     Levels = levels;
                     break;
 
                 default:
-                    return;
+                    throw new UnreachableException();
             }
-            SizedInternalFormat = sizedInternalFormat;
+            TextureFormat = format;
         }
 
         /// <summary>
@@ -250,9 +256,9 @@ namespace IDKEngine.OpenGL
         /// GL_ARB_bindless_texture must be available
         /// </summary>
         /// <returns></returns>
-        public long GetImageHandleARB(SizedInternalFormat sizedInternalFormat, int layer = 0, bool layered = false, int level = 0)
+        public long GetImageHandleARB(InternalFormat format, int layer = 0, bool layered = false, int level = 0)
         {
-            long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)sizedInternalFormat);
+            long imageHandle = GL.Arb.GetImageHandle(ID, level, layered, layer, (PixelFormat)format);
 
             if (true)
             {
@@ -315,7 +321,7 @@ namespace IDKEngine.OpenGL
             return Vector3i.ComponentMax(size, new Vector3i(1));
         }
 
-        public static int GetBlockCompressedImageSize(SizedInternalFormat internalFormat, int width, int height, int depth)
+        public static int GetBlockCompressedImageSize(InternalFormat format, int width, int height, int depth)
         {
             // Returns same as KTX2.GetImageSize()
 
@@ -327,32 +333,20 @@ namespace IDKEngine.OpenGL
             width = (width + 4 - 1) & -4;
             height = (height + 4 - 1) & -4;
 
-            switch (internalFormat)
+            switch (format)
             {
                 // BC1 and BC4 store 4x4 blocks with 64 bits (8 bytes)
-                case SizedInternalFormat.CompressedRgbS3tcDxt1Ext:
-                case SizedInternalFormat.CompressedRgbaS3tcDxt1Ext:
-                case SizedInternalFormat.CompressedSrgbS3tcDxt1Ext:
-                case SizedInternalFormat.CompressedSrgbAlphaS3tcDxt1Ext:
-                case SizedInternalFormat.CompressedRedRgtc1:
-                case SizedInternalFormat.CompressedSignedRedRgtc1:
+                case InternalFormat.Bc1RgbUnorm:
+                case InternalFormat.Bc4RUnorm:
                     return width * height * depth / 2;
 
                 // BC3, BC5, BC6, and BC7 store 4x4 blocks with 128 bits (16 bytes)
-                case SizedInternalFormat.CompressedRgbaS3tcDxt3Ext:
-                case SizedInternalFormat.CompressedSrgbAlphaS3tcDxt3Ext:
-                case SizedInternalFormat.CompressedRgbaS3tcDxt5Ext:
-                case SizedInternalFormat.CompressedSrgbAlphaS3tcDxt5Ext:
-                case SizedInternalFormat.CompressedRgRgtc2:
-                case SizedInternalFormat.CompressedSignedRgRgtc2:
-                case SizedInternalFormat.CompressedRgbBptcUnsignedFloat:
-                case SizedInternalFormat.CompressedRgbBptcSignedFloat:
-                case SizedInternalFormat.CompressedRgbaBptcUnorm:
-                case SizedInternalFormat.CompressedSrgbAlphaBptcUnorm:
+                case InternalFormat.Bc7RgbaUnorm:
+                case InternalFormat.Bc7RgbaSrgb:
                     return width * height * depth;
 
                 default:
-                    throw new NotSupportedException($"{nameof(internalFormat)} = {internalFormat} not known");
+                    throw new NotSupportedException($"{nameof(format)} = {format} not known");
             }
         }
     }

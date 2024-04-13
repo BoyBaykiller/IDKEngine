@@ -30,7 +30,7 @@ namespace IDKEngine.Render
         {
             frame++;
 
-            Result.BindToImageUnit(0, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.TextureFormat);
             PrevResult.BindToUnit(0);
             color.BindToUnit(1);
 
@@ -45,16 +45,16 @@ namespace IDKEngine.Render
         public void SetSize(Vector2i size)
         {
             if (taaPing != null) taaPing.Dispose();
-            taaPing = new Texture(TextureTarget2d.Texture2D);
+            taaPing = new Texture(Texture.Type.Texture2D);
             taaPing.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             taaPing.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPing.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba16f);
+            taaPing.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
 
             if (taaPong != null) taaPong.Dispose();
-            taaPong = new Texture(TextureTarget2d.Texture2D);
+            taaPong = new Texture(Texture.Type.Texture2D);
             taaPong.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             taaPong.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPong.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba16f);
+            taaPong.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
         }
 
         public void Dispose()

@@ -105,7 +105,7 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            Result.BindToImageUnit(0, Result.SizedInternalFormat, 0, true);
+            Result.BindToImageUnit(0, Result.TextureFormat, 0, true);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Width + 8 - 1) / 8, 6);
@@ -115,8 +115,8 @@ namespace IDKEngine.Render
         public void SetSize(int size)
         {
             if (Result != null) Result.Dispose();
-            Result = new Texture(TextureTarget2d.TextureCubeMap);
-            Result.ImmutableAllocate(size, size, 1, SizedInternalFormat.Rgba32f);
+            Result = new Texture(Texture.Type.Cubemap);
+            Result.ImmutableAllocate(size, size, 1, Texture.InternalFormat.R32G32B32A32Float);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
         }
 

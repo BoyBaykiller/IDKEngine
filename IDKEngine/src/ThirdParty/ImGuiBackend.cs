@@ -88,10 +88,10 @@ namespace IDKEngine.ThirdParty
             ImGuiIOPtr io = ImGui.GetIO();
             io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int width, out int height, out _);
 
-            fontTexture = new Texture(TextureTarget2d.Texture2D);
+            fontTexture = new Texture(Texture.Type.Texture2D);
             fontTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
             fontTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            fontTexture.ImmutableAllocate(width, height, 1, SizedInternalFormat.Rgba8);
+            fontTexture.ImmutableAllocate(width, height, 1, Texture.InternalFormat.R8G8B8A8Unorm);
             fontTexture.Upload2D(width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
 
             io.Fonts.SetTexID(fontTexture.ID);

@@ -43,7 +43,7 @@ namespace IDKEngine.Render
             gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
             gpuSettingsBuffer.UploadElements(Settings);
 
-            Result.BindToImageUnit(0, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.TextureFormat);
 
             shaderProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
@@ -53,10 +53,10 @@ namespace IDKEngine.Render
         public void SetSize(Vector2i size)
         {
             if (Result != null) Result.Dispose();
-            Result = new Texture(TextureTarget2d.Texture2D);
+            Result = new Texture(Texture.Type.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.R8);
+            Result.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R8Unorm);
         }
 
         public void Dispose()

@@ -110,12 +110,12 @@ namespace IDKEngine.Render
 
         private void ClearTextures()
         {
-            ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true);
+            ResultVoxels.BindToImageUnit(0, ResultVoxels.TextureFormat, 0, true);
             if (!TAKE_ATOMIC_FP16_PATH)
             {
-                intermediateResultRbg[0].BindToImageUnit(1, intermediateResultRbg[0].SizedInternalFormat, 0, true);
-                intermediateResultRbg[1].BindToImageUnit(2, intermediateResultRbg[1].SizedInternalFormat, 0, true);
-                intermediateResultRbg[2].BindToImageUnit(3, intermediateResultRbg[2].SizedInternalFormat, 0, true);
+                intermediateResultRbg[0].BindToImageUnit(1, intermediateResultRbg[0].TextureFormat, 0, true);
+                intermediateResultRbg[1].BindToImageUnit(2, intermediateResultRbg[1].TextureFormat, 0, true);
+                intermediateResultRbg[2].BindToImageUnit(3, intermediateResultRbg[2].TextureFormat, 0, true);
             }
 
             clearTexturesProgram.Use();
@@ -148,12 +148,12 @@ namespace IDKEngine.Render
             GL.Viewport(0, 0, ResultVoxels.Width, ResultVoxels.Height);
             GL.Disable(EnableCap.CullFace);
 
-            ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true);
+            ResultVoxels.BindToImageUnit(0, ResultVoxels.TextureFormat, 0, true);
             if (!TAKE_ATOMIC_FP16_PATH)
             {
-                intermediateResultRbg[0].BindToImageUnit(1, SizedInternalFormat.R32ui, 0, true);
-                intermediateResultRbg[1].BindToImageUnit(2, SizedInternalFormat.R32ui, 0, true);
-                intermediateResultRbg[2].BindToImageUnit(3, SizedInternalFormat.R32ui, 0, true);
+                intermediateResultRbg[0].BindToImageUnit(1, Texture.InternalFormat.R32Uint, 0, true);
+                intermediateResultRbg[1].BindToImageUnit(2, Texture.InternalFormat.R32Uint, 0, true);
+                intermediateResultRbg[2].BindToImageUnit(3, Texture.InternalFormat.R32Uint, 0, true);
             }
 
             voxelizeProgram.Use();
@@ -189,7 +189,7 @@ namespace IDKEngine.Render
 
         private void MergeIntermediateTextures()
         {
-            ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true);
+            ResultVoxels.BindToImageUnit(0, ResultVoxels.TextureFormat, 0, true);
 
             intermediateResultRbg[0].BindToUnit(0);
             intermediateResultRbg[1].BindToUnit(1);
@@ -208,7 +208,7 @@ namespace IDKEngine.Render
             int levels = Texture.GetMaxMipmapLevel(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth);
             for (int i = 1; i < levels; i++)
             {
-                ResultVoxels.BindToImageUnit(0, ResultVoxels.SizedInternalFormat, 0, true, i);
+                ResultVoxels.BindToImageUnit(0, ResultVoxels.TextureFormat, 0, true, i);
 
                 Vector3i size = Texture.GetMipMapLevelSize(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth, i);
 
@@ -223,7 +223,7 @@ namespace IDKEngine.Render
             visualizeDebugProgram.Upload(0, DebugStepMultiplier);
             visualizeDebugProgram.Upload(1, DebugConeAngle);
 
-            debugResult.BindToImageUnit(0, debugResult.SizedInternalFormat);
+            debugResult.BindToImageUnit(0, debugResult.TextureFormat);
             ResultVoxels.BindToUnit(0);
             visualizeDebugProgram.Use();
             GL.DispatchCompute((debugResult.Width + 8 - 1) / 8, (debugResult.Height + 8 - 1) / 8, 1);
@@ -233,20 +233,20 @@ namespace IDKEngine.Render
         public void SetSize(int width, int height, int depth)
         {
             if (ResultVoxels != null) ResultVoxels.Dispose();
-            ResultVoxels = new Texture(TextureTarget3d.Texture3D);
+            ResultVoxels = new Texture(Texture.Type.Texture3D);
             ResultVoxels.SetFilter(TextureMinFilter.LinearMipmapLinear, TextureMagFilter.Linear);
             ResultVoxels.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
             ResultVoxels.SetAnisotropy(16.0f);
-            ResultVoxels.ImmutableAllocate(width, height, depth, SizedInternalFormat.Rgba16f, Texture.GetMaxMipmapLevel(width, height, depth));
+            ResultVoxels.ImmutableAllocate(width, height, depth, Texture.InternalFormat.R16G16B16A16Float, Texture.GetMaxMipmapLevel(width, height, depth));
 
             if (!TAKE_ATOMIC_FP16_PATH)
             {
                 for (int i = 0; i < 3; i++)
                 {
                     if (intermediateResultRbg[i] != null) intermediateResultRbg[i].Dispose();
-                    intermediateResultRbg[i] = new Texture(TextureTarget3d.Texture3D);
+                    intermediateResultRbg[i] = new Texture(Texture.Type.Texture3D);
                     intermediateResultRbg[i].SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, SizedInternalFormat.R32f);
+                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, Texture.InternalFormat.R32Float);
                 }
             }
 

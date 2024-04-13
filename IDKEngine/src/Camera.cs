@@ -63,7 +63,7 @@ namespace IDKEngine
             LookX = lookX;
             LookY = lookY;
 
-            MouseSensitivity = 0.05f;
+            MouseSensitivity = 0.09f;
             KeyboardAccelerationSpeed = 30.0f * MASS; // same "experienced" acceleration regardless of mass
 
             ProjectionSize = size;

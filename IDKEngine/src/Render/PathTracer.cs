@@ -147,7 +147,7 @@ namespace IDKEngine.Render
             gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
             gpuSettingsBuffer.UploadElements(gpuSettings);
 
-            Result.BindToImageUnit(0, Result.SizedInternalFormat);
+            Result.BindToImageUnit(0, Result.TextureFormat);
             firstHitProgram.Use();
             GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
@@ -180,10 +180,10 @@ namespace IDKEngine.Render
             float clear = 0.0f;
 
             if (Result != null) Result.Dispose();
-            Result = new Texture(TextureTarget2d.Texture2D);
+            Result = new Texture(Texture.Type.Texture2D);
             Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
             Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(size.X, size.Y, 1, SizedInternalFormat.Rgba32f);
+            Result.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R32G32B32A32Float);
             Result.Clear(PixelFormat.Red, PixelType.Float, clear);
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();

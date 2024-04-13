@@ -4,7 +4,7 @@ using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
-using NativeFileDialogExtendedSharp;
+using NativeFileDialogSharp;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
@@ -152,7 +152,7 @@ namespace IDKEngine.Render
                     }
 
                     ImGui.SliderFloat("AccelerationSpeed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f * Camera.MASS);
-                    ImGui.SliderFloat("Sensitivity", ref app.Camera.MouseSensitivity, 0.0f, 0.1f);
+                    ImGui.SliderFloat("Sensitivity", ref app.Camera.MouseSensitivity, 0.0f, 0.2f);
 
                     tempFloat = MathHelper.RadiansToDegrees(app.Camera.FovY);
                     if (ImGui.SliderFloat("FovY", ref tempFloat, 10.0f, 130.0f))
@@ -797,15 +797,12 @@ namespace IDKEngine.Render
                         app.WindowFullscreen = false;
                     }
 
-                    NfdFilter[] filters = new NfdFilter[1];
-                    filters[0] = new NfdFilter() { Specification = "gltf,glb", Description = "glTF" };
-
-                    NfdDialogResult result = Nfd.FileOpen(filters);
-                    if (result.Status == NfdStatus.Error)
+                    DialogResult result = Dialog.FileOpen("gltf,glb");
+                    if (result.IsError)
                     {
-                        Logger.Log(Logger.LogLevel.Error, result.Error);
+                        Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
                     }
-                    else if (result.Status == NfdStatus.Ok)
+                    else if (result.IsOk)
                     {
                         ModelLoader.Model newScene = ModelLoader.GltfToEngineFormat(result.Path, Matrix4.CreateTranslation(app.Camera.Position));
                         app.ModelSystem.Add(newScene);
