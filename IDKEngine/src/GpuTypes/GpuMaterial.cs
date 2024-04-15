@@ -51,6 +51,7 @@ namespace IDKEngine.GpuTypes
         public long EmissiveTextureHandle;
 
         public long TransmissionTextureHandle;
-        private readonly long _pad0;
+        public bool DoAlphaBlending;
+        private readonly uint _pad0;
     }
 }

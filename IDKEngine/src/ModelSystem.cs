@@ -87,14 +87,7 @@ namespace IDKEngine
 
             vao = new VAO();
             vao.SetElementBuffer(vertexIndicesBuffer);
-
-            vao.AddSourceBuffer(vertexPositionBuffer, 0, sizeof(Vector3));
-            vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0);
-
-            vao.AddSourceBuffer(vertexBuffer, 1, sizeof(GpuVertex));
-            vao.SetAttribFormat(1, 1, 2, VertexAttribType.Float, (int)Marshal.OffsetOf<GpuVertex>(nameof(GpuVertex.TexCoord)));
-            vao.SetAttribFormatI(1, 2, 1, VertexAttribType.UnsignedInt, (int)Marshal.OffsetOf<GpuVertex>(nameof(GpuVertex.Tangent)));
-            vao.SetAttribFormatI(1, 3, 1, VertexAttribType.UnsignedInt, (int)Marshal.OffsetOf<GpuVertex>(nameof(GpuVertex.Normal)));
+            // We use Vertex Pulling, no need to declare vertex format using VAO API
 
             BVH = new BVH();
         }

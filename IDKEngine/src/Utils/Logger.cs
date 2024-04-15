@@ -30,9 +30,12 @@ namespace IDKEngine.Utils
             text = Indent(text, preText.Length);
             string formated = $"{preText}{text}";
 
-            Console.ForegroundColor = LogLevelToColor(level);
-            Console.WriteLine(formated);
-            Console.ResetColor();
+            lock (Console.Out)
+            {
+                Console.ForegroundColor = LogLevelToColor(level);
+                Console.WriteLine(formated);
+                Console.ResetColor();
+            }
 
             outText.WriteLine(formated);
             outText.Flush();

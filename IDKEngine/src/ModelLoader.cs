@@ -113,6 +113,7 @@ namespace IDKEngine
             public float MetallicFactor;
             public Vector3 Absorbance;
             public float IOR;
+            public bool DoAlphaBlending;
 
             public static readonly MaterialParams Default = new MaterialParams()
             {
@@ -138,18 +139,13 @@ namespace IDKEngine
             public int LocalIndicesLength;
         }
 
-        private static Action callbackTextureLoaded = null;
-        public static void SetCallackTextureLoaded(Action callback)
+        public static event Action? TextureLoaded;
+        public static Model LoadGltfFromFile(string path)
         {
-            callbackTextureLoaded = callback;
+            return LoadGltfFromFile(path, Matrix4.Identity);
         }
 
-        public static Model GltfToEngineFormat(string path)
-        {
-            return GltfToEngineFormat(path, Matrix4.Identity);
-        }
-
-        public static Model GltfToEngineFormat(string path, Matrix4 rootTransform)
+        public static Model LoadGltfFromFile(string path, Matrix4 rootTransform)
         {
             if (!File.Exists(path))
             {
@@ -157,33 +153,31 @@ namespace IDKEngine
                 return new Model();
             }
 
+            ModelRoot gltf = ModelRoot.Load(path, new ReadSettings() { Validation = SharpGLTF.Validation.ValidationMode.Skip });
+            string fileName = Path.GetFileName(path);
+            foreach (string ext in gltf.ExtensionsUsed)
+            {
+                if (SupportedExtensions.Contains(ext))
+                {
+                    Logger.Log(Logger.LogLevel.Info, $"Model \"{fileName}\" uses extension {ext}");
+                }
+                else
+                {
+                    Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" uses extension {ext} which is not supported");
+                }
+            }
+
             Stopwatch sw = Stopwatch.StartNew();
+            Model model = GltfToEngineFormat(gltf, rootTransform);
 
-            Model model = LoadFromFile(path, rootTransform);
-
-            Logger.Log(Logger.LogLevel.Info, $"Loaded {Path.GetFileName(path)} in {sw.ElapsedMilliseconds}ms (Triangles = {model.VertexIndices.Length / 3})");
+            Logger.Log(Logger.LogLevel.Info, $"Loaded \"{fileName}\" in {sw.ElapsedMilliseconds}ms (Triangles = {model.VertexIndices.Length / 3})");
 
             return model;
         }
 
-        private static Model LoadFromFile(string path, Matrix4 rootTransform)
+        private static Model GltfToEngineFormat(ModelRoot gltf, Matrix4 rootTransform)
         {
-            ModelRoot gltfFile = ModelRoot.Load(path, new ReadSettings() { Validation = SharpGLTF.Validation.ValidationMode.Skip });
-
-            string gltfFilePathName = Path.GetFileName(path);
-            foreach (string ext in gltfFile.ExtensionsUsed)
-            {
-                if (SupportedExtensions.Contains(ext))
-                {
-                    Logger.Log(Logger.LogLevel.Info, $"Model {gltfFilePathName} uses extension {ext}");
-                }
-                else
-                {
-                    Logger.Log(Logger.LogLevel.Warn, $"Model {gltfFilePathName} uses extension {ext} which is not supported");
-                }
-            }
-
-            MaterialLoadData[] materialsLoadData = GetMaterialLoadDataFromGltf(gltfFile.LogicalMaterials);
+            MaterialLoadData[] materialsLoadData = GetMaterialLoadDataFromGltf(gltf.LogicalMaterials);
             List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(materialsLoadData));
 
             List<GpuMesh> listMeshes = new List<GpuMesh>();
@@ -199,7 +193,7 @@ namespace IDKEngine
             List<byte> listMeshletsLocalIndices = new List<byte>();
 
             Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
-            foreach (Node node in gltfFile.DefaultScene.VisualChildren)
+            foreach (Node node in gltf.DefaultScene.VisualChildren)
             {
                 nodeStack.Push((node, rootTransform));
             }
@@ -234,7 +228,7 @@ namespace IDKEngine
                 //{
                 //    Vector3 trans = Helper.RandomVec3(-15.0f, 15.0f);
                 //    Vector3 rot = Helper.RandomVec3(0.0f, 2.0f * MathF.PI);
-                //    float scale = 0.01f;
+                //    float scale = 1.0f;
                 //    var test = Matrix4.CreateScale(scale) *
                 //            Matrix4.CreateRotationZ(rot.Z) *
                 //               Matrix4.CreateRotationY(rot.Y) *
@@ -362,6 +356,7 @@ namespace IDKEngine
                 gpuMaterial.MetallicFactor = materialParams.MetallicFactor;
                 gpuMaterial.Absorbance = materialParams.Absorbance;
                 gpuMaterial.IOR = materialParams.IOR;
+                gpuMaterial.DoAlphaBlending = materialParams.DoAlphaBlending;
                 
                 for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
                 {
@@ -522,10 +517,7 @@ namespace IDKEngine
                                             stagingBuffer.Dispose();
                                             Ktx2.Destroy(ktxTexture);
 
-                                            if (callbackTextureLoaded != null)
-                                            {
-                                                callbackTextureLoaded();
-                                            }
+                                            TextureLoaded?.Invoke();
                                         });
                                     });
 
@@ -554,10 +546,7 @@ namespace IDKEngine
                                     }
                                     stagingBuffer.Dispose();
 
-                                    if (callbackTextureLoaded != null)
-                                    {
-                                        callbackTextureLoaded();
-                                    }
+                                    TextureLoaded?.Invoke();
                                 });
                             });
                         }
@@ -752,11 +741,19 @@ namespace IDKEngine
         private static MaterialParams GetMaterialParams(Material gltfMaterial)
         {
             MaterialParams materialParams = MaterialParams.Default;
-            
-            materialParams.AlphaCutoff = gltfMaterial.AlphaCutoff;
+
             if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.OPAQUE)
             {
                 materialParams.AlphaCutoff = -1.0f;
+            }
+            else if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.MASK)
+            {
+                materialParams.AlphaCutoff = gltfMaterial.AlphaCutoff;
+            }
+            else if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.BLEND)
+            {
+                // Blending only yet supported in Path Tracer
+                materialParams.DoAlphaBlending = true;
             }
 
             MaterialChannel? baseColorChannel = gltfMaterial.FindChannel(KnownChannel.BaseColor.ToString());
@@ -839,6 +836,10 @@ namespace IDKEngine
                 case GLTexture.InternalFormat.Bc7RgbaUnorm:
                 case GLTexture.InternalFormat.Bc7RgbaSrgb:
                     return Ktx2.TranscodeFormat.Bc7Rgba;
+
+                case GLTexture.InternalFormat.Astc4X4Rgba:
+                case GLTexture.InternalFormat.Astc4X4RgbaSrgb:
+                    return Ktx2.TranscodeFormat.Astc4X4Rgba;
 
                 default:
                     throw new NotSupportedException($"Can not convert {nameof(internalFormat)} = {internalFormat} to {nameof(Ktx2.TranscodeFormat)}");
@@ -965,6 +966,126 @@ namespace IDKEngine
             result.LocalIndicesLength = (int)meshletsLocalIndicesLength;
 
             return result;
+        }
+
+        public static class CompressionUtils
+        {
+            public const string COMPRESSION_TOOL_NAME = "gltfpack"; // https://github.com/zeux/meshoptimizer
+
+            public struct CompressGltfSettings
+            {
+                public string InputPath;
+                public string OutputPath;
+                public Action<string>? ProcessError;
+                public Action<string>? ProcessOutput;
+            }
+            public static Task? CompressGltf(CompressGltfSettings settings)
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo()
+                {
+                    FileName = COMPRESSION_TOOL_NAME,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+
+                    // -v         = verbose output
+                    // -mi        = use instancing (EXT_mesh_gpu_instancing)
+                    // -noq       = no mesh quanization (KHR_mesh_quantization)
+                    // -tc        = do KTX2 texture comression (KHR_texture_basisu)
+                    // -tq 10     = texture quality 10
+                    // -tu attrib = use UASTC when encoding type-attrib textures (much higher quality and much larger size)
+                    Arguments = $"-v -mi -noq -tc -tq 10 -tu attrib -i {settings.InputPath} -o {settings.OutputPath}",
+                };
+
+                try
+                {
+                    Process proc = Process.Start(startInfo);
+                    if (proc == null)
+                    {
+                        return null;
+                    }
+
+                    proc.BeginErrorReadLine();
+                    proc.BeginOutputReadLine();
+                    proc.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
+                    {
+                        if (e.Data == null)
+                        {
+                            return;
+                        }
+
+                        settings.ProcessError?.Invoke($"{COMPRESSION_TOOL_NAME}: {e.Data}");
+                    };
+                    proc.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
+                    {
+                        if (e.Data == null)
+                        {
+                            return;
+                        }
+
+                        settings.ProcessOutput?.Invoke($"{COMPRESSION_TOOL_NAME}: {e.Data}");
+                    };
+
+                    return proc.WaitForExitAsync();
+                }
+                catch (Exception)
+                {
+                    return null;
+                }
+            }
+
+            public static bool CompressionToolAvailable()
+            {
+                string[] pathsToSearch = new string[1];
+                pathsToSearch[0] = @"C:\Users\Julian\Downloads\Models\MyGltfpack";
+
+                string envVars = Environment.GetEnvironmentVariable("PATH");
+                if (envVars != null)
+                {
+                    Helper.ArrayAdd(ref pathsToSearch, envVars.Split(';'));
+                }
+                envVars = Environment.GetEnvironmentVariable("Path");
+                if (envVars != null)
+                {
+                    Helper.ArrayAdd(ref pathsToSearch, envVars.Split(';'));
+                }
+
+                for (int i = 0; i < pathsToSearch.Length; i++)
+                {
+                    string envPath = pathsToSearch[i];
+                    if (!Directory.Exists(envPath))
+                    {
+                        continue;
+                    }
+
+                    string[] results = Directory.GetFiles(envPath, $"{COMPRESSION_TOOL_NAME}.*");
+                    if (results.Length > 0)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            public static bool IsCompressedGltf(string path)
+            {
+                if (!File.Exists(path))
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
+                    return false;
+                }
+
+                ModelRoot gltf = ModelRoot.Load(path, new ReadSettings() { Validation = SharpGLTF.Validation.ValidationMode.Skip });
+                foreach (string ext in gltf.ExtensionsUsed)
+                {
+                    // the definition of wether a glTF is compressed may be expanded in the future
+                    if (ext == "KHR_texture_basisu")
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
         }
     }
 }

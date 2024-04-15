@@ -6,11 +6,6 @@ AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 
-layout(location = 0) in vec3 Position;
-layout(location = 1) in vec2 TexCoord;
-layout(location = 2) in uint Tangent;
-layout(location = 3) in uint Normal;
-
 out InOutVars
 {
     vec2 TexCoord;
@@ -22,11 +17,14 @@ out InOutVars
 
 void main()
 {
+    Vertex vertex = vertexSSBO.Vertices[gl_VertexID];
+    vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
+    
     uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
     
-    vec3 normal = DecompressSR11G11B10(Normal);
-    vec3 tangent = DecompressSR11G11B10(Tangent);
+    vec3 normal = DecompressSR11G11B10(vertex.Normal);
+    vec3 tangent = DecompressSR11G11B10(vertex.Tangent);
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
     mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
@@ -34,11 +32,11 @@ void main()
 
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.Tangent = normalize(unitVecToWorld * tangent);
-    outData.TexCoord = TexCoord;
-    outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(Position, 1.0);
+    outData.TexCoord = vertex.TexCoord;
+    outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(vertexPosition, 1.0);
     outData.MeshID = gl_DrawID;
     
-    vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(Position, 1.0);
+    vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(vertexPosition, 1.0);
 
     // Add jitter independent of perspective by multiplying with w
     vec4 jitteredClipPos = clipPos;

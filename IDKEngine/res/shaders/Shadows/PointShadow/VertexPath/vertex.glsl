@@ -12,18 +12,18 @@ AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 
-layout(location = 0) in vec3 Position;
-
 layout(location = 0) uniform int ShadowIndex;
 
 void main()
 {
+    vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
+
     uint faceAndMeshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance * 6];
     uint faceID = faceAndMeshInstanceID >> 29;
     uint meshInstanceID = faceAndMeshInstanceID & ((1u << 29) - 1);
     
     mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceID].ModelMatrix);
-    vec3 fragPos = vec3(modelMatrix * vec4(Position, 1.0));
+    vec3 fragPos = vec3(modelMatrix * vec4(vertexPosition, 1.0));
     gl_Position = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceID] * vec4(fragPos, 1.0);
     gl_Layer = int(faceID);
 }

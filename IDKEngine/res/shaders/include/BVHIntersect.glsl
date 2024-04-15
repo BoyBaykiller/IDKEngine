@@ -58,11 +58,11 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
             for (uint j = first; j < first + summedTriCount; j++)
             {
-                uvec3 indices = PackedUintsToUvec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
+                uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
 
-                vec3 v0 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 v1 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 v2 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
+                vec3 v0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 v1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 v2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
 
                 vec3 bary;
                 float hitT;
@@ -133,10 +133,10 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
             for (uint j = first; j < first + summedTriCount; j++)
             {
-                uvec3 indices = PackedUintsToUvec3(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
-                vec3 v0 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 v1 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 v2 = PackedFloatsToVec3(vertexPositionsSSBO.VertexPositions[indices.z]);
+                uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
+                vec3 v0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 v1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 v2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
 
                 vec3 bary;
                 float hitT;

@@ -7,10 +7,6 @@ AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Compression.glsl)
 
-layout(location = 0) in vec3 Position;
-layout(location = 1) in vec2 TexCoord;
-layout(location = 3) in uint Normal;
-
 out InOutVars
 {
     vec3 FragPos;
@@ -26,19 +22,22 @@ layout(location = 0) uniform int RenderAxis;
 
 void main()
 {
+    Vertex vertex = vertexSSBO.Vertices[gl_VertexID];
+    vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
+
     Mesh mesh = meshSSBO.Meshes[gl_DrawID];
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
 
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
 
-    outData.FragPos = (modelMatrix * vec4(Position, 1.0)).xyz;
+    outData.FragPos = (modelMatrix * vec4(vertexPosition, 1.0)).xyz;
 
-    vec3 normal = DecompressSR11G11B10(Normal);
+    vec3 normal = DecompressSR11G11B10(vertex.Normal);
 
     mat3 unitVecToWorld = mat3(transpose(invModelMatrix));
     outData.Normal = normalize(unitVecToWorld * normal);
-    outData.TexCoord = TexCoord;
+    outData.TexCoord = vertex.TexCoord;
 
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;

@@ -399,6 +399,7 @@ namespace IDKEngine
 
         private TypedBuffer<GpuPerFrameData> gpuPerFrameBuffer;
         public GpuPerFrameData GpuBasicData;
+
         protected override void OnStart()
         {
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
@@ -455,7 +456,7 @@ namespace IDKEngine
             PresentationResolution = WindowFramebufferSize;
             ModelSystem = new ModelSystem();
 
-            ModelLoader.SetCallackTextureLoaded(() =>
+            ModelLoader.TextureLoaded += (() =>
             {
                 if (PathTracer != null)
                 {
@@ -466,7 +467,7 @@ namespace IDKEngine
             Camera = new Camera(RenderResolution, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
             if (true)
             {
-                ModelLoader.Model sponza = ModelLoader.GltfToEngineFormat("res/models/SponzaCompressed/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
+                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("res/models/SponzaCompressed/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
                 sponza.Meshes[63].EmissiveBias = 10.0f;
                 sponza.Meshes[70].EmissiveBias = 20.0f;
                 sponza.Meshes[3].EmissiveBias = 12.0f;
@@ -479,14 +480,14 @@ namespace IDKEngine
                 sponza.Meshes[46].SpecularBias = 1.0f;
                 sponza.Meshes[46].RoughnessBias = -0.436f;
 
-                ModelLoader.Model lucy = ModelLoader.GltfToEngineFormat("res/models/LucyCompressed/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
+                ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("res/models/LucyCompressed/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
                 lucy.Meshes[0].SpecularBias = -1.0f;
                 lucy.Meshes[0].TransmissionBias = 0.98f;
                 lucy.Meshes[0].IORBias = 0.174f;
                 lucy.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
-                ModelLoader.Model helmet = ModelLoader.GltfToEngineFormat("res/models/HelmetCompressed/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
+                ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("res/models/HelmetCompressed/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
                 //ModelLoader.Model plane = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\Plane.gltf", Matrix4.CreateScale(30.0f, 1.0f, 30.0f) * Matrix4.CreateRotationZ(MathF.PI) * Matrix4.CreateTranslation(0.0f, 17.0f, 10.0f));
                 //ModelLoader.Model test = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
@@ -515,7 +516,7 @@ namespace IDKEngine
             }
             else
             {
-                ModelLoader.Model a = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\BaseCompressed\NewSponza_Main_glTF_002.gltf");
+                ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf");
                 //a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 //a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
                 //a.MeshInstances[271].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
@@ -545,11 +546,11 @@ namespace IDKEngine
                 //a.Meshes[324].EmissiveBias = 20.0f;
                 //a.Meshes[376].EmissiveBias = 20.0f;
                 //a.Meshes[379].EmissiveBias = 20.0f;
-                ModelLoader.Model b = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\CurtainsCompressed\NewSponza_Curtains_glTF.gltf");
-                //ModelLoader.Model c = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                //ModelLoader.Model d = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\CurtainsCompressed\NewSponza_Curtains_glTF.gltf");
+                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
+                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelSystem.Add(a, b);
+                ModelSystem.Add(a);
 
                 LightManager = new LightManager();
                 LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
@@ -579,8 +580,7 @@ namespace IDKEngine
 
         protected override void OnWindowResize()
         {
-            gui.Backend.SetSize(WindowFramebufferSize);
-
+            gui.SetSize(WindowFramebufferSize);
             if (!RenderGui)
             {
                 PresentationResolution = WindowFramebufferSize;
@@ -589,7 +589,7 @@ namespace IDKEngine
 
         protected override void OnKeyPress(char key)
         {
-            gui.Backend.PressChar(key);
+            gui.PressChar(key);
         }
     }
 }

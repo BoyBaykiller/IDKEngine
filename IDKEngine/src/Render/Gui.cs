@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
@@ -10,10 +11,14 @@ using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 using IDKEngine.Windowing;
 using IDKEngine.ThirdParty;
+using SysVec3 = System.Numerics.Vector3;
+using SysVec2 = System.Numerics.Vector2;
+using OtkVec3 = OpenTK.Mathematics.Vector3;
+using OtkVec2 = OpenTK.Mathematics.Vector2;
 
 namespace IDKEngine.Render
 {
-    class Gui : IDisposable
+    partial class Gui : IDisposable
     {
         public enum EntityType : int
         {
@@ -44,20 +49,32 @@ namespace IDKEngine.Render
                 Distance = distance;
             }
 
+            public static bool operator ==(SelectedEntityInfo first, SelectedEntityInfo other)
+            {
+                return (first.EntityType == other.EntityType) &&
+                       (first.EntityID == other.EntityID) &&
+                       (first.InstanceID == other.InstanceID);
+            }
+
+            public static bool operator !=(SelectedEntityInfo first, SelectedEntityInfo other)
+            {
+                return !(first == other);
+            }
+
             public static readonly SelectedEntityInfo None = new SelectedEntityInfo()
             {
                 EntityType = EntityType.None
             };
         }
 
-        public ImGuiBackend Backend { get; private set; }
         public FrameRecorderState FrameRecState { get; private set; }
 
         public SelectedEntityInfo SelectedEntity;
 
+        private readonly ImGuiBackend backend;
         public Gui(int width, int height)
         {
-            Backend = new ImGuiBackend(width, height);
+            backend = new ImGuiBackend(width, height);
             FrameRecState = FrameRecorderState.Nothing;
             recordingRenderSampleGoal = 1;
             recordingFPS = 48;
@@ -70,32 +87,23 @@ namespace IDKEngine.Render
         private bool isInfiniteReplay;
         private bool isVideoRender;
         private bool useMeshShaders;
-        private System.Numerics.Vector2 viewportHeaderSize;
+        private SysVec2 viewportHeaderSize;
+        private bool shouldResetPT;
         public unsafe void Draw(Application app, float frameTime)
         {
-            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal)
-            {
-                Backend.IsIgnoreMouseInput = false;
-            }
-            else if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
-            {
-                Backend.IsIgnoreMouseInput = true;
-            }
-
-            Backend.Update(app, frameTime);
+            backend.Update(app, frameTime);
             ImGui.DockSpaceOverViewport();
 
             int tempInt;
             bool tempBool;
             float tempFloat;
-            bool shouldResetPT = false;
-            System.Numerics.Vector2 tempVec2;
-            System.Numerics.Vector3 tempVec3;
-
+            shouldResetPT = false;
+            SysVec2 tempVec2;
+            SysVec3 tempVec3;
 
             if (ImGui.Begin("Stats"))
             {
-                float mbDrawVertices = (app.ModelSystem.Vertices.Length * ((nint)sizeof(GpuVertex) + sizeof(Vector3))) / 1000000.0f;
+                float mbDrawVertices = (app.ModelSystem.Vertices.Length * ((nint)sizeof(GpuVertex) + sizeof(OtkVec3))) / 1000000.0f;
                 float mbDrawIndices = (app.ModelSystem.VertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
                 float mbMeshlets = (app.ModelSystem.Meshlets.Length * (nint)sizeof(GpuMeshlet)) / 1000000.0f;
                 float mbMeshletsVertexIndices = (app.ModelSystem.MeshletsVertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
@@ -144,7 +152,7 @@ namespace IDKEngine.Render
                     ImGui.SameLine();
                     ImGui.Text($"({app.Camera.Velocity.Length})");
 
-                    tempVec2 = new System.Numerics.Vector2(app.Camera.LookX, app.Camera.LookY);
+                    tempVec2 = new SysVec2(app.Camera.LookX, app.Camera.LookY);
                     if (ImGui.DragFloat2("LookAt", ref tempVec2))
                     {
                         app.Camera.LookX = tempVec2.X;
@@ -288,6 +296,12 @@ namespace IDKEngine.Render
                     app.ModelSystem.BVH.GpuUseTlas = gpuUseTlas;
                 }
                 ToolTipForItemAboveHovered("This increases GPU BVH traversal performance when there exist a lot of instances.\nNote that the TLAS does not get rebuild automatically.");
+
+                ImGui.SameLine();
+                if (ImGui.Button("RebuildTlas"))
+                {
+                    app.ModelSystem.BVH.TlasBuild();
+                }
 
                 ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.01f, 4.0f);
                 ImGui.SliderFloat("Saturation", ref app.TonemapAndGamma.Settings.Saturation, 0.0f, 1.5f);
@@ -562,11 +576,11 @@ namespace IDKEngine.Render
                             ImGui.SliderFloat("Scattering", ref app.VolumetricLight.Settings.Scattering, 0.0f, 1.0f);
                             ImGui.SliderFloat("Strength##StrengthVolumetricLight", ref app.VolumetricLight.Settings.Strength, 0.0f, 1.0f);
 
-                            System.Numerics.Vector3 tempVec = app.VolumetricLight.Settings.Absorbance.ToNumerics();
+                            SysVec3 tempVec = app.VolumetricLight.Settings.Absorbance.ToNumerics();
                             if (ImGui.InputFloat3("Absorbance", ref tempVec))
                             {
-                                Vector3 temp = tempVec.ToOpenTK();
-                                temp = Vector3.ComponentMax(temp, Vector3.Zero);
+                                OtkVec3 temp = tempVec.ToOpenTK();
+                                temp = OtkVec3.ComponentMax(temp, OtkVec3.Zero);
                                 app.VolumetricLight.Settings.Absorbance = temp;
                             }
                         }
@@ -769,55 +783,26 @@ namespace IDKEngine.Render
             {
                 if (ImGui.Button("Add light"))
                 {
-                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new Vector2(0.0f));
-                    Vector3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
+                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new OtkVec2(0.0f));
+                    OtkVec3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    CpuLight newLight = new CpuLight(spawnPoint, new Vector3(Helper.RandomVec3(32.0f, 88.0f)), 0.3f);
+                    CpuLight newLight = new CpuLight(spawnPoint, new OtkVec3(Helper.RandomVec3(32.0f, 88.0f)), 0.3f);
                     if (app.LightManager.AddLight(newLight))
                     {
                         int newLightIndex = app.LightManager.Count - 1;
-                        PointShadow pointShadow = new PointShadow(256, app.RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
+                        PointShadow pointShadow = new PointShadow(256, app.RenderResolution, new OtkVec2(newLight.GpuLight.Radius, 60.0f));
                         if (!app.LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
                         {
                             pointShadow.Dispose();
                         }
 
-                        float distance = Vector3.Distance(app.Camera.Position, newLight.GpuLight.Position);
+                        float distance = OtkVec3.Distance(app.Camera.Position, newLight.GpuLight.Position);
                         SelectedEntity = new SelectedEntityInfo(EntityType.Light, newLightIndex, 0, distance);
 
                         shouldResetPT = true;
                     }
                 }
-
-                if (ImGui.Button("Load model"))
-                {
-                    if (app.WindowFullscreen)
-                    {
-                        // Need to end fullscreen otherwise file-explorer is not visible
-                        app.WindowFullscreen = false;
-                    }
-
-                    DialogResult result = Dialog.FileOpen("gltf,glb");
-                    if (result.IsError)
-                    {
-                        Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
-                    }
-                    else if (result.IsOk)
-                    {
-                        ModelLoader.Model newScene = ModelLoader.GltfToEngineFormat(result.Path, Matrix4.CreateTranslation(app.Camera.Position));
-                        app.ModelSystem.Add(newScene);
-
-                        int newMeshIndex = app.ModelSystem.Meshes.Length - 1;
-
-                        ref readonly GpuDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[newMeshIndex];
-                        Vector3 position = app.ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix.ExtractTranslation();
-                        float distance = Vector3.Distance(app.Camera.Position, position);
-
-                        SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, cmd.BaseInstance, distance);
-
-                        shouldResetPT = true;
-                    }
-                }
+                ModuleLoadSceneRender(app);
             }
             ImGui.End();
 
@@ -839,12 +824,12 @@ namespace IDKEngine.Render
                     ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance}");
                     ImGui.Text($"Triangle Count: {cmd.IndexCount / 3}");
 
-                    Vector3 beforeTranslation = meshInstance.ModelMatrix.ExtractTranslation();
+                    OtkVec3 beforeTranslation = meshInstance.ModelMatrix.ExtractTranslation();
                     tempVec3 = beforeTranslation.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
                     {
                         shouldUpdateMesh = true;
-                        Vector3 dif = tempVec3.ToOpenTK() - beforeTranslation;
+                        OtkVec3 dif = tempVec3.ToOpenTK() - beforeTranslation;
                         meshInstance.ModelMatrix = meshInstance.ModelMatrix * Matrix4.CreateTranslation(dif);
                     }
 
@@ -852,16 +837,16 @@ namespace IDKEngine.Render
                     if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
                     {
                         shouldUpdateMesh = true;
-                        Vector3 temp = Vector3.ComponentMax(tempVec3.ToOpenTK(), new Vector3(0.001f));
+                        OtkVec3 temp = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
                         meshInstance.ModelMatrix = Matrix4.CreateScale(temp) * meshInstance.ModelMatrix.ClearScale();
                     }
 
-                    meshInstance.ModelMatrix.ExtractRotation().ToEulerAngles(out Vector3 beforeAngles);
+                    meshInstance.ModelMatrix.ExtractRotation().ToEulerAngles(out OtkVec3 beforeAngles);
                     tempVec3 = beforeAngles.ToNumerics();
                     if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
                     {
                         shouldUpdateMesh = true;
-                        Vector3 dif = tempVec3.ToOpenTK() - beforeAngles;
+                        OtkVec3 dif = tempVec3.ToOpenTK() - beforeAngles;
 
                         meshInstance.ModelMatrix = Matrix4.CreateRotationZ(dif.Z) *
                                                     Matrix4.CreateRotationY(dif.Y) *
@@ -970,7 +955,7 @@ namespace IDKEngine.Render
                         {
                             if (ImGui.Button("Create PointShadow"))
                             {
-                                PointShadow newPointShadow = new PointShadow(256, app.RenderResolution, new Vector2(gpuLight.Radius, 60.0f));
+                                PointShadow newPointShadow = new PointShadow(256, app.RenderResolution, new OtkVec2(gpuLight.Radius, 60.0f));
                                 if (!app.LightManager.CreatePointShadowForLight(newPointShadow, SelectedEntity.EntityID))
                                 {
                                     newPointShadow.Dispose();
@@ -1006,20 +991,20 @@ namespace IDKEngine.Render
             }
             ImGui.End();
 
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(0.0f));
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new SysVec2(0.0f));
             if (ImGui.Begin($"Viewport"))
             {
-                System.Numerics.Vector2 content = ImGui.GetContentRegionAvail();
+                SysVec2 content = ImGui.GetContentRegionAvail();
                 if (content.X != app.PresentationResolution.X || content.Y != app.PresentationResolution.Y)
                 {
                     // Viewport changed, inform app of the new resolution
                     app.PresentationResolution = new Vector2i((int)content.X, (int)content.Y);
                 }
 
-                System.Numerics.Vector2 tileBar = ImGui.GetCursorPos();
+                SysVec2 tileBar = ImGui.GetCursorPos();
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
-                ImGui.Image(app.TonemapAndGamma.Result.ID, content, new System.Numerics.Vector2(0.0f, 1.0f), new System.Numerics.Vector2(1.0f, 0.0f));
+                ImGui.Image(app.TonemapAndGamma.Result.ID, content, new SysVec2(0.0f, 1.0f), new SysVec2(1.0f, 0.0f));
             }
             ImGui.PopStyleVar();
             ImGui.End();
@@ -1028,35 +1013,20 @@ namespace IDKEngine.Render
             {
                 app.PathTracer.ResetRenderProcess();
             }
-            Backend.Render();
-        }
-
-        private static void ToolTipForItemAboveHovered(string text)
-        {
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip(text);
-            }
-        }
-
-        private static void BothAxisCenteredText(string text)
-        {
-            System.Numerics.Vector2 size = ImGui.GetWindowSize();
-            System.Numerics.Vector2 textWidth = ImGui.CalcTextSize(text);
-            ImGui.SetCursorPos((size - textWidth) * 0.5f);
-            ImGui.Text(text);
-        }
-
-        private static void HorizontallyCenteredText(string text)
-        {
-            System.Numerics.Vector2 size = ImGui.GetWindowSize();
-            System.Numerics.Vector2 textWidth = ImGui.CalcTextSize(text);
-            ImGui.SetCursorPos(new System.Numerics.Vector2((size - textWidth).X * 0.5f, ImGui.GetCursorPos().Y));
-            ImGui.Text(text);
+            backend.Render();
         }
 
         public void Update(Application app)
         {
+            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal)
+            {
+                backend.IsIgnoreMouseInput = false;
+            }
+            else if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
+            {
+                backend.IsIgnoreMouseInput = true;
+            }
+
             void TakeScreenshot()
             {
                 int frameIndex = app.FrameStateRecorder.ReplayStateIndex;
@@ -1067,6 +1037,8 @@ namespace IDKEngine.Render
 
                 Helper.TextureToDiskJpg(app.TonemapAndGamma.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
+
+            ModuleLoadSceneUpdate(app);
 
             if (FrameRecState == FrameRecorderState.Replaying)
             {
@@ -1124,75 +1096,6 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && app.MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
-            {
-                Vector2i point = new Vector2i((int)app.MouseState.Position.X, (int)app.MouseState.Position.Y);
-                if (app.RenderGui)
-                {
-                    point -= (Vector2i)viewportHeaderSize.ToOpenTK();
-                }
-                point.Y = app.TonemapAndGamma.Result.Height - point.Y;
-
-                Vector2 ndc = new Vector2((float)point.X / app.TonemapAndGamma.Result.Width, (float)point.Y / app.TonemapAndGamma.Result.Height) * 2.0f - new Vector2(1.0f);
-                if (ndc.X > 1.0f || ndc.Y > 1.0f || ndc.X < -1.0f || ndc.Y < -1.0f)
-                {
-                    return;
-                }
-
-                Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndc);
-
-                //Stopwatch timer = Stopwatch.StartNew();
-                //System.Threading.Tasks.Parallel.For(0, app.RenderResolution.X * app.RenderResolution.Y, i =>
-                //{
-                //    int y = i / app.RenderResolution.X;
-                //    int x = i % app.RenderResolution.X;
-
-                //    Vector2 ndcDebug = new Vector2((float)x / app.RenderResolution.X, (float)y / app.RenderResolution.Y) * 2.0f - new Vector2(1.0f);
-                //    worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndcDebug);
-
-                //    app.ModelSystem.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo test);
-                //});
-                //timer.Stop();
-                //Console.WriteLine(timer.Elapsed.TotalMilliseconds);
-
-                bool hitMesh = app.ModelSystem.BVH.Intersect(worldSpaceRay, out BVH.RayHitInfo meshHitInfo);
-                bool hitLight = app.LightManager.Intersect(worldSpaceRay, out LightManager.RayHitInfo lightHitInfo);
-                if (app.RenderMode == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
-
-                if (!hitMesh && !hitLight)
-                {
-                    SelectedEntity = SelectedEntityInfo.None;
-                    return;
-                }
-
-                if (!hitLight) lightHitInfo.T = float.MaxValue;
-                if (!hitMesh) meshHitInfo.T = float.MaxValue;
-
-                SelectedEntityInfo newSelectedEntity;
-                if (meshHitInfo.T < lightHitInfo.T)
-                {
-                    newSelectedEntity = new SelectedEntityInfo(EntityType.Mesh, meshHitInfo.MeshID, meshHitInfo.InstanceID, meshHitInfo.T);
-                }
-                else
-                {
-                    newSelectedEntity = new SelectedEntityInfo(EntityType.Light, lightHitInfo.LightID, 0, lightHitInfo.T);
-                }
-
-                bool entityWasAlreadySelected =
-                    (newSelectedEntity.EntityType == SelectedEntity.EntityType) &&
-                    (newSelectedEntity.EntityID == SelectedEntity.EntityID) &&
-                    (newSelectedEntity.InstanceID == SelectedEntity.InstanceID);
-
-                if (entityWasAlreadySelected)
-                {
-                    SelectedEntity = SelectedEntityInfo.None;
-                }
-                else
-                {
-                    SelectedEntity = newSelectedEntity;
-                }
-            }
-
             if (FrameRecState == FrameRecorderState.Replaying)
             {
                 FrameState state = app.FrameStateRecorder[app.FrameStateRecorder.ReplayStateIndex];
@@ -1201,11 +1104,269 @@ namespace IDKEngine.Render
                 app.Camera.LookX = state.LookX;
                 app.Camera.LookY = state.LookY;
             }
+
+            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && app.MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
+            {
+                OtkVec2 clickedPixel = app.MouseState.Position;
+                if (app.RenderGui)
+                {
+                    clickedPixel -= viewportHeaderSize.ToOpenTK();
+                }
+                clickedPixel.Y = app.TonemapAndGamma.Result.Height - clickedPixel.Y;
+
+                OtkVec2 ndc = clickedPixel / app.PresentationResolution * 2.0f - new OtkVec2(1.0f);
+                bool clickedInsideViewport = ndc.X < 1.0f && ndc.Y < 1.0f && ndc.X > -1.0f && ndc.Y > -1.0f;
+                if (clickedInsideViewport)
+                {
+                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndc);
+                    SelectedEntityInfo hitEntity = RayTraceEntity(app, worldSpaceRay);
+
+                    bool entityWasAlreadySelected = hitEntity == SelectedEntity;
+                    if (entityWasAlreadySelected)
+                    {
+                        SelectedEntity = SelectedEntityInfo.None;
+                    }
+                    else
+                    {
+                        SelectedEntity = hitEntity;
+                    }
+                }
+            }
+        }
+        private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray)
+        {
+            bool hitMesh = app.ModelSystem.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
+            bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
+            if (app.RenderMode == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
+
+            SelectedEntityInfo hitEntity = SelectedEntityInfo.None;
+            if (!hitMesh && !hitLight)
+            {
+                return hitEntity;
+            }
+
+            if (!hitLight) lightHitInfo.T = float.MaxValue;
+            if (!hitMesh) meshHitInfo.T = float.MaxValue;
+
+            if (meshHitInfo.T < lightHitInfo.T)
+            {
+                hitEntity = new SelectedEntityInfo(EntityType.Mesh, meshHitInfo.MeshID, meshHitInfo.InstanceID, meshHitInfo.T);
+            }
+            else
+            {
+                hitEntity = new SelectedEntityInfo(EntityType.Light, lightHitInfo.LightID, 0, lightHitInfo.T);
+            }
+
+            return hitEntity;
+        }
+
+        public void SetSize(Vector2i size)
+        {
+            backend.WindowResized(size.X, size.Y);
+        }
+        public void PressChar(char key)
+        {
+            backend.PressChar(key);
         }
 
         public void Dispose()
         {
-            Backend.Dispose();
+            backend.Dispose();
+        }
+
+        private static void ToolTipForItemAboveHovered(string text)
+        {
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(text);
+            }
+        }
+        private static void BothAxisCenteredText(string text)
+        {
+            SysVec2 size = ImGui.GetWindowSize();
+            SysVec2 textWidth = ImGui.CalcTextSize(text);
+            ImGui.SetCursorPos((size - textWidth) * 0.5f);
+            ImGui.Text(text);
+        }
+        private static void HorizontallyCenteredText(string text)
+        {
+            SysVec2 size = ImGui.GetWindowSize();
+            SysVec2 textWidth = ImGui.CalcTextSize(text);
+            ImGui.SetCursorPos(new SysVec2((size - textWidth).X * 0.5f, ImGui.GetCursorPos().Y));
+            ImGui.Text(text);
+        }
+    }
+
+    partial class Gui
+    {
+        private struct ModuleLoadSceneVars
+        {
+            public bool DialogAskForCompression;
+            public string GuiGltfSourcePath;
+
+            public Tuple<Task, string>?[] GltfCompressionsTasks = new Tuple<Task, string>[10];
+
+            public ModuleLoadSceneVars()
+            {
+            }
+        }
+
+        private ModuleLoadSceneVars moduleLoadSceneVars = new ModuleLoadSceneVars();
+        public void ModuleLoadSceneRender(Application app)
+        {
+            const string POPUP_ASK_FOR_COMPRESSION = "Compress glTF?";
+            if (ImGui.Button("Load glTF"))
+            {
+                if (app.WindowFullscreen)
+                {
+                    // Need to end fullscreen otherwise file explorer is not visible
+                    app.WindowFullscreen = false;
+                }
+
+                DialogResult result = Dialog.FileOpen("gltf,glb");
+                if (result.IsError)
+                {
+                    Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
+                }
+                else if (result.IsOk)
+                {
+                    if (ModelLoader.CompressionUtils.IsCompressedGltf(result.Path))
+                    {
+                        LoadModel(app, result.Path);
+                    }
+                    if (!ModelLoader.CompressionUtils.IsCompressedGltf(result.Path) && !ModelLoader.CompressionUtils.CompressionToolAvailable())
+                    {
+                        LoadModel(app, result.Path);
+                        Logger.Log(Logger.LogLevel.Warn, $"The loaded model \"{Path.GetFileName(result.Path)}\" is uncompressed and the compresion tool \"{ModelLoader.CompressionUtils.COMPRESSION_TOOL_NAME}\" was not found.");
+                    }
+
+                    if (!ModelLoader.CompressionUtils.IsCompressedGltf(result.Path) && ModelLoader.CompressionUtils.CompressionToolAvailable())
+                    {
+                        moduleLoadSceneVars.DialogAskForCompression = true;
+                        ImGui.OpenPopup(POPUP_ASK_FOR_COMPRESSION);
+                    }
+
+                    moduleLoadSceneVars.GuiGltfSourcePath = result.Path;
+                }
+            }
+
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new SysVec2(0.0f));
+            if (ImGui.BeginPopupModal(POPUP_ASK_FOR_COMPRESSION, ref moduleLoadSceneVars.DialogAskForCompression, ImGuiWindowFlags.NoNavInputs))
+            {
+                HorizontallyCenteredText("The glTF model doesn't have compression.\nWould you like to compress to disk via gltfpack and load that?");
+                ImGui.Separator();
+
+                float availX = ImGui.GetContentRegionAvail().X;
+                float availY = ImGui.GetContentRegionAvail().Y;
+                ImGui.SetCursorPosX(availX * 0.1f);
+                if (ImGui.Button("Yes", new SysVec2(ImGui.GetWindowWidth() * 0.35f, availY * 0.6f)))
+                {
+                    ImGui.CloseCurrentPopup();
+
+                    int workerIndex = -1;
+                    for (int i = 0; i < moduleLoadSceneVars.GltfCompressionsTasks.Length; i++)
+                    {
+                        if (moduleLoadSceneVars.GltfCompressionsTasks[i] == null)
+                        {
+                            workerIndex = i;
+                            break;
+                        }
+                    }
+                    if (workerIndex == -1)
+                    {
+                        Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
+                        LoadModel(app, moduleLoadSceneVars.GuiGltfSourcePath);
+                        return;
+                    }
+
+                    string fileName = Path.GetFileName(moduleLoadSceneVars.GuiGltfSourcePath);
+                    string compressedGltfDir = Path.Combine(Path.GetDirectoryName(moduleLoadSceneVars.GuiGltfSourcePath), "Compressed");
+                    string compressedGtlfPath = Path.Combine(compressedGltfDir, fileName);
+                    Directory.CreateDirectory(compressedGltfDir);
+
+                    Task? task = ModelLoader.CompressionUtils.CompressGltf(new ModelLoader.CompressionUtils.CompressGltfSettings()
+                    {
+                        InputPath = moduleLoadSceneVars.GuiGltfSourcePath,
+                        OutputPath = compressedGtlfPath,
+                        ProcessError = (string message) =>
+                        {
+                            Logger.Log(Logger.LogLevel.Error, message);
+                            Logger.Log(Logger.LogLevel.Error, $"An error occured while compressing \"{fileName}\". Falling back to uncompressed model");
+                            moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.GuiGltfSourcePath);
+                        },
+                        ProcessOutput = (string message) =>
+                        {
+                            Logger.Log(Logger.LogLevel.Info, message);
+                        }
+                    });
+
+                    if (task == null)
+                    {
+                        Logger.Log(Logger.LogLevel.Error, $"Failed to create compression task. Falling back to uncompressed model");
+                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.GuiGltfSourcePath);
+                    }
+                    else
+                    {
+                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(task, compressedGtlfPath);
+                    }
+                }
+
+                ImGui.SameLine();
+                if (ImGui.Button("No", new SysVec2(ImGui.GetWindowWidth() * 0.35f, availY * 0.6f)))
+                {
+                    ImGui.CloseCurrentPopup();
+
+                    LoadModel(app, moduleLoadSceneVars.GuiGltfSourcePath);
+                }
+
+                ImGui.EndPopup();
+            }
+            ImGui.PopStyleVar();
+
+            for (int i = 0; i < moduleLoadSceneVars.GltfCompressionsTasks.Length; i++)
+            {
+                if (moduleLoadSceneVars.GltfCompressionsTasks[i] == null)
+                {
+                    continue;
+                }
+
+                (Task task, string gltfPath) = moduleLoadSceneVars.GltfCompressionsTasks[i];
+                if (!task.IsCompleted)
+                {
+                    ImGui.Text($"Compressing {Path.GetFileName(gltfPath)}...\n");
+                }
+            }
+        }
+        public void ModuleLoadSceneUpdate(Application app)
+        {
+            for (int i = 0; i < moduleLoadSceneVars.GltfCompressionsTasks.Length; i++)
+            {
+                if (moduleLoadSceneVars.GltfCompressionsTasks[i] == null)
+                {
+                    continue;
+                }
+
+                (Task task, string gltfPath) = moduleLoadSceneVars.GltfCompressionsTasks[i];
+                if (task.IsCompletedSuccessfully)
+                {
+                    LoadModel(app, gltfPath);
+                    moduleLoadSceneVars.GltfCompressionsTasks[i] = null;
+                }
+            }
+        }
+        private void LoadModel(Application app, string path)
+        {
+            ModelLoader.Model newScene = ModelLoader.LoadGltfFromFile(path, Matrix4.CreateTranslation(app.Camera.Position));
+            app.ModelSystem.Add(newScene);
+
+            int newMeshIndex = app.ModelSystem.Meshes.Length - 1;
+
+            ref readonly GpuDrawElementsCmd cmd = ref app.ModelSystem.DrawCommands[newMeshIndex];
+            OtkVec3 position = app.ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix.ExtractTranslation();
+            float distance = OtkVec3.Distance(app.Camera.Position, position);
+
+            SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, cmd.BaseInstance, distance);
+            shouldResetPT = true;
         }
     }
 }

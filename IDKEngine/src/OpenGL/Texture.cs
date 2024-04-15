@@ -52,6 +52,10 @@ namespace IDKEngine.OpenGL
 
             D16Unorm = SizedInternalFormat.DepthComponent16,
             D32Float = SizedInternalFormat.DepthComponent32f,
+
+            // Require GL_KHR_texture_compression_astc_ldr
+            Astc4X4Rgba = SizedInternalFormat.CompressedRgbaAstc4X4,
+            Astc4X4RgbaSrgb = SizedInternalFormat.CompressedSrgb8Alpha8Astc4X4,
         }
 
         public readonly int ID;
@@ -323,9 +327,10 @@ namespace IDKEngine.OpenGL
 
         public static int GetBlockCompressedImageSize(InternalFormat format, int width, int height, int depth)
         {
-            // Returns same as KTX2.GetImageSize()
-
+            // Returns the same as KTX2.GetImageSize()
             // Source: https://github.com/JuanDiegoMontoya/Fwog/blob/a26365764fbcca77dfdef0184f1aaff1825c605f/src/Texture.cpp#L22
+            //         https://www.reedbeta.com/blog/understanding-bcn-texture-compression-formats/
+            //         https://themaister.net/blog/2020/08/12/compressed-gpu-texture-formats-a-review-and-compute-shader-decoders-part-1/
 
             // BCn formats store 4x4 blocks of pixels, even if the dimensions aren't a multiple of 4
             // We round up to the nearest multiple of 4 for width and height, but not depth, since
@@ -340,9 +345,11 @@ namespace IDKEngine.OpenGL
                 case InternalFormat.Bc4RUnorm:
                     return width * height * depth / 2;
 
-                // BC3, BC5, BC6, and BC7 store 4x4 blocks with 128 bits (16 bytes)
+                // BC3, BC5, BC6, BC7 and ASTC store 4x4 blocks with 128 bits (16 bytes)
                 case InternalFormat.Bc7RgbaUnorm:
                 case InternalFormat.Bc7RgbaSrgb:
+                case InternalFormat.Astc4X4Rgba:
+                case InternalFormat.Astc4X4RgbaSrgb:
                     return width * height * depth;
 
                 default:

@@ -21,10 +21,10 @@ Feature list:
 Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
 
 Notes:
+ * If [gltfpack](https://github.com/zeux/meshoptimizer/tree/master/gltf#-gltfpack) is found in PATH or working dir you are given the option to automatically compress glTF files on load
  * Crashes on AMD drivers newer than 23.12.1 because of [driver bug](https://community.amd.com/t5/opengl-vulkan/opengl-bug-imagesize-causes-crash-when-using-gl-arb-bindless/m-p/668942#M5125)
  * I am forced to rely on undefined behaviour (writing a read-only bindless image) when using Ray Traced shadows, as a workarround to an AMD driver bug. Nothing is guaranteed :)
  * Doesn't fully work on Mesa radeonsi driver
- * For KTX texture compression and more glTFs can be run through `gltfpack -v -noq -mi -tc -tq 10 -tu attrib -i old.gltf -o new.gltf`
 
 
 # Controls
@@ -343,7 +343,7 @@ void main() {
 ```
 
 At this point, you can use both the average speed and the Coefficient of variation of the luminance to get an appropriate shading rate. That is not the most interesting part.
-I decided to scale both of these factors, add them together and then use that to mix between different rates. The code is [here](https://github.com/BoyBaykiller/IDKEngine/blob/master/IDKEngine/res/shaders/ShadingRateClassification/compute.glsl).
+I decided to scale both of these factors, add them together and then use that to mix between different rates.
 
 ### 3.0 Subgroup optimizations
 

@@ -75,7 +75,7 @@ void main()
 
 bool TraceRay(inout WavefrontRay wavefrontRay)
 {
-    vec3 uncompressedDir = DecompressOctahedron(vec2(wavefrontRay.CompressedDirectionX, wavefrontRay.CompressedDirectionY));
+    vec3 uncompressedDir = DecodeUnitVec(vec2(wavefrontRay.CompressedDirectionX, wavefrontRay.CompressedDirectionY));
 
     HitInfo hitInfo;
     if (TraceRay(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, settingsUBO.IsTraceLights, FLOAT_MAX))
@@ -123,7 +123,9 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             transmissionChance = clamp(texture(material.Transmission, interpTexCoord).r * material.TransmissionFactor + mesh.TransmissionBias, 0.0, 1.0);
             roughness = clamp(texture(material.MetallicRoughness, interpTexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
             specularChance = clamp(texture(material.MetallicRoughness, interpTexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - transmissionChance);
-            if (albedoAlpha.a < material.AlphaCutoff)
+            
+            float alphaCutoff = material.DoAlphaBlending ? GetRandomFloat01() : material.AlphaCutoff;
+            if (albedoAlpha.a < alphaCutoff)
             {
                 wavefrontRay.Origin += uncompressedDir * 0.001;
                 return true;
@@ -179,7 +181,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         wavefrontRay.Origin += result.Direction * 0.001;
         wavefrontRay.PreviousIOROrDebugNodeCounter = result.Ior;
 
-        vec2 compressedDir = CompressOctahedron(result.Direction);
+        vec2 compressedDir = EncodeUnitVec(result.Direction);
         wavefrontRay.CompressedDirectionX = compressedDir.x;
         wavefrontRay.CompressedDirectionY = compressedDir.y;
         return true;

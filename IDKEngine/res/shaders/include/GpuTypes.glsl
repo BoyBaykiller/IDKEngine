@@ -2,7 +2,7 @@ struct PackedVec3
 {
     float x, y, z;
 };
-vec3 PackedFloatsToVec3(PackedVec3 floats)
+vec3 Unpack(PackedVec3 floats)
 {
     return vec3(floats.x, floats.y, floats.z);
 }
@@ -11,7 +11,7 @@ struct PackedUVec3
 {
     uint x, y, z;
 };
-uvec3 PackedUintsToUvec3(PackedUVec3 uints)
+uvec3 Unpack(PackedUVec3 uints)
 {
     return uvec3(uints.x, uints.y, uints.z);
 }
@@ -155,7 +155,8 @@ struct Material
     MATERIAL_SAMPLER_2D_TYPE Emissive;
 
     MATERIAL_SAMPLER_2D_TYPE Transmission;
-    uvec2 _pad0;
+    bool DoAlphaBlending;
+    uint _pad0;
 };
 
 struct Vertex
