@@ -72,7 +72,7 @@ namespace IDKEngine
                     // best candiate to form the smallest possible bounding box out of all left over nodes
                     if (nodeAId == nodeCId)
                     {
-                        // Move other child node next to nodeA in memory
+                        // Move nodeBId such that [..., nodeB, nodeA, ...]
                         MathHelper.Swap(ref Nodes[nodeAId - 1], ref Nodes[nodeBId]);
                         nodeBId = nodeAId - 1;
 
@@ -92,7 +92,7 @@ namespace IDKEngine
                         int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
                         Nodes[newNodeIndex] = newNode;
 
-                        // By subtracting two, the two child nodes (nodeAId, nodeBId) will no longer be included in the search for potential candidates
+                        // By subtracting two, the two child nodes (nodeBId, nodeAId) will no longer be included in the search for potential candidates
                         candidatesSearchStart -= 2;
 
                         // Newly created parent should be included in the search for potential candidates which is why -1 (i know intuitively should be +1 but we are building in reverse)
@@ -145,7 +145,7 @@ namespace IDKEngine
 
             int stackPtr = 0;
             uint stackTop = 0;
-            Span<uint> stack = stackalloc uint[22];
+            Span<uint> stack = stackalloc uint[32];
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref Nodes[stackTop];
@@ -204,7 +204,7 @@ namespace IDKEngine
         {
             int stackPtr = 0;
             uint stackTop = 0;
-            Span<uint> stack = stackalloc uint[22];
+            Span<uint> stack = stackalloc uint[32];
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref Nodes[stackTop];

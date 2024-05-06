@@ -97,18 +97,19 @@ namespace IDKEngine.Render
             int tempInt;
             bool tempBool;
             float tempFloat;
-            shouldResetPT = false;
             SysVec2 tempVec2;
             SysVec3 tempVec3;
+            shouldResetPT = false;
 
             if (ImGui.Begin("Stats"))
             {
-                float mbDrawVertices = (app.ModelSystem.Vertices.Length * ((nint)sizeof(GpuVertex) + sizeof(OtkVec3))) / 1000000.0f;
-                float mbDrawIndices = (app.ModelSystem.VertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
-                float mbMeshlets = (app.ModelSystem.Meshlets.Length * (nint)sizeof(GpuMeshlet)) / 1000000.0f;
-                float mbMeshletsVertexIndices = (app.ModelSystem.MeshletsVertexIndices.Length * (nint)sizeof(uint)) / 1000000.0f;
-                float mbMeshletsLocalIndices = (app.ModelSystem.MeshletsLocalIndices.Length * (nint)sizeof(byte)) / 1000000.0f;
-                float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshlets + mbMeshletsVertexIndices + mbMeshletsLocalIndices;
+                float mbDrawVertices = (app.ModelSystem.Vertices.SizeInBytes() + app.ModelSystem.VertexPositions.SizeInBytes()) / 1000000.0f;
+                float mbDrawIndices = app.ModelSystem.VertexIndices.SizeInBytes() / 1000000.0f;
+                float mbMeshlets = app.ModelSystem.Meshlets.SizeInBytes() / 1000000.0f;
+                float mbMeshletsVertexIndices = app.ModelSystem.MeshletsVertexIndices.SizeInBytes() / 1000000.0f;
+                float mbMeshletsLocalIndices = app.ModelSystem.MeshletsLocalIndices.SizeInBytes() / 1000000.0f;
+                float mbMeshInstances = app.ModelSystem.MeshInstances.SizeInBytes() / 1000000.0f;
+                float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshlets + mbMeshletsVertexIndices + mbMeshletsLocalIndices + mbMeshInstances;
                 if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
                 {
                     ImGui.Text($"  * Vertices ({app.ModelSystem.Vertices.Length}) = {mbDrawVertices}mb");
@@ -116,12 +117,13 @@ namespace IDKEngine.Render
                     ImGui.Text($"  * Meshlets ({app.ModelSystem.Meshlets.Length}) = {mbMeshlets}mb");
                     ImGui.Text($"  * MeshletsVertexIndices ({app.ModelSystem.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
                     ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelSystem.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
+                    ImGui.Text($"  * MeshInstances ({app.ModelSystem.MeshInstances.Length}) = {mbMeshInstances}mb");
                     ImGui.TreePop();
                 }
 
-                float mbBlasTrianglesIndices = (app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet)) / 1000000.0f;
-                float mbBlasNodes = (app.ModelSystem.BVH.GetBlasesNodeCount() * (nint)sizeof(GpuBlasNode)) / 1000000.0f;
-                float mbBTlasNodes = (app.ModelSystem.BVH.Tlas.Blases.Length * (nint)sizeof(GpuTlasNode)) / 1000000.0f;
+                float mbBlasTrianglesIndices = app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet) / 1000000.0f;
+                float mbBlasNodes = app.ModelSystem.BVH.GetBlasesNodeCount() * sizeof(GpuBlasNode) / 1000000.0f;
+                float mbBTlasNodes = app.ModelSystem.BVH.Tlas.Nodes.SizeInBytes() / 1000000.0f;
                 float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
                 if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
                 {
@@ -151,8 +153,9 @@ namespace IDKEngine.Render
                     }
                     ImGui.SameLine();
                     ImGui.Text($"({app.Camera.Velocity.Length})");
-
+                    
                     tempVec2 = new SysVec2(app.Camera.LookX, app.Camera.LookY);
+                    OtkVec2 a = new OtkVec2();
                     if (ImGui.DragFloat2("LookAt", ref tempVec2))
                     {
                         app.Camera.LookX = tempVec2.X;
@@ -303,7 +306,7 @@ namespace IDKEngine.Render
                     app.ModelSystem.BVH.TlasBuild();
                 }
 
-                ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.01f, 4.0f);
+                ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.0f, 4.0f);
                 ImGui.SliderFloat("Saturation", ref app.TonemapAndGamma.Settings.Saturation, 0.0f, 1.5f);
 
                 tempFloat = app.ResolutionScale;
@@ -371,7 +374,8 @@ namespace IDKEngine.Render
                         if (app.RasterizerPipeline.IsVXGI)
                         {
                             ToolTipForItemAboveHovered("Controls wether the scene is re-voxelized every frame");
-                            ImGui.Checkbox("ShouldReVoxelize", ref app.RasterizerPipeline.ShouldReVoxelize);
+                            ImGui.Checkbox("GridReVoxelize", ref app.RasterizerPipeline.GridReVoxelize);
+                            ImGui.Checkbox("GridFollowCamera", ref app.RasterizerPipeline.GridFollowCamera);
 
                             ImGui.Checkbox("IsConfigureGrid", ref app.RasterizerPipeline.IsConfigureGridMode);
                             ToolTipForItemAboveHovered(
@@ -786,7 +790,7 @@ namespace IDKEngine.Render
                     Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new OtkVec2(0.0f));
                     OtkVec3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    CpuLight newLight = new CpuLight(spawnPoint, new OtkVec3(Helper.RandomVec3(32.0f, 88.0f)), 0.3f);
+                    CpuLight newLight = new CpuLight(spawnPoint, Helper.RandomVec3(32.0f, 88.0f), 0.3f);
                     if (app.LightManager.AddLight(newLight))
                     {
                         int newLightIndex = app.LightManager.Count - 1;
@@ -1202,12 +1206,16 @@ namespace IDKEngine.Render
         private struct ModuleLoadSceneVars
         {
             public bool DialogAskForCompression;
-            public string GuiGltfSourcePath;
+
+            public ModelLoader.CompressionUtils.CompressGltfSettings CompressGltfSettings;
 
             public Tuple<Task, string>?[] GltfCompressionsTasks = new Tuple<Task, string>[10];
 
             public ModuleLoadSceneVars()
             {
+                CompressGltfSettings = new ModelLoader.CompressionUtils.CompressGltfSettings();
+                CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
+                CompressGltfSettings.UseInstancing = true;
             }
         }
 
@@ -1230,23 +1238,25 @@ namespace IDKEngine.Render
                 }
                 else if (result.IsOk)
                 {
-                    if (ModelLoader.CompressionUtils.IsCompressedGltf(result.Path))
+                    bool isCompressed = ModelLoader.CompressionUtils.IsCompressedGltf(result.Path);
+                    bool compressionToolAvailable = ModelLoader.CompressionUtils.CompressionToolAvailable();
+                    if (isCompressed)
                     {
                         LoadModel(app, result.Path);
                     }
-                    if (!ModelLoader.CompressionUtils.IsCompressedGltf(result.Path) && !ModelLoader.CompressionUtils.CompressionToolAvailable())
+                    if (!isCompressed && !compressionToolAvailable)
                     {
+                        Logger.Log(Logger.LogLevel.Warn, $"The glTF model \"{Path.GetFileName(result.Path)}\" is uncompressed and the compresion tool \"{ModelLoader.CompressionUtils.COMPRESSION_TOOL_NAME}\" was not found.");
                         LoadModel(app, result.Path);
-                        Logger.Log(Logger.LogLevel.Warn, $"The loaded model \"{Path.GetFileName(result.Path)}\" is uncompressed and the compresion tool \"{ModelLoader.CompressionUtils.COMPRESSION_TOOL_NAME}\" was not found.");
                     }
 
-                    if (!ModelLoader.CompressionUtils.IsCompressedGltf(result.Path) && ModelLoader.CompressionUtils.CompressionToolAvailable())
+                    if (!isCompressed && compressionToolAvailable)
                     {
                         moduleLoadSceneVars.DialogAskForCompression = true;
                         ImGui.OpenPopup(POPUP_ASK_FOR_COMPRESSION);
                     }
 
-                    moduleLoadSceneVars.GuiGltfSourcePath = result.Path;
+                    moduleLoadSceneVars.CompressGltfSettings.InputPath = result.Path;
                 }
             }
 
@@ -1254,6 +1264,12 @@ namespace IDKEngine.Render
             if (ImGui.BeginPopupModal(POPUP_ASK_FOR_COMPRESSION, ref moduleLoadSceneVars.DialogAskForCompression, ImGuiWindowFlags.NoNavInputs))
             {
                 HorizontallyCenteredText("The glTF model doesn't have compression.\nWould you like to compress to disk via gltfpack and load that?");
+                if (ImGui.TreeNode("CompressionOption"))
+                {
+                    ImGui.SliderInt("Threads", ref moduleLoadSceneVars.CompressGltfSettings.ThreadsUsed, 1, Environment.ProcessorCount);
+                    ImGui.Checkbox("UseInstancing", ref moduleLoadSceneVars.CompressGltfSettings.UseInstancing);
+                }
+
                 ImGui.Separator();
 
                 float availX = ImGui.GetContentRegionAvail().X;
@@ -1275,35 +1291,32 @@ namespace IDKEngine.Render
                     if (workerIndex == -1)
                     {
                         Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
-                        LoadModel(app, moduleLoadSceneVars.GuiGltfSourcePath);
+                        LoadModel(app, moduleLoadSceneVars.CompressGltfSettings.InputPath);
                         return;
                     }
 
-                    string fileName = Path.GetFileName(moduleLoadSceneVars.GuiGltfSourcePath);
-                    string compressedGltfDir = Path.Combine(Path.GetDirectoryName(moduleLoadSceneVars.GuiGltfSourcePath), "Compressed");
+                    string fileName = Path.GetFileName(moduleLoadSceneVars.CompressGltfSettings.InputPath);
+                    string compressedGltfDir = Path.Combine(Path.GetDirectoryName(moduleLoadSceneVars.CompressGltfSettings.InputPath), "Compressed");
                     string compressedGtlfPath = Path.Combine(compressedGltfDir, fileName);
                     Directory.CreateDirectory(compressedGltfDir);
+                    moduleLoadSceneVars.CompressGltfSettings.OutputPath = compressedGtlfPath;
 
-                    Task? task = ModelLoader.CompressionUtils.CompressGltf(new ModelLoader.CompressionUtils.CompressGltfSettings()
+                    moduleLoadSceneVars.CompressGltfSettings.ProcessError = (string message) =>
                     {
-                        InputPath = moduleLoadSceneVars.GuiGltfSourcePath,
-                        OutputPath = compressedGtlfPath,
-                        ProcessError = (string message) =>
-                        {
-                            Logger.Log(Logger.LogLevel.Error, message);
-                            Logger.Log(Logger.LogLevel.Error, $"An error occured while compressing \"{fileName}\". Falling back to uncompressed model");
-                            moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.GuiGltfSourcePath);
-                        },
-                        ProcessOutput = (string message) =>
-                        {
-                            Logger.Log(Logger.LogLevel.Info, message);
-                        }
-                    });
+                        Logger.Log(Logger.LogLevel.Error, message);
+                        Logger.Log(Logger.LogLevel.Error, $"An error occured while compressing \"{fileName}\". Falling back to uncompressed model");
+                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.CompressGltfSettings.InputPath);
+                    };
+                    moduleLoadSceneVars.CompressGltfSettings.ProcessOutput = (string message) =>
+                    {
+                        Logger.Log(Logger.LogLevel.Info, message);
+                    };
 
+                    Task? task = ModelLoader.CompressionUtils.CompressGltf(moduleLoadSceneVars.CompressGltfSettings);
                     if (task == null)
                     {
                         Logger.Log(Logger.LogLevel.Error, $"Failed to create compression task. Falling back to uncompressed model");
-                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.GuiGltfSourcePath);
+                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.CompressGltfSettings.InputPath);
                     }
                     else
                     {
@@ -1316,7 +1329,7 @@ namespace IDKEngine.Render
                 {
                     ImGui.CloseCurrentPopup();
 
-                    LoadModel(app, moduleLoadSceneVars.GuiGltfSourcePath);
+                    LoadModel(app, moduleLoadSceneVars.CompressGltfSettings.InputPath);
                 }
 
                 ImGui.EndPopup();

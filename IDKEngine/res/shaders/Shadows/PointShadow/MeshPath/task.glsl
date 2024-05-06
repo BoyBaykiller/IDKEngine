@@ -15,7 +15,7 @@ layout(local_size_x = MESHLETS_PER_WORKGROUP) in;
 
 taskNV out InOutVars
 {
-    uint MeshID; // interestingly this needs to be passed down, otherwise we get subtle bugs
+    uint MeshID;
     uint InstanceID;
     uint8_t FaceID;
     uint MeshletsStart;

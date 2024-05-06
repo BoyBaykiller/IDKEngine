@@ -27,7 +27,7 @@ namespace IDKEngine.Render
         {
             skyBoxTextureBuffer = new TypedBuffer<long>();
             skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
-            skyBoxTextureBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1, 0);
+            skyBoxTextureBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1, 0);
 
             Paths = paths;
             SetSkyBoxMode(skyBoxMode);

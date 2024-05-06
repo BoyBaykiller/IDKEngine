@@ -5,24 +5,33 @@ namespace IDKEngine.OpenGL
 {
     public class BufferObject : IDisposable
     {
-        public enum BufferStorageType
+        public enum MemLocation
         {
-            // The buffer resides in DEVICE memory and can only filled from the CPU at the time of creation
+            // The buffer resides in DEVICE memory
             DeviceLocal = BufferStorageFlags.None,
 
-            // The buffer must be read & write by using the mapped memory pointer.
+            // The buffer resides in HOST memory
+            HostLocal = BufferStorageFlags.ClientStorageBit,
+        }
+        public enum MemAccess
+        {
+            // The buffer can not be written to from the HOST except at the time of creation.
+            // It can be read by using the Download functions.
+            None = BufferStorageFlags.None,
+
+            // The buffer must be written or read to by using the mapped memory pointer or read by using the Download functions.
             // Writes by the HOST only become visible to the DEVICE after a call to glFlushMappedBufferRange.
             // Writes by the DEVICE only become visible to the HOST after a call to glMemoryBarrier(CLIENT_MAPPED_BUFFER_BARRIER_BIT)
             // followed by glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)
-            DeviceLocalHostVisible = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapReadBit | BufferStorageFlags.MapWriteBit,
+            MappedIncoherent = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapReadBit | BufferStorageFlags.MapWriteBit/* | memAccessMask.MapFlushExplicitBit*/,
 
-            // The buffer must be read & write by using the mapped memory pointer.
+            // The buffer must be written or read to by using the mapped memory pointer or read by using the Download functions.
             // Writes by the DEVICE only become visible to the HOST after a call to glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0).
-            DeviceLocalHostVisibleCoherent = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapCoherentBit | BufferStorageFlags.MapReadBit | BufferStorageFlags.MapWriteBit,
+            MappedCoherent = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapCoherentBit | BufferStorageFlags.MapReadBit | BufferStorageFlags.MapWriteBit,
 
-            // The buffer may be updated or downloaded from using the given functions.
-            // Synchronization is taken care of by OpenGL. 
-            Dynamic = BufferStorageFlags.DynamicStorageBit
+            // The buffer must be written or read by to using the Upload/Download functions.
+            // Synchronization is taken care of by OpenGL.
+            Synced = BufferStorageFlags.DynamicStorageBit,
         }
 
         public readonly int ID;
@@ -44,20 +53,20 @@ namespace IDKEngine.OpenGL
             GL.BindBuffer(bufferTarget, ID);
         }
 
-        public void ImmutableAllocate(BufferStorageType type, nint size, nint data = 0)
+        public void ImmutableAllocate(MemLocation memLocation, MemAccess memAccess, nint size, nint data = 0)
         {
-            GL.NamedBufferStorage(ID, size, data, (BufferStorageFlags)type);
+            GL.NamedBufferStorage(ID, size, data, (BufferStorageFlags)memLocation | (BufferStorageFlags)memAccess);
             Size = size;
 
             MappedMemory = nint.Zero;
 
-            if (type == BufferStorageType.DeviceLocalHostVisible)
+            if (memAccess == MemAccess.MappedIncoherent)
             {
-                MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)type | BufferAccessMask.MapFlushExplicitBit);
+                MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)memAccess | BufferAccessMask.MapFlushExplicitBit);
             }
-            else if (type == BufferStorageType.DeviceLocalHostVisibleCoherent)
+            else if (memAccess == MemAccess.MappedCoherent)
             {
-                MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)type);
+                MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (BufferAccessMask)memAccess);
             }
         }
         public void MutableAllocate(nint size, nint data = 0)
@@ -110,23 +119,22 @@ namespace IDKEngine.OpenGL
         public TypedBuffer()
             : base()
         {
-
         }
 
-        public void ImmutableAllocateElements(BufferStorageType type, ReadOnlySpan<T> data)
+        public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> data)
         {
-            ImmutableAllocateElements(type, data.Length, data[0]);
+            ImmutableAllocateElements(memLocation, memAccess, data.Length, data[0]);
         }
-        public void ImmutableAllocateElements(BufferStorageType type, nint count, in T data)
+        public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
         {
             fixed (void* ptr = &data)
             {
-                ImmutableAllocateElements(type, count, (nint)ptr);
+                ImmutableAllocateElements(memLocation, memAccess, count, (nint)ptr);
             }
         }
-        public void ImmutableAllocateElements(BufferStorageType type, nint count, nint data = 0)
+        public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, nint data = 0)
         {
-            ImmutableAllocate(type, sizeof(T) * count, data);
+            ImmutableAllocate(memLocation, memAccess, sizeof(T) * count, data);
         }
 
         public void MutableAllocateElements(ReadOnlySpan<T> data)

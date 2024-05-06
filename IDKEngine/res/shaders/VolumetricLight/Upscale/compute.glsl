@@ -36,9 +36,10 @@ void main()
         vec2 sampleUv = (curPixel + 0.5) / imageSize(ImgResult);
 
         vec3 downscaledColor = texture(SamplerVolumetric, sampleUv).rgb;
-        float lowResDepth = LogarithmicDepthToLinearViewDepth(perFrameDataUBO.NearPlane, perFrameDataUBO.FarPlane, texture(SamplerDepth, uv).r) / perFrameDataUBO.FarPlane;
+        float lowResDepth = LogarithmicDepthToLinearViewDepth(perFrameDataUBO.NearPlane, perFrameDataUBO.FarPlane, texture(SamplerDepth, sampleUv).r) / perFrameDataUBO.FarPlane;
 
-        float currentWeight = max(0.0, 1.0 - 0.05 * abs(lowResDepth - highResDepth));
+        float currentWeight = 1.0 - 0.05 * abs(lowResDepth - highResDepth);
+        currentWeight = max(currentWeight, 0.0);
 
         color += downscaledColor * currentWeight;
         totalWeight += currentWeight;

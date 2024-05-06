@@ -190,7 +190,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         specularChance = SpecularBasedOnViewAngle(specularChance, cosTheta, prevIor, ior);
         transmissionChance = 1.0 - diffuseChance - specularChance; // normalize again to (diff + spec + trans == 1.0)
 
-        NewRayProperties result = SampleMaterial(uncompressedDir, specularChance, roughness, transmissionChance, ior, prevIor, normal, fromInside);
+        RayProperties result = SampleMaterial(uncompressedDir, specularChance, roughness, transmissionChance, ior, prevIor, normal, fromInside);
 
         if (result.RayType != RAY_TYPE_REFRACTIVE || settingsUBO.IsAlwaysTintWithAlbedo)
         {

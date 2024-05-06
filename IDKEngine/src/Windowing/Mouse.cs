@@ -11,6 +11,14 @@ namespace IDKEngine.Windowing
             Changed,
         }
 
+        public enum InputState : int
+        {
+            Released,
+            Pressed,
+            Repeating,
+            Touched
+        }
+
         private CursorModeValue _cursorMode;
         public CursorModeValue CursorMode
         {

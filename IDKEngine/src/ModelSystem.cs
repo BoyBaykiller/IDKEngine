@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Runtime.InteropServices;
+using System.Collections;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using IDKEngine.Utils;
@@ -37,7 +37,7 @@ namespace IDKEngine
         public GpuMeshletTaskCmd[] MeshletTasksCmds = Array.Empty<GpuMeshletTaskCmd>();
         private readonly TypedBuffer<GpuMeshletTaskCmd> meshletTasksCmdsBuffer;
 
-        private readonly TypedBuffer<uint> meshletTasksCountBuffer;
+        private readonly TypedBuffer<int> meshletTasksCountBuffer;
 
         public GpuMeshlet[] Meshlets = Array.Empty<GpuMeshlet>();
         private readonly TypedBuffer<GpuMeshlet> meshletBuffer;
@@ -65,7 +65,7 @@ namespace IDKEngine
             vertexPositionBuffer = new TypedBuffer<Vector3>();
             vertexIndicesBuffer = new TypedBuffer<uint>();
             meshletTasksCmdsBuffer = new TypedBuffer<GpuMeshletTaskCmd>();
-            meshletTasksCountBuffer = new TypedBuffer<uint>();
+            meshletTasksCountBuffer = new TypedBuffer<int>();
             meshletBuffer = new TypedBuffer<GpuMeshlet>();
             meshletInfoBuffer = new TypedBuffer<GpuMeshletInfo>();
             meshletsVertexIndicesBuffer = new TypedBuffer<uint>();
@@ -161,6 +161,7 @@ namespace IDKEngine
             }
 
             UploadAllModelData();
+            meshInstanceShouldUpload = new BitArray(MeshInstances.Length, true);
         }
 
         public unsafe void Draw()
@@ -181,51 +182,82 @@ namespace IDKEngine
             GL.NV.MultiDrawMeshTasksIndirectCount(IntPtr.Zero, IntPtr.Zero, maxMeshlets, sizeof(GpuMeshletTaskCmd));
         }
 
+        private static BitArray meshInstanceShouldUpload;
         public void Update(out bool anyMeshInstanceMoved)
         {
             anyMeshInstanceMoved = false;
 
-            UpdateMeshInstanceBuffer(0, MeshInstances.Length);
-            for (int i = 0; i < MeshInstances.Length; i++)
+            int batchedUploadSize = 1 << 8;
+            int lastCleanBatch = MeshInstances.Length / batchedUploadSize * batchedUploadSize;
+            bool shouldBatchUpload = false;
+            for (int i = 0; i < MeshInstances.Length;)
             {
                 if (MeshInstances[i].DidMove())
                 {
-                    anyMeshInstanceMoved = true;
+                    shouldBatchUpload = true;
                 }
-                MeshInstances[i].SetPrevToCurrentMatrix();
+                if (meshInstanceShouldUpload[i])
+                {
+                    meshInstanceShouldUpload[i] = false;
+                    shouldBatchUpload = true;
+                }
+
+                i++;
+                if ((i % batchedUploadSize == 0 || i == MeshInstances.Length) && shouldBatchUpload)
+                {
+                    int batchSize = batchedUploadSize;
+                    int start = i - batchSize;
+                    if (i > lastCleanBatch)
+                    {
+                        batchSize = MeshInstances.Length - lastCleanBatch;
+                        start = lastCleanBatch;
+                    }
+
+                    UpdateMeshInstanceBuffer(start, batchSize);
+
+                    for (int j = start; j < start + batchSize; j++)
+                    {
+                        if (MeshInstances[j].DidMove())
+                        {
+                            MeshInstances[j].SetPrevToCurrentMatrix();
+
+                            // Prev matrix got updated, needs upload next frame
+                            meshInstanceShouldUpload[j] = true;
+                        }
+                    }
+
+                    anyMeshInstanceMoved = true;
+                    shouldBatchUpload = false;
+                }
             }
         }
 
         public void UpdateMeshBuffer(int start, int count)
         {
-            if (count == 0) return;
             meshBuffer.UploadElements(start, count, Meshes[start]);
         }
 
         public void UpdateDrawCommandBuffer(int start, int count)
         {
-            if (count == 0) return;
             drawCommandBuffer.UploadElements(start, count, DrawCommands[start]);
         }
 
         public void UpdateMeshInstanceBuffer(int start, int count)
         {
-            if (count == 0) return;
             meshInstanceBuffer.UploadElements(start, count, MeshInstances[start]);
         }
 
         public void UpdateVertexPositions(int start, int count)
         {
-            if (count == 0) return;
             vertexPositionBuffer.UploadElements(start, count, VertexPositions[start]);
         }
 
-        public void ResetInstancesBeforeCulling()
+        public void ResetInstancesBeforeCulling(int count = 0)
         {
             // for vertex rendering path
             for (int i = 0; i < DrawCommands.Length; i++)
             {
-                DrawCommands[i].InstanceCount = 0;
+                DrawCommands[i].InstanceCount = count;
             }
             UpdateDrawCommandBuffer(0, DrawCommands.Length);
             for (int i = 0; i < DrawCommands.Length; i++)
@@ -235,7 +267,7 @@ namespace IDKEngine
             }
 
             // for mesh-shader rendering path
-            meshletTasksCountBuffer.UploadElements(0);
+            meshletTasksCountBuffer.UploadElements(count);
         }
 
         public void UploadAllModelData()

@@ -75,23 +75,26 @@ This is a visualization of a 384-sized `rgba16f`-format 3D texture. It's the out
 There are two variables `vec3: GridMin, GridMax`.
 Those define the world space region which the voxel grid spans over. When rendering, triangles get transformed to world space like normally and then mapped from the range `[GridMin, GridMax]` to `[-1, 1]` (normalized device coordinates).
 Triangles outside the grid will not be voxelized.
-You can do this mapping yourself or use an orthographic projection.
 As the grid grows, voxel resolution decreases. 
 
 ```glsl
 #version 460 core
 layout(location = 0) in vec3 Position;
 
-uniform mat4 VoxelGridMatrix; // Matrix4.CreateOrthographicOffCenter(GridMin, GridMax)
+uniform vec3 GridMin, GridMax;
 out vec3 NormalizedDeviceCoords;
 
 void main() {
     vec3 fragPos = (ModelMatrix * vec4(Position, 1.0)).xyz;
 
     // transform fragPos from [GridMin, GridMax] to [-1, 1]
-    NormalizedDeviceCoords = (VoxelGridMatrix * fragPos).xyz;
+    NormalizedDeviceCoords = MapToNdc(fragPos, GridMin, GridMax);
 
     gl_Position = vec4(NormalizedDeviceCoords, 1.0);
+}
+
+vec3 MapToNdc(vec3 value, vec3 rangeMin, vec3 rangeMax) {
+    return ((value - rangeMin) / (rangeMax - rangeMin)) * 2.0 - 1.0;
 }
 ```
 
@@ -244,6 +247,92 @@ Voxelization performance for 11 million triangles [Intel Sponza](https://www.int
 ### 3.0 Cone Tracing
 
 TODO
+
+## Asynchronous Texture Loading
+
+There's a surprisingly simple way to do multithreaded texture loading in OpenGL that doesn't require dealing with multiple contexts.
+With this method you can have your textures gradually load in at run-time without any significant lag.
+
+![Asynchronus Textures Loading](Screenshots/Articles/TextureLoad.gif)
+
+The technique works like this:
+
+0. Get image extends & channels (main thread)
+1. Allocate "staging" buffer with size of image (main thread)
+2. Decode image and copy the pixels into staging buffer (worker thread)
+3. Transfer pixels from staging buffer into texture (main thread)
+
+You might wonder what Buffer Objects have to do with any of this. They are used because we can upload data to them from any thread by using (persistently) mapped memory. The transfer from buffer into texture happens on the main thread but because the data is already on the GPU it should be pretty fast.
+Here's an example:
+```cs
+// 1. Allocate buffer to hold pixels
+var flags = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapWriteBit;
+GL.CreateBuffers(1, out int stagingBuffer);
+GL.NamedBufferStorage(stagingBuffer, imageSize, IntPtr.Zero, flags);
+
+// 2. Upload pixels into buffer
+void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
+NativeMemory.Copy(imageData, bufferMemory, imageSize);
+
+// 3. Transfer pixels from buffer into texture
+GL.BindBuffer(BufferTarget.PixelUnpackBuffer, stagingBuffer);
+GL.TextureSubImage2D(___, IntPtr.Zero);
+GL.DeleteBuffer(stagingBuffer);
+```
+The `NativeMemory.Copy` together with image decoding will be done on a different thread. Notice how the pixels argument in `TextureSubImage2D` is null. That is because a Pixel Unpack Buffer is bound which is used as the data source. So the argument actually gets interpreted as an offset. By the way, don't worry about the CPU->Buffer->Texture method of uploading adding overhead compared to CPU->Texture. It's what the driver does anyway and it's the default method in Vulkan/DX12.
+
+We need a way to signal to the main thread that it should start step 3 after a worker thread completed step 2.
+This can be implemented with a Queue.
+```cs
+public static class MainThreadQueue
+{
+    private static readonly ConcurrentQueue<Action> lazyQueue = new ConcurrentQueue<Action>();
+
+    public static void AddToLazyQueue(Action action)
+    {
+        lazyQueue.Enqueue(action);
+    }
+
+    // Intended to be called periodically from the main thread
+    public static void Execute()
+    {
+        if (lazyQueue.TryDequeue(out Action action))
+        {
+            action();
+        }
+    }
+}
+```
+C# has `ConcurrentQueue`, which is also thread-safe, so perfect for this use case.
+`Execute()` is called every frame on the main thread. When a worker thread wants something done on the main thread it enqueues the Action and shortly afterwards it will be dequeued and executed. I decided to dequeue only a single Action at a time as I prefer the work to be distributed across multiple frames.
+
+With that done, the final texture loading algorithm is just a few lines:
+```cs
+int imageSize = imageWidth * imageHeight * imageChannels;
+
+var flags = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapWriteBit;
+GL.CreateBuffers(1, out int stagingBuffer);
+GL.NamedBufferStorage(stagingBuffer, imageSize, IntPtr.Zero, flags);
+void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
+
+Task.Run(() =>
+{
+    ImageResult imageResult = ImageResult.FromStream(...);
+    NativeMemory.Copy(imageResult.Data, bufferMemory, imageSize);
+
+    MainThreadQueue.AddToLazyQueue(() =>
+    {
+        GL.BindBuffer(BufferTarget.PixelUnpackBuffer, stagingBuffer);
+        texture.Upload2D(imageWidth, imageHeight, PixelFormat, PixelType, IntPtr.Zero);
+        GL.DeleteBuffer(stagingBuffer);
+    });
+});
+```
+The algorithm requires knowing the image extends and channels before it is decoded in order to compute its size. If you are using stbi, the `stbi__info_` functions can give you that information.
+The code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that the loading only starts as soon as the render loop is entered - that is `MainThreadQueue.Execute()` gets called.
+Creating a thread for every image might introduce lag so I am calling `Task.Run()` which uses a thread pool. The numer of thread pool threads can be set with `ThreadPool.Set{Min/Max}Threads()`. 
+
+Finally, a nice way to demonstrate that things are working is to have a random thread sleep inside the worker threads, causing textures to slowly load in at different times.
 
 ## Variable Rate Shading
 
@@ -512,7 +601,7 @@ While this renders all geometry just fine, you might be wondering how to access 
 
 ### 2.0 Bindless Textures
 
-First of all `ARB_bindless_texture` is not a core extension. Nevertheless, almost all AMD and NVIDIA GPUs implement it, as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately render doc doesn't support it.
+First of all `ARB_bindless_texture` is not a core extension. Nevertheless, almost all AMD and NVIDIA GPUs implement it, as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately RenderDoc doesn't support it.
 
 The main idea behind bindless textures is the ability to generate a unique 64 bit handle from any texture, which can then be used to represent it inside glsl and thus no longer depend on previous state based mechanics.
 Specifically, this means that you no longer call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.

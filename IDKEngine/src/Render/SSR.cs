@@ -32,7 +32,7 @@ namespace IDKEngine.Render
             shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "SSR/compute.glsl"));
 
             gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
 
             SetSize(size);
 

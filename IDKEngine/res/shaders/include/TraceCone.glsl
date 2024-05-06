@@ -1,5 +1,6 @@
-AppInclude(include/Ray.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/Ray.glsl)
+AppInclude(include/Transformations.glsl)
 
 vec4 TraceCone(sampler3D samplerVoxels, Ray ray, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
 {
@@ -20,8 +21,7 @@ vec4 TraceCone(sampler3D samplerVoxels, Ray ray, vec3 normal, float coneAngle, f
         float sampleLod = log2(sampleDiameter / voxelMinLength);
         
         vec3 worldPos = ray.Origin + ray.Direction * distFromStart;
-        vec3 ndc = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz;
-        vec3 sampleUVW = ndc * 0.5 + 0.5;
+        vec3 sampleUVW = MapToZeroOne(worldPos, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax);
         if (any(lessThan(sampleUVW, vec3(0.0))) || any(greaterThanEqual(sampleUVW, vec3(1.0))) || sampleLod > maxLevel)
         {
             break;

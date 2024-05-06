@@ -378,7 +378,7 @@ namespace IDKEngine
                         // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
                         texture.SetSwizzleR(TextureSwizzle.Blue);
                     }
-
+                    
                     Ktx2.Texture* ktxTexture = null;
                     bool isKtxCompressed = false;
                     bool mipmapsRequired = false;
@@ -392,12 +392,12 @@ namespace IDKEngine
                             // Need to copy because of "CS1686: Local variable or its members cannot have their address taken and be used inside an anonymous method or lambda expression."
                             int copyWidth, copyHeight, copyChannels;
                             StbImage.stbi__info_main(new StbImage.stbi__context(imageStream), &copyWidth, &copyHeight, &copyChannels);
-
+                            
                             imageWidth = copyWidth;
                             imageHeight = copyHeight;
                             imageChannels = copyChannels;
                             levels = GLTexture.GetMaxMipmapLevel(imageWidth, imageHeight, 1);
-
+                            
                             internalFormat = textureType switch
                             {
                                 GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.R8G8B8A8Srgb,
@@ -418,7 +418,8 @@ namespace IDKEngine
                             Ktx2.CreateFromMemory(rawImageData[0], (nuint)rawImageData.Length, Ktx2.TextureCreateFlagBits.LoadImageDataBit, &ktxTextureCopy);
                             if (Ktx2.NeedsTranscoding(ktxTextureCopy) == 0)
                             {
-                                Logger.Log(Logger.LogLevel.Error, $"KTX textures are expected to be in supercompressed format and require transcoding");
+                                Logger.Log(Logger.LogLevel.Error, "KTX textures are expected to require transcoding, meaning they are either ETC1S or UASTC encoded.\n" +
+                                                                 $"SupercompressionScheme = {ktxTextureCopy->SupercompressionScheme}");
                                 continue;
                             }
 
@@ -431,11 +432,11 @@ namespace IDKEngine
 
                             internalFormat = textureType switch
                             {
-                                GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.Bc7RgbaSrgb,
-                                GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.Bc7RgbaSrgb,
-                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.Bc1RgbUnorm, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
-                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.Bc1RgbUnorm,
-                                GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.Bc4RUnorm,
+                                GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
+                                GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
+                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.BC7RgbaUnorm, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
+                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.BC7RgbaUnorm,
+                                GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.BC4RUnorm,
                                 _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
                             };
                         }
@@ -466,7 +467,7 @@ namespace IDKEngine
 
                         /* For uncompressed textures:
                          * 1. Create staging buffer on main thread
-                         * 2. Decode and copy the uncompressed pixels into staging buffer in parallel
+                         * 2. Decode image and copy the pixels into staging buffer in parallel
                          * 3. Copy from staging buffer to texture on main thread
                          */
 
@@ -482,7 +483,8 @@ namespace IDKEngine
                             //       ThreadPool work (like loading texturs in this case), because it causes frame stutters. Fix!
                             Task.Run(() =>
                             {
-                                // For Basis Supercompression the 'uncompressed' size cannot be known until the data is transcoded.
+                                //int supercompressedImageSize = (int)ktxTexture->DataSize; // Supercompressed Size (Size on Disk, minus additional Metadata)
+
                                 Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxTranscodeFormat(texture.TextureFormat), Ktx2.TranscodeFlagBits.HighQuality);
                                 if (errorCode != Ktx2.ErrorCode.Success)
                                 {
@@ -490,14 +492,14 @@ namespace IDKEngine
                                     return;
                                 }
 
-                                int compressedImageSize = (int)ktxTexture->DataSize;
-                                int uncompressedImageSize = imageWidth * imageHeight * imageChannels;
-                                int saved = uncompressedImageSize - compressedImageSize;
-
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
+                                    int compressedImageSize = (int)ktxTexture->DataSize; // Compressed Size (Size in Vram)
+                                    int uncompressedImageSize = imageWidth * imageHeight * imageChannels;
+                                    int saved = uncompressedImageSize - compressedImageSize;
+
                                     TypedBuffer<byte> stagingBuffer = new TypedBuffer<byte>();
-                                    stagingBuffer.ImmutableAllocate(BufferObject.BufferStorageType.DeviceLocalHostVisible, compressedImageSize);
+                                    stagingBuffer.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.MappedIncoherent, compressedImageSize);
 
                                     Task.Run(() =>
                                     {
@@ -520,7 +522,6 @@ namespace IDKEngine
                                             TextureLoaded?.Invoke();
                                         });
                                     });
-
                                 });
                             });
                         }
@@ -528,7 +529,7 @@ namespace IDKEngine
                         {
                             int imageSize = imageWidth * imageHeight * imageChannels;
                             TypedBuffer<byte> stagingBuffer = new TypedBuffer<byte>();
-                            stagingBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocalHostVisible, imageSize);
+                            stagingBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.MappedIncoherent, imageSize);
 
                             Task.Run(() =>
                             {
@@ -827,14 +828,17 @@ namespace IDKEngine
         {
             switch (internalFormat)
             {
-                case GLTexture.InternalFormat.Bc1RgbUnorm:
+                case GLTexture.InternalFormat.BC1RgbUnorm:
                     return Ktx2.TranscodeFormat.Bc1Rgb;
 
-                case GLTexture.InternalFormat.Bc4RUnorm:
+                case GLTexture.InternalFormat.BC4RUnorm:
                     return Ktx2.TranscodeFormat.Bc4R;
 
-                case GLTexture.InternalFormat.Bc7RgbaUnorm:
-                case GLTexture.InternalFormat.Bc7RgbaSrgb:
+                case GLTexture.InternalFormat.BC5RgUnorm:
+                    return Ktx2.TranscodeFormat.Bc5Rg;
+
+                case GLTexture.InternalFormat.BC7RgbaUnorm:
+                case GLTexture.InternalFormat.BC7RgbaSrgb:
                     return Ktx2.TranscodeFormat.Bc7Rgba;
 
                 case GLTexture.InternalFormat.Astc4X4Rgba:
@@ -901,7 +905,7 @@ namespace IDKEngine
 
                     Meshopt.RemapIndexBuffer(ref meshIndices[0], meshIndices[0], (nuint)meshIndices.Length, remapTable[0]);
                     Meshopt.RemapVertexBuffer(vertexStreams[0].Data, vertexStreams[0].Data, (nuint)meshVertices.Length, vertexStreams[0].Stride, remapTable[0]);
-                    Meshopt.RemapVertexBuffer(vertexStreams[1].Data, vertexStreams[1].Data, (nuint)meshVertices.Length, vertexStreams[1].Stride, remapTable[0]);
+                    Meshopt.RemapVertexBuffer(vertexStreams[1].Data, vertexStreams[1].Data, (nuint)meshVertexPositions.Length, vertexStreams[1].Stride, remapTable[0]);
                 }
                 Array.Resize(ref meshVertices, (int)optimizedVertexCount);
                 Array.Resize(ref meshVertexPositions, (int)optimizedVertexCount);
@@ -931,7 +935,7 @@ namespace IDKEngine
             const uint MESHLET_MAX_VERTEX_COUNT = 128;
 
             // (252 * 3) + 4(hardware reserved) = 760bytes. Which almost perfectly fits NVIDIA-Turing 128 byte allocation granularity.
-            // Note: Meshoptimizer also requires this to be divisible by 4
+            // Meshoptimizer also requires this to be divisible by 4
             const uint MESHLET_MAX_TRIANGLE_COUNT = 252;
 
             nuint maxMeshlets = Meshopt.BuildMeshletsBound((nuint)meshIndices.Length, MESHLET_MAX_VERTEX_COUNT, MESHLET_MAX_TRIANGLE_COUNT);
@@ -939,7 +943,8 @@ namespace IDKEngine
             Meshopt.Meshlet[] meshlets = new Meshopt.Meshlet[maxMeshlets];
             uint[] meshletsVertexIndices = new uint[maxMeshlets * MESHLET_MAX_VERTEX_COUNT];
             byte[] meshletsPrimitiveIndices = new byte[maxMeshlets * MESHLET_MAX_TRIANGLE_COUNT * 3];
-            nuint meshletCount = Meshopt.BuildMeshlets(ref meshlets[0],
+            nuint meshletCount = Meshopt.BuildMeshlets(
+                ref meshlets[0],
                 meshletsVertexIndices[0],
                 meshletsPrimitiveIndices[0],
                 meshIndices[0],
@@ -949,7 +954,21 @@ namespace IDKEngine
                 (nuint)sizeof(Vector3),
                 MESHLET_MAX_VERTEX_COUNT,
                 MESHLET_MAX_TRIANGLE_COUNT,
-                coneWeight);
+                coneWeight
+            );
+            
+            for (int i = 0; i < meshlets.Length; i++)
+            {
+                ref readonly Meshopt.Meshlet meshlet = ref meshlets[i];
+
+                // https://zeux.io/2024/04/09/meshlet-triangle-locality/
+                Meshopt.OptimizeMeshlet(
+                    ref meshletsVertexIndices[meshlet.VertexOffset],
+                    ref meshletsPrimitiveIndices[meshlet.TriangleOffset],
+                    meshlet.TriangleCount,
+                    meshlet.VertexCount
+                );
+            }
 
             ref readonly Meshopt.Meshlet last = ref meshlets[meshletCount - 1];
             uint meshletsVertexIndicesLength = last.VertexOffset + last.VertexCount;
@@ -976,6 +995,8 @@ namespace IDKEngine
             {
                 public string InputPath;
                 public string OutputPath;
+                public int ThreadsUsed;
+                public bool UseInstancing;
                 public Action<string>? ProcessError;
                 public Action<string>? ProcessOutput;
             }
@@ -988,12 +1009,13 @@ namespace IDKEngine
                     RedirectStandardError = true,
 
                     // -v         = verbose output
+                    // -tj        = number of threads to use when compressing textures
                     // -mi        = use instancing (EXT_mesh_gpu_instancing)
                     // -noq       = no mesh quanization (KHR_mesh_quantization)
                     // -tc        = do KTX2 texture comression (KHR_texture_basisu)
                     // -tq 10     = texture quality 10
                     // -tu attrib = use UASTC when encoding type-attrib textures (much higher quality and much larger size)
-                    Arguments = $"-v -mi -noq -tc -tq 10 -tu attrib -i {settings.InputPath} -o {settings.OutputPath}",
+                    Arguments = $"-v -tj {settings.ThreadsUsed} {(settings.UseInstancing ? "-mi" : string.Empty)} -noq -tc -tq 10 -tu attrib -i {settings.InputPath} -o {settings.OutputPath}",
                 };
 
                 try
@@ -1035,21 +1057,21 @@ namespace IDKEngine
 
             public static bool CompressionToolAvailable()
             {
-                string[] pathsToSearch = new string[1];
-                pathsToSearch[0] = @"C:\Users\Julian\Downloads\Models\MyGltfpack";
+                List<string> pathsToSearch = new List<string>();
+                pathsToSearch.Add(Directory.GetCurrentDirectory());
 
                 string envVars = Environment.GetEnvironmentVariable("PATH");
                 if (envVars != null)
                 {
-                    Helper.ArrayAdd(ref pathsToSearch, envVars.Split(';'));
+                    pathsToSearch.AddRange(envVars.Split(';'));
                 }
                 envVars = Environment.GetEnvironmentVariable("Path");
                 if (envVars != null)
                 {
-                    Helper.ArrayAdd(ref pathsToSearch, envVars.Split(';'));
+                    pathsToSearch.AddRange(envVars.Split(';'));
                 }
 
-                for (int i = 0; i < pathsToSearch.Length; i++)
+                for (int i = 0; i < pathsToSearch.Count; i++)
                 {
                     string envPath = pathsToSearch[i];
                     if (!Directory.Exists(envPath))

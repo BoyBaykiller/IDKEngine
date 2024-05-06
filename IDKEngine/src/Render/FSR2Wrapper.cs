@@ -26,6 +26,7 @@ namespace IDKEngine.Render
             }
 
             SetSize(maxInputSize, outputSize);
+            IsSharpening = true;
         }
 
         public void RunFSR2(Vector2 jitter, Texture color, Texture depth, Texture velocity, Camera camera, float deltaMilliseconds)

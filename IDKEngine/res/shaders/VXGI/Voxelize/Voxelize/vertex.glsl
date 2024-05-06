@@ -5,6 +5,7 @@
 
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/Transformations.glsl)
 AppInclude(include/Compression.glsl)
 
 out InOutVars
@@ -42,12 +43,13 @@ void main()
     outData.MaterialIndex = mesh.MaterialIndex;
     outData.EmissiveBias = mesh.EmissiveBias;
 
-    gl_Position = voxelizerDataUBO.OrthoProjection * vec4(outData.FragPos, 1.0);
+    vec3 ndc = MapToZeroOne(outData.FragPos, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax) * 2.0 - 1.0;
+    gl_Position = vec4(ndc, 1.0);
 
 #if !TAKE_FAST_GEOMETRY_SHADER_PATH
 
     // Instead of doing a single draw call with a standard geometry shader to select the swizzle
-    // we render the scene 3 times, each time with a different swizzle. I have observed this to be slightly faster
+    // we render the scene 3 times, each time with a different swizzle. I have observed this to be faster
     if (RenderAxis == 0) gl_Position = gl_Position.zyxw;
     if (RenderAxis == 1) gl_Position = gl_Position.xzyw;
 #endif

@@ -50,9 +50,9 @@ namespace IDKEngine.OpenGL
 
     class AbstractShader : Shader
     {
-        public readonly string LocalShaderPath;
         public string FullShaderPath => Path.Combine(SHADER_PATH, LocalShaderPath);
 
+        public readonly string LocalShaderPath;
         public AbstractShader(ShaderType shaderType, string localShaderPath)
             : this(shaderType, File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath)), localShaderPath)
         {
@@ -63,11 +63,13 @@ namespace IDKEngine.OpenGL
             : base(shaderType, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.ShaderInsertions.GlobalAppInsertions, name), name)
         {
             // We currently dont allow public construction from just a srcCode
-            // as that would make the LocalShaderPath variable meaningless, which we need.
+            // as that would make the LocalShaderPath variable meaningless, which we need for shader recompilation.
         }
 
         public static class Preprocessor
         {
+            public static string DEBUG_LAST_PRE_PROCESSED;
+
             public enum Keyword : int
             {
                 None,
@@ -115,8 +117,10 @@ namespace IDKEngine.OpenGL
                 }
 
                 preProcessInfo.UsedAppInsertionKeys = usedAppInsertions.ToArray();
+                string preprocessed = result.ToString();
+                DEBUG_LAST_PRE_PROCESSED = preprocessed;
 
-                return result.ToString();
+                return preprocessed;
 
                 StringBuilder RecursiveResolveKeywords(string source, string name = null)
                 {
@@ -195,7 +199,7 @@ namespace IDKEngine.OpenGL
                 keyword = Keyword.None;
                 value = null;
 
-                Regex regex = new Regex($"({Keyword.AppInsert}|{Keyword.AppInclude})\\((.*?)\\)");
+                Regex regex = new Regex(@$"(?<!\/\/.*?)({Keyword.AppInsert}|{Keyword.AppInclude})\((.*?)\)");
                 Match match = regex.Match(source, startIndex);
                 if (match.Success)
                 {

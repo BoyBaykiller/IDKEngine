@@ -21,8 +21,6 @@ namespace IDKEngine.Render
             set
             {
                 gpuVoxelizerData.GridMin = Vector3.ComponentMin(value, gpuVoxelizerData.GridMax - new Vector3(0.1f));
-                gpuVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(gpuVoxelizerData.GridMin.X, gpuVoxelizerData.GridMax.X, gpuVoxelizerData.GridMin.Y, gpuVoxelizerData.GridMax.Y, gpuVoxelizerData.GridMax.Z, gpuVoxelizerData.GridMin.Z);
-                voxelizerDataBuffer.UploadElements(gpuVoxelizerData);
             }
         }
         public Vector3 GridMax
@@ -32,8 +30,6 @@ namespace IDKEngine.Render
             set
             {
                 gpuVoxelizerData.GridMax = Vector3.ComponentMax(value, gpuVoxelizerData.GridMin + new Vector3(0.1f));
-                gpuVoxelizerData.OrthoProjection = Matrix4.CreateOrthographicOffCenter(gpuVoxelizerData.GridMin.X, gpuVoxelizerData.GridMax.X, gpuVoxelizerData.GridMin.Y, gpuVoxelizerData.GridMax.Y, gpuVoxelizerData.GridMax.Z, gpuVoxelizerData.GridMin.Z);
-                voxelizerDataBuffer.UploadElements(gpuVoxelizerData);
             }
         }
 
@@ -86,7 +82,7 @@ namespace IDKEngine.Render
             }
 
             voxelizerDataBuffer = new TypedBuffer<GpuVoxelizerData>();
-            voxelizerDataBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            voxelizerDataBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
             voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);
 
             fboNoAttachments = new Framebuffer();
@@ -125,6 +121,8 @@ namespace IDKEngine.Render
 
         private void Voxelize(ModelSystem modelSystem)
         {
+            voxelizerDataBuffer.UploadElements(gpuVoxelizerData);
+
             fboNoAttachments.Bind();
 
             if (TAKE_CONSERVATIVE_RASTER_PATH && IsConservativeRasterization)

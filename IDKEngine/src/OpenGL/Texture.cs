@@ -43,19 +43,18 @@ namespace IDKEngine.OpenGL
             R16G16B16A16Float = SizedInternalFormat.Rgba16f,
             R32G32B32A32Float = SizedInternalFormat.Rgba32f,
 
-            Bc1RgbUnorm = SizedInternalFormat.CompressedRgbS3tcDxt1Ext,
+            BC1RgbUnorm = SizedInternalFormat.CompressedRgbS3tcDxt1Ext,
+            BC4RUnorm = SizedInternalFormat.CompressedRedRgtc1,
+            BC5RgUnorm = SizedInternalFormat.CompressedRgRgtc2,
+            BC7RgbaUnorm = SizedInternalFormat.CompressedRgbaBptcUnorm,
+            BC7RgbaSrgb = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm,
 
-            Bc4RUnorm = SizedInternalFormat.CompressedRedRgtc1,
-
-            Bc7RgbaUnorm = SizedInternalFormat.CompressedRgbaBptcUnorm,
-            Bc7RgbaSrgb = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm,
+            // Require GL_KHR_texture_compression_astc
+            Astc4X4Rgba = SizedInternalFormat.CompressedRgbaAstc4X4,
+            Astc4X4RgbaSrgb = SizedInternalFormat.CompressedSrgb8Alpha8Astc4X4,
 
             D16Unorm = SizedInternalFormat.DepthComponent16,
             D32Float = SizedInternalFormat.DepthComponent32f,
-
-            // Require GL_KHR_texture_compression_astc_ldr
-            Astc4X4Rgba = SizedInternalFormat.CompressedRgbaAstc4X4,
-            Astc4X4RgbaSrgb = SizedInternalFormat.CompressedSrgb8Alpha8Astc4X4,
         }
 
         public readonly int ID;
@@ -341,13 +340,14 @@ namespace IDKEngine.OpenGL
             switch (format)
             {
                 // BC1 and BC4 store 4x4 blocks with 64 bits (8 bytes)
-                case InternalFormat.Bc1RgbUnorm:
-                case InternalFormat.Bc4RUnorm:
+                case InternalFormat.BC1RgbUnorm:
+                case InternalFormat.BC4RUnorm:
                     return width * height * depth / 2;
 
                 // BC3, BC5, BC6, BC7 and ASTC store 4x4 blocks with 128 bits (16 bytes)
-                case InternalFormat.Bc7RgbaUnorm:
-                case InternalFormat.Bc7RgbaSrgb:
+                case InternalFormat.BC5RgUnorm:
+                case InternalFormat.BC7RgbaUnorm:
+                case InternalFormat.BC7RgbaSrgb:
                 case InternalFormat.Astc4X4Rgba:
                 case InternalFormat.Astc4X4RgbaSrgb:
                     return width * height * depth;

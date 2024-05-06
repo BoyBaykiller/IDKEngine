@@ -35,8 +35,8 @@ namespace IDKEngine.Shapes
 
         public void GrowToFit(in Vector128<float> point)
         {
-            SIMDMin = Sse.Min(SIMDMin, point);
-            SIMDMax = Sse.Max(SIMDMax, point);
+            SIMDMin = Vector128.Min(SIMDMin, point);
+            SIMDMax = Vector128.Max(SIMDMax, point);
         }
 
         public void GrowToFit(in Vector3 point)
@@ -87,18 +87,16 @@ namespace IDKEngine.Shapes
 
         public void Transform(in Matrix4 matrix)
         {
-            Box newBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
-            for (int i = 0; i < 8; i++)
-            {
-                newBox.GrowToFit((new Vector4(this[i], 1.0f) * matrix).Xyz);
-            }
-            this = newBox;
+            this = Transformed(this, matrix);
         }
 
         public static Box Transformed(in Box box, in Matrix4 matrix)
         {
-            Box newBox = box;
-            newBox.Transform(matrix);
+            Box newBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            for (int i = 0; i < 8; i++)
+            {
+                newBox.GrowToFit((new Vector4(box[i], 1.0f) * matrix).Xyz);
+            }
             return newBox;
         }
 

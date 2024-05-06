@@ -68,17 +68,17 @@ namespace IDKEngine.Render
                 new AbstractShader(ShaderType.FragmentShader, "Light/fragment.glsl"));
 
             lightBufferObject = new TypedBuffer<GpuLight>();
-            lightBufferObject.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, lights.Length * sizeof(GpuLight) + sizeof(int));
+            lightBufferObject.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));
             lightBufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
 
             const int SphereLatitudes = 12, SphereLongitudes = 12;
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, SphereLatitudes, SphereLongitudes);
             TypedBuffer<ObjectFactory.Vertex> vbo = new TypedBuffer<ObjectFactory.Vertex>();
-            vbo.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocal, vertecis);
+            vbo.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.None, vertecis);
 
             Span<uint> indicis = ObjectFactory.GenerateSmoothSphereIndicis(SphereLatitudes, SphereLongitudes);
             TypedBuffer<uint> ebo = new TypedBuffer<uint>();
-            ebo.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocal, indicis);
+            ebo.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.None, indicis);
 
             vao = new VAO();
             vao.SetElementBuffer(ebo);
@@ -338,6 +338,7 @@ namespace IDKEngine.Render
                 }
                 light.GpuLight.SetPrevToCurrentPosition();
             }
+            pointShadowManager.Update();
         }
 
         public bool TryGetLight(int index, out CpuLight light)

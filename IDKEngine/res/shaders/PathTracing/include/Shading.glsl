@@ -4,7 +4,7 @@ AppInclude(include/Random.glsl)
 #define RAY_TYPE_SPECULAR   1
 #define RAY_TYPE_REFRACTIVE 2
 
-struct NewRayProperties
+struct RayProperties
 {
     vec3 Direction;
     float Ior;
@@ -12,9 +12,9 @@ struct NewRayProperties
     uint RayType;
 };
 
-NewRayProperties SampleMaterial(vec3 incomming, float specularChance, float roughness, float transmissionChance, float ior, float prevIor, vec3 normal, bool fromInside)
+RayProperties SampleMaterial(vec3 incomming, float specularChance, float roughness, float transmissionChance, float ior, float prevIor, vec3 normal, bool fromInside)
 {
-    NewRayProperties result;
+    RayProperties result;
     roughness *= roughness; // just a convention to make roughness more linear perceptually
 
     float rnd = GetRandomFloat01();

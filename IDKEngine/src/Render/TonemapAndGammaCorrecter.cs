@@ -35,7 +35,7 @@ namespace IDKEngine.Render
             tonemapAndGammaCorrecterProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "TonemapAndGammaCorrect/compute.glsl"));
 
             gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
 
             SetSize(size);
 

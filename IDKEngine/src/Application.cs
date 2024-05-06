@@ -193,8 +193,8 @@ namespace IDKEngine
                     LightManager.TryGetLight(gui.SelectedEntity.EntityID, out CpuLight cpuLight);
                     ref GpuLight light = ref cpuLight.GpuLight;
 
-                    selectedEntityBox.Min = new Vector3(light.Position) - new Vector3(light.Radius);
-                    selectedEntityBox.Max = new Vector3(light.Position) + new Vector3(light.Radius);
+                    selectedEntityBox.Min = light.Position - new Vector3(light.Radius);
+                    selectedEntityBox.Max = light.Position + new Vector3(light.Radius);
                 }
 
                 BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, selectedEntityBox);
@@ -329,7 +329,7 @@ namespace IDKEngine
                     }
                 }
             }
-            
+
             Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
             Vector3 prevSpherePos = movingSphere.Center;
             Intersections.SceneVsMovingSphereCollisionRoutine(ModelSystem, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
@@ -405,7 +405,7 @@ namespace IDKEngine
             Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
             Logger.Log(Logger.LogLevel.Info, $"GPU: {Helper.GPU}");
             Logger.Log(Logger.LogLevel.Info, $"{nameof(AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)} = {AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH}");
-
+            
             if (Helper.APIVersion < 4.6)
             {
                 Logger.Log(Logger.LogLevel.Fatal, "Your system does not support OpenGL 4.6");
@@ -435,7 +435,7 @@ namespace IDKEngine
             Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
 
             gpuPerFrameBuffer = new TypedBuffer<GpuPerFrameData>();
-            gpuPerFrameBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuPerFrameBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
             gpuPerFrameBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
 
             finalProgram = new AbstractShaderProgram(

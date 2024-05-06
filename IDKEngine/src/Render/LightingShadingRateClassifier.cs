@@ -27,7 +27,7 @@ namespace IDKEngine.Render
             {
                 DebugValue = DebugMode.NoDebug,
                 SpeedFactor = 0.2f,
-                LumVarianceFactor = 0.025f,
+                LumVarianceFactor = 0.04f,
             };
         }
 
@@ -51,7 +51,7 @@ namespace IDKEngine.Render
             debugProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadingRateClassification/debugCompute.glsl"));
 
             gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
 
             SetSize(size);
 

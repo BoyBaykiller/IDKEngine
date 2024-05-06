@@ -55,7 +55,7 @@ namespace IDKEngine.Render
             upscaleProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VolumetricLight/Upscale/compute.glsl"));
 
             gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
 
             _resolutionScale = resolutionScale;
             SetSize(size);
@@ -108,9 +108,13 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
+            Result.Dispose();
             volumetricLightingTexture.Dispose();
+            depthTexture.Dispose();
+
             volumetricLightingProgram.Dispose();
             upscaleProgram.Dispose();
+
             gpuSettingsBuffer.Dispose();
         }
     }

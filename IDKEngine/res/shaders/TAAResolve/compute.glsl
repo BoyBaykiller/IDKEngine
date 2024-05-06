@@ -56,11 +56,6 @@ void main()
     vec2 localPixelPos = fract(historyUV * textureSize(SamplerHistoryColor, 0));
     float pixelCenterDistance = abs(0.5 - localPixelPos.x) + abs(0.5 - localPixelPos.y);
     blend = mix(blend, 1.0, pixelCenterDistance * PreferAliasingOverBlur);
-
-    // // Source: https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/shaders/temporalaaCS.hlsl#L121
-    // ivec2 size = textureSize(SamplerHistoryColor, 0);
-    // float subpixelCorrection = fract(max(abs(velocity.x) * size.x, abs(velocity.y) * size.y)) * 0.5;
-    // blend = mix(blend, 0.8, subpixelCorrection);
     
     vec4 color = mix(historyColor, currentColor, blend);
     imageStore(ImgResult, imgCoord, color);

@@ -33,7 +33,6 @@ layout(std140, binding = 4) uniform SkyBoxUBO
 
 layout(std140, binding = 5) uniform VoxelizerDataUBO
 {
-    mat4 OrthoProjection;
     vec3 GridMin;
     float _pad0;
     vec3 GridMax;

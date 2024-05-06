@@ -117,8 +117,7 @@ float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
 
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos)
 {
-    vec3 ndc = (voxelizerDataUBO.OrthoProjection * vec4(worldPos, 1.0)).xyz;
-    vec3 uvw = ndc * 0.5 + 0.5;
+    vec3 uvw = MapToZeroOne(worldPos, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax);
     ivec3 voxelPos = ivec3(uvw * imageSize(ImgResult));
     return voxelPos;
 }

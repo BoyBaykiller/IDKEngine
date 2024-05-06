@@ -20,6 +20,11 @@ namespace IDKEngine.Utils
         public static readonly string API = GL.GetString(StringName.Version);
         public static readonly string GPU = GL.GetString(StringName.Renderer);
 
+        public static unsafe int SizeInBytes<T>(this T[] data) where T : unmanaged
+        {
+            return sizeof(T) * data.Length;
+        }
+
         public static int Sum<T>(this ReadOnlySpan<T> values, Func<T, int> func)
         {
             int sum = 0;

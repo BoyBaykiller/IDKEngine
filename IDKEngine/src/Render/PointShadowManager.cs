@@ -33,7 +33,7 @@ namespace IDKEngine.Render
             rayTracedShadowsProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadowsRayTraced/compute.glsl"));
 
             pointShadowsBuffer = new TypedBuffer<GpuPointShadow>();
-            pointShadowsBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
+            pointShadowsBuffer.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
             pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
         }
 
@@ -43,8 +43,6 @@ namespace IDKEngine.Render
             GL.DepthFunc(DepthFunction.Less);
             for (int i = 0; i < Count; i++)
             {
-                UploadPointShadow(i);
-
                 pointShadows[i].RenderShadowMap(modelSystem, camera, i);
             }
         }
@@ -79,6 +77,7 @@ namespace IDKEngine.Render
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
         }
 
+
         public bool AddPointShadow(PointShadow newPointShadow)
         {
             if (Count == GPU_MAX_UBO_POINT_SHADOW_COUNT)
@@ -105,6 +104,14 @@ namespace IDKEngine.Render
             if (Count > 0)
             {
                 pointShadows[index] = pointShadows[--Count];
+            }
+        }
+
+        public void Update()
+        {
+            for (int i = 0; i < Count; i++)
+            {
+                UploadPointShadow(i);
             }
         }
 

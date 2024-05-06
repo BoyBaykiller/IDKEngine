@@ -64,6 +64,16 @@ float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMi
     return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
 }
 
+vec3 MapRangeToAnOther(vec3 value, vec3 valueMin, vec3 valueMax, vec3 mapMin, vec3 mapMax)
+{
+    return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
+}
+
+vec3 MapToZeroOne(vec3 value, vec3 rangeMin, vec3 rangeMax)
+{
+    return MapRangeToAnOther(value, rangeMin, rangeMax, vec3(0.0), vec3(1.0));
+}
+
 vec3 GetTriangleNormal(vec3 p0, vec3 p1, vec3 p2)
 {
     vec3 p0p1 = p1 - p0;

@@ -6,12 +6,12 @@ namespace IDKEngine.Windowing
 {
     unsafe class Keyboard
     {
-        public enum InputState : byte
+        public enum InputState : int
         {
-            Released = 0,
-            Pressed = 1,
-            Repeating = 2,
-            Touched = 3
+            Released,
+            Pressed,
+            Repeating,
+            Touched
         }
 
         public InputState this[Keys key]

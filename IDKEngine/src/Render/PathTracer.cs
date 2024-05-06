@@ -133,7 +133,7 @@ namespace IDKEngine.Render
             finalDrawProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "PathTracing/FinalDraw/compute.glsl"));
 
             gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
 
             SetSize(size);
 
@@ -188,12 +188,12 @@ namespace IDKEngine.Render
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
             wavefrontRayBuffer = new TypedBuffer<GpuWavefrontRay>();
-            wavefrontRayBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.DeviceLocal, size.X * size.Y);
+            wavefrontRayBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.None, size.X * size.Y);
             wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
 
             if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
             wavefrontPTBuffer = new BufferObject();
-            wavefrontPTBuffer.ImmutableAllocate(BufferObject.BufferStorageType.Dynamic, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
+            wavefrontPTBuffer.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
             wavefrontPTBuffer.SimpleClear(0, sizeof(GpuWavefrontPTHeader), (nint)(&clear));
             wavefrontPTBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
 

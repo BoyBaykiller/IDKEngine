@@ -1,13 +1,13 @@
 ﻿using ImGuiNET;
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using System.Diagnostics;
-using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
 using IDKEngine.Windowing;
+using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
 
 // Source: https://github.com/NogginBops/ImGui.NET_OpenTK_Sample/blob/5d62fc77ebacc022b2430084a87939849c119913/Dear%20ImGui%20Sample/ImGuiController.cs
 namespace IDKEngine.ThirdParty
@@ -261,6 +261,9 @@ void main()
             io.MouseDown[3] = mouseState[MouseButton.Button4] == Keyboard.InputState.Pressed;
             io.MouseDown[4] = mouseState[MouseButton.Button5] == Keyboard.InputState.Pressed;
 
+            io.MouseWheel = (float)wnd.MouseState.ScrollX;
+            io.MouseWheelH = (float)wnd.MouseState.ScrollY;
+
             if (IsIgnoreMouseInput)
             {
                 io.MousePos = new System.Numerics.Vector2(-1.0f);
@@ -269,6 +272,7 @@ void main()
             {
                 io.MousePos = new System.Numerics.Vector2(wnd.MouseState.Position.X, wnd.MouseState.Position.Y);
             }
+
             foreach (Keys key in Enum.GetValues(typeof(Keys)))
             {
                 if (key == Keys.Unknown)
@@ -293,14 +297,6 @@ void main()
         internal void PressChar(char keyChar)
         {
             PressedChars.Add(keyChar);
-        }
-
-        internal void MouseScroll(Vector2 offset)
-        {
-            ImGuiIOPtr io = ImGui.GetIO();
-
-            io.MouseWheel = offset.Y;
-            io.MouseWheelH = offset.X;
         }
 
         private void RenderImDrawData(ImDrawDataPtr draw_data)

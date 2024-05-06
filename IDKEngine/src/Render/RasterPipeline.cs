@@ -111,9 +111,11 @@ namespace IDKEngine.Render
         public bool IsSSAO;
         public bool IsSSR;
         public bool IsVariableRateShading;
-        public bool IsConfigureGridMode;
         public bool GenerateShadowMaps;
-        public bool ShouldReVoxelize;
+
+        public bool IsConfigureGridMode;
+        public bool GridReVoxelize;
+        public bool GridFollowCamera;
 
         public int RayTracingSamples;
 
@@ -198,11 +200,11 @@ namespace IDKEngine.Render
             mergeLightingProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new TypedBuffer<GpuTaaData>();
-            taaDataBuffer.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            taaDataBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
             taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
 
             gBufferData = new TypedBuffer<GpuGBuffer>();
-            gBufferData.ImmutableAllocateElements(BufferObject.BufferStorageType.Dynamic, 1);
+            gBufferData.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
             gBufferData.BindBufferBase(BufferRangeTarget.UniformBuffer, 6);
 
             gBufferFBO = new Framebuffer();
@@ -221,7 +223,7 @@ namespace IDKEngine.Render
             IsVariableRateShading = false;
             IsVXGI = false;
             GenerateShadowMaps = true;
-            ShouldReVoxelize = true;
+            GridReVoxelize = true;
             RayTracingSamples = 1;
             ShadowMode = ShadowTechnique.PcfShadowMap;
 
@@ -264,8 +266,18 @@ namespace IDKEngine.Render
                 lightManager.RenderShadowMaps(modelSystem, camera);
             }
 
-            if (IsVXGI && ShouldReVoxelize)
+            if (IsVXGI && GridReVoxelize)
             {
+                if (GridFollowCamera)
+                {
+                    int granularity = 8;
+                    Vector3i quantizedMin = (Vector3i)((camera.Position - new Vector3(35.0f, 20.0f, 35.0f)) / granularity) * granularity;
+                    Vector3i quantizedMax = (Vector3i)((camera.Position + new Vector3(35.0f, 40.0f, 35.0f)) / granularity) * granularity;
+                    
+                    Voxelizer.GridMin = quantizedMin;
+                    Voxelizer.GridMax = quantizedMax;
+                }
+
                 // Reset instance count, don't want to miss meshes when voxelizing
                 for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
                 {
@@ -287,7 +299,7 @@ namespace IDKEngine.Render
             // G Buffer generation
             {
                 HiZGenerate();
-                
+
                 // Frustum + Occlusion Culling
                 {
                     modelSystem.ResetInstancesBeforeCulling();
@@ -416,7 +428,7 @@ namespace IDKEngine.Render
             {
                 FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, resultBeforeTAA, DepthTexture, VelocityTexture, camera, dT * 1000.0f);
 
-                // Note: This is a hack to fix global UBO bindings modified by FSR2
+                // This is a hack to fix global UBO bindings modified by FSR2
                 taaDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 3);
                 SkyBoxManager.skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
                 Voxelizer.voxelizerDataBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 5);

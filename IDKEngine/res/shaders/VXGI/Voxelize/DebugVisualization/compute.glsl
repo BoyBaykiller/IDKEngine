@@ -44,7 +44,7 @@ void main()
     }
 
     vec4 color = TraceCone(SamplerVoxels, worldRay, ConeAngle, StepMultiplier);
-    color += (1.0 - color.a) * (texture(skyBoxUBO.Albedo, worldRay.Direction));
+    color += (1.0 - color.a) * texture(skyBoxUBO.Albedo, worldRay.Direction);
 
     imageStore(ImgResult, imgCoord, color);
 }

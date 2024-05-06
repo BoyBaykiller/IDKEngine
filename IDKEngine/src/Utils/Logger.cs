@@ -27,18 +27,18 @@ namespace IDKEngine.Utils
             }
 
             string preText = $"{DateTime.Now.ToString(DATE_TIME_FORMAT)} [{level.ToString().ToUpper()}] ";
-            text = Indent(text, preText.Length);
-            string formated = $"{preText}{text}";
+            string indentedText = Indent(text, preText.Length);
+            string formatedText = $"{preText}{indentedText}";
 
             lock (Console.Out)
             {
                 Console.ForegroundColor = LogLevelToColor(level);
-                Console.WriteLine(formated);
+                Console.WriteLine(formatedText);
                 Console.ResetColor();
-            }
 
-            outText.WriteLine(formated);
-            outText.Flush();
+                outText.WriteLine(formatedText);
+                outText.Flush();
+            }
         }
 
         private static ConsoleColor LogLevelToColor(LogLevel level)
@@ -56,12 +56,13 @@ namespace IDKEngine.Utils
 
         private static string Indent(string text, int spaces)
         {
+            string indentation = new string(' ', spaces);
             for (int i = 0; i < text.Length; i++)
             {
                 if (text[i] == '\n')
                 {
-                    text = text.Insert(i + 1, new string(' ', spaces));
-                    i += spaces;
+                    text = text.Insert(i + 1, indentation);
+                    i += indentation.Length;
                 }
             }
             return text;

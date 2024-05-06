@@ -26,7 +26,6 @@ void main()
     MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
     uint meshID = meshInstance.MeshIndex;
 
-    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
     BlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeIndex];
     
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
@@ -65,6 +64,8 @@ void main()
         meshletTaskCmdSSBO.TaskCommands[meshletTaskID].Count = meshletsWorkGroupCount;
 
     #else
+
+        DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
 
         uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshID].InstanceCount, 1u);
         visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceID;

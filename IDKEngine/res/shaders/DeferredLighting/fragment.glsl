@@ -8,8 +8,6 @@ AppInclude(include/Transformations.glsl)
 AppInclude(include/Pbr.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
-AppInclude(include/BVHIntersect.glsl)
-
 layout(location = 0) out vec4 FragColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
