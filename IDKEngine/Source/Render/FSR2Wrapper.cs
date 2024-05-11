@@ -30,9 +30,11 @@ namespace IDKEngine.Render
 
         public void RunFSR2(Vector2 jitter, BBG.Texture color, BBG.Texture depth, BBG.Texture velocity, Camera camera, float deltaMilliseconds)
         {
-            Vector2i renderSize = new Vector2i(color.Width, color.Height);
+            BBG.Debugging.PushDebugGroup("Run FSR2");
 
+            Vector2i renderSize = new Vector2i(color.Width, color.Height);
             Vector2 jitterUsedThisFrame = jitter / 2.0f * renderSize;
+
             FSR2.DispatchDescription dispatchDesc = new FSR2.DispatchDescription()
             {
                 Color = FSR2.GL.GetTextureResource((uint)color.ID, (uint)color.Width, (uint)color.Height, (uint)color.Format),
@@ -58,6 +60,7 @@ namespace IDKEngine.Render
             FSR2.ContextDispatch(ref fsr2Context, dispatchDesc);
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
 
+            BBG.Debugging.PopDebugGroup();
         }
 
         private FSR2.Context fsr2Context;

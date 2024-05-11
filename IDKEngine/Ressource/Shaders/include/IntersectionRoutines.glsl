@@ -90,10 +90,10 @@ bool BoxBoxIntersect(Box a, Box b)
            a.Max.z > b.Min.z;
 }
 
-bool BoxDepthBufferIntersect(Box boxNdc, sampler2D samplerHiZ)
+bool BoxDepthBufferIntersect(Box geometryBoxNdc, sampler2D samplerHiZ)
 {
-    vec2 boxUvMin = clamp(boxNdc.Min.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0));
-    vec2 boxUvMax = clamp(boxNdc.Max.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+    vec2 boxUvMin = clamp(geometryBoxNdc.Min.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+    vec2 boxUvMax = clamp(geometryBoxNdc.Max.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0));
 
     ivec2 size = ivec2((boxUvMax - boxUvMin) * textureSize(samplerHiZ, 0));
     int level = int(ceil(log2(float(max(size.x, size.y)))));
@@ -113,12 +113,12 @@ bool BoxDepthBufferIntersect(Box boxNdc, sampler2D samplerHiZ)
     vec4 depths;
     depths.x = textureLod(samplerHiZ, boxUvMin, level).r;
     depths.y = textureLod(samplerHiZ, vec2(boxUvMax.x, boxUvMin.y), level).r;
-    depths.w = textureLod(samplerHiZ, vec2(boxUvMin.x, boxUvMax.y), level).r;
-    depths.z = textureLod(samplerHiZ, boxUvMax, level).r;
+    depths.z = textureLod(samplerHiZ, vec2(boxUvMin.x, boxUvMax.y), level).r;
+    depths.w = textureLod(samplerHiZ, boxUvMax, level).r;
 
     float furthestDepth = max(max(depths.x, depths.y), max(depths.z, depths.w));
-    float boxClosestDepth = clamp(boxNdc.Min.z, 0.0, 1.0);
-    bool isVisible = boxClosestDepth <= furthestDepth;
+    float boxClosestDepth = clamp(geometryBoxNdc.Min.z, 0.0, 1.0);
+    bool isVisible = boxClosestDepth < furthestDepth;
 
     return isVisible;
 }

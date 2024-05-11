@@ -27,7 +27,7 @@ namespace BBOpenGL
 
         public class Shader : IDisposable
         {
-            public const string SHADER_PATH = "res/shaders/";
+            public const string SHADER_PATH = "Ressource/Shaders/";
 
             public readonly int ID;
             public readonly ShaderType ShaderType;

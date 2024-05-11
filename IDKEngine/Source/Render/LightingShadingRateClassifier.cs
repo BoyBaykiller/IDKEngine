@@ -9,7 +9,7 @@ namespace IDKEngine.Render
         // Defined by https://registry.khronos.org/OpenGL/extensions/NV/NV_shading_rate_image.txt
         public const int TILE_SIZE = 16;
 
-        public static bool IS_SUPPORTED = BBG.GetDeviceInfo().ExtensionSupport.VariableRateShading;
+        public static readonly bool IS_SUPPORTED = BBG.GetDeviceInfo().ExtensionSupport.VariableRateShading;
 
         // Used in shader and client code - keep in sync!
         public enum DebugMode : int
@@ -119,6 +119,7 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
+            Result.Dispose();
             debugTexture.Dispose();
             shaderProgram.Dispose();
             debugProgram.Dispose();

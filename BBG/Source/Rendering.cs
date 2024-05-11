@@ -333,11 +333,11 @@ namespace BBOpenGL
                 Debugging.PopDebugGroup();
             }
 
-            public static void Render(string renderpassName, in NoAttachmentsParams fboParameters, in GraphicsPipelineState pipelineState, Action funcRender)
+            public static void Render(string renderPassName, in NoAttachmentsParams fboParameters, in GraphicsPipelineState pipelineState, Action funcRender)
             {
                 inferredViewportSize = new Vector2i();
 
-                Debugging.PushDebugGroup(renderpassName);
+                Debugging.PushDebugGroup(renderPassName);
 
                 if (noAttachmentsFBO == 0)
                 {
@@ -359,10 +359,9 @@ namespace BBOpenGL
             {
                 Debugging.PushDebugGroup("Copy texture to swapchain");
 
-                VerboseRenderAttachments renderAttachments = new VerboseRenderAttachments()
-                {
-                    ColorAttachments = [new ColorAttachment() { Texture = texture, AttachmentLoadOp = AttachmentLoadOp.DontCare }]
-                };
+                VerboseRenderAttachments renderAttachments = new VerboseRenderAttachments();
+                renderAttachments.ColorAttachments = [new ColorAttachment() { Texture = texture }];
+
                 int fbo = FramebufferCache.GetFramebuffer(RenderAttachmentsToFramebufferDesc(renderAttachments));
 
                 GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);

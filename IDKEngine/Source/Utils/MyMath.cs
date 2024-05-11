@@ -85,5 +85,28 @@ namespace IDKEngine.Utils
                 points[j * 4 + 3] = leftBottom.Xyz;
             }
         }
+
+        public static ulong Split(ulong x, int log_bits)
+        {
+            int bit_count = 1 << log_bits;
+            ulong mask = ulong.MaxValue >> (bit_count / 2);
+            x &= mask;
+            for (int i = log_bits - 1, n = 1 << i; i > 0; --i, n >>= 1)
+            {
+                mask = (mask | (mask << n)) & ~(mask << (n / 2));
+                x = (x | (x << n)) & mask;
+            }
+            return x;
+        }
+
+        public static ulong Encode(ulong x, ulong y, ulong z, int log_bits)
+        {
+            return Split(x, log_bits) | (Split(y, log_bits) << 1) | (Split(z, log_bits) << 2);
+        }
+
+        public static Vector3 Encode(Vector3 a)
+        {
+            return new Vector3(0.0f);
+        }
     }
 }

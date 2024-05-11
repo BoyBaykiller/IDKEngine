@@ -98,7 +98,7 @@ namespace IDKEngine.Render
 
         public void Draw()
         {
-            shaderProgram.Use();
+            BBG.Cmd.UseShaderProgram(shaderProgram);
             vao.Bind();
             BBG.Rendering.DrawIndexed(BBG.Rendering.Topology.Triangles, IndicisCount, BBG.Rendering.IndexType.Uint, Count);
         }

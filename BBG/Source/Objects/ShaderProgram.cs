@@ -71,11 +71,6 @@ namespace BBOpenGL
                 return success == 1;
             }
 
-            public void Use()
-            {
-                GL.UseProgram(ID);
-            }
-
             public unsafe void Upload(int location, in Matrix4 matrix4, int count = 1, bool transpose = false)
             {
                 fixed (float* ptr = &matrix4.Row0.X)

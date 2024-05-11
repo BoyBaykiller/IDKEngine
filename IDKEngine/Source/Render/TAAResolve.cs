@@ -25,11 +25,11 @@ namespace IDKEngine.Render
             PreferAliasingOverBlur = preferAliasingOverBlurAmount;
         }
 
-        public void RunTAA(BBG.Texture color)
+        public void Compute(BBG.Texture color)
         {
             frame++;
 
-            BBG.Computing.Compute("Merge Textures", () =>
+            BBG.Computing.Compute("Temporal Anti Aliasing", () =>
             {
                 taaResolveProgram.Upload("PreferAliasingOverBlur", PreferAliasingOverBlur);
                 taaResolveProgram.Upload("IsNaiveTaa", IsNaiveTaa);

@@ -218,7 +218,7 @@ namespace IDKEngine.Render
             GridReVoxelize = true;
             RayTracingSamples = 1;
             ShadowMode = ShadowTechnique.PcfShadowMap;
-
+            
             SetSize(renderSize, renderPresentationSize);
             TemporalAntiAliasing = TemporalAntiAliasingMode.TAA;
         }
@@ -287,30 +287,33 @@ namespace IDKEngine.Render
                 return;
             }
 
-            for (int currentWritelod = 1; currentWritelod < DepthTexture.Levels; currentWritelod++)
+            if (IsHiZCulling)
             {
-                BBG.Rendering.Render($"Generate Depth Mipmap level {currentWritelod}", new BBG.Rendering.VerboseRenderAttachments()
+                for (int currentWritelod = 1; currentWritelod < DepthTexture.Levels; currentWritelod++)
                 {
-                    DepthAttachment = new BBG.Rendering.DepthAttachment()
+                    BBG.Rendering.Render($"Generate Depth Mipmap level {currentWritelod}", new BBG.Rendering.VerboseRenderAttachments()
                     {
-                        Texture = DepthTexture,
-                        AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.DontCare,
-                        Level = currentWritelod,
-                    }
-                }, new BBG.Rendering.GraphicsPipelineState()
-                {
-                    EnabledCapabilities = [BBG.Rendering.Capability.DepthTest],
-                    DepthFunction = BBG.Rendering.DepthFunction.Always,
-                }, () =>
-                {
-                    hiZGenerateProgram.Upload(0, currentWritelod - 1);
+                        DepthAttachment = new BBG.Rendering.DepthAttachment()
+                        {
+                            Texture = DepthTexture,
+                            AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.DontCare,
+                            Level = currentWritelod,
+                        }
+                    }, new BBG.Rendering.GraphicsPipelineState()
+                    {
+                        EnabledCapabilities = [BBG.Rendering.Capability.DepthTest],
+                        DepthFunction = BBG.Rendering.DepthFunction.Always,
+                    }, () =>
+                    {
+                        hiZGenerateProgram.Upload(0, currentWritelod - 1);
 
-                    BBG.Cmd.BindTextureUnit(DepthTexture, 0);
-                    BBG.Cmd.UseShaderProgram(hiZGenerateProgram);
+                        BBG.Cmd.BindTextureUnit(DepthTexture, 0);
+                        BBG.Cmd.UseShaderProgram(hiZGenerateProgram);
 
-                    BBG.Rendering.InferViewportSize();
-                    BBG.Rendering.DrawNonIndexed(BBG.Rendering.Topology.Triangles, 0, 3);
-                });
+                        BBG.Rendering.InferViewportSize();
+                        BBG.Rendering.DrawNonIndexed(BBG.Rendering.Topology.Triangles, 0, 3);
+                    });
+                }
             }
 
             BBG.Computing.Compute("Main view Frustum and Occlusion Culling", () =>
@@ -326,7 +329,7 @@ namespace IDKEngine.Render
             {
                 ColorAttachments = new BBG.Rendering.ColorAttachments()
                 {
-                    Textures = [resultBeforeTAA, AlbedoAlphaTexture, NormalSpecularTexture, EmissiveRoughnessTexture, VelocityTexture],
+                    Textures = [AlbedoAlphaTexture, NormalSpecularTexture, EmissiveRoughnessTexture, VelocityTexture],
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.DontCare,
                 },
                 DepthAttachment = new BBG.Rendering.DepthAttachment()
@@ -469,7 +472,7 @@ namespace IDKEngine.Render
 
             if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
             {
-                TaaResolve.RunTAA(resultBeforeTAA);
+                TaaResolve.Compute(resultBeforeTAA);
             }
             else if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
             {

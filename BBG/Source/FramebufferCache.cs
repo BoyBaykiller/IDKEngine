@@ -6,7 +6,7 @@ namespace BBOpenGL
 {
     public static partial class BBG
     {
-        internal static class FramebufferCache
+        public static class FramebufferCache
         {
             public const int MAX_COLOR_ATTACHMENTS = 8;
             public const int MAX_FRAMEBUFFER_ATTACHMENTS = 8 + 2; // 8color + 1depth + 1stencil
@@ -59,7 +59,7 @@ namespace BBOpenGL
                 }
             }
 
-            private struct FramebufferRessorce
+            public struct FramebufferRessorce
             {
                 public FramebufferDesc FramebufferDesc;
                 public int GLRessource;
@@ -119,7 +119,7 @@ namespace BBOpenGL
                 Array.Resize(ref framebuffers, count);
             }
 
-            private static FramebufferRessorce CreateFramebuffer(in FramebufferDesc framebufferDesc)
+            public static FramebufferRessorce CreateFramebuffer(in FramebufferDesc framebufferDesc)
             {
                 FramebufferRessorce newFramebuffer = new FramebufferRessorce();
                 newFramebuffer.FramebufferDesc = framebufferDesc;
@@ -127,6 +127,7 @@ namespace BBOpenGL
 
                 Span<ColorBuffer> drawBuffers = stackalloc ColorBuffer[MAX_COLOR_ATTACHMENTS];
                 int numColorAttachments = 0;
+                bool hasDepth = false;
                 for (int i = 0; i < framebufferDesc.NumAttachments; i++)
                 {
                     ref readonly Attachment attachment = ref framebufferDesc.Attachments[i];
@@ -138,6 +139,14 @@ namespace BBOpenGL
                         drawBuffers[numColorAttachments] = ColorBuffer.ColorAttachment0 + (uint)numColorAttachments;
                         numColorAttachments++;
                     }
+                    if (attachment.AttachmentPoint == FramebufferAttachment.DepthAttachment)
+                    {
+                        hasDepth = true;
+                    }
+                }
+                if (!hasDepth)
+                {
+                    GL.NamedFramebufferTexture(newFramebuffer.GLRessource, FramebufferAttachment.DepthAttachment, 0, 0);
                 }
                 GL.NamedFramebufferDrawBuffers(newFramebuffer.GLRessource, numColorAttachments, drawBuffers[0]);
 

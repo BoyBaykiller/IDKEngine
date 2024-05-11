@@ -6,10 +6,10 @@ AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
-layout(location = 1) out vec4 AlbedoAlpha;
-layout(location = 2) out vec3 NormalSpecular;
-layout(location = 3) out vec4 EmissiveRoughness;
-layout(location = 4) out vec2 Velocity;
+layout(location = 0) out vec4 AlbedoAlpha;
+layout(location = 1) out vec3 NormalSpecular;
+layout(location = 2) out vec4 EmissiveRoughness;
+layout(location = 3) out vec2 Velocity;
 
 in InOutVars
 {
@@ -46,7 +46,7 @@ void main()
     float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
 
     AlbedoAlpha = albedoAlpha;
-    NormalSpecular = vec3(EncodeUnitVec(textureNormal), specular);
+    NormalSpecular = vec3(EncodeUnitVec(normal), specular);
     EmissiveRoughness = vec4(emissive, roughness);
 
     vec2 uv = gl_FragCoord.xy / textureSize(gBufferDataUBO.Velocity, 0);

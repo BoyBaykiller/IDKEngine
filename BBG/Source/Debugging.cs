@@ -36,7 +36,7 @@ namespace BBOpenGL
             // False by default because of AMD driver bug: https://gist.github.com/BoyBaykiller/4918880dd86a9f544c3254479b6d6190
             public static bool EnableDebugGroups = false;
 
-            internal static void PushDebugGroup(string message)
+            public static void PushDebugGroup(string message)
             {
                 if (EnableDebugGroups)
                 {
@@ -44,7 +44,7 @@ namespace BBOpenGL
                 }
             }
 
-            internal static void PopDebugGroup()
+            public static void PopDebugGroup()
             {
                 if (EnableDebugGroups)
                 {
