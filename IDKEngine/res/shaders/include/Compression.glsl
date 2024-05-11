@@ -43,15 +43,29 @@ vec2 SignNotZero(vec2 v)
     return vec2((v.x >= 0.0) ? +1.0 : -1.0, (v.y >= 0.0) ? +1.0 : -1.0);
 }
 
+// vec3 in range [-1.0, 1.0] with length=1 ->
+// vec2 in range [-1.0, 1.0]
 vec2 EncodeUnitVec(vec3 v)
 {
     vec2 p = vec2(v.x, v.y) * (1.0 / (abs(v.x) + abs(v.y) + abs(v.z)));
     return (v.z <= 0.0) ? ((1.0 - abs(vec2(p.y, p.x))) * SignNotZero(p)) : p;
 }
 
+// vec2 in range [-1.0, 1.0] ->
+// vec3 in range [-1.0, 1.0] with length=1
 vec3 DecodeUnitVec(vec2 e)
 {
     vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
     if (v.z < 0) v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
     return normalize(v);
+}
+
+// vec2 in range [0.0, 1.0] ->
+// vec3 in range [-1.0, 1.0] with length=1
+vec3 ReconstructPackedNormal(vec2 v)
+{
+    vec3 result;
+    result.xy = v * 2.0 - 1.0;
+    result.z = sqrt(max(1.0 - dot(v.rg, v.rg), 0.0));
+    return normalize(result);
 }

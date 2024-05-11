@@ -1,8 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using IDKEngine.Utils;
-using IDKEngine.OpenGL;
+using BBLogger;
+using BBOpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -23,24 +22,22 @@ namespace IDKEngine.Render
             get => _count;
         }
 
-        private readonly PointShadow[] pointShadows;
-        private readonly AbstractShaderProgram rayTracedShadowsProgram;
-        private readonly TypedBuffer<GpuPointShadow> pointShadowsBuffer;
+        private readonly CpuPointShadow[] pointShadows;
+        private readonly BBG.AbstractShaderProgram rayTracedShadowsProgram;
+        private readonly BBG.TypedBuffer<GpuPointShadow> pointShadowsBuffer;
         public unsafe PointShadowManager()
         {
-            pointShadows = new PointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
+            pointShadows = new CpuPointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
-            rayTracedShadowsProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadowsRayTraced/compute.glsl"));
+            rayTracedShadowsProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "ShadowsRayTraced/compute.glsl"));
 
-            pointShadowsBuffer = new TypedBuffer<GpuPointShadow>();
-            pointShadowsBuffer.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
-            pointShadowsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 2);
+            pointShadowsBuffer = new BBG.TypedBuffer<GpuPointShadow>();
+            pointShadowsBuffer.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
+            pointShadowsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 2);
         }
 
         public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
         {
-            GL.Disable(EnableCap.CullFace);
-            GL.DepthFunc(DepthFunction.Less);
             for (int i = 0; i < Count; i++)
             {
                 pointShadows[i].RenderShadowMap(modelSystem, camera, i);
@@ -57,7 +54,7 @@ namespace IDKEngine.Render
             Vector2i commonSize = new Vector2i();
             for (int i = 0; i < Count; i++)
             {
-                PointShadow pointShadow = pointShadows[i];
+                CpuPointShadow pointShadow = pointShadows[i];
                 Vector2i size = new Vector2i(pointShadow.RayTracedShadowMap.Width, pointShadow.RayTracedShadowMap.Height);
                 if (i == 0)
                 {
@@ -70,22 +67,26 @@ namespace IDKEngine.Render
                 }
             }
 
-            rayTracedShadowsProgram.Upload(0, samples);
+            BBG.Computing.Compute("Debug render shading rate attributes", () =>
+            {
+                rayTracedShadowsProgram.Upload(0, samples);
 
-            rayTracedShadowsProgram.Use();
-            GL.DispatchCompute((commonSize.X + 8 - 1) / 8, (commonSize.Y + 8 - 1) / 8, Count);
-            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+                BBG.Cmd.UseShaderProgram(rayTracedShadowsProgram);
+                BBG.Computing.Dispatch((commonSize.X + 8 - 1) / 8, (commonSize.Y + 8 - 1) / 8, Count);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit);
+            });
         }
 
-
-        public bool AddPointShadow(PointShadow newPointShadow)
+        public bool TryAddPointShadow(CpuPointShadow newPointShadow, out int newIndex)
         {
+            newIndex = -1;
             if (Count == GPU_MAX_UBO_POINT_SHADOW_COUNT)
             {
-                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(PointShadow)}. Limit of {GPU_MAX_UBO_POINT_SHADOW_COUNT} is reached");
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot add {nameof(CpuPointShadow)}. Limit of {GPU_MAX_UBO_POINT_SHADOW_COUNT} is reached");
                 return false;
             }
 
+            newIndex = Count;
             pointShadows[Count++] = newPointShadow;
 
             return true;
@@ -93,7 +94,7 @@ namespace IDKEngine.Render
 
         public void DeletePointShadow(int index)
         {
-            if (!TryGetPointShadow(index, out PointShadow pointShadow))
+            if (!TryGetPointShadow(index, out CpuPointShadow pointShadow))
             {
                 Logger.Log(Logger.LogLevel.Warn, $"{nameof(pointShadow)} {pointShadow} does not exist. Cannot delete it");
                 return;
@@ -115,18 +116,18 @@ namespace IDKEngine.Render
             }
         }
 
-        private void UploadPointShadow(int index)
+        private unsafe void UploadPointShadow(int index)
         {
-            if (!TryGetPointShadow(index, out PointShadow pointShadow))
+            if (!TryGetPointShadow(index, out CpuPointShadow pointShadow))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(PointShadow)} {index} does not exist. Cannot update it's buffer content");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuPointShadow)} {index} does not exist. Cannot update it's buffer content");
                 return;
             }
 
             pointShadowsBuffer.UploadElements(pointShadow.GetGpuPointShadow(), index);
         }
 
-        public bool TryGetPointShadow(int index, out PointShadow pointShadow)
+        public bool TryGetPointShadow(int index, out CpuPointShadow pointShadow)
         {
             if (index >= 0 && index < Count)
             {

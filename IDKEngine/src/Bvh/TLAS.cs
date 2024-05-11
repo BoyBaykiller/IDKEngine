@@ -1,4 +1,5 @@
 ﻿using System;
+using BBOpenGL;
 using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
@@ -12,10 +13,10 @@ namespace IDKEngine
         public int TreeDepth { get; private set; }
 
         public GpuMeshInstance[] MeshInstances;
-        public GpuDrawElementsCmd[] DrawCommands;
+        public BBG.DrawElementsIndirectCommand[] DrawCommands;
         public BLAS[] Blases;
         public GpuTlasNode[] Nodes;
-        public TLAS(BLAS[] blases, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances)
+        public TLAS(BLAS[] blases, BBG.DrawElementsIndirectCommand[] drawCommands, GpuMeshInstance[] meshInstances)
         {
             Blases = blases;
             DrawCommands = drawCommands;
@@ -35,7 +36,7 @@ namespace IDKEngine
                 for (int i = 0; i < Blases.Length; i++)
                 {
                     BLAS blas = Blases[i];
-                    ref readonly GpuDrawElementsCmd cmd = ref DrawCommands[i];
+                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[i];
 
                     for (int j = 0; j < cmd.InstanceCount; j++)
                     {

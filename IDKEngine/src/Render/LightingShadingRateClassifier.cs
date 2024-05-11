@@ -1,16 +1,20 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using IDKEngine.OpenGL;
+using BBOpenGL;
 
 namespace IDKEngine.Render
 {
-    class LightingShadingRateClassifier : VariableRateShading, IDisposable
+    class LightingShadingRateClassifier : IDisposable
     {
-        // used in shader and client code - keep in sync!
-        public enum DebugMode
+        // Defined by https://registry.khronos.org/OpenGL/extensions/NV/NV_shading_rate_image.txt
+        public const int TILE_SIZE = 16;
+
+        public static bool IS_SUPPORTED = BBG.GetDeviceInfo().ExtensionSupport.VariableRateShading;
+
+        // Used in shader and client code - keep in sync!
+        public enum DebugMode : int
         {
-            NoDebug,
+            None,
             ShadingRate,
             Speed,
             Luminance,
@@ -25,95 +29,109 @@ namespace IDKEngine.Render
 
             public static GpuSettings Default = new GpuSettings()
             {
-                DebugValue = DebugMode.NoDebug,
+                DebugValue = DebugMode.None,
                 SpeedFactor = 0.2f,
                 LumVarianceFactor = 0.04f,
             };
         }
 
         public GpuSettings Settings;
+        public BBG.Rendering.ShadingRate[] ShadingRatePalette;
 
-        private Texture debugTexture;
-        private readonly AbstractShaderProgram shaderProgram;
-        private readonly AbstractShaderProgram debugProgram;
-        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public LightingShadingRateClassifier(Vector2i size, in GpuSettings settings)
-            : base(size, new NvShadingRateImage[]
-            {
-                NvShadingRateImage.ShadingRate1InvocationPerPixelNv,
-                NvShadingRateImage.ShadingRate1InvocationPer2X1PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer2X2PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer4X2PixelsNv,
-                NvShadingRateImage.ShadingRate1InvocationPer4X4PixelsNv
-            })
+        public BBG.Texture Result;
+        private BBG.Texture debugTexture;
+        private readonly BBG.AbstractShaderProgram shaderProgram;
+        private readonly BBG.AbstractShaderProgram debugProgram;
+        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public unsafe LightingShadingRateClassifier(Vector2i size, in GpuSettings settings)
         {
-            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadingRateClassification/compute.glsl"));
-            debugProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "ShadingRateClassification/debugCompute.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "ShadingRateClassification/compute.glsl"));
+            debugProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "ShadingRateClassification/debugCompute.glsl"));
 
-            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
+            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
 
             SetSize(size);
+
+            ShadingRatePalette = [
+                BBG.Rendering.ShadingRate._1InvocationPerPixelNV,
+                BBG.Rendering.ShadingRate._1InvocationPer2x1PixelsNV,
+                BBG.Rendering.ShadingRate._1InvocationPer2x2PixelsNV,
+                BBG.Rendering.ShadingRate._1InvocationPer4x2PixelsNV,
+                BBG.Rendering.ShadingRate._1InvocationPer4x4PixelsNV
+            ];
 
             Settings = settings;
         }
 
-        public void Compute(Texture shaded)
+        public void Compute(BBG.Texture shaded)
         {
-            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            gpuSettingsBuffer.UploadElements(Settings);
+            BBG.Computing.Compute("Generate Shading Rate Image", () =>
+            {
+                gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
+                gpuSettingsBuffer.UploadElements(Settings);
 
-            Result.BindToImageUnit(0, Result.TextureFormat);
-            debugTexture.BindToImageUnit(1, debugTexture.TextureFormat);
-            shaded.BindToUnit(0);
+                BBG.Cmd.BindImageUnit(Result, 0);
+                BBG.Cmd.BindImageUnit(debugTexture, 1);
+                BBG.Cmd.BindTextureUnit(shaded, 0);
+                BBG.Cmd.UseShaderProgram(shaderProgram);
 
-            shaderProgram.Use();
-            GL.DispatchCompute((shaded.Width + TILE_SIZE - 1) / TILE_SIZE, (shaded.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+                BBG.Computing.Dispatch((shaded.Width + TILE_SIZE - 1) / TILE_SIZE, (shaded.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+            });
         }
 
-        public void DebugRender(Texture dest)
+        public void DebugRender(BBG.Texture dest)
         {
-            if (Settings.DebugValue == DebugMode.NoDebug)
+            if (Settings.DebugValue == DebugMode.None)
             {
                 return;
             }
 
-            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            gpuSettingsBuffer.UploadElements(Settings);
-
-            dest.BindToImageUnit(0, dest.TextureFormat);
-            dest.BindToUnit(0);
-            if (Settings.DebugValue != DebugMode.ShadingRate)
+            BBG.Computing.Compute("Debug shading sate attributes", () =>
             {
-                debugTexture.BindToUnit(1);
-            }
-            else
-            {
-                Result.BindToUnit(1);
-            }
+                gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
+                gpuSettingsBuffer.UploadElements(Settings);
 
-            debugProgram.Use();
-            GL.DispatchCompute((dest.Width + TILE_SIZE - 1) / TILE_SIZE, (dest.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+                BBG.Cmd.BindImageUnit(dest, 0);
+                BBG.Cmd.BindTextureUnit(dest, 0);
+                BBG.Cmd.BindTextureUnit(Settings.DebugValue == DebugMode.ShadingRate ? Result : debugTexture, 1);
+
+                BBG.Cmd.UseShaderProgram(debugProgram);
+                BBG.Computing.Dispatch((dest.Width + TILE_SIZE - 1) / TILE_SIZE, (dest.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+            });
         }
 
-        public new void SetSize(Vector2i size)
+        public void SetSize(Vector2i size)
         {
-            base.SetSize(size);
+            size.X = (int)MathF.Ceiling((float)size.X / TILE_SIZE);
+            size.Y = (int)MathF.Ceiling((float)size.Y / TILE_SIZE);
+
+            if (Result != null) Result.Dispose();
+            Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            Result.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
+            Result.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R8Uint);
 
             if (debugTexture != null) debugTexture.Dispose();
-            debugTexture = new Texture(Texture.Type.Texture2D);
-            debugTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            debugTexture.ImmutableAllocate(base.Result.Width, base.Result.Height, 1, Texture.InternalFormat.R16Float);
+            debugTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            debugTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
+            debugTexture.ImmutableAllocate(Result.Width, Result.Height, 1, BBG.Texture.InternalFormat.R32Float);
         }
 
-        public new void Dispose()
+        public void Dispose()
         {
-            base.Dispose();
-
             debugTexture.Dispose();
             shaderProgram.Dispose();
             debugProgram.Dispose();
             gpuSettingsBuffer.Dispose();
+        }
+
+        public BBG.Rendering.VariableRateShadingNV GetVariableRateShading()
+        {
+            return new BBG.Rendering.VariableRateShadingNV()
+            {
+                ShadingRateImage = Result,
+                ShadingRatePalette = ShadingRatePalette,
+            };
         }
     }
 }

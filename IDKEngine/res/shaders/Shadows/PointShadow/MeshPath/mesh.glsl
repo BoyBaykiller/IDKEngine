@@ -6,11 +6,12 @@
 #pragma optionNV(unroll all)
 
 #define DECLARE_MESHLET_STORAGE_BUFFERS
-AppInclude(include/StaticStorageBuffers.glsl)
+#define DECLARE_MESHLET_RENDERING_TYPES
 
-AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
 
 layout(local_size_x = 32) in;
 // We write out indices in packs of 4 using writePackedPrimitiveIndices4x8NV as an optimization.

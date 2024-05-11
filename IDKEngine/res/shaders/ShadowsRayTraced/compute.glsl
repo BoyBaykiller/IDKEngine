@@ -3,9 +3,10 @@
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)
 
-AppInclude(include/Constants.glsl)
-AppInclude(include/Transformations.glsl)
 AppInclude(include/Random.glsl)
+AppInclude(include/Constants.glsl)
+AppInclude(include/Compression.glsl)
+AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
 #define LOCAL_SIZE_X 8
@@ -34,7 +35,7 @@ void main()
     vec2 uv = (imgCoord + 0.5) / imageSize(image2D(pointShadow.RayTracedShadowMapImage));
     vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
-    vec3 normal = normalize(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb);
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
 
     vec3 sampleToLightDir = light.Position - unjitteredFragPos;
     float cosTerm = dot(normal, sampleToLightDir);

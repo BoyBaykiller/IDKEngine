@@ -1,14 +1,14 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
+using BBLogger;
+using BBOpenGL;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
-using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
 {
-    class PointShadow : IDisposable
+    class CpuPointShadow : IDisposable
     {
         private static bool _takeMeshShaderPath;
         public static bool TakeMeshShaderPath
@@ -23,26 +23,26 @@ namespace IDKEngine.Render
                 }
                 _takeMeshShaderPath = value;
 
-                if (TakeMeshShaderPath && !Helper.IsExtensionsAvailable("GL_NV_mesh_shader"))
+                if (TakeMeshShaderPath && !BBG.GetDeviceInfo().ExtensionSupport.MeshShader)
                 {
                     Logger.Log(Logger.LogLevel.Error, $"Mesh shader path requires GL_NV_mesh_shader");
                     TakeMeshShaderPath = false;
                 }
 
                 if (renderShadowMapProgram != null) renderShadowMapProgram.Dispose();
-                AbstractShaderProgram.ShaderInsertions["TAKE_MESH_SHADER_PATH_SHADOW"] = TakeMeshShaderPath ? "1" : "0";
+                BBG.AbstractShaderProgram.ShaderInsertions["TAKE_MESH_SHADER_PATH_SHADOW"] = TakeMeshShaderPath ? "1" : "0";
                 if (TakeMeshShaderPath)
                 {
-                    renderShadowMapProgram = new AbstractShaderProgram(
-                        new AbstractShader((ShaderType)NvMeshShader.TaskShaderNv, "Shadows/PointShadow/MeshPath/task.glsl"),
-                        new AbstractShader((ShaderType)NvMeshShader.MeshShaderNv, "Shadows/PointShadow/MeshPath/mesh.glsl"),
-                        new AbstractShader(ShaderType.FragmentShader, "Shadows/PointShadow/fragment.glsl"));
+                    renderShadowMapProgram = new BBG.AbstractShaderProgram(
+                       new BBG.AbstractShader(BBG.ShaderType.TaskNV, "Shadows/PointShadow/MeshPath/task.glsl"),
+                       new BBG.AbstractShader(BBG.ShaderType.MeshNV, "Shadows/PointShadow/MeshPath/mesh.glsl"),
+                       new BBG.AbstractShader(BBG.ShaderType.Fragment, "Shadows/PointShadow/fragment.glsl"));
                 }
                 else
                 {
-                    renderShadowMapProgram = new AbstractShaderProgram(
-                        new AbstractShader(ShaderType.VertexShader, "Shadows/PointShadow/VertexPath/vertex.glsl"),
-                        new AbstractShader(ShaderType.FragmentShader, "Shadows/PointShadow/fragment.glsl"));
+                    renderShadowMapProgram = new BBG.AbstractShaderProgram(
+                        new BBG.AbstractShader(BBG.ShaderType.Vertex, "Shadows/PointShadow/VertexPath/vertex.glsl"),
+                        new BBG.AbstractShader(BBG.ShaderType.Fragment, "Shadows/PointShadow/fragment.glsl"));
                 }
             }
         }
@@ -90,29 +90,25 @@ namespace IDKEngine.Render
             }
         }
 
-        public Texture ShadowMap;
-        public Texture RayTracedShadowMap;
+        public BBG.Texture ShadowMap;
+        public BBG.Texture RayTracedShadowMap;
 
-        private readonly Framebuffer framebuffer;
-        private Sampler nearestSampler;
-        private Sampler shadowSampler;
+        private BBG.Sampler nearestSampler;
+        private BBG.Sampler shadowSampler;
         private GpuPointShadow gpuPointShadow;
 
         private static bool isLazyInitialized = false;
-        private static AbstractShaderProgram renderShadowMapProgram;
-        private static AbstractShaderProgram cullingProgram;
+        private static BBG.AbstractShaderProgram renderShadowMapProgram;
+        private static BBG.AbstractShaderProgram cullingProgram;
 
-        public PointShadow(int shadowMapSize, Vector2i rayTracedShadowMapSize, Vector2 clippingPlanes)
+        public CpuPointShadow(int shadowMapSize, Vector2i rayTracedShadowMapSize, Vector2 clippingPlanes)
         {
             if (!isLazyInitialized)
             {
                 TakeMeshShaderPath = false;
-                cullingProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "MeshCulling/PointShadow/compute.glsl"));
+                cullingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "MeshCulling/PointShadow/compute.glsl"));
                 isLazyInitialized = true;
             }
-
-            framebuffer = new Framebuffer();
-            framebuffer.SetDrawBuffers([DrawBuffersEnum.None]);
 
             ClippingPlanes = clippingPlanes;
             SetSizeShadowMap(shadowMapSize);
@@ -121,13 +117,6 @@ namespace IDKEngine.Render
 
         public void RenderShadowMap(ModelSystem modelSystem, Camera camera, int gpuPointShadowIndex)
         {
-            renderShadowMapProgram.Upload(0, gpuPointShadowIndex);
-            cullingProgram.Upload(0, gpuPointShadowIndex);
-
-            GL.Viewport(0, 0, ShadowMap.Width, ShadowMap.Height);
-            framebuffer.Bind();
-            framebuffer.Clear(ClearBufferMask.DepthBufferBit);
-
             Matrix4 cameraProjView = camera.GetViewMatrix() * camera.GetProjectionMatrix();
             Frustum cameraFrustum = new Frustum(cameraProjView);
             Span<Vector3> cameraFrustumVertices = stackalloc Vector3[8];
@@ -151,23 +140,45 @@ namespace IDKEngine.Render
                     numVisibleFaces++;
                 }
             }
-            cullingProgram.Upload(1, numVisibleFaces);
-            cullingProgram.Upload(2, visibleFaces);
 
-            modelSystem.ResetInstancesBeforeCulling();
-            cullingProgram.Use();
-            GL.DispatchCompute((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
+            BBG.Computing.Compute("Cubemap shadow map culling", () =>
+            {
+                modelSystem.ResetInstanceCounts();
 
-            renderShadowMapProgram.Use();
-            if (TakeMeshShaderPath)
+                cullingProgram.Upload(0, gpuPointShadowIndex);
+                cullingProgram.Upload(1, numVisibleFaces);
+                cullingProgram.Upload(2, visibleFaces);
+
+                BBG.Cmd.UseShaderProgram(cullingProgram);
+                BBG.Computing.Dispatch((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+            });
+
+            BBG.Rendering.Render("Generate Shadow Cubemap", new BBG.Rendering.RenderAttachments()
             {
-                modelSystem.MeshShaderDrawNV();
-            }
-            else
+                DepthAttachment = new BBG.Rendering.DepthAttachment()
+                {
+                    Texture = ShadowMap,
+                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
+                }
+            }, new BBG.Rendering.GraphicsPipelineState()
             {
-                modelSystem.Draw();
-            }
+                EnabledCapabilities = [BBG.Rendering.Capability.DepthTest]
+            }, () =>
+            {
+                renderShadowMapProgram.Upload(0, gpuPointShadowIndex);
+                BBG.Cmd.UseShaderProgram(renderShadowMapProgram);
+
+                BBG.Rendering.InferViewportSize();
+                if (TakeMeshShaderPath)
+                {
+                    modelSystem.MeshShaderDrawNV();
+                }
+                else
+                {
+                    modelSystem.Draw();
+                }
+            });
         }
 
         private void UpdateViewMatrices()
@@ -185,43 +196,38 @@ namespace IDKEngine.Render
             return ref gpuPointShadow;
         }
 
-        public void SetReferencingLightIndex(int lightIndex)
+        public void SetConnectedLight(int lightIndex)
         {
             gpuPointShadow.LightIndex = lightIndex;
         }
 
         public void SetSizeShadowMap(int size)
         {
-            size = Math.Max(size, 1);
-
             if (shadowSampler != null) { shadowSampler.Dispose(); }
             if (nearestSampler != null) { nearestSampler.Dispose(); }
             if (ShadowMap != null) { ShadowMap.Dispose(); }
 
-            shadowSampler = new Sampler(new Sampler.State()
+            shadowSampler = new BBG.Sampler(new BBG.Sampler.State()
             {
-                MinFilter = Sampler.MinFilter.Linear,
-                MagFilter = Sampler.MagFilter.Linear,
+                MinFilter = BBG.Sampler.MinFilter.Linear,
+                MagFilter = BBG.Sampler.MagFilter.Linear,
 
-                CompareMode = Sampler.CompareMode.CompareRefToTexture,
-                CompareFunc = Sampler.CompareFunc.Less,
+                CompareMode = BBG.Sampler.CompareMode.CompareRefToTexture,
+                CompareFunc = BBG.Sampler.CompareFunc.Less,
             });
 
-            nearestSampler = new Sampler(new Sampler.State()
+            nearestSampler = new BBG.Sampler(new BBG.Sampler.State()
             {
-                MinFilter = Sampler.MinFilter.Nearest,
-                MagFilter = Sampler.MagFilter.Nearest,
+                MinFilter = BBG.Sampler.MinFilter.Nearest,
+                MagFilter = BBG.Sampler.MagFilter.Nearest,
             });
 
-            ShadowMap = new Texture(Texture.Type.Cubemap);
-            ShadowMap.ImmutableAllocate(size, size, 1, Texture.InternalFormat.D16Unorm);
+            ShadowMap = new BBG.Texture(BBG.Texture.Type.Cubemap);
+            ShadowMap.ImmutableAllocate(size, size, 1, BBG.Texture.InternalFormat.D16Unorm);
 
             // Note: Using bindless textures for cubemaps causes sampling issues on radeonsi driver
             gpuPointShadow.Texture = ShadowMap.GetTextureHandleARB(nearestSampler);
             gpuPointShadow.ShadowTexture = ShadowMap.GetTextureHandleARB(shadowSampler);
-
-            framebuffer.SetRenderTarget(FramebufferAttachment.DepthAttachment, ShadowMap);
-            framebuffer.ClearBuffer(ClearBuffer.Depth, 0, 1.0f);
         }
 
         public void SetSizeRayTracedShadowMap(Vector2i size)
@@ -231,17 +237,15 @@ namespace IDKEngine.Render
 
             if (RayTracedShadowMap != null) RayTracedShadowMap.Dispose();
 
-            RayTracedShadowMap = new Texture(Texture.Type.Texture2D);
-            RayTracedShadowMap.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R8Unorm);
-            RayTracedShadowMap.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
+            RayTracedShadowMap = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            RayTracedShadowMap.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R8Unorm);
+            RayTracedShadowMap.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
 
-            gpuPointShadow.RayTracedShadowTexture = RayTracedShadowMap.GetImageHandleARB(RayTracedShadowMap.TextureFormat);
+            gpuPointShadow.RayTracedShadowTexture = RayTracedShadowMap.GetImageHandleARB(RayTracedShadowMap.Format);
         }
 
         public void Dispose()
         {
-            framebuffer.Dispose();
-
             RayTracedShadowMap.Dispose();
 
             shadowSampler.Dispose();

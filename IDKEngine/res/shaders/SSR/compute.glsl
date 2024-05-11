@@ -1,6 +1,7 @@
 #version 460 core
 
 AppInclude(include/Constants.glsl)
+AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
@@ -23,7 +24,7 @@ void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
+    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).b;
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (specular < 0.001 || depth == 1.0)
     {
@@ -34,7 +35,7 @@ void main()
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
     
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjection);
-    vec3 normal = normalize(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb);
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
     mat3 normalToView = mat3(transpose(perFrameDataUBO.InvView));
     normal = normalToView * normal;
 

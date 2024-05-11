@@ -1,6 +1,6 @@
 #version 460 core
 #extension GL_AMD_gpu_shader_half_float : enable
-#extension GL_AMD_gpu_shader_half_float_fetch : enable // requires GL_AMD_gpu_shader_half_float
+#extension GL_AMD_gpu_shader_half_float_fetch : enable
 
 #if GL_AMD_gpu_shader_half_float_fetch
 #define MATERIAL_SAMPLER_2D_TYPE f16sampler2D
@@ -11,13 +11,12 @@
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)
 
-AppInclude(include/StaticUniformBuffers.glsl)
-AppInclude(include/Constants.glsl)
-AppInclude(include/Transformations.glsl)
-AppInclude(include/Compression.glsl)
-AppInclude(include/Random.glsl)
 AppInclude(include/Ray.glsl)
-
+AppInclude(include/Random.glsl)
+AppInclude(include/Constants.glsl)
+AppInclude(include/Compression.glsl)
+AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
 
 #define TRAVERSAL_STACK_USE_SHARED_STACK_SIZE N_HIT_PROGRAM_LOCAL_SIZE_X

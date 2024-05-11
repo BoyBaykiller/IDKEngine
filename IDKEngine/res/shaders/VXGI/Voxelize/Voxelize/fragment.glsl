@@ -7,12 +7,12 @@
     #extension GL_NV_gpu_shader5 : require
 #endif
 
-AppInclude(include/StaticStorageBuffers.glsl)
-AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/Pbr.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
-AppInclude(include/Pbr.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(binding = 0, rgba16f) restrict uniform image3D ImgResult;
 

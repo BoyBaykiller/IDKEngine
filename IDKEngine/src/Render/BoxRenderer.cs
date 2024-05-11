@@ -1,49 +1,49 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
+using BBOpenGL;
 using IDKEngine.Shapes;
-using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
     class BoxRenderer : IDisposable
     {
-        private readonly AbstractShaderProgram shaderProgram;
-        private readonly Framebuffer fbo;
+        private readonly BBG.AbstractShaderProgram shaderProgram;
         public BoxRenderer()
         {
-            shaderProgram = new AbstractShaderProgram(
-                new AbstractShader(ShaderType.VertexShader, "Box/vertex.glsl"),
-                new AbstractShader(ShaderType.FragmentShader, "Box/fragment.glsl"));
-
-            fbo = new Framebuffer();
+            shaderProgram = new BBG.AbstractShaderProgram(
+                new BBG.AbstractShader(BBG.ShaderType.Vertex, "Box/vertex.glsl"),
+                new BBG.AbstractShader(BBG.ShaderType.Fragment, "Box/fragment.glsl"));
         }
 
-        public void Render(Texture result, Matrix4 matrix, in Box box)
+        public void Render(BBG.Texture result, Matrix4 matrix, Box box)
         {
-            fbo.SetRenderTarget(FramebufferAttachment.ColorAttachment0, result);
+            BBG.Rendering.Render("Bounding Box", new BBG.Rendering.RenderAttachments()
+            {
+                ColorAttachments = new BBG.Rendering.ColorAttachments()
+                {
+                    Textures = [result],
+                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
+                }
+            }, new BBG.Rendering.GraphicsPipelineState()
+            {
+                DepthFunction = BBG.Rendering.DepthFunction.Always,
+                FillMode = BBG.Rendering.FillMode.Line,
+            }, () =>
+            {
+                shaderProgram.Upload(0, box.Min);
+                shaderProgram.Upload(1, box.Max);
+                shaderProgram.Upload(2, matrix);
 
-            GL.Viewport(0, 0, result.Width, result.Height);
+                BBG.Cmd.UseShaderProgram(shaderProgram);
 
-            GL.DepthFunc(DepthFunction.Always);
-            GL.Disable(EnableCap.CullFace);
-            GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
-
-            shaderProgram.Upload(0, box.Min);
-            shaderProgram.Upload(1, box.Max);
-            shaderProgram.Upload(2, matrix);
-
-            fbo.Bind();
-            shaderProgram.Use();
-            GL.DrawArrays(PrimitiveType.Quads, 0, 24);
-
-            GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
+                BBG.Rendering.InferViewportSize();
+                BBG.Rendering.DrawNonIndexed(BBG.Rendering.Topology.Quads, 0, 24);
+            });
         }
 
         public void Dispose()
         {
             shaderProgram.Dispose();
-            fbo.Dispose();
         }
     }
 }

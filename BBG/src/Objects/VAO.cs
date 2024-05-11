@@ -1,0 +1,55 @@
+﻿using OpenTK.Graphics.OpenGL;
+
+namespace BBOpenGL
+{
+    public static partial class BBG
+    {
+        public class VAO : IDisposable
+        {
+            public readonly int ID;
+            public VAO()
+            {
+                GL.CreateVertexArrays(1, ref ID);
+            }
+
+            public void SetElementBuffer(BufferObject sourceBuffer)
+            {
+                GL.VertexArrayElementBuffer(ID, sourceBuffer.ID);
+            }
+
+            public void AddSourceBuffer(BufferObject sourceBuffer, int bindingIndex, int vertexSize, int bufferOffset = 0)
+            {
+                GL.VertexArrayVertexBuffer(ID, (uint)bindingIndex, sourceBuffer.ID, bufferOffset, vertexSize);
+            }
+
+            public void SetAttribFormat(int bindingIndex, int attribIndex, int attribTypeElements, VertexAttribType vertexAttribType, int relativeOffset, bool normalize = false)
+            {
+                GL.EnableVertexArrayAttrib(ID, (uint)attribIndex);
+                GL.VertexArrayAttribFormat(ID, (uint)attribIndex, attribTypeElements, vertexAttribType, normalize, (uint)relativeOffset);
+                GL.VertexArrayAttribBinding(ID, (uint)attribIndex, (uint)bindingIndex);
+            }
+
+            public void SetAttribFormatI(int bindingIndex, int attribIndex, int attribTypeElements, VertexAttribIType vertexAttribType, int relativeOffset)
+            {
+                GL.EnableVertexArrayAttrib(ID, (uint)attribIndex);
+                GL.VertexArrayAttribIFormat(ID, (uint)attribIndex, attribTypeElements, vertexAttribType, (uint)relativeOffset);
+                GL.VertexArrayAttribBinding(ID, (uint)attribIndex, (uint)bindingIndex);
+            }
+
+            public void Bind()
+            {
+                GL.BindVertexArray(ID);
+            }
+
+            public static void Bind(int id)
+            {
+                GL.BindVertexArray(id);
+            }
+
+            public void Dispose()
+            {
+                GL.DeleteVertexArray(ID);
+            }
+        }
+    }
+}

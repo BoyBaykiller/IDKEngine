@@ -1,13 +1,13 @@
 #version 460 core
 
-AppInclude(include/StaticStorageBuffers.glsl)
-AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(location = 1) out vec4 AlbedoAlpha;
-layout(location = 2) out vec4 NormalSpecular;
+layout(location = 2) out vec3 NormalSpecular;
 layout(location = 3) out vec4 EmissiveRoughness;
 layout(location = 4) out vec2 Velocity;
 
@@ -36,8 +36,9 @@ void main()
     vec3 interpNormal = normalize(inData.Normal);
 
     mat3 tbn = GetTBN(interpTangent, interpNormal);
-    vec3 textureNormal = texture(material.Normal, inData.TexCoord).rgb;
-    textureNormal = tbn * normalize(textureNormal * 2.0 - 1.0);
+
+    vec3 textureNormal = ReconstructPackedNormal(texture(material.Normal, inData.TexCoord).rg);
+    textureNormal = tbn * textureNormal;
 
     vec3 normal = normalize(mix(interpNormal, textureNormal, mesh.NormalMapStrength));
     vec3 emissive = texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + mesh.EmissiveBias * albedoAlpha.rgb;
@@ -45,7 +46,7 @@ void main()
     float roughness = clamp(texture(material.MetallicRoughness, inData.TexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
 
     AlbedoAlpha = albedoAlpha;
-    NormalSpecular = vec4(normal, specular);
+    NormalSpecular = vec3(EncodeUnitVec(textureNormal), specular);
     EmissiveRoughness = vec4(emissive, roughness);
 
     vec2 uv = gl_FragCoord.xy / textureSize(gBufferDataUBO.Velocity, 0);

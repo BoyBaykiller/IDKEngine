@@ -1,15 +1,20 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
+using OpenTK.Graphics.OpenGL;
+using BBLogger;
+using BBOpenGL;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
-using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
 {
     class LightManager : IDisposable
     {
+        // Light and PointShadow are in a 1-to-1 relationship.
+        // Light is the owner.
+        // Both reference each other.
+
         public const int GPU_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
 
         public struct RayHitInfo
@@ -55,32 +60,32 @@ namespace IDKEngine.Render
         public readonly int IndicisCount;
         private readonly CpuLight[] lights;
         
-        private readonly TypedBuffer<GpuLight> lightBufferObject;
-        private readonly AbstractShaderProgram shaderProgram;
+        private readonly BBG.TypedBuffer<GpuLight> lightBufferObject;
+        private readonly BBG.AbstractShaderProgram shaderProgram;
         private readonly PointShadowManager pointShadowManager;
-        private readonly VAO vao;
+        private readonly BBG.VAO vao;
         public unsafe LightManager()
         {
             lights = new CpuLight[GPU_MAX_UBO_LIGHT_COUNT];
 
-            shaderProgram = new AbstractShaderProgram(
-                new AbstractShader(ShaderType.VertexShader, "Light/vertex.glsl"),
-                new AbstractShader(ShaderType.FragmentShader, "Light/fragment.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(
+                new BBG.AbstractShader(BBG.ShaderType.Vertex, "Light/vertex.glsl"),
+                new BBG.AbstractShader(BBG.ShaderType.Fragment, "Light/fragment.glsl"));
 
-            lightBufferObject = new TypedBuffer<GpuLight>();
-            lightBufferObject.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));
-            lightBufferObject.BindBufferBase(BufferRangeTarget.UniformBuffer, 1);
+            lightBufferObject = new BBG.TypedBuffer<GpuLight>();
+            lightBufferObject.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));
+            lightBufferObject.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 1);
 
             const int SphereLatitudes = 12, SphereLongitudes = 12;
             Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, SphereLatitudes, SphereLongitudes);
-            TypedBuffer<ObjectFactory.Vertex> vbo = new TypedBuffer<ObjectFactory.Vertex>();
-            vbo.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.None, vertecis);
+            BBG.TypedBuffer<ObjectFactory.Vertex> vbo = new BBG.TypedBuffer<ObjectFactory.Vertex>();
+            vbo.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, vertecis);
 
             Span<uint> indicis = ObjectFactory.GenerateSmoothSphereIndicis(SphereLatitudes, SphereLongitudes);
-            TypedBuffer<uint> ebo = new TypedBuffer<uint>();
-            ebo.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.None, indicis);
+            BBG.TypedBuffer<uint> ebo = new BBG.TypedBuffer<uint>();
+            ebo.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, indicis);
 
-            vao = new VAO();
+            vao = new BBG.VAO();
             vao.SetElementBuffer(ebo);
             vao.AddSourceBuffer(vbo, 0, sizeof(ObjectFactory.Vertex));
             vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0 * sizeof(float)); // Positions
@@ -95,20 +100,11 @@ namespace IDKEngine.Render
         {
             shaderProgram.Use();
             vao.Bind();
-            GL.DrawElementsInstanced(PrimitiveType.Triangles, IndicisCount, DrawElementsType.UnsignedInt, IntPtr.Zero, Count);
+            BBG.Rendering.DrawIndexed(BBG.Rendering.Topology.Triangles, IndicisCount, BBG.Rendering.IndexType.Uint, Count);
         }
 
         public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
         {
-            for (int i = 0; i < Count; i++)
-            {
-                CpuLight light = lights[i];
-                if (light.HasPointShadow())
-                {
-                    pointShadowManager.TryGetPointShadow(light.GpuLight.PointShadowIndex, out PointShadow associatedPointShadow);
-                    associatedPointShadow.Position = light.GpuLight.Position;
-                }
-            }
             pointShadowManager.RenderShadowMaps(modelSystem, camera);
         }
 
@@ -146,27 +142,35 @@ namespace IDKEngine.Render
             if (Count > 0)
             {
                 lights[index] = lights[--Count];
+
+                // Correct PointShadow's LightIndex since the light moved
+                CpuLight affectedLight = lights[index];
+                if (affectedLight.HasPointShadow())
+                {
+                    pointShadowManager.TryGetPointShadow(affectedLight.GpuLight.PointShadowIndex, out CpuPointShadow pointShadow);
+                    pointShadow.SetConnectedLight(index);
+                }
             }
         }
 
-        public bool CreatePointShadowForLight(PointShadow pointShadow, int lightIndex)
+        public bool CreatePointShadowForLight(CpuPointShadow pointShadow, int lightIndex)
         {
             if (!TryGetLight(lightIndex, out CpuLight light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {lightIndex} does not exist. Cannot attach {nameof(PointShadow)} to it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {lightIndex} does not exist. Cannot attach {nameof(CpuPointShadow)} to it");
                 return false;
             }
 
             if (light.HasPointShadow())
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {lightIndex} already has a {nameof(PointShadow)} attached. First you must delete the old one by calling {nameof(DeletePointShadowOfLight)}");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {lightIndex} already has a {nameof(CpuPointShadow)} attached. First you must delete the old one by calling {nameof(DeletePointShadowOfLight)}");
                 return false;
             }
 
-            if (pointShadowManager.AddPointShadow(pointShadow))
+            if (pointShadowManager.TryAddPointShadow(pointShadow, out int pointShadowIndex))
             {
-                pointShadow.SetReferencingLightIndex(lightIndex);
-                lights[lightIndex].GpuLight.PointShadowIndex = pointShadowManager.Count - 1;
+                pointShadow.SetConnectedLight(lightIndex);
+                lights[lightIndex].GpuLight.PointShadowIndex = pointShadowIndex;
                 return true;
             }
             return false;
@@ -176,26 +180,26 @@ namespace IDKEngine.Render
         {
             if (!TryGetLight(index, out CpuLight light))
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} does not exist. Cannot detach {nameof(PointShadow)} from it");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} does not exist. Cannot detach {nameof(CpuPointShadow)} from it");
                 return;
             }
 
             if (!light.HasPointShadow())
             {
-                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} has no {nameof(PointShadow)} assigned which could be detached");
+                Logger.Log(Logger.LogLevel.Warn, $"{nameof(CpuLight)} {index} has no {nameof(CpuPointShadow)} assigned which could be detached");
                 return;
             }
 
             int pointShadowIndex = light.GpuLight.PointShadowIndex;
-            light.GpuLight.PointShadowIndex = -1;
+            light.DisconnectPointShadow();
             pointShadowManager.DeletePointShadow(pointShadowIndex);
 
-            // Correct light PointShadowIndex index after the point shadow was deleted and an other moved to its location
-            if (pointShadowManager.TryGetPointShadow(pointShadowIndex, out PointShadow pointShadow))
+            // Correct light PointShadowIndex index since the PointShadow moved
+            if (pointShadowManager.TryGetPointShadow(pointShadowIndex, out CpuPointShadow pointShadow))
             {
                 if (!TryGetLight(pointShadow.GetGpuPointShadow().LightIndex, out CpuLight affectedLight))
                 {
-                    Logger.Log(Logger.LogLevel.Fatal, $"{nameof(PointShadow)} {index} references {nameof(CpuLight)} {pointShadow.GetGpuPointShadow().LightIndex} which does not exist");
+                    Logger.Log(Logger.LogLevel.Fatal, $"{nameof(CpuPointShadow)} {index} references {nameof(CpuLight)} {pointShadow.GetGpuPointShadow().LightIndex} which does not exist");
                     return;
                 }
 
@@ -326,6 +330,17 @@ namespace IDKEngine.Render
 
         public void Update(out bool anyLightMoved)
         {
+            // Update PointShadows
+            for (int i = 0; i < pointShadowManager.Count; i++)
+            {
+                pointShadowManager.TryGetPointShadow(i, out CpuPointShadow pointShadow);
+                
+                CpuLight light = lights[pointShadow.GetGpuPointShadow().LightIndex];
+                pointShadow.Position = light.GpuLight.Position;
+            }
+            pointShadowManager.Update();
+
+            // Update lights
             anyLightMoved = false;
             for (int i = 0; i < Count; i++)
             {
@@ -338,7 +353,6 @@ namespace IDKEngine.Render
                 }
                 light.GpuLight.SetPrevToCurrentPosition();
             }
-            pointShadowManager.Update();
         }
 
         public bool TryGetLight(int index, out CpuLight light)
@@ -353,7 +367,7 @@ namespace IDKEngine.Render
             return false;
         }
 
-        public bool TryGetPointShadow(int index, out PointShadow pointShadow)
+        public bool TryGetPointShadow(int index, out CpuPointShadow pointShadow)
         {
             return pointShadowManager.TryGetPointShadow(index, out pointShadow);
         }

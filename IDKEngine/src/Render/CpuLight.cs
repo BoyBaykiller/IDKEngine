@@ -1,7 +1,8 @@
 ﻿using System;
+using IDKEngine.GpuTypes;
 using OpenTK.Mathematics;
 
-namespace IDKEngine.GpuTypes
+namespace IDKEngine.Render
 {
     class CpuLight
     {
@@ -61,6 +62,11 @@ namespace IDKEngine.GpuTypes
         public bool HasPointShadow()
         {
             return GpuLight.PointShadowIndex >= 0;
+        }
+
+        public void DisconnectPointShadow()
+        {
+            GpuLight.PointShadowIndex = -1;
         }
     }
 }

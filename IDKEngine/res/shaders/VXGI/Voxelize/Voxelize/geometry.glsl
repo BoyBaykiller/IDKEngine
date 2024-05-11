@@ -33,4 +33,3 @@ void main()
     // This works using the GL_NV_viewport_swizzle extension
     gl_ViewportIndex = 2 - dominantAxis;
 }
-

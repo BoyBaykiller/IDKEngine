@@ -1,11 +1,12 @@
 ﻿using System;
+using OpenTK;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using IDKEngine.Utils;
+using BBLogger;
 
 namespace IDKEngine.Windowing
 {
-    abstract unsafe class GameWindowBase : IDisposable
+    abstract unsafe class GameWindowBase : IDisposable, IBindingsContext
     {
         private string _title;
         public string WindowTitle
@@ -121,12 +122,12 @@ namespace IDKEngine.Windowing
             WindowPosition = new Vector2i(videoMode->Width / 2 - _framebufferSize.X / 2, videoMode->Height / 2 - _framebufferSize.Y / 2);
 
             GLFW.MakeContextCurrent(window);
-            OpenTK.Graphics.OpenGL4.GL.LoadBindings(new GLFWBindingsContext());
+            OpenTK.Graphics.GLLoader.LoadBindings(this);
 
             {
                 // Set black loading screen (calling SwapBuffers here irritates diagnostic tools like renderdoc)
                 Vector4 clearColor = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
-                OpenTK.Graphics.OpenGL4.GL.ClearNamedFramebuffer(0, OpenTK.Graphics.OpenGL4.ClearBuffer.Color, 0, ref clearColor.X);
+                OpenTK.Graphics.OpenGL.GL.ClearNamedFramebufferf(0, OpenTK.Graphics.OpenGL.Buffer.Color, 0, clearColor.X);
                 GLFW.SwapBuffers(window);
             }
         }
@@ -229,6 +230,11 @@ namespace IDKEngine.Windowing
         {
             GLFW.Terminate();
             glfwInitialized = false;
+        }
+
+        public nint GetProcAddress(string procName)
+        {
+            return GLFW.GetProcAddress(procName);
         }
     }
 }

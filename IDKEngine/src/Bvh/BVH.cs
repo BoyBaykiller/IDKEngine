@@ -3,10 +3,10 @@ using System.Linq;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
+using BBLogger;
+using BBOpenGL;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
-using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine
@@ -23,7 +23,7 @@ namespace IDKEngine
             set
             {
                 _gpuUseTlas = value;
-                AbstractShaderProgram.ShaderInsertions["USE_TLAS"] = value ? "1" : "0";
+                BBG.AbstractShaderProgram.ShaderInsertions["USE_TLAS"] = value ? "1" : "0";
             }
         }
 
@@ -48,22 +48,22 @@ namespace IDKEngine
         public TLAS Tlas { get; private set; }
         private BLAS[] blases;
 
-        private readonly TypedBuffer<GpuBlasNode> blasBuffer;
-        private readonly TypedBuffer<BLAS.IndicesTriplet> blasTriangleIndicesBuffer;
-        private readonly TypedBuffer<GpuTlasNode> tlasBuffer;
+        private readonly BBG.TypedBuffer<GpuBlasNode> blasBuffer;
+        private readonly BBG.TypedBuffer<BLAS.IndicesTriplet> blasTriangleIndicesBuffer;
+        private readonly BBG.TypedBuffer<GpuTlasNode> tlasBuffer;
         public BVH()
         {
-            blasBuffer = new TypedBuffer<GpuBlasNode>();
-            blasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4);
+            blasBuffer = new BBG.TypedBuffer<GpuBlasNode>();
+            blasBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 4);
 
-            blasTriangleIndicesBuffer = new TypedBuffer<BLAS.IndicesTriplet>();
-            blasTriangleIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5);
+            blasTriangleIndicesBuffer = new BBG.TypedBuffer<BLAS.IndicesTriplet>();
+            blasTriangleIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 5);
 
-            tlasBuffer = new TypedBuffer<GpuTlasNode>();
-            tlasBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6);
+            tlasBuffer = new BBG.TypedBuffer<GpuTlasNode>();
+            tlasBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 6);
 
             blases = Array.Empty<BLAS>();
-            Tlas = new TLAS(blases, Array.Empty<GpuDrawElementsCmd>(), Array.Empty<GpuMeshInstance>());
+            Tlas = new TLAS(blases, Array.Empty<BBG.DrawElementsIndirectCommand>(), Array.Empty<GpuMeshInstance>());
 
 
             // Needs more optimization. Currently only pays of on scenes with many BLAS'es.
@@ -85,7 +85,7 @@ namespace IDKEngine
                 for (int i = 0; i < Tlas.Blases.Length; i++)
                 {
                     BLAS blas = Tlas.Blases[i];
-                    ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
+                    ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref Tlas.DrawCommands[i];
 
                     for (int j = 0; j < drawCmd.InstanceCount; j++)
                     {
@@ -122,7 +122,7 @@ namespace IDKEngine
                 for (int i = 0; i < blases.Length; i++)
                 {
                     BLAS blas = Tlas.Blases[i];
-                    ref readonly GpuDrawElementsCmd drawCmd = ref Tlas.DrawCommands[i];
+                    ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref Tlas.DrawCommands[i];
 
                     for (int j = 0; j < drawCmd.InstanceCount; j++)
                     {
@@ -152,7 +152,7 @@ namespace IDKEngine
         /// <param name="newMeshesDrawCommands"></param>
         /// <param name="vertexPositions"></param>
         /// <param name="vertexIndices"></param>
-        public void AddMeshes(ReadOnlyMemory<GpuDrawElementsCmd> newMeshesDrawCommands, GpuDrawElementsCmd[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] vertexIndices)
+        public void AddMeshes(ReadOnlyMemory<BBG.DrawElementsIndirectCommand> newMeshesDrawCommands, BBG.DrawElementsIndirectCommand[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] vertexIndices)
         {
             BLAS[] newBlases = new BLAS[newMeshesDrawCommands.Length];
             for (int i = 0; i < newBlases.Length; i++)
@@ -219,7 +219,7 @@ namespace IDKEngine
             }
         }
 
-        private void SetBlasBuffersContent()
+        private unsafe void SetBlasBuffersContent()
         {
             blasBuffer.MutableAllocateElements(GetBlasesNodeCount());
             blasTriangleIndicesBuffer.MutableAllocateElements(GetBlasesTriangleIndicesCount());

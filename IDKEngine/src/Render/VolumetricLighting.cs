@@ -1,7 +1,6 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using IDKEngine.OpenGL;
+using BBOpenGL;
 
 namespace IDKEngine.Render
 {
@@ -42,20 +41,20 @@ namespace IDKEngine.Render
 
         public GpuSettings Settings;
 
-        public Texture Result;
-        private Texture depthTexture;
-        private Texture volumetricLightingTexture;
+        public BBG.Texture Result;
+        private BBG.Texture depthTexture;
+        private BBG.Texture volumetricLightingTexture;
 
-        private readonly AbstractShaderProgram volumetricLightingProgram;
-        private readonly AbstractShaderProgram upscaleProgram;
-        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
+        private readonly BBG.AbstractShaderProgram volumetricLightingProgram;
+        private readonly BBG.AbstractShaderProgram upscaleProgram;
+        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public unsafe VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
         {
-            volumetricLightingProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VolumetricLight/compute.glsl"));
-            upscaleProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "VolumetricLight/Upscale/compute.glsl"));
+            volumetricLightingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VolumetricLight/compute.glsl"));
+            upscaleProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VolumetricLight/Upscale/compute.glsl"));
 
-            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
+            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
 
             _resolutionScale = resolutionScale;
             SetSize(size);
@@ -65,21 +64,29 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
             gpuSettingsBuffer.UploadElements(Settings);
 
-            volumetricLightingTexture.BindToImageUnit(0, volumetricLightingTexture.TextureFormat);
-            depthTexture.BindToImageUnit(1, depthTexture.TextureFormat);
-            volumetricLightingProgram.Use();
-            GL.DispatchCompute((volumetricLightingTexture.Width + 8 - 1) / 8, (volumetricLightingTexture.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+            BBG.Computing.Compute("Compute Volumetric Lighting", () =>
+            {
+                BBG.Cmd.BindImageUnit(volumetricLightingTexture, 0);
+                BBG.Cmd.BindImageUnit(depthTexture, 1);
+                BBG.Cmd.UseShaderProgram(volumetricLightingProgram);
 
-            Result.BindToImageUnit(0, Result.TextureFormat);
-            volumetricLightingTexture.BindToUnit(0);
-            depthTexture.BindToUnit(1);
-            upscaleProgram.Use();
-            GL.DispatchCompute((PresentationResolution.X + 8 - 1) / 8, (PresentationResolution.Y + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+                BBG.Computing.Dispatch((volumetricLightingTexture.Width + 8 - 1) / 8, (volumetricLightingTexture.Height + 8 - 1) / 8, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
+            });
+
+            BBG.Computing.Compute("Upscale Volumetric Lighting", () =>
+            {
+                BBG.Cmd.BindImageUnit(Result, 0);
+                BBG.Cmd.BindTextureUnit(volumetricLightingTexture, 0);
+                BBG.Cmd.BindTextureUnit(depthTexture, 1);
+                BBG.Cmd.UseShaderProgram(upscaleProgram);
+
+                BBG.Computing.Dispatch((PresentationResolution.X + 8 - 1) / 8, (PresentationResolution.Y + 8 - 1) / 8, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
+            });
         }
 
         public void SetSize(Vector2i size)
@@ -88,22 +95,22 @@ namespace IDKEngine.Render
             RenderResolution = (Vector2i)((Vector2)PresentationResolution * ResolutionScale);
 
             if (Result != null) Result.Dispose();
-            Result = new Texture(Texture.Type.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(PresentationResolution.X, PresentationResolution.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
+            Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            Result.ImmutableAllocate(PresentationResolution.X, PresentationResolution.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
             if (volumetricLightingTexture != null) volumetricLightingTexture.Dispose();
-            volumetricLightingTexture = new Texture(Texture.Type.Texture2D);
-            volumetricLightingTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            volumetricLightingTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            volumetricLightingTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
+            volumetricLightingTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            volumetricLightingTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            volumetricLightingTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            volumetricLightingTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
             if (depthTexture != null) depthTexture.Dispose();
-            depthTexture = new Texture(Texture.Type.Texture2D);
-            depthTexture.SetFilter(TextureMinFilter.Nearest, TextureMagFilter.Nearest);
-            depthTexture.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            depthTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, Texture.InternalFormat.R32Float);
+            depthTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            depthTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
+            depthTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            depthTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, BBG.Texture.InternalFormat.R32Float);
         }
 
         public void Dispose()

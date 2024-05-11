@@ -1,7 +1,7 @@
 #version 460 core
 
-AppInclude(include/CubeVertices.glsl)
 AppInclude(include/GpuTypes.glsl)
+AppInclude(include/CubeVertices.glsl)
 
 layout(location = 0) uniform vec3 Min;
 layout(location = 1) uniform vec3 Max;

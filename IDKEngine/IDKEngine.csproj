@@ -45,12 +45,17 @@
     <PackageReference Include="Ktx2.NET" Version="1.0.1" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.4" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
-    <PackageReference Include="OpenTK.GraphicsFork" Version="4.8.2" />
-    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.8.2" />
+    <PackageReference Include="OpenTK.Graphics" Version="5.0.0-pre.10" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.10" />
     <PackageReference Include="SharpGLTF.Core" Version="1.0.0-alpha0031" />
     <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.0-alpha0031" />
     <PackageReference Include="StbImageSharp" Version="2.27.14" />
     <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BBG\BBOpenGL.csproj" />
+    <ProjectReference Include="..\Logger\BBLogger.csproj" />
   </ItemGroup>
 
 </Project>

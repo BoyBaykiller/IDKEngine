@@ -3,9 +3,10 @@
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)
 
-AppInclude(include/Constants.glsl)
-AppInclude(include/Transformations.glsl)
 AppInclude(include/Pbr.glsl)
+AppInclude(include/Constants.glsl)
+AppInclude(include/Compression.glsl)
+AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(location = 0) out vec4 FragColor;
@@ -49,8 +50,8 @@ void main()
 
     vec3 albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
     float alpha = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).a;
-    vec3 normal = normalize(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb);
-    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
+    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).b;
     vec3 emissive = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).rgb;
     float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
     float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
@@ -102,7 +103,7 @@ void main()
     }
 
     FragColor = vec4((directLighting + indirectLight) + emissive, 1.0);
-    // FragColor = vec4(albedo, 1.0);
+    // FragColor = vec4(normal * 0.5 + 0.5, 1.0);
 }
 
 vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight, float ambientOcclusion)

@@ -8,18 +8,19 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
+using OpenTK.Graphics.OpenGL;
 using Ktx;
 using StbImageSharp;
 using SharpGLTF.Schema2;
 using SharpGLTF.Materials;
 using Meshoptimizer;
+using BBLogger;
+using BBOpenGL;
 using IDKEngine.Utils;
-using IDKEngine.OpenGL;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
-using GLTexture = IDKEngine.OpenGL.Texture;
-using GLSampler = IDKEngine.OpenGL.Sampler;
+using GLTexture = BBOpenGL.BBG.Texture;
+using GLSampler = BBOpenGL.BBG.Sampler;
 using GltfTexture = SharpGLTF.Schema2.Texture;
 
 namespace IDKEngine
@@ -38,7 +39,7 @@ namespace IDKEngine
 
         public struct Model
         {
-            public GpuDrawElementsCmd[] DrawCommands;
+            public BBG.DrawElementsIndirectCommand[] DrawCommands;
             public GpuMesh[] Meshes;
             public GpuMeshInstance[] MeshInstances;
             public GpuMaterial[] Materials;
@@ -49,7 +50,7 @@ namespace IDKEngine
             public uint[] VertexIndices;
 
             // Meshlet-rendering specific data
-            public GpuMeshletTaskCmd[] MeshletTasksCmds;
+            public BBG.DrawMeshTasksIndirectCommandNV[] MeshletTasksCmds;
             public GpuMeshlet[] Meshlets;
             public GpuMeshletInfo[] MeshletsInfo;
             public uint[] MeshletsVertexIndices;
@@ -182,11 +183,11 @@ namespace IDKEngine
 
             List<GpuMesh> listMeshes = new List<GpuMesh>();
             List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
-            List<GpuDrawElementsCmd> listDrawCommands = new List<GpuDrawElementsCmd>();
+            List<BBG.DrawElementsIndirectCommand> listDrawCommands = new List<BBG.DrawElementsIndirectCommand>();
             List<GpuVertex> listVertices = new List<GpuVertex>();
             List<Vector3> listVertexPositions = new List<Vector3>();
             List<uint> listIndices = new List<uint>();
-            List<GpuMeshletTaskCmd> listMeshetTasksCmd = new List<GpuMeshletTaskCmd>();
+            List<BBG.DrawMeshTasksIndirectCommandNV> listMeshetTasksCmd = new List<BBG.DrawMeshTasksIndirectCommandNV>();
             List<GpuMeshlet> listMeshlets = new List<GpuMeshlet>();
             List<GpuMeshletInfo> listMeshletsInfo = new List<GpuMeshletInfo>();
             List<uint> listMeshletsVertexIndices = new List<uint>();
@@ -220,7 +221,7 @@ namespace IDKEngine
                 if (!nodeUsesInstancing)
                 {
                     // If node does not define transformations using EXT_mesh_gpu_instancing extension we must use standard local transform
-                    nodeTransformations = new Matrix4[1] { nodeLocalTransform };
+                    nodeTransformations = [nodeLocalTransform];
                 }
 
                 //nodeTransformations = new Matrix4[5];
@@ -276,7 +277,7 @@ namespace IDKEngine
                     }
                     else
                     {
-                        GpuMaterial defaultGpuMaterial = LoadGpuMaterials(new MaterialLoadData[] { MaterialLoadData.Default })[0];
+                        GpuMaterial defaultGpuMaterial = LoadGpuMaterials([MaterialLoadData.Default])[0];
                         listMaterials.Add(defaultGpuMaterial);
 
                         mesh.NormalMapStrength = 0.0f;
@@ -284,19 +285,19 @@ namespace IDKEngine
                     }
 
                     GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
-                    GpuMeshletTaskCmd[] meshletTaskCmds = new GpuMeshletTaskCmd[mesh.InstanceCount];
+                    BBG.DrawMeshTasksIndirectCommandNV[] meshletTaskCmds = new BBG.DrawMeshTasksIndirectCommandNV[mesh.InstanceCount];
                     for (int j = 0; j < meshInstances.Length; j++)
                     {
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
                         meshInstance.ModelMatrix = nodeTransformations[j] * parentNodeGlobalTransform;
                         meshInstance.MeshIndex = listMeshes.Count;
 
-                        ref GpuMeshletTaskCmd meshletTaskCmd = ref meshletTaskCmds[j];
+                        ref BBG.DrawMeshTasksIndirectCommandNV meshletTaskCmd = ref meshletTaskCmds[j];
                         meshletTaskCmd.First = 0;
                         meshletTaskCmd.Count = (int)MathF.Ceiling(meshMeshlets.Length / 32.0f); // divide by task shader work group size
                     }
 
-                    GpuDrawElementsCmd drawCmd = new GpuDrawElementsCmd();
+                    BBG.DrawElementsIndirectCommand drawCmd = new BBG.DrawElementsIndirectCommand();
                     drawCmd.IndexCount = meshIndices.Length;
                     drawCmd.InstanceCount = meshInstances.Length;
                     drawCmd.FirstIndex = listIndices.Count;
@@ -339,7 +340,7 @@ namespace IDKEngine
             GLTexture defaultTexture = new GLTexture(GLTexture.Type.Texture2D);
             defaultTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
             defaultTexture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
-            long defaultTextureHandle = defaultTexture.GetTextureHandleARB(new GLSampler(new GLSampler.State()));
+            ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB(new GLSampler(new GLSampler.State()));
 
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
             for (int i = 0; i < gpuMaterials.Length; i++)
@@ -349,7 +350,7 @@ namespace IDKEngine
 
                 MaterialParams materialParams = materialLoadData.MaterialParams;
                 gpuMaterial.EmissiveFactor = materialParams.EmissiveFactor;
-                gpuMaterial.BaseColorFactor = Helper.CompressUR8G8B8A8(materialParams.BaseColorFactor);
+                gpuMaterial.BaseColorFactor = Compression.CompressUR8G8B8A8(materialParams.BaseColorFactor);
                 gpuMaterial.TransmissionFactor = materialParams.TransmissionFactor;
                 gpuMaterial.AlphaCutoff = materialParams.AlphaCutoff;
                 gpuMaterial.RoughnessFactor = materialParams.RoughnessFactor;
@@ -403,7 +404,7 @@ namespace IDKEngine
                                 GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.R8G8B8A8Srgb,
                                 GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.R8G8B8A8Srgb,
                                 GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
-                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.R11G11B10Float,
+                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.R8G8Unorm,
                                 GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.R8Unorm,
                                 _ => throw new NotSupportedException($"{nameof(MaterialLoadData.TextureType)} = {textureType} not supported")
                             };
@@ -455,7 +456,7 @@ namespace IDKEngine
 
                         gpuMaterial[textureType] = texture.GetTextureHandleARB(sampler);
                     }
-
+                    
                     MainThreadQueue.AddToLazyQueue(() =>
                     {
                         /* For compressed textures:
@@ -485,7 +486,7 @@ namespace IDKEngine
                             {
                                 //int supercompressedImageSize = (int)ktxTexture->DataSize; // Supercompressed Size (Size on Disk, minus additional Metadata)
 
-                                Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxTranscodeFormat(texture.TextureFormat), Ktx2.TranscodeFlagBits.HighQuality);
+                                Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxFormat(texture.Format), Ktx2.TranscodeFlagBits.HighQuality);
                                 if (errorCode != Ktx2.ErrorCode.Success)
                                 {
                                     Logger.Log(Logger.LogLevel.Error, $"Ktx {nameof(Ktx2.TranscodeBasis)} returned {errorCode}");
@@ -498,23 +499,22 @@ namespace IDKEngine
                                     int uncompressedImageSize = imageWidth * imageHeight * imageChannels;
                                     int saved = uncompressedImageSize - compressedImageSize;
 
-                                    TypedBuffer<byte> stagingBuffer = new TypedBuffer<byte>();
-                                    stagingBuffer.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.MappedIncoherent, compressedImageSize);
+                                    BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
+                                    stagingBuffer.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.MappedIncoherent, compressedImageSize);
 
                                     Task.Run(() =>
                                     {
-                                        Helper.MemCpy(ktxTexture->Data, stagingBuffer.MappedMemory, (nuint)compressedImageSize);
+                                        Memory.Copy(ktxTexture->Data, stagingBuffer.MappedMemory, compressedImageSize);
 
                                         MainThreadQueue.AddToLazyQueue(() =>
                                         {
-                                            stagingBuffer.Bind(BufferTarget.PixelUnpackBuffer);
                                             for (int level = 0; level < levels; level++)
                                             {
                                                 nuint dataOffset;
                                                 Ktx2.GetImageOffset(ktxTexture, (uint)level, 0, 0, &dataOffset);
 
                                                 Vector3i size = GLTexture.GetMipMapLevelSize((int)ktxTexture->BaseWidth, (int)ktxTexture->BaseHeight, (int)ktxTexture->BaseDepth, level);
-                                                texture.UploadCompressed2D(size.X, size.Y, (nint)dataOffset, level);
+                                                texture.UploadCompressed2D(stagingBuffer, size.X, size.Y, (void*)dataOffset, level);
                                             }
                                             stagingBuffer.Dispose();
                                             Ktx2.Destroy(ktxTexture);
@@ -528,19 +528,18 @@ namespace IDKEngine
                         else
                         {
                             int imageSize = imageWidth * imageHeight * imageChannels;
-                            TypedBuffer<byte> stagingBuffer = new TypedBuffer<byte>();
-                            stagingBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.MappedIncoherent, imageSize);
+                            BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
+                            stagingBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.MappedIncoherent, imageSize);
 
                             Task.Run(() =>
                             {
                                 using Stream imageStream = gltfTexture.PrimaryImage.Content.Open();
                                 ImageResult imageResult = ImageResult.FromStream(imageStream, NumChannelsToColorComponents(imageChannels));
-                                Helper.MemCpy(imageResult.Data[0], stagingBuffer.MappedMemory, imageSize);
-
+                                Memory.Copy(imageResult.Data[0], stagingBuffer.MappedMemory, imageSize);
+                                
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
-                                    stagingBuffer.Bind(BufferTarget.PixelUnpackBuffer);
-                                    texture.Upload2D(imageWidth, imageHeight, NumChannelsToPixelFormat(imageChannels), PixelType.UnsignedByte, IntPtr.Zero);
+                                    texture.Upload2D(stagingBuffer, imageWidth, imageHeight, NumChannelsToPixelFormat(imageChannels), PixelType.UnsignedByte, null);
                                     if (mipmapsRequired)
                                     {
                                         texture.GenerateMipmap();
@@ -676,12 +675,12 @@ namespace IDKEngine
                 for (int i = 0; i < normals.Length; i++)
                 {
                     Vector3 normal = normals[i];
-                    vertices[i].Normal = Helper.CompressSR11G11B10(normal);
+                    vertices[i].Normal = Compression.CompressSR11G11B10(normal);
 
                     Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
                     Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
                     Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
-                    vertices[i].Tangent = Helper.CompressSR11G11B10(tangent);
+                    vertices[i].Tangent = Compression.CompressSR11G11B10(tangent);
                 }
             }
 
@@ -705,7 +704,7 @@ namespace IDKEngine
             Span<byte> rawData = accessor.SourceBufferView.Content.AsSpan(accessor.ByteOffset, accessor.ByteLength);
             for (int i = 0; i < vertexIndices.Length; i++)
             {
-                Helper.MemCpy(rawData[componentSize * i], ref vertexIndices[i], componentSize);
+                Memory.Copy(rawData[componentSize * i], ref vertexIndices[i], componentSize);
             }
 
             return vertexIndices;
@@ -824,7 +823,7 @@ namespace IDKEngine
             throw new UnreachableException($"{nameof(property)} = {property} is not a part of the {nameof(materialChannel)}");
         }
 
-        private static Ktx2.TranscodeFormat GLFormatToKtxTranscodeFormat(GLTexture.InternalFormat internalFormat)
+        private static Ktx2.TranscodeFormat GLFormatToKtxFormat(GLTexture.InternalFormat internalFormat)
         {
             switch (internalFormat)
             {
@@ -841,8 +840,8 @@ namespace IDKEngine
                 case GLTexture.InternalFormat.BC7RgbaSrgb:
                     return Ktx2.TranscodeFormat.Bc7Rgba;
 
-                case GLTexture.InternalFormat.Astc4X4Rgba:
-                case GLTexture.InternalFormat.Astc4X4RgbaSrgb:
+                case GLTexture.InternalFormat.Astc4X4RgbaKHR:
+                case GLTexture.InternalFormat.Astc4X4RgbaSrgbKHR:
                     return Ktx2.TranscodeFormat.Astc4X4Rgba;
 
                 default:

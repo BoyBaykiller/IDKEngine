@@ -1,8 +1,10 @@
-﻿namespace IDKEngine.GpuTypes
+﻿using BBOpenGL;
+
+namespace IDKEngine.GpuTypes
 {
     unsafe struct GpuWavefrontPTHeader
     {
-        public GpuDispatchCmd DispatchCommand;
+        public BBG.DispatchIndirectCommand DispatchCommand;
         public fixed uint Counts[2];
         public uint PingPongIndex;
         public uint AccumulatedSamples;

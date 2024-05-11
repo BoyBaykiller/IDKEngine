@@ -4,12 +4,13 @@
 #if TAKE_MESH_SHADER_PATH_SHADOW
     #extension GL_NV_gpu_shader5 : enable
     #define DECLARE_MESHLET_STORAGE_BUFFERS
+    #define DECLARE_MESHLET_RENDERING_TYPES
 #endif
 
-AppInclude(include/StaticStorageBuffers.glsl)
-AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 

@@ -1,10 +1,10 @@
 ﻿using System.IO;
 using System.Linq;
+using OpenTK.Graphics.OpenGL;
 using System.Threading.Tasks;
-using OpenTK.Graphics.OpenGL4;
 using StbImageSharp;
-using IDKEngine.Utils;
-using IDKEngine.OpenGL;
+using BBLogger;
+using BBOpenGL;
 
 namespace IDKEngine.Render
 {
@@ -17,17 +17,17 @@ namespace IDKEngine.Render
         }
 
         public static string[] Paths;
-        public static Texture SkyBoxTexture => AtmosphericScatterer != null ? AtmosphericScatterer.Result : externalSkyBoxTexture;
+        public static BBG.Texture SkyBoxTexture => AtmosphericScatterer != null ? AtmosphericScatterer.Result : externalSkyBoxTexture;
         public static AtmosphericScatterer AtmosphericScatterer { get; private set; }
 
 
-        private static Texture externalSkyBoxTexture;
-        public static TypedBuffer<long> skyBoxTextureBuffer;
+        private static BBG.Texture externalSkyBoxTexture;
+        public static BBG.TypedBuffer<ulong> skyBoxTextureBuffer;
         public static void Init(SkyBoxMode skyBoxMode, string[] paths = null)
         {
-            skyBoxTextureBuffer = new TypedBuffer<long>();
-            skyBoxTextureBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 4);
-            skyBoxTextureBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1, 0);
+            skyBoxTextureBuffer = new BBG.TypedBuffer<ulong>();
+            skyBoxTextureBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 4);
+            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1, 0);
 
             Paths = paths;
             SetSkyBoxMode(skyBoxMode);
@@ -44,10 +44,10 @@ namespace IDKEngine.Render
                     AtmosphericScatterer = null;
                 }
 
-                externalSkyBoxTexture = new Texture(Texture.Type.Cubemap);
-                externalSkyBoxTexture.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+                externalSkyBoxTexture = new BBG.Texture(BBG.Texture.Type.Cubemap);
+                externalSkyBoxTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
 
-                if (!LoadCubemap(externalSkyBoxTexture, Texture.InternalFormat.R8G8B8SRgba, Paths))
+                if (!LoadCubemap(externalSkyBoxTexture, BBG.Texture.InternalFormat.R8G8B8SRgba, Paths))
                 {
                     skyBoxMode = SkyBoxMode.InternalAtmosphericScattering;
                 }
@@ -65,20 +65,20 @@ namespace IDKEngine.Render
                 AtmosphericScatterer.Compute();
             }
 
-            SkyBoxTexture.EnableSeamlessCubemapARB_AMD(true);
+            SkyBoxTexture.TryEnableSeamlessCubemap(true);
             skyBoxTextureBuffer.UploadElements(SkyBoxTexture.GetTextureHandleARB());
 
             _skyBoxMode = skyBoxMode;
         }
 
-        private static bool LoadCubemap(Texture texture, Texture.InternalFormat format, string[] imagePaths)
+        private static bool LoadCubemap(BBG.Texture texture, BBG.Texture.InternalFormat format, string[] imagePaths)
         {
             if (imagePaths == null)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Cubemap imagePaths is null");
                 return false;
             }
-            if (texture.TextureType != Texture.Type.Cubemap)
+            if (texture.TextureType != BBG.Texture.Type.Cubemap)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Texture must be of type {TextureTarget.TextureCubeMap}");
                 return false;

@@ -328,8 +328,8 @@ Task.Run(() =>
     });
 });
 ```
-The algorithm requires knowing the image extends and channels before it is decoded in order to compute its size. If you are using stbi, the `stbi__info_` functions can give you that information.
-The code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that the loading only starts as soon as the render loop is entered - that is `MainThreadQueue.Execute()` gets called.
+The algorithm requires knowing the image extends and channels before it is decoded in order to compute the size. If you are using stbi, the `stbi_info` family of functions can give you that information.
+The code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that loading only really starts as soon as the render loop is entered and `MainThreadQueue.Execute()` gets called.
 Creating a thread for every image might introduce lag so I am calling `Task.Run()` which uses a thread pool. The numer of thread pool threads can be set with `ThreadPool.Set{Min/Max}Threads()`. 
 
 Finally, a nice way to demonstrate that things are working is to have a random thread sleep inside the worker threads, causing textures to slowly load in at different times.

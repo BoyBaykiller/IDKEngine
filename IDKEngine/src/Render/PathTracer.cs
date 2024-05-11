@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using IDKEngine.OpenGL;
+using OpenTK.Graphics.OpenGL;
+using BBOpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -118,22 +118,22 @@ namespace IDKEngine.Render
 
         private GpuSettings gpuSettings;
 
-        public Texture Result;
-        private readonly AbstractShaderProgram firstHitProgram;
-        private readonly AbstractShaderProgram nHitProgram;
-        private readonly AbstractShaderProgram finalDrawProgram;
-        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        private TypedBuffer<GpuWavefrontRay> wavefrontRayBuffer;
-        private BufferObject wavefrontPTBuffer;
-        public PathTracer(Vector2i size, in GpuSettings settings)
+        public BBG.Texture Result;
+        private readonly BBG.AbstractShaderProgram firstHitProgram;
+        private readonly BBG.AbstractShaderProgram nHitProgram;
+        private readonly BBG.AbstractShaderProgram finalDrawProgram;
+        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        private BBG.TypedBuffer<GpuWavefrontRay> wavefrontRayBuffer;
+        private BBG.BufferObject wavefrontPTBuffer;
+        public unsafe PathTracer(Vector2i size, in GpuSettings settings)
         {
-            firstHitProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "PathTracing/FirstHit/compute.glsl"));
+            firstHitProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "PathTracing/FirstHit/compute.glsl"));
 
-            nHitProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "PathTracing/NHit/compute.glsl"));
-            finalDrawProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "PathTracing/FinalDraw/compute.glsl"));
+            nHitProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "PathTracing/NHit/compute.glsl"));
+            finalDrawProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "PathTracing/FinalDraw/compute.glsl"));
 
-            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
+            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
 
             SetSize(size);
 
@@ -144,33 +144,41 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
+            gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
             gpuSettingsBuffer.UploadElements(gpuSettings);
 
-            Result.BindToImageUnit(0, Result.TextureFormat);
-            firstHitProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
-
-            wavefrontPTBuffer.Bind(BufferTarget.DispatchIndirectBuffer);
-            nHitProgram.Use();
-            for (int j = 1; j < RayDepth; j++)
+            BBG.Computing.Compute($"Trace Primary Rays", () =>
             {
-                int pingPongIndex = j % 2;
+                BBG.Cmd.BindImageUnit(Result, 0);
+                BBG.Cmd.UseShaderProgram(firstHitProgram);
+                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+            });
 
-                nint pingPongIndexOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.PingPongIndex));
-                wavefrontPTBuffer.UploadData(pingPongIndexOffset, sizeof(uint), pingPongIndex);
+            for (int i = 1; i < RayDepth; i++)
+            {
+                BBG.Computing.Compute($"Trace Rays {i}", () =>
+                {
+                    int pingPongIndex = i % 2;
 
-                nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
-                wavefrontPTBuffer.UploadData(rayCountsBaseOffset + (1 - pingPongIndex) * sizeof(uint), sizeof(uint), 0);
+                    nint pingPongIndexOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.PingPongIndex));
+                    wavefrontPTBuffer.UploadData(pingPongIndexOffset, sizeof(uint), pingPongIndex);
 
-                GL.DispatchComputeIndirect(0);
-                GL.MemoryBarrier(MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
+                    nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
+                    wavefrontPTBuffer.UploadData(rayCountsBaseOffset + (1 - pingPongIndex) * sizeof(uint), sizeof(uint), 0);
+
+                    BBG.Cmd.UseShaderProgram(nHitProgram);
+                    BBG.Computing.DispatchIndirect(wavefrontPTBuffer, 0);
+                    BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+                });
             }
 
-            finalDrawProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit | MemoryBarrierFlags.ShaderStorageBarrierBit | MemoryBarrierFlags.CommandBarrierBit);
+            BBG.Computing.Compute("Accumulate rays radiance on screen", () =>
+            {
+                BBG.Cmd.UseShaderProgram(finalDrawProgram);
+                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit | BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+            });
 
             AccumulatedSamples++;
         }
@@ -180,22 +188,22 @@ namespace IDKEngine.Render
             float clear = 0.0f;
 
             if (Result != null) Result.Dispose();
-            Result = new Texture(Texture.Type.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R32G32B32A32Float);
+            Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            Result.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
             Result.Clear(PixelFormat.Red, PixelType.Float, clear);
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
-            wavefrontRayBuffer = new TypedBuffer<GpuWavefrontRay>();
-            wavefrontRayBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.None, size.X * size.Y);
-            wavefrontRayBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7);
+            wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>();
+            wavefrontRayBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, size.X * size.Y);
+            wavefrontRayBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 7);
 
             if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
-            wavefrontPTBuffer = new BufferObject();
-            wavefrontPTBuffer.ImmutableAllocate(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
-            wavefrontPTBuffer.SimpleClear(0, sizeof(GpuWavefrontPTHeader), (nint)(&clear));
-            wavefrontPTBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8);
+            wavefrontPTBuffer = new BBG.BufferObject();
+            wavefrontPTBuffer.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
+            wavefrontPTBuffer.SimpleClear(0, sizeof(GpuWavefrontPTHeader), &clear);
+            wavefrontPTBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 8);
 
             ResetRenderProcess();
         }

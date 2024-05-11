@@ -1,8 +1,8 @@
 #version 460 core
 
+AppInclude(include/Constants.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
-AppInclude(include/Constants.glsl)
 
 layout(location = 0) in vec3 Position;
 

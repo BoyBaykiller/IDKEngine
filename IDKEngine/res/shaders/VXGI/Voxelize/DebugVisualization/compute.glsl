@@ -2,8 +2,8 @@
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX
 
-AppInclude(include/Transformations.glsl)
 AppInclude(include/TraceCone.glsl)
+AppInclude(include/Transformations.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 

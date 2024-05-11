@@ -4,11 +4,12 @@
 #extension GL_KHR_shader_subgroup_ballot : require
 
 #define DECLARE_MESHLET_STORAGE_BUFFERS
-AppInclude(include/StaticStorageBuffers.glsl)
+#define DECLARE_MESHLET_RENDERING_TYPES
 
 AppInclude(include/Constants.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
 
 #define MESHLETS_PER_WORKGROUP 32
 layout(local_size_x = MESHLETS_PER_WORKGROUP) in;

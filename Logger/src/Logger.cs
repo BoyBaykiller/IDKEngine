@@ -1,9 +1,6 @@
-﻿using System;
-using System.IO;
-
-namespace IDKEngine.Utils
+﻿namespace BBLogger
 {
-    static class Logger
+    public static class Logger
     {
         public enum LogLevel : int
         {

@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using BBLogger;
+using BBOpenGL;
 using IDKEngine.Utils;
 using IDKEngine.Render;
 using IDKEngine.Shapes;
-using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 using IDKEngine.Windowing;
 
@@ -49,7 +49,7 @@ namespace IDKEngine
             {
                 // Having this here enables resizing on AMD drivers without occasional crashing.
                 // Normally this shouldnt be necessary and its probably an other driver bug.
-                GL.Finish();
+                BBG.Cmd.Finish();
 
                 _presentationResolution = value;
 
@@ -146,7 +146,7 @@ namespace IDKEngine
                 RasterizerPipeline.Render(ModelSystem, LightManager, Camera, dT);
                 if (RasterizerPipeline.IsConfigureGridMode)
                 {
-                    TonemapAndGamma.Combine(RasterizerPipeline.Result);
+                    TonemapAndGamma.Compute(RasterizerPipeline.Result);
                     BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, new Box(RasterizerPipeline.Voxelizer.GridMin, RasterizerPipeline.Voxelizer.GridMax));
                 }
                 else
@@ -161,7 +161,7 @@ namespace IDKEngine
                         VolumetricLight.Compute();
                     }
 
-                    TonemapAndGamma.Combine(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null);
+                    TonemapAndGamma.Compute(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null);
                     RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
                 }
             }
@@ -174,7 +174,7 @@ namespace IDKEngine
                     Bloom.Compute(PathTracer.Result);
                 }
 
-                TonemapAndGamma.Combine(PathTracer.Result, IsBloom ? Bloom.Result : null);
+                TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
             if (gui.SelectedEntity.EntityType != Gui.EntityType.None)
@@ -200,25 +200,15 @@ namespace IDKEngine
                 BoxRenderer.Render(TonemapAndGamma.Result, GpuBasicData.ProjView, selectedEntityBox);
             }
 
-            Framebuffer.Bind(0);
-            GL.Disable(EnableCap.DepthTest);
-            GL.Disable(EnableCap.CullFace);
-            GL.Enable(EnableCap.Blend);
-            GL.BlendFunc(0, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha);
-            GL.Viewport(0, 0, WindowFramebufferSize.X, WindowFramebufferSize.Y);
+            BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderGui)
             {
-                gui.Draw(this, (float)dT);
+                gui.Draw(this, dT);
             }
             else
             {
-                TonemapAndGamma.Result.BindToUnit(0);
-                finalProgram.Use();
-                GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
+                BBG.Rendering.CopyTextureToSwapchain(TonemapAndGamma.Result);
             }
-            GL.Enable(EnableCap.CullFace);
-            GL.Enable(EnableCap.DepthTest);
-            GL.Disable(EnableCap.Blend);
 
             fpsCounter++;
         }
@@ -278,11 +268,11 @@ namespace IDKEngine
                 }
                 if (KeyboardState[Keys.D1] == Keyboard.InputState.Touched)
                 {
-                    AbstractShaderProgram.RecompileAll();
+                    BBG.AbstractShaderProgram.RecompileAll();
                 }
             }
 
-            if (gui.FrameRecState != Gui.FrameRecorderState.Replaying)
+            if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
             {
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
@@ -299,7 +289,7 @@ namespace IDKEngine
                         if (LightManager.AddLight(newLight))
                         {
                             int newLightIndex = LightManager.Count - 1;
-                            PointShadow pointShadow = new PointShadow(256, RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
+                            CpuPointShadow pointShadow = new CpuPointShadow(256, RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
                             if (!LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
                             {
                                 pointShadow.Dispose();
@@ -381,7 +371,6 @@ namespace IDKEngine
         }
 
         private Gui gui;
-        private AbstractShaderProgram finalProgram;
 
         public Camera Camera;
         public ModelSystem ModelSystem;
@@ -397,26 +386,29 @@ namespace IDKEngine
         public RasterPipeline RasterizerPipeline;
         public PathTracer PathTracer;
 
-        private TypedBuffer<GpuPerFrameData> gpuPerFrameBuffer;
+        private BBG.TypedBuffer<GpuPerFrameData> gpuPerFrameBuffer;
         public GpuPerFrameData GpuBasicData;
-
-        protected override void OnStart()
+        protected unsafe override void OnStart()
         {
-            Logger.Log(Logger.LogLevel.Info, $"API: {Helper.API}");
-            Logger.Log(Logger.LogLevel.Info, $"GPU: {Helper.GPU}");
-            Logger.Log(Logger.LogLevel.Info, $"{nameof(AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)} = {AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH}");
+            BBG.Initialize(Helper.GLDebugCallback);
+
+            ref readonly BBG.ContextInfo glContextInfo = ref BBG.GetContextInfo();
             
-            if (Helper.APIVersion < 4.6)
+            Logger.Log(Logger.LogLevel.Info, $"API: {glContextInfo.Name}");
+            Logger.Log(Logger.LogLevel.Info, $"GPU: {glContextInfo.DeviceInfo.Name}");
+            Logger.Log(Logger.LogLevel.Info, $"{nameof(BBG.AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)} = {BBG.AbstractShader.Preprocessor.SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH}");
+
+            if (glContextInfo.GLVersion < 4.6)
             {
                 Logger.Log(Logger.LogLevel.Fatal, "Your system does not support OpenGL 4.6");
                 Environment.Exit(0);
             }
-            if (!Helper.IsExtensionsAvailable("GL_ARB_bindless_texture"))
+            if (!glContextInfo.DeviceInfo.ExtensionSupport.BindlessTextures)
             {
                 Logger.Log(Logger.LogLevel.Fatal, "Your system does not support GL_ARB_bindless_texture");
                 Environment.Exit(0);
             }
-            if (!Helper.IsExtensionsAvailable("GL_EXT_shader_image_load_formatted"))
+            if (!glContextInfo.DeviceInfo.ExtensionSupport.ImageLoadFormatted)
             {
                 Logger.Log(Logger.LogLevel.Fatal, 
                     "Your system does not support GL_EXT_shader_image_load_formatted.\n" +
@@ -426,23 +418,10 @@ namespace IDKEngine
                 );
             }
 
-            GL.Enable(EnableCap.DebugOutputSynchronous);
-            GL.DebugMessageCallback(Helper.GLDebugCallbackFuncPtr, IntPtr.Zero);
-            GL.Disable(EnableCap.Multisample);
-            GL.Enable(EnableCap.TextureCubeMapSeamless);
-            GL.PixelStore(PixelStoreParameter.PackAlignment, 1);
-            GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
-            Helper.SetDepthConvention(Helper.DepthConvention.ZeroToOne);
-
-            gpuPerFrameBuffer = new TypedBuffer<GpuPerFrameData>();
-            gpuPerFrameBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
-            gpuPerFrameBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 0);
-
-            finalProgram = new AbstractShaderProgram(
-                new AbstractShader(ShaderType.VertexShader, "ToScreen/vertex.glsl"),
-                new AbstractShader(ShaderType.FragmentShader, "ToScreen/fragment.glsl")
-            );
-
+            gpuPerFrameBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
+            gpuPerFrameBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
+            gpuPerFrameBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 0);
+            
             SkyBoxManager.Init(SkyBoxManager.SkyBoxMode.ExternalAsset, new string[]
             {
                 "res/textures/environmentMap/posx.jpg",
@@ -456,13 +435,13 @@ namespace IDKEngine
             PresentationResolution = WindowFramebufferSize;
             ModelSystem = new ModelSystem();
 
-            ModelLoader.TextureLoaded += (() =>
+            ModelLoader.TextureLoaded += () =>
             {
                 if (PathTracer != null)
                 {
                     PathTracer.ResetRenderProcess();
                 }
-            });
+            };
 
             Camera = new Camera(RenderResolution, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
             if (true)
@@ -506,7 +485,7 @@ namespace IDKEngine
                 {
                     if (LightManager.TryGetLight(i, out CpuLight light))
                     {
-                        PointShadow pointShadow = new PointShadow(512, RenderResolution, new Vector2(light.GpuLight.Radius, 60.0f));
+                        CpuPointShadow pointShadow = new CpuPointShadow(512, RenderResolution, new Vector2(light.GpuLight.Radius, 60.0f));
                         LightManager.CreatePointShadowForLight(pointShadow, i);
                     }
                 }
@@ -554,7 +533,7 @@ namespace IDKEngine
 
                 LightManager = new LightManager();
                 LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
-                LightManager.CreatePointShadowForLight(new PointShadow(512, RenderResolution, new Vector2(0.1f, 60.0f)), 0);
+                LightManager.CreatePointShadowForLight(new CpuPointShadow(512, RenderResolution, new Vector2(0.1f, 60.0f)), 0);
 
                 RenderMode = RenderMode.Rasterizer;
 

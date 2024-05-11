@@ -1,7 +1,6 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using IDKEngine.OpenGL;
+using BBOpenGL;
 
 namespace IDKEngine.Render
 {
@@ -23,15 +22,15 @@ namespace IDKEngine.Render
 
         public GpuSettings Settings;
 
-        public Texture Result;
-        private readonly AbstractShaderProgram shaderProgram;
-        private readonly TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public SSAO(Vector2i size, in GpuSettings settings)
+        public BBG.Texture Result;
+        private readonly BBG.AbstractShaderProgram shaderProgram;
+        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
+        public unsafe SSAO(Vector2i size, in GpuSettings settings)
         {
-            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "SSAO/compute.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "SSAO/compute.glsl"));
 
-            gpuSettingsBuffer = new TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BufferObject.MemLocation.DeviceLocal, BufferObject.MemAccess.Synced, 1);
+            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
 
             SetSize(size);
 
@@ -40,23 +39,25 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            gpuSettingsBuffer.BindBufferBase(BufferRangeTarget.UniformBuffer, 7);
-            gpuSettingsBuffer.UploadElements(Settings);
+            BBG.Computing.Compute("Compute SSAO", () =>
+            {
+                gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
+                gpuSettingsBuffer.UploadElements(Settings);
 
-            Result.BindToImageUnit(0, Result.TextureFormat);
-
-            shaderProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+                BBG.Cmd.BindImageUnit(Result, 0);
+                BBG.Cmd.UseShaderProgram(shaderProgram);
+                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
+            });
         }
 
         public void SetSize(Vector2i size)
         {
             if (Result != null) Result.Dispose();
-            Result = new Texture(Texture.Type.Texture2D);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            Result.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            Result.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R8Unorm);
+            Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            Result.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R8Unorm);
         }
 
         public void Dispose()

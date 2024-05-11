@@ -1,6 +1,7 @@
 #version 460 core
 
 AppInclude(include/Random.glsl)
+AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
@@ -28,7 +29,7 @@ void main()
     }
 
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
-    vec3 normal = normalize(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb);
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjView);
 
     float occlusion = SSAO(fragPos, normal);

@@ -2,9 +2,10 @@
 
 AppInclude(include/Random.glsl)
 AppInclude(include/Constants.glsl)
+AppInclude(include/TraceCone.glsl)
+AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
-AppInclude(include/TraceCone.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -37,8 +38,8 @@ void main()
     }
 
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjView);
-    vec3 normal = normalize(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rgb);
-    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).a;
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
+    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).b;
     float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
 
     vec3 viewDir = fragPos - perFrameDataUBO.ViewPos;

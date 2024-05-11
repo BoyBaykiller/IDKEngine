@@ -1,8 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
+using BBOpenGL;
 using IDKEngine.Utils;
-using IDKEngine.OpenGL;
 
 namespace IDKEngine.Render
 {
@@ -72,11 +71,11 @@ namespace IDKEngine.Render
             get => _lightIntensity;
         }
 
-        public Texture Result;
-        private readonly AbstractShaderProgram shaderProgram;
+        public BBG.Texture Result;
+        private readonly BBG.AbstractShaderProgram shaderProgram;
         public AtmosphericScatterer(int size)
         {
-            shaderProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "AtmosphericScattering/compute.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "AtmosphericScattering/compute.glsl"));
 
             Matrix4[] invViewsAndInvprojecion = new Matrix4[]
             {
@@ -105,19 +104,22 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            Result.BindToImageUnit(0, Result.TextureFormat, 0, true);
+            BBG.Computing.Compute("Compute Atmospheric Scattering", () =>
+            {
+                BBG.Cmd.BindImageUnit(Result, 0, 0, true);
 
-            shaderProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Width + 8 - 1) / 8, 6);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+                BBG.Cmd.UseShaderProgram(shaderProgram);
+                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Width + 8 - 1) / 8, 6);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
+            });
         }
 
         public void SetSize(int size)
         {
             if (Result != null) Result.Dispose();
-            Result = new Texture(Texture.Type.Cubemap);
-            Result.ImmutableAllocate(size, size, 1, Texture.InternalFormat.R32G32B32A32Float);
-            Result.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
+            Result = new BBG.Texture(BBG.Texture.Type.Cubemap);
+            Result.ImmutableAllocate(size, size, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
+            Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
         }
 
         public void Dispose()

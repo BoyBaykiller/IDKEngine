@@ -3,10 +3,10 @@
 // 1 if NV_geometry_shader_passthrough and NV_viewport_swizzle are supported else 0
 #define TAKE_FAST_GEOMETRY_SHADER_PATH AppInsert(TAKE_FAST_GEOMETRY_SHADER_PATH)
 
-AppInclude(include/StaticStorageBuffers.glsl)
-AppInclude(include/StaticUniformBuffers.glsl)
-AppInclude(include/Transformations.glsl)
 AppInclude(include/Compression.glsl)
+AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
 
 out InOutVars
 {

@@ -1,5 +1,6 @@
 ﻿using System;
 using OpenTK.Mathematics;
+using BBOpenGL;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
@@ -38,13 +39,13 @@ namespace IDKEngine
         public int TriangleCount => GeometryInfo.IndexCount / 3;
         public int MaxTreeDepth { get; private set; }
 
-        public readonly GpuDrawElementsCmd GeometryInfo;
+        public readonly BBG.DrawElementsIndirectCommand GeometryInfo;
         public readonly Vector3[] VertexPositions;
         public readonly IndicesTriplet[] TriangleIndices;
 
         private int unpaddedNodesCount;
         public GpuBlasNode[] Nodes;
-        public BLAS(Vector3[] vertexPositions, ReadOnlySpan<uint> vertexIndices, GpuDrawElementsCmd geometryInfo)
+        public BLAS(Vector3[] vertexPositions, ReadOnlySpan<uint> vertexIndices, BBG.DrawElementsIndirectCommand geometryInfo)
         {
             GeometryInfo = geometryInfo;
             VertexPositions = vertexPositions;

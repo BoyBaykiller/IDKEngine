@@ -1,7 +1,6 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using IDKEngine.OpenGL;
+using BBOpenGL;
 
 namespace IDKEngine.Render
 {
@@ -10,51 +9,54 @@ namespace IDKEngine.Render
         public bool IsNaiveTaa;
         public float PreferAliasingOverBlur;
 
-        public Texture Result => (frame % 2 == 0) ? taaPing : taaPong;
-        public Texture PrevResult => (frame % 2 == 0) ? taaPong : taaPing;
+        public BBG.Texture Result => (frame % 2 == 0) ? taaPing : taaPong;
+        public BBG.Texture PrevResult => (frame % 2 == 0) ? taaPong : taaPing;
 
-        private Texture taaPing;
-        private Texture taaPong;
-        private readonly AbstractShaderProgram taaResolveProgram;
+        private BBG.Texture taaPing;
+        private BBG.Texture taaPong;
+        private readonly BBG.AbstractShaderProgram taaResolveProgram;
         private int frame;
         public TAAResolve(Vector2i size, float preferAliasingOverBlurAmount = 0.25f)
         {
-            taaResolveProgram = new AbstractShaderProgram(new AbstractShader(ShaderType.ComputeShader, "TAAResolve/compute.glsl"));
+            taaResolveProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "TAAResolve/compute.glsl"));
 
             SetSize(size);
 
             PreferAliasingOverBlur = preferAliasingOverBlurAmount;
         }
 
-        public void RunTAA(Texture color)
+        public void RunTAA(BBG.Texture color)
         {
             frame++;
 
-            Result.BindToImageUnit(0, Result.TextureFormat);
-            PrevResult.BindToUnit(0);
-            color.BindToUnit(1);
+            BBG.Computing.Compute("Merge Textures", () =>
+            {
+                taaResolveProgram.Upload("PreferAliasingOverBlur", PreferAliasingOverBlur);
+                taaResolveProgram.Upload("IsNaiveTaa", IsNaiveTaa);
 
-            taaResolveProgram.Upload("PreferAliasingOverBlur", PreferAliasingOverBlur);
-            taaResolveProgram.Upload("IsNaiveTaa", IsNaiveTaa);
+                BBG.Cmd.BindImageUnit(Result, 0);
+                BBG.Cmd.BindTextureUnit(PrevResult, 0);
+                BBG.Cmd.BindTextureUnit(color, 1);
+                BBG.Cmd.UseShaderProgram(taaResolveProgram);
 
-            taaResolveProgram.Use();
-            GL.DispatchCompute((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
-            GL.MemoryBarrier(MemoryBarrierFlags.TextureFetchBarrierBit);
+                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
+            });
         }
 
         public void SetSize(Vector2i size)
         {
             if (taaPing != null) taaPing.Dispose();
-            taaPing = new Texture(Texture.Type.Texture2D);
-            taaPing.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            taaPing.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPing.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
+            taaPing = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            taaPing.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            taaPing.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            taaPing.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
             if (taaPong != null) taaPong.Dispose();
-            taaPong = new Texture(Texture.Type.Texture2D);
-            taaPong.SetFilter(TextureMinFilter.Linear, TextureMagFilter.Linear);
-            taaPong.SetWrapMode(TextureWrapMode.ClampToEdge, TextureWrapMode.ClampToEdge);
-            taaPong.ImmutableAllocate(size.X, size.Y, 1, Texture.InternalFormat.R16G16B16A16Float);
+            taaPong = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            taaPong.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            taaPong.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            taaPong.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
         }
 
         public void Dispose()

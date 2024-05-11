@@ -1,13 +1,13 @@
-﻿using ImGuiNET;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using OpenTK.Graphics.OpenGL;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using ImGuiNET;
 using IDKEngine.Windowing;
-using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
+using ErrorCode = OpenTK.Graphics.OpenGL.ErrorCode;
 
 // Source: https://github.com/NogginBops/ImGui.NET_OpenTK_Sample/blob/5d62fc77ebacc022b2430084a87939849c119913/Dear%20ImGui%20Sample/ImGuiController.cs
 namespace IDKEngine.ThirdParty
@@ -98,17 +98,17 @@ namespace IDKEngine.ThirdParty
 
             _vertexArray = GL.GenVertexArray();
             GL.BindVertexArray(_vertexArray);
-            LabelObject(ObjectLabelIdentifier.VertexArray, _vertexArray, "ImGui");
+            LabelObject(ObjectIdentifier.VertexArray, _vertexArray, "ImGui");
 
             _vertexBuffer = GL.GenBuffer();
             GL.BindBuffer(BufferTarget.ArrayBuffer, _vertexBuffer);
-            LabelObject(ObjectLabelIdentifier.Buffer, _vertexBuffer, "VBO: ImGui");
-            GL.BufferData(BufferTarget.ArrayBuffer, _vertexBufferSize, IntPtr.Zero, BufferUsageHint.DynamicDraw);
+            LabelObject(ObjectIdentifier.Buffer, _vertexBuffer, "VBO: ImGui");
+            GL.BufferData(BufferTarget.ArrayBuffer, _vertexBufferSize, IntPtr.Zero, BufferUsage.DynamicDraw);
 
             _indexBuffer = GL.GenBuffer();
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, _indexBuffer);
-            LabelObject(ObjectLabelIdentifier.Buffer, _indexBuffer, "EBO: ImGui");
-            GL.BufferData(BufferTarget.ElementArrayBuffer, _indexBufferSize, IntPtr.Zero, BufferUsageHint.DynamicDraw);
+            LabelObject(ObjectIdentifier.Buffer, _indexBuffer, "EBO: ImGui");
+            GL.BufferData(BufferTarget.ElementArrayBuffer, _indexBufferSize, IntPtr.Zero, BufferUsage.DynamicDraw);
 
             RecreateFontDeviceTexture();
 
@@ -174,27 +174,27 @@ void main()
 
             int prevActiveTexture = GL.GetInteger(GetPName.ActiveTexture);
             GL.ActiveTexture(TextureUnit.Texture0);
-            int prevTexture2D = GL.GetInteger(GetPName.TextureBinding2D);
+            int prevTexture2D = GL.GetInteger(GetPName.TextureBinding2d);
 
             _fontTexture = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture2D, _fontTexture);
-            GL.TexStorage2D(TextureTarget2d.Texture2D, mips, SizedInternalFormat.Rgba8, width, height);
-            LabelObject(ObjectLabelIdentifier.Texture, _fontTexture, "ImGui Text Atlas");
+            GL.BindTexture(TextureTarget.Texture2d, _fontTexture);
+            GL.TexStorage2D(TextureTarget.Texture2d, mips, SizedInternalFormat.Rgba8, width, height);
+            LabelObject(ObjectIdentifier.Texture, _fontTexture, "ImGui Text Atlas");
 
-            GL.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
+            GL.TexSubImage2D(TextureTarget.Texture2d, 0, 0, 0, width, height, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
 
-            GL.GenerateMipmap(GenerateMipmapTarget.Texture2D);
+            GL.GenerateMipmap(TextureTarget.Texture2d);
 
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
 
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxLevel, mips - 1);
+            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMaxLevel, mips - 1);
 
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
 
             // Restore state
-            GL.BindTexture(TextureTarget.Texture2D, prevTexture2D);
+            GL.BindTexture(TextureTarget.Texture2d, prevTexture2D);
             GL.ActiveTexture((TextureUnit)prevActiveTexture);
 
             io.Fonts.SetTexID((IntPtr)_fontTexture);
@@ -306,6 +306,8 @@ void main()
                 return;
             }
 
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+
             // Get intial state.
             int prevVAO = GL.GetInteger(GetPName.VertexArrayBinding);
             int prevArrayBuffer = GL.GetInteger(GetPName.ArrayBufferBinding);
@@ -321,22 +323,16 @@ void main()
             bool prevDepthTestEnabled = GL.GetBoolean(GetPName.DepthTest);
             int prevActiveTexture = GL.GetInteger(GetPName.ActiveTexture);
             GL.ActiveTexture(TextureUnit.Texture0);
-            int prevTexture2D = GL.GetInteger(GetPName.TextureBinding2D);
+            int prevTexture2D = GL.GetInteger(GetPName.TextureBinding2d);
             Span<int> prevScissorBox = stackalloc int[4];
             unsafe
             {
-                fixed (int* iptr = &prevScissorBox[0])
-                {
-                    GL.GetInteger(GetPName.ScissorBox, iptr);
-                }
+                GL.GetInteger(GetPName.ScissorBox, ref prevScissorBox[0]);
             }
             Span<int> prevPolygonMode = stackalloc int[2];
             unsafe
             {
-                fixed (int* iptr = &prevPolygonMode[0])
-                {
-                    GL.GetInteger(GetPName.PolygonMode, iptr);
-                }
+                GL.GetInteger(GetPName.PolygonMode, ref prevPolygonMode[0]);
             }
 
             GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
@@ -354,7 +350,7 @@ void main()
                 {
                     int newSize = (int)Math.Max(_vertexBufferSize * 1.5f, vertexSize);
 
-                    GL.BufferData(BufferTarget.ArrayBuffer, newSize, IntPtr.Zero, BufferUsageHint.DynamicDraw);
+                    GL.BufferData(BufferTarget.ArrayBuffer, newSize, IntPtr.Zero, BufferUsage.DynamicDraw);
                     _vertexBufferSize = newSize;
                 }
 
@@ -362,7 +358,7 @@ void main()
                 if (indexSize > _indexBufferSize)
                 {
                     int newSize = (int)Math.Max(_indexBufferSize * 1.5f, indexSize);
-                    GL.BufferData(BufferTarget.ElementArrayBuffer, newSize, IntPtr.Zero, BufferUsageHint.DynamicDraw);
+                    GL.BufferData(BufferTarget.ElementArrayBuffer, newSize, IntPtr.Zero, BufferUsage.DynamicDraw);
                     _indexBufferSize = newSize;
                 }
             }
@@ -378,8 +374,8 @@ void main()
                 1.0f);
 
             GL.UseProgram(_shader);
-            GL.UniformMatrix4(_shaderProjectionMatrixLocation, false, ref mvp);
-            GL.Uniform1(_shaderFontTextureLocation, 0);
+            GL.UniformMatrix4f(_shaderProjectionMatrixLocation, 1, false, mvp);
+            GL.Uniform1i(_shaderFontTextureLocation, 0);
             CheckGLError("Projection");
 
             GL.BindVertexArray(_vertexArray);
@@ -415,7 +411,7 @@ void main()
                     else
                     {
                         GL.ActiveTexture(TextureUnit.Texture0);
-                        GL.BindTexture(TextureTarget.Texture2D, (int)pcmd.TextureId);
+                        GL.BindTexture(TextureTarget.Texture2d, (int)pcmd.TextureId);
                         CheckGLError("Texture");
 
                         // We do _windowHeight - (int)clip.W instead of (int)clip.Y because gl has flipped Y when it comes to these coordinates
@@ -429,7 +425,7 @@ void main()
                         }
                         else
                         {
-                            GL.DrawElements(BeginMode.Triangles, (int)pcmd.ElemCount, DrawElementsType.UnsignedShort, (int)pcmd.IdxOffset * sizeof(ushort));
+                            GL.DrawElements(PrimitiveType.Triangles, (int)pcmd.ElemCount, DrawElementsType.UnsignedShort, (int)pcmd.IdxOffset * sizeof(ushort));
                         }
                         CheckGLError("Draw");
                     }
@@ -440,17 +436,17 @@ void main()
             GL.Disable(EnableCap.ScissorTest);
 
             // Reset state
-            GL.BindTexture(TextureTarget.Texture2D, prevTexture2D);
+            GL.BindTexture(TextureTarget.Texture2d, prevTexture2D);
             GL.ActiveTexture((TextureUnit)prevActiveTexture);
             GL.BindVertexArray(prevVAO);
             GL.Scissor(prevScissorBox[0], prevScissorBox[1], prevScissorBox[2], prevScissorBox[3]);
             GL.BindBuffer(BufferTarget.ArrayBuffer, prevArrayBuffer);
             GL.BlendEquationSeparate((BlendEquationMode)prevBlendEquationRgb, (BlendEquationMode)prevBlendEquationAlpha);
             GL.BlendFuncSeparate(
-                (BlendingFactorSrc)prevBlendFuncSrcRgb,
-                (BlendingFactorDest)prevBlendFuncDstRgb,
-                (BlendingFactorSrc)prevBlendFuncSrcAlpha,
-                (BlendingFactorDest)prevBlendFuncDstAlpha);
+                (BlendingFactor)prevBlendFuncSrcRgb,
+                (BlendingFactor)prevBlendFuncDstRgb,
+                (BlendingFactor)prevBlendFuncSrcAlpha,
+                (BlendingFactor)prevBlendFuncDstAlpha);
             if (prevBlendEnabled) GL.Enable(EnableCap.Blend); else GL.Disable(EnableCap.Blend);
             if (prevDepthTestEnabled) GL.Enable(EnableCap.DepthTest); else GL.Disable(EnableCap.DepthTest);
             if (prevCullFaceEnabled) GL.Enable(EnableCap.CullFace); else GL.Disable(EnableCap.CullFace);
@@ -471,10 +467,10 @@ void main()
             GL.DeleteProgram(_shader);
         }
 
-        public static void LabelObject(ObjectLabelIdentifier objLabelIdent, int glObject, string name)
+        public static void LabelObject(ObjectIdentifier objLabelIdent, int glObject, string name)
         {
             if (KHRDebugAvailable)
-                GL.ObjectLabel(objLabelIdent, glObject, name.Length, name);
+                GL.ObjectLabel(objLabelIdent, (uint)glObject, name.Length, name);
         }
 
         static bool IsExtensionSupported(string name)
@@ -482,7 +478,7 @@ void main()
             int n = GL.GetInteger(GetPName.NumExtensions);
             for (int i = 0; i < n; i++)
             {
-                string extension = GL.GetString(StringNameIndexed.Extensions, i);
+                string extension = GL.GetStringi(StringName.Extensions, (uint)i);
                 if (extension == name) return true;
             }
 
@@ -492,7 +488,7 @@ void main()
         public static int CreateProgram(string name, string vertexSource, string fragmentSoruce)
         {
             int program = GL.CreateProgram();
-            LabelObject(ObjectLabelIdentifier.Program, program, $"Program: {name}");
+            LabelObject(ObjectIdentifier.Program, program, $"Program: {name}");
 
             int vertex = CompileShader(name, ShaderType.VertexShader, vertexSource);
             int fragment = CompileShader(name, ShaderType.FragmentShader, fragmentSoruce);
@@ -502,10 +498,11 @@ void main()
 
             GL.LinkProgram(program);
 
-            GL.GetProgram(program, GetProgramParameterName.LinkStatus, out int success);
+            int success = 0;
+            GL.GetProgrami(program, ProgramProperty.LinkStatus, ref success);
             if (success == 0)
             {
-                string info = GL.GetProgramInfoLog(program);
+                GL.GetProgramInfoLog(program, out string info);
                 Debug.WriteLine($"GL.LinkProgram had info log [{name}]:\n{info}");
             }
 
@@ -521,15 +518,16 @@ void main()
         private static int CompileShader(string name, ShaderType type, string source)
         {
             int shader = GL.CreateShader(type);
-            LabelObject(ObjectLabelIdentifier.Shader, shader, $"Shader: {name}");
+            LabelObject(ObjectIdentifier.Shader, shader, $"Shader: {name}");
 
             GL.ShaderSource(shader, source);
             GL.CompileShader(shader);
 
-            GL.GetShader(shader, ShaderParameter.CompileStatus, out int success);
+            int success = 0;
+            GL.GetShaderi(shader, ShaderParameterName.CompileStatus, ref success);
             if (success == 0)
             {
-                string info = GL.GetShaderInfoLog(shader);
+                GL.GetShaderInfoLog(shader, out string info);
                 Debug.WriteLine($"GL.CompileShader for shader '{name}' [{type}] had info log:\n{info}");
             }
 

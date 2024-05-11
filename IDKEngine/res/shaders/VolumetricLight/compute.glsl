@@ -1,11 +1,11 @@
 #version 460 core
 
-AppInclude(include/StaticStorageBuffers.glsl)
-AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/Pbr.glsl)
 AppInclude(include/Random.glsl)
 AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
-AppInclude(include/Pbr.glsl)
+AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 

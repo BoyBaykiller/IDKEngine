@@ -1,91 +1,90 @@
 ﻿using System;
 using System.Collections;
-using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using BBOpenGL;
 using IDKEngine.Utils;
-using IDKEngine.OpenGL;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine
 {
     public class ModelSystem : IDisposable
     {
-        public GpuDrawElementsCmd[] DrawCommands = Array.Empty<GpuDrawElementsCmd>();
-        public readonly TypedBuffer<GpuDrawElementsCmd> drawCommandBuffer;
+        public BBG.DrawElementsIndirectCommand[] DrawCommands = Array.Empty<BBG.DrawElementsIndirectCommand>();
+        public readonly BBG.TypedBuffer<BBG.DrawElementsIndirectCommand> drawCommandBuffer;
 
         public GpuMesh[] Meshes = Array.Empty<GpuMesh>();
-        private readonly TypedBuffer<GpuMesh> meshBuffer;
+        private readonly BBG.TypedBuffer<GpuMesh> meshBuffer;
 
         public GpuMeshInstance[] MeshInstances = Array.Empty<GpuMeshInstance>();
-        private readonly TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
+        private readonly BBG.TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
 
         public uint[] VisibleMeshInstances = Array.Empty<uint>();
-        private readonly TypedBuffer<uint> visibleMeshInstanceBuffer;
+        private readonly BBG.TypedBuffer<uint> visibleMeshInstanceBuffer;
 
         public GpuMaterial[] Materials = Array.Empty<GpuMaterial>();
-        private readonly TypedBuffer<GpuMaterial> materialBuffer;
+        private readonly BBG.TypedBuffer<GpuMaterial> materialBuffer;
 
         public GpuVertex[] Vertices = Array.Empty<GpuVertex>();
-        private readonly TypedBuffer<GpuVertex> vertexBuffer;
+        private readonly BBG.TypedBuffer<GpuVertex> vertexBuffer;
 
         public Vector3[] VertexPositions = Array.Empty<Vector3>();
-        private readonly TypedBuffer<Vector3> vertexPositionBuffer;
+        private readonly BBG.TypedBuffer<Vector3> vertexPositionBuffer;
 
         public uint[] VertexIndices = Array.Empty<uint>();
-        private readonly TypedBuffer<uint> vertexIndicesBuffer;
+        private readonly BBG.TypedBuffer<uint> vertexIndicesBuffer;
 
-        public GpuMeshletTaskCmd[] MeshletTasksCmds = Array.Empty<GpuMeshletTaskCmd>();
-        private readonly TypedBuffer<GpuMeshletTaskCmd> meshletTasksCmdsBuffer;
+        public BBG.DrawMeshTasksIndirectCommandNV[] MeshletTasksCmds = Array.Empty<BBG.DrawMeshTasksIndirectCommandNV>();
+        private readonly BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV> meshletTasksCmdsBuffer;
 
-        private readonly TypedBuffer<int> meshletTasksCountBuffer;
+        private readonly BBG.TypedBuffer<int> meshletTasksCountBuffer;
 
         public GpuMeshlet[] Meshlets = Array.Empty<GpuMeshlet>();
-        private readonly TypedBuffer<GpuMeshlet> meshletBuffer;
+        private readonly BBG.TypedBuffer<GpuMeshlet> meshletBuffer;
 
         public GpuMeshletInfo[] MeshletsInfo = Array.Empty<GpuMeshletInfo>();
-        private readonly TypedBuffer<GpuMeshletInfo> meshletInfoBuffer;
+        private readonly BBG.TypedBuffer<GpuMeshletInfo> meshletInfoBuffer;
 
         public uint[] MeshletsVertexIndices = Array.Empty<uint>();
-        private readonly TypedBuffer<uint> meshletsVertexIndicesBuffer;
+        private readonly BBG.TypedBuffer<uint> meshletsVertexIndicesBuffer;
 
         public byte[] MeshletsLocalIndices = Array.Empty<byte>();
-        private readonly TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
+        private readonly BBG.TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
 
         public BVH BVH;
 
-        private readonly VAO vao;
+        private readonly BBG.VAO vao;
         public unsafe ModelSystem()
         {
-            drawCommandBuffer = new TypedBuffer<GpuDrawElementsCmd>();
-            meshBuffer = new TypedBuffer<GpuMesh>();
-            meshInstanceBuffer = new TypedBuffer<GpuMeshInstance>();
-            visibleMeshInstanceBuffer = new TypedBuffer<uint>();
-            materialBuffer = new TypedBuffer<GpuMaterial>();
-            vertexBuffer = new TypedBuffer<GpuVertex>();
-            vertexPositionBuffer = new TypedBuffer<Vector3>();
-            vertexIndicesBuffer = new TypedBuffer<uint>();
-            meshletTasksCmdsBuffer = new TypedBuffer<GpuMeshletTaskCmd>();
-            meshletTasksCountBuffer = new TypedBuffer<int>();
-            meshletBuffer = new TypedBuffer<GpuMeshlet>();
-            meshletInfoBuffer = new TypedBuffer<GpuMeshletInfo>();
-            meshletsVertexIndicesBuffer = new TypedBuffer<uint>();
-            meshletsPrimitiveIndicesBuffer = new TypedBuffer<byte>();
+            drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
+            meshBuffer = new BBG.TypedBuffer<GpuMesh>();
+            meshInstanceBuffer = new BBG.TypedBuffer<GpuMeshInstance>();
+            visibleMeshInstanceBuffer = new BBG.TypedBuffer<uint>();
+            materialBuffer = new BBG.TypedBuffer<GpuMaterial>();
+            vertexBuffer = new BBG.TypedBuffer<GpuVertex>();
+            vertexPositionBuffer = new BBG.TypedBuffer<Vector3>();
+            vertexIndicesBuffer = new BBG.TypedBuffer<uint>();
+            meshletTasksCmdsBuffer = new BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV>();
+            meshletTasksCountBuffer = new BBG.TypedBuffer<int>();
+            meshletBuffer = new BBG.TypedBuffer<GpuMeshlet>();
+            meshletInfoBuffer = new BBG.TypedBuffer<GpuMeshletInfo>();
+            meshletsVertexIndicesBuffer = new BBG.TypedBuffer<uint>();
+            meshletsPrimitiveIndicesBuffer = new BBG.TypedBuffer<byte>();
 
-            drawCommandBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0);
-            meshBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1);
-            meshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2);
-            visibleMeshInstanceBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3);
-            materialBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 9);
-            vertexBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 10);
-            vertexPositionBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 11);
-            meshletTasksCmdsBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 12);
-            meshletTasksCountBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 13);
-            meshletBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 14);
-            meshletInfoBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 15);
-            meshletsVertexIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 16);
-            meshletsPrimitiveIndicesBuffer.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 17);
+            drawCommandBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 0);
+            meshBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 1);
+            meshInstanceBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 2);
+            visibleMeshInstanceBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 3);
+            materialBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 9);
+            vertexBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 10);
+            vertexPositionBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 11);
+            meshletTasksCmdsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 12);
+            meshletTasksCountBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 13);
+            meshletBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 14);
+            meshletInfoBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 15);
+            meshletsVertexIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 16);
+            meshletsPrimitiveIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 17);
 
-            vao = new VAO();
+            vao = new BBG.VAO();
             vao.SetElementBuffer(vertexIndicesBuffer);
             // We use Vertex Pulling, no need to declare vertex format using VAO API
 
@@ -107,7 +106,7 @@ namespace IDKEngine
                 Helper.ArrayAdd(ref DrawCommands, models[i].DrawCommands);
                 for (int j = DrawCommands.Length - models[i].DrawCommands.Length; j < DrawCommands.Length; j++)
                 {
-                    ref GpuDrawElementsCmd newDrawCmd = ref DrawCommands[j];
+                    ref BBG.DrawElementsIndirectCommand newDrawCmd = ref DrawCommands[j];
                     newDrawCmd.BaseInstance += MeshInstances.Length;
                     newDrawCmd.BaseVertex += Vertices.Length;
                     newDrawCmd.FirstIndex += VertexIndices.Length;
@@ -146,7 +145,7 @@ namespace IDKEngine
             }
 
             {
-                ReadOnlyMemory<GpuDrawElementsCmd> newDrawCommands = new ReadOnlyMemory<GpuDrawElementsCmd>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
+                ReadOnlyMemory<BBG.DrawElementsIndirectCommand> newDrawCommands = new ReadOnlyMemory<BBG.DrawElementsIndirectCommand>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
                 BVH.AddMeshes(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);
 
                 // Adjust root node index in context of all Nodes
@@ -157,7 +156,7 @@ namespace IDKEngine
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
 
-                AbstractShaderProgram.ShaderInsertions["MAX_BLAS_TREE_DEPTH"] = BVH.MaxBlasTreeDepth.ToString();
+                BBG.AbstractShaderProgram.ShaderInsertions["MAX_BLAS_TREE_DEPTH"] = BVH.MaxBlasTreeDepth.ToString();
             }
 
             UploadAllModelData();
@@ -167,19 +166,16 @@ namespace IDKEngine
         public unsafe void Draw()
         {
             vao.Bind();
-            drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, sizeof(GpuDrawElementsCmd));
+            BBG.Rendering.MultiDrawIndexed(drawCommandBuffer, BBG.Rendering.Topology.Triangles, BBG.Rendering.IndexType.Uint, Meshes.Length, sizeof(BBG.DrawElementsIndirectCommand));
         }
 
         /// <summary>
-        /// Requires support for GL_NV_mesh_shader
+        /// Requires GL_NV_mesh_shader
         /// </summary>
         public unsafe void MeshShaderDrawNV()
         {
-            meshletTasksCmdsBuffer.Bind(BufferTarget.DrawIndirectBuffer);
-            meshletTasksCountBuffer.Bind(BufferTarget.ParameterBuffer);
             int maxMeshlets = meshletTasksCmdsBuffer.GetNumElements();
-            GL.NV.MultiDrawMeshTasksIndirectCount(IntPtr.Zero, IntPtr.Zero, maxMeshlets, sizeof(GpuMeshletTaskCmd));
+            BBG.Rendering.MultiDrawMeshletsCountNV(meshletTasksCmdsBuffer, meshletTasksCountBuffer, maxMeshlets, sizeof(BBG.DrawMeshTasksIndirectCommandNV));
         }
 
         private static BitArray meshInstanceShouldUpload;
@@ -252,7 +248,7 @@ namespace IDKEngine
             vertexPositionBuffer.UploadElements(start, count, VertexPositions[start]);
         }
 
-        public void ResetInstancesBeforeCulling(int count = 0)
+        public void ResetInstanceCounts(int count = 0)
         {
             // for vertex rendering path
             for (int i = 0; i < DrawCommands.Length; i++)
@@ -270,7 +266,7 @@ namespace IDKEngine
             meshletTasksCountBuffer.UploadElements(count);
         }
 
-        public void UploadAllModelData()
+        public unsafe void UploadAllModelData()
         {
             drawCommandBuffer.MutableAllocateElements(DrawCommands);
             meshBuffer.MutableAllocateElements(Meshes);
