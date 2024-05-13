@@ -78,7 +78,7 @@ namespace BBOpenGL
             }
 
             private AbstractShader(ShaderType shaderType, string srcCode, string name)
-                : base(shaderType, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.ShaderInsertions.GlobalAppInsertions, name), name)
+                : base(shaderType, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, name), name)
             {
                 // We currently dont allow public construction from just a srcCode
                 // as that would make the LocalShaderPath variable meaningless, which we need for shader recompilation.
@@ -135,6 +135,7 @@ namespace BBOpenGL
                     }
 
                     preProcessInfo.UsedAppInsertionKeys = usedAppInsertions.ToArray();
+                    
                     string preprocessed = result.ToString();
                     DEBUG_LAST_PRE_PROCESSED = preprocessed;
 
@@ -159,15 +160,15 @@ namespace BBOpenGL
 
                             if (keyword == Keyword.AppInsert)
                             {
-                                if (!shaderInsertions.TryGetValue(userKey, out string userValue))
+                                if (!shaderInsertions.TryGetValue(userKey, out string appInsertionValue))
                                 {
                                     const string defaultFallbackValue = "0";
-                                    userValue = defaultFallbackValue;
+                                    appInsertionValue = defaultFallbackValue;
 
                                     Logger.Log(Logger.LogLevel.Error, $"The application does not provide a glsl {keyword} value for {userKey}. {defaultFallbackValue} as fallback is inserted");
                                 }
 
-                                result.Append(userValue);
+                                result.Append(appInsertionValue);
                                 usedAppInsertions.Add(userKey);
                             }
                             else if (keyword == Keyword.AppInclude)

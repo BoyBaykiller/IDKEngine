@@ -11,7 +11,7 @@
         }
 
         private const string PATH = "log.txt";
-        private const string DATE_TIME_FORMAT = "HH:mm:ss.f";
+        private const string DATE_TIME_FORMAT = "hh:mm:ss.f";
 
         private static StreamWriter outText;
         private static bool lazyLoaded = false;

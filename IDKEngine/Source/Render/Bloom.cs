@@ -72,7 +72,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(src, 0);
                 shaderProgram.Upload(1, (int)Stage.Downsample);
 
-                BBG.Computing.Compute("Copy downsample and filter into level 0", () =>
+                BBG.Computing.Compute("Copy downsample and filter into Bloom texture level 0", () =>
                 {
                     shaderProgram.Upload(0, currentWriteLod);
                     BBG.Cmd.BindImageUnit(downscaleTexture, 0);
@@ -87,7 +87,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(downscaleTexture, 0);
                 for (; currentWriteLod < downscaleTexture.Levels; currentWriteLod++)
                 {
-                    BBG.Computing.Compute($"Downsample to level {currentWriteLod}", () =>
+                    BBG.Computing.Compute($"Downsample Bloom texture to level {currentWriteLod}", () =>
                     {
                         shaderProgram.Upload(0, currentWriteLod - 1);
                         BBG.Cmd.BindImageUnit(downscaleTexture, 0, currentWriteLod);
@@ -105,7 +105,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(downscaleTexture, 1);
                 shaderProgram.Upload(1, (int)Stage.Upsample);
 
-                BBG.Computing.Compute($"Upsample to level {currentWriteLod}", () =>
+                BBG.Computing.Compute($"Upsample Bloom texture to level {currentWriteLod}", () =>
                 {
                     shaderProgram.Upload(0, currentWriteLod + 1);
                     BBG.Cmd.BindImageUnit(upsampleTexture, 0, currentWriteLod);
@@ -120,7 +120,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(upsampleTexture, 1);
                 for (; currentWriteLod >= 0; currentWriteLod--)
                 {
-                    BBG.Computing.Compute($"Upsample to level {currentWriteLod}", () =>
+                    BBG.Computing.Compute($"Upsample Bloom texture to level {currentWriteLod}", () =>
                     {
                         shaderProgram.Upload(0, currentWriteLod + 1);
                         BBG.Cmd.BindImageUnit(upsampleTexture, 0, currentWriteLod);

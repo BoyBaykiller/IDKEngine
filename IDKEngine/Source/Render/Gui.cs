@@ -41,14 +41,12 @@ namespace IDKEngine.Render
             public EntityType EntityType { get; private set; }
             public int EntityID { get; private set; }
             public int InstanceID { get; private set; }
-            public float Distance { get; private set; }
 
-            public SelectedEntityInfo(EntityType entityType, int entityID, int instanceID, float distance)
+            public SelectedEntityInfo(EntityType entityType, int entityID, int instanceID)
             {
                 EntityType = entityType;
                 EntityID = entityID;
                 InstanceID = instanceID;
-                Distance = distance;
             }
 
             public static bool operator ==(SelectedEntityInfo first, SelectedEntityInfo other)
@@ -71,8 +69,8 @@ namespace IDKEngine.Render
 
         public struct RecordingSettings
         {
-            public int recordingRenderSampleGoal;
-            public int PathTracingRenderSampleGoal;
+            public int RasterizerFPSGoal;
+            public int PathTracingSamplesGoal;
             public bool IsInfiniteReplay;
             public bool IsOutputFrames;
             public FrameRecorderState FrameRecState;
@@ -84,21 +82,18 @@ namespace IDKEngine.Render
         public RecordingSettings RecordingVars;
 
         private readonly ImGuiBackend backend;
+        private SysVec2 viewportHeaderSize;
         public Gui(int width, int height)
         {
             backend = new ImGuiBackend(width, height);
 
             RecordingVars = new RecordingSettings();
-            RecordingVars.recordingRenderSampleGoal = 10000;
-            RecordingVars.PathTracingRenderSampleGoal = 1;
+            RecordingVars.RasterizerFPSGoal = 10000;
+            RecordingVars.PathTracingSamplesGoal = 1;
             RecordingVars.FrameRecState = FrameRecorderState.Nothing;
             RecordingVars.Timer = Stopwatch.StartNew();
         }
-
         
-        private bool useMeshShaders;
-        private SysVec2 viewportHeaderSize;
-        private bool shouldResetPT;
         public unsafe void Draw(Application app, float frameTime)
         {
             backend.Update(app, frameTime);
@@ -110,7 +105,7 @@ namespace IDKEngine.Render
             float tempFloat;
             SysVec2 tempVec2;
             SysVec3 tempVec3;
-            shouldResetPT = false;
+            bool shouldResetPT = false;
 
             if (ImGui.Begin("Stats"))
             {
@@ -232,9 +227,9 @@ namespace IDKEngine.Render
                     bool isRecording = RecordingVars.FrameRecState == FrameRecorderState.Recording;
                     ImGui.Text($"Is Recording (Press {Keys.LeftControl} + {Keys.R}): {isRecording}");
 
-                    if (ImGui.InputInt("Recording FPS", ref RecordingVars.recordingRenderSampleGoal))
+                    if (ImGui.InputInt("Recording FPS", ref RecordingVars.RasterizerFPSGoal))
                     {
-                        RecordingVars.recordingRenderSampleGoal = Math.Max(5, RecordingVars.recordingRenderSampleGoal);
+                        RecordingVars.RasterizerFPSGoal = Math.Max(5, RecordingVars.RasterizerFPSGoal);
                     }
 
                     if (RecordingVars.FrameRecState == FrameRecorderState.Recording)
@@ -270,12 +265,12 @@ namespace IDKEngine.Render
                     }
                     ImGui.Separator();
 
-                    if (app.RenderMode == RenderMode.PathTracer)
+                    if (app.RenderPath == Application.RenderMode.PathTracer)
                     {
-                        tempInt = RecordingVars.recordingRenderSampleGoal;
+                        tempInt = RecordingVars.RasterizerFPSGoal;
                         if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
                         {
-                            RecordingVars.recordingRenderSampleGoal = Math.Max(1, tempInt);
+                            RecordingVars.RasterizerFPSGoal = Math.Max(1, tempInt);
                         }
                     }
                     ImGui.Separator();
@@ -300,7 +295,7 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Renderer"))
             {
-                ImGui.Text($"FPS: {app.FPS}");
+                ImGui.Text($"FPS: {app.FramesPerSecond}");
                 ImGui.Text($"Viewport size: {app.PresentationResolution.X}x{app.PresentationResolution.Y}");
                 ImGui.Text($"{BBG.GetDeviceInfo().Name}");
 
@@ -320,17 +315,21 @@ namespace IDKEngine.Render
                 ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.0f, 4.0f);
                 ImGui.SliderFloat("Saturation", ref app.TonemapAndGamma.Settings.Saturation, 0.0f, 1.5f);
 
-                tempFloat = app.ResolutionScale;
+                tempFloat = app.RenderResolutionScale;
+
                 if (ImGui.SliderFloat("ResolutionScale", ref tempFloat, 0.1f, 1.0f))
                 {
-                    app.ResolutionScale = Math.Max(tempFloat, 0.1f);
+                    if (!MyMath.AlmostEqual(tempFloat, app.RenderResolutionScale, 0.001f))
+                    {
+                        app.RequestRenderResolutionScale = tempFloat;
+                    }
                 }
 
                 {
-                    string current = app.RenderMode.ToString();
+                    string current = app.RenderPath.ToString();
                     if (ImGui.BeginCombo("Render Mode", current))
                     {
-                        RenderMode[] renderModes = Enum.GetValues<RenderMode>();
+                        Application.RenderMode[] renderModes = Enum.GetValues<Application.RenderMode>();
                         for (int i = 0; i < renderModes.Length; i++)
                         {
                             string enumName = renderModes[i].ToString();
@@ -338,7 +337,7 @@ namespace IDKEngine.Render
                             if (ImGui.Selectable(enumName, isSelected))
                             {
                                 current = enumName;
-                                app.RenderMode = (RenderMode)i;
+                                app.RequestRenderMode = (Application.RenderMode)i;
                             }
 
                             if (isSelected)
@@ -351,17 +350,17 @@ namespace IDKEngine.Render
                     ImGui.Separator();
                 }
                 
-                if (app.RenderMode == RenderMode.Rasterizer)
+                if (app.RenderPath == Application.RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
 
                     ImGui.SameLine();
 
-                    useMeshShaders = app.RasterizerPipeline.TakeMeshShaderPath && CpuPointShadow.TakeMeshShaderPath;
-                    if (CheckBoxEnabled("UseMeshShaders", ref useMeshShaders, BBG.GetDeviceInfo().ExtensionSupport.MeshShader))
+                    tempBool = app.RasterizerPipeline.TakeMeshShaderPath && CpuPointShadow.TakeMeshShaderPath;
+                    if (CheckBoxEnabled("UseMeshShaders", ref tempBool, BBG.GetDeviceInfo().ExtensionSupport.MeshShader))
                     {
-                        app.RasterizerPipeline.TakeMeshShaderPath = useMeshShaders;
-                        CpuPointShadow.TakeMeshShaderPath = useMeshShaders;
+                        app.RasterizerPipeline.TakeMeshShaderPath = tempBool;
+                        CpuPointShadow.TakeMeshShaderPath = tempBool;
                     }
                     ToolTipForItemAboveHovered(
                         "If your GPU supports them this will significantly improve performance assuming a proper vertex load is given (not old sponza)."
@@ -663,11 +662,11 @@ namespace IDKEngine.Render
                         }
                     }
                 }
-                else if (app.RenderMode == RenderMode.PathTracer)
+                else if (app.RenderPath == Application.RenderMode.PathTracer)
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
-                        if (app.RenderMode == RenderMode.PathTracer)
+                        if (app.RenderPath == Application.RenderMode.PathTracer)
                         {
                             ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
                         }
@@ -798,7 +797,8 @@ namespace IDKEngine.Render
             {
                 if (ImGui.Button("Add light"))
                 {
-                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, new OtkVec2(0.0f));
+                    ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
+                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(perFrameData.CameraPos, perFrameData.InvProjection, perFrameData.InvView, new OtkVec2(0.0f));
                     OtkVec3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
                     CpuLight newLight = new CpuLight(spawnPoint, Helper.RandomVec3(32.0f, 88.0f), 0.3f);
@@ -811,13 +811,12 @@ namespace IDKEngine.Render
                             pointShadow.Dispose();
                         }
 
-                        float distance = OtkVec3.Distance(app.Camera.Position, newLight.GpuLight.Position);
-                        SelectedEntity = new SelectedEntityInfo(EntityType.Light, newLightIndex, 0, distance);
+                        SelectedEntity = new SelectedEntityInfo(EntityType.Light, newLightIndex, 0);
 
                         shouldResetPT = true;
                     }
                 }
-                ModuleLoadSceneRender(app);
+                ModuleLoadSceneRender(app, ref shouldResetPT);
             }
             ImGui.End();
 
@@ -826,7 +825,6 @@ namespace IDKEngine.Render
                 if (SelectedEntity.EntityType != EntityType.None)
                 {
                     ImGui.Text($"{SelectedEntity.EntityType}ID: {SelectedEntity.EntityID}");
-                    ImGui.Text($"Distance: {MathF.Round(SelectedEntity.Distance, 3)}");
                 }
                 if (SelectedEntity.EntityType == EntityType.Mesh)
                 {
@@ -1010,10 +1008,11 @@ namespace IDKEngine.Render
             if (ImGui.Begin($"Viewport"))
             {
                 SysVec2 content = ImGui.GetContentRegionAvail();
+
                 if (content.X != app.PresentationResolution.X || content.Y != app.PresentationResolution.Y)
                 {
                     // Viewport changed, inform app of the new resolution
-                    app.PresentationResolution = new Vector2i((int)content.X, (int)content.Y);
+                    app.RequestPresentationResolution = new Vector2i((int)content.X, (int)content.Y);
                 }
 
                 SysVec2 tileBar = ImGui.GetCursorPos();
@@ -1023,12 +1022,12 @@ namespace IDKEngine.Render
             }
             ImGui.PopStyleVar();
             ImGui.End();
+            backend.Render();
 
             if (shouldResetPT && app.PathTracer != null)
             {
                 app.PathTracer.ResetRenderProcess();
             }
-            backend.Render();
         }
 
         public void Update(Application app)
@@ -1053,11 +1052,12 @@ namespace IDKEngine.Render
                 Helper.TextureToDiskJpg(app.TonemapAndGamma.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
 
-            ModuleLoadSceneUpdate(app);
+            bool shouldResetPT = false;
+            ModuleLoadSceneUpdate(app, ref shouldResetPT);
 
             if (RecordingVars.FrameRecState == FrameRecorderState.Replaying)
             {
-                if (app.RenderMode == RenderMode.Rasterizer || (app.RenderMode == RenderMode.PathTracer && app.PathTracer.AccumulatedSamples >= RecordingVars.PathTracingRenderSampleGoal))
+                if (app.RenderPath == Application.RenderMode.Rasterizer || (app.RenderPath == Application.RenderMode.PathTracer && app.PathTracer.AccumulatedSamples >= RecordingVars.PathTracingSamplesGoal))
                 {
                     app.FrameStateRecorder.ReplayStateIndex++;
                     if (RecordingVars.IsOutputFrames)
@@ -1072,7 +1072,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (RecordingVars.FrameRecState == FrameRecorderState.Recording && RecordingVars.Timer.Elapsed.TotalMilliseconds >= (1000.0f / RecordingVars.recordingRenderSampleGoal))
+            if (RecordingVars.FrameRecState == FrameRecorderState.Recording && RecordingVars.Timer.Elapsed.TotalMilliseconds >= (1000.0f / RecordingVars.RasterizerFPSGoal))
             {
                 FrameState state = new FrameState();
                 state.Position = app.Camera.Position;
@@ -1133,7 +1133,8 @@ namespace IDKEngine.Render
                 bool clickedInsideViewport = ndc.X < 1.0f && ndc.Y < 1.0f && ndc.X > -1.0f && ndc.Y > -1.0f;
                 if (clickedInsideViewport)
                 {
-                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.GpuBasicData.CameraPos, app.GpuBasicData.InvProjection, app.GpuBasicData.InvView, ndc);
+                    ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
+                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(perFrameData.CameraPos, perFrameData.InvProjection, perFrameData.InvView, ndc);
                     SelectedEntityInfo hitEntity = RayTraceEntity(app, worldSpaceRay);
 
                     bool entityWasAlreadySelected = hitEntity == SelectedEntity;
@@ -1147,13 +1148,18 @@ namespace IDKEngine.Render
                     }
                 }
             }
+
+            if (shouldResetPT && app.PathTracer != null)
+            {
+                app.PathTracer.ResetRenderProcess();
+            }
         }
         
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray)
         {
             bool hitMesh = app.ModelSystem.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
-            if (app.RenderMode == RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
+            if (app.RenderPath == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
 
             SelectedEntityInfo hitEntity = SelectedEntityInfo.None;
             if (!hitMesh && !hitLight)
@@ -1166,11 +1172,11 @@ namespace IDKEngine.Render
 
             if (meshHitInfo.T < lightHitInfo.T)
             {
-                hitEntity = new SelectedEntityInfo(EntityType.Mesh, meshHitInfo.MeshID, meshHitInfo.InstanceID, meshHitInfo.T);
+                hitEntity = new SelectedEntityInfo(EntityType.Mesh, meshHitInfo.MeshID, meshHitInfo.InstanceID);
             }
             else
             {
-                hitEntity = new SelectedEntityInfo(EntityType.Light, lightHitInfo.LightID, 0, lightHitInfo.T);
+                hitEntity = new SelectedEntityInfo(EntityType.Light, lightHitInfo.LightID, 0);
             }
 
             return hitEntity;
@@ -1234,7 +1240,7 @@ namespace IDKEngine.Render
 
     partial class Gui
     {
-        private struct ModuleLoadSceneVars
+        private struct LoadSceneVars
         {
             public bool DialogAskForCompression;
 
@@ -1242,7 +1248,7 @@ namespace IDKEngine.Render
 
             public Tuple<Task, string>?[] GltfCompressionsTasks = new Tuple<Task, string>[10];
 
-            public ModuleLoadSceneVars()
+            public LoadSceneVars()
             {
                 CompressGltfSettings = new ModelLoader.CompressionUtils.CompressGltfSettings();
                 CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
@@ -1250,8 +1256,8 @@ namespace IDKEngine.Render
             }
         }
 
-        private ModuleLoadSceneVars moduleLoadSceneVars = new ModuleLoadSceneVars();
-        public void ModuleLoadSceneRender(Application app)
+        private LoadSceneVars moduleLoadSceneVars = new LoadSceneVars();
+        public void ModuleLoadSceneRender(Application app, ref bool shouldUpdatePathTracer)
         {
             const string POPUP_ASK_FOR_COMPRESSION = "Compress glTF?";
             if (ImGui.Button("Load glTF"))
@@ -1273,12 +1279,18 @@ namespace IDKEngine.Render
                     bool compressionToolAvailable = ModelLoader.CompressionUtils.CompressionToolAvailable();
                     if (isCompressed)
                     {
-                        LoadModel(app, result.Path);
+                        if (LoadModel(app, result.Path))
+                        {
+                            shouldUpdatePathTracer = true;
+                        }
                     }
                     if (!isCompressed && !compressionToolAvailable)
                     {
                         Logger.Log(Logger.LogLevel.Warn, $"The glTF model \"{Path.GetFileName(result.Path)}\" is uncompressed and the compresion tool \"{ModelLoader.CompressionUtils.COMPRESSION_TOOL_NAME}\" was not found.");
-                        LoadModel(app, result.Path);
+                        if (LoadModel(app, result.Path))
+                        {
+                            shouldUpdatePathTracer = true;
+                        }
                     }
 
                     if (!isCompressed && compressionToolAvailable)
@@ -1381,7 +1393,7 @@ namespace IDKEngine.Render
                 }
             }
         }
-        public void ModuleLoadSceneUpdate(Application app)
+        public void ModuleLoadSceneUpdate(Application app, ref bool shouldResetPT)
         {
             for (int i = 0; i < moduleLoadSceneVars.GltfCompressionsTasks.Length; i++)
             {
@@ -1393,24 +1405,25 @@ namespace IDKEngine.Render
                 (Task task, string gltfPath) = moduleLoadSceneVars.GltfCompressionsTasks[i];
                 if (task.IsCompletedSuccessfully)
                 {
-                    LoadModel(app, gltfPath);
+                    if (LoadModel(app, gltfPath))
+                    {
+                        shouldResetPT = true;
+                    }
                     moduleLoadSceneVars.GltfCompressionsTasks[i] = null;
                 }
             }
         }
-        private void LoadModel(Application app, string path)
+        private bool LoadModel(Application app, string path)
         {
-            ModelLoader.Model newScene = ModelLoader.LoadGltfFromFile(path, Matrix4.CreateTranslation(app.Camera.Position));
-            app.ModelSystem.Add(newScene);
+            ModelLoader.Model newModel = ModelLoader.LoadGltfFromFile(path, Matrix4.CreateTranslation(app.Camera.Position));
+            app.ModelSystem.Add(newModel);
 
             int newMeshIndex = app.ModelSystem.Meshes.Length - 1;
 
             ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelSystem.DrawCommands[newMeshIndex];
-            OtkVec3 position = app.ModelSystem.MeshInstances[cmd.BaseInstance].ModelMatrix.ExtractTranslation();
-            float distance = OtkVec3.Distance(app.Camera.Position, position);
 
-            SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, cmd.BaseInstance, distance);
-            shouldResetPT = true;
+            SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, cmd.BaseInstance);
+            return true;
         }
     }
 }

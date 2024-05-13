@@ -1,6 +1,5 @@
 ﻿using System.IO;
 using System.Linq;
-using OpenTK.Graphics.OpenGL;
 using System.Threading.Tasks;
 using StbImageSharp;
 using BBLogger;
@@ -23,7 +22,7 @@ namespace IDKEngine.Render
 
         private static BBG.Texture externalSkyBoxTexture;
         public static BBG.TypedBuffer<ulong> skyBoxTextureBuffer;
-        public static void Init(SkyBoxMode skyBoxMode, string[] paths = null)
+        public static void Initialize(SkyBoxMode skyBoxMode, string[] paths = null)
         {
             skyBoxTextureBuffer = new BBG.TypedBuffer<ulong>();
             skyBoxTextureBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 4);
@@ -80,7 +79,7 @@ namespace IDKEngine.Render
             }
             if (texture.TextureType != BBG.Texture.Type.Cubemap)
             {
-                Logger.Log(Logger.LogLevel.Error, $"Texture must be of type {TextureTarget.TextureCubeMap}");
+                Logger.Log(Logger.LogLevel.Error, $"Texture must be of type {BBG.Texture.Type.Cubemap}");
                 return false;
             }
             if (imagePaths.Length != 6)
@@ -111,7 +110,7 @@ namespace IDKEngine.Render
             texture.ImmutableAllocate(size, size, 1, format);
             for (int i = 0; i < 6; i++)
             {
-                texture.Upload3D(size, size, 1, PixelFormat.Rgb, PixelType.UnsignedByte, images[i].Data[0], 0, 0, 0, i);
+                texture.Upload3D(size, size, 1, BBG.Texture.PixelFormat.RGB, BBG.Texture.PixelType.UByte, images[i].Data[0], 0, 0, 0, i);
             }
 
             return true;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using OpenTK;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -56,6 +57,31 @@ namespace IDKEngine.Windowing
         
         private float _time;
         public float WindowTime => _time;
+
+        private Vector2i _framebufferSize;
+        public Vector2i WindowFramebufferSize
+        {
+            get => _framebufferSize;
+
+            set
+            {
+                GLFW.SetWindowSize(window, value.X, value.Y);
+            }
+        }
+
+        private bool _isFocused = true;
+        public bool WindowFocused => _isFocused;
+
+        private Vector2i _position;
+        public Vector2i WindowPosition
+        {
+            get => _position;
+
+            set
+            {
+                GLFW.SetWindowPos(window, value.X, value.Y);
+            }
+        }
 
         public int WindowRefreshRate => videoMode->RefreshRate;
 
@@ -134,26 +160,30 @@ namespace IDKEngine.Windowing
 
         public void Run()
         {
+            Stopwatch sw = Stopwatch.StartNew();
+
             OnStart();
-            double lastTime = 0.0;
-            GLFW.SetTime(0.0);
             while (!GLFW.WindowShouldClose(window))
             {
-                double currentTime = GLFW.GetTime();
-                double runTime = currentTime - lastTime;
-                
+                sw.Restart();
+
                 KeyboardState.Update();
                 MouseState.Update();
-                OnRender((float)runTime);
+                GameLoop();
 
-                GLFW.PollEvents();
-                GLFW.SwapBuffers(window);
-
-                lastTime = currentTime;
-                _time += (float)runTime;
+                float elapsed = (float)sw.Elapsed.TotalMilliseconds;
+                _time += elapsed;
             }
+        }
 
-            OnEnd();
+        public void PollEvents()
+        {
+            GLFW.PollEvents();
+        }
+
+        public void SwapBuffers()
+        {
+            GLFW.SwapBuffers(window);
         }
 
         public void ShouldClose()
@@ -161,23 +191,10 @@ namespace IDKEngine.Windowing
             GLFW.SetWindowShouldClose(window, true);
         }
 
-        protected abstract void OnRender(float dT);
+        protected abstract void GameLoop();
         protected abstract void OnStart();
-        protected abstract void OnEnd();
         protected abstract void OnWindowResize();
         protected abstract void OnKeyPress(char key);
-
-
-        private Vector2i _framebufferSize;
-        public Vector2i WindowFramebufferSize
-        {
-            get => _framebufferSize;
-
-            set
-            {
-                GLFW.SetWindowSize(window, value.X, value.Y);
-            }
-        }
 
         private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeFuncPtr;
         private void FramebufferSizeCallback(Window* window, int width, int height)
@@ -190,26 +207,10 @@ namespace IDKEngine.Windowing
             }
         }
 
-
-        private bool _isFocused = true;
-        public bool WindowFocused => _isFocused;
-
         private readonly GLFWCallbacks.WindowFocusCallback windowFocusFuncPtr;
         private void WindowFocusCallback(Window* window, bool focused)
         {
             _isFocused = focused;
-        }
-
-
-        private Vector2i _position;
-        public Vector2i WindowPosition
-        {
-            get => _position;
-
-            set
-            {
-                GLFW.SetWindowPos(window, value.X, value.Y);
-            }
         }
 
         private readonly GLFWCallbacks.WindowPosCallback windowPosFuncPtr;
@@ -217,7 +218,6 @@ namespace IDKEngine.Windowing
         {
             _position.X = x;
             _position.Y = y;
-            MouseState.Update();
         }
 
         private readonly GLFWCallbacks.CharCallback windowCharFuncPtr;

@@ -6,6 +6,7 @@ namespace BBOpenGL
     {
         public static class Cmd
         {
+            [Flags]
             public enum MemoryBarrierMask : uint
             {
                 TextureFetchBarrierBit = OpenTK.Graphics.OpenGL.MemoryBarrierMask.TextureFetchBarrierBit,

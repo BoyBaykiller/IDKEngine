@@ -54,8 +54,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BBG\BBOpenGL.csproj" />
-    <ProjectReference Include="..\Logger\BBLogger.csproj" />
+    <ProjectReference Include="..\BBG\BBG.csproj" />
+    <ProjectReference Include="..\Logger\Logger.csproj" />
   </ItemGroup>
 
 </Project>

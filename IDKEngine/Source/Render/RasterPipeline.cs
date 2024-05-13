@@ -25,7 +25,7 @@ namespace IDKEngine.Render
                 }
 
                 if (gBufferProgram != null) gBufferProgram.Dispose();
-                BBG.AbstractShaderProgram.ShaderInsertions["TAKE_MESH_SHADER_PATH_CAMERA"] = TakeMeshShaderPath ? "1" : "0";
+                BBG.AbstractShaderProgram.SetShaderInsertionValue("TAKE_MESH_SHADER_PATH_CAMERA", TakeMeshShaderPath);
 
                 if (TakeMeshShaderPath)
                 {
@@ -51,7 +51,7 @@ namespace IDKEngine.Render
             set
             {
                 _isHiZCulling = value;
-                BBG.AbstractShaderProgram.ShaderInsertions["IS_HI_Z_CULLING"] = IsHiZCulling ? "1" : "0";
+                BBG.AbstractShaderProgram.SetShaderInsertionValue("IS_HI_Z_CULLING", IsHiZCulling);
             }
         }
 
@@ -291,7 +291,7 @@ namespace IDKEngine.Render
             {
                 for (int currentWritelod = 1; currentWritelod < DepthTexture.Levels; currentWritelod++)
                 {
-                    BBG.Rendering.Render($"Generate Depth Mipmap level {currentWritelod}", new BBG.Rendering.VerboseRenderAttachments()
+                    BBG.Rendering.Render($"Generate Main View Depth Mipmap level {currentWritelod}", new BBG.Rendering.VerboseRenderAttachments()
                     {
                         DepthAttachment = new BBG.Rendering.DepthAttachment()
                         {
@@ -356,9 +356,12 @@ namespace IDKEngine.Render
                 }
             });
 
-            // Note: Only needed because of broken AMD drivers (should open bug ticket one day)
+            // Note: Only needed because of AMD driver bug. Should open bug ticket one day.
             // See discussion https://discord.com/channels/318590007881236480/318783155744145411/1070453712021098548
-            BBG.Cmd.Flush();
+            if (BBG.GetDeviceInfo().Vendor == BBG.GpuVendor.AMD)
+            {
+                BBG.Cmd.Flush();
+            }
 
             if (ShadowMode == ShadowTechnique.RayTraced)
             {

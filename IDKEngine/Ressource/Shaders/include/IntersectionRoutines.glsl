@@ -117,8 +117,8 @@ bool BoxDepthBufferIntersect(Box geometryBoxNdc, sampler2D samplerHiZ)
     depths.w = textureLod(samplerHiZ, boxUvMax, level).r;
 
     float furthestDepth = max(max(depths.x, depths.y), max(depths.z, depths.w));
-    float boxClosestDepth = clamp(geometryBoxNdc.Min.z, 0.0, 1.0);
-    bool isVisible = boxClosestDepth < furthestDepth;
+    float boxDepth = clamp(geometryBoxNdc.Min.z, 0.0, 1.0);
+    bool isVisible = boxDepth < furthestDepth;
 
     return isVisible;
 }

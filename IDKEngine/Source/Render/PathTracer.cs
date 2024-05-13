@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL;
 using BBOpenGL;
 using IDKEngine.GpuTypes;
 
@@ -9,6 +8,8 @@ namespace IDKEngine.Render
 {
     class PathTracer : IDisposable
     {
+        public Vector2i RenderResolution => new Vector2i(Result.Width, Result.Height);
+
         private int cachedRayDepth;
         
         public int _rayDepth;
@@ -147,7 +148,7 @@ namespace IDKEngine.Render
             gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
             gpuSettingsBuffer.UploadElements(gpuSettings);
 
-            BBG.Computing.Compute($"Trace Primary Rays", () =>
+            BBG.Computing.Compute($"PathTrace Primary Rays", () =>
             {
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.UseShaderProgram(firstHitProgram);
@@ -157,7 +158,7 @@ namespace IDKEngine.Render
 
             for (int i = 1; i < RayDepth; i++)
             {
-                BBG.Computing.Compute($"Trace Rays {i}", () =>
+                BBG.Computing.Compute($"PathTrace Ray bounce {i}", () =>
                 {
                     int pingPongIndex = i % 2;
 
@@ -173,7 +174,7 @@ namespace IDKEngine.Render
                 });
             }
 
-            BBG.Computing.Compute("Accumulate rays radiance on screen", () =>
+            BBG.Computing.Compute("Accumulate and output rays color", () =>
             {
                 BBG.Cmd.UseShaderProgram(finalDrawProgram);
                 BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
@@ -192,7 +193,7 @@ namespace IDKEngine.Render
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
             Result.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
-            Result.Clear(PixelFormat.Red, PixelType.Float, clear);
+            Result.Clear(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.Float, clear);
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
             wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>();

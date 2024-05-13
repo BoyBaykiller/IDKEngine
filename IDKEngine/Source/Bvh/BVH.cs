@@ -23,7 +23,7 @@ namespace IDKEngine
             set
             {
                 _gpuUseTlas = value;
-                BBG.AbstractShaderProgram.ShaderInsertions["USE_TLAS"] = value ? "1" : "0";
+                BBG.AbstractShaderProgram.SetShaderInsertionValue("USE_TLAS", GpuUseTlas);
             }
         }
 

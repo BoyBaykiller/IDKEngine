@@ -66,8 +66,8 @@ namespace IDKEngine.Render
 
         public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
         {
-            BBG.AbstractShaderProgram.ShaderInsertions[nameof(TAKE_ATOMIC_FP16_PATH)] = TAKE_ATOMIC_FP16_PATH ? "1" : "0";
-            BBG.AbstractShaderProgram.ShaderInsertions[nameof(TAKE_FAST_GEOMETRY_SHADER_PATH)] = TAKE_FAST_GEOMETRY_SHADER_PATH ? "1" : "0";
+            BBG.AbstractShaderProgram.SetShaderInsertionValue(nameof(TAKE_ATOMIC_FP16_PATH), TAKE_ATOMIC_FP16_PATH);
+            BBG.AbstractShaderProgram.SetShaderInsertionValue(nameof(TAKE_FAST_GEOMETRY_SHADER_PATH), TAKE_FAST_GEOMETRY_SHADER_PATH);
 
             {
                 List<BBG.AbstractShader> voxelizeProgramShaders = new List<BBG.AbstractShader>()
@@ -216,7 +216,7 @@ namespace IDKEngine.Render
             int levels = BBG.Texture.GetMaxMipmapLevel(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth);
             for (int i = 1; i < levels; i++)
             {
-                BBG.Computing.Compute($"Downsample texture to level {i}", () =>
+                BBG.Computing.Compute($"Downsample Voxel texture to level {i}", () =>
                 {
                     mipmapProgram.Upload(0, i - 1);
 
@@ -231,7 +231,7 @@ namespace IDKEngine.Render
 
         public void DebugRender(BBG.Texture debugResult)
         {
-            BBG.Computing.Compute("Visualize 3D Voxel Texture", () =>
+            BBG.Computing.Compute("Visualize Voxel texture", () =>
             {
                 visualizeDebugProgram.Upload(0, DebugStepMultiplier);
                 visualizeDebugProgram.Upload(1, DebugConeAngle);

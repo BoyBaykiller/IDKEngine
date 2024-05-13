@@ -59,7 +59,7 @@ namespace BBOpenGL
                 }
             }
 
-            public struct FramebufferRessorce
+            private struct FramebufferRessorce
             {
                 public FramebufferDesc FramebufferDesc;
                 public int GLRessource;
@@ -119,7 +119,7 @@ namespace BBOpenGL
                 Array.Resize(ref framebuffers, count);
             }
 
-            public static FramebufferRessorce CreateFramebuffer(in FramebufferDesc framebufferDesc)
+            private static FramebufferRessorce CreateFramebuffer(in FramebufferDesc framebufferDesc)
             {
                 FramebufferRessorce newFramebuffer = new FramebufferRessorce();
                 newFramebuffer.FramebufferDesc = framebufferDesc;

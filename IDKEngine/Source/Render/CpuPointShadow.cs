@@ -30,7 +30,7 @@ namespace IDKEngine.Render
                 }
 
                 if (renderShadowMapProgram != null) renderShadowMapProgram.Dispose();
-                BBG.AbstractShaderProgram.ShaderInsertions["TAKE_MESH_SHADER_PATH_SHADOW"] = TakeMeshShaderPath ? "1" : "0";
+                BBG.AbstractShaderProgram.SetShaderInsertionValue("TAKE_MESH_SHADER_PATH_SHADOW", TakeMeshShaderPath);
                 if (TakeMeshShaderPath)
                 {
                     renderShadowMapProgram = new BBG.AbstractShaderProgram(

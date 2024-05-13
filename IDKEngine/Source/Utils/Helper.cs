@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL;
 using StbImageWriteSharp;
 using BBLogger;
 using BBOpenGL;
@@ -12,15 +11,20 @@ namespace IDKEngine.Utils
 {
     static class Helper
     {
-        public static void GLDebugCallback(DebugSource source, DebugType type, DebugSeverity severity, uint messageID, string message)
+        public static void GLDebugCallback(
+            BBG.Debugging.DebugSource source,
+            BBG.Debugging.DebugType type,
+            BBG.Debugging.DebugSeverity severity,
+            uint messageID,
+            string message)
         {
             switch (severity)
             {
-                case DebugSeverity.DebugSeverityLow:
+                case BBG.Debugging.DebugSeverity.DebugSeverityLow:
                     Logger.Log(Logger.LogLevel.Info, message);
                     break;
 
-                case DebugSeverity.DebugSeverityMedium:
+                case BBG.Debugging.DebugSeverity.DebugSeverityMedium:
                     if (messageID == 0) return; // Shader compile warning, Intel
                     if (messageID == 2) return; // using glNamedBufferSubData(buffer 35, offset 0, size 1668) to update a GL_STATIC_DRAW buffer, AMD radeonsi
                     // if (messageID == 131186) return; // Buffer object is being copied/moved from VIDEO memory to HOST memory, NVIDIA
@@ -28,7 +32,7 @@ namespace IDKEngine.Utils
                     Logger.Log(Logger.LogLevel.Warn, message);
                     break;
 
-                case DebugSeverity.DebugSeverityHigh:
+                case BBG.Debugging.DebugSeverity.DebugSeverityHigh:
                     if (messageID == 0) return; // Shader compile error, Intel
                     if (messageID == 2000) return; // Shader compile error, AMD
                     if (messageID == 2001) return; // Program link error, AMD
@@ -36,12 +40,12 @@ namespace IDKEngine.Utils
                     Logger.Log(Logger.LogLevel.Error, message);
                     break;
 
-                case DebugSeverity.DebugSeverityNotification:
+                case BBG.Debugging.DebugSeverity.DebugSeverityNotification:
                     if (messageID == 131185) return; // Buffer detailed info, NVIDIA
                     Logger.Log(Logger.LogLevel.Info, message);
                     break;
 
-                case DebugSeverity.DontCare:
+                case BBG.Debugging.DebugSeverity.DontCare:
                 default:
                     break;
             }
@@ -140,7 +144,7 @@ namespace IDKEngine.Utils
             StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
 
             byte* pixels = Memory.Malloc<byte>(texture.Width * texture.Height * 3);
-            texture.GetImageData(PixelFormat.Rgb, PixelType.UnsignedByte, pixels, texture.Width * texture.Height * 3 * sizeof(byte));
+            texture.GetImageData(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * 3 * sizeof(byte));
 
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
             ImageWriter imageWriter = new ImageWriter();

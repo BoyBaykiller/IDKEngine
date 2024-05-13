@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL;
 using Ktx;
 using StbImageSharp;
 using SharpGLTF.Schema2;
@@ -339,7 +338,7 @@ namespace IDKEngine
         {
             GLTexture defaultTexture = new GLTexture(GLTexture.Type.Texture2D);
             defaultTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-            defaultTexture.Clear(PixelFormat.Rgba, PixelType.Float, new Vector4(1.0f));
+            defaultTexture.Clear(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.Float, new Vector4(1.0f));
             ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB(new GLSampler(new GLSampler.State()));
 
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
@@ -377,7 +376,7 @@ namespace IDKEngine
                     {
                         // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
                         // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
-                        texture.SetSwizzleR(TextureSwizzle.Blue);
+                        texture.SetSwizzleR(BBG.Texture.Swizzle.B);
                     }
                     
                     Ktx2.Texture* ktxTexture = null;
@@ -539,7 +538,7 @@ namespace IDKEngine
                                 
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
-                                    texture.Upload2D(stagingBuffer, imageWidth, imageHeight, NumChannelsToPixelFormat(imageChannels), PixelType.UnsignedByte, null);
+                                    texture.Upload2D(stagingBuffer, imageWidth, imageHeight, NumChannelsToPixelFormat(imageChannels), BBG.Texture.PixelType.UByte, null);
                                     if (mipmapsRequired)
                                     {
                                         texture.GenerateMipmap();
@@ -871,14 +870,14 @@ namespace IDKEngine
             };
             return colorComponents;
         }
-        private static PixelFormat NumChannelsToPixelFormat(int numChannels)
+        private static BBG.Texture.PixelFormat NumChannelsToPixelFormat(int numChannels)
         {
-            PixelFormat pixelFormat = numChannels switch
+            BBG.Texture.PixelFormat pixelFormat = numChannels switch
             {
-                1 => PixelFormat.Red,
-                2 => PixelFormat.Rg,
-                3 => PixelFormat.Rgb,
-                4 => PixelFormat.Rgba,
+                1 => BBG.Texture.PixelFormat.R,
+                2 => BBG.Texture.PixelFormat.RG,
+                3 => BBG.Texture.PixelFormat.RGB,
+                4 => BBG.Texture.PixelFormat.RGBA,
                 _ => throw new NotSupportedException($"Can not convert {nameof(numChannels)} = {numChannels} to {nameof(pixelFormat)}"),
             };
             return pixelFormat;

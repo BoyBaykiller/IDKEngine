@@ -357,16 +357,12 @@ namespace BBOpenGL
 
             public static void CopyTextureToSwapchain(Texture texture)
             {
-                Debugging.PushDebugGroup("Copy texture to swapchain");
-
                 VerboseRenderAttachments renderAttachments = new VerboseRenderAttachments();
                 renderAttachments.ColorAttachments = [new ColorAttachment() { Texture = texture }];
 
                 int fbo = FramebufferCache.GetFramebuffer(RenderAttachmentsToFramebufferDesc(renderAttachments));
 
                 GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
-
-                Debugging.PopDebugGroup();
             }
 
             public static void DrawIndexed(Topology topology, int count, IndexType indexType, int instanceCount = 1, int baseInstance = 0, nint offset = 0)

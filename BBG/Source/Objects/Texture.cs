@@ -75,6 +75,30 @@ namespace BBOpenGL
                 Stencil,
             }
 
+            public enum PixelFormat : uint
+            {
+                R = OpenTK.Graphics.OpenGL.PixelFormat.Red,
+                RG = OpenTK.Graphics.OpenGL.PixelFormat.Rg,
+                RGB = OpenTK.Graphics.OpenGL.PixelFormat.Rgb,
+                RGBA = OpenTK.Graphics.OpenGL.PixelFormat.Rgba,
+            }
+
+            public enum PixelType : uint
+            {
+                UByte = OpenTK.Graphics.OpenGL.PixelType.UnsignedByte,
+                Float = OpenTK.Graphics.OpenGL.PixelType.Float,
+            }
+
+            public enum Swizzle : uint
+            {
+                Zero = TextureSwizzle.Zero,
+                One = TextureSwizzle.One,
+                R = TextureSwizzle.Red,
+                G = TextureSwizzle.Green,
+                B = TextureSwizzle.Blue,
+                A = TextureSwizzle.Alpha,
+            }
+
             public readonly int ID;
             public readonly Type TextureType;
             public InternalFormat Format { get; private set; }
@@ -116,19 +140,19 @@ namespace BBOpenGL
                 GL.TextureParameteri(ID, TextureParameterName.TextureWrapR, (int)wrapR);
             }
 
-            public void SetSwizzleR(TextureSwizzle swizzle)
+            public void SetSwizzleR(Swizzle swizzle)
             {
                 GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleR, (int)swizzle);
             }
-            public void SetSwizzleG(TextureSwizzle swizzle)
+            public void SetSwizzleG(Swizzle swizzle)
             {
                 GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleG, (int)swizzle);
             }
-            public void SetSwizzleB(TextureSwizzle swizzle)
+            public void SetSwizzleB(Swizzle swizzle)
             {
                 GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleB, (int)swizzle);
             }
-            public void SetSwizzleA(TextureSwizzle swizzle)
+            public void SetSwizzleA(Swizzle swizzle)
             {
                 GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleA, (int)swizzle);
             }
@@ -162,7 +186,7 @@ namespace BBOpenGL
             }
             public void Upload3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
             {
-                GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, pixelFormat, pixelType, (nint)pixels);
+                GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, (nint)pixels);
             }
 
             public void Upload2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
@@ -174,7 +198,7 @@ namespace BBOpenGL
             }
             public void Upload2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
             {
-                GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, pixelFormat, pixelType, (nint)pixels);
+                GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, (nint)pixels);
             }
             public void Upload2D(BufferObject bufferObject, int width, int height, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
             {
@@ -197,7 +221,7 @@ namespace BBOpenGL
 
             public void GetImageData(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int bufSize, int level = 0)
             {
-                GL.GetTextureImage(ID, level, pixelFormat, pixelType, bufSize, (nint)pixels);
+                GL.GetTextureImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, (nint)pixels);
             }
 
             public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, in T value, int level = 0) where T : unmanaged
@@ -209,7 +233,7 @@ namespace BBOpenGL
             }
             public void Clear(PixelFormat pixelFormat, PixelType pixelType, void* data, int level = 0)
             {
-                GL.ClearTexImage(ID, level, pixelFormat, pixelType, (nint)data);
+                GL.ClearTexImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, (nint)data);
             }
 
             public void GenerateMipmap()
@@ -270,19 +294,10 @@ namespace BBOpenGL
             /// <returns></returns>
             public ulong GetImageHandleARB(InternalFormat format, int layer = 0, bool layered = false, int level = 0)
             {
-                ulong imageHandle = GL.ARB.GetImageHandleARB(ID, level, layered, layer, (PixelFormat)format);
+                ulong imageHandle = GL.ARB.GetImageHandleARB(ID, level, layered, layer, (OpenTK.Graphics.OpenGL.PixelFormat)format);
 
-                if (true)
-                {
-                    // Workarround for AMD driver bug when using GL_READ_WRITE or GL_WRITE_ONLY.
-                    // You'd think having GL_READ_ONLY would create other problems since we write to the them,
-                    // but it works and is the best we can do until the bug is fixed.
-                    GL.ARB.MakeImageHandleResidentARB(imageHandle, All.ReadOnly);
-                }
-                else
-                {
-                    GL.ARB.MakeImageHandleResidentARB(imageHandle, All.ReadWrite);
-                }
+                GL.ARB.MakeImageHandleResidentARB(imageHandle, All.ReadWrite);
+
                 associatedImageHandles.Add(imageHandle);
                 return imageHandle;
             }
@@ -307,6 +322,8 @@ namespace BBOpenGL
 
             public void Dispose()
             {
+                FramebufferCache.DeleteFramebuffersWithTexture(this);
+
                 for (int i = 0; i < associatedTextureHandles.Count; i++)
                 {
                     UnmakeTextureHandleARB(associatedTextureHandles[i]);
@@ -320,8 +337,6 @@ namespace BBOpenGL
                 associatedImageHandles.Clear();
 
                 GL.DeleteTexture(ID);
-
-                FramebufferCache.DeleteFramebuffersWithTexture(this);
             }
 
             public static int GetMaxMipmapLevel(int width, int height, int depth)

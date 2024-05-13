@@ -156,7 +156,7 @@ namespace IDKEngine
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
 
-                BBG.AbstractShaderProgram.ShaderInsertions["MAX_BLAS_TREE_DEPTH"] = BVH.MaxBlasTreeDepth.ToString();
+                BBG.AbstractShaderProgram.SetShaderInsertionValue("MAX_BLAS_TREE_DEPTH", BVH.MaxBlasTreeDepth);
             }
 
             UploadAllModelData();

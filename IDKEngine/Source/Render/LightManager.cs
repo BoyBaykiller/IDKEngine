@@ -1,6 +1,5 @@
 ﻿using System;
 using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL;
 using BBLogger;
 using BBOpenGL;
 using IDKEngine.Utils;
@@ -88,7 +87,7 @@ namespace IDKEngine.Render
             vao = new BBG.VAO();
             vao.SetElementBuffer(ebo);
             vao.AddSourceBuffer(vbo, 0, sizeof(ObjectFactory.Vertex));
-            vao.SetAttribFormat(0, 0, 3, VertexAttribType.Float, 0 * sizeof(float)); // Positions
+            vao.SetAttribFormat(0, 0, 3, BBG.VAO.VertexAttribType.Float, 0 * sizeof(float)); // Positions
             //vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 3 * sizeof(float)); // TexCoord
 
             IndicisCount = indicis.Length;

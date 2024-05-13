@@ -3,6 +3,8 @@
 #extension GL_NV_gpu_shader5 : require
 #extension GL_KHR_shader_subgroup_ballot : require
 
+#define IS_HI_Z_CULLING AppInsert(IS_HI_Z_CULLING)
+
 #define DECLARE_MESHLET_STORAGE_BUFFERS
 #define DECLARE_MESHLET_RENDERING_TYPES
 
@@ -70,6 +72,7 @@ void main()
         isVisible = FrustumBoxIntersect(frustum, meshletLocalBounds);
     }
 
+#if IS_HI_Z_CULLING
     // Hi-Z Occlusion Culling
     if (isVisible)
     {
@@ -80,6 +83,7 @@ void main()
             isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
         }
     }
+#endif
 
     uvec4 visibleMeshletsBitmask = subgroupBallot(isVisible);
     if (isVisible)

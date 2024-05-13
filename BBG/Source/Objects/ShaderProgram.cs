@@ -194,18 +194,13 @@ namespace BBOpenGL
                 : this(others.Concat([first]).ToArray())
             {
             }
-            public void Link(AbstractShader first, params AbstractShader[] others)
-            {
-                AbstractShader[] abstractShaders = others.Concat([first]).ToArray();
-                Link(abstractShaders);
-            }
 
             public void Link(AbstractShader[] shaders)
             {
                 DisposeShaders();
+                Shaders = shaders;
 
                 base.Link(shaders);
-                Shaders = shaders;
             }
 
             private void DisposeShaders()
@@ -227,74 +222,69 @@ namespace BBOpenGL
                 base.Dispose();
             }
 
-            // "Singleton"-workarround for "CS0720: 'static class': cannot declare indexers in a static class"
-            public class ShaderInsertionsSingleton
+            /// <summary>
+            /// Responsible for managing global shader insertions like "AppInsert(USE_TLAS)".
+            /// In that example the key is "USE_TLAS". If the application updates the value for that key
+            /// all shaders will be recompiled and their programs linked again.
+            /// </summary>
+            public static IReadOnlyDictionary<string, string> GlobalShaderInsertions => globalShaderInsertions;
+
+            private static readonly Dictionary<string, string> globalShaderInsertions = new Dictionary<string, string>();
+
+            public static void SetShaderInsertionValue(string key, bool value)
             {
-                /// <summary>
-                /// Maps Shader-required <see cref="Shader.Preprocessor.Keyword.AppInsert"/> key -> the coressponding value filled in by the preprocessing
-                /// </summary>
-                public IReadOnlyDictionary<string, string> GlobalAppInsertions => globalAppInsertions;
-
-                private readonly Dictionary<string, string> globalAppInsertions = new Dictionary<string, string>();
-
-                public string this[string key]
+                SetShaderInsertionValue(key, value ? "1" : "0");
+            }
+            
+            public static void SetShaderInsertionValue(string key, int value)
+            {
+                SetShaderInsertionValue(key, value.ToString());
+            }
+            
+            public static void SetShaderInsertionValue(string key, string value)
+            {
+                if (globalShaderInsertions.TryGetValue(key, out string prevValue) && prevValue == value)
                 {
-                    get
+                    return;
+                }
+                globalShaderInsertions[key] = value;
+
+                string recompiledShadersNames = string.Empty;
+                for (int i = 0; i < globalInstances.Count; i++)
+                {
+                    AbstractShaderProgram shaderProgram = globalInstances[i];
+
+                    bool programIncludesAppInsertionKey = false;
+                    for (int j = 0; j < shaderProgram.Shaders.Length; j++)
                     {
-                        if (globalAppInsertions.TryGetValue(key, out string value))
+                        AbstractShader shader = shaderProgram.Shaders[j];
+
+                        string srcCode = File.ReadAllText(shader.FullShaderPath);
+                        AbstractShader.Preprocessor.PreProcess(srcCode, GlobalShaderInsertions, out AbstractShader.Preprocessor.PreProcessInfo preprocessInfo);
+
+                        if (preprocessInfo.UsedAppInsertionKeys.Contains(key))
                         {
-                            return value;
+                            programIncludesAppInsertionKey = true;
+                            break;
                         }
-                        return null;
                     }
 
-                    set
+                    if (programIncludesAppInsertionKey)
                     {
-                        if (globalAppInsertions.TryGetValue(key, out string prevValue) && prevValue == value)
-                        {
-                            return;
-                        }
-                        globalAppInsertions[key] = value;
+                        Recompile(shaderProgram);
 
-                        string recompiledShadersNames = string.Empty;
-                        for (int i = 0; i < globalInstances.Count; i++)
-                        {
-                            AbstractShaderProgram shaderProgram = globalInstances[i];
-
-                            bool programIncludesAppInsertionKey = false;
-                            for (int j = 0; j < shaderProgram.Shaders.Length; j++)
-                            {
-                                AbstractShader shader = shaderProgram.Shaders[j];
-
-                                string srcCode = File.ReadAllText(shader.FullShaderPath);
-                                AbstractShader.Preprocessor.PreProcess(srcCode, GlobalAppInsertions, out AbstractShader.Preprocessor.PreProcessInfo preprocessInfo);
-
-                                if (preprocessInfo.UsedAppInsertionKeys.Contains(key))
-                                {
-                                    programIncludesAppInsertionKey = true;
-                                    break;
-                                }
-                            }
-
-                            if (programIncludesAppInsertionKey)
-                            {
-                                Recompile(shaderProgram);
-
-                                recompiledShadersNames += $"[{string.Join(", ", shaderProgram.Shaders.Select(shader => $"{shader.Name}"))}]";
-                            }
-                        }
-
-                        if (recompiledShadersNames != string.Empty)
-                        {
-                            Logger.Log(Logger.LogLevel.Info,
-                                   $"{nameof(AbstractShader.Preprocessor.Keyword.AppInclude)} \"{key}\" was assigned new value \"{value}\", " +
-                                   $"causing shader recompilation for {recompiledShadersNames}"
-                               );
-                        }
+                        recompiledShadersNames += $"[{string.Join(", ", shaderProgram.Shaders.Select(shader => $"{shader.Name}"))}]";
                     }
                 }
+
+                if (recompiledShadersNames != string.Empty)
+                {
+                    Logger.Log(Logger.LogLevel.Info,
+                           $"{nameof(AbstractShader.Preprocessor.Keyword.AppInclude)} \"{key}\" was assigned new value \"{value}\", " +
+                           $"causing shader recompilation for {recompiledShadersNames}"
+                       );
+                }
             }
-            public static readonly ShaderInsertionsSingleton ShaderInsertions = new ShaderInsertionsSingleton();
 
             public static void RecompileAll()
             {

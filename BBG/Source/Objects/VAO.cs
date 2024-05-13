@@ -6,6 +6,11 @@ namespace BBOpenGL
     {
         public class VAO : IDisposable
         {
+            public enum VertexAttribType : uint
+            {
+                Float = OpenTK.Graphics.OpenGL.VertexAttribType.Float,
+            }
+
             public readonly int ID;
             public VAO()
             {
@@ -25,14 +30,7 @@ namespace BBOpenGL
             public void SetAttribFormat(int bindingIndex, int attribIndex, int attribTypeElements, VertexAttribType vertexAttribType, int relativeOffset, bool normalize = false)
             {
                 GL.EnableVertexArrayAttrib(ID, (uint)attribIndex);
-                GL.VertexArrayAttribFormat(ID, (uint)attribIndex, attribTypeElements, vertexAttribType, normalize, (uint)relativeOffset);
-                GL.VertexArrayAttribBinding(ID, (uint)attribIndex, (uint)bindingIndex);
-            }
-
-            public void SetAttribFormatI(int bindingIndex, int attribIndex, int attribTypeElements, VertexAttribIType vertexAttribType, int relativeOffset)
-            {
-                GL.EnableVertexArrayAttrib(ID, (uint)attribIndex);
-                GL.VertexArrayAttribIFormat(ID, (uint)attribIndex, attribTypeElements, vertexAttribType, (uint)relativeOffset);
+                GL.VertexArrayAttribFormat(ID, (uint)attribIndex, attribTypeElements, (OpenTK.Graphics.OpenGL.VertexAttribType)vertexAttribType, normalize, (uint)relativeOffset);
                 GL.VertexArrayAttribBinding(ID, (uint)attribIndex, (uint)bindingIndex);
             }
 

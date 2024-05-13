@@ -86,27 +86,19 @@ namespace IDKEngine.Utils
             }
         }
 
-        public static ulong Split(ulong x, int log_bits)
+        public static bool AlmostEqual(float a, float b, float epsilon)
         {
-            int bit_count = 1 << log_bits;
-            ulong mask = ulong.MaxValue >> (bit_count / 2);
-            x &= mask;
-            for (int i = log_bits - 1, n = 1 << i; i > 0; --i, n >>= 1)
-            {
-                mask = (mask | (mask << n)) & ~(mask << (n / 2));
-                x = (x | (x << n)) & mask;
-            }
-            return x;
+            return MathF.Abs(a - b) < epsilon;
         }
 
-        public static ulong Encode(ulong x, ulong y, ulong z, int log_bits)
+        public static Vector3 MapRangeToAnOther(Vector3 value, Vector3 valueMin, Vector3 valueMax, Vector3 mapMin, Vector3 mapMax)
         {
-            return Split(x, log_bits) | (Split(y, log_bits) << 1) | (Split(z, log_bits) << 2);
+            return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
         }
 
-        public static Vector3 Encode(Vector3 a)
+        public static Vector3 MapToZeroOne(Vector3 value, Vector3 rangeMin, Vector3 rangeMax)
         {
-            return new Vector3(0.0f);
+            return MapRangeToAnOther(value, rangeMin, rangeMax, new Vector3(0.0f), new Vector3(1.0f));
         }
     }
 }
