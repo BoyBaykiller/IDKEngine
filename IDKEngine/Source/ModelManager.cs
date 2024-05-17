@@ -7,7 +7,7 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine
 {
-    public class ModelSystem : IDisposable
+    public class ModelManager : IDisposable
     {
         public BBG.DrawElementsIndirectCommand[] DrawCommands = Array.Empty<BBG.DrawElementsIndirectCommand>();
         public readonly BBG.TypedBuffer<BBG.DrawElementsIndirectCommand> drawCommandBuffer;
@@ -53,7 +53,7 @@ namespace IDKEngine
         public BVH BVH;
 
         private readonly BBG.VAO vao;
-        public unsafe ModelSystem()
+        public ModelManager()
         {
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
             meshBuffer = new BBG.TypedBuffer<GpuMesh>();
@@ -156,7 +156,6 @@ namespace IDKEngine
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
 
-                BBG.AbstractShaderProgram.SetShaderInsertionValue("MAX_BLAS_TREE_DEPTH", BVH.MaxBlasTreeDepth);
             }
 
             UploadAllModelData();
@@ -165,7 +164,7 @@ namespace IDKEngine
 
         public unsafe void Draw()
         {
-            vao.Bind();
+            BBG.Rendering.UseVertexArrayObject(vao);
             BBG.Rendering.MultiDrawIndexed(drawCommandBuffer, BBG.Rendering.Topology.Triangles, BBG.Rendering.IndexType.Uint, Meshes.Length, sizeof(BBG.DrawElementsIndirectCommand));
         }
 

@@ -107,10 +107,10 @@ namespace IDKEngine.Render
             DebugStepMultiplier = debugStepMultiplier;
         }
 
-        public void Render(ModelSystem modelSystem)
+        public void Render(ModelManager modelManager)
         {
             ClearTextures();
-            Voxelize(modelSystem);
+            Voxelize(modelManager);
             Mipmap();
         }
 
@@ -132,7 +132,7 @@ namespace IDKEngine.Render
             });
         }
 
-        private void Voxelize(ModelSystem modelSystem)
+        private void Voxelize(ModelManager modelManager)
         {
             BBG.Rendering.Render("Voxelize", new BBG.Rendering.NoAttachmentsParams()
             {
@@ -154,11 +154,11 @@ namespace IDKEngine.Render
                         },
                         new BBG.Rendering.Viewport() {
                             Size = new Vector2(ResultVoxels.Width, ResultVoxels.Height),
-                            ViewportSwizzle = new BBG.Rendering.ViewportSwizzleNV() { Y = BBG.Rendering.ViewportSwizzleAxis.PositiveZ, Z = BBG.Rendering.ViewportSwizzleAxis.PositiveY },
+                            ViewportSwizzle = new BBG.Rendering.ViewportSwizzleNV() { Y = BBG.Rendering.ViewportSwizzleAxisNV.PositiveZ, Z = BBG.Rendering.ViewportSwizzleAxisNV.PositiveY },
                         },
                         new BBG.Rendering.Viewport() {
                             Size = new Vector2(ResultVoxels.Width, ResultVoxels.Height),
-                            ViewportSwizzle = new BBG.Rendering.ViewportSwizzleNV() { X = BBG.Rendering.ViewportSwizzleAxis.PositiveZ, Z = BBG.Rendering.ViewportSwizzleAxis.PositiveX },
+                            ViewportSwizzle = new BBG.Rendering.ViewportSwizzleNV() { X = BBG.Rendering.ViewportSwizzleAxisNV.PositiveZ, Z = BBG.Rendering.ViewportSwizzleAxisNV.PositiveX },
                         }
                     ];
                     BBG.Rendering.SetViewport(viewport);
@@ -177,7 +177,7 @@ namespace IDKEngine.Render
                 BBG.Rendering.InferViewportSize();
                 if (TAKE_FAST_GEOMETRY_SHADER_PATH)
                 {
-                    modelSystem.Draw();
+                    modelManager.Draw();
                 }
                 else
                 {
@@ -186,7 +186,7 @@ namespace IDKEngine.Render
                     for (int i = 0; i < 3; i++)
                     {
                         voxelizeProgram.Upload(0, i);
-                        modelSystem.Draw();
+                        modelManager.Draw();
                     }
                 }
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit | BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);

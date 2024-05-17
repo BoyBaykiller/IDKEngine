@@ -58,7 +58,7 @@ void main()
 
         vec3 fragToLight = light.Position - biasedPosition;
         float distanceToLight, pdf;
-        vec3 direction = SampleLight(fragToLight, light.Radius, rnd0, rnd1, distanceToLight, pdf);
+        vec3 direction = SampleSphere(fragToLight, light.Radius, rnd0, rnd1, distanceToLight, pdf);
 
         Ray ray;
         ray.Origin = biasedPosition;

@@ -89,7 +89,7 @@ namespace IDKEngine.Render
             }
             if (!imagePaths.All(p => File.Exists(p)))
             {
-                Logger.Log(Logger.LogLevel.Error, "At least one of the specified cubemap image paths is not found");
+                Logger.Log(Logger.LogLevel.Error, "At least one of the specified cubemap images is not found");
                 return false;
             }
 

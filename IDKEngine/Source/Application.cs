@@ -84,7 +84,6 @@ namespace IDKEngine
         // both Rasterizer and PathTracer RenderMode which is why they are here
         public TonemapAndGammaCorrect TonemapAndGamma;
         public BoxRenderer BoxRenderer;
-        public LightManager LightManager;
         public Bloom Bloom;
         public bool IsBloom = true;
         private Gui gui;
@@ -92,8 +91,9 @@ namespace IDKEngine
         public VolumetricLighting VolumetricLight;
         public bool IsVolumetricLighting = true;
 
-        // Holds all geometry and the associated gpu buffers
-        public ModelSystem ModelSystem;
+        // All models and all lights (the types of different entities)
+        public ModelManager ModelManager;
+        public LightManager LightManager;
 
         public Camera Camera;
         public StateRecorder<FrameState> FrameStateRecorder;
@@ -142,7 +142,7 @@ namespace IDKEngine
 
             if (RenderPath == RenderMode.Rasterizer)
             {
-                RasterizerPipeline.Render(ModelSystem, LightManager, Camera, dT);
+                RasterizerPipeline.Render(ModelManager, LightManager, Camera, dT);
                 if (RasterizerPipeline.IsConfigureGridMode)
                 {
                     TonemapAndGamma.Compute(RasterizerPipeline.Result);
@@ -182,11 +182,11 @@ namespace IDKEngine
                 Box selectedEntityBox = new Box();
                 if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
                 {
-                    GpuBlasNode node = ModelSystem.BVH.Tlas.Blases[gui.SelectedEntity.EntityID].Root;
+                    GpuBlasNode node = ModelManager.BVH.Tlas.Blases[gui.SelectedEntity.EntityID].Root;
                     selectedEntityBox.Min = node.Min;
                     selectedEntityBox.Max = node.Max;
 
-                    selectedEntityBox.Transform(ModelSystem.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
+                    selectedEntityBox.Transform(ModelManager.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
                 }
                 else
                 {
@@ -292,7 +292,7 @@ namespace IDKEngine
 
                 if (RunSimulations)
                 {
-                    LightManager.AdvanceSimulation(dT, ModelSystem);
+                    LightManager.AdvanceSimulation(dT, ModelManager);
                 }
 
                 if (KeyboardState[Keys.E] == Keyboard.InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
@@ -311,7 +311,7 @@ namespace IDKEngine
 
             Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
             Vector3 prevSpherePos = movingSphere.Center;
-            Intersections.SceneVsMovingSphereCollisionRoutine(ModelSystem, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
+            Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
             {
                 Vector3 deltaStep = Camera.Position - prevSpherePos;
                 Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
@@ -350,7 +350,7 @@ namespace IDKEngine
 
             Camera.SetPrevToCurrentPosition();
             LightManager.Update(out bool anyLightMoved);
-            ModelSystem.Update(out bool anyMeshInstanceMoved);
+            ModelManager.Update(out bool anyMeshInstanceMoved);
 
             bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
             if ((RenderPath == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
@@ -403,7 +403,9 @@ namespace IDKEngine
                 }
             };
 
-            ModelSystem = new ModelSystem();
+            ModelManager = new ModelManager();
+            LightManager = new LightManager();
+
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
             if (true)
             {
@@ -417,8 +419,8 @@ namespace IDKEngine
                 sponza.Meshes[38].EmissiveBias = 20.0f;
                 sponza.Meshes[40].EmissiveBias = 20.0f;
                 sponza.Meshes[42].EmissiveBias = 20.0f;
-                sponza.Meshes[46].SpecularBias = 1.0f;
-                sponza.Meshes[46].RoughnessBias = -0.436f;
+                //sponza.Meshes[46].SpecularBias = 1.0f;
+                //sponza.Meshes[46].RoughnessBias = -0.436f;
 
                 ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Ressource/Models/LucyCompressed/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f));
                 lucy.Meshes[0].SpecularBias = -1.0f;
@@ -433,11 +435,10 @@ namespace IDKEngine
                 //ModelLoader.Model test = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
                 //ModelLoader.Model bistro = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\BistroExterior\Bistro.gltf");
 
-                ModelSystem.Add(sponza, lucy, helmet);
+                ModelManager.Add(sponza, lucy, helmet);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
-                LightManager = new LightManager();
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), /*new Vector3(-4.0f, 0.0f, 0.0f), */new Vector3(8.773416f, 22.459948f, 533.77466f), 0.3f));
@@ -490,7 +491,7 @@ namespace IDKEngine
                 //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
                 //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelSystem.Add(a);
+                ModelManager.Add(a);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -499,7 +500,6 @@ namespace IDKEngine
                 RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
                 RasterizerPipeline.ConeTracer.Settings.MaxSamples = 4;
 
-                LightManager = new LightManager();
                 LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
                 LightManager.CreatePointShadowForLight(new CpuPointShadow(512, WindowFramebufferSize, new Vector2(0.1f, 60.0f)), 0);
             }
@@ -516,16 +516,10 @@ namespace IDKEngine
         {
             gui.SetSize(WindowFramebufferSize);
 
-            // Smooth resizing
-            if (RenderGui)
+            // If GUI is used it will handle resizing
+            if (!RenderGui)
             {
-                // Gui will handle resize
-                GameLoop();
-            }
-            else
-            {
-                SetResolutions(RenderResolution, WindowFramebufferSize);
-                GameLoop();
+                RequestPresentationResolution = WindowFramebufferSize;
             }
         }
 

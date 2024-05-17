@@ -8,9 +8,9 @@ namespace IDKEngine.GpuTypes
         public float PreviousIOROrDebugNodeCounter;
 
         public Vector3 Throughput;
-        public float CompressedDirectionX;
+        public float PackedDirectionX;
 
         public Vector3 Radiance;
-        public float CompressedDirectionY;
+        public float PackedDirectionY;
     }
 }

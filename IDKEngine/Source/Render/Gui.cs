@@ -109,33 +109,33 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Stats"))
             {
-                float mbDrawVertices = (app.ModelSystem.Vertices.SizeInBytes() + app.ModelSystem.VertexPositions.SizeInBytes()) / 1000000.0f;
-                float mbDrawIndices = app.ModelSystem.VertexIndices.SizeInBytes() / 1000000.0f;
-                float mbMeshlets = app.ModelSystem.Meshlets.SizeInBytes() / 1000000.0f;
-                float mbMeshletsVertexIndices = app.ModelSystem.MeshletsVertexIndices.SizeInBytes() / 1000000.0f;
-                float mbMeshletsLocalIndices = app.ModelSystem.MeshletsLocalIndices.SizeInBytes() / 1000000.0f;
-                float mbMeshInstances = app.ModelSystem.MeshInstances.SizeInBytes() / 1000000.0f;
+                float mbDrawVertices = (app.ModelManager.Vertices.SizeInBytes() + app.ModelManager.VertexPositions.SizeInBytes()) / 1000000.0f;
+                float mbDrawIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
+                float mbMeshlets = app.ModelManager.Meshlets.SizeInBytes() / 1000000.0f;
+                float mbMeshletsVertexIndices = app.ModelManager.MeshletsVertexIndices.SizeInBytes() / 1000000.0f;
+                float mbMeshletsLocalIndices = app.ModelManager.MeshletsLocalIndices.SizeInBytes() / 1000000.0f;
+                float mbMeshInstances = app.ModelManager.MeshInstances.SizeInBytes() / 1000000.0f;
                 float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshlets + mbMeshletsVertexIndices + mbMeshletsLocalIndices + mbMeshInstances;
                 if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
                 {
-                    ImGui.Text($"  * Vertices ({app.ModelSystem.Vertices.Length}) = {mbDrawVertices}mb");
-                    ImGui.Text($"  * TriangleIndices ({app.ModelSystem.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
-                    ImGui.Text($"  * Meshlets ({app.ModelSystem.Meshlets.Length}) = {mbMeshlets}mb");
-                    ImGui.Text($"  * MeshletsVertexIndices ({app.ModelSystem.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
-                    ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelSystem.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
-                    ImGui.Text($"  * MeshInstances ({app.ModelSystem.MeshInstances.Length}) = {mbMeshInstances}mb");
+                    ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbDrawVertices}mb");
+                    ImGui.Text($"  * TriangleIndices ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
+                    ImGui.Text($"  * Meshlets ({app.ModelManager.Meshlets.Length}) = {mbMeshlets}mb");
+                    ImGui.Text($"  * MeshletsVertexIndices ({app.ModelManager.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
+                    ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelManager.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
+                    ImGui.Text($"  * MeshInstances ({app.ModelManager.MeshInstances.Length}) = {mbMeshInstances}mb");
                     ImGui.TreePop();
                 }
 
-                float mbBlasTrianglesIndices = app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet) / 1000000.0f;
-                float mbBlasNodes = app.ModelSystem.BVH.GetBlasesNodeCount() * sizeof(GpuBlasNode) / 1000000.0f;
-                float mbBTlasNodes = app.ModelSystem.BVH.Tlas.Nodes.SizeInBytes() / 1000000.0f;
+                float mbBlasTrianglesIndices = app.ModelManager.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet) / 1000000.0f;
+                float mbBlasNodes = app.ModelManager.BVH.GetBlasesNodeCount() * sizeof(GpuBlasNode) / 1000000.0f;
+                float mbBTlasNodes = app.ModelManager.BVH.Tlas.Nodes.SizeInBytes() / 1000000.0f;
                 float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
                 if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
                 {
-                    ImGui.Text($"  * Vertex Indices ({app.ModelSystem.BVH.GetBlasesTriangleIndicesCount() * 3}) = {mbBlasTrianglesIndices}mb");
-                    ImGui.Text($"  * Blas Nodes ({app.ModelSystem.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
-                    ImGui.Text($"  * Tlas Nodes ({app.ModelSystem.BVH.Tlas.Nodes.Length}) = {mbBTlasNodes}mb");
+                    ImGui.Text($"  * Vertex Indices ({app.ModelManager.BVH.GetBlasesTriangleIndicesCount() * 3}) = {mbBlasTrianglesIndices}mb");
+                    ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
+                    ImGui.Text($"  * Tlas Nodes ({app.ModelManager.BVH.Tlas.Nodes.Length}) = {mbBTlasNodes}mb");
 
                     ImGui.TreePop();
                 }
@@ -299,17 +299,17 @@ namespace IDKEngine.Render
                 ImGui.Text($"Viewport size: {app.PresentationResolution.X}x{app.PresentationResolution.Y}");
                 ImGui.Text($"{BBG.GetDeviceInfo().Name}");
 
-                bool gpuUseTlas = app.ModelSystem.BVH.GpuUseTlas;
+                bool gpuUseTlas = app.ModelManager.BVH.GpuUseTlas;
                 if (ImGui.Checkbox("UseGpuTlas", ref gpuUseTlas))
                 {
-                    app.ModelSystem.BVH.GpuUseTlas = gpuUseTlas;
+                    app.ModelManager.BVH.GpuUseTlas = gpuUseTlas;
                 }
                 ToolTipForItemAboveHovered("This increases GPU BVH traversal performance when there exist a lot of instances.\nNote that the TLAS does not get rebuild automatically.");
 
                 ImGui.SameLine();
                 if (ImGui.Button("RebuildTlas"))
                 {
-                    app.ModelSystem.BVH.TlasBuild();
+                    app.ModelManager.BVH.TlasBuild();
                 }
 
                 ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.0f, 4.0f);
@@ -829,9 +829,9 @@ namespace IDKEngine.Render
                 if (SelectedEntity.EntityType == EntityType.Mesh)
                 {
                     bool shouldUpdateMesh = false;
-                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelSystem.DrawCommands[SelectedEntity.EntityID];
-                    ref GpuMesh mesh = ref app.ModelSystem.Meshes[SelectedEntity.EntityID];
-                    ref GpuMeshInstance meshInstance = ref app.ModelSystem.MeshInstances[SelectedEntity.InstanceID];
+                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[SelectedEntity.EntityID];
+                    ref GpuMesh mesh = ref app.ModelManager.Meshes[SelectedEntity.EntityID];
+                    ref GpuMeshInstance meshInstance = ref app.ModelManager.MeshInstances[SelectedEntity.InstanceID];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance}");
@@ -907,7 +907,7 @@ namespace IDKEngine.Render
                     if (shouldUpdateMesh)
                     {
                         shouldResetPT = true;
-                        app.ModelSystem.UpdateMeshBuffer(SelectedEntity.EntityID, 1);
+                        app.ModelManager.UpdateMeshBuffer(SelectedEntity.EntityID, 1);
                     }
                 }
                 else if (SelectedEntity.EntityType == EntityType.Light)
@@ -1157,7 +1157,7 @@ namespace IDKEngine.Render
         
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray)
         {
-            bool hitMesh = app.ModelSystem.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
+            bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
             if (app.RenderPath == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
 
@@ -1416,11 +1416,11 @@ namespace IDKEngine.Render
         private bool LoadModel(Application app, string path)
         {
             ModelLoader.Model newModel = ModelLoader.LoadGltfFromFile(path, Matrix4.CreateTranslation(app.Camera.Position));
-            app.ModelSystem.Add(newModel);
+            app.ModelManager.Add(newModel);
 
-            int newMeshIndex = app.ModelSystem.Meshes.Length - 1;
+            int newMeshIndex = app.ModelManager.Meshes.Length - 1;
 
-            ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelSystem.DrawCommands[newMeshIndex];
+            ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[newMeshIndex];
 
             SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, cmd.BaseInstance);
             return true;

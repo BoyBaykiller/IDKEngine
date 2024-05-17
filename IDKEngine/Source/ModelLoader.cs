@@ -26,15 +26,14 @@ namespace IDKEngine
 {
     public static class ModelLoader
     {
-        public static readonly string[] SupportedExtensions = new string[] 
-        { 
+        public static readonly string[] SupportedExtensions = [
             "KHR_materials_emissive_strength",
             "KHR_materials_volume",
             "KHR_materials_ior",
             "KHR_materials_transmission",
             "EXT_mesh_gpu_instancing",
             "KHR_texture_basisu"
-        };
+        ];
 
         public struct Model
         {
@@ -311,7 +310,7 @@ namespace IDKEngine
                     listDrawCommands.Add(drawCmd);
                     listMeshlets.AddRange(meshMeshlets);
                     listMeshletsInfo.AddRange(meshMeshletsInfo);
-                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshletData.VertexIndices, 0, meshletData.VertexIndicesLength));
+                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshletData.VertexIndices, 0,meshletData.VertexIndicesLength));
                     listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshletData.LocalIndices, 0, meshletData.LocalIndicesLength));
                     listMeshetTasksCmd.AddRange(meshletTaskCmds);
                 }
@@ -338,7 +337,7 @@ namespace IDKEngine
         {
             GLTexture defaultTexture = new GLTexture(GLTexture.Type.Texture2D);
             defaultTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-            defaultTexture.Clear(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.Float, new Vector4(1.0f));
+            defaultTexture.Clear(BBG.Texture.PixelFormat.RGBA, BBG.Texture.PixelType.Float, new Vector4(1.0f));
             ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB(new GLSampler(new GLSampler.State()));
 
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];

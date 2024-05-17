@@ -18,9 +18,9 @@ struct HitInfo
 };
 
 #ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
-shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][MAX_BLAS_TREE_DEPTH];
+shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][max(MAX_BLAS_TREE_DEPTH, 1)];
 #else
-uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
+uint BlasTraversalStack[max(MAX_BLAS_TREE_DEPTH, 1)];
 #endif
 
 void StackPush(inout uint stackPtr, uint newEntry);

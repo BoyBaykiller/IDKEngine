@@ -14,7 +14,7 @@ layout(location = 0) out vec4 FragColor;
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
 
-vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight, float ambientOcclusion);
+vec3 EvaluateLighting(Light light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion);
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
 
@@ -56,15 +56,18 @@ void main()
     float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
     float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
-    vec3 viewDir = normalize(fragPos - perFrameDataUBO.ViewPos);
-
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)
     {
         Light light = lightsUBO.Lights[i];
 
-        vec3 sampleToLight = light.Position - fragPos;
-        vec3 contribution = GetBlinnPhongLighting(light, viewDir, normal, albedo, specular, roughness, sampleToLight, ambientOcclusion);
+        Surface surface;
+        surface.Albedo = albedo;
+        surface.Normal = normal;
+        surface.Metallic = specular;
+        surface.PerceivedRoughness = roughness;
+
+        vec3 contribution = EvaluateLighting(light, surface, fragPos, perFrameDataUBO.ViewPos, ambientOcclusion);
         
         if (contribution != vec3(0.0))
         {
@@ -106,36 +109,18 @@ void main()
     // FragColor = vec4(normal * 0.5 + 0.5, 1.0);
 }
 
-vec3 GetBlinnPhongLighting(Light light, vec3 viewDir, vec3 normal, vec3 albedo, float specular, float roughness, vec3 sampleToLight, float ambientOcclusion)
+vec3 EvaluateLighting(Light light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion)
 {
-    float dist = length(sampleToLight);
-
-    vec3 lightDir = sampleToLight / dist;
-    float cosTerm = dot(normal, lightDir);
-    if (cosTerm > 0.0)
-    {
-        vec3 diffuseContrib = light.Color * cosTerm * albedo * ambientOcclusion;  
+    vec3 surfaceToLight = light.Position - fragPos;
+    vec3 dirSurfaceToCam = normalize(viewPos - fragPos);
+    vec3 dirSurfaceToLight = normalize(surfaceToLight);
     
-        // TODO: Implement not shit lighting that doesnt break under some conditions
-        vec3 specularContrib = vec3(0.0);
-        if (!IsVXGI)
-        {
-            vec3 halfwayDir = normalize(lightDir + -viewDir);
-            float temp = dot(normal, halfwayDir);
-            if (temp > 0.0)
-            {
-                // double spec = pow(double(temp), 256.0lf * (1.0lf - double(roughness)));
-                // This bugged on bistro for some reason
-                float spec = pow(temp, 256.0 * (1.0 - roughness));
-                specularContrib = light.Color * float(spec) * specular;
-            }
-        }
-        
-        float attenuation = GetAttenuationFactor(dist * dist, light.Radius);
+    float cosTerm = clamp(dot(surface.Normal, dirSurfaceToLight), 0.0, 1.0);
 
-        return (diffuseContrib + specularContrib) * attenuation;
-    }
-    return vec3(0.0);
+    float distSq = dot(surfaceToLight, surfaceToLight);
+    float attenuation = GetAttenuationFactor(distSq, light.Radius);
+
+    return BRDF(surface, dirSurfaceToCam, dirSurfaceToLight, ambientOcclusion) * attenuation * cosTerm * light.Color;
 }
 
 float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample)

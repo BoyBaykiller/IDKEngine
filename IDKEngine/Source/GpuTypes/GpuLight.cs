@@ -4,12 +4,6 @@ namespace IDKEngine.GpuTypes
 {
     public struct GpuLight
     {
-        public Vector3 Position;
-        public float Radius;
-        public Vector3 Color;
-        public int PointShadowIndex;
-
-        private Vector3 _prevPosition;
         public Vector3 PrevPosition
         {
             get
@@ -25,7 +19,19 @@ namespace IDKEngine.GpuTypes
             set => _prevPosition = value;
         }
 
+        public Vector3 Position;
+        public float Radius;
+
+        public Vector3 Color;
+        public int PointShadowIndex = -1;
+
+        private Vector3 _prevPosition;
         private readonly float _pad0;
+
+
+        public GpuLight()
+        {
+        }
 
         public bool DidMove()
         {

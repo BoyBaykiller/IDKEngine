@@ -27,6 +27,19 @@ namespace IDKEngine
             }
         }
 
+        private int _maxBlasTreeDepth;
+        public int MaxBlasTreeDepth
+        {
+            get => _maxBlasTreeDepth;
+
+            set
+            {
+                _maxBlasTreeDepth = value;
+
+                BBG.AbstractShaderProgram.SetShaderInsertionValue("MAX_BLAS_TREE_DEPTH", MaxBlasTreeDepth);
+            }
+        }
+
         public struct RayHitInfo
         {
             public BLAS.IndicesTriplet TriangleIndices;
@@ -42,8 +55,6 @@ namespace IDKEngine
             public int MeshID;
             public int InstanceID;
         }
-
-        public int MaxBlasTreeDepth { get; private set; }
 
         public TLAS Tlas { get; private set; }
         private BLAS[] blases;
@@ -69,6 +80,8 @@ namespace IDKEngine
             // Needs more optimization. Currently only pays of on scenes with many BLAS'es.
             // Also does not get rebuild automatically.
             GpuUseTlas = false;
+
+            MaxBlasTreeDepth = 1;
         }
 
         public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMax = float.MaxValue)

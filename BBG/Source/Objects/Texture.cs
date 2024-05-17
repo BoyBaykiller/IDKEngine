@@ -17,7 +17,7 @@ namespace BBOpenGL
             
             public enum InternalFormat : uint
             {
-                // UNorm = [0, 1]  range
+                // UNorm = [ 0, 1] range
                 // SNorm = [-1, 1] range
                 // Float = float range
                 // Uint  = uint range
@@ -56,6 +56,7 @@ namespace BBOpenGL
                 /// <summary>
                 /// Requires GL_KHR_texture_compression_astc
                 /// </summary>
+                
                 Astc4X4RgbaKHR = SizedInternalFormat.CompressedRgbaAstc4x4Khr,
                 /// <summary>
                 /// Requires GL_KHR_texture_compression_astc

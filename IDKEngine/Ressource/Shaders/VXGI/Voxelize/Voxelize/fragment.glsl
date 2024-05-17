@@ -31,7 +31,7 @@ in InOutVars
     flat float EmissiveBias;
 } inData;
 
-vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight);
+vec3 EvaluateDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight);
 float Visibility(PointShadow pointShadow, vec3 lightToSample);
 float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos);
@@ -50,7 +50,7 @@ void main()
         Light light = lightsUBO.Lights[i];
 
         vec3 sampleToLight = light.Position - inData.FragPos;
-        vec3 contrib = GetDirectLighting(light, albedoAlpha.rgb, sampleToLight);
+        vec3 contrib = EvaluateDiffuseLighting(light, albedoAlpha.rgb, sampleToLight);
         if (light.PointShadowIndex >= 0)
         {
             PointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
@@ -79,7 +79,7 @@ void main()
 
 }
 
-vec3 GetDirectLighting(Light light, vec3 albedo, vec3 sampleToLight)
+vec3 EvaluateDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight)
 {
     float dist = length(sampleToLight);
 

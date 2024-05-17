@@ -34,16 +34,6 @@ namespace BBOpenGL
                 GL.VertexArrayAttribBinding(ID, (uint)attribIndex, (uint)bindingIndex);
             }
 
-            public void Bind()
-            {
-                GL.BindVertexArray(ID);
-            }
-
-            public static void Bind(int id)
-            {
-                GL.BindVertexArray(id);
-            }
-
             public void Dispose()
             {
                 GL.DeleteVertexArray(ID);

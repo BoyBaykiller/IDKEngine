@@ -115,7 +115,7 @@ namespace IDKEngine.Render
             SetSizeRayTracedShadowMap(rayTracedShadowMapSize);
         }
 
-        public void RenderShadowMap(ModelSystem modelSystem, Camera camera, int gpuPointShadowIndex)
+        public void RenderShadowMap(ModelManager modelManager, Camera camera, int gpuPointShadowIndex)
         {
             Matrix4 cameraProjView = camera.GetViewMatrix() * camera.GetProjectionMatrix();
             Frustum cameraFrustum = new Frustum(cameraProjView);
@@ -143,14 +143,14 @@ namespace IDKEngine.Render
 
             BBG.Computing.Compute("Cubemap shadow map culling", () =>
             {
-                modelSystem.ResetInstanceCounts();
+                modelManager.ResetInstanceCounts();
 
                 cullingProgram.Upload(0, gpuPointShadowIndex);
                 cullingProgram.Upload(1, numVisibleFaces);
                 cullingProgram.Upload(2, visibleFaces);
 
                 BBG.Cmd.UseShaderProgram(cullingProgram);
-                BBG.Computing.Dispatch((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
+                BBG.Computing.Dispatch((modelManager.MeshInstances.Length + 64 - 1) / 64, 1, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
 
@@ -172,11 +172,11 @@ namespace IDKEngine.Render
                 BBG.Rendering.InferViewportSize();
                 if (TakeMeshShaderPath)
                 {
-                    modelSystem.MeshShaderDrawNV();
+                    modelManager.MeshShaderDrawNV();
                 }
                 else
                 {
-                    modelSystem.Draw();
+                    modelManager.Draw();
                 }
             });
         }

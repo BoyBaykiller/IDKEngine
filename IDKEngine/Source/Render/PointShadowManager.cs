@@ -36,11 +36,11 @@ namespace IDKEngine.Render
             pointShadowsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 2);
         }
 
-        public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
+        public void RenderShadowMaps(ModelManager modelManager, Camera camera)
         {
             for (int i = 0; i < Count; i++)
             {
-                pointShadows[i].RenderShadowMap(modelSystem, camera, i);
+                pointShadows[i].RenderShadowMap(modelManager, camera, i);
             }
         }
 
@@ -158,7 +158,6 @@ namespace IDKEngine.Render
             }
 
             rayTracedShadowsProgram.Dispose();
-
             pointShadowsBuffer.Dispose();
         }
     }

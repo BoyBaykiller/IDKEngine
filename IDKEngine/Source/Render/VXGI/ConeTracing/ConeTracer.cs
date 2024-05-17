@@ -19,8 +19,8 @@ namespace IDKEngine.Render
             {
                 NormalRayOffset = 1.0f,
                 MaxSamples = 4,
-                GIBoost = 2.0f,
-                GISkyBoxBoost = 1.0f / 2.0f,
+                GIBoost = 1.3f,
+                GISkyBoxBoost = 1.0f / 1.3f,
                 StepMultiplier = 0.16f,
                 IsTemporalAccumulation = true
             };

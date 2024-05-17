@@ -223,7 +223,7 @@ namespace IDKEngine.Render
             TemporalAntiAliasing = TemporalAntiAliasingMode.TAA;
         }
 
-        public void Render(ModelSystem modelSystem, LightManager lightManager, Camera camera, float dT)
+        public void Render(ModelManager modelManager, LightManager lightManager, Camera camera, float dT)
         {
             // Update Temporal AntiAliasing stuff
             {
@@ -255,7 +255,7 @@ namespace IDKEngine.Render
 
             if (GenerateShadowMaps)
             {
-                lightManager.RenderShadowMaps(modelSystem, camera);
+                lightManager.RenderShadowMaps(modelManager, camera);
             }
 
             if (IsVXGI && GridReVoxelize)
@@ -271,14 +271,14 @@ namespace IDKEngine.Render
                 }
 
                 // Reset instance count, don't want to miss meshes when voxelizing
-                for (int i = 0; i < modelSystem.DrawCommands.Length; i++)
+                for (int i = 0; i < modelManager.DrawCommands.Length; i++)
                 {
-                    ref readonly GpuMesh mesh = ref modelSystem.Meshes[i];
-                    modelSystem.DrawCommands[i].InstanceCount = mesh.InstanceCount;
+                    ref readonly GpuMesh mesh = ref modelManager.Meshes[i];
+                    modelManager.DrawCommands[i].InstanceCount = mesh.InstanceCount;
                 }
-                modelSystem.UpdateDrawCommandBuffer(0, modelSystem.DrawCommands.Length);
+                modelManager.UpdateDrawCommandBuffer(0, modelManager.DrawCommands.Length);
 
-                Voxelizer.Render(modelSystem);
+                Voxelizer.Render(modelManager);
             }
 
             if (IsConfigureGridMode)
@@ -318,10 +318,10 @@ namespace IDKEngine.Render
 
             BBG.Computing.Compute("Main view Frustum and Occlusion Culling", () =>
             {
-                modelSystem.ResetInstanceCounts();
+                modelManager.ResetInstanceCounts();
 
                 BBG.Cmd.UseShaderProgram(cullingProgram);
-                BBG.Computing.Dispatch((modelSystem.MeshInstances.Length + 64 - 1) / 64, 1, 1);
+                BBG.Computing.Dispatch((modelManager.MeshInstances.Length + 64 - 1) / 64, 1, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
 
@@ -348,11 +348,11 @@ namespace IDKEngine.Render
                 BBG.Rendering.InferViewportSize();
                 if (TakeMeshShaderPath)
                 {
-                    modelSystem.MeshShaderDrawNV();
+                    modelManager.MeshShaderDrawNV();
                 }
                 else
                 {
-                    modelSystem.Draw();
+                    modelManager.Draw();
                 }
             });
 
@@ -430,7 +430,7 @@ namespace IDKEngine.Render
             {
                 ColorAttachments = new BBG.Rendering.ColorAttachments()
                 {
-                    Textures = [resultBeforeTAA, VelocityTexture],
+                    Textures = [resultBeforeTAA, AlbedoAlphaTexture, NormalSpecularTexture, EmissiveRoughnessTexture, VelocityTexture],
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
                 },
                 DepthAttachment = new BBG.Rendering.DepthAttachment()

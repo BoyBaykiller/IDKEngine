@@ -65,7 +65,10 @@ namespace BBOpenGL
                 NegativeOneToOne = ClipControlDepth.NegativeOneToOne,
             }
 
-            public enum ViewportSwizzleAxis : uint
+            /// <summary>
+            /// Requires GL_NV_viewport_swizzle
+            /// </summary>
+            public enum ViewportSwizzleAxisNV : uint
             {
                 PositiveX = All.ViewportSwizzlePositiveXNv,
                 PositiveY = All.ViewportSwizzlePositiveYNv,
@@ -82,9 +85,9 @@ namespace BBOpenGL
 
             public enum FillMode : uint
             {
-                Point = OpenTK.Graphics.OpenGL.PolygonMode.Point,
-                Line = OpenTK.Graphics.OpenGL.PolygonMode.Line,
-                Fill = OpenTK.Graphics.OpenGL.PolygonMode.Fill,
+                Point = PolygonMode.Point,
+                Line = PolygonMode.Line,
+                Fill = PolygonMode.Fill,
             }
 
             public enum DepthFunction : uint
@@ -171,10 +174,10 @@ namespace BBOpenGL
             /// </summary>
             public struct ViewportSwizzleNV
             {
-                public ViewportSwizzleAxis X = ViewportSwizzleAxis.PositiveX;
-                public ViewportSwizzleAxis Y = ViewportSwizzleAxis.PositiveY;
-                public ViewportSwizzleAxis Z = ViewportSwizzleAxis.PositiveZ;
-                public ViewportSwizzleAxis W = ViewportSwizzleAxis.PositiveW;
+                public ViewportSwizzleAxisNV X = ViewportSwizzleAxisNV.PositiveX;
+                public ViewportSwizzleAxisNV Y = ViewportSwizzleAxisNV.PositiveY;
+                public ViewportSwizzleAxisNV Z = ViewportSwizzleAxisNV.PositiveZ;
+                public ViewportSwizzleAxisNV W = ViewportSwizzleAxisNV.PositiveW;
 
                 public ViewportSwizzleNV()
                 {
@@ -304,7 +307,7 @@ namespace BBOpenGL
                 {
                     StencilAttachment stencilAttachment = renderAttachments.StencilAttachment.Value;
 
-                    Debug.Assert(Texture.GetFormatType(stencilAttachment.Texture.Format) == Texture.InternalFormatType.Depth);
+                    Debug.Assert(Texture.GetFormatType(stencilAttachment.Texture.Format) == Texture.InternalFormatType.Stencil);
 
                     switch (stencilAttachment.AttachmentLoadOp)
                     {
@@ -363,6 +366,11 @@ namespace BBOpenGL
                 int fbo = FramebufferCache.GetFramebuffer(RenderAttachmentsToFramebufferDesc(renderAttachments));
 
                 GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+            }
+
+            public static void UseVertexArrayObject(VAO vao)
+            {
+                GL.BindVertexArray(vao.ID);
             }
 
             public static void DrawIndexed(Topology topology, int count, IndexType indexType, int instanceCount = 1, int baseInstance = 0, nint offset = 0)

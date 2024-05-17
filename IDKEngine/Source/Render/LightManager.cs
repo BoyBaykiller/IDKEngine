@@ -98,13 +98,13 @@ namespace IDKEngine.Render
         public void Draw()
         {
             BBG.Cmd.UseShaderProgram(shaderProgram);
-            vao.Bind();
+            BBG.Rendering.UseVertexArrayObject(vao);
             BBG.Rendering.DrawIndexed(BBG.Rendering.Topology.Triangles, IndicisCount, BBG.Rendering.IndexType.Uint, Count);
         }
 
-        public void RenderShadowMaps(ModelSystem modelSystem, Camera camera)
+        public void RenderShadowMaps(ModelManager modelManager, Camera camera)
         {
-            pointShadowManager.RenderShadowMaps(modelSystem, camera);
+            pointShadowManager.RenderShadowMaps(modelManager, camera);
         }
 
         public void ComputeRayTracedShadows(int samples)
@@ -206,7 +206,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public void AdvanceSimulation(float dT, ModelSystem modelSystem)
+        public void AdvanceSimulation(float dT, ModelManager modelManager)
         {
             for (int i = 0; i < Count; i++)
             {
@@ -215,7 +215,7 @@ namespace IDKEngine.Render
 
                 Sphere movingSphere = new Sphere(cpuLight.GpuLight.PrevPosition, cpuLight.GpuLight.Radius);
                 Vector3 prevSpherePos = movingSphere.Center;
-                Intersections.SceneVsMovingSphereCollisionRoutine(modelSystem, SceneVsSphereCollisionSettings, ref movingSphere, cpuLight.GpuLight.Position, (in Intersections.SceneHitInfo hitInfo) =>
+                Intersections.SceneVsMovingSphereCollisionRoutine(modelManager, SceneVsSphereCollisionSettings, ref movingSphere, cpuLight.GpuLight.Position, (in Intersections.SceneHitInfo hitInfo) =>
                 {
                     Vector3 deltaStep = cpuLight.GpuLight.Position - prevSpherePos;
                     Vector3 slidedDeltaStep = Plane.Reflect(deltaStep, hitInfo.SlidingPlane);

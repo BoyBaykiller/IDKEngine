@@ -125,10 +125,10 @@ struct WavefrontRay
     float PreviousIOROrDebugNodeCounter;
 
     vec3 Throughput;
-    float CompressedDirectionX;
+    float PackedDirectionX;
 
     vec3 Radiance;
-    float CompressedDirectionY;
+    float PackedDirectionY;
 };
 
 // Allow for custum sampler2D types. Mainly for supporting fp16 samplers from GL_AMD_gpu_shader_half_float_fetch

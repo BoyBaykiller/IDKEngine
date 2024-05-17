@@ -104,4 +104,3 @@ float GetMaterialVariance(float specularChance, float roughness)
     float perceivedFinalRoughness = 1.0 - (specularChance * (1.0 - roughness));
     return mix(perceivedFinalRoughness, 1.0, diffuseChance);
 }
-

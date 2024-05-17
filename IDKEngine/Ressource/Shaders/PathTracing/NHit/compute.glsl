@@ -74,12 +74,12 @@ void main()
 
 bool TraceRay(inout WavefrontRay wavefrontRay)
 {
-    vec3 uncompressedDir = DecodeUnitVec(vec2(wavefrontRay.CompressedDirectionX, wavefrontRay.CompressedDirectionY));
+    vec3 rayDir = DecodeUnitVec(vec2(wavefrontRay.PackedDirectionX, wavefrontRay.PackedDirectionY));
 
     HitInfo hitInfo;
-    if (TraceRay(Ray(wavefrontRay.Origin, uncompressedDir), hitInfo, settingsUBO.IsTraceLights, FLOAT_MAX))
+    if (TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, settingsUBO.IsTraceLights, FLOAT_MAX))
     {
-        wavefrontRay.Origin += uncompressedDir * hitInfo.T;
+        wavefrontRay.Origin += rayDir * hitInfo.T;
 
         vec3 albedo = vec3(0.0);
         vec3 normal = vec3(0.0);
@@ -108,9 +108,9 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             vec3 worldNormal = normalize(unitVecToWorld * interpNormal);
             vec3 worldTangent = normalize(unitVecToWorld * interpTangent);
-            mat3 TBN = GetTBN(worldTangent, worldNormal);
-            vec3 textureWorldNormal = texture(material.Normal, interpTexCoord).rgb;
-            textureWorldNormal = TBN * (textureWorldNormal * 2.0 - 1.0);
+            mat3 tbn = GetTBN(worldTangent, worldNormal);
+            vec3 textureWorldNormal = ReconstructPackedNormal(texture(material.Normal, interpTexCoord).rg);
+            textureWorldNormal = tbn * textureWorldNormal;
             normal = normalize(mix(worldNormal, textureWorldNormal, mesh.NormalMapStrength));
 
             ior = max(material.IOR + mesh.IORBias, 1.0);
@@ -126,7 +126,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             float alphaCutoff = material.DoAlphaBlending ? GetRandomFloat01() : material.AlphaCutoff;
             if (albedoAlpha.a < alphaCutoff)
             {
-                wavefrontRay.Origin += uncompressedDir * 0.001;
+                wavefrontRay.Origin += rayDir * 0.001;
                 return true;
             }
         }
@@ -138,7 +138,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
             normal = (wavefrontRay.Origin - light.Position) / light.Radius;
         }
 
-        float cosTheta = dot(-uncompressedDir, normal);
+        float cosTheta = dot(-rayDir, normal);
         bool fromInside = cosTheta < 0.0;
 
         if (fromInside)
@@ -159,7 +159,7 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         specularChance = SpecularBasedOnViewAngle(specularChance, cosTheta, wavefrontRay.PreviousIOROrDebugNodeCounter, ior);
         transmissionChance = 1.0 - diffuseChance - specularChance; // normalize again to (diff + spec + trans == 1.0)
 
-        RayProperties result = SampleMaterial(uncompressedDir, specularChance, roughness, transmissionChance, ior, wavefrontRay.PreviousIOROrDebugNodeCounter, normal, fromInside);
+        RayProperties result = SampleMaterial(rayDir, specularChance, roughness, transmissionChance, ior, wavefrontRay.PreviousIOROrDebugNodeCounter, normal, fromInside);
 
         if (result.RayType != RAY_TYPE_REFRACTIVE || settingsUBO.IsAlwaysTintWithAlbedo)
         {
@@ -180,14 +180,14 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
         wavefrontRay.Origin += result.Direction * 0.001;
         wavefrontRay.PreviousIOROrDebugNodeCounter = result.Ior;
 
-        vec2 compressedDir = EncodeUnitVec(result.Direction);
-        wavefrontRay.CompressedDirectionX = compressedDir.x;
-        wavefrontRay.CompressedDirectionY = compressedDir.y;
+        vec2 packedDir = EncodeUnitVec(result.Direction);
+        wavefrontRay.PackedDirectionX = packedDir.x;
+        wavefrontRay.PackedDirectionY = packedDir.y;
         return true;
     }
     else
     {
-        wavefrontRay.Radiance += texture(skyBoxUBO.Albedo, uncompressedDir).rgb * wavefrontRay.Throughput;
+        wavefrontRay.Radiance += texture(skyBoxUBO.Albedo, rayDir).rgb * wavefrontRay.Throughput;
         return false;
     }
 }

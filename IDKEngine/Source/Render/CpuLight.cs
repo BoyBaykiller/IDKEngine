@@ -1,5 +1,4 @@
-﻿using System;
-using IDKEngine.GpuTypes;
+﻿using IDKEngine.GpuTypes;
 using OpenTK.Mathematics;
 
 namespace IDKEngine.Render
@@ -12,20 +11,30 @@ namespace IDKEngine.Render
 
         public Vector3 Velocity;
         private Vector3 thisFrameAcceleration;
-
-        public CpuLight(Vector3 position, Vector3 velocity, Vector3 color, float radius)
-        {
-            GpuLight.Position = position;
-            GpuLight.Color = color;
-            GpuLight.Radius = radius;
-            GpuLight.PointShadowIndex = -1;
-
-            Velocity = velocity;
-        }
-
         public CpuLight(Vector3 position, Vector3 color, float radius)
             : this(position, new Vector3(0.0f), color, radius)
         {
+        }
+
+        public CpuLight(Vector3 position, Vector3 velocity, Vector3 color, float radius)
+            : this(new GpuLight() { Position = position, Color = color, Radius = radius }, velocity)
+        {
+        }
+
+        public CpuLight(in GpuLight gpuLight, Vector3 velocity)
+        {
+            GpuLight = gpuLight;
+            Velocity = velocity;
+        }
+
+        public CpuLight(in GpuLight gpuLight)
+        {
+            GpuLight = gpuLight;
+        }
+
+        public static implicit operator CpuLight(in GpuLight gpuLight)
+        {
+            return new CpuLight(gpuLight);
         }
 
         public void AdvanceSimulation(float dT)

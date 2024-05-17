@@ -93,14 +93,14 @@ namespace IDKEngine.Shapes
         {
             // Source: https://stackoverflow.com/a/4579069/12103839
 
-            float distSquared = Squared(sphere.Radius);
-            if (sphere.Center.X < c1.X) distSquared -= Squared(sphere.Center.X - c1.X);
-            else if (sphere.Center.X > c2.X) distSquared -= Squared(sphere.Center.X - c2.X);
-            if (sphere.Center.Y < c1.Y) distSquared -= Squared(sphere.Center.Y - c1.Y);
-            else if (sphere.Center.Y > c2.Y) distSquared -= Squared(sphere.Center.Y - c2.Y);
-            if (sphere.Center.Z < c1.Z) distSquared -= Squared(sphere.Center.Z - c1.Z);
-            else if (sphere.Center.Z > c2.Z) distSquared -= Squared(sphere.Center.Z - c2.Z);
-            return distSquared > 0.0f;
+            float distSq = Squared(sphere.Radius);
+            if (sphere.Center.X < c1.X) distSq -= Squared(sphere.Center.X - c1.X);
+            else if (sphere.Center.X > c2.X) distSq -= Squared(sphere.Center.X - c2.X);
+            if (sphere.Center.Y < c1.Y) distSq -= Squared(sphere.Center.Y - c1.Y);
+            else if (sphere.Center.Y > c2.Y) distSq -= Squared(sphere.Center.Y - c2.Y);
+            if (sphere.Center.Z < c1.Z) distSq -= Squared(sphere.Center.Z - c1.Z);
+            else if (sphere.Center.Z > c2.Z) distSq -= Squared(sphere.Center.Z - c2.Z);
+            return distSq > 0.0f;
 
             static float Squared(float x)
             {
@@ -118,9 +118,9 @@ namespace IDKEngine.Shapes
         public static bool SphereVsTriangle(in Sphere sphere, in Triangle triangle)
         {
             Vector3 triangleClosestPoint = TriangleClosestPoint(triangle, sphere.Center);
-            float distSquared = Vector3.DistanceSquared(triangleClosestPoint, sphere.Center);
+            float distSq = Vector3.DistanceSquared(triangleClosestPoint, sphere.Center);
 
-            return distSquared < sphere.RadiusSquared;
+            return distSq < sphere.RadiusSquared;
         }
 
 
@@ -380,13 +380,13 @@ namespace IDKEngine.Shapes
             Vector3 otherLightRealVelocity = sphereB.Center - sphereBPrevPos;
 
             Vector3 path = lightRealVelocity - otherLightRealVelocity;
-            float squaredLen = Vector3.Dot(path, path);
-            if (squaredLen == 0.0f)
+            float lenSquared = Vector3.Dot(path, path);
+            if (lenSquared == 0.0f)
             {
                 return false;
             }
 
-            tScale = MathF.Sqrt(squaredLen);
+            tScale = MathF.Sqrt(lenSquared);
             Ray ray = new Ray(sphereAPrevPos, path / tScale);
 
             float combinedRadius = sphereA.Radius + sphereB.Radius;
@@ -484,13 +484,13 @@ namespace IDKEngine.Shapes
         }
 
         public delegate void FuncIntersect(in SceneHitInfo hitInfo);
-        public static void SceneVsMovingSphereCollisionRoutine(ModelSystem modelSystem, in SceneVsMovingSphereSettings settings, ref Sphere movingSphere, in Vector3 sphereDestination, FuncIntersect intersectFunc)
+        public static void SceneVsMovingSphereCollisionRoutine(ModelManager modelManager, in SceneVsMovingSphereSettings settings, ref Sphere movingSphere, in Vector3 sphereDestination, FuncIntersect intersectFunc)
         {
             if (settings.IsEnabled)
             {
                 for (int i = 0; i < settings.RecursiveSteps; i++)
                 {
-                    bool hit = SceneVsMovingSphere(modelSystem, settings.TestSteps, sphereDestination, ref movingSphere, out SceneHitInfo hitInfo);
+                    bool hit = SceneVsMovingSphere(modelManager, settings.TestSteps, sphereDestination, ref movingSphere, out SceneHitInfo hitInfo);
                     if (hit)
                     {
                         movingSphere.Center += hitInfo.SlidingPlane.Normal * settings.EpsilonNormalOffset;
@@ -510,13 +510,13 @@ namespace IDKEngine.Shapes
         /// At each step a collision test is performed and true is returned if a collison was detected.
         /// If after all steps no collision was detected <paramref name="previousSphere"/> position ends up exactly at <paramref name="sphereDestination"/>
         /// </summary>
-        /// <param name="modelSystem">For accessing the scene and its BVH</param>
+        /// <param name="modelManager">For accessing the scene and its BVH</param>
         /// <param name="testSteps">The number of intervals to test collison for</param>
         /// <param name="sphereDestination">The position the sphere is heading towards</param>
         /// <param name="movingSphere">The previous position of the sphere and its radius</param>
         /// <param name="sceneHitInfo">Contains useful hit info data</param>
         /// <returns></returns>
-        public static bool SceneVsMovingSphere(ModelSystem modelSystem, int testSteps, in Vector3 sphereDestination, ref Sphere movingSphere, out SceneHitInfo sceneHitInfo)
+        public static bool SceneVsMovingSphere(ModelManager modelManager, int testSteps, in Vector3 sphereDestination, ref Sphere movingSphere, out SceneHitInfo sceneHitInfo)
         {
             sceneHitInfo = new SceneHitInfo();
 
@@ -534,14 +534,14 @@ namespace IDKEngine.Shapes
                 float bestPenetrationDepth = 0.0f;
 
                 bool triCollisionDetected = false;
-                modelSystem.BVH.Intersect(hitBox, (in BVH.BoxHitInfo hitInfo) =>
+                modelManager.BVH.Intersect(hitBox, (in BVH.BoxHitInfo hitInfo) =>
                 {
                     Triangle triangle = new Triangle(
-                        modelSystem.VertexPositions[hitInfo.TriangleIndices.X],
-                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Y],
-                        modelSystem.VertexPositions[hitInfo.TriangleIndices.Z]
+                        modelManager.VertexPositions[hitInfo.TriangleIndices.X],
+                        modelManager.VertexPositions[hitInfo.TriangleIndices.Y],
+                        modelManager.VertexPositions[hitInfo.TriangleIndices.Z]
                     );
-                    Matrix4 modelMatrix = modelSystem.MeshInstances[hitInfo.InstanceID].ModelMatrix;
+                    Matrix4 modelMatrix = modelManager.MeshInstances[hitInfo.InstanceID].ModelMatrix;
                     Triangle worldSpaceTri = Triangle.Transformed(triangle, modelMatrix);
 
                     bool intersect = SphereVsTriangle(movingSphereCopy, worldSpaceTri, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth);

@@ -40,7 +40,7 @@ vec3 SampleCone(vec3 normal, float phi, float sinTheta, float cosTheta)
     return (u * cos(phi) + v * sin(phi)) * sinTheta + w * cosTheta;
 }
 
-vec3 SampleLight(vec3 toSphere, float sphereRadius, float rnd0, float rnd1, out float distanceToSphere, out float solidAnglePdf)
+vec3 SampleSphere(vec3 toSphere, float sphereRadius, float rnd0, float rnd1, out float distanceToSphere, out float solidAnglePdf)
 {
     // Source: https://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources#x2-SamplingSpheres
 
@@ -61,9 +61,9 @@ vec3 SampleLight(vec3 toSphere, float sphereRadius, float rnd0, float rnd1, out 
     return dirInCone;
 }
 
-vec3 SampleLight(vec3 toSphere, float sphereRadius, out float distanceToSphere, out float solidAnglePdf)
+vec3 SampleSphere(vec3 toSphere, float sphereRadius, out float distanceToSphere, out float solidAnglePdf)
 {
-    return SampleLight(toSphere, sphereRadius, GetRandomFloat01(), GetRandomFloat01(), distanceToSphere, solidAnglePdf);
+    return SampleSphere(toSphere, sphereRadius, GetRandomFloat01(), GetRandomFloat01(), distanceToSphere, solidAnglePdf);
 }
 
 vec3 UniformSampleSphere()
@@ -140,4 +140,18 @@ vec3 UniformSampleDisk(vec3 normal, float rnd0, float rnd1)
     tangent = cross(bitangent, normal);
 
     return tangent * diskSample.x + bitangent * diskSample.y;
+}
+
+// Probability to choose pf when given pf and pg as weights. Examples:
+// * pf = 1.0; pg = 0.0; => 1.0, meaning choose pf 100% of the time
+// * pf =   x; pg =   x; => 0.5; meaning choose pf  50% of the time
+// * pf = 0.0; pg = 1.0; => 0.0; meaning choose pf   0% of the time
+float BalanceHeuristic(float pf, float pg)
+{
+	return pf / (pf + pg);
+}
+
+float CosineSampleHemispherePdf(float cosTheta)
+{
+    return cosTheta / PI;
 }
