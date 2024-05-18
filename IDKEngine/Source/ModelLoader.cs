@@ -32,7 +32,8 @@ namespace IDKEngine
             "KHR_materials_ior",
             "KHR_materials_transmission",
             "EXT_mesh_gpu_instancing",
-            "KHR_texture_basisu"
+            "KHR_texture_basisu",
+            "IDK_BC5_normal_metallicRoughness"
         ];
 
         public struct Model
@@ -166,6 +167,13 @@ namespace IDKEngine
                 }
             }
 
+            if (gltf.ExtensionsUsed.Contains("KHR_texture_basisu") && !gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness"))
+            {
+                Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" uses extension KHR_texture_basisu without IDK_BC5_normal_metallicRoughness,\n" +
+                                                  "causing normal and metallicRoughness textures with a suboptimal (BC7) format and potentially visible error.\n" +
+                                                  "Consider compressing with https://github.com/BoyBaykiller/meshoptimizer");
+            }
+
             Stopwatch sw = Stopwatch.StartNew();
             Model model = GltfToEngineFormat(gltf, rootTransform);
 
@@ -177,7 +185,7 @@ namespace IDKEngine
         private static Model GltfToEngineFormat(ModelRoot gltf, Matrix4 rootTransform)
         {
             MaterialLoadData[] materialsLoadData = GetMaterialLoadDataFromGltf(gltf.LogicalMaterials);
-            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(materialsLoadData));
+            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(materialsLoadData, gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness")));
 
             List<GpuMesh> listMeshes = new List<GpuMesh>();
             List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
@@ -333,7 +341,7 @@ namespace IDKEngine
             return model;
         }
 
-        private unsafe static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadData)
+        private unsafe static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadData, bool bc5NormalMetallicRoughness = false)
         {
             GLTexture defaultTexture = new GLTexture(GLTexture.Type.Texture2D);
             defaultTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
@@ -435,9 +443,10 @@ namespace IDKEngine
                                 GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
                                 GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
 
-                                // BC5 support added in gltfpack fork
-                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.BC5RgUnorm,
-                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.BC5RgUnorm,
+                                // BC5 support added with gltfpack fork (https://github.com/BoyBaykiller/meshoptimizer)
+                                // that implements IDK_BC5_normal_metallicRoughness extension
+                                GpuMaterial.TextureHandle.MetallicRoughness => bc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
+                                GpuMaterial.TextureHandle.Normal => bc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
 
                                 GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.BC4RUnorm,
                                 _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
@@ -997,7 +1006,10 @@ namespace IDKEngine
                 public string OutputPath;
                 public int ThreadsUsed;
                 public bool UseInstancing;
+
+                // Added in gltfpack fork
                 public bool KeepMeshPrimitives;
+
                 public Action<string>? ProcessError;
                 public Action<string>? ProcessOutput;
             }
@@ -1005,12 +1017,13 @@ namespace IDKEngine
             {
                 // -v         = verbose output
                 // -noq       = no mesh quanization (KHR_mesh_quantization)
+                // -ac        = keep constant animation tracks even if they don't modify the node transform
                 // -tc        = do KTX2 texture comression (KHR_texture_basisu)
                 // -tq        = texture quality
                 // -mi        = use instancing (EXT_mesh_gpu_instancing)
                 // -kp        = disable mesh primitive merging (added in gltfpack fork)
                 // -tj        = number of threads to use when compressing textures
-                string arguments = $"-v -noq -tc -tq 10 " +
+                string arguments = $"-v -noq -ac -tc -tq 10 " +
                                    $"{Argument("-mi", settings.UseInstancing)} " +
                                    $"{Argument("-kp", settings.KeepMeshPrimitives)} " +
                                    $"-tj {settings.ThreadsUsed} " +

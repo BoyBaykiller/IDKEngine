@@ -1253,7 +1253,6 @@ namespace IDKEngine.Render
                 CompressGltfSettings = new ModelLoader.CompressionUtils.CompressGltfSettings();
                 CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
                 CompressGltfSettings.UseInstancing = true;
-                CompressGltfSettings.KeepMeshPrimitives = true;
             }
         }
 
@@ -1314,7 +1313,7 @@ namespace IDKEngine.Render
                 {
                     ImGui.SliderInt("Threads", ref moduleLoadSceneVars.CompressGltfSettings.ThreadsUsed, 1, Environment.ProcessorCount);
                     ImGui.Checkbox("UseInstancing", ref moduleLoadSceneVars.CompressGltfSettings.UseInstancing);
-                    ImGui.Checkbox("KeepMeshPrimitives", ref moduleLoadSceneVars.CompressGltfSettings.KeepMeshPrimitives);
+                    ImGui.Checkbox("KeepMeshPrimitives (only supported in gltfpack fork)", ref moduleLoadSceneVars.CompressGltfSettings.KeepMeshPrimitives);
                 }
 
                 ImGui.Separator();

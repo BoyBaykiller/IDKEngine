@@ -10,6 +10,7 @@ using IDKEngine.Render;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 using IDKEngine.Windowing;
+using System.Runtime.InteropServices;
 
 namespace IDKEngine
 {
