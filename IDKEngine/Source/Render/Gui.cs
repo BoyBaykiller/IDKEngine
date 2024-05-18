@@ -42,11 +42,11 @@ namespace IDKEngine.Render
             public int EntityID { get; private set; }
             public int InstanceID { get; private set; }
 
-            public SelectedEntityInfo(EntityType entityType, int entityID, int instanceID)
+            public SelectedEntityInfo(EntityType entityType, int entityID, int globalInstanceID)
             {
                 EntityType = entityType;
                 EntityID = entityID;
-                InstanceID = instanceID;
+                InstanceID = globalInstanceID;
             }
 
             public static bool operator ==(SelectedEntityInfo first, SelectedEntityInfo other)
@@ -1253,6 +1253,7 @@ namespace IDKEngine.Render
                 CompressGltfSettings = new ModelLoader.CompressionUtils.CompressGltfSettings();
                 CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
                 CompressGltfSettings.UseInstancing = true;
+                CompressGltfSettings.KeepMeshPrimitives = true;
             }
         }
 
@@ -1284,6 +1285,7 @@ namespace IDKEngine.Render
                             shouldUpdatePathTracer = true;
                         }
                     }
+                    
                     if (!isCompressed && !compressionToolAvailable)
                     {
                         Logger.Log(Logger.LogLevel.Warn, $"The glTF model \"{Path.GetFileName(result.Path)}\" is uncompressed and the compresion tool \"{ModelLoader.CompressionUtils.COMPRESSION_TOOL_NAME}\" was not found.");
@@ -1307,10 +1309,12 @@ namespace IDKEngine.Render
             if (ImGui.BeginPopupModal(POPUP_ASK_FOR_COMPRESSION, ref moduleLoadSceneVars.DialogAskForCompression, ImGuiWindowFlags.NoNavInputs))
             {
                 HorizontallyCenteredText("The glTF model doesn't have compression.\nWould you like to compress to disk via gltfpack and load that?");
+                
                 if (ImGui.TreeNode("CompressionOption"))
                 {
                     ImGui.SliderInt("Threads", ref moduleLoadSceneVars.CompressGltfSettings.ThreadsUsed, 1, Environment.ProcessorCount);
                     ImGui.Checkbox("UseInstancing", ref moduleLoadSceneVars.CompressGltfSettings.UseInstancing);
+                    ImGui.Checkbox("KeepMeshPrimitives", ref moduleLoadSceneVars.CompressGltfSettings.KeepMeshPrimitives);
                 }
 
                 ImGui.Separator();
@@ -1358,7 +1362,7 @@ namespace IDKEngine.Render
                     Task? task = ModelLoader.CompressionUtils.CompressGltf(moduleLoadSceneVars.CompressGltfSettings);
                     if (task == null)
                     {
-                        Logger.Log(Logger.LogLevel.Error, $"Failed to create compression task. Falling back to uncompressed model");
+                        Logger.Log(Logger.LogLevel.Error, "Failed to create compression task. Falling back to uncompressed model");
                         moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.CompressGltfSettings.InputPath);
                     }
                     else
@@ -1409,6 +1413,7 @@ namespace IDKEngine.Render
                     {
                         shouldResetPT = true;
                     }
+
                     moduleLoadSceneVars.GltfCompressionsTasks[i] = null;
                 }
             }

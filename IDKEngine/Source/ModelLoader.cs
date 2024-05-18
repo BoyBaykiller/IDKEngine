@@ -371,12 +371,6 @@ namespace IDKEngine
                     }
 
                     GLTexture texture = new GLTexture(GLTexture.Type.Texture2D);
-                    if (textureType == GpuMaterial.TextureHandle.MetallicRoughness)
-                    {
-                        // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
-                        // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
-                        texture.SetSwizzleR(BBG.Texture.Swizzle.B);
-                    }
                     
                     Ktx2.Texture* ktxTexture = null;
                     bool isKtxCompressed = false;
@@ -401,11 +395,18 @@ namespace IDKEngine
                             {
                                 GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.R8G8B8A8Srgb,
                                 GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.R8G8B8A8Srgb,
-                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
+                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels :(
                                 GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.R8G8Unorm,
                                 GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.R8Unorm,
                                 _ => throw new NotSupportedException($"{nameof(MaterialLoadData.TextureType)} = {textureType} not supported")
                             };
+
+                            if (textureType == GpuMaterial.TextureHandle.MetallicRoughness)
+                            {
+                                // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
+                                // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
+                                texture.SetSwizzleR(BBG.Texture.Swizzle.B);
+                            }
                         }
                         else if (gltfTexture.PrimaryImage.Content.IsKtx2)
                         {
@@ -433,8 +434,11 @@ namespace IDKEngine
                             {
                                 GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
                                 GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
-                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.BC7RgbaUnorm, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels.
-                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.BC7RgbaUnorm,
+
+                                // BC5 support added in gltfpack fork
+                                GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.BC5RgUnorm,
+                                GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.BC5RgUnorm,
+
                                 GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.BC4RUnorm,
                                 _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
                             };
@@ -726,8 +730,7 @@ namespace IDKEngine
                 for (uint j = gpuMeshlet.VertexOffset; j < gpuMeshlet.VertexOffset + gpuMeshlet.VertexCount; j++)
                 {
                     uint vertexIndex = meshMeshletsData.VertexIndices[j];
-                    ref readonly Vector3 pos = ref meshVertexPositions[(int)vertexIndex];
-                    meshletBoundingBox.GrowToFit(pos);
+                    meshletBoundingBox.GrowToFit(meshVertexPositions[(int)vertexIndex]);
                 }
                 gpuMeshletInfo.Min = meshletBoundingBox.Min;
                 gpuMeshletInfo.Max = meshletBoundingBox.Max;
@@ -986,7 +989,7 @@ namespace IDKEngine
 
         public static class CompressionUtils
         {
-            public const string COMPRESSION_TOOL_NAME = "gltfpack"; // https://github.com/zeux/meshoptimizer
+            public const string COMPRESSION_TOOL_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer/tree/master
 
             public struct CompressGltfSettings
             {
@@ -994,30 +997,38 @@ namespace IDKEngine
                 public string OutputPath;
                 public int ThreadsUsed;
                 public bool UseInstancing;
+                public bool KeepMeshPrimitives;
                 public Action<string>? ProcessError;
                 public Action<string>? ProcessOutput;
             }
             public static Task? CompressGltf(CompressGltfSettings settings)
             {
+                // -v         = verbose output
+                // -noq       = no mesh quanization (KHR_mesh_quantization)
+                // -tc        = do KTX2 texture comression (KHR_texture_basisu)
+                // -tq        = texture quality
+                // -mi        = use instancing (EXT_mesh_gpu_instancing)
+                // -kp        = disable mesh primitive merging (added in gltfpack fork)
+                // -tj        = number of threads to use when compressing textures
+                string arguments = $"-v -noq -tc -tq 10 " +
+                                   $"{Argument("-mi", settings.UseInstancing)} " +
+                                   $"{Argument("-kp", settings.KeepMeshPrimitives)} " +
+                                   $"-tj {settings.ThreadsUsed} " +
+                                   $"-i {settings.InputPath} -o {settings.OutputPath}";
+
                 ProcessStartInfo startInfo = new ProcessStartInfo()
                 {
                     FileName = COMPRESSION_TOOL_NAME,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-
-                    // -v         = verbose output
-                    // -tj        = number of threads to use when compressing textures
-                    // -mi        = use instancing (EXT_mesh_gpu_instancing)
-                    // -noq       = no mesh quanization (KHR_mesh_quantization)
-                    // -tc        = do KTX2 texture comression (KHR_texture_basisu)
-                    // -tq 10     = texture quality 10
-                    // -tu attrib = use UASTC when encoding type-attrib textures (much higher quality and much larger size)
-                    Arguments = $"-v -tj {settings.ThreadsUsed} {(settings.UseInstancing ? "-mi" : string.Empty)} -noq -tc -tq 10 -tu attrib -i {settings.InputPath} -o {settings.OutputPath}",
+                    Arguments = arguments,
                 };
 
                 try
                 {
-                    Process proc = Process.Start(startInfo);
+                    Logger.Log(Logger.LogLevel.Info, $"Running \"{COMPRESSION_TOOL_NAME} {arguments}\"");
+
+                    Process? proc = Process.Start(startInfo);
                     if (proc == null)
                     {
                         return null;
@@ -1043,12 +1054,22 @@ namespace IDKEngine
 
                         settings.ProcessOutput?.Invoke($"{COMPRESSION_TOOL_NAME}: {e.Data}");
                     };
-
+                    
                     return proc.WaitForExitAsync();
                 }
                 catch (Exception)
                 {
                     return null;
+                }
+
+                static string Argument(string argument, bool yes)
+                {
+                    if (yes)
+                    {
+                        return argument;
+                    }
+
+                    return string.Empty;
                 }
             }
 

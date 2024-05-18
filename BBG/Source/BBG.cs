@@ -119,6 +119,7 @@ namespace BBOpenGL
             // set default graphics pipeline state
             Rendering.SetGraphicsPipelineState(new Rendering.GraphicsPipelineState());
 
+            // ideally should be a paramater in pixel pack/unpack functions
             GL.PixelStorei(PixelStoreParameter.PackAlignment, 1);
             GL.PixelStorei(PixelStoreParameter.UnpackAlignment, 1);
 

@@ -393,7 +393,14 @@ namespace IDKEngine
             gpuPerFrameDataBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
             gpuPerFrameDataBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 0);
             
-            SkyBoxManager.Initialize(SkyBoxManager.SkyBoxMode.ExternalAsset, Directory.GetFiles("Ressource/Textures/EnvironmentMap/", "*.jpg"));
+            SkyBoxManager.Initialize(SkyBoxManager.SkyBoxMode.ExternalAsset, [
+                "Ressource/Textures/EnvironmentMap/1.jpg",
+                "Ressource/Textures/EnvironmentMap/2.jpg",
+                "Ressource/Textures/EnvironmentMap/3.jpg",
+                "Ressource/Textures/EnvironmentMap/4.jpg",
+                "Ressource/Textures/EnvironmentMap/5.jpg",
+                "Ressource/Textures/EnvironmentMap/6.jpg"
+            ]);
 
             ModelLoader.TextureLoaded += () =>
             {
@@ -409,7 +416,7 @@ namespace IDKEngine
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
             if (true)
             {
-                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Ressource/Models/SponzaCompressed/glTF/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
+                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Ressource/Models/SponzaCompressed/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f));
                 sponza.Meshes[63].EmissiveBias = 10.0f;
                 sponza.Meshes[70].EmissiveBias = 20.0f;
                 sponza.Meshes[3].EmissiveBias = 12.0f;

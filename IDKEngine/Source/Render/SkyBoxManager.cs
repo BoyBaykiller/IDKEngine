@@ -74,7 +74,7 @@ namespace IDKEngine.Render
         {
             if (imagePaths == null)
             {
-                Logger.Log(Logger.LogLevel.Error, $"Cubemap imagePaths is null");
+                Logger.Log(Logger.LogLevel.Error, $"Cubemap {nameof(imagePaths)} is null");
                 return false;
             }
             if (texture.TextureType != BBG.Texture.Type.Cubemap)
@@ -121,7 +121,7 @@ namespace IDKEngine.Render
             return _skyBoxMode;
         }
 
-        public static void Dispose()
+        public static void Terminate()
         {
             if (AtmosphericScatterer != null) AtmosphericScatterer.Dispose();
             if (externalSkyBoxTexture != null) externalSkyBoxTexture.Dispose();
