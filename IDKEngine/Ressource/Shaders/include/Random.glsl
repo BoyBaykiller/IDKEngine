@@ -148,7 +148,7 @@ vec3 UniformSampleDisk(vec3 normal, float rnd0, float rnd1)
 // * pf = 0.0; pg = 1.0; => 0.0; meaning choose pf   0% of the time
 float BalanceHeuristic(float pf, float pg)
 {
-	return pf / (pf + pg);
+    return pf / (pf + pg);
 }
 
 float CosineSampleHemispherePdf(float cosTheta)

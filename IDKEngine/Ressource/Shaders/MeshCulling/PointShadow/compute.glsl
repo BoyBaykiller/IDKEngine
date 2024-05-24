@@ -7,7 +7,6 @@
     #define DECLARE_MESHLET_RENDERING_TYPES
 #endif
 
-AppInclude(include/Constants.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
@@ -26,11 +25,11 @@ void main()
         return;
     }
 
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
     uint meshID = meshInstance.MeshIndex;
     
-    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
-    BlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeIndex];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+    GpuBlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeIndex];
 
     for (int i = 0; i < NumVisibleFaces; i++)
     {

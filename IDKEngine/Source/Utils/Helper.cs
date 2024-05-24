@@ -65,12 +65,14 @@ namespace IDKEngine.Utils
             }
             return sum;
         }
+
         public static void ArrayAdd<T>(ref T[] array, ReadOnlySpan<T> toAdd)
         {
             int prevLength = array.Length;
             Array.Resize(ref array, prevLength + toAdd.Length);
             toAdd.CopyTo(new Span<T>(array, prevLength, toAdd.Length));
         }
+
         public static void ArrayRemoveRange<T>(ref T[] array, int start, int count)
         {
             int end = start + count;

@@ -75,7 +75,7 @@ namespace IDKEngine.Render
         private readonly BBG.AbstractShaderProgram shaderProgram;
         public AtmosphericScatterer(int size)
         {
-            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "AtmosphericScattering/compute.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "AtmosphericScattering/compute.glsl"));
 
             Matrix4[] invViewsAndInvprojecion = new Matrix4[]
             {

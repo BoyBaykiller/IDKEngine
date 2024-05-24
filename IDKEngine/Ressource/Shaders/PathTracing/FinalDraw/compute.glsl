@@ -32,7 +32,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
     uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
-    WavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
+    GpuWavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
 
     vec3 irradiance = wavefrontRay.Radiance;
     if (settingsUBO.IsDebugBVHTraversal)

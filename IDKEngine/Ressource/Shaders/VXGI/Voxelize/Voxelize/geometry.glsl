@@ -11,7 +11,7 @@ layout(passthrough) in gl_PerVertex
     vec4 gl_Position;
 } gl_in[];
 
-layout(passthrough) in InOutVars
+layout(passthrough) in InOutData
 {
     vec3 FragPos;
     vec2 TexCoord;

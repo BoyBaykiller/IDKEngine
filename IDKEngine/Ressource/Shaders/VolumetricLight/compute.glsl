@@ -2,7 +2,6 @@
 
 AppInclude(include/Pbr.glsl)
 AppInclude(include/Random.glsl)
-AppInclude(include/Constants.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
@@ -21,9 +20,9 @@ layout(std140, binding = 7) uniform SettingsUBO
     float Strength;
 } settingsUBO;
 
-vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep, int sampleCount);
-bool Shadow(PointShadow pointShadow, vec3 lightToSample);
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
+vec3 UniformScatter(GpuLight light, GpuPointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep, int sampleCount);
+bool Shadow(GpuPointShadow pointShadow, vec3 lightToSample);
+float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos);
 float ComputeScattering(float cosTheta, float scaterring);
 
 // Source: http://www.alexandre-pestana.com/volumetric-lights/
@@ -60,8 +59,8 @@ void main()
     vec3 scattered = vec3(0.0);
     for (int i = 0; i < shadowsUBO.Count; i++)
     {
-        PointShadow pointShadow = shadowsUBO.PointShadows[i];
-        Light light = lightsUBO.Lights[pointShadow.LightIndex];
+        GpuPointShadow pointShadow = shadowsUBO.PointShadows[i];
+        GpuLight light = lightsUBO.Lights[pointShadow.LightIndex];
 
         scattered += UniformScatter(light, pointShadow, origin, viewDir, deltaStep, settingsUBO.SampleCount);
     }
@@ -70,7 +69,7 @@ void main()
     imageStore(ImgResultDepth, imgCoord, vec4(depth));
 }
 
-vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep, int sampleCount)
+vec3 UniformScatter(GpuLight light, GpuPointShadow pointShadow, vec3 origin, vec3 viewDir, vec3 deltaStep, int sampleCount)
 {
     vec3 scattered = vec3(0.0);
     vec3 samplePoint = origin;
@@ -102,7 +101,7 @@ vec3 UniformScatter(Light light, PointShadow pointShadow, vec3 origin, vec3 view
 }
 
 // Only binaries shadow because soft shadows are not worth it in this case
-bool Shadow(PointShadow pointShadow, vec3 lightToSample)
+bool Shadow(GpuPointShadow pointShadow, vec3 lightToSample)
 {
     float depth = GetLightSpaceDepth(pointShadow, lightToSample);
     float closestDepth = texture(pointShadow.ShadowMapTexture, lightToSample).r;
@@ -110,7 +109,7 @@ bool Shadow(PointShadow pointShadow, vec3 lightToSample)
     return depth > closestDepth;
 }
 
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
+float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos)
 {
     float dist = max(abs(lightSpaceSamplePos.x), max(abs(lightSpaceSamplePos.y), abs(lightSpaceSamplePos.z)));
     float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);

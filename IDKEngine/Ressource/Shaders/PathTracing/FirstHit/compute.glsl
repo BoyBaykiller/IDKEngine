@@ -13,7 +13,6 @@ AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Ray.glsl)
 AppInclude(include/Random.glsl)
-AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
@@ -37,7 +36,7 @@ layout(std140, binding = 7) uniform SettingsUBO
     bool IsAlwaysTintWithAlbedo;
 } settingsUBO;
 
-bool TraceRay(inout WavefrontRay wavefrontRay);
+bool TraceRay(inout GpuWavefrontRay wavefrontRay);
 ivec2 ReorderInvocations(uint n);
 
 AppInclude(PathTracing/include/RussianRoulette.glsl)
@@ -63,7 +62,7 @@ void main()
 
     camDir = normalize(focalPoint - pointOnLense);
 
-    WavefrontRay wavefrontRay;
+    GpuWavefrontRay wavefrontRay;
     wavefrontRay.Origin = pointOnLense;
     
     vec2 packedDir = EncodeUnitVec(camDir);
@@ -91,7 +90,7 @@ void main()
     }
 }
 
-bool TraceRay(inout WavefrontRay wavefrontRay)
+bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 {
     vec3 rayDir = DecodeUnitVec(vec2(wavefrontRay.PackedDirectionX, wavefrontRay.PackedDirectionY));
 
@@ -107,93 +106,73 @@ bool TraceRay(inout WavefrontRay wavefrontRay)
 
         wavefrontRay.Origin += rayDir * hitInfo.T;
 
-        vec3 albedo = vec3(0.0);
-        vec3 normal = vec3(0.0);
-        vec3 emissive = vec3(0.0);
-        float transmissionChance = 0.0;
-        float specularChance = 0.0;
-        float roughness = 0.0;
-        float ior = 1.0;
-        vec3 absorbance = vec3(0.0);
-        
-        bool hitLight = hitInfo.VertexIndices == uvec3(0);
-        if (!hitLight)
+        Surface surface = GetDefaultSurface();
+        if (hitInfo.VertexIndices != uvec3(0))
         {
-            Vertex v0 = vertexSSBO.Vertices[hitInfo.VertexIndices.x];
-            Vertex v1 = vertexSSBO.Vertices[hitInfo.VertexIndices.y];
-            Vertex v2 = vertexSSBO.Vertices[hitInfo.VertexIndices.z];
+            GpuVertex v0 = vertexSSBO.Vertices[hitInfo.VertexIndices.x];
+            GpuVertex v1 = vertexSSBO.Vertices[hitInfo.VertexIndices.y];
+            GpuVertex v2 = vertexSSBO.Vertices[hitInfo.VertexIndices.z];
 
             vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
             vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
             vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
 
-            MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
-            Mesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
-            Material material = materialSSBO.Materials[mesh.MaterialIndex];
+            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
+            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+            GpuMaterial material = materialSSBO.Materials[mesh.MaterialIndex];
+
+            surface = GetSurface(material, interpTexCoord);
+            SurfaceApplyModificatons(surface, mesh);
+
+            float alphaCutoff = surface.DoAlphaBlending ? GetRandomFloat01() : surface.AlphaCutoff;
+            if (surface.Alpha < alphaCutoff)
+            {
+                wavefrontRay.Origin += rayDir * 0.001;
+                return true;
+            }
 
             mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             vec3 worldNormal = normalize(unitVecToWorld * interpNormal);
             vec3 worldTangent = normalize(unitVecToWorld * interpTangent);
             mat3 tbn = GetTBN(worldTangent, worldNormal);
-            vec3 textureWorldNormal = ReconstructPackedNormal(texture(material.Normal, interpTexCoord).rg);
-            textureWorldNormal = tbn * textureWorldNormal;
-            normal = normalize(mix(worldNormal, textureWorldNormal, mesh.NormalMapStrength));
-
-            ior = max(material.IOR + mesh.IORBias, 1.0);
-            vec4 albedoAlpha = texture(material.BaseColor, interpTexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
-            albedo = albedoAlpha.rgb;
-            absorbance = max(mesh.AbsorbanceBias + material.Absorbance, vec3(0.0));
-            emissive = texture(material.Emissive, interpTexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + mesh.EmissiveBias * albedo;
-            
-            transmissionChance = clamp(texture(material.Transmission, interpTexCoord).r * material.TransmissionFactor + mesh.TransmissionBias, 0.0, 1.0);
-            roughness = clamp(texture(material.MetallicRoughness, interpTexCoord).g * material.RoughnessFactor + mesh.RoughnessBias, 0.0, 1.0);
-            specularChance = clamp(texture(material.MetallicRoughness, interpTexCoord).r * material.MetallicFactor + mesh.SpecularBias, 0.0, 1.0 - transmissionChance);
-            
-            float alphaCutoff = material.DoAlphaBlending ? GetRandomFloat01() : material.AlphaCutoff;
-            if (albedoAlpha.a < alphaCutoff)
-            {
-                wavefrontRay.Origin += rayDir * 0.001;
-                return true;
-            }
+            surface.Normal = tbn * surface.Normal;
+            surface.Normal = normalize(mix(worldNormal, surface.Normal, mesh.NormalMapStrength));
         }
         else if (settingsUBO.IsTraceLights)
         {
-            Light light = lightsUBO.Lights[hitInfo.InstanceID];
-            emissive = light.Color;
-            albedo = light.Color;
-            normal = (wavefrontRay.Origin - light.Position) / light.Radius;
+            GpuLight light = lightsUBO.Lights[hitInfo.InstanceID];
+            surface.Emissive = light.Color;
+            surface.Albedo = light.Color;
+            surface.Normal = (wavefrontRay.Origin - light.Position) / light.Radius;
         }
 
-        float cosTheta = dot(-rayDir, normal);
+        float cosTheta = dot(-rayDir, surface.Normal);
         bool fromInside = cosTheta < 0.0;
 
         float prevIor = 1.0;
         if (fromInside)
         {
             // This is the first hit shader which means we determine previous IOR here
-            prevIor = ior;
+            prevIor = surface.IOR;
             
-            normal *= -1.0;
+            surface.Normal *= -1.0;
             cosTheta *= -1.0;
 
-            wavefrontRay.Throughput = ApplyAbsorption(wavefrontRay.Throughput, absorbance, hitInfo.T);
+            wavefrontRay.Throughput = ApplyAbsorption(wavefrontRay.Throughput, surface.Absorbance, hitInfo.T);
         }
+        cosTheta = clamp(cosTheta, 0.0, 1.0);
 
-        wavefrontRay.Radiance += emissive * wavefrontRay.Throughput;
+        wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
 
-        // specularChance = 0.0;
-        // roughness = 0.0;
-        // transmissionChance = 0.0;
+        float diffuseChance = max(1.0 - surface.Metallic - surface.Transmission, 0.0);
+        surface.Metallic = SpecularBasedOnViewAngle(surface.Metallic, cosTheta, prevIor, surface.IOR);
+        surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // normalize again to (diff + spec + trans == 1.0)
 
-        float diffuseChance = 1.0 - specularChance - transmissionChance;
-        specularChance = SpecularBasedOnViewAngle(specularChance, cosTheta, prevIor, ior);
-        transmissionChance = 1.0 - diffuseChance - specularChance; // normalize again to (diff + spec + trans == 1.0)
-
-        RayProperties result = SampleMaterial(rayDir, specularChance, roughness, transmissionChance, ior, prevIor, normal, fromInside);
+        RayProperties result = SampleMaterial(rayDir, surface, prevIor, fromInside);
 
         if (result.RayType != RAY_TYPE_REFRACTIVE || settingsUBO.IsAlwaysTintWithAlbedo)
         {
-            vec3 brdf = albedo / PI;
+            vec3 brdf = surface.Albedo / PI;
             float pdf = max(cosTheta / PI, 0.0001);
             wavefrontRay.Throughput *= cosTheta * brdf / pdf;
             // wavefrontRay.Throughput *= albedo;

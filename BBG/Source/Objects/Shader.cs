@@ -7,12 +7,12 @@ namespace BBOpenGL
 {
     public static partial class BBG
     {
-        public enum ShaderType : uint
+        public enum ShaderStage : uint
         {
-            Vertex = OpenTK.Graphics.OpenGL.ShaderType.VertexShader,
-            Geometry = OpenTK.Graphics.OpenGL.ShaderType.GeometryShader,
-            Fragment = OpenTK.Graphics.OpenGL.ShaderType.FragmentShader,
-            Compute = OpenTK.Graphics.OpenGL.ShaderType.ComputeShader,
+            Vertex = ShaderType.VertexShader,
+            Geometry = ShaderType.GeometryShader,
+            Fragment = ShaderType.FragmentShader,
+            Compute = ShaderType.ComputeShader,
 
             /// <summary>
             /// Requires GL_NV_mesh_shader
@@ -27,18 +27,16 @@ namespace BBOpenGL
 
         public class Shader : IDisposable
         {
-            public const string SHADER_PATH = "Ressource/Shaders/";
-
             public readonly int ID;
-            public readonly ShaderType ShaderType;
+            public readonly ShaderStage ShaderStage;
             public readonly string Name;
-            public Shader(ShaderType shaderType, string srcCode, string name = null)
+            public Shader(ShaderStage stage, string srcCode, string name = null)
             {
-                ShaderType = shaderType;
+                ShaderStage = stage;
 
-                ID = GL.CreateShader((OpenTK.Graphics.OpenGL.ShaderType)shaderType);
+                ID = GL.CreateShader((ShaderType)stage);
 
-                Name = name ?? shaderType.ToString();
+                Name = name ?? stage.ToString();
 
                 GL.ShaderSource(ID, srcCode);
                 GL.CompileShader(ID);
@@ -68,17 +66,19 @@ namespace BBOpenGL
 
         public class AbstractShader : Shader
         {
+            public const string SHADER_PATH = "Ressource/Shaders/";
+
             public string FullShaderPath => Path.Combine(SHADER_PATH, LocalShaderPath);
 
             public readonly string LocalShaderPath;
-            public AbstractShader(ShaderType shaderType, string localShaderPath)
-                : this(shaderType, File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath)), localShaderPath)
+            public AbstractShader(ShaderStage stage, string localShaderPath)
+                : this(stage, File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath)), localShaderPath)
             {
                 LocalShaderPath = localShaderPath;
             }
 
-            private AbstractShader(ShaderType shaderType, string srcCode, string name)
-                : base(shaderType, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, name), name)
+            private AbstractShader(ShaderStage stage, string srcCode, string name)
+                : base(stage, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, stage, name), name)
             {
                 // We currently dont allow public construction from just a srcCode
                 // as that would make the LocalShaderPath variable meaningless, which we need for shader recompilation.
@@ -86,6 +86,8 @@ namespace BBOpenGL
 
             public static class Preprocessor
             {
+                public const bool SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH = false; // for debugging only (requires GL_GOOGLE_cpp_style_line_directive)
+
                 public static string DEBUG_LAST_PRE_PROCESSED;
 
                 public enum Keyword : int
@@ -100,14 +102,12 @@ namespace BBOpenGL
                     public string[] UsedAppInsertionKeys;
                 }
 
-                public const bool SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH = false; // for debugging only (requires GL_GOOGLE_cpp_style_line_directive)
-
-                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, string name = null)
+                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, string name = null)
                 {
-                    return PreProcess(source, shaderInsertions, out _, name);
+                    return PreProcess(source, shaderInsertions, shaderStage, out _, name);
                 }
 
-                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, out PreProcessInfo preProcessInfo, string name = null)
+                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, out PreProcessInfo preProcessInfo, string name = null)
                 {
                     List<string> usedAppInsertions = new List<string>();
                     List<string> pathsAlreadyIncluded = new List<string>();
@@ -127,6 +127,7 @@ namespace BBOpenGL
                             #if {(SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH ? 1 : 0)}
                                 #extension GL_GOOGLE_cpp_style_line_directive : require
                             #endif
+                            #define APP_SHADER_STAGE_{shaderStage.ToString().ToUpper()}
                             #line {lineCountVersionStatement + 1}
 
                             """;
@@ -183,7 +184,7 @@ namespace BBOpenGL
                                     string includedText;
                                     if (pathsAlreadyIncluded.Contains(path))
                                     {
-                                        includedText = $"// Omitted including {path} as it's already part of this file";
+                                        includedText = $"// Omitted including \"{path}\" as it's already part of this file";
                                     }
                                     else
                                     {
@@ -194,7 +195,11 @@ namespace BBOpenGL
                                     int lineCount = CountLines(source, currentIndex);
 
                                     string newLine = "#line 1";
-                                    if (SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH) newLine += $" \"{path}\"";
+                                    if (SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)
+                                    {
+                                        newLine += $" \"{path}\"";
+                                    }
+                                    newLine += $" // Including \"{path}\"";
                                     result.AppendLine(newLine);
 
                                     result.Append(RecursiveResolveKeywords(includedText, path));
@@ -202,7 +207,11 @@ namespace BBOpenGL
 
                                     string origionalLine = $"#line {lineCount + 1}";
                                     string safeSourceName = name ?? "No source name given";
-                                    if (SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH) origionalLine += $" \"{safeSourceName}\"";
+                                    if (SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)
+                                    {
+                                        origionalLine += $" \"{safeSourceName}\"";
+                                    }
+                                    origionalLine += $" // Included \"{path}\"";
                                     result.AppendLine(origionalLine);
                                 }
                             }
@@ -212,6 +221,7 @@ namespace BBOpenGL
                         return result;
                     }
                 }
+                
                 private static int AdvanceToNextKeyword(string source, int startIndex, out int expressionLength, out Keyword keyword, out string value)
                 {
                     expressionLength = 0;
@@ -233,6 +243,7 @@ namespace BBOpenGL
                         return source.Length;
                     }
                 }
+                
                 private static int CountLines(string searchString, int count, int startIndex = 0)
                 {
                     int lineCount = 0;

@@ -128,10 +128,10 @@ namespace IDKEngine.Render
         private BBG.BufferObject wavefrontPTBuffer;
         public unsafe PathTracer(Vector2i size, in GpuSettings settings)
         {
-            firstHitProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "PathTracing/FirstHit/compute.glsl"));
+            firstHitProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "PathTracing/FirstHit/compute.glsl"));
 
-            nHitProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "PathTracing/NHit/compute.glsl"));
-            finalDrawProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "PathTracing/FinalDraw/compute.glsl"));
+            nHitProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "PathTracing/NHit/compute.glsl"));
+            finalDrawProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "PathTracing/FinalDraw/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
             gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);

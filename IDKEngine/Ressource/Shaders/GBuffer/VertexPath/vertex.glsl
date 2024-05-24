@@ -1,12 +1,11 @@
 #version 460 core
 
-AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
-out InOutVars
+out InOutData
 {
     vec2 TexCoord;
     vec4 PrevClipPos;
@@ -17,11 +16,11 @@ out InOutVars
 
 void main()
 {
-    Vertex vertex = vertexSSBO.Vertices[gl_VertexID];
+    GpuVertex vertex = vertexSSBO.Vertices[gl_VertexID];
     vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
     
     uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
     
     vec3 normal = DecompressSR11G11B10(vertex.Normal);
     vec3 tangent = DecompressSR11G11B10(vertex.Tangent);

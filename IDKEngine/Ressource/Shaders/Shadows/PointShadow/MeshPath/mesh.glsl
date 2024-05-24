@@ -19,7 +19,7 @@ layout(local_size_x = 32) in;
 // To prevent out of bounds access we pad by 1
 layout(triangles, max_primitives = MESHLET_MAX_TRIANGLE_COUNT + 1, max_vertices = MESHLET_MAX_VERTEX_COUNT) out;
 
-taskNV in InOutVars
+taskNV in InOutData
 {
     uint MeshID;
     uint InstanceID;
@@ -36,9 +36,9 @@ void main()
     uint instanceID = inData.InstanceID;
     uint meshletID = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x]; 
 
-    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[instanceID];
-    Meshlet meshlet = meshletSSBO.Meshlets[meshletID];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[instanceID];
+    GpuMeshlet meshlet = meshletSSBO.Meshlets[meshletID];
 
     const uint verticesPerInvocationRounded = (MESHLET_MAX_VERTEX_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
     for (int i = 0; i < verticesPerInvocationRounded; i++)

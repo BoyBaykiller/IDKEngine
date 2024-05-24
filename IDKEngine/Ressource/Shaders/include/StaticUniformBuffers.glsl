@@ -1,20 +1,23 @@
 AppInclude(include/GpuTypes.glsl)
-AppInclude(include/Constants.glsl)
+
+// These constants are used in shader and client code. Keep in sync!
+#define GPU_MAX_UBO_POINT_SHADOW_COUNT 128
+#define GPU_MAX_UBO_LIGHT_COUNT 256
 
 layout(std140, binding = 0) uniform PerFrameDataUBO
 {
-    PerFrameData perFrameDataUBO;
+    GpuPerFrameData perFrameDataUBO;
 };
 
 layout(std140, binding = 1) uniform LightsUBO
 {
-    Light Lights[GPU_MAX_UBO_LIGHT_COUNT];
+    GpuLight Lights[GPU_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
 layout(std140, binding = 2) uniform ShadowsUBO
 {
-    PointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
+    GpuPointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowsUBO;
 
@@ -42,8 +45,9 @@ layout(std140, binding = 5) uniform VoxelizerDataUBO
 layout(std140, binding = 6) uniform GBufferDataUBO
 {
     sampler2D AlbedoAlpha;
-    sampler2D NormalSpecular;
-    sampler2D EmissiveRoughness;
+    sampler2D Normal;
+    sampler2D MetallicRoughness;
+    sampler2D Emissive;
     sampler2D Velocity;
     sampler2D Depth;
 } gBufferDataUBO;

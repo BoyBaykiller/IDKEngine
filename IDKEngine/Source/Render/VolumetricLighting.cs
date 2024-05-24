@@ -50,8 +50,8 @@ namespace IDKEngine.Render
         private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
         public unsafe VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
         {
-            volumetricLightingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VolumetricLight/compute.glsl"));
-            upscaleProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VolumetricLight/Upscale/compute.glsl"));
+            volumetricLightingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VolumetricLight/compute.glsl"));
+            upscaleProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VolumetricLight/Upscale/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
             gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);

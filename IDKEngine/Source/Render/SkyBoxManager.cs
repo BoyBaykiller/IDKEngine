@@ -97,7 +97,7 @@ namespace IDKEngine.Render
             Parallel.For(0, images.Length, i =>
             {
                 using FileStream stream = File.OpenRead(imagePaths[i]);
-                images[i] = ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlue);
+                images[i] = ImageResult.FromStream(stream, ColorComponents.RedGreenBlue);
             });
 
             if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))

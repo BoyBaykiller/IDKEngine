@@ -235,10 +235,6 @@ namespace IDKEngine
                         bool leftCloser = tMinLeft < tMinRight;
                         stackTop = leftCloser ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                         stack[stackPtr++] = leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild;
-                        if (stackPtr - 1 >= MaxTreeDepth)
-                        {
-                            Console.WriteLine("penis");
-                        }
                     }
                     else
                     {

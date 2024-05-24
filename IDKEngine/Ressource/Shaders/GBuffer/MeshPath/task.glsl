@@ -16,7 +16,7 @@ AppInclude(include/StaticStorageBuffers.glsl)
 #define MESHLETS_PER_WORKGROUP 32
 layout(local_size_x = MESHLETS_PER_WORKGROUP) in;
 
-taskNV out InOutVars
+taskNV out InOutData
 {
     uint MeshID;
     uint InstanceID;
@@ -27,10 +27,10 @@ taskNV out InOutVars
 void main()
 {
     uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_DrawID];
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
 
     uint meshID = meshInstance.MeshIndex;
-    Mesh mesh = meshSSBO.Meshes[meshID];
+    GpuMesh mesh = meshSSBO.Meshes[meshID];
 
     if (gl_GlobalInvocationID.x >= mesh.MeshletCount)
     {
@@ -41,8 +41,8 @@ void main()
     uint workgroupFirstMeshlet = mesh.MeshletsStart + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
     uint workgroupThisMeshlet = workgroupFirstMeshlet + localMeshlet;
 
-    DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
-    MeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+    GpuMeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
 
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);

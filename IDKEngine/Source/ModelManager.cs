@@ -51,8 +51,6 @@ namespace IDKEngine
         private readonly BBG.TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
 
         public BVH BVH;
-
-        private readonly BBG.VAO vao;
         public ModelManager()
         {
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
@@ -83,10 +81,6 @@ namespace IDKEngine
             meshletInfoBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 15);
             meshletsVertexIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 16);
             meshletsPrimitiveIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 17);
-
-            vao = new BBG.VAO();
-            vao.SetElementBuffer(vertexIndicesBuffer);
-            // We use Vertex Pulling, no need to declare vertex format using VAO API
 
             BVH = new BVH();
         }
@@ -164,7 +158,10 @@ namespace IDKEngine
 
         public unsafe void Draw()
         {
-            BBG.Rendering.UseVertexArrayObject(vao);
+            BBG.Rendering.SetVertexInputAssembly(new BBG.Rendering.VertexInputAssembly()
+            {
+                IndexBuffer = vertexIndicesBuffer,
+            });
             BBG.Rendering.MultiDrawIndexed(drawCommandBuffer, BBG.Rendering.Topology.Triangles, BBG.Rendering.IndexType.Uint, Meshes.Length, sizeof(BBG.DrawElementsIndirectCommand));
         }
 
@@ -173,7 +170,7 @@ namespace IDKEngine
         /// </summary>
         public unsafe void MeshShaderDrawNV()
         {
-            int maxMeshlets = meshletTasksCmdsBuffer.GetNumElements();
+            int maxMeshlets = meshletTasksCmdsBuffer.NumElements;
             BBG.Rendering.MultiDrawMeshletsCountNV(meshletTasksCmdsBuffer, meshletTasksCountBuffer, maxMeshlets, sizeof(BBG.DrawMeshTasksIndirectCommandNV));
         }
 
@@ -184,21 +181,23 @@ namespace IDKEngine
 
             int batchedUploadSize = 1 << 8;
             int lastCleanBatch = MeshInstances.Length / batchedUploadSize * batchedUploadSize;
-            bool shouldBatchUpload = false;
+            bool batchNeedsUpload = false;
             for (int i = 0; i < MeshInstances.Length;)
             {
-                if (MeshInstances[i].DidMove())
-                {
-                    shouldBatchUpload = true;
-                }
                 if (meshInstanceShouldUpload[i])
                 {
                     meshInstanceShouldUpload[i] = false;
-                    shouldBatchUpload = true;
+                    batchNeedsUpload = true;
+                }
+                else if (MeshInstances[i].DidMove())
+                {
+                    batchNeedsUpload = true;
                 }
 
                 i++;
-                if ((i % batchedUploadSize == 0 || i == MeshInstances.Length) && shouldBatchUpload)
+
+                bool endOfBatch = (i % batchedUploadSize == 0 || i == MeshInstances.Length);
+                if (batchNeedsUpload && endOfBatch)
                 {
                     int batchSize = batchedUploadSize;
                     int start = i - batchSize;
@@ -216,13 +215,13 @@ namespace IDKEngine
                         {
                             MeshInstances[j].SetPrevToCurrentMatrix();
 
-                            // Prev matrix got updated, needs upload next frame
+                            // We'll need to upload the changed prev matrix next frame
                             meshInstanceShouldUpload[j] = true;
                         }
                     }
 
                     anyMeshInstanceMoved = true;
-                    shouldBatchUpload = false;
+                    batchNeedsUpload = false;
                 }
             }
         }
@@ -318,8 +317,6 @@ namespace IDKEngine
             vertexPositionBuffer.Dispose();
             meshletsVertexIndicesBuffer.Dispose();
             meshletsPrimitiveIndicesBuffer.Dispose();
-
-            vao.Dispose();
 
             BVH.Dispose();
         }

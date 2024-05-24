@@ -7,7 +7,7 @@ const vec2 VertexPositions[] =
     vec2( -1.0,  3.0 )
 };
 
-out InOutVars
+out InOutData
 {
     vec2 TexCoord;
 } outData;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using BBLogger;
 using BBOpenGL;
@@ -56,50 +57,60 @@ namespace IDKEngine.Render
             RecursiveSteps = 8,
         };
 
-        public readonly int IndicisCount;
         private readonly CpuLight[] lights;
-        
+
         private readonly BBG.TypedBuffer<GpuLight> lightBufferObject;
+        private readonly BBG.TypedBuffer<ObjectFactory.Sphere.Vertex> vertexBuffer;
+        private readonly BBG.TypedBuffer<uint> indexBuffer;
         private readonly BBG.AbstractShaderProgram shaderProgram;
         private readonly PointShadowManager pointShadowManager;
-        private readonly BBG.VAO vao;
         public unsafe LightManager()
         {
             lights = new CpuLight[GPU_MAX_UBO_LIGHT_COUNT];
 
             shaderProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderType.Vertex, "Light/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderType.Fragment, "Light/fragment.glsl"));
+                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "Light/vertex.glsl"),
+                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Light/fragment.glsl"));
 
             lightBufferObject = new BBG.TypedBuffer<GpuLight>();
             lightBufferObject.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));
             lightBufferObject.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 1);
 
             const int SphereLatitudes = 12, SphereLongitudes = 12;
-            Span<ObjectFactory.Vertex> vertecis = ObjectFactory.GenerateSmoothSphere(1.0f, SphereLatitudes, SphereLongitudes);
-            BBG.TypedBuffer<ObjectFactory.Vertex> vbo = new BBG.TypedBuffer<ObjectFactory.Vertex>();
-            vbo.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, vertecis);
+            const float SphereRadius = 1.0f;
 
-            Span<uint> indicis = ObjectFactory.GenerateSmoothSphereIndicis(SphereLatitudes, SphereLongitudes);
-            BBG.TypedBuffer<uint> ebo = new BBG.TypedBuffer<uint>();
-            ebo.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, indicis);
+            Span<ObjectFactory.Sphere.Vertex> vertices = ObjectFactory.Sphere.GenerateVertices(SphereRadius, SphereLatitudes, SphereLongitudes);
+            vertexBuffer = new BBG.TypedBuffer<ObjectFactory.Sphere.Vertex>();
+            vertexBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, vertices);
 
-            vao = new BBG.VAO();
-            vao.SetElementBuffer(ebo);
-            vao.AddSourceBuffer(vbo, 0, sizeof(ObjectFactory.Vertex));
-            vao.SetAttribFormat(0, 0, 3, BBG.VAO.VertexAttribType.Float, 0 * sizeof(float)); // Positions
-            //vao.SetAttribFormat(0, 1, 2, VertexAttribType.Float, 3 * sizeof(float)); // TexCoord
-
-            IndicisCount = indicis.Length;
+            Span<uint> indices = ObjectFactory.Sphere.GenerateIndices(SphereLatitudes, SphereLongitudes);
+            indexBuffer = new BBG.TypedBuffer<uint>();
+            indexBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, indices);
 
             pointShadowManager = new PointShadowManager();
         }
 
-        public void Draw()
+        public unsafe void Draw()
         {
             BBG.Cmd.UseShaderProgram(shaderProgram);
-            BBG.Rendering.UseVertexArrayObject(vao);
-            BBG.Rendering.DrawIndexed(BBG.Rendering.Topology.Triangles, IndicisCount, BBG.Rendering.IndexType.Uint, Count);
+            BBG.Rendering.SetVertexInputAssembly(new BBG.Rendering.VertexInputAssembly()
+            {
+                IndexBuffer = indexBuffer,
+                VertexDescription = new BBG.Rendering.VertexDescription()
+                {
+                    VertexBuffers = [new BBG.Rendering.VertexBuffer() { Buffer = vertexBuffer, VertexSize = sizeof(ObjectFactory.Sphere.Vertex) } ],
+                    VertexAttributes = [
+                        new BBG.Rendering.VertexAttribute()
+                        {
+                            BufferIndex = 0,
+                            RelativeOffset = Marshal.OffsetOf<ObjectFactory.Sphere.Vertex>(nameof(ObjectFactory.Sphere.Vertex.Position)),
+                            Type = BBG.Rendering.VertexAttributeType.Float,
+                            NumComponents = 3,
+                        },
+                    ]
+                }
+            });
+            BBG.Rendering.DrawIndexed(BBG.Rendering.Topology.Triangles, indexBuffer.NumElements, BBG.Rendering.IndexType.Uint, Count);
         }
 
         public void RenderShadowMaps(ModelManager modelManager, Camera camera)
@@ -174,7 +185,7 @@ namespace IDKEngine.Render
             }
             return false;
         }
-        
+
         public void DeletePointShadowOfLight(int index)
         {
             if (!TryGetLight(index, out CpuLight light))
@@ -227,7 +238,7 @@ namespace IDKEngine.Render
                 });
             }
 
-            
+
             for (int i = 0; i < MovingLightsCollisionSetting.RecursiveSteps && MovingLightsCollisionSetting.IsEnabled; i++)
             {
                 for (int j = 0; j < Count; j++)
@@ -333,7 +344,7 @@ namespace IDKEngine.Render
             for (int i = 0; i < pointShadowManager.Count; i++)
             {
                 pointShadowManager.TryGetPointShadow(i, out CpuPointShadow pointShadow);
-                
+
                 CpuLight light = lights[pointShadow.GetGpuPointShadow().LightIndex];
                 pointShadow.Position = light.GpuLight.Position;
             }
@@ -396,9 +407,10 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
-            vao.Dispose();
             pointShadowManager.Dispose();
             shaderProgram.Dispose();
+            vertexBuffer.Dispose();
+            indexBuffer.Dispose();
             lightBufferObject.Dispose();
         }
     }

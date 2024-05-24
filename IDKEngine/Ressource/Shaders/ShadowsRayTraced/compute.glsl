@@ -4,7 +4,6 @@
 AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Random.glsl)
-AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
@@ -22,7 +21,7 @@ void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     
-    PointShadow pointShadow = shadowsUBO.PointShadows[gl_GlobalInvocationID.z];
+    GpuPointShadow pointShadow = shadowsUBO.PointShadows[gl_GlobalInvocationID.z];
 
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (depth == 0.0 || any(greaterThanEqual(imgCoord, imageSize(image2D(pointShadow.RayTracedShadowMapImage)))))
@@ -30,12 +29,12 @@ void main()
         return;
     }
 
-    Light light = lightsUBO.Lights[pointShadow.LightIndex]; 
+    GpuLight light = lightsUBO.Lights[pointShadow.LightIndex]; 
 
     vec2 uv = (imgCoord + 0.5) / imageSize(image2D(pointShadow.RayTracedShadowMapImage));
     vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
 
     vec3 sampleToLightDir = light.Position - unjitteredFragPos;
     float cosTerm = dot(normal, sampleToLightDir);

@@ -8,7 +8,7 @@
 #endif
 
 AppInclude(include/Pbr.glsl)
-AppInclude(include/Constants.glsl)
+AppInclude(include/Surface.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
@@ -22,7 +22,7 @@ layout(binding = 2, r32ui) restrict uniform uimage3D ImgResultG;
 layout(binding = 3, r32ui) restrict uniform uimage3D ImgResultB;
 #endif
 
-in InOutVars
+in InOutData
 {
     vec3 FragPos;
     vec2 TexCoord;
@@ -31,29 +31,30 @@ in InOutVars
     flat float EmissiveBias;
 } inData;
 
-vec3 EvaluateDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight);
-float Visibility(PointShadow pointShadow, vec3 lightToSample);
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
+vec3 EvaluateDiffuseLighting(GpuLight light, vec3 albedo, vec3 sampleToLight);
+float Visibility(GpuPointShadow pointShadow, vec3 lightToSample);
+float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos);
 ivec3 WorlSpaceToVoxelImageSpace(vec3 worldPos);
 
 void main()
 {
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
 
-    Material material = materialSSBO.Materials[inData.MaterialIndex];
-    vec4 albedoAlpha = texture(material.BaseColor, inData.TexCoord) * DecompressUR8G8B8A8(material.BaseColorFactor);
-    vec3 emissive = texture(material.Emissive, inData.TexCoord).rgb * material.EmissiveFactor * MATERIAL_EMISSIVE_FACTOR + inData.EmissiveBias * albedoAlpha.rgb;
+    GpuMaterial material = materialSSBO.Materials[inData.MaterialIndex];
+
+    Surface surface = GetSurface(material, inData.TexCoord);
+    surface.Emissive = surface.Emissive + inData.EmissiveBias * surface.Albedo;
 
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)
     {
-        Light light = lightsUBO.Lights[i];
+        GpuLight light = lightsUBO.Lights[i];
 
         vec3 sampleToLight = light.Position - inData.FragPos;
-        vec3 contrib = EvaluateDiffuseLighting(light, albedoAlpha.rgb, sampleToLight);
+        vec3 contrib = EvaluateDiffuseLighting(light, surface.Albedo, sampleToLight);
         if (light.PointShadowIndex >= 0)
         {
-            PointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
+            GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
             contrib *= Visibility(pointShadow, -sampleToLight);
         }
 
@@ -61,8 +62,8 @@ void main()
     }
 
     const float ambient = 0.015;
-    directLighting += albedoAlpha.rgb * ambient;
-    directLighting += emissive;
+    directLighting += surface.Albedo * ambient;
+    directLighting += surface.Emissive;
 
 #if TAKE_ATOMIC_FP16_PATH
 
@@ -79,7 +80,7 @@ void main()
 
 }
 
-vec3 EvaluateDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight)
+vec3 EvaluateDiffuseLighting(GpuLight light, vec3 albedo, vec3 sampleToLight)
 {
     float dist = length(sampleToLight);
 
@@ -96,7 +97,7 @@ vec3 EvaluateDiffuseLighting(Light light, vec3 albedo, vec3 sampleToLight)
     return vec3(0.0);
 }
 
-float Visibility(PointShadow pointShadow, vec3 lightToSample)
+float Visibility(GpuPointShadow pointShadow, vec3 lightToSample)
 {
     float bias = 0.02;
     const float sampleDiskRadius = 0.08;
@@ -107,7 +108,7 @@ float Visibility(PointShadow pointShadow, vec3 lightToSample)
     return visibilityFactor;
 }
 
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
+float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos)
 {
     float dist = max(abs(lightSpaceSamplePos.x), max(abs(lightSpaceSamplePos.y), abs(lightSpaceSamplePos.z)));
     float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);

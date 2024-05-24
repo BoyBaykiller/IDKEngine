@@ -1,12 +1,11 @@
 #version 460 core
 
-AppInclude(include/Constants.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(location = 0) in vec3 Position;
 
-out InOutVars
+out InOutData
 {
     vec3 LightColor;
     vec3 FragPos;
@@ -18,7 +17,8 @@ out InOutVars
 
 void main()
 {
-    Light light = lightsUBO.Lights[gl_InstanceID];
+    GpuLight light = lightsUBO.Lights[gl_InstanceID];
+    
     mat4x3 modelMatrix = mat4x3(
         vec3(light.Radius, 0.0, 0.0),
         vec3(0.0, light.Radius, 0.0),

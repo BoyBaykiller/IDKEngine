@@ -170,7 +170,7 @@ namespace IDKEngine
             if (gltf.ExtensionsUsed.Contains("KHR_texture_basisu") && !gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness"))
             {
                 Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" uses extension KHR_texture_basisu without IDK_BC5_normal_metallicRoughness,\n" +
-                                                  "causing normal and metallicRoughness textures with a suboptimal (BC7) format and potentially visible error.\n" +
+                                                  "causing normal and metallicRoughness textures with a suboptimal format (BC7) and potentially visible error.\n" +
                                                   "Consider compressing with https://github.com/BoyBaykiller/meshoptimizer");
             }
 

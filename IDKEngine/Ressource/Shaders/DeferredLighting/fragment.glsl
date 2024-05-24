@@ -4,19 +4,18 @@
 AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Pbr.glsl)
-AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
-layout(location = 0) out vec4 FragColor;
+layout(location = 0) out vec4 OutFragColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
 
-vec3 EvaluateLighting(Light light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion);
-float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample);
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos);
+vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion);
+float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample);
+float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos);
 
 #define SHADOW_MODE_NONE 0
 #define SHADOW_MODE_PCF_SHADOW_MAP 1 
@@ -25,7 +24,7 @@ uniform int ShadowMode;
 
 uniform bool IsVXGI;
 
-in InOutVars
+in InOutData
 {
     vec2 TexCoord;
 } inData;
@@ -38,7 +37,7 @@ void main()
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
-        FragColor = vec4(0.0);
+        OutFragColor = vec4(0.0);
         return;
     }
     
@@ -50,22 +49,25 @@ void main()
 
     vec3 albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
     float alpha = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).a;
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
-    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).b;
-    vec3 emissive = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).rgb;
-    float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
+    float specular = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
+    float roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
+    vec3 emissive = texelFetch(gBufferDataUBO.Emissive, imgCoord, 0).rgb;
     float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)
     {
-        Light light = lightsUBO.Lights[i];
+        GpuLight light = lightsUBO.Lights[i];
 
         Surface surface;
         surface.Albedo = albedo;
         surface.Normal = normal;
         surface.Metallic = specular;
-        surface.PerceivedRoughness = roughness;
+        surface.Roughness = roughness;
+
+        // TODO: Use real value
+        surface.IOR = 1.0;
 
         vec3 contribution = EvaluateLighting(light, surface, fragPos, perFrameDataUBO.ViewPos, ambientOcclusion);
         
@@ -78,13 +80,13 @@ void main()
             }
             else if (ShadowMode == SHADOW_MODE_PCF_SHADOW_MAP)
             {
-                PointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
+                GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
                 vec3 lightToSample = unjitteredFragPos - light.Position;
                 shadow = 1.0 - Visibility(pointShadow, normal, lightToSample);
             }
             else if (ShadowMode == SHADOW_MODE_RAY_TRACED)
             {
-                PointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
+                GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
                 shadow = imageLoad(image2D(pointShadow.RayTracedShadowMapImage), imgCoord).r;
             }
 
@@ -105,11 +107,11 @@ void main()
         indirectLight = ambient * albedo;
     }
 
-    FragColor = vec4((directLighting + indirectLight) + emissive, 1.0);
-    // FragColor = vec4(normal * 0.5 + 0.5, 1.0);
+    OutFragColor = vec4((directLighting + indirectLight) + emissive, 1.0);
+    // OutFragColor = vec4(normal * 0.5 + 0.5, 1.0);
 }
 
-vec3 EvaluateLighting(Light light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion)
+vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion)
 {
     vec3 surfaceToLight = light.Position - fragPos;
     vec3 dirSurfaceToCam = normalize(viewPos - fragPos);
@@ -123,7 +125,7 @@ vec3 EvaluateLighting(Light light, Surface surface, vec3 fragPos, vec3 viewPos, 
     return BRDF(surface, dirSurfaceToCam, dirSurfaceToLight, ambientOcclusion) * attenuation * cosTerm * light.Color;
 }
 
-float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample)
+float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample)
 {
     // TODO: Use overall better sampling method
     // Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
@@ -152,7 +154,7 @@ float Visibility(PointShadow pointShadow, vec3 normal, vec3 lightToSample)
     return visibilityFactor;
 }
 
-float GetLightSpaceDepth(PointShadow pointShadow, vec3 lightSpaceSamplePos)
+float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos)
 {
     float dist = max(abs(lightSpaceSamplePos.x), max(abs(lightSpaceSamplePos.y), abs(lightSpaceSamplePos.z)));
     float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);

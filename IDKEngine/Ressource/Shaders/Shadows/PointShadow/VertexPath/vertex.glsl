@@ -8,7 +8,6 @@
 #error "PointShadow vertex shader shader is missing extension support."
 #endif
 
-AppInclude(include/Constants.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 

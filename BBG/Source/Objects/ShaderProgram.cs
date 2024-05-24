@@ -260,7 +260,7 @@ namespace BBOpenGL
                         AbstractShader shader = shaderProgram.Shaders[j];
 
                         string srcCode = File.ReadAllText(shader.FullShaderPath);
-                        AbstractShader.Preprocessor.PreProcess(srcCode, GlobalShaderInsertions, out AbstractShader.Preprocessor.PreProcessInfo preprocessInfo);
+                        AbstractShader.Preprocessor.PreProcess(srcCode, GlobalShaderInsertions, shader.ShaderStage, out AbstractShader.Preprocessor.PreProcessInfo preprocessInfo);
 
                         if (preprocessInfo.UsedAppInsertionKeys.Contains(key))
                         {
@@ -306,7 +306,7 @@ namespace BBOpenGL
                 for (int i = 0; i < recompiledShaders.Length; i++)
                 {
                     AbstractShader existingShader = shaderProgram.Shaders[i];
-                    recompiledShaders[i] = new AbstractShader(existingShader.ShaderType, existingShader.LocalShaderPath);
+                    recompiledShaders[i] = new AbstractShader(existingShader.ShaderStage, existingShader.LocalShaderPath);
                 }
                 shaderProgram.Link(recompiledShaders);
             }

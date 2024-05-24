@@ -33,7 +33,7 @@ namespace IDKEngine.Render
         private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
         public unsafe ConeTracer(Vector2i size, in GpuSettings settings)
         {
-            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VXGI/ConeTracing/compute.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/ConeTracing/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
             gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);

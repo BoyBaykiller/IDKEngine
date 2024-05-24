@@ -4,7 +4,7 @@ Feature list:
  - Wavefront Path Tracer
  - Real-Time Voxel Global Illumination
  - Mesh Shaders + Multi Draw Indirect + Bindless Textures + other extensions
- - [AMD FSR2](https://github.com/GPUOpen-Effects/FidelityFX-FSR2) and Temporal Anti Aliasing
+ - [AMD FSR2](https://github.com/JuanDiegoMontoya/FidelityFX-FSR2-OpenGL) and Temporal Anti Aliasing
  - Lights & Camera Collision Detection against arbitrary triangle meshes
  - CoD-Modern-Warfare Bloom
  - Ray Traced Shadows
@@ -214,7 +214,7 @@ layout(passthrough) in gl_PerVertex {
     vec4 gl_Position;
 } gl_in[];
 
-layout(passthrough) in InOutVars {
+layout(passthrough) in InOutData {
     // in & out variables...
 } inData[];
 

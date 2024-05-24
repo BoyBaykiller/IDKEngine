@@ -56,7 +56,7 @@ namespace IDKEngine.GpuTypes
 
         private static unsafe bool FastMatrix3x4Equal(in Matrix3x4 a, in Matrix3x4 b)
         {
-            // Soon gets implemented in OpenTK https://github.com/opentk/opentk/pull/1722
+            // Soon gets implemented in OpenTK https://github.com/opentk/opentk/pull/1721
             Vector256<float> aLo = Vector256.LoadUnsafe(in a.Row0.X);
             Vector256<float> bLo = Vector256.LoadUnsafe(in b.Row0.X);
 

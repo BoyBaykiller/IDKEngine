@@ -9,7 +9,6 @@
 
 #define IS_HI_Z_CULLING AppInsert(IS_HI_Z_CULLING)
 
-AppInclude(include/Constants.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
@@ -24,10 +23,10 @@ void main()
         return;
     }
 
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
     uint meshID = meshInstance.MeshIndex;
 
-    BlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeIndex];
+    GpuBlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeIndex];
     
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
@@ -66,7 +65,7 @@ void main()
 
     #else
 
-        DrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+        GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
 
         uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshID].InstanceCount, 1u);
         visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceID;

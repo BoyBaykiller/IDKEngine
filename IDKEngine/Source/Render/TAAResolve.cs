@@ -18,7 +18,7 @@ namespace IDKEngine.Render
         private int frame;
         public TAAResolve(Vector2i size, float preferAliasingOverBlurAmount = 0.25f)
         {
-            taaResolveProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "TAAResolve/compute.glsl"));
+            taaResolveProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "TAAResolve/compute.glsl"));
 
             SetSize(size);
 

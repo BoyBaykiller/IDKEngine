@@ -1,7 +1,6 @@
 #version 460 core
 
 AppInclude(include/Random.glsl)
-AppInclude(include/Constants.glsl)
 AppInclude(include/TraceCone.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
@@ -38,9 +37,9 @@ void main()
     }
 
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjView);
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).rg);
-    float specular = texelFetch(gBufferDataUBO.NormalSpecular, imgCoord, 0).b;
-    float roughness = texelFetch(gBufferDataUBO.EmissiveRoughness, imgCoord, 0).a;
+    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
+    float specular = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
+    float roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).b;
 
     vec3 viewDir = fragPos - perFrameDataUBO.ViewPos;
     vec3 indirectLight = IndirectLight(fragPos, viewDir, normal, specular, roughness) * settingsUBO.GIBoost;

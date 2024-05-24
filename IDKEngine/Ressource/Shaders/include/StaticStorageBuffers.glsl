@@ -8,17 +8,17 @@ AppInclude(include/GpuTypes.glsl)
 
 layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
 {
-    DrawElementsCmd DrawCommands[];
+    GpuDrawElementsCmd DrawCommands[];
 } drawElementsCmdSSBO;
 
 layout(std430, binding = 1) restrict readonly buffer MeshSSBO
 {
-    Mesh Meshes[];
+    GpuMesh Meshes[];
 } meshSSBO;
 
 layout(std430, binding = 2, row_major) restrict readonly buffer MeshInstanceSSBO
 {
-    MeshInstance MeshInstances[];
+    GpuMeshInstance MeshInstances[];
 } meshInstanceSSBO;
 
 layout(std430, binding = 3) restrict buffer VisibleMeshInstanceSSBO
@@ -28,7 +28,7 @@ layout(std430, binding = 3) restrict buffer VisibleMeshInstanceSSBO
 
 layout(std430, binding = 4) restrict readonly buffer BlasSSBO
 {
-    BlasNode Nodes[];
+    GpuBlasNode Nodes[];
 } blasSSBO;
 
 #ifdef DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS // used only in bvh traversal code
@@ -39,18 +39,18 @@ layout(std430, binding = 5) restrict readonly buffer BlasTriangleIndicesSSBO
 
 layout(std430, binding = 6) restrict readonly buffer TlasSSBO
 {
-    TlasNode Nodes[];
+    GpuTlasNode Nodes[];
 } tlasSSBO;
 #endif
 
 layout(std430, binding = 7) restrict buffer WavefrontRaySSBO
 {
-    WavefrontRay Rays[];
+    GpuWavefrontRay Rays[];
 } wavefrontRaySSBO;
 
 layout(std430, binding = 8) restrict buffer WavefrontPTSSBO
 {
-    DispatchCommand DispatchCommand;
+    GpuDispatchCommand DispatchCommand;
     uint Counts[2];
     uint PingPongIndex;
     uint AccumulatedSamples;
@@ -59,12 +59,12 @@ layout(std430, binding = 8) restrict buffer WavefrontPTSSBO
 
 layout(std430, binding = 9) restrict readonly buffer MaterialSSBO
 {
-    Material Materials[];
+    GpuMaterial Materials[];
 } materialSSBO;
 
 layout(std430, binding = 10) restrict readonly buffer VertexSSBO
 {
-    Vertex Vertices[];
+    GpuVertex Vertices[];
 } vertexSSBO;
 
 layout(std430, binding = 11) restrict readonly buffer VertexPositionsSSBO
@@ -75,7 +75,7 @@ layout(std430, binding = 11) restrict readonly buffer VertexPositionsSSBO
 #ifdef DECLARE_MESHLET_STORAGE_BUFFERS // used only when mesh shader path is taken
 layout(std430, binding = 12) restrict buffer MeshletTaskCmdSSBO
 {
-    MeshletTaskCmd TaskCommands[];
+    GpuMeshletTaskCmd TaskCommands[];
 } meshletTaskCmdSSBO;
 
 layout(std430, binding = 13) restrict buffer MeshletTasksCountSSBO
@@ -85,12 +85,12 @@ layout(std430, binding = 13) restrict buffer MeshletTasksCountSSBO
 
 layout(std430, binding = 14) restrict readonly buffer MeshletSSBO
 {
-    Meshlet Meshlets[];
+    GpuMeshlet Meshlets[];
 } meshletSSBO;
 
 layout(std430, binding = 15) restrict readonly buffer MeshletInfoSSBO
 {
-    MeshletInfo MeshletsInfo[];
+    GpuMeshletInfo MeshletsInfo[];
 } meshletInfoSSBO;
 
 layout(std430, binding = 16) restrict readonly buffer MeshletVertexIndicesSSBO

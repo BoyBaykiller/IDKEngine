@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -10,7 +9,6 @@ using IDKEngine.Render;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 using IDKEngine.Windowing;
-using System.Runtime.InteropServices;
 
 namespace IDKEngine
 {
@@ -44,6 +42,7 @@ namespace IDKEngine
         }
 
         public Vector2i PresentationResolution => new Vector2i(TonemapAndGamma.Result.Width, TonemapAndGamma.Result.Height);
+        
         public Vector2i RenderResolution
         {
             get
@@ -62,17 +61,10 @@ namespace IDKEngine
             }
         }
 
-        public int FramesPerSecond { get; private set; }
+        public float RenderResolutionScale => (float)RenderResolution.Y / PresentationResolution.Y;
+        
 
-        public bool RunSimulations = true;
-        public Intersections.SceneVsMovingSphereSettings SceneVsCamCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
-        {
-            IsEnabled = true,
-            TestSteps = 3,
-            RecursiveSteps = 12,
-            EpsilonNormalOffset = 0.001f
-        };
-
+        // These will take effect at the beginning of a frame
         public Vector2i? RequestPresentationResolution;
         public float? RequestRenderResolutionScale;
         public RenderMode? RequestRenderMode;
@@ -92,20 +84,30 @@ namespace IDKEngine
         public VolumetricLighting VolumetricLight;
         public bool IsVolumetricLighting = true;
 
-        // All models and all lights (the types of different entities)
+        // All models and all lights and Camera (the types of different entities)
         public ModelManager ModelManager;
         public LightManager LightManager;
-
         public Camera Camera;
+
         public StateRecorder<FrameState> FrameStateRecorder;
 
         private GpuPerFrameData gpuPerFrameData;
         private BBG.TypedBuffer<GpuPerFrameData> gpuPerFrameDataBuffer;
 
-        private float lastRenderTime = 1.0f / 144.0f;
+        public int FramesPerSecond { get; private set; }
+
+        public bool RunSimulations = true;
+        public Intersections.SceneVsMovingSphereSettings SceneVsCamCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
+        {
+            IsEnabled = true,
+            TestSteps = 3,
+            RecursiveSteps = 12,
+            EpsilonNormalOffset = 0.001f
+        };
 
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
+        private float lastRenderTime = 1.0f / 144.0f;
         public Application(int width, int height, string title)
             : base(width, height, title, 4, 6)
         {
@@ -180,25 +182,27 @@ namespace IDKEngine
 
             if (gui.SelectedEntity.EntityType != Gui.EntityType.None)
             {
-                Box selectedEntityBox = new Box();
+                Box boundingBox = new Box();
                 if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
                 {
                     GpuBlasNode node = ModelManager.BVH.Tlas.Blases[gui.SelectedEntity.EntityID].Root;
-                    selectedEntityBox.Min = node.Min;
-                    selectedEntityBox.Max = node.Max;
+                    boundingBox.Min = node.Min;
+                    boundingBox.Max = node.Max;
 
-                    selectedEntityBox.Transform(ModelManager.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
+                    boundingBox.Transform(ModelManager.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
                 }
-                else
+
+                if (gui.SelectedEntity.EntityType == Gui.EntityType.Light)
                 {
                     LightManager.TryGetLight(gui.SelectedEntity.EntityID, out CpuLight cpuLight);
                     ref GpuLight light = ref cpuLight.GpuLight;
 
-                    selectedEntityBox.Min = light.Position - new Vector3(light.Radius);
-                    selectedEntityBox.Max = light.Position + new Vector3(light.Radius);
+                    boundingBox.Min = light.Position - new Vector3(light.Radius);
+                    boundingBox.Max = light.Position + new Vector3(light.Radius);
                 }
 
-                BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, selectedEntityBox);
+                BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, boundingBox);
+
             }
 
             BBG.Rendering.SetViewport(WindowFramebufferSize);
@@ -495,11 +499,11 @@ namespace IDKEngine
                 //a.Meshes[324].EmissiveBias = 20.0f;
                 //a.Meshes[376].EmissiveBias = 20.0f;
                 //a.Meshes[379].EmissiveBias = 20.0f;
-                //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\CurtainsCompressed\NewSponza_Curtains_glTF.gltf");
-                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\NewSponza_IvyGrowth_glTF.gltf");
-                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\NewSponza_CypressTree_glTF.gltf");
+                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf");
+                ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf");
+                ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelManager.Add(a);
+                ModelManager.Add(a, b, c, d);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -535,8 +539,6 @@ namespace IDKEngine
         {
             gui.PressChar(key);
         }
-
-        public float RenderResolutionScale => (float)RenderResolution.Y / PresentationResolution.Y;
 
         /// <summary>
         /// We should avoid random resolution changes inside a frame so if you can use

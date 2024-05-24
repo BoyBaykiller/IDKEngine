@@ -29,7 +29,7 @@ namespace IDKEngine.Render
         {
             pointShadows = new CpuPointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
-            rayTracedShadowsProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "ShadowsRayTraced/compute.glsl"));
+            rayTracedShadowsProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "ShadowsRayTraced/compute.glsl"));
 
             pointShadowsBuffer = new BBG.TypedBuffer<GpuPointShadow>();
             pointShadowsBuffer.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));

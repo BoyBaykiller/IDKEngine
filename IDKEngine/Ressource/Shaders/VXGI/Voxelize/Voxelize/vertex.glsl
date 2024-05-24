@@ -8,7 +8,7 @@ AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 
-out InOutVars
+out InOutData
 {
     vec3 FragPos;
     vec2 TexCoord;
@@ -23,11 +23,11 @@ layout(location = 0) uniform int RenderAxis;
 
 void main()
 {
-    Vertex vertex = vertexSSBO.Vertices[gl_VertexID];
+    GpuVertex vertex = vertexSSBO.Vertices[gl_VertexID];
     vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
 
-    Mesh mesh = meshSSBO.Meshes[gl_DrawID];
-    MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
+    GpuMesh mesh = meshSSBO.Meshes[gl_DrawID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
 
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);

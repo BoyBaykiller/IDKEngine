@@ -11,8 +11,8 @@ namespace IDKEngine.Render
         public BoxRenderer()
         {
             shaderProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderType.Vertex, "Box/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderType.Fragment, "Box/fragment.glsl"));
+                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "Box/vertex.glsl"),
+                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Box/fragment.glsl"));
         }
 
         public void Render(BBG.Texture result, Matrix4 matrix, Box box)

@@ -3,7 +3,7 @@
 AppInclude(include/CubeVertices.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
-out InOutVars
+out InOutData
 {
     vec3 TexCoord;
     vec4 ClipPos;

@@ -119,6 +119,7 @@ namespace BBOpenGL
         {
 
             public new T* MappedMemory => (T*)base.MappedMemory;
+            public int NumElements => (int)(Size / sizeof(T));
 
             public TypedBuffer()
                 : base()
@@ -184,11 +185,6 @@ namespace BBOpenGL
                 {
                     DownloadData(startIndex * sizeof(T), count * sizeof(T), ptr);
                 }
-            }
-
-            public int GetNumElements()
-            {
-                return (int)(Size / sizeof(T));
             }
         }
     }

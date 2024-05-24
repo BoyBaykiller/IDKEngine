@@ -16,7 +16,7 @@ uvec3 Unpack(PackedUVec3 uints)
     return uvec3(uints.x, uints.y, uints.z);
 }
 
-struct DrawElementsCmd
+struct GpuDrawElementsCmd
 {
     uint IndexCount;
     uint InstanceCount;
@@ -25,14 +25,14 @@ struct DrawElementsCmd
     uint BaseInstance;
 };
 
-struct DispatchCommand
+struct GpuDispatchCommand
 {
     int NumGroupsX;
     int NumGroupsY;
     int NumGroupsZ;
 };
 
-struct PerFrameData
+struct GpuPerFrameData
 {
     mat4 ProjView;
     mat4 View;
@@ -50,17 +50,19 @@ struct PerFrameData
     float Time;
 };
 
-struct Light
+struct GpuLight
 {
     vec3 Position;
     float Radius;
+    
     vec3 Color;
     int PointShadowIndex;
+    
     vec3 PrevPosition;
     float _pad0;
 };
 
-struct PointShadow
+struct GpuPointShadow
 {
     samplerCube ShadowMapTexture;
     samplerCubeShadow PcfShadowTexture;
@@ -77,7 +79,7 @@ struct PointShadow
     int LightIndex;
 };
 
-struct Mesh
+struct GpuMesh
 {
     int MaterialIndex;
     float NormalMapStrength;
@@ -94,7 +96,7 @@ struct Mesh
     vec2 _pad0;
 };
 
-struct MeshInstance
+struct GpuMeshInstance
 {
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
@@ -103,7 +105,7 @@ struct MeshInstance
     uint MeshIndex;
 };
 
-struct BlasNode
+struct GpuBlasNode
 {
     vec3 Min;
     uint TriStartOrChild;
@@ -111,7 +113,7 @@ struct BlasNode
     uint TriCount;
 };
 
-struct TlasNode
+struct GpuTlasNode
 {
     vec3 Min;
     uint IsLeafAndChildOrInstanceID;
@@ -119,7 +121,7 @@ struct TlasNode
     float _pad0;
 };
 
-struct WavefrontRay
+struct GpuWavefrontRay
 {
     vec3 Origin;
     float PreviousIOROrDebugNodeCounter;
@@ -135,7 +137,7 @@ struct WavefrontRay
 #ifndef MATERIAL_SAMPLER_2D_TYPE
 #define MATERIAL_SAMPLER_2D_TYPE sampler2D
 #endif
-struct Material
+struct GpuMaterial
 {
     vec3 EmissiveFactor;
     uint BaseColorFactor;
@@ -159,7 +161,7 @@ struct Material
     uint _pad0;
 };
 
-struct Vertex
+struct GpuVertex
 {
     vec2 TexCoord;
     uint Tangent;
@@ -167,13 +169,13 @@ struct Vertex
 };
 
 #ifdef DECLARE_MESHLET_RENDERING_TYPES
-struct MeshletTaskCmd
+struct GpuMeshletTaskCmd
 {
     uint Count;
     uint First;
 };
 
-struct Meshlet
+struct GpuMeshlet
 {
     uint VertexOffset;
     uint IndicesOffset;
@@ -182,7 +184,7 @@ struct Meshlet
     uint8_t TriangleCount;
 };
 
-struct MeshletInfo
+struct GpuMeshletInfo
 {
     vec3 Min;
     float _pad0;

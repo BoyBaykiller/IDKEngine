@@ -34,7 +34,7 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
     float tMax;
     
     #if !USE_TLAS
-    BlasNode rootNode = blasSSBO.Nodes[blasRootNodeIndex];
+    GpuBlasNode rootNode = blasSSBO.Nodes[blasRootNodeIndex];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft, tMax) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -46,8 +46,8 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
     while (true)
     {
         debugNodeCounter++;
-        BlasNode leftNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop];
-        BlasNode rightNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop + 1];
+        GpuBlasNode leftNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop];
+        GpuBlasNode rightNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop + 1];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
@@ -110,7 +110,7 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
     float tMax;
     
     #if !USE_TLAS
-    BlasNode rootNode = blasSSBO.Nodes[blasRootNodeIndex];
+    GpuBlasNode rootNode = blasSSBO.Nodes[blasRootNodeIndex];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft, tMax) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -121,8 +121,8 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
     uint stackTop = 1;
     while (true)
     {
-        BlasNode leftNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop];
-        BlasNode rightNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop + 1];
+        GpuBlasNode leftNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop];
+        GpuBlasNode rightNode = blasSSBO.Nodes[blasRootNodeIndex + stackTop + 1];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
@@ -189,7 +189,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         float tMax;
         for (int i = 0; i < lightsUBO.Count; i++)
         {
-            Light light = lightsUBO.Lights[i];
+            GpuLight light = lightsUBO.Lights[i];
             if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
             {
                 hitInfo.T = tMin < 0.0 ? tMax : tMin;
@@ -209,7 +209,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
     uint stack[MAX_TLAS_TREE_DEPTH];
     while (true)
     {
-        TlasNode parent = tlasSSBO.Nodes[stackTop];
+        GpuTlasNode parent = tlasSSBO.Nodes[stackTop];
         // float tMin;
         // if (!(RayBoxIntersect(ray, Box(parent.Min, parent.Max), tMin, tMax) && tMin <= hitInfo.T))
         // {
@@ -222,9 +222,9 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         uint childOrInstanceID = parent.IsLeafAndChildOrInstanceID & ((1u << 31) - 1);
         if (isLeaf)
         {
-            MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
-            DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
-            Mesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
+            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
 
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
@@ -242,8 +242,8 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
 
         uint leftChild = childOrInstanceID;
         uint rightChild = leftChild + 1;
-        TlasNode leftNode = tlasSSBO.Nodes[leftChild];
-        TlasNode rightNode = tlasSSBO.Nodes[rightChild];
+        GpuTlasNode leftNode = tlasSSBO.Nodes[leftChild];
+        GpuTlasNode rightNode = tlasSSBO.Nodes[rightChild];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
@@ -270,8 +270,8 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
     #else
     for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
     {
-        DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
-        Mesh mesh = meshSSBO.Meshes[i];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
+        GpuMesh mesh = meshSSBO.Meshes[i];
         for (uint j = 0; j < mesh.InstanceCount; j++)
         {
             uint instanceID = cmd.BaseInstance + j;
@@ -305,7 +305,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         float tMax;
         for (int i = 0; i < lightsUBO.Count; i++)
         {
-            Light light = lightsUBO.Lights[i];
+            GpuLight light = lightsUBO.Lights[i];
             if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
             {
                 hitInfo.T = tMin < 0.0 ? tMax : tMin;
@@ -327,7 +327,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
     uint stack[MAX_TLAS_TREE_DEPTH];
     while (true)
     {
-        TlasNode parent = tlasSSBO.Nodes[stackTop];
+        GpuTlasNode parent = tlasSSBO.Nodes[stackTop];
         // float tMin;
         // if (!(RayBoxIntersect(ray, Box(parent.Min, parent.Max), tMin, tMax) && tMin <= hitInfo.T))
         // {
@@ -340,9 +340,9 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         uint childOrInstanceID = parent.IsLeafAndChildOrInstanceID & ((1u << 31) - 1);
         if (isLeaf)
         {
-            MeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
-            DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
-            Mesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
+            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
 
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
@@ -362,8 +362,8 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 
         uint leftChild = childOrInstanceID;
         uint rightChild = leftChild + 1;
-        TlasNode leftNode = tlasSSBO.Nodes[leftChild];
-        TlasNode rightNode = tlasSSBO.Nodes[rightChild];
+        GpuTlasNode leftNode = tlasSSBO.Nodes[leftChild];
+        GpuTlasNode rightNode = tlasSSBO.Nodes[rightChild];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft, tMax) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight, tMax) && tMinRight <= hitInfo.T;
@@ -391,8 +391,8 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 
     for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
     {
-        DrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
-        Mesh mesh = meshSSBO.Meshes[i];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
+        GpuMesh mesh = meshSSBO.Meshes[i];
         for (uint j = 0; j < mesh.InstanceCount; j++)
         {
             uint instanceID = cmd.BaseInstance + j;

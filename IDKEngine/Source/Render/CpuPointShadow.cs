@@ -34,15 +34,15 @@ namespace IDKEngine.Render
                 if (TakeMeshShaderPath)
                 {
                     renderShadowMapProgram = new BBG.AbstractShaderProgram(
-                       new BBG.AbstractShader(BBG.ShaderType.TaskNV, "Shadows/PointShadow/MeshPath/task.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderType.MeshNV, "Shadows/PointShadow/MeshPath/mesh.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderType.Fragment, "Shadows/PointShadow/fragment.glsl"));
+                       new BBG.AbstractShader(BBG.ShaderStage.TaskNV, "Shadows/PointShadow/MeshPath/task.glsl"),
+                       new BBG.AbstractShader(BBG.ShaderStage.MeshNV, "Shadows/PointShadow/MeshPath/mesh.glsl"),
+                       new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Shadows/PointShadow/fragment.glsl"));
                 }
                 else
                 {
                     renderShadowMapProgram = new BBG.AbstractShaderProgram(
-                        new BBG.AbstractShader(BBG.ShaderType.Vertex, "Shadows/PointShadow/VertexPath/vertex.glsl"),
-                        new BBG.AbstractShader(BBG.ShaderType.Fragment, "Shadows/PointShadow/fragment.glsl"));
+                        new BBG.AbstractShader(BBG.ShaderStage.Vertex, "Shadows/PointShadow/VertexPath/vertex.glsl"),
+                        new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Shadows/PointShadow/fragment.glsl"));
                 }
             }
         }
@@ -106,7 +106,7 @@ namespace IDKEngine.Render
             if (!isLazyInitialized)
             {
                 TakeMeshShaderPath = false;
-                cullingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "MeshCulling/PointShadow/compute.glsl"));
+                cullingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "MeshCulling/PointShadow/compute.glsl"));
                 isLazyInitialized = true;
             }
 

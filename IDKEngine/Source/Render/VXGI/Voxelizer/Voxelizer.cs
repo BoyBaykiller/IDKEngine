@@ -9,8 +9,10 @@ namespace IDKEngine.Render
 {
     class Voxelizer : IDisposable
     {
-        public static readonly bool ALLOW_CONSERVATIVE_RASTER = BBG.GetDeviceInfo().ExtensionSupport.ConservativeRaster;
-        public static readonly bool TAKE_ATOMIC_FP16_PATH = BBG.GetDeviceInfo().ExtensionSupport.AtomicFp16Vector;
+        public static readonly bool ALLOW_CONSERVATIVE_RASTER      = BBG.GetDeviceInfo().ExtensionSupport.ConservativeRaster;
+
+        public static readonly bool TAKE_ATOMIC_FP16_PATH          = BBG.GetDeviceInfo().ExtensionSupport.AtomicFp16Vector;
+
         public static readonly bool TAKE_FAST_GEOMETRY_SHADER_PATH = BBG.GetDeviceInfo().ExtensionSupport.GeometryShaderPassthrough &&
                                                                      BBG.GetDeviceInfo().ExtensionSupport.ViewportSwizzle;
 
@@ -72,35 +74,34 @@ namespace IDKEngine.Render
             {
                 List<BBG.AbstractShader> voxelizeProgramShaders = new List<BBG.AbstractShader>()
                 {
-                    new BBG.AbstractShader(BBG.ShaderType.Vertex, "VXGI/Voxelize/Voxelize/vertex.glsl"),
-                    new BBG.AbstractShader(BBG.ShaderType.Fragment, "VXGI/Voxelize/Voxelize/fragment.glsl")
+                    new BBG.AbstractShader(BBG.ShaderStage.Vertex, "VXGI/Voxelize/Voxelize/vertex.glsl"),
+                    new BBG.AbstractShader(BBG.ShaderStage.Fragment, "VXGI/Voxelize/Voxelize/fragment.glsl")
                 };
                 if (TAKE_FAST_GEOMETRY_SHADER_PATH)
                 {
-                    voxelizeProgramShaders.Add(new BBG.AbstractShader(BBG.ShaderType.Geometry, "VXGI/Voxelize/Voxelize/geometry.glsl"));
+                    voxelizeProgramShaders.Add(new BBG.AbstractShader(BBG.ShaderStage.Geometry, "VXGI/Voxelize/Voxelize/geometry.glsl"));
                 }
 
                 voxelizeProgram = new BBG.AbstractShaderProgram(voxelizeProgramShaders.ToArray());
 
-                clearTexturesProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VXGI/Voxelize/Clear/compute.glsl"));
+                clearTexturesProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/Clear/compute.glsl"));
             }
 
-            mipmapProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VXGI/Voxelize/Mipmap/compute.glsl"));
-            visualizeDebugProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
+            mipmapProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/Mipmap/compute.glsl"));
+            visualizeDebugProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
             if (!TAKE_ATOMIC_FP16_PATH)
             {
                 intermediateResultRbg = new BBG.Texture[3];
-                mergeIntermediatesProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
+                mergeIntermediatesProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
             }
 
             voxelizerDataBuffer = new BBG.TypedBuffer<GpuVoxelizerData>();
             voxelizerDataBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
             voxelizerDataBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 5);
 
-            gpuVoxelizerData.GridMax = new Vector3(float.MaxValue);
-            gpuVoxelizerData.GridMin = new Vector3(float.MinValue);
-
             SetSize(width, height, depth);
+
+            gpuVoxelizerData = new GpuVoxelizerData();
             GridMin = gridMin;
             GridMax = gridMax;
             DebugConeAngle = debugConeAngle;
@@ -134,13 +135,13 @@ namespace IDKEngine.Render
 
         private void Voxelize(ModelManager modelManager)
         {
-            BBG.Rendering.Render("Voxelize", new BBG.Rendering.NoAttachmentsParams()
+            BBG.Rendering.Render("Voxelize", new BBG.Rendering.NoRenderAttachmentsParams()
             {
                 Width = ResultVoxels.Width,
                 Height = ResultVoxels.Height,
             }, new BBG.Rendering.GraphicsPipelineState()
             {
-                EnabledCapabilities = [IsConservativeRasterization ? BBG.Rendering.Capability.ConservativeRasterizationNV : BBG.Rendering.Capability.None],
+                EnabledCapabilities = [BBG.Rendering.CapIf(IsConservativeRasterization, BBG.Rendering.Capability.ConservativeRasterizationNV)],
                 DepthConvention = BBG.Rendering.DepthConvention.NegativeOneToOne,
             }, () =>
             {
@@ -161,7 +162,7 @@ namespace IDKEngine.Render
                             ViewportSwizzle = new BBG.Rendering.ViewportSwizzleNV() { X = BBG.Rendering.ViewportSwizzleAxisNV.PositiveZ, Z = BBG.Rendering.ViewportSwizzleAxisNV.PositiveX },
                         }
                     ];
-                    BBG.Rendering.SetViewport(viewport);
+                    BBG.Rendering.SetViewports(viewport);
                 }
 
                 BBG.Cmd.BindImageUnit(ResultVoxels, 0, 0, true);

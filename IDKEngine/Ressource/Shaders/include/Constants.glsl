@@ -1,11 +1,6 @@
-#define MATERIAL_EMISSIVE_FACTOR 1.0
 #define PI 3.14159265
 #define FLOAT_MAX 3.4028235e+38
 #define FLOAT_MIN -FLOAT_MAX
-
-// These constants are used in shader and client code. Keep in sync!
-#define GPU_MAX_UBO_POINT_SHADOW_COUNT 128
-#define GPU_MAX_UBO_LIGHT_COUNT 256
 
 #define TEMPORAL_ANTI_ALIASING_MODE_NO_AA 0
 #define TEMPORAL_ANTI_ALIASING_MODE_TAA 1

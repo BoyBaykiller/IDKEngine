@@ -33,26 +33,22 @@ namespace IDKEngine
             // Flatten and transform local space blas instances into
             // world space tlas nodes. These nodes are the primitives of the the TLAS.
             {
-                for (int i = 0; i < Blases.Length; i++)
+                for (int i = 0; i < MeshInstances.Length; i++)
                 {
-                    BLAS blas = Blases[i];
-                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[i];
+                    ref readonly GpuMeshInstance meshInstance = ref MeshInstances[i];
+                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[meshInstance.MeshIndex];
+                    BLAS blas = Blases[meshInstance.MeshIndex];
 
-                    for (int j = 0; j < cmd.InstanceCount; j++)
-                    {
-                        int instanceID = cmd.BaseInstance + j;
+                    Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), MeshInstances[i].ModelMatrix);
 
-                        Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), MeshInstances[instanceID].ModelMatrix);
+                    GpuTlasNode newNode = new GpuTlasNode();
+                    newNode.Min = worldSpaceBounds.Min;
+                    newNode.Max = worldSpaceBounds.Max;
+                    newNode.IsLeaf = true;
+                    newNode.ChildOrInstanceID = (uint)i;
 
-                        GpuTlasNode newNode = new GpuTlasNode();
-                        newNode.Min = worldSpaceBounds.Min;
-                        newNode.Max = worldSpaceBounds.Max;
-                        newNode.IsLeaf = true;
-                        newNode.ChildOrInstanceID = (uint)instanceID;
-
-                        int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
-                        Nodes[newNodeIndex] = newNode;
-                    }
+                    int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
+                    Nodes[newNodeIndex] = newNode;
                 }
             }
 

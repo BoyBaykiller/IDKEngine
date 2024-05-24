@@ -31,7 +31,7 @@ namespace IDKEngine.Render
         private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
         public unsafe TonemapAndGammaCorrect(Vector2i size, in GpuSettings settings)
         {
-            tonemapAndGammaCorrecterProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "TonemapAndGammaCorrect/compute.glsl"));
+            tonemapAndGammaCorrecterProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "TonemapAndGammaCorrect/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
             gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);

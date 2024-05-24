@@ -4,7 +4,7 @@ layout(binding = 0) uniform sampler2D SamplerDepth;
 
 layout(location = 0) uniform int Lod;
 
-in InOutVars
+in InOutData
 {
     vec2 TexCoord;
 } inData;

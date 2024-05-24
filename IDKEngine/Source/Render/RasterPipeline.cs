@@ -30,15 +30,15 @@ namespace IDKEngine.Render
                 if (TakeMeshShaderPath)
                 {
                     gBufferProgram = new BBG.AbstractShaderProgram(
-                       new BBG.AbstractShader(BBG.ShaderType.TaskNV, "GBuffer/MeshPath/task.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderType.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderType.Fragment, "GBuffer/fragment.glsl"));
+                       new BBG.AbstractShader(BBG.ShaderStage.TaskNV, "GBuffer/MeshPath/task.glsl"),
+                       new BBG.AbstractShader(BBG.ShaderStage.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
+                       new BBG.AbstractShader(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
                 }
                 else
                 {
                     gBufferProgram = new BBG.AbstractShaderProgram(
-                        new BBG.AbstractShader(BBG.ShaderType.Vertex, "GBuffer/VertexPath/vertex.glsl"),
-                        new BBG.AbstractShader(BBG.ShaderType.Fragment, "GBuffer/fragment.glsl"));
+                        new BBG.AbstractShader(BBG.ShaderStage.Vertex, "GBuffer/VertexPath/vertex.glsl"),
+                        new BBG.AbstractShader(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
                 }
             }
         }
@@ -80,19 +80,22 @@ namespace IDKEngine.Render
 
                 _temporalAntiAliasingMode = value;
 
-                if (TemporalAntiAliasing == TemporalAntiAliasingMode.None)
-                {
-                    return;
-                }
-
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA && TaaResolve == null)
                 {
                     TaaResolve = new TAAResolve(PresentationResolution);
+                }
+                else
+                {
+                    if (TaaResolve != null) { TaaResolve.Dispose(); TaaResolve = null; }
                 }
 
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2 && FSR2Wrapper == null)
                 {
                     FSR2Wrapper = new FSR2Wrapper(RenderResolution, PresentationResolution);
+                }
+                else
+                {
+                    if (FSR2Wrapper != null) { FSR2Wrapper.Dispose(); FSR2Wrapper = null; }
                 }
             }
         }
@@ -119,8 +122,8 @@ namespace IDKEngine.Render
 
         public int RayTracingSamples;
 
-        public int TAASamples = 6;
-        public float FSR2AddMipBias = 0.25f;
+        public int TAASamples;
+        public float FSR2AdditionalMipBias;
 
         // Runs at render presentation resolution
         public TAAResolve TaaResolve;
@@ -155,13 +158,14 @@ namespace IDKEngine.Render
         private BBG.Texture resultBeforeTAA;
 
         public BBG.Texture AlbedoAlphaTexture;
-        public BBG.Texture NormalSpecularTexture;
-        public BBG.Texture EmissiveRoughnessTexture;
+        public BBG.Texture NormalTexture;
+        public BBG.Texture MetallicRoughnessTexture;
+        public BBG.Texture EmissiveTexture;
         public BBG.Texture VelocityTexture;
         public BBG.Texture DepthTexture;
 
         private BBG.AbstractShaderProgram gBufferProgram;
-        private readonly BBG.AbstractShaderProgram lightingProgram;
+        private readonly BBG.AbstractShaderProgram deferredLightingProgram;
         private readonly BBG.AbstractShaderProgram skyBoxProgram;
         private readonly BBG.AbstractShaderProgram mergeLightingProgram;
         private readonly BBG.AbstractShaderProgram hiZGenerateProgram;
@@ -179,21 +183,21 @@ namespace IDKEngine.Render
             TakeMeshShaderPath = false;
             IsHiZCulling = false;
 
-            lightingProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderType.Vertex, "ToScreen/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderType.Fragment, "DeferredLighting/fragment.glsl"));
+            deferredLightingProgram = new BBG.AbstractShaderProgram(
+                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "ToScreen/vertex.glsl"),
+                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "DeferredLighting/fragment.glsl"));
 
             skyBoxProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderType.Vertex, "SkyBox/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderType.Fragment, "SkyBox/fragment.glsl"));
+                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "SkyBox/vertex.glsl"),
+                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "SkyBox/fragment.glsl"));
 
             hiZGenerateProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderType.Vertex, "ToScreen/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderType.Fragment, "MeshCulling/Camera/HiZGenerate/fragment.glsl"));
+                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "ToScreen/vertex.glsl"),
+                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "MeshCulling/Camera/HiZGenerate/fragment.glsl"));
 
-            cullingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "MeshCulling/Camera/Cull/compute.glsl"));
+            cullingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "MeshCulling/Camera/Cull/compute.glsl"));
 
-            mergeLightingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderType.Compute, "MergeTextures/compute.glsl"));
+            mergeLightingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
             taaDataBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
@@ -216,10 +220,14 @@ namespace IDKEngine.Render
             IsVXGI = false;
             GenerateShadowMaps = true;
             GridReVoxelize = true;
+
             RayTracingSamples = 1;
             ShadowMode = ShadowTechnique.PcfShadowMap;
-            
+
             SetSize(renderSize, renderPresentationSize);
+
+            TAASamples = 6;
+            FSR2AdditionalMipBias = 0.25f;
             TemporalAntiAliasing = TemporalAntiAliasingMode.TAA;
         }
 
@@ -237,7 +245,7 @@ namespace IDKEngine.Render
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
-                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + FSR2AddMipBias;
+                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + FSR2AdditionalMipBias;
                     gpuTaaData.SampleCount = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.None)
@@ -291,7 +299,7 @@ namespace IDKEngine.Render
             {
                 for (int currentWritelod = 1; currentWritelod < DepthTexture.Levels; currentWritelod++)
                 {
-                    BBG.Rendering.Render($"Generate Main View Depth Mipmap level {currentWritelod}", new BBG.Rendering.VerboseRenderAttachments()
+                    BBG.Rendering.Render($"Generate Main View Depth Mipmap level {currentWritelod}", new BBG.Rendering.RenderAttachmentsVerbose()
                     {
                         DepthAttachment = new BBG.Rendering.DepthAttachment()
                         {
@@ -329,8 +337,8 @@ namespace IDKEngine.Render
             {
                 ColorAttachments = new BBG.Rendering.ColorAttachments()
                 {
-                    Textures = [AlbedoAlphaTexture, NormalSpecularTexture, EmissiveRoughnessTexture, VelocityTexture],
-                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.DontCare,
+                    Textures = [AlbedoAlphaTexture, NormalTexture, MetallicRoughnessTexture, EmissiveTexture, VelocityTexture],
+                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
                 },
                 DepthAttachment = new BBG.Rendering.DepthAttachment()
                 {
@@ -339,7 +347,7 @@ namespace IDKEngine.Render
                 }
             }, new BBG.Rendering.GraphicsPipelineState()
             {
-                EnabledCapabilities = [BBG.Rendering.Capability.DepthTest, IsWireframe ? BBG.Rendering.Capability.None : BBG.Rendering.Capability.CullFace],
+                EnabledCapabilities = [BBG.Rendering.Capability.DepthTest, BBG.Rendering.CapIf(!IsWireframe, BBG.Rendering.Capability.CullFace)],
                 FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
             }, () =>
             {
@@ -385,16 +393,16 @@ namespace IDKEngine.Render
                 }
             }, new BBG.Rendering.GraphicsPipelineState()
             {
-                EnabledCapabilities = [IsVariableRateShading ? BBG.Rendering.Capability.VariableRateShadingNV : BBG.Rendering.Capability.None],
+                EnabledCapabilities = [BBG.Rendering.CapIf(IsVariableRateShading, BBG.Rendering.Capability.VariableRateShadingNV)],
                 VariableRateShading = LightingVRS.GetVariableRateShading(),
             }, () =>
             {
-                lightingProgram.Upload("ShadowMode", (int)ShadowMode);
-                lightingProgram.Upload("IsVXGI", IsVXGI);
+                deferredLightingProgram.Upload("ShadowMode", (int)ShadowMode);
+                deferredLightingProgram.Upload("IsVXGI", IsVXGI);
 
                 BBG.Cmd.BindTextureUnit(SSAO.Result, 0, IsSSAO);
                 BBG.Cmd.BindTextureUnit(ConeTracer.Result, 1, IsVXGI);
-                BBG.Cmd.UseShaderProgram(lightingProgram);
+                BBG.Cmd.UseShaderProgram(deferredLightingProgram);
 
                 BBG.Rendering.InferViewportSize();
                 BBG.Rendering.DrawNonIndexed(BBG.Rendering.Topology.Triangles, 0, 3);
@@ -404,7 +412,7 @@ namespace IDKEngine.Render
             {
                 ColorAttachments = new BBG.Rendering.ColorAttachments()
                 {
-                    Textures = [resultBeforeTAA, AlbedoAlphaTexture, NormalSpecularTexture, EmissiveRoughnessTexture, VelocityTexture],
+                    Textures = [resultBeforeTAA, NormalTexture, EmissiveTexture, VelocityTexture],
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
                 },
                 DepthAttachment = new BBG.Rendering.DepthAttachment()
@@ -416,7 +424,7 @@ namespace IDKEngine.Render
             {
                 EnabledCapabilities = [
                     BBG.Rendering.Capability.DepthTest, BBG.Rendering.Capability.CullFace,
-                    IsVariableRateShading ? BBG.Rendering.Capability.VariableRateShadingNV : BBG.Rendering.Capability.None
+                    BBG.Rendering.CapIf(IsVariableRateShading, BBG.Rendering.Capability.VariableRateShadingNV)
                 ],
                 VariableRateShading = LightingVRS.GetVariableRateShading(),
             }, () =>
@@ -430,7 +438,7 @@ namespace IDKEngine.Render
             {
                 ColorAttachments = new BBG.Rendering.ColorAttachments()
                 {
-                    Textures = [resultBeforeTAA, AlbedoAlphaTexture, NormalSpecularTexture, EmissiveRoughnessTexture, VelocityTexture],
+                    Textures = [resultBeforeTAA, VelocityTexture],
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
                 },
                 DepthAttachment = new BBG.Rendering.DepthAttachment()
@@ -442,7 +450,7 @@ namespace IDKEngine.Render
             {
                 EnabledCapabilities = [
                     BBG.Rendering.Capability.DepthTest,
-                    IsVariableRateShading ? BBG.Rendering.Capability.VariableRateShadingNV : BBG.Rendering.Capability.None
+                    BBG.Rendering.CapIf(IsVariableRateShading, BBG.Rendering.Capability.VariableRateShadingNV)
                 ],
                 DepthFunction = BBG.Rendering.DepthFunction.Lequal,
                 VariableRateShading = LightingVRS.GetVariableRateShading(),
@@ -516,17 +524,23 @@ namespace IDKEngine.Render
             AlbedoAlphaTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8B8A8Unorm);
             gpuGBufferData.AlbedoAlphaTextureHandle = AlbedoAlphaTexture.GetTextureHandleARB();
 
-            NormalSpecularTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
-            NormalSpecularTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
-            NormalSpecularTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            NormalSpecularTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8B8A8Snorm);
-            gpuGBufferData.NormalSpecularTextureHandle = NormalSpecularTexture.GetTextureHandleARB();
+            NormalTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            NormalTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            NormalTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            NormalTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8Snorm);
+            gpuGBufferData.NormalTextureHandle = NormalTexture.GetTextureHandleARB();
 
-            EmissiveRoughnessTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
-            EmissiveRoughnessTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
-            EmissiveRoughnessTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            EmissiveRoughnessTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
-            gpuGBufferData.EmissiveRoughnessTextureHandle = EmissiveRoughnessTexture.GetTextureHandleARB();
+            MetallicRoughnessTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            MetallicRoughnessTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            MetallicRoughnessTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            MetallicRoughnessTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8Unorm);
+            gpuGBufferData.MetallicRoughnessTextureHandle = MetallicRoughnessTexture.GetTextureHandleARB();
+
+            EmissiveTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            EmissiveTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+            EmissiveTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            EmissiveTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R11G11B10Float);
+            gpuGBufferData.EmissiveTextureHandle = EmissiveTexture.GetTextureHandleARB();
 
             VelocityTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             VelocityTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
@@ -546,8 +560,8 @@ namespace IDKEngine.Render
         private void DisposeBindlessGBufferTextures()
         {
             if (AlbedoAlphaTexture != null) AlbedoAlphaTexture.Dispose();
-            if (NormalSpecularTexture != null) NormalSpecularTexture.Dispose();
-            if (EmissiveRoughnessTexture != null) EmissiveRoughnessTexture.Dispose();
+            if (NormalTexture != null) NormalTexture.Dispose();
+            if (MetallicRoughnessTexture != null) MetallicRoughnessTexture.Dispose();
             if (VelocityTexture != null) VelocityTexture.Dispose();
             if (DepthTexture != null) DepthTexture.Dispose();
         }
@@ -576,7 +590,7 @@ namespace IDKEngine.Render
             DisposeBindlessGBufferTextures();
 
             gBufferProgram.Dispose();
-            lightingProgram.Dispose();
+            deferredLightingProgram.Dispose();
             skyBoxProgram.Dispose();
             mergeLightingProgram.Dispose();
             cullingProgram.Dispose();

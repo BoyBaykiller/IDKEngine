@@ -1,13 +1,13 @@
 ﻿using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL;
-using Buffer = OpenTK.Graphics.OpenGL.Buffer;
+using FboBufferType = OpenTK.Graphics.OpenGL.Buffer;
 
 namespace BBOpenGL
 {
     public static partial class BBG
     { 
-        public class Rendering
+        public unsafe class Rendering
         {
             public enum AttachmentLoadOp : int
             {
@@ -113,19 +113,40 @@ namespace BBOpenGL
                 _16InvocationsPerPixelNV = All.ShadingRate16InvocationsPerPixelNv,
             }
 
+            public enum VertexAttributeType : uint
+            {
+                Float = VertexAttribType.Float,
+            }
+
+            public struct RenderAttachments
+            {
+                public ColorAttachments? ColorAttachments;
+                public DepthAttachment? DepthAttachment;
+                public StencilAttachment? StencilAttachment;
+            }
+
+            public struct RenderAttachmentsVerbose
+            {
+                public ColorAttachment[]? ColorAttachments;
+                public DepthAttachment? DepthAttachment;
+                public StencilAttachment? StencilAttachment;
+            }
+
+            /// <summary>
+            /// Similar to <see cref="ColorAttachment"/> but less verbose - allows for simpler API
+            /// </summary>
+            public struct ColorAttachments
+            {
+                public Texture[] Textures;
+                public AttachmentLoadOp AttachmentLoadOp;
+                public Vector4 ClearColor;
+            }
+
             public struct ColorAttachment
             {
                 public Texture Texture;
                 public AttachmentLoadOp AttachmentLoadOp;
                 public int Level;
-                public Vector4 ClearColor;
-            }
-
-            // Similar to ColorAttachment but less verbose - allows for simpler API
-            public struct ColorAttachments
-            {
-                public Texture[] Textures;
-                public AttachmentLoadOp AttachmentLoadOp;
                 public Vector4 ClearColor;
             }
 
@@ -149,24 +170,39 @@ namespace BBOpenGL
                 public int ClearValue;
             }
 
-            public struct VerboseRenderAttachments
-            {
-                public ColorAttachment[]? ColorAttachments;
-                public DepthAttachment? DepthAttachment;
-                public StencilAttachment? StencilAttachment;
-            }
-
-            public struct RenderAttachments
-            {
-                public ColorAttachments? ColorAttachments;
-                public DepthAttachment? DepthAttachment;
-                public StencilAttachment? StencilAttachment;
-            }
-
-            public struct NoAttachmentsParams
+            public struct NoRenderAttachmentsParams
             {
                 public int Width;
                 public int Height;
+            }
+
+            public struct VertexInputAssembly
+            {
+                public BufferObject IndexBuffer;
+                public VertexDescription? VertexDescription;
+            }
+
+            public struct VertexDescription
+            {
+                public VertexBuffer[] VertexBuffers;
+                public VertexAttribute[] VertexAttributes;
+            }
+
+            public struct VertexBuffer
+            {
+                public BufferObject Buffer;
+                public int VertexSize;
+                public int Offset;
+            }
+
+            public struct VertexAttribute
+            {
+                public int BufferIndex;
+                public nint RelativeOffset;
+
+                public VertexAttributeType Type;
+                public int NumComponents;
+                public bool Normalize;
             }
 
             /// <summary>
@@ -220,11 +256,13 @@ namespace BBOpenGL
                 }
             }
 
-            private static int noAttachmentsFBO;
+            private static int fboNoAttachmentsGLHandle = 0;
+            private static int vaoGLHandle = 0;
+
             private static Vector2i inferredViewportSize;
             public static void Render(string renderPassName, in RenderAttachments renderAttachments, in GraphicsPipelineState pipelineState, Action funcRender)
             {
-                VerboseRenderAttachments verboseRenderAttachments = new VerboseRenderAttachments();
+                RenderAttachmentsVerbose verboseRenderAttachments = new RenderAttachmentsVerbose();
                 if (renderAttachments.ColorAttachments.HasValue)
                 {
                     verboseRenderAttachments.ColorAttachments = new ColorAttachment[renderAttachments.ColorAttachments.Value.Textures.Length];
@@ -241,7 +279,7 @@ namespace BBOpenGL
                 Render(renderPassName, verboseRenderAttachments, pipelineState, funcRender);
             }
 
-            public static unsafe void Render(string renderPassName, in VerboseRenderAttachments renderAttachments, in GraphicsPipelineState pipelineState, Action funcRender)
+            public static void Render(string renderPassName, in RenderAttachmentsVerbose renderAttachments, in GraphicsPipelineState pipelineState, Action funcRender)
             {
                 inferredViewportSize = new Vector2i();
 
@@ -264,7 +302,7 @@ namespace BBOpenGL
 
                             case AttachmentLoadOp.Clear:
                                 Vector4 clearColor = colorAttachment.ClearColor;
-                                GL.ClearNamedFramebufferfv(fbo, Buffer.Color, i, &clearColor.X);
+                                GL.ClearNamedFramebufferfv(fbo, FboBufferType.Color, i, &clearColor.X);
                                 break;
 
                             case AttachmentLoadOp.DontCare:
@@ -290,7 +328,7 @@ namespace BBOpenGL
                             break;
 
                         case AttachmentLoadOp.Clear:
-                            GL.ClearNamedFramebufferfv(fbo, Buffer.Depth, 0, &depthAttachment.ClearValue);
+                            GL.ClearNamedFramebufferfv(fbo, FboBufferType.Depth, 0, &depthAttachment.ClearValue);
                             break;
 
                         case AttachmentLoadOp.DontCare:
@@ -315,7 +353,7 @@ namespace BBOpenGL
                             break;
 
                         case AttachmentLoadOp.Clear:
-                            GL.ClearNamedFramebufferiv(fbo, Buffer.Stencil, 0, &stencilAttachment.ClearValue);
+                            GL.ClearNamedFramebufferiv(fbo, FboBufferType.Stencil, 0, &stencilAttachment.ClearValue);
                             break;
 
                         case AttachmentLoadOp.DontCare:
@@ -336,18 +374,18 @@ namespace BBOpenGL
                 Debugging.PopDebugGroup();
             }
 
-            public static void Render(string renderPassName, in NoAttachmentsParams fboParameters, in GraphicsPipelineState pipelineState, Action funcRender)
+            public static void Render(string renderPassName, in NoRenderAttachmentsParams fboParameters, in GraphicsPipelineState pipelineState, Action funcRender)
             {
                 inferredViewportSize = new Vector2i();
 
                 Debugging.PushDebugGroup(renderPassName);
 
-                if (noAttachmentsFBO == 0)
+                if (fboNoAttachmentsGLHandle == 0)
                 {
-                    GL.CreateFramebuffers(1, ref noAttachmentsFBO);
+                    GL.CreateFramebuffers(1, ref fboNoAttachmentsGLHandle);
                 }
-                GL.NamedFramebufferParameteri(noAttachmentsFBO, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
-                GL.NamedFramebufferParameteri(noAttachmentsFBO, FramebufferParameterName.FramebufferDefaultHeight, fboParameters.Height);
+                GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
+                GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultHeight, fboParameters.Height);
                 inferredViewportSize = new Vector2i(fboParameters.Width, fboParameters.Height);
 
                 GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -360,7 +398,7 @@ namespace BBOpenGL
 
             public static void CopyTextureToSwapchain(Texture texture)
             {
-                VerboseRenderAttachments renderAttachments = new VerboseRenderAttachments();
+                RenderAttachmentsVerbose renderAttachments = new RenderAttachmentsVerbose();
                 renderAttachments.ColorAttachments = [new ColorAttachment() { Texture = texture }];
 
                 int fbo = FramebufferCache.GetFramebuffer(RenderAttachmentsToFramebufferDesc(renderAttachments));
@@ -368,9 +406,33 @@ namespace BBOpenGL
                 GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
             }
 
-            public static void UseVertexArrayObject(VAO vao)
+            public static void SetVertexInputAssembly(in VertexInputAssembly vertexInputAssembly)
             {
-                GL.BindVertexArray(vao.ID);
+                if (vaoGLHandle == 0)
+                {
+                    GL.CreateVertexArrays(1, ref vaoGLHandle);
+                }
+
+                GL.VertexArrayElementBuffer(vaoGLHandle, vertexInputAssembly.IndexBuffer.ID);
+                if (vertexInputAssembly.VertexDescription.HasValue)
+                {
+                    VertexDescription vertexDescription = vertexInputAssembly.VertexDescription.Value;
+                    for (int i = 0; i < vertexDescription.VertexBuffers.Length; i++)
+                    {
+                        ref readonly VertexBuffer vertexBufferSource = ref vertexDescription.VertexBuffers[i];
+                        GL.VertexArrayVertexBuffer(vaoGLHandle, (uint)i, vertexBufferSource.Buffer.ID, vertexBufferSource.Offset, vertexBufferSource.VertexSize);
+                    }
+
+                    for (int i = 0; i < vertexDescription.VertexAttributes.Length; i++)
+                    {
+                        ref readonly VertexAttribute vertexAttribute = ref vertexDescription.VertexAttributes[i];
+
+                        GL.EnableVertexArrayAttrib(vaoGLHandle, (uint)i);
+                        GL.VertexArrayAttribFormat(vaoGLHandle, (uint)i, vertexAttribute.NumComponents, (VertexAttribType)vertexAttribute.Type, vertexAttribute.Normalize, (uint)vertexAttribute.RelativeOffset);
+                        GL.VertexArrayAttribBinding(vaoGLHandle, (uint)i, (uint)vertexAttribute.BufferIndex);
+                    }
+                }
+                GL.BindVertexArray(vaoGLHandle);
             }
 
             public static void DrawIndexed(Topology topology, int count, IndexType indexType, int instanceCount = 1, int baseInstance = 0, nint offset = 0)
@@ -408,10 +470,10 @@ namespace BBOpenGL
 
             public static void SetViewport(Viewport viewport)
             {
-                SetViewport(new ReadOnlySpan<Viewport>(in viewport));
+                SetViewports(new ReadOnlySpan<Viewport>(in viewport));
             }
             
-            public static void SetViewport(ReadOnlySpan<Viewport> viewports)
+            public static void SetViewports(ReadOnlySpan<Viewport> viewports)
             {
                 Span<Vector4> data = stackalloc Vector4[viewports.Length];
                 for (int i = 0; i < data.Length; i++)
@@ -429,7 +491,12 @@ namespace BBOpenGL
                 GL.ViewportArray(0, viewports.Length, data[0].X);
             }
 
-            public static unsafe void SetGraphicsPipelineState(in GraphicsPipelineState pipelineState)
+            public static Capability CapIf(bool val, Capability cap)
+            {
+                return val ? cap : Capability.None;
+            }
+
+            internal static void SetGraphicsPipelineState(in GraphicsPipelineState pipelineState)
             {
                 Capability[] capabilities = Enum.GetValues<Capability>();
                 ref readonly ExtensionSupport extensionSupport = ref GetDeviceInfo().ExtensionSupport;
@@ -480,7 +547,7 @@ namespace BBOpenGL
                 }
             }
 
-            private static FramebufferCache.FramebufferDesc RenderAttachmentsToFramebufferDesc(in VerboseRenderAttachments renderAttachments)
+            private static FramebufferCache.FramebufferDesc RenderAttachmentsToFramebufferDesc(in RenderAttachmentsVerbose renderAttachments)
             {
                 FramebufferCache.FramebufferDesc framebufferDesc = new FramebufferCache.FramebufferDesc();
                 if (renderAttachments.ColorAttachments != null)
