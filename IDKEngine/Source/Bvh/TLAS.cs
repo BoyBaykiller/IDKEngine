@@ -1,6 +1,6 @@
 ﻿using System;
-using BBOpenGL;
 using OpenTK.Mathematics;
+using BBOpenGL;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
@@ -10,7 +10,8 @@ namespace IDKEngine
     public class TLAS
     {
         public GpuTlasNode Root => Nodes[0];
-        public int TreeDepth { get; private set; }
+
+        public int SearchRadius;
 
         public GpuMeshInstance[] MeshInstances;
         public BBG.DrawElementsIndirectCommand[] DrawCommands;
@@ -23,117 +24,145 @@ namespace IDKEngine
             MeshInstances = meshInstances;
 
             Nodes = new GpuTlasNode[Math.Max(2 * meshInstances.Length - 1, 1)];
-            TreeDepth = (int)MathF.Ceiling(MathF.Log2(Nodes.Length));
+            SearchRadius = 15;
         }
 
         public void Build()
         {
-            int nodesUsed = 0;
+            Span<GpuTlasNode> initialChildNodes = new Span<GpuTlasNode>(Nodes, Nodes.Length - MeshInstances.Length, MeshInstances.Length);
 
-            // Flatten and transform local space blas instances into
-            // world space tlas nodes. These nodes are the primitives of the the TLAS.
+            // Place initial nodes at the end of array
+            Box globalBounds = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            for (int i = 0; i < initialChildNodes.Length; i++)
             {
-                for (int i = 0; i < MeshInstances.Length; i++)
-                {
-                    ref readonly GpuMeshInstance meshInstance = ref MeshInstances[i];
-                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[meshInstance.MeshIndex];
-                    BLAS blas = Blases[meshInstance.MeshIndex];
+                ref readonly GpuMeshInstance meshInstance = ref MeshInstances[i];
+                ref readonly BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[meshInstance.MeshIndex];
+                BLAS blas = Blases[meshInstance.MeshIndex];
 
-                    Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), MeshInstances[i].ModelMatrix);
+                Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), meshInstance.ModelMatrix);
+                globalBounds.GrowToFit(worldSpaceBounds);
 
-                    GpuTlasNode newNode = new GpuTlasNode();
-                    newNode.Min = worldSpaceBounds.Min;
-                    newNode.Max = worldSpaceBounds.Max;
-                    newNode.IsLeaf = true;
-                    newNode.ChildOrInstanceID = (uint)i;
+                GpuTlasNode newNode = new GpuTlasNode();
+                newNode.Min = worldSpaceBounds.Min;
+                newNode.Max = worldSpaceBounds.Max;
+                newNode.IsLeaf = true;
+                newNode.ChildOrInstanceID = (uint)i;
 
-                    int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
-                    Nodes[newNodeIndex] = newNode;
-                }
+                initialChildNodes[i] = newNode;
             }
 
-            // Build TLAS from generated child nodes.
-            // Technique: Every two nodes with the lowest combined area form a parent node.
-            //            Apply this scheme recursivly until only a single root node encompassing the entire scene is left.          
+            // Sort the initial child nodes according to space filling morton curve.
+            // That means nodes which are spatially close will also be close in memory.
+            MemoryExtensions.Sort(initialChildNodes, (GpuTlasNode a, GpuTlasNode b) =>
             {
-                int candidatesSearchCount = MeshInstances.Length;
-                int candidatesSearchCountBackup = candidatesSearchCount;
-                int candidatesSearchStart = Nodes.Length - 1;
-                while (candidatesSearchCount > 1)
-                {
-                    int nodeAId = candidatesSearchStart;
-                    int nodeBId = FindBestMatch(candidatesSearchStart, candidatesSearchCount, nodeAId);
-                    int nodeCId = FindBestMatch(candidatesSearchStart, candidatesSearchCount, nodeBId);
+                Vector3 mappedA = MyMath.MapToZeroOne((a.Max + a.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
+                ulong mortonCodeA = MyMath.Morton3D(mappedA);
 
-                    // Check if BestMatch(BestMatch(nodeA)) == nodeA, that is a pair of nodes which agree on each other as the
-                    // best candiate to form the smallest possible bounding box out of all left over nodes
+                Vector3 mappedB = MyMath.MapToZeroOne((b.Max + b.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
+                ulong mortonCodeB = MyMath.Morton3D(mappedB);
+
+                if (mortonCodeA < mortonCodeB)
+                {
+                    return -1;
+                }
+                if (mortonCodeA > mortonCodeB)
+                {
+                    return 1;
+                }
+
+                return 0;
+            });
+
+            int activeRangeCount = MeshInstances.Length;
+            int activeRangeEnd = Nodes.Length;
+            GpuTlasNode[] tempNodes = new GpuTlasNode[Nodes.Length];
+            while (activeRangeCount > 1)
+            {
+                // Find the nodeId each node prefers to merge with
+                // TODO: When search radius is very low, like 5, we sometimes end up never finding a node, causing infinite loop. This shouldnt happen
+                int[] preferedNbors = new int[activeRangeCount];
+                for (int i = 0; i < preferedNbors.Length; i++)
+                {
+                    int baseOffset = activeRangeEnd - activeRangeCount;
+
+                    int nodeAid = baseOffset + i;
+                    int searchStart = Math.Max(nodeAid - SearchRadius, baseOffset);
+                    int searchEnd = Math.Min(nodeAid + SearchRadius, activeRangeEnd);
+                    int nodeBId = FindBestMatch(Nodes, searchStart, searchEnd, nodeAid);
+
+                    preferedNbors[i] = nodeBId;
+                }
+
+                // Find number of merged nodes in advance so we know where to insert new parent nodes
+                int mergedNodes = 0;
+                for (int i = 0; i < activeRangeCount; i++)
+                {
+                    int baseOffset = activeRangeEnd - activeRangeCount;
+
+                    int nodeAId = baseOffset + i;
+                    int nodeAIdLocal = i;
+
+                    int nodeBId = preferedNbors[nodeAIdLocal];
+                    int nodeBIdLocal = nodeBId - baseOffset;
+
+                    int nodeCId = preferedNbors[nodeBIdLocal];
+
+                    if (nodeAId == nodeCId && nodeAId < nodeBId)
+                    {
+                        mergedNodes += 2;
+                    }
+                }
+
+                // Merge nodes and create parents
+                int mergedNodesHead = activeRangeEnd;
+                int unmergedNodesHead = activeRangeEnd - mergedNodes;
+                for (int i = 0; i < activeRangeCount; i++)
+                {
+                    int baseOffset = activeRangeEnd - activeRangeCount;
+
+                    int nodeAId = baseOffset + i;
+                    int nodeAIdLocal = i;
+
+                    int nodeBId = preferedNbors[nodeAIdLocal];
+                    int nodeBIdLocal = nodeBId - baseOffset;
+
+                    int nodeCId = preferedNbors[nodeBIdLocal];
                     if (nodeAId == nodeCId)
                     {
-                        // Move nodeBId such that [..., nodeB, nodeA, ...]
-                        MathHelper.Swap(ref Nodes[nodeAId - 1], ref Nodes[nodeBId]);
-                        nodeBId = nodeAId - 1;
+                        if (nodeAId < nodeBId)
+                        {
+                            ref GpuTlasNode nodeB = ref tempNodes[--mergedNodesHead];
+                            ref GpuTlasNode nodeA = ref tempNodes[--mergedNodesHead];
 
-                        ref readonly GpuTlasNode nodeB = ref Nodes[nodeBId];
-                        ref readonly GpuTlasNode nodeA = ref Nodes[nodeAId];
+                            nodeB = Nodes[nodeBId];
+                            nodeA = Nodes[nodeAId];
 
-                        Box boundsFittingChildren = Conversions.ToBox(nodeA);
-                        boundsFittingChildren.GrowToFit(nodeB.Min);
-                        boundsFittingChildren.GrowToFit(nodeB.Max);
+                            Box boundsFittingChildren = Conversions.ToBox(nodeA);
+                            boundsFittingChildren.GrowToFit(nodeB.Min);
+                            boundsFittingChildren.GrowToFit(nodeB.Max);
 
-                        GpuTlasNode newNode = new GpuTlasNode();
-                        newNode.Min = boundsFittingChildren.Min;
-                        newNode.Max = boundsFittingChildren.Max;
-                        newNode.IsLeaf = false;
-                        newNode.ChildOrInstanceID = (uint)nodeBId;
+                            GpuTlasNode newNode = new GpuTlasNode();
+                            newNode.Min = boundsFittingChildren.Min;
+                            newNode.Max = boundsFittingChildren.Max;
+                            newNode.IsLeaf = false;
+                            newNode.ChildOrInstanceID = (uint)mergedNodesHead;
 
-                        int newNodeIndex = Nodes.Length - 1 - nodesUsed++;
-                        Nodes[newNodeIndex] = newNode;
-
-                        // By subtracting two, the two child nodes (nodeBId, nodeAId) will no longer be included in the search for potential candidates
-                        candidatesSearchStart -= 2;
-
-                        // Newly created parent should be included in the search for potential candidates which is why -1 (i know intuitively should be +1 but we are building in reverse)
-                        candidatesSearchCount = candidatesSearchCountBackup - 1;
-                        candidatesSearchCountBackup = candidatesSearchCount;
+                            tempNodes[--unmergedNodesHead] = newNode;
+                        }
                     }
                     else
                     {
-                        // If no pair was found we swap nodeAID out with the end node, and exclude nodeAID for future search until a pair is found.
-                        MathHelper.Swap(ref Nodes[nodeAId], ref Nodes[nodeAId - --candidatesSearchCount]);
+                        tempNodes[--unmergedNodesHead] = Nodes[nodeAId];
                     }
                 }
+                Array.Copy(tempNodes, unmergedNodesHead, Nodes, unmergedNodesHead, activeRangeEnd - unmergedNodesHead);
+
+                // For every merged pair, 2 nodes become inactive and 1 new one gets active
+                activeRangeCount -= mergedNodes / 2;
+                activeRangeEnd = mergedNodesHead;
             }
         }
 
-        private int FindBestMatch(int start, int count, int nodeIndex)
-        {
-            float smallestArea = float.MaxValue;
-            int bestNodeIndex = -1;
-
-            ref readonly GpuTlasNode node = ref Nodes[nodeIndex];
-            for (int i = start; i > start - count; i--)
-            {
-                if (i == nodeIndex)
-                {
-                    continue;
-                }
-
-                ref readonly GpuTlasNode otherNode = ref Nodes[i];
-
-                Box fittingBox = Conversions.ToBox(node);
-                fittingBox.GrowToFit(otherNode.Min);
-                fittingBox.GrowToFit(otherNode.Max);
-
-                float area = MyMath.Area(fittingBox.Max - fittingBox.Min);
-                if (area < smallestArea)
-                {
-                    smallestArea = area;
-                    bestNodeIndex = i;
-                }
-            }
-
-            return bestNodeIndex;
-        }
 
         public bool Intersect(in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
         {
@@ -251,6 +280,36 @@ namespace IDKEngine
                     stackTop = stack[--stackPtr];
                 }
             }
+        }
+
+        private static int FindBestMatch(ReadOnlySpan<GpuTlasNode> nodes, int start, int end, int nodeIndex)
+        {
+            float smallestArea = float.MaxValue;
+            int bestNodeIndex = -1;
+
+            ref readonly GpuTlasNode node = ref nodes[nodeIndex];
+            for (int i = start; i < end; i++)
+            {
+                ref readonly GpuTlasNode otherNode = ref nodes[i];
+
+                if (i == nodeIndex)
+                {
+                    continue;
+                }
+
+                Box fittingBox = Conversions.ToBox(node);
+                fittingBox.GrowToFit(otherNode.Min);
+                fittingBox.GrowToFit(otherNode.Max);
+
+                float area = MyMath.Area(fittingBox.Max - fittingBox.Min);
+                if (area < smallestArea)
+                {
+                    smallestArea = area;
+                    bestNodeIndex = i;
+                }
+            }
+
+            return bestNodeIndex;
         }
     }
 }

@@ -153,7 +153,7 @@ namespace IDKEngine
             }
 
             UploadAllModelData();
-            meshInstanceShouldUpload = new BitArray(MeshInstances.Length, true);
+            meshInstanceShouldUpload = new BitArray(MeshInstances.Length, false);
         }
 
         public unsafe void Draw()
@@ -180,48 +180,38 @@ namespace IDKEngine
             anyMeshInstanceMoved = false;
 
             int batchedUploadSize = 1 << 8;
-            int lastCleanBatch = MeshInstances.Length / batchedUploadSize * batchedUploadSize;
-            bool batchNeedsUpload = false;
             for (int i = 0; i < MeshInstances.Length;)
             {
+                bool uploadBatch = false;
                 if (meshInstanceShouldUpload[i])
                 {
                     meshInstanceShouldUpload[i] = false;
-                    batchNeedsUpload = true;
+                    uploadBatch = true;
                 }
                 else if (MeshInstances[i].DidMove())
                 {
-                    batchNeedsUpload = true;
+                    // We'll need to upload the changed prev matrix next frame
+                    meshInstanceShouldUpload[i] = true;
+                    uploadBatch = true;
                 }
 
-                i++;
-
-                bool endOfBatch = (i % batchedUploadSize == 0 || i == MeshInstances.Length);
-                if (batchNeedsUpload && endOfBatch)
+                if (uploadBatch)
                 {
-                    int batchSize = batchedUploadSize;
-                    int start = i - batchSize;
-                    if (i > lastCleanBatch)
+                    int batchStart = i;
+                    int batchEnd = Math.Min(MyMath.NextMultiple(i, batchedUploadSize), MeshInstances.Length);
+
+                    UpdateMeshInstanceBuffer(batchStart, batchEnd - batchStart);
+                    for (int j = batchStart; j < batchEnd; j++)
                     {
-                        batchSize = MeshInstances.Length - lastCleanBatch;
-                        start = lastCleanBatch;
+                        MeshInstances[j].SetPrevToCurrentMatrix();
                     }
 
-                    UpdateMeshInstanceBuffer(start, batchSize);
-
-                    for (int j = start; j < start + batchSize; j++)
-                    {
-                        if (MeshInstances[j].DidMove())
-                        {
-                            MeshInstances[j].SetPrevToCurrentMatrix();
-
-                            // We'll need to upload the changed prev matrix next frame
-                            meshInstanceShouldUpload[j] = true;
-                        }
-                    }
-
+                    i = batchEnd;
                     anyMeshInstanceMoved = true;
-                    batchNeedsUpload = false;
+                }
+                else
+                {
+                    i++;
                 }
             }
         }

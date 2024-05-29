@@ -93,7 +93,7 @@ namespace IDKEngine.Render
             RecordingVars.FrameRecState = FrameRecorderState.Nothing;
             RecordingVars.Timer = Stopwatch.StartNew();
         }
-        
+
         public unsafe void Draw(Application app, float frameTime)
         {
             backend.Update(app, frameTime);
@@ -300,23 +300,28 @@ namespace IDKEngine.Render
                 ImGui.Text($"{BBG.GetDeviceInfo().Name}");
 
                 bool gpuUseTlas = app.ModelManager.BVH.GpuUseTlas;
-                if (ImGui.Checkbox("UseGpuTlas", ref gpuUseTlas))
+                if (ImGui.Checkbox("GpuUseTlas", ref gpuUseTlas))
                 {
                     app.ModelManager.BVH.GpuUseTlas = gpuUseTlas;
                 }
-                ToolTipForItemAboveHovered("This increases GPU BVH traversal performance when there exist a lot of instances.\nNote that the TLAS does not get rebuild automatically.");
+                ToolTipForItemAboveHovered(
+                    "This increases GPU BVH traversal performance when there exist a lot of instances.\n" +
+                    $"You probably want this together with {nameof(app.ModelManager.BVH.UpdateTlas)}"
+                );
 
                 ImGui.SameLine();
-                if (ImGui.Button("RebuildTlas"))
-                {
-                    app.ModelManager.BVH.TlasBuild();
-                }
+                ImGui.Checkbox("CpuUseTlas", ref app.ModelManager.BVH.CpuUseTlas);
+                ToolTipForItemAboveHovered(
+                    "This increases CPU BVH traversal performance when there exist a lot of instances.\n" +
+                    $"You probably want this together with {nameof(app.ModelManager.BVH.UpdateTlas)}"
+                );
+                ImGui.SameLine();
+                ImGui.Checkbox("UpdateTlas", ref app.ModelManager.BVH.UpdateTlas);
 
                 ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.0f, 4.0f);
                 ImGui.SliderFloat("Saturation", ref app.TonemapAndGamma.Settings.Saturation, 0.0f, 1.5f);
 
                 tempFloat = app.RenderResolutionScale;
-
                 if (ImGui.SliderFloat("ResolutionScale", ref tempFloat, 0.1f, 1.0f))
                 {
                     if (!MyMath.AlmostEqual(tempFloat, app.RenderResolutionScale, 0.001f))
@@ -662,7 +667,7 @@ namespace IDKEngine.Render
                         }
                     }
                 }
-                else if (app.RenderPath == Application.RenderMode.PathTracer)
+                if (app.RenderPath == Application.RenderMode.PathTracer)
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
@@ -805,7 +810,7 @@ namespace IDKEngine.Render
                     if (app.LightManager.AddLight(newLight))
                     {
                         int newLightIndex = app.LightManager.Count - 1;
-                        CpuPointShadow pointShadow = new CpuPointShadow(256, app.RenderResolution, new OtkVec2(newLight.GpuLight.Radius, 60.0f));
+                        CpuPointShadow pointShadow = new CpuPointShadow(128, app.RenderResolution, new OtkVec2(newLight.GpuLight.Radius, 60.0f));
                         if (!app.LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
                         {
                             pointShadow.Dispose();
@@ -1012,7 +1017,7 @@ namespace IDKEngine.Render
                 if (content.X != app.PresentationResolution.X || content.Y != app.PresentationResolution.Y)
                 {
                     // Viewport changed, inform app of the new resolution
-                    app.RequestPresentationResolution = new Vector2i((int)content.X, (int)content.Y);
+                    app.RequestPresentationResolution = (Vector2i)content.ToOpenTK();
                 }
 
                 SysVec2 tileBar = ImGui.GetCursorPos();

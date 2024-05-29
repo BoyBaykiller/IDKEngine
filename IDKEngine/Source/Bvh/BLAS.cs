@@ -188,15 +188,6 @@ namespace IDKEngine
             hitInfo = new RayHitInfo();
             hitInfo.T = tMaxDist;
 
-            if (!BVH.CPU_USE_TLAS)
-            {
-                ref readonly GpuBlasNode rootNode = ref Nodes[0];
-                if (!(Intersections.RayVsBox(ray, Conversions.ToBox(rootNode), out float tMinRoot, out float tMaxRoot) && tMinRoot < hitInfo.T))
-                {
-                    return false;
-                }
-            }
-
             uint stackTop = 1;
             int stackPtr = 0;
             Span<uint> stack = stackalloc uint[MaxTreeDepth];

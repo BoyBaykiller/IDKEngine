@@ -30,10 +30,9 @@ namespace BBOpenGL
                 None = 0,
 
                 // The buffer must be written or read to by using the mapped memory pointer or read by using the Download functions.
-                // Writes by the HOST only become visible to the DEVICE after a call to glFlushMappedBufferRange.
                 // Writes by the DEVICE only become visible to the HOST after a call to glMemoryBarrier(CLIENT_MAPPED_BUFFER_BARRIER_BIT)
                 // followed by glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)
-                MappedIncoherent = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapReadBit | BufferStorageMask.MapWriteBit/* | memAccessMask.MapFlushExplicitBit*/,
+                MappedIncoherent = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapReadBit | BufferStorageMask.MapWriteBit,
 
                 // The buffer must be written or read to by using the mapped memory pointer or read by using the Download functions.
                 // Writes by the DEVICE only become visible to the HOST after a call to glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0).
@@ -65,7 +64,7 @@ namespace BBOpenGL
 
                 MappedMemory = null;
 
-                if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedIncoherent)
+                if (memAccess == MemAccess.MappedCoherent || memAccess == MemAccess.MappedIncoherent)
                 {
                     MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
                 }

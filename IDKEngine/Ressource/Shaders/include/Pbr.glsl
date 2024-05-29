@@ -41,7 +41,7 @@ float DistributionGGX(float NoH, float roughness)
     float denom = max((1.0 - NoH * NoH + a * a), 0.0001);
 
     float k = numer / denom;
-    return k * k * (1.0 / PI);
+    return k * k / PI;
 }
 
 // GGX - F Term. Accounts for different reflectivity from different angles

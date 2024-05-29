@@ -6,7 +6,7 @@ using FboBufferType = OpenTK.Graphics.OpenGL.Buffer;
 namespace BBOpenGL
 {
     public static partial class BBG
-    { 
+    {
         public unsafe class Rendering
         {
             public enum AttachmentLoadOp : int
@@ -97,20 +97,23 @@ namespace BBOpenGL
                 Always = OpenTK.Graphics.OpenGL.DepthFunction.Always,
             }
 
-            public enum ShadingRate : uint
+            /// <summary>
+            /// Requires GL_NV_shading_rate_image
+            /// </summary>
+            public enum ShadingRateNV : uint
             {
                 _0InvocationsPerPixel = All.ShadingRateNoInvocationsNv,
-                _1InvocationPerPixelNV = All.ShadingRate1InvocationPerPixelNv,
-                _1InvocationPer1x2PixelsNV = All.ShadingRate1InvocationPer1x2PixelsNv,
-                _1InvocationPer2x1PixelsNV = All.ShadingRate1InvocationPer2x1PixelsNv,
-                _1InvocationPer2x2PixelsNV = All.ShadingRate1InvocationPer2x2PixelsNv,
-                _1InvocationPer2x4PixelsNV = All.ShadingRate1InvocationPer2x4PixelsNv,
-                _1InvocationPer4x2PixelsNV = All.ShadingRate1InvocationPer4x2PixelsNv,
-                _1InvocationPer4x4PixelsNV = All.ShadingRate1InvocationPer4x4PixelsNv,
-                _2InvocationsPerPixelNV = All.ShadingRate2InvocationsPerPixelNv,
-                _4InvocationsPerPixelNV = All.ShadingRate4InvocationsPerPixelNv,
-                _8InvocationsPerPixelNV = All.ShadingRate8InvocationsPerPixelNv,
-                _16InvocationsPerPixelNV = All.ShadingRate16InvocationsPerPixelNv,
+                _1InvocationPerPixel = All.ShadingRate1InvocationPerPixelNv,
+                _1InvocationPer1x2Pixels = All.ShadingRate1InvocationPer1x2PixelsNv,
+                _1InvocationPer2x1Pixels = All.ShadingRate1InvocationPer2x1PixelsNv,
+                _1InvocationPer2x2Pixels = All.ShadingRate1InvocationPer2x2PixelsNv,
+                _1InvocationPer2x4Pixels = All.ShadingRate1InvocationPer2x4PixelsNv,
+                _1InvocationPer4x2Pixels = All.ShadingRate1InvocationPer4x2PixelsNv,
+                _1InvocationPer4x4Pixels = All.ShadingRate1InvocationPer4x4PixelsNv,
+                _2InvocationsPerPixel = All.ShadingRate2InvocationsPerPixelNv,
+                _4InvocationsPerPixel = All.ShadingRate4InvocationsPerPixelNv,
+                _8InvocationsPerPixel = All.ShadingRate8InvocationsPerPixelNv,
+                _16InvocationsPerPixel = All.ShadingRate16InvocationsPerPixelNv,
             }
 
             public enum VertexAttributeType : uint
@@ -225,7 +228,7 @@ namespace BBOpenGL
             /// </summary>
             public struct VariableRateShadingNV
             {
-                public ShadingRate[] ShadingRatePalette;
+                public ShadingRateNV[] ShadingRatePalette;
                 public Texture ShadingRateImage;
             }
 
@@ -260,23 +263,26 @@ namespace BBOpenGL
             private static int vaoGLHandle = 0;
 
             private static Vector2i inferredViewportSize;
+
             public static void Render(string renderPassName, in RenderAttachments renderAttachments, in GraphicsPipelineState pipelineState, Action funcRender)
             {
-                RenderAttachmentsVerbose verboseRenderAttachments = new RenderAttachmentsVerbose();
+                RenderAttachmentsVerbose verboseRTs = new RenderAttachmentsVerbose();
                 if (renderAttachments.ColorAttachments.HasValue)
                 {
-                    verboseRenderAttachments.ColorAttachments = new ColorAttachment[renderAttachments.ColorAttachments.Value.Textures.Length];
+                    ColorAttachments colorAttachments = renderAttachments.ColorAttachments.Value;
+
+                    verboseRTs.ColorAttachments = new ColorAttachment[colorAttachments.Textures.Length];
                     for (int i = 0; i < renderAttachments.ColorAttachments.Value.Textures.Length; i++)
                     {
-                        verboseRenderAttachments.ColorAttachments[i].Texture = renderAttachments.ColorAttachments.Value.Textures[i];
-                        verboseRenderAttachments.ColorAttachments[i].AttachmentLoadOp = renderAttachments.ColorAttachments.Value.AttachmentLoadOp;
-                        verboseRenderAttachments.ColorAttachments[i].ClearColor = renderAttachments.ColorAttachments.Value.ClearColor;
+                        verboseRTs.ColorAttachments[i].Texture = colorAttachments.Textures[i];
+                        verboseRTs.ColorAttachments[i].AttachmentLoadOp = colorAttachments.AttachmentLoadOp;
+                        verboseRTs.ColorAttachments[i].ClearColor = colorAttachments.ClearColor;
                     }
                 }
-                verboseRenderAttachments.DepthAttachment = renderAttachments.DepthAttachment;
-                verboseRenderAttachments.StencilAttachment = renderAttachments.StencilAttachment;
+                verboseRTs.DepthAttachment = renderAttachments.DepthAttachment;
+                verboseRTs.StencilAttachment = renderAttachments.StencilAttachment;
 
-                Render(renderPassName, verboseRenderAttachments, pipelineState, funcRender);
+                Render(renderPassName, verboseRTs, pipelineState, funcRender);
             }
 
             public static void Render(string renderPassName, in RenderAttachmentsVerbose renderAttachments, in GraphicsPipelineState pipelineState, Action funcRender)
@@ -311,8 +317,8 @@ namespace BBOpenGL
                                 break;
                         }
 
-                        Vector3i textureSize = Texture.GetMipMapLevelSize(colorAttachment.Texture.Width, colorAttachment.Texture.Height, colorAttachment.Texture.Depth, colorAttachment.Level);
-                        inferredViewportSize = textureSize.Xy;
+                        Vector3i textureSize = Texture.GetMipmapLevelSize(colorAttachment.Texture.Width, colorAttachment.Texture.Height, 1, colorAttachment.Level);
+                        inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
                     }
                 }
 
@@ -337,8 +343,8 @@ namespace BBOpenGL
                             break;
                     }
 
-                    Vector3i textureSize = Texture.GetMipMapLevelSize(depthAttachment.Texture.Width, depthAttachment.Texture.Height, depthAttachment.Texture.Depth, depthAttachment.Level);
-                    inferredViewportSize = textureSize.Xy;
+                    Vector3i textureSize = Texture.GetMipmapLevelSize(depthAttachment.Texture.Width, depthAttachment.Texture.Height, 1, depthAttachment.Level);
+                    inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
                 }
 
                 if (renderAttachments.StencilAttachment != null)
@@ -362,8 +368,8 @@ namespace BBOpenGL
                             break;
                     }
 
-                    Vector3i textureSize = Texture.GetMipMapLevelSize(stencilAttachment.Texture.Width, stencilAttachment.Texture.Height, stencilAttachment.Texture.Depth, stencilAttachment.Level);
-                    inferredViewportSize = textureSize.Xy;
+                    Vector3i textureSize = Texture.GetMipmapLevelSize(stencilAttachment.Texture.Width, stencilAttachment.Texture.Height, 1, stencilAttachment.Level);
+                    inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
                 }
 
                 GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
@@ -376,21 +382,18 @@ namespace BBOpenGL
 
             public static void Render(string renderPassName, in NoRenderAttachmentsParams fboParameters, in GraphicsPipelineState pipelineState, Action funcRender)
             {
-                inferredViewportSize = new Vector2i();
-
                 Debugging.PushDebugGroup(renderPassName);
 
-                if (fboNoAttachmentsGLHandle == 0)
-                {
-                    GL.CreateFramebuffers(1, ref fboNoAttachmentsGLHandle);
-                }
+                GL.DeleteFramebuffer(fboNoAttachmentsGLHandle);
+                GL.CreateFramebuffers(1, ref fboNoAttachmentsGLHandle);
+
                 GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
                 GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultHeight, fboParameters.Height);
-                inferredViewportSize = new Vector2i(fboParameters.Width, fboParameters.Height);
 
                 GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
                 SetGraphicsPipelineState(pipelineState);
 
+                inferredViewportSize = new Vector2i(fboParameters.Width, fboParameters.Height);
                 funcRender();
 
                 Debugging.PopDebugGroup();
@@ -398,29 +401,29 @@ namespace BBOpenGL
 
             public static void CopyTextureToSwapchain(Texture texture)
             {
-                RenderAttachmentsVerbose renderAttachments = new RenderAttachmentsVerbose();
-                renderAttachments.ColorAttachments = [new ColorAttachment() { Texture = texture }];
+                FramebufferCache.FramebufferDesc desc = new FramebufferCache.FramebufferDesc();
+                desc.Attachments[desc.NumAttachments++] = new FramebufferCache.Attachment() { Texture = texture, AttachmentPoint = FramebufferAttachment.ColorAttachment0 };
 
-                int fbo = FramebufferCache.GetFramebuffer(RenderAttachmentsToFramebufferDesc(renderAttachments));
+                int fbo = FramebufferCache.GetFramebuffer(desc);
 
                 GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
             }
 
             public static void SetVertexInputAssembly(in VertexInputAssembly vertexInputAssembly)
             {
-                if (vaoGLHandle == 0)
-                {
-                    GL.CreateVertexArrays(1, ref vaoGLHandle);
-                }
+                GL.DeleteVertexArray(vaoGLHandle);
+                GL.CreateVertexArrays(1, ref vaoGLHandle);
 
                 GL.VertexArrayElementBuffer(vaoGLHandle, vertexInputAssembly.IndexBuffer.ID);
+
                 if (vertexInputAssembly.VertexDescription.HasValue)
                 {
                     VertexDescription vertexDescription = vertexInputAssembly.VertexDescription.Value;
                     for (int i = 0; i < vertexDescription.VertexBuffers.Length; i++)
                     {
-                        ref readonly VertexBuffer vertexBufferSource = ref vertexDescription.VertexBuffers[i];
-                        GL.VertexArrayVertexBuffer(vaoGLHandle, (uint)i, vertexBufferSource.Buffer.ID, vertexBufferSource.Offset, vertexBufferSource.VertexSize);
+                        ref readonly VertexBuffer vertexBuffer = ref vertexDescription.VertexBuffers[i];
+
+                        GL.VertexArrayVertexBuffer(vaoGLHandle, (uint)i, vertexBuffer.Buffer.ID, vertexBuffer.Offset, vertexBuffer.VertexSize);
                     }
 
                     for (int i = 0; i < vertexDescription.VertexAttributes.Length; i++)
@@ -432,6 +435,7 @@ namespace BBOpenGL
                         GL.VertexArrayAttribBinding(vaoGLHandle, (uint)i, (uint)vertexAttribute.BufferIndex);
                     }
                 }
+
                 GL.BindVertexArray(vaoGLHandle);
             }
 
@@ -472,7 +476,7 @@ namespace BBOpenGL
             {
                 SetViewports(new ReadOnlySpan<Viewport>(in viewport));
             }
-            
+
             public static void SetViewports(ReadOnlySpan<Viewport> viewports)
             {
                 Span<Vector4> data = stackalloc Vector4[viewports.Length];
@@ -556,7 +560,8 @@ namespace BBOpenGL
                     {
                         ref readonly ColorAttachment colorAttachment = ref renderAttachments.ColorAttachments[i];
 
-                        framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment() {
+                        framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment()
+                        {
                             Texture = colorAttachment.Texture,
                             Level = colorAttachment.Level,
                             AttachmentPoint = FramebufferAttachment.ColorAttachment0 + (uint)i,
@@ -567,7 +572,8 @@ namespace BBOpenGL
                 {
                     DepthAttachment depthAttachment = renderAttachments.DepthAttachment.Value;
 
-                    framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment() {
+                    framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment()
+                    {
                         Texture = depthAttachment.Texture,
                         Level = depthAttachment.Level,
                         AttachmentPoint = FramebufferAttachment.DepthAttachment,
@@ -577,7 +583,8 @@ namespace BBOpenGL
                 {
                     StencilAttachment stencilAttachment = renderAttachments.StencilAttachment.Value;
 
-                    framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment() {
+                    framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment()
+                    {
                         Texture = stencilAttachment.Texture,
                         Level = stencilAttachment.Level,
                         AttachmentPoint = FramebufferAttachment.StencilAttachment,

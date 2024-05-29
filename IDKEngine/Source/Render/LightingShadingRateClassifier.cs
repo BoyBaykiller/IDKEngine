@@ -36,7 +36,7 @@ namespace IDKEngine.Render
         }
 
         public GpuSettings Settings;
-        public BBG.Rendering.ShadingRate[] ShadingRatePalette;
+        public BBG.Rendering.ShadingRateNV[] ShadingRatePalette;
 
         public BBG.Texture Result;
         private BBG.Texture debugTexture;
@@ -54,11 +54,11 @@ namespace IDKEngine.Render
             SetSize(size);
 
             ShadingRatePalette = [
-                BBG.Rendering.ShadingRate._1InvocationPerPixelNV,
-                BBG.Rendering.ShadingRate._1InvocationPer2x1PixelsNV,
-                BBG.Rendering.ShadingRate._1InvocationPer2x2PixelsNV,
-                BBG.Rendering.ShadingRate._1InvocationPer4x2PixelsNV,
-                BBG.Rendering.ShadingRate._1InvocationPer4x4PixelsNV
+                BBG.Rendering.ShadingRateNV._1InvocationPerPixel,
+                BBG.Rendering.ShadingRateNV._1InvocationPer2x1Pixels,
+                BBG.Rendering.ShadingRateNV._1InvocationPer2x2Pixels,
+                BBG.Rendering.ShadingRateNV._1InvocationPer4x2Pixels,
+                BBG.Rendering.ShadingRateNV._1InvocationPer4x4Pixels
             ];
 
             Settings = settings;

@@ -127,7 +127,6 @@ namespace BBOpenGL
 
                 Span<ColorBuffer> drawBuffers = stackalloc ColorBuffer[MAX_COLOR_ATTACHMENTS];
                 int numColorAttachments = 0;
-                bool hasDepth = false;
                 for (int i = 0; i < framebufferDesc.NumAttachments; i++)
                 {
                     ref readonly Attachment attachment = ref framebufferDesc.Attachments[i];
@@ -139,14 +138,6 @@ namespace BBOpenGL
                         drawBuffers[numColorAttachments] = ColorBuffer.ColorAttachment0 + (uint)numColorAttachments;
                         numColorAttachments++;
                     }
-                    if (attachment.AttachmentPoint == FramebufferAttachment.DepthAttachment)
-                    {
-                        hasDepth = true;
-                    }
-                }
-                if (!hasDepth)
-                {
-                    GL.NamedFramebufferTexture(newFramebuffer.GLRessource, FramebufferAttachment.DepthAttachment, 0, 0);
                 }
                 GL.NamedFramebufferDrawBuffers(newFramebuffer.GLRessource, numColorAttachments, drawBuffers[0]);
 

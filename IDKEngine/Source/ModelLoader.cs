@@ -524,7 +524,7 @@ namespace IDKEngine
                                                 nuint dataOffset;
                                                 Ktx2.GetImageOffset(ktxTexture, (uint)level, 0, 0, &dataOffset);
 
-                                                Vector3i size = GLTexture.GetMipMapLevelSize((int)ktxTexture->BaseWidth, (int)ktxTexture->BaseHeight, (int)ktxTexture->BaseDepth, level);
+                                                Vector3i size = GLTexture.GetMipmapLevelSize((int)ktxTexture->BaseWidth, (int)ktxTexture->BaseHeight, (int)ktxTexture->BaseDepth, level);
                                                 texture.UploadCompressed2D(stagingBuffer, size.X, size.Y, (void*)dataOffset, level);
                                             }
                                             stagingBuffer.Dispose();

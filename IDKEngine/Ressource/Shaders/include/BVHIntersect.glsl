@@ -1,7 +1,7 @@
 #define USE_TLAS AppInsert(USE_TLAS)
 
-#define MAX_BLAS_TREE_DEPTH AppInsert(MAX_BLAS_TREE_DEPTH) - 1
-#define MAX_TLAS_TREE_DEPTH 20
+#define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH) - 1, 1)
+#define MAX_TLAS_TREE_DEPTH max(26 - 1, 1)
 
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)
@@ -18,9 +18,9 @@ struct HitInfo
 };
 
 #ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
-shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][max(MAX_BLAS_TREE_DEPTH, 1)];
+shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][MAX_BLAS_TREE_DEPTH];
 #else
-uint BlasTraversalStack[max(MAX_BLAS_TREE_DEPTH, 1)];
+uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
 #endif
 
 void StackPush(inout uint stackPtr, uint newEntry);

@@ -24,19 +24,17 @@ namespace IDKEngine.Utils
                 List<Vertex> vertices = new List<Vertex>((latitudes + 1) * (longitudes + 1));
 
                 float deltaLatitude = MathF.PI / latitudes;
-                float deltaLongitude = 2 * MathF.PI / longitudes;
-                float latitudeAngle;
-                float longitudeAngle;
+                float deltaLongitude = 2.0f * MathF.PI / longitudes;
 
                 for (int i = 0; i <= latitudes; i++)
                 {
-                    latitudeAngle = MathF.PI / 2 - i * deltaLatitude;
+                    float latitudeAngle = MathF.PI / 2 - i * deltaLatitude;
                     float xy = radius * MathF.Cos(latitudeAngle);
                     float z = radius * MathF.Sin(latitudeAngle);
 
                     for (int j = 0; j <= longitudes; j++)
                     {
-                        longitudeAngle = j * deltaLongitude;
+                        float longitudeAngle = j * deltaLongitude;
 
                         Vertex vertex;
                         vertex.Position.X = xy * MathF.Cos(longitudeAngle);
@@ -93,7 +91,7 @@ namespace IDKEngine.Utils
                 public Vector3 Position;
             }
 
-            public static Vertex[] GeneratePlane(float width, float depth, int subdivisonX, int subdivisionZ)
+            public static Vertex[] GenerateVertices(float width, float depth, int subdivisonX, int subdivisionZ)
             {
                 List<Vertex> positions = new List<Vertex>();
                 float stepX = width / subdivisonX;

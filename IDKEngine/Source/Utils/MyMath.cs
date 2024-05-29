@@ -100,5 +100,39 @@ namespace IDKEngine.Utils
         {
             return MapRangeToAnOther(value, rangeMin, rangeMax, new Vector3(0.0f), new Vector3(1.0f));
         }
+
+        public static int NextMultiple(int num, int multiple)
+        {
+            return ((num / multiple) + 1) * multiple;
+        }
+
+        // Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
+
+        // Expands a 10-bit integer into 30 bits
+        // by inserting 2 zeros after each bit.
+        private static uint ExpandBits(uint v)
+        {
+            v = unchecked((v * 0x00010001u) & 0xFF0000FFu);
+            v = unchecked((v * 0x00000101u) & 0x0F00F00Fu);
+            v = unchecked((v * 0x00000011u) & 0xC30C30C3u);
+            v = unchecked((v * 0x00000005u) & 0x49249249u);
+            return v;
+        }
+
+        // Calculates a 30-bit Morton code for the
+        // given 3D point located within the unit cube [0,1].
+        public static uint Morton3D(in Vector3 value)
+        {
+            uint x = Math.Clamp((uint)(value.X * 1024.0f), 0, 1023);
+            uint y = Math.Clamp((uint)(value.Y * 1024.0f), 0, 1023);
+            uint z = Math.Clamp((uint)(value.Z * 1024.0f), 0, 1023);
+
+            uint xx = ExpandBits(x);
+            uint yy = ExpandBits(y);
+            uint zz = ExpandBits(z);
+            uint result = xx * 4 + yy * 2 + zz;
+
+            return result;
+        }
     }
 }

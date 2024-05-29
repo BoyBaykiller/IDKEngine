@@ -13,8 +13,6 @@ namespace IDKEngine
 {
     public class BVH : IDisposable
     {
-        public const bool CPU_USE_TLAS = false;
-
         private bool _gpuUseTlas;
         public bool GpuUseTlas
         {
@@ -56,6 +54,9 @@ namespace IDKEngine
             public int InstanceID;
         }
 
+        public bool CpuUseTlas;
+        public bool UpdateTlas;
+
         public TLAS Tlas { get; private set; }
         private BLAS[] blases;
 
@@ -76,17 +77,16 @@ namespace IDKEngine
             blases = Array.Empty<BLAS>();
             Tlas = new TLAS(blases, Array.Empty<BBG.DrawElementsIndirectCommand>(), Array.Empty<GpuMeshInstance>());
 
-
-            // Needs more optimization. Currently only pays of on scenes with many BLAS'es.
-            // Also does not get rebuild automatically.
-            GpuUseTlas = false;
+            GpuUseTlas = false; // Only pays of on scenes with many BLAS'es (not sponza). So disabled by default.
+            CpuUseTlas = false;
+            UpdateTlas = false;
 
             MaxBlasTreeDepth = 1;
         }
 
         public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMax = float.MaxValue)
         {
-            if (CPU_USE_TLAS)
+            if (CpuUseTlas)
             {
                 return Tlas.Intersect(ray, out hitInfo, tMax);
             }
@@ -126,7 +126,7 @@ namespace IDKEngine
         public delegate void FuncIntersectLeafNode(in BoxHitInfo hitInfo);
         public void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
         {
-            if (CPU_USE_TLAS)
+            if (CpuUseTlas)
             {
                 Tlas.Intersect(box, intersectFunc);
             }
@@ -177,14 +177,17 @@ namespace IDKEngine
 
             Stopwatch sw = Stopwatch.StartNew();
             Tlas = new TLAS(blases, drawCommands, meshInstances);
-            TlasBuild();
+            TlasBuild(true);
             Logger.Log(Logger.LogLevel.Info, $"Created Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
         }
 
-        public void TlasBuild()
+        public void TlasBuild(bool force = false)
         {
-            Tlas.Build();
-            tlasBuffer.MutableAllocateElements(Tlas.Nodes);
+            if (UpdateTlas || force)
+            {
+                Tlas.Build();
+                tlasBuffer.MutableAllocateElements(Tlas.Nodes);
+            }
         }
 
         public void BlasesBuild()

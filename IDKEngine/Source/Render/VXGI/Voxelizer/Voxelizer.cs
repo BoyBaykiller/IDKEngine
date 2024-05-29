@@ -221,7 +221,7 @@ namespace IDKEngine.Render
                 {
                     mipmapProgram.Upload(0, i - 1);
 
-                    Vector3i size = BBG.Texture.GetMipMapLevelSize(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth, i);
+                    Vector3i size = BBG.Texture.GetMipmapLevelSize(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth, i);
 
                     BBG.Cmd.BindImageUnit(ResultVoxels, 0, i, true);
                     BBG.Computing.Dispatch((size.X + 4 - 1) / 4, (size.Y + 4 - 1) / 4, (size.Z + 4 - 1) / 4);

@@ -56,8 +56,8 @@ namespace BBOpenGL
                 /// <summary>
                 /// Requires GL_KHR_texture_compression_astc
                 /// </summary>
-                
                 Astc4X4RgbaKHR = SizedInternalFormat.CompressedRgbaAstc4x4Khr,
+
                 /// <summary>
                 /// Requires GL_KHR_texture_compression_astc
                 /// </summary>
@@ -345,7 +345,7 @@ namespace BBOpenGL
                 return MathF.ILogB(Math.Max(width, Math.Max(height, depth))) + 1;
             }
 
-            public static Vector3i GetMipMapLevelSize(int width, int height, int depth, int level)
+            public static Vector3i GetMipmapLevelSize(int width, int height, int depth, int level)
             {
                 Vector3i size = new Vector3i(width, height, depth) / (1 << level);
                 return Vector3i.ComponentMax(size, new Vector3i(1));

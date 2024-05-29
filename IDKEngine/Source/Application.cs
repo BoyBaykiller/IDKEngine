@@ -202,7 +202,6 @@ namespace IDKEngine
                 }
 
                 BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, boundingBox);
-
             }
 
             BBG.Rendering.SetViewport(WindowFramebufferSize);
@@ -225,14 +224,6 @@ namespace IDKEngine
         {
             MainThreadQueue.Execute();
 
-            if (fpsTimer.ElapsedMilliseconds >= 1000)
-            {
-                FramesPerSecond = fpsCounter;
-                WindowTitle = $"IDKEngine FPS: {FramesPerSecond}";
-                fpsCounter = 0;
-                fpsTimer.Restart();
-            }
-
             gui.Update(this);
 
             {
@@ -249,7 +240,7 @@ namespace IDKEngine
                     RenderGui = !RenderGui;
                     if (!RenderGui)
                     {
-                        RequestPresentationResolution = new Vector2i(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+                        RequestPresentationResolution = WindowFramebufferSize;
                     }
                 }
                 if (KeyboardState[Keys.F11] == Keyboard.InputState.Touched)
@@ -356,11 +347,20 @@ namespace IDKEngine
             Camera.SetPrevToCurrentPosition();
             LightManager.Update(out bool anyLightMoved);
             ModelManager.Update(out bool anyMeshInstanceMoved);
+            ModelManager.BVH.TlasBuild();
 
             bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
             if ((RenderPath == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
             {
                 PathTracer.ResetRenderProcess();
+            }
+            
+            if (fpsTimer.ElapsedMilliseconds >= 1000)
+            {
+                FramesPerSecond = fpsCounter;
+                WindowTitle = $"IDKEngine FPS: {FramesPerSecond}";
+                fpsCounter = 0;
+                fpsTimer.Restart();
             }
         }
 
@@ -443,9 +443,9 @@ namespace IDKEngine
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Ressource/Models/HelmetCompressed/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
 
-                //ModelLoader.Model plane = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\Plane.gltf", Matrix4.CreateScale(30.0f, 1.0f, 30.0f) * Matrix4.CreateRotationZ(MathF.PI) * Matrix4.CreateTranslation(0.0f, 17.0f, 10.0f));
-                //ModelLoader.Model test = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
-                //ModelLoader.Model bistro = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\BistroExterior\Bistro.gltf");
+                //ModelLoader.Model plane = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Plane.gltf", Matrix4.CreateScale(30.0f, 1.0f, 30.0f) * Matrix4.CreateRotationZ(MathF.PI) * Matrix4.CreateTranslation(0.0f, 17.0f, 10.0f));
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Models\2.0\SimpleInstancing\glTF\\SimpleInstancing.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f));
+                //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroExteriorCompressed\BistroExteriorCompressed.gltf");
 
                 ModelManager.Add(sponza, lucy, helmet);
 
@@ -500,10 +500,10 @@ namespace IDKEngine
                 //a.Meshes[376].EmissiveBias = 20.0f;
                 //a.Meshes[379].EmissiveBias = 20.0f;
                 ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf");
-                ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf");
-                ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf");
+                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf");
+                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf");
                 //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
-                ModelManager.Add(a, b, c, d);
+                ModelManager.Add(a, b);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 

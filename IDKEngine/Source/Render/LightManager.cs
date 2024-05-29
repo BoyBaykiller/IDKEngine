@@ -35,14 +35,6 @@ namespace IDKEngine.Render
             get => _count;
         }
 
-        public Intersections.SceneVsMovingSphereSettings SceneVsSphereCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
-        {
-            IsEnabled = true,
-            TestSteps = 1,
-            RecursiveSteps = 8,
-            EpsilonNormalOffset = 0.001f,
-        };
-
         public struct MovingLightsCollisionSettings
         {
             public bool IsEnabled;
@@ -50,11 +42,20 @@ namespace IDKEngine.Render
             public float EpsilonOffset;
         }
 
+
         public MovingLightsCollisionSettings MovingLightsCollisionSetting = new MovingLightsCollisionSettings()
         {
             IsEnabled = true,
             EpsilonOffset = 0.001f,
             RecursiveSteps = 8,
+        };
+        
+        public Intersections.SceneVsMovingSphereSettings SceneVsSphereCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
+        {
+            IsEnabled = true,
+            TestSteps = 1,
+            RecursiveSteps = 8,
+            EpsilonNormalOffset = 0.001f,
         };
 
         private readonly CpuLight[] lights;
