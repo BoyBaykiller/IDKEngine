@@ -99,6 +99,7 @@ namespace BBOpenGL
         }
 
         private static ContextInfo contextInfo;
+
         public static void Initialize(Debugging.FuncOpenGLDebugCallback openglDebugCallback = null)
         {
             if (openglDebugCallback != null)
@@ -125,14 +126,11 @@ namespace BBOpenGL
 
             contextInfo.Name = GL.GetString(StringName.Version);
             contextInfo.GLVersion = Convert.ToDouble($"{GL.GetInteger(GetPName.MajorVersion)}.{GL.GetInteger(GetPName.MinorVersion)}");
-            {
-                DeviceInfo deviceInfo;
-                deviceInfo.Name = GL.GetString(StringName.Renderer);
-                deviceInfo.Vendor = GetGpuVendor();
-                deviceInfo.ExtensionSupport = GetSupportedExtensions();
 
-                contextInfo.DeviceInfo = deviceInfo;
-            }
+            ref DeviceInfo deviceInfo = ref contextInfo.DeviceInfo;
+            deviceInfo.Name = GL.GetString(StringName.Renderer);
+            deviceInfo.Vendor = GetGpuVendor();
+            deviceInfo.ExtensionSupport = GetSupportedExtensions();
         }
 
         private static GpuVendor GetGpuVendor()

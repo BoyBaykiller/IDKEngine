@@ -54,7 +54,7 @@ namespace BBOpenGL
 
             public static void BindImageUnit(Texture texture, Texture.InternalFormat format, int unit, int level = 0, bool layered = false, int layer = 0)
             {
-                GL.BindImageTexture((uint)unit, texture.ID, level, layered, layer, BufferAccess.ReadWrite, (OpenTK.Graphics.OpenGL.InternalFormat)format);
+                GL.BindImageTexture((uint)unit, texture.ID, level, layered, layer, BufferAccess.ReadWrite, (InternalFormat)format);
             }
 
             public static void UnbindTextureUnit(int unit)

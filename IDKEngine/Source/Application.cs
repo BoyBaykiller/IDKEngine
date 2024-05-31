@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Diagnostics;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -24,10 +25,6 @@ namespace IDKEngine
         {
             get
             {
-                if (RasterizerPipeline != null && PathTracer != null)
-                {
-                    throw new InvalidOperationException($"Invalid state. Rasterizer and PathTracer should never be enabled both");
-                }
                 if (RasterizerPipeline != null)
                 {
                     return RenderMode.Rasterizer;
@@ -37,7 +34,7 @@ namespace IDKEngine
                     return RenderMode.PathTracer;
                 }
 
-                throw new UnreachableException();
+                throw new UnreachableException($"Rasterizer and PathTracer are both disposed. Select a {nameof(RenderMode)}");
             }
         }
 
@@ -62,16 +59,16 @@ namespace IDKEngine
         }
 
         public float RenderResolutionScale => (float)RenderResolution.Y / PresentationResolution.Y;
-        
 
         // These will take effect at the beginning of a frame
         public Vector2i? RequestPresentationResolution;
         public float? RequestRenderResolutionScale;
         public RenderMode? RequestRenderMode;
 
-        // Used in Rasterizer and PathTracer RenderMode respectively
-        public RasterPipeline RasterizerPipeline;
-        public PathTracer PathTracer;
+        // Used for Rasterizer and PathTracer RenderMode.
+        // When inactive should be disposed and set to null which is why we signal nullable with "?"
+        public RasterPipeline? RasterizerPipeline;
+        public PathTracer? PathTracer;
 
         // These effects run at presentation resolution and are useful for
         // both Rasterizer and PathTracer RenderMode which is why they are here
@@ -96,11 +93,11 @@ namespace IDKEngine
 
         public int FramesPerSecond { get; private set; }
 
-        public bool RunSimulations = true;
+        public bool TimeEnabled = true;
         public Intersections.SceneVsMovingSphereSettings SceneVsCamCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
         {
             IsEnabled = true,
-            TestSteps = 3,
+            TestSteps = 12,
             RecursiveSteps = 12,
             EpsilonNormalOffset = 0.001f
         };
@@ -137,10 +134,8 @@ namespace IDKEngine
 
             if (RequestRenderMode.HasValue)
             {
-                RenderMode newRenderMode = RequestRenderMode.Value;
+                SetRenderMode(RequestRenderMode.Value, RenderResolution, PresentationResolution);
                 RequestRenderMode = null;
-
-                SetRenderMode(newRenderMode, RenderResolution, PresentationResolution);
             }
 
             if (RenderPath == RenderMode.Rasterizer)
@@ -249,11 +244,12 @@ namespace IDKEngine
                 }
                 if (KeyboardState[Keys.T] == Keyboard.InputState.Touched)
                 {
-                    RunSimulations = !RunSimulations;
+                    TimeEnabled = !TimeEnabled;
                 }
                 if (KeyboardState[Keys.D1] == Keyboard.InputState.Touched)
                 {
                     BBG.AbstractShaderProgram.RecompileAll();
+                    PathTracer?.ResetRenderProcess();
                 }
             }
 
@@ -286,7 +282,7 @@ namespace IDKEngine
                     Camera.AdvanceSimulation(dT);
                 }
 
-                if (RunSimulations)
+                if (TimeEnabled)
                 {
                     LightManager.AdvanceSimulation(dT, ModelManager);
                 }
@@ -388,7 +384,7 @@ namespace IDKEngine
             {
                 Logger.Log(Logger.LogLevel.Fatal, 
                     "Your system does not support GL_EXT_shader_image_load_formatted.\n" +
-                    "Execution is still continued because some AMD drivers have a bug to not report this extension even though its there.\n" +
+                    "Execution is still continued because AMD drivers older than 24.10 have a bug to not report this extension even though its there.\n" +
                     "https://community.amd.com/t5/opengl-vulkan/opengl-bug-gl-ext-shader-image-load-formatted-not-reported-even/m-p/676326#M5140\n" +
                     "If the extension is indeed not supported shader compilation will throw errors"
                 );
@@ -409,10 +405,7 @@ namespace IDKEngine
 
             ModelLoader.TextureLoaded += () =>
             {
-                if (PathTracer != null)
-                {
-                    PathTracer.ResetRenderProcess();
-                }
+                PathTracer?.ResetRenderProcess();
             };
 
             ModelManager = new ModelManager();
@@ -540,6 +533,23 @@ namespace IDKEngine
             gui.PressChar(key);
         }
 
+        protected override void OnFilesDrop(string[] paths)
+        {
+            for (int i = 0; i < paths.Length; i++)
+            {
+                string path = paths[i];
+                string ext = Path.GetExtension(path);
+                if (ext == ".gltf" || ext == ".glb")
+                {
+                    gui.AddModelDialog(path);
+                }
+                else
+                {
+                    Logger.Log(Logger.LogLevel.Warn, $"Dropped file \"{Path.GetFileName(path)}\" is unsupported. Only .gltf and .glb");
+                }
+            }
+        }
+
         /// <summary>
         /// We should avoid random resolution changes inside a frame so if you can use
         /// <seealso cref="RequestPresentationResolution"/> instead.
@@ -547,14 +557,9 @@ namespace IDKEngine
         /// </summary>
         private void SetResolutions(Vector2i renderRes, Vector2i presentRes)
         {
-            if (RenderPath == RenderMode.Rasterizer)
-            {
-                if (RasterizerPipeline != null) RasterizerPipeline.SetSize(renderRes, presentRes);
-            }
-            if (RenderPath == RenderMode.PathTracer)
-            {
-                if (PathTracer != null) PathTracer.SetSize(renderRes);
-            }
+            RasterizerPipeline?.SetSize(renderRes, presentRes);
+            PathTracer?.SetSize(renderRes);
+
             if (RenderPath == RenderMode.Rasterizer || RenderPath == RenderMode.PathTracer)
             {
                 if (VolumetricLight != null) VolumetricLight.SetSize(presentRes);
@@ -571,24 +576,30 @@ namespace IDKEngine
         /// </summary>
         private void SetRenderMode(RenderMode renderMode, Vector2i renderRes, Vector2i presentRes)
         {
+            // On AMD driver Vanguard-24.10-RC5-May22 and newer (and not 23.12.1 or earlier) setting the render mode
+            // may cause a crash, especially during texture loading.
+
             if (renderMode == RenderMode.Rasterizer)
             {
-                if (RasterizerPipeline != null) RasterizerPipeline.Dispose();
+                RasterizerPipeline?.Dispose();
                 RasterizerPipeline = new RasterPipeline(renderRes, presentRes);
             }
             else
             {
-                if (RasterizerPipeline != null) { RasterizerPipeline.Dispose(); RasterizerPipeline = null; }
+                RasterizerPipeline?.Dispose();
+                RasterizerPipeline = null;
             }
 
             if (renderMode == RenderMode.PathTracer)
             {
-                if (PathTracer != null) PathTracer.Dispose();
+                TimeEnabled = false;
+                PathTracer?.Dispose();
                 PathTracer = new PathTracer(renderRes, PathTracer == null ? PathTracer.GpuSettings.Default : PathTracer.GetGpuSettings());
             }
             else
             {
-                if (PathTracer != null) { PathTracer.Dispose(); PathTracer = null; }
+                PathTracer?.Dispose();
+                PathTracer = null;
             }
 
             if (renderMode == RenderMode.Rasterizer || renderMode == RenderMode.PathTracer)

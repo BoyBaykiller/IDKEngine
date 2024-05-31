@@ -143,9 +143,10 @@ vec3 UniformSampleDisk(vec3 normal, float rnd0, float rnd1)
 }
 
 // Probability to choose pf when given pf and pg as weights. Examples:
-// * pf = 1.0; pg = 0.0; => 1.0, meaning choose pf 100% of the time
-// * pf =   x; pg =   x; => 0.5; meaning choose pf  50% of the time
-// * pf = 0.0; pg = 1.0; => 0.0; meaning choose pf   0% of the time
+// * pf = 1.0; pg = 0.0; ==> 1.0, meaning choose pf 100% of the time
+// * pf =   x; pg =   x; ==> 0.5, meaning choose pf  50% of the time
+// * pf =   3; pg =   7; ==> 0.3, meaning choose pf  30% of the time
+// * pf = 0.0; pg = 1.0; ==> 0.0, meaning choose pf   0% of the time
 float BalanceHeuristic(float pf, float pg)
 {
     return pf / (pf + pg);

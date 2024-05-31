@@ -1,6 +1,7 @@
 #version 460 core
 
 AppInclude(include/Random.glsl)
+AppInclude(include/Surface.glsl)
 AppInclude(include/TraceCone.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
@@ -21,7 +22,7 @@ layout(std140, binding = 7) uniform SettingsUBO
     bool IsTemporalAccumulation;
 } settingsUBO;
 
-vec3 IndirectLight(vec3 point, vec3 incomming, vec3 normal, float specularChance, float roughness);
+vec3 IndirectLight(Surface surface, vec3 position, vec3 incomming);
 float GetMaterialVariance(float specularChance, float roughness);
 
 void main()
@@ -39,20 +40,25 @@ void main()
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjView);
     vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
     float specular = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
-    float roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).b;
+    float roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
+
+    Surface surface = GetDefaultSurface();
+    surface.Metallic = specular;
+    surface.Roughness = roughness;
+    surface.Normal = normal;
 
     vec3 viewDir = fragPos - perFrameDataUBO.ViewPos;
-    vec3 indirectLight = IndirectLight(fragPos, viewDir, normal, specular, roughness) * settingsUBO.GIBoost;
+    vec3 indirectLight = IndirectLight(surface, fragPos, viewDir) * settingsUBO.GIBoost;
 
     imageStore(ImgResult, imgCoord, vec4(indirectLight, 1.0));
 }
 
-vec3 IndirectLight(vec3 position, vec3 incomming, vec3 normal, float specularChance, float roughness)
+vec3 IndirectLight(Surface surface, vec3 position, vec3 incomming)
 {    
-    roughness *= roughness; // just a convention to make roughness feel more linear perceptually
+    surface.Roughness *= surface.Roughness; // just a convention to make roughness feel more linear perceptually
     
     vec3 irradiance = vec3(0.0);
-    float materialVariance = GetMaterialVariance(specularChance, roughness);
+    float materialVariance = GetMaterialVariance(surface.Metallic, surface.Roughness);
     uint samples = uint(mix(1.0, float(settingsUBO.MaxSamples), materialVariance));
 
     bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
@@ -68,18 +74,18 @@ vec3 IndirectLight(vec3 position, vec3 incomming, vec3 normal, float specularCha
         coneRay.Origin = position;
         coneRay.Direction;
 
-        vec3 diffuseDir = CosineSampleHemisphere(normal, rnd0, rnd1);
+        vec3 diffuseDir = CosineSampleHemisphere(surface.Normal, rnd0, rnd1);
         
         const float maxConeAngle = 0.32;  // 18 degree
         const float minConeAngle = 0.005; // 0.29 degree
         float coneAngle;
-        if (specularChance > rnd2)
+        if (surface.Metallic > rnd2)
         {
-            vec3 reflectionDir = reflect(incomming, normal);
-            reflectionDir = normalize(mix(reflectionDir, diffuseDir, roughness));
+            vec3 reflectionDir = reflect(incomming, surface.Normal);
+            reflectionDir = normalize(mix(reflectionDir, diffuseDir, surface.Roughness));
             coneRay.Direction = reflectionDir;
             
-            coneAngle = mix(minConeAngle, maxConeAngle, roughness);
+            coneAngle = mix(minConeAngle, maxConeAngle, surface.Roughness);
         }
         else
         {
@@ -87,7 +93,7 @@ vec3 IndirectLight(vec3 position, vec3 incomming, vec3 normal, float specularCha
             coneAngle = maxConeAngle;
         }
 
-        vec4 coneTrace = TraceCone(SamplerVoxels, coneRay, normal, coneAngle, settingsUBO.StepMultiplier, settingsUBO.NormalRayOffset, 0.99);
+        vec4 coneTrace = TraceCone(SamplerVoxels, coneRay, surface.Normal, coneAngle, settingsUBO.StepMultiplier, settingsUBO.NormalRayOffset, 0.99);
         coneTrace += (1.0 - coneTrace.a) * (texture(skyBoxUBO.Albedo, coneRay.Direction) * settingsUBO.GISkyBoxBoost);
         
         irradiance += coneTrace.rgb;

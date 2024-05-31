@@ -101,8 +101,10 @@ struct GpuMeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
-    vec3 _pad0;
     uint MeshIndex;
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
 };
 
 struct GpuBlasNode

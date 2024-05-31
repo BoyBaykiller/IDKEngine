@@ -21,6 +21,7 @@ using IDKEngine.GpuTypes;
 using GLTexture = BBOpenGL.BBG.Texture;
 using GLSampler = BBOpenGL.BBG.Sampler;
 using GltfTexture = SharpGLTF.Schema2.Texture;
+using GltfSampler = SharpGLTF.Schema2.TextureSampler;
 
 namespace IDKEngine
 {
@@ -167,17 +168,29 @@ namespace IDKEngine
                 }
             }
 
+            if (!CompressionUtils.IsCompressedGltf(gltf))
+            {
+                Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" is uncompressed");
+            }
+
             if (gltf.ExtensionsUsed.Contains("KHR_texture_basisu") && !gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness"))
             {
                 Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" uses extension KHR_texture_basisu without IDK_BC5_normal_metallicRoughness,\n" +
                                                   "causing normal and metallicRoughness textures with a suboptimal format (BC7) and potentially visible error.\n" +
-                                                  "Consider compressing with https://github.com/BoyBaykiller/meshoptimizer");
+                                                  "Optimal compression can be done with https://github.com/BoyBaykiller/meshoptimizer");
             }
 
             Stopwatch sw = Stopwatch.StartNew();
             Model model = GltfToEngineFormat(gltf, rootTransform);
+            sw.Stop();
 
-            Logger.Log(Logger.LogLevel.Info, $"Loaded \"{fileName}\" in {sw.ElapsedMilliseconds}ms (Triangles = {model.VertexIndices.Length / 3})");
+            nint totalIndicesCount = 0;
+            for (int i = 0; i < model.MeshInstances.Length; i++)
+            {
+                ref readonly BBG.DrawElementsIndirectCommand cmd = ref model.DrawCommands[model.MeshInstances[i].MeshIndex];
+                totalIndicesCount += cmd.IndexCount * cmd.InstanceCount;
+            }
+            Logger.Log(Logger.LogLevel.Info, $"Loaded \"{fileName}\" in {sw.ElapsedMilliseconds}ms (Triangles = {totalIndicesCount / 3})");
 
             return model;
         }
@@ -345,7 +358,7 @@ namespace IDKEngine
         {
             GLTexture defaultTexture = new GLTexture(GLTexture.Type.Texture2D);
             defaultTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-            defaultTexture.Clear(BBG.Texture.PixelFormat.RGBA, BBG.Texture.PixelType.Float, new Vector4(1.0f));
+            defaultTexture.Clear(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
             ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB(new GLSampler(new GLSampler.State()));
 
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
@@ -413,7 +426,7 @@ namespace IDKEngine
                             {
                                 // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
                                 // We "move" metallic from B into R channel, so it matches order of MetallicRoughness name
-                                texture.SetSwizzleR(BBG.Texture.Swizzle.B);
+                                texture.SetSwizzleR(GLTexture.Swizzle.B);
                             }
                         }
                         else if (gltfTexture.PrimaryImage.Content.IsKtx2)
@@ -550,7 +563,7 @@ namespace IDKEngine
                                 
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
-                                    texture.Upload2D(stagingBuffer, imageWidth, imageHeight, NumChannelsToPixelFormat(imageChannels), BBG.Texture.PixelType.UByte, null);
+                                    texture.Upload2D(stagingBuffer, imageWidth, imageHeight, GLTexture.NumChannelsToPixelFormat(imageChannels), GLTexture.PixelType.UByte, null);
                                     if (mipmapsRequired)
                                     {
                                         texture.GenerateMipmap();
@@ -611,7 +624,7 @@ namespace IDKEngine
 
             return null;
         }
-        private static GLSampler.State GetGLSamplerState(TextureSampler sampler)
+        private static GLSampler.State GetGLSamplerState(GltfSampler sampler)
         {
             GLSampler.State state = new GLSampler.State();
             if (sampler == null)
@@ -693,6 +706,10 @@ namespace IDKEngine
                     Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
                     vertices[i].Tangent = Compression.CompressSR11G11B10(tangent);
                 }
+            }
+            else
+            {
+                Logger.Log(Logger.LogLevel.Error, "Mesh provides no vertex normals");
             }
 
             if (hasTexCoords)
@@ -881,18 +898,6 @@ namespace IDKEngine
             };
             return colorComponents;
         }
-        private static BBG.Texture.PixelFormat NumChannelsToPixelFormat(int numChannels)
-        {
-            BBG.Texture.PixelFormat pixelFormat = numChannels switch
-            {
-                1 => BBG.Texture.PixelFormat.R,
-                2 => BBG.Texture.PixelFormat.RG,
-                3 => BBG.Texture.PixelFormat.RGB,
-                4 => BBG.Texture.PixelFormat.RGBA,
-                _ => throw new NotSupportedException($"Can not convert {nameof(numChannels)} = {numChannels} to {nameof(pixelFormat)}"),
-            };
-            return pixelFormat;
-        }
 
         private static unsafe void OptimizeMesh(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices)
         {
@@ -998,7 +1003,7 @@ namespace IDKEngine
 
         public static class CompressionUtils
         {
-            public const string COMPRESSION_TOOL_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer/tree/master
+            public const string COMPRESSION_TOOL_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer
 
             public struct CompressGltfSettings
             {
@@ -1042,10 +1047,6 @@ namespace IDKEngine
                     Logger.Log(Logger.LogLevel.Info, $"Running \"{COMPRESSION_TOOL_NAME} {arguments}\"");
 
                     Process? proc = Process.Start(startInfo);
-                    if (proc == null)
-                    {
-                        return null;
-                    }
 
                     proc.BeginErrorReadLine();
                     proc.BeginOutputReadLine();
@@ -1072,6 +1073,7 @@ namespace IDKEngine
                 }
                 catch (Exception)
                 {
+                    Logger.Log(Logger.LogLevel.Error, $"Failed to create process. Be sure to provide a {COMPRESSION_TOOL_NAME} binary (https://github.com/BoyBaykiller/meshoptimizer) in working dir or PATH");
                     return null;
                 }
 
@@ -1120,18 +1122,16 @@ namespace IDKEngine
                 return false;
             }
 
-            public static bool IsCompressedGltf(string path)
+            public static bool IsCompressedGltf(ModelRoot gltf)
             {
-                if (!File.Exists(path))
+                if (gltf.LogicalTextures.Count == 0)
                 {
-                    Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
-                    return false;
+                    return true;
                 }
 
-                ModelRoot gltf = ModelRoot.Load(path, new ReadSettings() { Validation = SharpGLTF.Validation.ValidationMode.Skip });
                 foreach (string ext in gltf.ExtensionsUsed)
                 {
-                    // the definition of wether a glTF is compressed may be expanded in the future
+                    // The definition of wether a glTF is compressed may be expanded in the future
                     if (ext == "KHR_texture_basisu")
                     {
                         return true;

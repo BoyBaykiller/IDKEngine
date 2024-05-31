@@ -1,6 +1,5 @@
 #version 460 core
 
-#define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Pbr.glsl)
@@ -18,8 +17,8 @@ float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample);
 float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos);
 
 #define SHADOW_MODE_NONE 0
-#define SHADOW_MODE_PCF_SHADOW_MAP 1 
-#define SHADOW_MODE_RAY_TRACED 2 
+#define SHADOW_MODE_PCF_SHADOW_MAP 1
+#define SHADOW_MODE_RAY_TRACED 2
 uniform int ShadowMode;
 
 uniform bool IsVXGI;
@@ -60,7 +59,7 @@ void main()
     {
         GpuLight light = lightsUBO.Lights[i];
 
-        Surface surface;
+        Surface surface = GetDefaultSurface();
         surface.Albedo = albedo;
         surface.Normal = normal;
         surface.Metallic = specular;
@@ -117,12 +116,19 @@ vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPo
     vec3 dirSurfaceToCam = normalize(viewPos - fragPos);
     vec3 dirSurfaceToLight = normalize(surfaceToLight);
     
-    float cosTerm = clamp(dot(surface.Normal, dirSurfaceToLight), 0.0, 1.0);
-
     float distSq = dot(surfaceToLight, surfaceToLight);
     float attenuation = GetAttenuationFactor(distSq, light.Radius);
 
-    return BRDF(surface, dirSurfaceToCam, dirSurfaceToLight, ambientOcclusion) * attenuation * cosTerm * light.Color;
+    
+    const float prevIor = 1.0;
+    vec3 fresnelTerm;
+    vec3 specularBrdf = GGXBrdf(surface, dirSurfaceToCam, dirSurfaceToLight, prevIor, fresnelTerm);
+    vec3 diffuseBrdf = surface.Albedo * ambientOcclusion;
+    
+    vec3 combinedBrdf = specularBrdf + diffuseBrdf * (vec3(1.0) - fresnelTerm) * (1.0 - surface.Metallic); 
+
+    float cosTheta = clamp(dot(surface.Normal, dirSurfaceToLight), 0.0, 1.0);
+    return combinedBrdf * attenuation * cosTheta * light.Color;
 }
 
 float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample)

@@ -1,6 +1,10 @@
 AppInclude(include/Surface.glsl)
 AppInclude(include/Constants.glsl)
 
+// Source: 
+// https://google.github.io/filament/Filament.html#materialsystem/specularbrdf
+// https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
+
 float GetAttenuationFactor(float distSq, float lightRadius)
 {
     lightRadius = max(lightRadius, 0.0001);
@@ -17,8 +21,7 @@ float BaseReflectivity(float n1, float n2)
     float r0 = (n1 - n2) / (n1 + n2);
     r0 *= r0;
 
-    // vec3 f0 = mix(r0, albedo, metallic);
-    float f0 = r0; // assumes metallic = 0.0
+    float f0 = r0; // same as mix(r0, albedo, metallic) with metallic=0 
     return f0;
 }
 
@@ -35,13 +38,21 @@ vec3 BaseReflectivity(vec3 albedo, float metallic, float n1, float n2)
 // GGX - D Term. Normal distribution function
 float DistributionGGX(float NoH, float roughness)
 {
+    // Force visible specular highlight for perfect mirror
+    roughness = max(roughness, 0.001);
+
     float a = NoH * roughness;
-
-    float numer = max(roughness, 0.001);
-    float denom = max((1.0 - NoH * NoH + a * a), 0.0001);
-
-    float k = numer / denom;
+    float k = roughness / (1.0 - NoH * NoH + a * a);
     return k * k / PI;
+}
+
+// GGX - G Term. Accounts for Geometric masking or self shadowing
+float SmithGGXCorrelated(float NoV, float NoL, float roughness)
+{
+    roughness = max(roughness, 0.0001);
+    float ggxl = NoV * sqrt((-NoL * roughness + NoL) * NoL + roughness);
+    float ggxv = NoL * sqrt((-NoV * roughness + NoV) * NoV + roughness);
+    return 0.5 / (ggxv + ggxl);
 }
 
 // GGX - F Term. Accounts for different reflectivity from different angles
@@ -54,21 +65,12 @@ float FresnelSchlick(float cosTheta, float f0, float f90)
     return f0 + (f90 - f0) * pow(1.0 - cosTheta, 5.0);
 }
 
-// GGX - G Term. Accounts for Geometric masking or self shadowing
-float SmithGGXCorrelated(float NoV, float NoL, float roughness)
+vec3 GGXBrdf(Surface surface, vec3 V, vec3 L, float prevIor, out vec3 F)
 {
-    roughness = max(roughness, 0.0001);
-    float ggxl = NoV * sqrt((-NoL * roughness + NoL) * NoL + roughness);
-    float ggxv = NoL * sqrt((-NoV * roughness + NoV) * NoV + roughness);
-    return 0.5 / (ggxv + ggxl);
-}
+    // V = incomming vector but negated (so pointing to sender)
+    // L = outgoing vector (explicitly to a light with direct lighting)
+    // H = halfway vector between V and L
 
-vec3 BRDF(Surface surface, vec3 V, vec3 L, float ambientOcclusion)
-{
-    // V = surface to camera
-    // L = surface to light
-
-    const float prevIor = 1.0;
     vec3 f0 = BaseReflectivity(surface.Albedo, surface.Metallic, prevIor, surface.IOR);
     vec3 f90 = vec3(1.0);
 
@@ -79,14 +81,19 @@ vec3 BRDF(Surface surface, vec3 V, vec3 L, float ambientOcclusion)
     float NoH = clamp(dot(surface.Normal, H), 0.0, 1.0);
     float LoH = clamp(dot(L, H), 0.0, 1.0);
 
-    float roughness = surface.Roughness * surface.Roughness;
+    surface.Roughness *= surface.Roughness; // just a convention to make roughness linear perceptually
 
-    float D = DistributionGGX(NoH, roughness);
-    float G = SmithGGXCorrelated(NoV, NoL, roughness);
-    vec3  F = FresnelSchlick(LoH, f0, f90);
+    float D = DistributionGGX(NoH, surface.Roughness);
+    float G = SmithGGXCorrelated(NoV, NoL, surface.Roughness);
+    F = FresnelSchlick(LoH, f0, f90);
 
-    vec3 specular = (F * G * D); //  / max((4.0 * NoV), 0.01)
-    vec3 diffuse = surface.Albedo * ambientOcclusion;
+    vec3 specular = (F * G * D); // max((4.0 * NoL * NoV), 0.001)
 
-    return specular + diffuse * (vec3(1.0) - F) * (1.0 - surface.Metallic);
+    return specular;
+}
+
+vec3 GGXBrdf(Surface surface, vec3 V, vec3 L, float prevIor)
+{
+    vec3 F;
+    return GGXBrdf(surface, V, L, prevIor, F);
 }

@@ -1,7 +1,5 @@
 #version 460 core
 #extension GL_KHR_shader_subgroup_arithmetic : enable
-#extension GL_NV_gpu_shader5 : enable
-#extension GL_AMD_gcn_shader : enable
 
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(ShadingRateClassification/include/Constants.glsl)
@@ -23,13 +21,13 @@ void GetTileData(vec3 color, vec2 velocity, out float meanSpeed, out float meanL
 float GetLuminance(vec3 color);
 
 #if !GL_KHR_shader_subgroup_arithmetic
-#define MIN_EFFECTIVE_SUBGROUP_SIZE 1 // effectively 1 if we can't use subgroup arithmetic
-#elif GL_NV_gpu_shader5
-#define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // NVIDIA device (fixed subgroup size)
-#elif GL_AMD_gcn_shader
-#define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // AMD device (smallest possible subgroup size)
+    #define MIN_EFFECTIVE_SUBGROUP_SIZE 1 // Effectively 1 if we can't use subgroup arithmetic
+#elif APP_VENDOR_NVIDIA
+    #define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // NVIDIA always has 32
+#elif APP_VENDOR_AMD
+    #define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // AMD can run shaders in both wave32 or wave64 mode
 #else
-#define MIN_EFFECTIVE_SUBGROUP_SIZE 8 // worst case on anything else
+    #define MIN_EFFECTIVE_SUBGROUP_SIZE 8 // Intel can go as low as 8 (this is also for anything else) 
 #endif
 
 shared float SharedMeanSpeed[TILE_SIZE * TILE_SIZE / MIN_EFFECTIVE_SUBGROUP_SIZE];

@@ -33,14 +33,14 @@ namespace IDKEngine.Utils
             return area;
         }
 
-        public static float Volume(in Vector3 size)
+        public static Vector3 PolarToCartesian(float elevation, float azimuth, float length = 1.0f)
         {
-            return size.X * size.Y * size.X;
-        }
+            // https://en.wikipedia.org/wiki/Spherical_coordinate_system
+            // azimuth   = phi
+            // elevation = theta
+            // length    = rho
 
-        public static Vector3 PolarToCartesian(float elevation, float azimuth)
-        {
-            Vector3 pos = new Vector3(MathF.Sin(elevation) * MathF.Cos(azimuth), MathF.Cos(elevation), MathF.Sin(elevation) * MathF.Sin(azimuth));
+            Vector3 pos = new Vector3(MathF.Sin(elevation) * MathF.Cos(azimuth), MathF.Cos(elevation), MathF.Sin(elevation) * MathF.Sin(azimuth)) * length;
             return pos;
         }
 
@@ -106,7 +106,7 @@ namespace IDKEngine.Utils
             return ((num / multiple) + 1) * multiple;
         }
 
-        // Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
+        /// Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
 
         // Expands a 10-bit integer into 30 bits
         // by inserting 2 zeros after each bit.

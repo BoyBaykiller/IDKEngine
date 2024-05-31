@@ -1,79 +1,23 @@
 AppInclude(include/Pbr.glsl)
 AppInclude(include/Random.glsl)
+AppInclude(include/Transformations.glsl)
+AppInclude(PathTracing/include/Bsdf.glsl)
 
 #define RAY_TYPE_DIFFUSE    0
 #define RAY_TYPE_SPECULAR   1
 #define RAY_TYPE_REFRACTIVE 2
 
-struct RayProperties
+struct SampleMaterialResult
 {
-    vec3 Direction;
-    float Ior;
-    float RayTypeProbability;
+    vec3 RayDirection;
     uint RayType;
+    float RayTypeProbability;
+
+    vec3 Bsdf;
+    float Pdf;
+
+    float NewIor;
 };
-
-RayProperties SampleMaterial(vec3 incomming, Surface surface, float prevIor, bool fromInside)
-{
-    RayProperties result;
-    surface.Roughness *= surface.Roughness; // just a convention to make roughness more linear perceptually
-
-    float rnd = GetRandomFloat01();
-    vec3 diffuseRayDir = CosineSampleHemisphere(surface.Normal);
-    if (surface.Metallic > rnd)
-    {
-        vec3 reflectionRayDir = reflect(incomming, surface.Normal);
-        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, surface.Roughness));
-        
-        result.Direction = reflectionRayDir;
-        result.RayTypeProbability = surface.Metallic;
-        result.Ior = prevIor;
-
-        result.RayType = RAY_TYPE_SPECULAR;
-    }
-    else if (surface.Metallic + surface.Transmission > rnd)
-    {
-        if (fromInside)
-        {
-            // we don't actually know wheter the next mesh we hit has ior 1.0
-            result.Ior = 1.0;
-        }
-        else
-        {
-            result.Ior = surface.IOR;
-        }
-
-        vec3 refractionRayDir = refract(incomming, surface.Normal, prevIor / result.Ior);
-        bool totalInternalReflection = refractionRayDir == vec3(0.0);
-        if (totalInternalReflection)
-        {
-            refractionRayDir = reflect(incomming, surface.Normal);
-            result.Ior = prevIor;
-        }
-        result.RayType = totalInternalReflection ? RAY_TYPE_SPECULAR : RAY_TYPE_REFRACTIVE;
-        refractionRayDir = normalize(mix(refractionRayDir, !totalInternalReflection ? -diffuseRayDir : diffuseRayDir, surface.Roughness));
-        
-        result.Direction = refractionRayDir;
-        result.RayTypeProbability = surface.Transmission;
-    }
-    else
-    {
-        result.Direction = diffuseRayDir;
-        result.RayTypeProbability = 1.0 - surface.Metallic - surface.Transmission;
-
-        result.Ior = prevIor;
-        result.RayType = RAY_TYPE_DIFFUSE;
-    }
-    result.RayTypeProbability = max(result.RayTypeProbability, 0.001);
-
-    return result;
-}
-
-vec3 ApplyAbsorption(vec3 color, vec3 absorbance, float t)
-{
-    // Beer's law
-    return color * exp(-absorbance * t);
-}
 
 float SpecularBasedOnViewAngle(float specularChance, float cosTheta, float prevIor, float newIor)
 {
@@ -87,4 +31,93 @@ float SpecularBasedOnViewAngle(float specularChance, float cosTheta, float prevI
     }
 
     return specularChance;
+}
+
+SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevIor, bool fromInside)
+{
+    surface.Roughness *= surface.Roughness; // just a convention to make roughness more perceptually
+
+    float cosTheta = dot(-incomming, surface.Normal);
+
+    float diffuseChance = max(1.0 - surface.Metallic - surface.Transmission, 0.0);
+    surface.Metallic = SpecularBasedOnViewAngle(surface.Metallic, cosTheta, prevIor, surface.IOR);
+    surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // normalize again to (diff + spec + trans == 1.0)
+
+    SampleMaterialResult result;
+
+    float rnd = GetRandomFloat01();
+
+    float lambertianPdf;
+    vec3 diffuseRayDir = SampleLambertian(surface.Normal, cosTheta, lambertianPdf);
+    if (surface.Metallic > rnd)
+    {
+        vec3 reflectionRayDir = reflect(incomming, surface.Normal);
+        reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, surface.Roughness));
+        
+        result.RayDirection = reflectionRayDir;
+        result.RayTypeProbability = surface.Metallic;
+        result.RayType = RAY_TYPE_SPECULAR;
+
+        result.NewIor = prevIor;
+
+        result.Bsdf = LambertianBrdf(surface.Albedo);
+        result.Pdf = lambertianPdf;
+
+        // float blinnPhongPdf;
+        // reflectionRayDir = SampleBlinnPhong(surface.Normal, -incomming, surface.Roughness, blinnPhongPdf);
+        // result.Bsdf = BlinnPhongBrdf(surface.Albedo, surface.Normal, -incomming, reflectionRayDir, surface.Roughness);
+        // result.Pdf = blinnPhongPdf;
+    }
+    else if (surface.Metallic + surface.Transmission > rnd)
+    {
+        if (fromInside)
+        {
+            // we don't actually know wheter the next mesh we hit has ior 1.0
+            result.NewIor = 1.0;
+        }
+        else
+        {
+            result.NewIor = surface.IOR;
+        }
+
+        vec3 refractionRayDir = refract(incomming, surface.Normal, prevIor / result.NewIor);
+        bool totalInternalReflection = refractionRayDir == vec3(0.0);
+        if (totalInternalReflection)
+        {
+            refractionRayDir = reflect(incomming, surface.Normal);
+            result.NewIor = prevIor;
+        }
+        result.RayType = totalInternalReflection ? RAY_TYPE_SPECULAR : RAY_TYPE_REFRACTIVE;
+        refractionRayDir = normalize(mix(refractionRayDir, !totalInternalReflection ? -diffuseRayDir : diffuseRayDir, surface.Roughness));
+        
+        result.RayDirection = refractionRayDir;
+        result.RayTypeProbability = surface.Transmission;
+
+        result.Bsdf = LambertianBrdf(surface.Albedo);
+        result.Pdf = lambertianPdf;
+    }
+    else
+    {
+        result.RayDirection = diffuseRayDir;
+        result.RayTypeProbability = 1.0 - surface.Metallic - surface.Transmission;
+        result.RayType = RAY_TYPE_DIFFUSE;
+
+        result.NewIor = prevIor;
+
+        result.Bsdf = LambertianBrdf(surface.Albedo);
+        result.Pdf = lambertianPdf;
+    }
+    result.RayTypeProbability = max(result.RayTypeProbability, 0.0001);
+    result.Pdf = max(result.Pdf, 0.0001);
+
+    // result.Pdf = 1.0;
+    // result.Bsdf = surface.Albedo;
+
+    return result;
+}
+
+vec3 ApplyAbsorption(vec3 color, vec3 absorbance, float t)
+{
+    // Beer's law
+    return color * exp(-absorbance * t);
 }

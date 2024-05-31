@@ -225,7 +225,7 @@ namespace IDKEngine.Render
             ShadowMap = new BBG.Texture(BBG.Texture.Type.Cubemap);
             ShadowMap.ImmutableAllocate(size, size, 1, BBG.Texture.InternalFormat.D16Unorm);
 
-            // Note: Using bindless textures for cubemaps causes sampling issues on radeonsi driver
+            // Using bindless textures for cubemaps causes sampling issues on radeonsi driver
             gpuPointShadow.Texture = ShadowMap.GetTextureHandleARB(nearestSampler);
             gpuPointShadow.ShadowTexture = ShadowMap.GetTextureHandleARB(shadowSampler);
         }

@@ -49,16 +49,6 @@ vec3 PerspectiveTransformUvDepth(vec3 uvAndDepth, mat4 matrix)
     return PerspectiveTransform(ndc, matrix);
 }
 
-mat3 GetTBN(vec3 tangent, vec3 normal)
-{
-    vec3 T = tangent;
-    vec3 N = normal;
-    T = normalize(T - dot(T, N) * N);
-    vec3 B = cross(N, T);
-    mat3 TBN = mat3(T, B, N);
-    return TBN;
-}
-
 float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMin, float mapMax)
 {
     return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
@@ -80,4 +70,43 @@ vec3 GetTriangleNormal(vec3 p0, vec3 p1, vec3 p2)
     vec3 p0p2 = p2 - p0;
     vec3 triNormal = normalize(cross(p0p1, p0p2));
     return triNormal;
+}
+
+mat3 ConstructBasis(vec3 normal)
+{
+    // Source: https://www.shadertoy.com/view/tsGcWV
+
+    float sign_ = sign(normal.z);
+    float a = -1.0 / (sign_ + normal.z);
+    float b = normal.x * normal.y * a;
+    vec3 tangent = vec3(1.0 + sign_ * normal.x * normal.x * a, sign_ * b, -sign_ * normal.x);
+    vec3 bitangent = vec3(b, sign_ + normal.y * normal.y * a, -normal.y);
+    return mat3(tangent, bitangent, normal);
+}
+
+mat3 GetTBN(vec3 tangent, vec3 normal)
+{
+    vec3 N = normal;
+    vec3 T = tangent;
+    // Gramschmidt Process (makes sure T and N always 90 degress)
+    T = normalize(T - dot(T, N) * N);
+    vec3 B = cross(N, T);    
+    return mat3(T, B, N);
+}
+
+
+vec3 PolarToCartesian(float azimuth, float elevation, float len)
+{
+    // https://en.wikipedia.org/wiki/Spherical_coordinate_system
+    // azimuth   = phi
+    // elevation = theta
+    // len       = rho
+
+    float sinTheta = sin(elevation);
+    return vec3(sinTheta * cos(azimuth), cos(elevation), sinTheta * sin(azimuth)) * len;
+}
+
+vec3 PolarToCartesian(float azimuth, float elevation)
+{
+    return PolarToCartesian(azimuth, elevation, 1.0);
 }

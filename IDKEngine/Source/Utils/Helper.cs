@@ -108,6 +108,11 @@ namespace IDKEngine.Utils
             return Unsafe.As<System.Numerics.Matrix4x4, Matrix4>(ref matrix4x4);
         }
 
+        public static string ToOnOff(this bool val)
+        {
+            return val ? "On" : "Off";
+        }
+
         public static int InterlockedMax(ref int location1, int value)
         {
             int initialValue;
@@ -143,13 +148,15 @@ namespace IDKEngine.Utils
 
         public static unsafe void TextureToDiskJpg(BBG.Texture texture, string path, int quality = 100, bool flipVertically = true)
         {
-            StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
+            int nChannels = 3;
 
-            byte* pixels = Memory.Malloc<byte>(texture.Width * texture.Height * 3);
-            texture.GetImageData(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * 3 * sizeof(byte));
+            byte* pixels = Memory.Malloc<byte>(texture.Width * texture.Height * nChannels);
+            texture.GetImageData(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
 
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
             ImageWriter imageWriter = new ImageWriter();
+
+            StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
             imageWriter.WriteJpg(pixels, texture.Width, texture.Height, ColorComponents.RedGreenBlue, fileStream, quality);
 
             Memory.Free(pixels);

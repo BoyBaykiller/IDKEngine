@@ -47,7 +47,7 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv, float baseColorLodBias)
 {
     Surface surface;
 
-#ifdef APP_SHADER_STAGE_FRAGMENT
+#if APP_SHADER_STAGE_FRAGMENT
     vec4 baseColorAndAlpha = texture(gpuMaterial.BaseColor, uv, baseColorLodBias) * DecompressUR8G8B8A8(gpuMaterial.BaseColorFactor);
 #else
     // Normally the GL does not try to compute automatic derivatives in shaders other than fragment. 

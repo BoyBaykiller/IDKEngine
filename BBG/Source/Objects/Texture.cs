@@ -399,6 +399,19 @@ namespace BBOpenGL
                         throw new NotSupportedException($"{nameof(format)} = {format} not known");
                 }
             }
+
+            public static PixelFormat NumChannelsToPixelFormat(int numChannels)
+            {
+                PixelFormat pixelFormat = numChannels switch
+                {
+                    1 => PixelFormat.R,
+                    2 => PixelFormat.RG,
+                    3 => PixelFormat.RGB,
+                    4 => PixelFormat.RGBA,
+                    _ => throw new NotSupportedException($"Can not convert {nameof(numChannels)} = {numChannels} to {nameof(pixelFormat)}"),
+                };
+                return pixelFormat;
+            }
         }
     }
 }

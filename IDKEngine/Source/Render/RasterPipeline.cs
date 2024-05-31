@@ -100,7 +100,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public enum ShadowTechnique
+        public enum ShadowTechnique : int
         {
             None,
             PcfShadowMap,
@@ -364,7 +364,7 @@ namespace IDKEngine.Render
                 }
             });
 
-            // Note: Only needed because of AMD driver bug. Should open bug ticket one day.
+            // Only needed because of AMD driver bug. Should open bug ticket one day.
             // See discussion https://discord.com/channels/318590007881236480/318783155744145411/1070453712021098548
             if (BBG.GetDeviceInfo().Vendor == BBG.GpuVendor.AMD)
             {

@@ -36,7 +36,6 @@ namespace IDKEngine
             for (int i = 0; i < initialChildNodes.Length; i++)
             {
                 ref readonly GpuMeshInstance meshInstance = ref MeshInstances[i];
-                ref readonly BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[meshInstance.MeshIndex];
                 BLAS blas = Blases[meshInstance.MeshIndex];
 
                 Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), meshInstance.ModelMatrix);
@@ -76,63 +75,60 @@ namespace IDKEngine
             int activeRangeCount = MeshInstances.Length;
             int activeRangeEnd = Nodes.Length;
             GpuTlasNode[] tempNodes = new GpuTlasNode[Nodes.Length];
+            int[] preferedNbors = new int[activeRangeCount];
             while (activeRangeCount > 1)
             {
+                int activeRangeStart = activeRangeEnd - activeRangeCount;
+
                 // Find the nodeId each node prefers to merge with
-                // TODO: When search radius is very low, like 5, we sometimes end up never finding a node, causing infinite loop. This shouldnt happen
-                int[] preferedNbors = new int[activeRangeCount];
-                for (int i = 0; i < preferedNbors.Length; i++)
+                for (int i = 0; i < activeRangeCount; i++)
                 {
-                    int baseOffset = activeRangeEnd - activeRangeCount;
-
-                    int nodeAid = baseOffset + i;
-                    int searchStart = Math.Max(nodeAid - SearchRadius, baseOffset);
-                    int searchEnd = Math.Min(nodeAid + SearchRadius, activeRangeEnd);
-                    int nodeBId = FindBestMatch(Nodes, searchStart, searchEnd, nodeAid);
-
-                    preferedNbors[i] = nodeBId;
+                    int nodeAId = activeRangeStart + i;
+                    int searchStart = Math.Max(nodeAId - SearchRadius, activeRangeStart);
+                    int searchEnd = Math.Min(nodeAId + SearchRadius, activeRangeEnd);
+                    int nodeBId = FindBestMatch(Nodes, searchStart, searchEnd, nodeAId);
+                    int nodeBIdLocal = nodeBId - activeRangeStart;
+                    preferedNbors[i] = nodeBIdLocal;
                 }
 
                 // Find number of merged nodes in advance so we know where to insert new parent nodes
                 int mergedNodes = 0;
                 for (int i = 0; i < activeRangeCount; i++)
                 {
-                    int baseOffset = activeRangeEnd - activeRangeCount;
-
-                    int nodeAId = baseOffset + i;
                     int nodeAIdLocal = i;
+                    int nodeBIdLocal = preferedNbors[nodeAIdLocal];
+                    int nodeCIdLocal = preferedNbors[nodeBIdLocal];
 
-                    int nodeBId = preferedNbors[nodeAIdLocal];
-                    int nodeBIdLocal = nodeBId - baseOffset;
-
-                    int nodeCId = preferedNbors[nodeBIdLocal];
-
-                    if (nodeAId == nodeCId && nodeAId < nodeBId)
+                    if (nodeAIdLocal == nodeCIdLocal && nodeAIdLocal < nodeBIdLocal)
                     {
                         mergedNodes += 2;
                     }
                 }
+
+                // TODO: When search radius is very low, like 5, we sometimes end up never finding a node, causing infinite loop.
+                //if (mergedNodes == 0)
+                //{
+                //    System.Diagnostics.Debugger.Break();
+                //}
 
                 // Merge nodes and create parents
                 int mergedNodesHead = activeRangeEnd;
                 int unmergedNodesHead = activeRangeEnd - mergedNodes;
                 for (int i = 0; i < activeRangeCount; i++)
                 {
-                    int baseOffset = activeRangeEnd - activeRangeCount;
-
-                    int nodeAId = baseOffset + i;
                     int nodeAIdLocal = i;
+                    int nodeBIdLocal = preferedNbors[nodeAIdLocal];
+                    int nodeCIdLocal = preferedNbors[nodeBIdLocal];
+                    int nodeAId = nodeAIdLocal + activeRangeStart;
 
-                    int nodeBId = preferedNbors[nodeAIdLocal];
-                    int nodeBIdLocal = nodeBId - baseOffset;
-
-                    int nodeCId = preferedNbors[nodeBIdLocal];
-                    if (nodeAId == nodeCId)
+                    if (nodeAIdLocal == nodeCIdLocal)
                     {
-                        if (nodeAId < nodeBId)
+                        if (nodeAIdLocal < nodeBIdLocal)
                         {
                             ref GpuTlasNode nodeB = ref tempNodes[--mergedNodesHead];
                             ref GpuTlasNode nodeA = ref tempNodes[--mergedNodesHead];
+
+                            int nodeBId = nodeBIdLocal + activeRangeStart;
 
                             nodeB = Nodes[nodeBId];
                             nodeA = Nodes[nodeAId];
@@ -290,12 +286,12 @@ namespace IDKEngine
             ref readonly GpuTlasNode node = ref nodes[nodeIndex];
             for (int i = start; i < end; i++)
             {
-                ref readonly GpuTlasNode otherNode = ref nodes[i];
-
                 if (i == nodeIndex)
                 {
                     continue;
                 }
+
+                ref readonly GpuTlasNode otherNode = ref nodes[i];
 
                 Box fittingBox = Conversions.ToBox(node);
                 fittingBox.GrowToFit(otherNode.Min);

@@ -61,7 +61,7 @@ void main()
         directLighting += contrib;
     }
 
-    const float ambient = 0.015;
+    const float ambient = 0.02;
     directLighting += surface.Albedo * ambient;
     directLighting += surface.Emissive;
 
@@ -85,10 +85,10 @@ vec3 EvaluateDiffuseLighting(GpuLight light, vec3 albedo, vec3 sampleToLight)
     float dist = length(sampleToLight);
 
     vec3 lightDir = sampleToLight / dist;
-    float cosTerm = dot(normalize(inData.Normal), lightDir);
-    if (cosTerm > 0.0)
+    float cosTheta = dot(normalize(inData.Normal), lightDir);
+    if (cosTheta > 0.0)
     {
-        vec3 diffuse = light.Color * cosTerm * albedo;
+        vec3 diffuse = light.Color * cosTheta * albedo;
         float attenuation = GetAttenuationFactor(dist * dist, light.Radius);
 
         return diffuse * attenuation;

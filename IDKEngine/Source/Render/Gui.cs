@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -69,6 +70,9 @@ namespace IDKEngine.Render
 
         public struct RecordingSettings
         {
+            public const string FRAME_RECORDER_FILE_PATH = "frameRecordData.frd";
+            public const string RECORDED_FRAME_DATA_OUT_DIR = "RecordedFrames";
+
             public int RasterizerFPSGoal;
             public int PathTracingSamplesGoal;
             public bool IsInfiniteReplay;
@@ -76,7 +80,6 @@ namespace IDKEngine.Render
             public FrameRecorderState FrameRecState;
             public Stopwatch Timer;
         }
-
 
         public SelectedEntityInfo SelectedEntity;
         public RecordingSettings RecordingVars;
@@ -278,15 +281,14 @@ namespace IDKEngine.Render
 
                 if (RecordingVars.FrameRecState == FrameRecorderState.Nothing)
                 {
-                    const string FRAME_RECORDER_FILE_PATH = "frameRecordData.frd";
                     if (ImGui.Button($"Save"))
                     {
-                        app.FrameStateRecorder.SaveToFile(FRAME_RECORDER_FILE_PATH);
+                        app.FrameStateRecorder.SaveToFile(RecordingSettings.FRAME_RECORDER_FILE_PATH);
                     }
                     ImGui.SameLine();
                     if (ImGui.Button("Load"))
                     {
-                        app.FrameStateRecorder.Load(FRAME_RECORDER_FILE_PATH);
+                        app.FrameStateRecorder.Load(RecordingSettings.FRAME_RECORDER_FILE_PATH);
                     }
                     ImGui.Separator();
                 }
@@ -295,8 +297,7 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Renderer"))
             {
-                ImGui.Text($"FPS: {app.FramesPerSecond}");
-                ImGui.Text($"Viewport size: {app.PresentationResolution.X}x{app.PresentationResolution.Y}");
+                ImGui.Text($"{app.FramesPerSecond}FPS | {app.PresentationResolution.X}x{app.PresentationResolution.Y} | VSync: {app.WindowVSync.ToOnOff()} | Time: {app.TimeEnabled.ToOnOff()}");
                 ImGui.Text($"{BBG.GetDeviceInfo().Name}");
 
                 bool gpuUseTlas = app.ModelManager.BVH.GpuUseTlas;
@@ -324,7 +325,7 @@ namespace IDKEngine.Render
                 tempFloat = app.RenderResolutionScale;
                 if (ImGui.SliderFloat("ResolutionScale", ref tempFloat, 0.1f, 1.0f))
                 {
-                    if (!MyMath.AlmostEqual(tempFloat, app.RenderResolutionScale, 0.001f))
+                    if (!MyMath.AlmostEqual(tempFloat, app.RenderResolutionScale, 0.002f))
                     {
                         app.RequestRenderResolutionScale = tempFloat;
                     }
@@ -821,7 +822,25 @@ namespace IDKEngine.Render
                         shouldResetPT = true;
                     }
                 }
-                ModuleLoadSceneRender(app, ref shouldResetPT);
+                if (ImGui.Button("Load glTF"))
+                {
+                    if (app.WindowFullscreen)
+                    {
+                        // Need to end fullscreen otherwise file explorer is not visible
+                        app.WindowFullscreen = false;
+                    }
+
+                    DialogResult result = Dialog.FileOpen("gltf,glb");
+                    if (result.IsError)
+                    {
+                        Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
+                    }
+                    else if (result.IsOk)
+                    {
+                        AddModelDialog(result.Path);
+                    }
+                }
+                ModuleLoadModelRender(app, ref shouldResetPT);
             }
             ImGui.End();
 
@@ -1012,38 +1031,39 @@ namespace IDKEngine.Render
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new SysVec2(0.0f));
             if (ImGui.Begin($"Viewport"))
             {
-                SysVec2 content = ImGui.GetContentRegionAvail();
+                OtkVec2 content = ImGui.GetContentRegionAvail().ToOpenTK();
 
-                if (content.X != app.PresentationResolution.X || content.Y != app.PresentationResolution.Y)
+                if (content != app.PresentationResolution)
                 {
                     // Viewport changed, inform app of the new resolution
-                    app.RequestPresentationResolution = (Vector2i)content.ToOpenTK();
+                    app.RequestPresentationResolution = (Vector2i)content;
                 }
 
                 SysVec2 tileBar = ImGui.GetCursorPos();
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
-                ImGui.Image(app.TonemapAndGamma.Result.ID, content, new SysVec2(0.0f, 1.0f), new SysVec2(1.0f, 0.0f));
+                ImGui.Image(app.TonemapAndGamma.Result.ID, content.ToNumerics(), new SysVec2(0.0f, 1.0f), new SysVec2(1.0f, 0.0f));
             }
             ImGui.PopStyleVar();
             ImGui.End();
+
             backend.Render();
 
-            if (shouldResetPT && app.PathTracer != null)
+            if (shouldResetPT)
             {
-                app.PathTracer.ResetRenderProcess();
+                app.PathTracer?.ResetRenderProcess();
             }
         }
 
         public void Update(Application app)
         {
-            if (app.MouseState.CursorMode == CursorModeValue.CursorNormal)
-            {
-                backend.IsIgnoreMouseInput = false;
-            }
-            else if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
+            if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
             {
                 backend.IsIgnoreMouseInput = true;
+            }
+            else
+            {
+                backend.IsIgnoreMouseInput = false;
             }
 
             void TakeScreenshot()
@@ -1051,14 +1071,13 @@ namespace IDKEngine.Render
                 int frameIndex = app.FrameStateRecorder.ReplayStateIndex;
                 if (frameIndex == 0) frameIndex = app.FrameStateRecorder.StatesCount;
 
-                const string RECORDED_FRAME_DATA_OUT_DIR = "RecordedFrames";
-                Directory.CreateDirectory(RECORDED_FRAME_DATA_OUT_DIR);
+                Directory.CreateDirectory(RecordingSettings.RECORDED_FRAME_DATA_OUT_DIR);
 
-                Helper.TextureToDiskJpg(app.TonemapAndGamma.Result, $"{RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
+                Helper.TextureToDiskJpg(app.TonemapAndGamma.Result, $"{RecordingSettings.RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
 
             bool shouldResetPT = false;
-            ModuleLoadSceneUpdate(app, ref shouldResetPT);
+            ModuleLoadModelUpdate(app, ref shouldResetPT);
 
             if (RecordingVars.FrameRecState == FrameRecorderState.Replaying)
             {
@@ -1103,7 +1122,7 @@ namespace IDKEngine.Render
                     app.FrameStateRecorder.Clear();
                 }
             }
-
+            
             if (RecordingVars.FrameRecState != FrameRecorderState.Recording && app.FrameStateRecorder.AreStatesLoaded &&
                 app.KeyboardState[Keys.Space] == Keyboard.InputState.Touched &&
                 app.KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
@@ -1154,9 +1173,9 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (shouldResetPT && app.PathTracer != null)
+            if (shouldResetPT)
             {
-                app.PathTracer.ResetRenderProcess();
+                app.PathTracer?.ResetRenderProcess();
             }
         }
         
@@ -1245,186 +1264,208 @@ namespace IDKEngine.Render
 
     partial class Gui
     {
-        private struct LoadSceneVars
+        private struct LoadModelContext
         {
-            public bool DialogAskForCompression;
-
-            public ModelLoader.CompressionUtils.CompressGltfSettings CompressGltfSettings;
-
-            public Tuple<Task, string>?[] GltfCompressionsTasks = new Tuple<Task, string>[10];
-
-            public LoadSceneVars()
+            public struct LoadingTask
             {
-                CompressGltfSettings = new ModelLoader.CompressionUtils.CompressGltfSettings();
-                CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
-                CompressGltfSettings.UseInstancing = true;
+                public ModelLoader.CompressionUtils.CompressGltfSettings CompressGltfSettings;
+                public bool DoCompressGltf;
+                public bool SpawnInCamera = true;
+                public OtkVec3 Scale;
+
+                public LoadingTask(string modelPath)
+                {
+                    CompressGltfSettings = new ModelLoader.CompressionUtils.CompressGltfSettings();
+                    CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
+                    CompressGltfSettings.UseInstancing = true;
+                    CompressGltfSettings.InputPath = modelPath;
+
+                    SpawnInCamera = true;
+                    Scale = new OtkVec3(1.0f);
+                }
+
+                public string GetPopupModalName()
+                {
+                    return $"Loading {Path.GetFileName(CompressGltfSettings.InputPath)}###{MODEL_LOAD_DIALOG}";
+                }
+            }
+
+            public const string MODEL_LOAD_DIALOG = "ModelLoadDialog";
+
+            public bool IsLoadModelDialog;
+            public Tuple<Task, LoadingTask>?[] CompressionsTasks = new Tuple<Task, LoadingTask>[10];
+            private readonly Queue<LoadingTask> queuedLoadingTasks = new Queue<LoadingTask>();
+
+            public LoadingTask CurrentGuiDialogLoadingTask;
+
+            public LoadModelContext()
+            {
+            }
+
+            public bool HandleNextLoadingTask()
+            {
+                return queuedLoadingTasks.TryDequeue(out CurrentGuiDialogLoadingTask);
+            }
+
+            public void AddLoadingTask(string modelPath)
+            {
+                queuedLoadingTasks.Enqueue(new LoadingTask(modelPath));
             }
         }
 
-        private LoadSceneVars moduleLoadSceneVars = new LoadSceneVars();
-        public void ModuleLoadSceneRender(Application app, ref bool shouldUpdatePathTracer)
+        private LoadModelContext loadModelContext = new LoadModelContext();
+
+        public void AddModelDialog(string path)
         {
-            const string POPUP_ASK_FOR_COMPRESSION = "Compress glTF?";
-            if (ImGui.Button("Load glTF"))
+            loadModelContext.AddLoadingTask(path);
+        }
+
+        public void ModuleLoadModelRender(Application app, ref bool shouldResetPT)
+        {
+            SysVec3 tempVec3;
+
+            if (!loadModelContext.IsLoadModelDialog)
             {
-                if (app.WindowFullscreen)
+                if (loadModelContext.HandleNextLoadingTask())
                 {
-                    // Need to end fullscreen otherwise file explorer is not visible
-                    app.WindowFullscreen = false;
-                }
-
-                DialogResult result = Dialog.FileOpen("gltf,glb");
-                if (result.IsError)
-                {
-                    Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
-                }
-                else if (result.IsOk)
-                {
-                    bool isCompressed = ModelLoader.CompressionUtils.IsCompressedGltf(result.Path);
-                    bool compressionToolAvailable = ModelLoader.CompressionUtils.CompressionToolAvailable();
-                    if (isCompressed)
-                    {
-                        if (LoadModel(app, result.Path))
-                        {
-                            shouldUpdatePathTracer = true;
-                        }
-                    }
-                    
-                    if (!isCompressed && !compressionToolAvailable)
-                    {
-                        Logger.Log(Logger.LogLevel.Warn, $"The glTF model \"{Path.GetFileName(result.Path)}\" is uncompressed and the compresion tool \"{ModelLoader.CompressionUtils.COMPRESSION_TOOL_NAME}\" was not found.");
-                        if (LoadModel(app, result.Path))
-                        {
-                            shouldUpdatePathTracer = true;
-                        }
-                    }
-
-                    if (!isCompressed && compressionToolAvailable)
-                    {
-                        moduleLoadSceneVars.DialogAskForCompression = true;
-                        ImGui.OpenPopup(POPUP_ASK_FOR_COMPRESSION);
-                    }
-
-                    moduleLoadSceneVars.CompressGltfSettings.InputPath = result.Path;
+                    loadModelContext.IsLoadModelDialog = true;
+                    ImGui.OpenPopup(loadModelContext.CurrentGuiDialogLoadingTask.GetPopupModalName());
                 }
             }
 
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new SysVec2(0.0f));
-            if (ImGui.BeginPopupModal(POPUP_ASK_FOR_COMPRESSION, ref moduleLoadSceneVars.DialogAskForCompression, ImGuiWindowFlags.NoNavInputs))
+            if (loadModelContext.IsLoadModelDialog)
             {
-                HorizontallyCenteredText("The glTF model doesn't have compression.\nWould you like to compress to disk via gltfpack and load that?");
-                
-                if (ImGui.TreeNode("CompressionOption"))
+                ref LoadModelContext.LoadingTask loadingTask = ref loadModelContext.CurrentGuiDialogLoadingTask;
+
+                if (loadModelContext.IsLoadModelDialog && ImGui.BeginPopupModal(loadingTask.GetPopupModalName(), ref loadModelContext.IsLoadModelDialog, ImGuiWindowFlags.NoNavInputs))
                 {
-                    ImGui.SliderInt("Threads", ref moduleLoadSceneVars.CompressGltfSettings.ThreadsUsed, 1, Environment.ProcessorCount);
-                    ImGui.Checkbox("UseInstancing", ref moduleLoadSceneVars.CompressGltfSettings.UseInstancing);
-                    ImGui.Checkbox("KeepMeshPrimitives (only supported in gltfpack fork)", ref moduleLoadSceneVars.CompressGltfSettings.KeepMeshPrimitives);
-                }
-
-                ImGui.Separator();
-
-                float availX = ImGui.GetContentRegionAvail().X;
-                float availY = ImGui.GetContentRegionAvail().Y;
-                ImGui.SetCursorPosX(availX * 0.1f);
-                if (ImGui.Button("Yes", new SysVec2(ImGui.GetWindowWidth() * 0.35f, availY * 0.6f)))
-                {
-                    ImGui.CloseCurrentPopup();
-
-                    int workerIndex = -1;
-                    for (int i = 0; i < moduleLoadSceneVars.GltfCompressionsTasks.Length; i++)
+                    ImGui.Checkbox("Compress glTF using gltfpack? (fails if not provided)", ref loadingTask.DoCompressGltf);
+                    if (loadingTask.DoCompressGltf)
                     {
-                        if (moduleLoadSceneVars.GltfCompressionsTasks[i] == null)
+                        ImGui.Checkbox("UseInstancing", ref loadingTask.CompressGltfSettings.UseInstancing);
+                        ImGui.Checkbox("KeepMeshPrimitives (requires gltfpack fork)", ref loadingTask.CompressGltfSettings.KeepMeshPrimitives);
+                        ImGui.SliderInt("Threads", ref loadingTask.CompressGltfSettings.ThreadsUsed, 1, Environment.ProcessorCount);
+                        ImGui.Separator();
+                    }
+
+                    ImGui.Checkbox("SpawnInCamera", ref loadingTask.SpawnInCamera);
+
+                    tempVec3 = loadingTask.Scale.ToNumerics();
+                    if (ImGui.InputFloat3("Scale", ref tempVec3))
+                    {
+                        loadingTask.Scale = tempVec3.ToOpenTK();
+                    }
+
+                    float availX = ImGui.GetContentRegionAvail().X;
+                    float availY = ImGui.GetContentRegionAvail().Y;
+                    ImGui.SetCursorPosX(availX * 0.7f);
+                    ImGui.SetCursorPosY(ImGui.GetCursorPosY() + availY * 0.4f);
+                    if (ImGui.Button("Load", new SysVec2(availX * 0.3f, availY * 0.5f)))
+                    {
+                        string gltfPath = loadingTask.CompressGltfSettings.InputPath;
+
+                        if (!loadingTask.DoCompressGltf)
                         {
-                            workerIndex = i;
-                            break;
+                            ModuleLoadModelLoad(app, loadingTask);
+                            shouldResetPT = true;
                         }
-                    }
-                    if (workerIndex == -1)
-                    {
-                        Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
-                        LoadModel(app, moduleLoadSceneVars.CompressGltfSettings.InputPath);
-                        return;
+
+                        if (loadingTask.DoCompressGltf)
+                        {
+                            int workerIndex = -1;
+                            for (int i = 0; i < loadModelContext.CompressionsTasks.Length; i++)
+                            {
+                                if (loadModelContext.CompressionsTasks[i] == null)
+                                {
+                                    workerIndex = i;
+                                    break;
+                                }
+                            }
+                            if (workerIndex == -1)
+                            {
+                                Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
+                                ModuleLoadModelLoad(app, loadingTask);
+                                shouldResetPT = true;
+                                return;
+                            }
+
+                            string fileName = Path.GetFileName(gltfPath);
+                            string compressedGltfDir = Path.Combine(Path.GetDirectoryName(gltfPath), $"{Path.GetFileNameWithoutExtension(gltfPath)}Compressed");
+                            string compressedGtlfPath = Path.Combine(compressedGltfDir, fileName);
+                            Directory.CreateDirectory(compressedGltfDir);
+
+                            loadingTask.CompressGltfSettings.OutputPath = compressedGtlfPath;
+                            loadingTask.CompressGltfSettings.ProcessError = (string message) =>
+                            {
+                                Logger.Log(Logger.LogLevel.Error, message);
+                                Logger.Log(Logger.LogLevel.Error, $"An error occured while compressing \"{fileName}\". Falling back to uncompressed model");
+                                loadModelContext.CompressionsTasks[workerIndex] = new Tuple<Task, LoadModelContext.LoadingTask>(Task.CompletedTask, loadModelContext.CurrentGuiDialogLoadingTask);
+                            };
+                            loadingTask.CompressGltfSettings.ProcessOutput = (string message) =>
+                            {
+                                Logger.Log(Logger.LogLevel.Info, message);
+                            };
+
+                            Task? task = ModelLoader.CompressionUtils.CompressGltf(loadingTask.CompressGltfSettings);
+                            if (task == null)
+                            {
+                                Logger.Log(Logger.LogLevel.Error, "Failed compressing. Falling back to uncompressed model");
+                                loadModelContext.CompressionsTasks[workerIndex] = new Tuple<Task, LoadModelContext.LoadingTask>(Task.CompletedTask, loadingTask);
+                            }
+                            else
+                            {
+                                loadModelContext.CompressionsTasks[workerIndex] = new Tuple<Task, LoadModelContext.LoadingTask>(task, loadingTask);
+                            }
+                        }
+
+                        ImGui.CloseCurrentPopup();
                     }
 
-                    string fileName = Path.GetFileName(moduleLoadSceneVars.CompressGltfSettings.InputPath);
-                    string compressedGltfDir = Path.Combine(Path.GetDirectoryName(moduleLoadSceneVars.CompressGltfSettings.InputPath), "Compressed");
-                    string compressedGtlfPath = Path.Combine(compressedGltfDir, fileName);
-                    Directory.CreateDirectory(compressedGltfDir);
-                    moduleLoadSceneVars.CompressGltfSettings.OutputPath = compressedGtlfPath;
-
-                    moduleLoadSceneVars.CompressGltfSettings.ProcessError = (string message) =>
-                    {
-                        Logger.Log(Logger.LogLevel.Error, message);
-                        Logger.Log(Logger.LogLevel.Error, $"An error occured while compressing \"{fileName}\". Falling back to uncompressed model");
-                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.CompressGltfSettings.InputPath);
-                    };
-                    moduleLoadSceneVars.CompressGltfSettings.ProcessOutput = (string message) =>
-                    {
-                        Logger.Log(Logger.LogLevel.Info, message);
-                    };
-
-                    Task? task = ModelLoader.CompressionUtils.CompressGltf(moduleLoadSceneVars.CompressGltfSettings);
-                    if (task == null)
-                    {
-                        Logger.Log(Logger.LogLevel.Error, "Failed to create compression task. Falling back to uncompressed model");
-                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(Task.CompletedTask, moduleLoadSceneVars.CompressGltfSettings.InputPath);
-                    }
-                    else
-                    {
-                        moduleLoadSceneVars.GltfCompressionsTasks[workerIndex] = new Tuple<Task, string>(task, compressedGtlfPath);
-                    }
+                    ImGui.EndPopup();
                 }
-
-                ImGui.SameLine();
-                if (ImGui.Button("No", new SysVec2(ImGui.GetWindowWidth() * 0.35f, availY * 0.6f)))
-                {
-                    ImGui.CloseCurrentPopup();
-
-                    LoadModel(app, moduleLoadSceneVars.CompressGltfSettings.InputPath);
-                }
-
-                ImGui.EndPopup();
             }
-            ImGui.PopStyleVar();
 
-            for (int i = 0; i < moduleLoadSceneVars.GltfCompressionsTasks.Length; i++)
+            for (int i = 0; i < loadModelContext.CompressionsTasks.Length; i++)
             {
-                if (moduleLoadSceneVars.GltfCompressionsTasks[i] == null)
+                if (loadModelContext.CompressionsTasks[i] == null)
                 {
                     continue;
                 }
 
-                (Task task, string gltfPath) = moduleLoadSceneVars.GltfCompressionsTasks[i];
+                (Task task, LoadModelContext.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
                 if (!task.IsCompleted)
                 {
-                    ImGui.Text($"Compressing {Path.GetFileName(gltfPath)}...\n");
+                    ImGui.Text($"Compressing {Path.GetFileName(loadingTask.CompressGltfSettings.InputPath)}...\n");
                 }
             }
         }
-        public void ModuleLoadSceneUpdate(Application app, ref bool shouldResetPT)
+        
+        public void ModuleLoadModelUpdate(Application app, ref bool shouldResetPT)
         {
-            for (int i = 0; i < moduleLoadSceneVars.GltfCompressionsTasks.Length; i++)
+            for (int i = 0; i < loadModelContext.CompressionsTasks.Length; i++)
             {
-                if (moduleLoadSceneVars.GltfCompressionsTasks[i] == null)
+                if (loadModelContext.CompressionsTasks[i] == null)
                 {
                     continue;
                 }
 
-                (Task task, string gltfPath) = moduleLoadSceneVars.GltfCompressionsTasks[i];
+                (Task task, LoadModelContext.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
                 if (task.IsCompletedSuccessfully)
                 {
-                    if (LoadModel(app, gltfPath))
+                    if (ModuleLoadModelLoad(app, loadingTask))
                     {
                         shouldResetPT = true;
                     }
 
-                    moduleLoadSceneVars.GltfCompressionsTasks[i] = null;
+                    loadModelContext.CompressionsTasks[i] = null;
                 }
             }
         }
-        private bool LoadModel(Application app, string path)
+        
+        private bool ModuleLoadModelLoad(Application app, LoadModelContext.LoadingTask loadingTask)
         {
-            ModelLoader.Model newModel = ModelLoader.LoadGltfFromFile(path, Matrix4.CreateTranslation(app.Camera.Position));
+            OtkVec3 modelPos = loadingTask.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
+            ModelLoader.Model newModel = ModelLoader.LoadGltfFromFile(loadingTask.CompressGltfSettings.InputPath, Matrix4.CreateScale(loadingTask.Scale) * Matrix4.CreateTranslation(modelPos));
             app.ModelManager.Add(newModel);
 
             int newMeshIndex = app.ModelManager.Meshes.Length - 1;

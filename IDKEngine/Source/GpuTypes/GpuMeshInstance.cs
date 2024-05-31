@@ -25,7 +25,6 @@ namespace IDKEngine.GpuTypes
         public Matrix4 InvModelMatrix => Mat3x4ToMat4x4Tranposed(invModelMatrix3x4);
         public Matrix4 PrevModelMatrix => Mat3x4ToMat4x4Tranposed(prevModelMatrix3x4);
 
-
         private Matrix3x4 _modelMatrix3x4;
         private Matrix3x4 modelMatrix3x4
         {
@@ -34,24 +33,33 @@ namespace IDKEngine.GpuTypes
             set
             {
                 _modelMatrix3x4 = value;
-                invModelMatrix3x4 = Matrix3x4.Invert(_modelMatrix3x4);
+
+                IsDirty = true;
+                invModelMatrix3x4 = Matrix3x4.Invert(modelMatrix3x4);
             }
         }
 
         private Matrix3x4 invModelMatrix3x4;
         private Matrix3x4 prevModelMatrix3x4;
 
-        private readonly Vector3 _pad0;
         public int MeshIndex;
-
-        public void SetPrevToCurrentMatrix()
-        {
-            prevModelMatrix3x4 = modelMatrix3x4;
-        }
+        public bool IsDirty { get; private set; }
+        private readonly Vector2 _pad0;
 
         public bool DidMove()
         {
-            return !FastMatrix3x4Equal(_modelMatrix3x4, prevModelMatrix3x4);
+            return !FastMatrix3x4Equal(prevModelMatrix3x4, modelMatrix3x4);
+        }
+
+        public void SetPrevToCurrentMatrix()
+        {
+            IsDirty = true;
+            prevModelMatrix3x4 = modelMatrix3x4;
+        }
+
+        public void ResetDirtyFlag()
+        {
+            IsDirty = false;
         }
 
         private static bool FastMatrix3x4Equal(in Matrix3x4 a, in Matrix3x4 b)

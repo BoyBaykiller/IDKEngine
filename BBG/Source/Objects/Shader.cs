@@ -47,7 +47,7 @@ namespace BBOpenGL
                     bool compiled = GetCompileStatus();
                     Logger.LogLevel level = compiled ? Logger.LogLevel.Info : Logger.LogLevel.Error;
 
-                    Logger.Log(level, $"Shader {Name} log:\n{shaderInfoLog}");
+                    Logger.Log(level, $"Shader \"{Name}\" log:\n{shaderInfoLog}");
                 }
             }
 
@@ -71,14 +71,25 @@ namespace BBOpenGL
             public string FullShaderPath => Path.Combine(SHADER_PATH, LocalShaderPath);
 
             public readonly string LocalShaderPath;
-            public AbstractShader(ShaderStage stage, string localShaderPath)
-                : this(stage, File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath)), localShaderPath)
+
+            public AbstractShader(ShaderStage shaderStage, string localShaderPath, bool __debugSaveAndRunRGA = false)
+                : this(shaderStage, File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath)), localShaderPath)
             {
+                if (__debugSaveAndRunRGA && GetCompileStatus())
+                {
+                    // This is ugly but only relevant for development.
+                    // Runs Radeon GPU Analyzer on the shader code and writes the results + preprocess code to disk
+                    string srcCode = File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath));
+                    string shaderCode = Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath);
+                    string outPath = Path.Combine(SHADER_PATH, "bin", localShaderPath);
+                    __DebugSaveAndRunRGA(shaderStage, shaderCode, outPath);
+                }
+
                 LocalShaderPath = localShaderPath;
             }
 
-            private AbstractShader(ShaderStage stage, string srcCode, string name)
-                : base(stage, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, stage, name), name)
+            private AbstractShader(ShaderStage shaderStage, string srcCode, string name)
+                : base(shaderStage, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, name), name)
             {
                 // We currently dont allow public construction from just a srcCode
                 // as that would make the LocalShaderPath variable meaningless, which we need for shader recompilation.
@@ -86,9 +97,7 @@ namespace BBOpenGL
 
             public static class Preprocessor
             {
-                public const bool SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH = false; // for debugging only (requires GL_GOOGLE_cpp_style_line_directive)
-
-                public static string DEBUG_LAST_PRE_PROCESSED;
+                public static readonly bool SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH = EmpiricalCheckGLSLLineDirectiveSupport();
 
                 public enum Keyword : int
                 {
@@ -102,16 +111,16 @@ namespace BBOpenGL
                     public string[] UsedAppInsertionKeys;
                 }
 
-                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, string name = null)
+                public static string PreProcess(string srcCode, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, string name = null)
                 {
-                    return PreProcess(source, shaderInsertions, shaderStage, out _, name);
+                    return PreProcess(srcCode, shaderInsertions, shaderStage, out _, name);
                 }
 
-                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, out PreProcessInfo preProcessInfo, string name = null)
+                public static string PreProcess(string srcCode, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, out PreProcessInfo preProcessInfo, string name = null)
                 {
                     List<string> usedAppInsertions = new List<string>();
                     List<string> pathsAlreadyIncluded = new List<string>();
-                    StringBuilder result = RecursiveResolveKeywords(source, name);
+                    StringBuilder result = RecursiveResolveKeywords(srcCode, name);
 
                     {
                         string copy = result.ToString();
@@ -127,7 +136,8 @@ namespace BBOpenGL
                             #if {(SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH ? 1 : 0)}
                                 #extension GL_GOOGLE_cpp_style_line_directive : require
                             #endif
-                            #define APP_SHADER_STAGE_{shaderStage.ToString().ToUpper()}
+                            #define APP_SHADER_STAGE_{shaderStage.ToString().ToUpper()} true
+                            #define APP_VENDOR_{GetDeviceInfo().Vendor.ToString().ToUpper()} true
                             #line {lineCountVersionStatement + 1}
 
                             """;
@@ -138,7 +148,6 @@ namespace BBOpenGL
                     preProcessInfo.UsedAppInsertionKeys = usedAppInsertions.ToArray();
                     
                     string preprocessed = result.ToString();
-                    DEBUG_LAST_PRE_PROCESSED = preprocessed;
 
                     return preprocessed;
 
@@ -261,6 +270,75 @@ namespace BBOpenGL
                     }
 
                     return lineCount;
+                }
+
+                private static bool EmpiricalCheckGLSLLineDirectiveSupport()
+                {
+                    // Neither AMD nor NVIDIA report GL_GOOGLE_cpp_style_line_directive,
+                    // even though they both support it inside shaders. So we have to check for support like that.
+
+                    string shaderString =
+                        """
+                        #version 460 core
+                        
+                        #extension GL_GOOGLE_cpp_style_line_directive : require
+
+                        #line 1 "filename"
+                        
+                        void main() {}
+                        """;
+
+                    Shader shader = new Shader(ShaderStage.Fragment, shaderString, """
+                        Check for (#line "Filename") support. If you see this message GL_GOOGLE_cpp_style_line_directive is not supported
+                        and errors in included GLSL shader code will not have the correct filename. The line will still be correct.
+                        Note https://forums.developer.nvidia.com/t/gl-google-cpp-style-line-directive-not-reported-even-though-functionality-is-implemented-driver-bug/294829
+                        """
+                    );
+                    return shader.GetCompileStatus();
+                }
+            }
+
+            /// <summary>
+            /// This is only meant to be used in development. It invokes the "rga" tool for shader analysis
+            /// </summary>
+            private static void __DebugSaveAndRunRGA(ShaderStage shaderStage, string shaderCode,  string outPath)
+            {
+                const string SHADER_ANALYZER_TOOL_NAME = "rga"; // https://github.com/GPUOpen-Tools/radeon_gpu_analyzer
+
+                string rgaShaderStage = shaderStage switch
+                {
+                    ShaderStage.Vertex => "--vert",
+                    ShaderStage.Geometry => "--geom",
+                    ShaderStage.Fragment => "--frag",
+                    ShaderStage.Compute => "--comp",
+                    _ => throw new NotSupportedException($"Can not convert {nameof(shaderStage)} = {shaderStage} to {nameof(rgaShaderStage)}"),
+                };
+
+                string outDir = Path.GetDirectoryName(outPath);
+                Directory.CreateDirectory(outDir);
+
+                string namePreprocessed = outPath;
+                File.WriteAllText(namePreprocessed, shaderCode);
+
+                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {namePreprocessed} " +
+                                   $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
+                                   $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
+                
+                System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo()
+                {
+                    FileName = SHADER_ANALYZER_TOOL_NAME,
+                    Arguments = arguments,
+                };
+
+                try
+                {
+                    System.Diagnostics.Process? proc = System.Diagnostics.Process.Start(startInfo);
+
+                    proc.Start();
+                }
+                catch (Exception)
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Failed to create process. Be sure to provide a {SHADER_ANALYZER_TOOL_NAME} binary (https://github.com/GPUOpen-Tools/radeon_gpu_analyzer) in working dir or PATH");
                 }
             }
         }

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using OpenTK;
 using OpenTK.Mathematics;
+using System.Runtime.InteropServices;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using BBLogger;
 
@@ -136,9 +137,16 @@ namespace IDKEngine.Windowing
             windowCharFuncPtr = WindowCharCallback;
             GLFW.SetCharCallback(window, windowCharFuncPtr);
 
+            windowDropCallback = WindowDropCallback;
+            GLFW.SetDropCallback(window, windowDropCallback);
+
             if (GLFW.RawMouseMotionSupported())
             {
                 GLFW.SetInputMode(window, RawMouseMotionAttribute.RawMouseMotion, true);
+            }
+            else
+            {
+                Logger.Log(Logger.LogLevel.Info, "Raw Mouse Motion is not supported");
             }
 
             monitor = GLFW.GetPrimaryMonitor();
@@ -195,6 +203,8 @@ namespace IDKEngine.Windowing
         protected abstract void OnStart();
         protected abstract void OnWindowResize();
         protected abstract void OnKeyPress(char key);
+        protected abstract void OnFilesDrop(string[] paths);
+
 
         private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeFuncPtr;
         private void FramebufferSizeCallback(Window* window, int width, int height)
@@ -224,6 +234,18 @@ namespace IDKEngine.Windowing
         private void WindowCharCallback(Window* window, uint codepoint)
         {
             OnKeyPress((char)codepoint);
+        }
+
+        private readonly GLFWCallbacks.DropCallback windowDropCallback;
+        private void WindowDropCallback(Window* window, int count, byte** paths)
+        {
+            string[] strings = new string[count];
+            for (int i = 0; i < count; i++)
+            {
+                strings[i] = Marshal.PtrToStringAnsi((nint)paths[i]);
+            }
+
+            OnFilesDrop(strings);
         }
 
         public void Dispose()

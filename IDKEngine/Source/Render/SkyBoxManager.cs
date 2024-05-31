@@ -9,7 +9,7 @@ namespace IDKEngine.Render
 {
     static class SkyBoxManager
     {
-        public enum SkyBoxMode
+        public enum SkyBoxMode : int
         {
             ExternalAsset,
             InternalAtmosphericScattering,

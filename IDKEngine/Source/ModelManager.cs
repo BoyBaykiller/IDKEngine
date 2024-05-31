@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using OpenTK.Mathematics;
 using BBOpenGL;
 using IDKEngine.Utils;
@@ -153,7 +152,6 @@ namespace IDKEngine
             }
 
             UploadAllModelData();
-            meshInstanceShouldUpload = new BitArray(MeshInstances.Length, false);
         }
 
         public unsafe void Draw()
@@ -174,7 +172,6 @@ namespace IDKEngine
             BBG.Rendering.MultiDrawMeshletsCountNV(meshletTasksCmdsBuffer, meshletTasksCountBuffer, maxMeshlets, sizeof(BBG.DrawMeshTasksIndirectCommandNV));
         }
 
-        private static BitArray meshInstanceShouldUpload;
         public void Update(out bool anyMeshInstanceMoved)
         {
             anyMeshInstanceMoved = false;
@@ -183,15 +180,8 @@ namespace IDKEngine
             for (int i = 0; i < MeshInstances.Length;)
             {
                 bool uploadBatch = false;
-                if (meshInstanceShouldUpload[i])
+                if (MeshInstances[i].IsDirty)
                 {
-                    meshInstanceShouldUpload[i] = false;
-                    uploadBatch = true;
-                }
-                else if (MeshInstances[i].DidMove())
-                {
-                    // We'll need to upload the changed prev matrix next frame
-                    meshInstanceShouldUpload[i] = true;
                     uploadBatch = true;
                 }
 
@@ -203,11 +193,14 @@ namespace IDKEngine
                     UpdateMeshInstanceBuffer(batchStart, batchEnd - batchStart);
                     for (int j = batchStart; j < batchEnd; j++)
                     {
-                        MeshInstances[j].SetPrevToCurrentMatrix();
+                        if (MeshInstances[j].DidMove())
+                        {
+                            MeshInstances[j].SetPrevToCurrentMatrix();
+                            anyMeshInstanceMoved = true;
+                        }
                     }
 
                     i = batchEnd;
-                    anyMeshInstanceMoved = true;
                 }
                 else
                 {
@@ -229,6 +222,10 @@ namespace IDKEngine
         public void UpdateMeshInstanceBuffer(int start, int count)
         {
             meshInstanceBuffer.UploadElements(start, count, MeshInstances[start]);
+            for (int i = start; i < start + count; i++)
+            {
+                MeshInstances[i].ResetDirtyFlag();
+            }
         }
 
         public void UpdateVertexPositions(int start, int count)

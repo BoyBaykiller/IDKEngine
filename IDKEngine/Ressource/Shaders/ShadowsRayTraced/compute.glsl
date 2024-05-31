@@ -37,8 +37,8 @@ void main()
     vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
 
     vec3 sampleToLightDir = light.Position - unjitteredFragPos;
-    float cosTerm = dot(normal, sampleToLightDir);
-    if (cosTerm <= 0.0)
+    float cosTheta = dot(normal, sampleToLightDir);
+    if (cosTheta <= 0.0)
     {
         imageStore(image2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(0.0));
         return;

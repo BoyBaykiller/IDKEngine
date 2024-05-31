@@ -134,20 +134,11 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
         wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
 
-        float diffuseChance = 1.0 - surface.Metallic - surface.Transmission;
-        surface.Metallic = SpecularBasedOnViewAngle(surface.Metallic, cosTheta, wavefrontRay.PreviousIOROrDebugNodeCounter, surface.IOR);
-        surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // normalize again to (diff + spec + trans == 1.0)
-
-        RayProperties result = SampleMaterial(rayDir, surface, wavefrontRay.PreviousIOROrDebugNodeCounter, fromInside);
-
+        SampleMaterialResult result = SampleMaterial(rayDir, surface, wavefrontRay.PreviousIOROrDebugNodeCounter, fromInside);
         if (result.RayType != RAY_TYPE_REFRACTIVE || settingsUBO.IsAlwaysTintWithAlbedo)
         {
-            vec3 brdf = surface.Albedo / PI;
-            float pdf = max(cosTheta / PI, 0.0001);
-            wavefrontRay.Throughput *= cosTheta * brdf / pdf;
-            // wavefrontRay.Throughput *= albedo;
+            wavefrontRay.Throughput *= result.Bsdf / result.Pdf * cosTheta;
         }
-        
         wavefrontRay.Throughput /= result.RayTypeProbability;
 
         bool terminateRay = RussianRouletteTerminateRay(wavefrontRay.Throughput);
@@ -156,10 +147,10 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             return false;
         }
 
-        wavefrontRay.Origin += result.Direction * 0.001;
-        wavefrontRay.PreviousIOROrDebugNodeCounter = result.Ior;
+        wavefrontRay.Origin += result.RayDirection * 0.001;
+        wavefrontRay.PreviousIOROrDebugNodeCounter = result.NewIor;
 
-        vec2 packedDir = EncodeUnitVec(result.Direction);
+        vec2 packedDir = EncodeUnitVec(result.RayDirection);
         wavefrontRay.PackedDirectionX = packedDir.x;
         wavefrontRay.PackedDirectionY = packedDir.y;
         return true;
