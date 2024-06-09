@@ -38,7 +38,7 @@ namespace IDKEngine.Render
             {
                 _elevation = value;
 
-                Vector3 pos = MyMath.PolarToCartesian(Elevation, Azimuth);
+                Vector3 pos = MyMath.PolarToCartesian(Azimuth, Elevation);
                 shaderProgram.Upload("LightPos", pos);
             }
 
@@ -52,7 +52,7 @@ namespace IDKEngine.Render
             {
                 _azimuth = value;
 
-                Vector3 pos = MyMath.PolarToCartesian(Elevation, Azimuth);
+                Vector3 pos = MyMath.PolarToCartesian(Azimuth, Elevation);
                 shaderProgram.Upload("LightPos", pos);
             }
 

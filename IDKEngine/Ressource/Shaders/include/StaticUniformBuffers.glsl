@@ -1,6 +1,6 @@
 AppInclude(include/GpuTypes.glsl)
 
-// These constants are used in shader and client code. Keep in sync!
+// Keep in sync between shader and client code!
 #define GPU_MAX_UBO_POINT_SHADOW_COUNT 128
 #define GPU_MAX_UBO_LIGHT_COUNT 256
 

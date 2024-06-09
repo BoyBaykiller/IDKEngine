@@ -15,18 +15,24 @@ namespace BBOpenGL
                 // https://community.arm.com/arm-community-blogs/b/graphics-gaming-and-vr-blog/posts/picking-the-most-efficient-load-store-operations
                 // https://interactive.arm.com/story/the-arm-manga-guide-to-the-mali-gpu/
 
-                // This is a no-op. On tiler GPUs it makes the driver do a full screen copy from image memory to tile memory which is bad.
-                // On Desktop GPUs this does nothing.
+                /// <summary>
+                /// This is a no-op. On tiler GPUs it makes the driver do a full screen copy from image memory to tile memory which is bad.
+                /// On Desktop GPUs this does nothing.
+                /// </summary>
                 Load,
 
-                // Clears the image to a specified clear color. On tiler GPUs this might or might not have the same cost as DontCare.
-                // On Mali for example image clear works directly on tile memory and is free (as fast as DontCare).
-                // On Desktop GPUs this has a minimal cost.
+                /// <summary>
+                /// Clears the image to a specified clear color. On tiler GPUs this might or might not have the same cost as DontCare.
+                /// On Mali for example image clear works directly on tile memory and is free (as fast as DontCare).
+                /// On Desktop GPUs this has a minimal cost.
+                /// </summary>
                 Clear,
 
-                // On tiler GPUs this tells the driver it does not have to load the image into tile memory before rendering. 
-                // That means tile memory will start out undefined as it is assumed nothing reads from it.
-                // This should be preferred.
+                /// <summary>
+                /// On tiler GPUs this tells the driver it does not have to load the image into tile memory before rendering.
+                /// That means tile memory will start out undefined as it is assumed nothing reads from it.
+                /// This should be preferred.
+                /// </summary>
                 DontCare,
             }
 
@@ -124,15 +130,13 @@ namespace BBOpenGL
             public struct RenderAttachments
             {
                 public ColorAttachments? ColorAttachments;
-                public DepthAttachment? DepthAttachment;
-                public StencilAttachment? StencilAttachment;
+                public DepthStencilAttachment? DepthStencilAttachment;
             }
 
             public struct RenderAttachmentsVerbose
             {
                 public ColorAttachment[]? ColorAttachments;
-                public DepthAttachment? DepthAttachment;
-                public StencilAttachment? StencilAttachment;
+                public DepthStencilAttachment? DepthStencilAttachment;
             }
 
             /// <summary>
@@ -153,24 +157,17 @@ namespace BBOpenGL
                 public Vector4 ClearColor;
             }
 
-            public struct DepthAttachment
+            public struct DepthStencilAttachment
             {
                 public Texture Texture;
                 public AttachmentLoadOp AttachmentLoadOp;
                 public int Level;
-                public float ClearValue = 1.0f;
+                public float DepthClearValue = 1.0f;
+                public int StencilClearValue = 0;
 
-                public DepthAttachment()
+                public DepthStencilAttachment()
                 {
                 }
-            }
-
-            public struct StencilAttachment
-            {
-                public Texture Texture;
-                public AttachmentLoadOp AttachmentLoadOp;
-                public int Level;
-                public int ClearValue;
             }
 
             public struct NoRenderAttachmentsParams
@@ -279,8 +276,7 @@ namespace BBOpenGL
                         verboseRTs.ColorAttachments[i].ClearColor = colorAttachments.ClearColor;
                     }
                 }
-                verboseRTs.DepthAttachment = renderAttachments.DepthAttachment;
-                verboseRTs.StencilAttachment = renderAttachments.StencilAttachment;
+                verboseRTs.DepthStencilAttachment = renderAttachments.DepthStencilAttachment;
 
                 Render(renderPassName, verboseRTs, pipelineState, funcRender);
             }
@@ -322,53 +318,39 @@ namespace BBOpenGL
                     }
                 }
 
-                if (renderAttachments.DepthAttachment != null)
+                if (renderAttachments.DepthStencilAttachment != null)
                 {
-                    DepthAttachment depthAttachment = renderAttachments.DepthAttachment.Value;
+                    DepthStencilAttachment depthStencilAttachment = renderAttachments.DepthStencilAttachment.Value;
 
-                    Debug.Assert(Texture.GetFormatType(depthAttachment.Texture.Format) == Texture.InternalFormatType.Depth);
+                    Texture.InternalFormatType formatType = Texture.GetFormatType(depthStencilAttachment.Texture.Format);
+                    bool hasDepthComponent = formatType.HasFlag(Texture.InternalFormatType.Depth);
+                    bool hasStencilComponent = formatType.HasFlag(Texture.InternalFormatType.Stencil);
 
-                    switch (depthAttachment.AttachmentLoadOp)
+                    Debug.Assert(hasDepthComponent || hasStencilComponent);
+
+                    switch (depthStencilAttachment.AttachmentLoadOp)
                     {
                         case AttachmentLoadOp.Load:
                             break;
 
                         case AttachmentLoadOp.Clear:
-                            GL.ClearNamedFramebufferfv(fbo, FboBufferType.Depth, 0, &depthAttachment.ClearValue);
+                            if (hasDepthComponent)
+                            {
+                                GL.ClearNamedFramebufferfv(fbo, FboBufferType.Depth, 0, &depthStencilAttachment.DepthClearValue);
+                            }
+                            if (hasStencilComponent)
+                            {
+                                GL.ClearNamedFramebufferiv(fbo, FboBufferType.Stencil, 0, &depthStencilAttachment.StencilClearValue);
+                            }
                             break;
 
                         case AttachmentLoadOp.DontCare:
-                            FramebufferAttachment framebufferAttachment = FramebufferAttachment.DepthAttachment;
-                            GL.InvalidateNamedFramebufferData(fbo, 1, framebufferAttachment);
+                            FramebufferAttachment attachment = FormatTypeToFboAttachment(formatType);
+                            GL.InvalidateNamedFramebufferData(fbo, 1, attachment);
                             break;
                     }
 
-                    Vector3i textureSize = Texture.GetMipmapLevelSize(depthAttachment.Texture.Width, depthAttachment.Texture.Height, 1, depthAttachment.Level);
-                    inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
-                }
-
-                if (renderAttachments.StencilAttachment != null)
-                {
-                    StencilAttachment stencilAttachment = renderAttachments.StencilAttachment.Value;
-
-                    Debug.Assert(Texture.GetFormatType(stencilAttachment.Texture.Format) == Texture.InternalFormatType.Stencil);
-
-                    switch (stencilAttachment.AttachmentLoadOp)
-                    {
-                        case AttachmentLoadOp.Load:
-                            break;
-
-                        case AttachmentLoadOp.Clear:
-                            GL.ClearNamedFramebufferiv(fbo, FboBufferType.Stencil, 0, &stencilAttachment.ClearValue);
-                            break;
-
-                        case AttachmentLoadOp.DontCare:
-                            FramebufferAttachment framebufferAttachment = FramebufferAttachment.StencilAttachment;
-                            GL.InvalidateNamedFramebufferData(fbo, 1, framebufferAttachment);
-                            break;
-                    }
-
-                    Vector3i textureSize = Texture.GetMipmapLevelSize(stencilAttachment.Texture.Width, stencilAttachment.Texture.Height, 1, stencilAttachment.Level);
+                    Vector3i textureSize = Texture.GetMipmapLevelSize(depthStencilAttachment.Texture.Width, depthStencilAttachment.Texture.Height, 1, depthStencilAttachment.Level);
                     inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
                 }
 
@@ -568,30 +550,33 @@ namespace BBOpenGL
                         };
                     }
                 }
-                if (renderAttachments.DepthAttachment.HasValue)
+                if (renderAttachments.DepthStencilAttachment.HasValue)
                 {
-                    DepthAttachment depthAttachment = renderAttachments.DepthAttachment.Value;
+                    DepthStencilAttachment depthStencilAttachment = renderAttachments.DepthStencilAttachment.Value;
 
                     framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment()
                     {
-                        Texture = depthAttachment.Texture,
-                        Level = depthAttachment.Level,
-                        AttachmentPoint = FramebufferAttachment.DepthAttachment,
-                    };
-                }
-                if (renderAttachments.StencilAttachment.HasValue)
-                {
-                    StencilAttachment stencilAttachment = renderAttachments.StencilAttachment.Value;
-
-                    framebufferDesc.Attachments[framebufferDesc.NumAttachments++] = new FramebufferCache.Attachment()
-                    {
-                        Texture = stencilAttachment.Texture,
-                        Level = stencilAttachment.Level,
-                        AttachmentPoint = FramebufferAttachment.StencilAttachment,
+                        Texture = depthStencilAttachment.Texture,
+                        Level = depthStencilAttachment.Level,
+                        AttachmentPoint = FormatTypeToFboAttachment(Texture.GetFormatType(depthStencilAttachment.Texture.Format))
                     };
                 }
 
                 return framebufferDesc;
+            }
+
+            private static FramebufferAttachment FormatTypeToFboAttachment(Texture.InternalFormatType type)
+            {
+                FramebufferAttachment framebufferAttachment = type switch
+                {
+                    Texture.InternalFormatType.Color => FramebufferAttachment.ColorAttachment0,
+                    Texture.InternalFormatType.Depth => FramebufferAttachment.DepthAttachment,
+                    Texture.InternalFormatType.Stencil => FramebufferAttachment.StencilAttachment,
+                    Texture.InternalFormatType.DepthStencil => FramebufferAttachment.DepthStencilAttachment,
+                    _ => throw new NotSupportedException($"Can not convert {nameof(type)} = {type} to {nameof(FramebufferAttachment)}"),
+                };
+
+                return framebufferAttachment;
             }
         }
     }

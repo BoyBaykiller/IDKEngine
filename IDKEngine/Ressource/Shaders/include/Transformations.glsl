@@ -74,26 +74,30 @@ vec3 GetTriangleNormal(vec3 p0, vec3 p1, vec3 p2)
 
 mat3 ConstructBasis(vec3 normal)
 {
-    // Source: https://www.shadertoy.com/view/tsGcWV
-
-    float sign_ = sign(normal.z);
-    float a = -1.0 / (sign_ + normal.z);
-    float b = normal.x * normal.y * a;
-    vec3 tangent = vec3(1.0 + sign_ * normal.x * normal.x * a, sign_ * b, -sign_ * normal.x);
-    vec3 bitangent = vec3(b, sign_ + normal.y * normal.y * a, -normal.y);
-    return mat3(tangent, bitangent, normal);
+    // Source: "Building an Orthonormal Basis, Revisited"
+    // float sign_ = sign(normal.z);
+    // float a = -1.0 / (sign_ + normal.z);
+    // float b = normal.x * normal.y * a;
+    // vec3 tangent = vec3(1.0 + sign_ * normal.x * normal.x * a, sign_ * b, -sign_ * normal.x);
+    // vec3 bitangent = vec3(b, sign_ + normal.y * normal.y * a, -normal.y);
+    // return mat3(tangent, normal, bitangent);
+    
+    // +X right +Y up -Z forward
+    vec3 up = abs(normal.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, normal));
+    vec3 bitangent = cross(normal, tangent);
+    return mat3(tangent, normal, bitangent);
 }
 
 mat3 GetTBN(vec3 tangent, vec3 normal)
 {
-    vec3 N = normal;
-    vec3 T = tangent;
+    vec3 N = normalize(normal);
+    vec3 T = normalize(tangent);
     // Gramschmidt Process (makes sure T and N always 90 degress)
-    T = normalize(T - dot(T, N) * N);
-    vec3 B = cross(N, T);    
+    // T = normalize(T - dot(T, N) * N);
+    vec3 B = normalize(cross(N, T));    
     return mat3(T, B, N);
 }
-
 
 vec3 PolarToCartesian(float azimuth, float elevation, float len)
 {

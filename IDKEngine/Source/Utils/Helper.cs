@@ -18,30 +18,34 @@ namespace IDKEngine.Utils
             uint messageID,
             string message)
         {
+            const bool FILTER_UNWANTED = true;
+
             switch (severity)
             {
-                case BBG.Debugging.DebugSeverity.DebugSeverityLow:
+                case BBG.Debugging.DebugSeverity.Low:
                     Logger.Log(Logger.LogLevel.Info, message);
                     break;
 
-                case BBG.Debugging.DebugSeverity.DebugSeverityMedium:
-                    if (messageID == 0) return; // Shader compile warning, Intel
-                    if (messageID == 2) return; // using glNamedBufferSubData(buffer 35, offset 0, size 1668) to update a GL_STATIC_DRAW buffer, AMD radeonsi
-                    // if (messageID == 131186) return; // Buffer object is being copied/moved from VIDEO memory to HOST memory, NVIDIA
-                    if (messageID == 131154) return; // Pixel-path performance warning: Pixel transfer is synchronized with 3D rendering, NVIDIA
+                case BBG.Debugging.DebugSeverity.Medium:
+                    if (FILTER_UNWANTED && messageID == 0) return; // Shader compile warning, Intel
+                    if (FILTER_UNWANTED && messageID == 2) return; // using glNamedBufferSubData(buffer 35, offset 0, size 1668) to update a GL_STATIC_DRAW buffer, AMD radeonsi
+                    // if (FILTER_UNWANTED && messageID == 131186) return; // Buffer object is being copied/moved from VIDEO memory to HOST memory, NVIDIA
+                    if (FILTER_UNWANTED && messageID == 131154) return; // Pixel-path performance warning: Pixel transfer is synchronized with 3D rendering, NVIDIA
+
                     Logger.Log(Logger.LogLevel.Warn, message);
                     break;
 
-                case BBG.Debugging.DebugSeverity.DebugSeverityHigh:
-                    if (messageID == 0) return; // Shader compile error, Intel
-                    if (messageID == 2000) return; // Shader compile error, AMD
-                    if (messageID == 2001) return; // Program link error, AMD
+                case BBG.Debugging.DebugSeverity.High:
+                    if (FILTER_UNWANTED && messageID == 0) return; // Shader compile error, Intel
+                    if (FILTER_UNWANTED && messageID == 2000) return; // Shader compile error, AMD
+                    if (FILTER_UNWANTED && messageID == 2001) return; // Program link error, AMD
 
                     Logger.Log(Logger.LogLevel.Error, message);
                     break;
 
-                case BBG.Debugging.DebugSeverity.DebugSeverityNotification:
-                    if (messageID == 131185) return; // Buffer detailed info, NVIDIA
+                case BBG.Debugging.DebugSeverity.Notification:
+                    if (FILTER_UNWANTED && messageID == 131185) return; // Buffer detailed info, NVIDIA
+
                     Logger.Log(Logger.LogLevel.Info, message);
                     break;
 
@@ -125,25 +129,6 @@ namespace IDKEngine.Utils
             while (Interlocked.CompareExchange(ref location1, newValue, initialValue) != initialValue);
 
             return initialValue;
-        }
-
-        private static readonly Random globalRng = new Random();
-        public static Vector3 RandomVec3(float min, float max, Random generator = null)
-        {
-            Random rng = generator == null ? globalRng : generator;
-            return new Vector3(min) + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
-        }
-
-        public static Vector3 RandomVec3(in Vector3 min, in Vector3 max, Random generator = null)
-        {
-            Random rng = generator == null ? globalRng : generator;
-            return min + new Vector3(rng.NextSingle(), rng.NextSingle(), rng.NextSingle()) * (max - min);
-        }
-
-        public static float RandomFloat(float min, float max, Random generator = null)
-        {
-            Random rng = generator == null ? globalRng : generator;
-            return min + rng.NextSingle() * (max - min);
         }
 
         public static unsafe void TextureToDiskJpg(BBG.Texture texture, string path, int quality = 100, bool flipVertically = true)

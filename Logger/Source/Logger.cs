@@ -46,7 +46,7 @@
                 LogLevel.Warn => ConsoleColor.DarkYellow,
                 LogLevel.Error => ConsoleColor.Red,
                 LogLevel.Fatal => ConsoleColor.DarkRed,
-                _ => throw new NotImplementedException($"Can not convert {nameof(level)} = {level} to {nameof(consoleColor)}"),
+                _ => throw new NotSupportedException($"Can not convert {nameof(level)} = {level} to {nameof(consoleColor)}"),
             };
             return consoleColor;
         }

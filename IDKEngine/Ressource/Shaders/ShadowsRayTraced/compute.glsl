@@ -3,7 +3,7 @@
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)
 
-AppInclude(include/Random.glsl)
+AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
@@ -21,6 +21,10 @@ void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     
+    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
+    uint noiseIndex = taaEnabled ? (perFrameDataUBO.Frame % taaDataUBO.SampleCount) * RayTracingSamples : 0u;
+    // InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (noiseIndex + 1));
+
     GpuPointShadow pointShadow = shadowsUBO.PointShadows[gl_GlobalInvocationID.z];
 
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
@@ -43,16 +47,14 @@ void main()
         imageStore(image2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(0.0));
         return;
     }
-
-    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
-    uint noiseIndex = taaEnabled ? (perFrameDataUBO.Frame % taaDataUBO.SampleCount) * RayTracingSamples : 0u;
+    
     float shadow = 0.0;
     for (int i = 0; i < RayTracingSamples; i++)
     {
         vec3 biasedPosition = unjitteredFragPos + normal * 0.01;
 
-        float rnd0 = InterleavedGradientNoise(imgCoord, noiseIndex + 0);
-        float rnd1 = InterleavedGradientNoise(imgCoord, noiseIndex + 1);
+        float rnd0 = InterleavedGradientNoise(imgCoord, noiseIndex + 0); // GetRandomFloat01()
+        float rnd1 = InterleavedGradientNoise(imgCoord, noiseIndex + 1); // GetRandomFloat01()
         noiseIndex++;
 
         vec3 fragToLight = light.Position - biasedPosition;

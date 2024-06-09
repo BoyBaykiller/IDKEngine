@@ -6,10 +6,10 @@ namespace BBOpenGL
 {
     public static partial class BBG
     {
-        public static class FramebufferCache
+        private static class FramebufferCache
         {
             public const int MAX_COLOR_ATTACHMENTS = 8;
-            public const int MAX_FRAMEBUFFER_ATTACHMENTS = 8 + 2; // 8color + 1depth + 1stencil
+            public const int MAX_FRAMEBUFFER_ATTACHMENTS = MAX_COLOR_ATTACHMENTS + 2; // 8color + 1depth + 1stencil
 
             public struct Attachment
             {

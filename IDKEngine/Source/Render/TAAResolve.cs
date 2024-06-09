@@ -65,5 +65,10 @@ namespace IDKEngine.Render
             taaPong.Dispose();
             taaResolveProgram.Dispose();
         }
+
+        public static float GetRecommendedMipmapBias(int renderWidth, int displayWith)
+        {
+            return MathF.Log2((float)renderWidth / displayWith) - 1.0f;
+        }
     }
 }

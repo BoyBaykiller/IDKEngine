@@ -1,14 +1,14 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
-using NativeFileDialogSharp;
 using BBLogger;
 using BBOpenGL;
+using NativeFileDialogSharp;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
@@ -561,14 +561,14 @@ namespace IDKEngine.Render
                                 ImGui.SliderFloat("PreferAliasingOverBlur", ref app.RasterizerPipeline.TaaResolve.PreferAliasingOverBlur, 0.0f, 1.0f);
                             }
                         }
-                        else if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.FSR2)
+                        
+                        if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.FSR2)
                         {
                             ImGui.Text(
                                 "FSR2 (by AMD) does Anti Aliasing but\n" +
                                 "simultaneously also upscaling.\n" +
                                 "Try reducing resolution scale!\n" +
-                                "Note: Performance is lower than expected\n" +
-                                "on NVIDIA!"
+                                "Note: Performance is lower than expected on NVIDIA!"
                             );
 
                             ImGui.Checkbox("IsSharpening", ref app.RasterizerPipeline.FSR2Wrapper.IsSharpening);
@@ -577,9 +577,17 @@ namespace IDKEngine.Render
                             {
                                 ImGui.SliderFloat("Sharpness", ref app.RasterizerPipeline.FSR2Wrapper.Sharpness, 0.0f, 1.0f);
                             }
+                        }
 
-                            ImGui.SliderFloat("MipBias", ref app.RasterizerPipeline.FSR2AdditionalMipBias, -3.0f, 3.0f);
-                            ToolTipForItemAboveHovered("This bias is applied in addition to the 'optimal' FSR2 computed bias\n");
+                        if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.TAA || 
+                            app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.FSR2)
+                        {
+                            ImGui.Checkbox("EnableMipBias", ref app.RasterizerPipeline.EnableMipBias);
+                            if (app.RasterizerPipeline.EnableMipBias)
+                            {
+                                ImGui.SliderFloat("MipBias", ref app.RasterizerPipeline.AdditionalMipBias, -3.0f, 3.0f);
+                                ToolTipForItemAboveHovered("This bias is applied in addition to the 'optimal' computed bias\n");
+                            }
                         }
                     }
 
@@ -807,7 +815,7 @@ namespace IDKEngine.Render
                     Ray worldSpaceRay = Ray.GetWorldSpaceRay(perFrameData.CameraPos, perFrameData.InvProjection, perFrameData.InvView, new OtkVec2(0.0f));
                     OtkVec3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
 
-                    CpuLight newLight = new CpuLight(spawnPoint, Helper.RandomVec3(32.0f, 88.0f), 0.3f);
+                    CpuLight newLight = new CpuLight(spawnPoint, RNG.RandomVec3(32.0f, 88.0f), 0.3f);
                     if (app.LightManager.AddLight(newLight))
                     {
                         int newLightIndex = app.LightManager.Count - 1;
@@ -1183,7 +1191,11 @@ namespace IDKEngine.Render
         {
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
-            if (app.RenderPath == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights) hitLight = false;
+
+            if (app.RenderPath == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights)
+            {
+                hitLight = false;
+            }
 
             SelectedEntityInfo hitEntity = SelectedEntityInfo.None;
             if (!hitMesh && !hitLight)
@@ -1191,8 +1203,14 @@ namespace IDKEngine.Render
                 return hitEntity;
             }
 
-            if (!hitLight) lightHitInfo.T = float.MaxValue;
-            if (!hitMesh) meshHitInfo.T = float.MaxValue;
+            if (!hitLight)
+            {
+                lightHitInfo.T = float.MaxValue;
+            }
+            if (!hitMesh)
+            {
+                meshHitInfo.T = float.MaxValue;
+            }
 
             if (meshHitInfo.T < lightHitInfo.T)
             {
@@ -1266,12 +1284,13 @@ namespace IDKEngine.Render
     {
         private struct LoadModelContext
         {
+            public const string IMGUI_ID_POPUP_MODAL = "ModelLoadDialog";
+
             public struct LoadingTask
             {
                 public ModelLoader.CompressionUtils.CompressGltfSettings CompressGltfSettings;
                 public bool DoCompressGltf;
-                public bool SpawnInCamera = true;
-                public OtkVec3 Scale;
+                public LoadParams LoadParams;
 
                 public LoadingTask(string modelPath)
                 {
@@ -1280,17 +1299,24 @@ namespace IDKEngine.Render
                     CompressGltfSettings.UseInstancing = true;
                     CompressGltfSettings.InputPath = modelPath;
 
-                    SpawnInCamera = true;
-                    Scale = new OtkVec3(1.0f);
+                    LoadParams = new LoadParams();
                 }
 
                 public string GetPopupModalName()
                 {
-                    return $"Loading {Path.GetFileName(CompressGltfSettings.InputPath)}###{MODEL_LOAD_DIALOG}";
+                    return $"Loading {Path.GetFileName(CompressGltfSettings.InputPath)}###{IMGUI_ID_POPUP_MODAL}";
                 }
             }
 
-            public const string MODEL_LOAD_DIALOG = "ModelLoadDialog";
+            public struct LoadParams
+            {
+                public bool SpawnInCamera = true;
+                public OtkVec3 Scale = new OtkVec3(1.0f);
+
+                public LoadParams()
+                {
+                }
+            }
 
             public bool IsLoadModelDialog;
             public Tuple<Task, LoadingTask>?[] CompressionsTasks = new Tuple<Task, LoadingTask>[10];
@@ -1348,12 +1374,12 @@ namespace IDKEngine.Render
                         ImGui.Separator();
                     }
 
-                    ImGui.Checkbox("SpawnInCamera", ref loadingTask.SpawnInCamera);
+                    ImGui.Checkbox("SpawnInCamera", ref loadingTask.LoadParams.SpawnInCamera);
 
-                    tempVec3 = loadingTask.Scale.ToNumerics();
+                    tempVec3 = loadingTask.LoadParams.Scale.ToNumerics();
                     if (ImGui.InputFloat3("Scale", ref tempVec3))
                     {
-                        loadingTask.Scale = tempVec3.ToOpenTK();
+                        loadingTask.LoadParams.Scale = tempVec3.ToOpenTK();
                     }
 
                     float availX = ImGui.GetContentRegionAvail().X;
@@ -1362,12 +1388,14 @@ namespace IDKEngine.Render
                     ImGui.SetCursorPosY(ImGui.GetCursorPosY() + availY * 0.4f);
                     if (ImGui.Button("Load", new SysVec2(availX * 0.3f, availY * 0.5f)))
                     {
-                        string gltfPath = loadingTask.CompressGltfSettings.InputPath;
+                        string gltfInputPath = loadingTask.CompressGltfSettings.InputPath;
 
                         if (!loadingTask.DoCompressGltf)
                         {
-                            ModuleLoadModelLoad(app, loadingTask);
-                            shouldResetPT = true;
+                            if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
+                            {
+                                shouldResetPT = true;
+                            }
                         }
 
                         if (loadingTask.DoCompressGltf)
@@ -1384,13 +1412,15 @@ namespace IDKEngine.Render
                             if (workerIndex == -1)
                             {
                                 Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
-                                ModuleLoadModelLoad(app, loadingTask);
-                                shouldResetPT = true;
+                                if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
+                                {
+                                    shouldResetPT = true;
+                                }
                                 return;
                             }
 
-                            string fileName = Path.GetFileName(gltfPath);
-                            string compressedGltfDir = Path.Combine(Path.GetDirectoryName(gltfPath), $"{Path.GetFileNameWithoutExtension(gltfPath)}Compressed");
+                            string fileName = Path.GetFileName(gltfInputPath);
+                            string compressedGltfDir = Path.Combine(Path.GetDirectoryName(gltfInputPath), $"{Path.GetFileNameWithoutExtension(gltfInputPath)}Compressed");
                             string compressedGtlfPath = Path.Combine(compressedGltfDir, fileName);
                             Directory.CreateDirectory(compressedGltfDir);
 
@@ -1452,7 +1482,7 @@ namespace IDKEngine.Render
                 (Task task, LoadModelContext.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
                 if (task.IsCompletedSuccessfully)
                 {
-                    if (ModuleLoadModelLoad(app, loadingTask))
+                    if (ModuleLoadModelLoad(app, loadingTask.CompressGltfSettings.OutputPath, loadingTask.LoadParams))
                     {
                         shouldResetPT = true;
                     }
@@ -1462,17 +1492,21 @@ namespace IDKEngine.Render
             }
         }
         
-        private bool ModuleLoadModelLoad(Application app, LoadModelContext.LoadingTask loadingTask)
+        private bool ModuleLoadModelLoad(Application app, string modelPath, in LoadModelContext.LoadParams loadParams)
         {
-            OtkVec3 modelPos = loadingTask.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
-            ModelLoader.Model newModel = ModelLoader.LoadGltfFromFile(loadingTask.CompressGltfSettings.InputPath, Matrix4.CreateScale(loadingTask.Scale) * Matrix4.CreateTranslation(modelPos));
-            app.ModelManager.Add(newModel);
+            OtkVec3 modelPos = loadParams.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
+            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, Matrix4.CreateScale(loadParams.Scale) * Matrix4.CreateTranslation(modelPos));
+            if (!newModel.HasValue)
+            {
+                return false;
+            }
+
+            app.ModelManager.Add(newModel.Value);
 
             int newMeshIndex = app.ModelManager.Meshes.Length - 1;
-
             ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[newMeshIndex];
-
             SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, cmd.BaseInstance);
+
             return true;
         }
     }

@@ -15,7 +15,7 @@ namespace IDKEngine.Render
         // Light is the owner.
         // Both reference each other.
 
-        public const int GPU_MAX_UBO_LIGHT_COUNT = 256; // used in shader and client code - keep in sync!
+        public const int GPU_MAX_UBO_LIGHT_COUNT = 256; // Keep in sync between shader and client code!
 
         public struct RayHitInfo
         {

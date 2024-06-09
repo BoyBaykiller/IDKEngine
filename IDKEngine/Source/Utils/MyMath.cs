@@ -27,20 +27,30 @@ namespace IDKEngine.Utils
             return result;
         }
 
-        public static float Area(in Vector3 size)
+        public static Vector3 Reflect(in Vector3 incident, in Vector3 normal)
         {
-            float area = 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
-            return area;
+            return incident - 2.0f * Vector3.Dot(normal, incident) * normal;
         }
 
-        public static Vector3 PolarToCartesian(float elevation, float azimuth, float length = 1.0f)
+        public static Matrix3 GetTBN(in Vector3 tangent, in Vector3 normal)
+        {
+            Vector3 N = Vector3.Normalize(normal);
+            Vector3 T = Vector3.Normalize(tangent);
+            // Gramschmidt Process (makes sure T and N always 90 degress)
+            // T = normalize(T - dot(T, N) * N);
+            Vector3 B = Vector3.Normalize(Vector3.Cross(N, T));
+            return new Matrix3(T, B, N);
+        }
+
+        public static Vector3 PolarToCartesian(float azimuth, float elevation, float length = 1.0f)
         {
             // https://en.wikipedia.org/wiki/Spherical_coordinate_system
             // azimuth   = phi
             // elevation = theta
             // length    = rho
 
-            Vector3 pos = new Vector3(MathF.Sin(elevation) * MathF.Cos(azimuth), MathF.Cos(elevation), MathF.Sin(elevation) * MathF.Sin(azimuth)) * length;
+            float sinTheta = MathF.Sin(elevation);
+            Vector3 pos = new Vector3(sinTheta * MathF.Cos(azimuth), MathF.Cos(elevation), sinTheta * MathF.Sin(azimuth)) * length;
             return pos;
         }
 
@@ -89,6 +99,12 @@ namespace IDKEngine.Utils
         public static bool AlmostEqual(float a, float b, float epsilon)
         {
             return MathF.Abs(a - b) < epsilon;
+        }
+
+        public static float Area(in Vector3 size)
+        {
+            float area = 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+            return area;
         }
 
         public static Vector3 MapRangeToAnOther(Vector3 value, Vector3 valueMin, Vector3 valueMax, Vector3 mapMin, Vector3 mapMax)

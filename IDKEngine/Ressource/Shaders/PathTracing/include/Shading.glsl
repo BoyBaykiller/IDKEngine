@@ -55,18 +55,14 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
         reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, surface.Roughness));
         
         result.RayDirection = reflectionRayDir;
+        result.Bsdf = LambertianBrdf(surface.Albedo);
+        result.Pdf = lambertianPdf;
+
+        result.RayDirection = reflectionRayDir;
         result.RayTypeProbability = surface.Metallic;
         result.RayType = RAY_TYPE_SPECULAR;
 
         result.NewIor = prevIor;
-
-        result.Bsdf = LambertianBrdf(surface.Albedo);
-        result.Pdf = lambertianPdf;
-
-        // float blinnPhongPdf;
-        // reflectionRayDir = SampleBlinnPhong(surface.Normal, -incomming, surface.Roughness, blinnPhongPdf);
-        // result.Bsdf = BlinnPhongBrdf(surface.Albedo, surface.Normal, -incomming, reflectionRayDir, surface.Roughness);
-        // result.Pdf = blinnPhongPdf;
     }
     else if (surface.Metallic + surface.Transmission > rnd)
     {

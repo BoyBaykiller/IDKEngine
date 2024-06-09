@@ -12,7 +12,7 @@
 AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Ray.glsl)
-AppInclude(include/Random.glsl)
+AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
@@ -81,7 +81,8 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         wavefrontRay.Origin += rayDir * hitInfo.T;
 
         Surface surface = GetDefaultSurface();
-        if (hitInfo.VertexIndices != uvec3(0))
+        bool hitLight = hitInfo.VertexIndices == uvec3(0);
+        if (!hitLight)
         {
             GpuVertex v0 = vertexSSBO.Vertices[hitInfo.VertexIndices.x];
             GpuVertex v1 = vertexSSBO.Vertices[hitInfo.VertexIndices.y];

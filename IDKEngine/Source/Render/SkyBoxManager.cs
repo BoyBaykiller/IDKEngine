@@ -1,7 +1,6 @@
 ﻿using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using StbImageSharp;
 using BBLogger;
 using BBOpenGL;
 
@@ -70,7 +69,7 @@ namespace IDKEngine.Render
             _skyBoxMode = skyBoxMode;
         }
 
-        private static bool LoadCubemap(BBG.Texture texture, BBG.Texture.InternalFormat format, string[] imagePaths)
+        private static unsafe bool LoadCubemap(BBG.Texture texture, BBG.Texture.InternalFormat format, string[] imagePaths)
         {
             if (imagePaths == null)
             {
@@ -93,24 +92,31 @@ namespace IDKEngine.Render
                 return false;
             }
 
-            ImageResult[] images = new ImageResult[6];
+            ImageLoader.ImageResult[] images = new ImageLoader.ImageResult[6];
             Parallel.For(0, images.Length, i =>
             {
-                using FileStream stream = File.OpenRead(imagePaths[i]);
-                images[i] = ImageResult.FromStream(stream, ColorComponents.RedGreenBlue);
+                ImageLoader.ImageResult imageResult = ImageLoader.Load(imagePaths[i], 3);
+                images[i] = imageResult;
             });
 
-            if (!images.All(i => i.Width == i.Height && i.Width == images[0].Width))
+            if (!images.All(i => i.Header.Width == i.Header.Height && i.Header.Width == images[0].Header.Width))
             {
                 Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and each texture must be of the same size");
                 return false;
             }
-            int size = images[0].Width;
+            int size = images[0].Header.Width;
 
             texture.ImmutableAllocate(size, size, 1, format);
             for (int i = 0; i < 6; i++)
             {
-                texture.Upload3D(size, size, 1, BBG.Texture.PixelFormat.RGB, BBG.Texture.PixelType.UByte, images[i].Data[0], 0, 0, 0, i);
+                using ImageLoader.ImageResult imageResult = images[i];
+                texture.Upload3D(
+                    size, size, 1,
+                    BBG.Texture.NumChannelsToPixelFormat(imageResult.Channels),
+                    BBG.Texture.PixelType.UByte,
+                    imageResult.RawPixels,
+                    0, 0, 0, i
+                );
             }
 
             return true;

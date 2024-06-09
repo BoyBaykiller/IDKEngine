@@ -46,7 +46,7 @@ namespace BBOpenGL
                 Less = All.Less
             }
 
-            public struct State
+            public struct SamplerState
             {
                 public MinFilter MinFilter;
                 public MagFilter MagFilter;
@@ -60,7 +60,7 @@ namespace BBOpenGL
                 public CompareMode CompareMode;
                 public CompareFunc CompareFunc;
 
-                public State()
+                public SamplerState()
                 {
                     MinFilter = MinFilter.Nearest;
                     MagFilter = MagFilter.Nearest;
@@ -73,16 +73,18 @@ namespace BBOpenGL
                 }
             }
 
-            private readonly State state;
+            public ref readonly SamplerState State => ref samplerState;
+
+            private SamplerState samplerState;
             public readonly int ID;
 
-            public Sampler(State state)
+            public Sampler(in SamplerState state)
             {
                 GL.CreateSamplers(1, ref ID);
                 SetState(state);
             }
 
-            public void SetState(in State state)
+            public void SetState(in SamplerState state)
             {
                 GL.SamplerParameteri(ID, SamplerParameterI.TextureMinFilter, (int)state.MinFilter);
                 GL.SamplerParameteri(ID, SamplerParameterI.TextureMagFilter, (int)state.MagFilter);
@@ -95,11 +97,8 @@ namespace BBOpenGL
 
                 GL.SamplerParameteri(ID, SamplerParameterI.TextureCompareMode, (int)state.CompareMode);
                 GL.SamplerParameteri(ID, SamplerParameterI.TextureCompareFunc, (int)state.CompareFunc);
-            }
 
-            public ref readonly State GetState()
-            {
-                return ref state;
+                samplerState = state;
             }
 
             public void Dispose()

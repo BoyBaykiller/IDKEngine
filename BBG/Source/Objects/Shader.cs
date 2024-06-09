@@ -97,7 +97,8 @@ namespace BBOpenGL
 
             public static class Preprocessor
             {
-                public static readonly bool SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH = EmpiricalCheckGLSLLineDirectiveSupport();
+                public static readonly string? GLSL_EXTENSION_NAME_LINE_SOURCEFILE; // The required GLSL-extension that enables #line "filename" or null if none
+                public static readonly bool SUPPORTS_LINE_SOURCEFILE = GetGLSLLineSourcefileSupport(out GLSL_EXTENSION_NAME_LINE_SOURCEFILE);
 
                 public enum Keyword : int
                 {
@@ -133,11 +134,13 @@ namespace BBOpenGL
                             $"""
                             #extension GL_ARB_bindless_texture : require
                             #extension GL_EXT_shader_image_load_formatted : enable
-                            #if {(SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH ? 1 : 0)}
-                                #extension GL_GOOGLE_cpp_style_line_directive : require
+                            #if {(GLSL_EXTENSION_NAME_LINE_SOURCEFILE != null ? 1 : 0)}
+                                #extension {GLSL_EXTENSION_NAME_LINE_SOURCEFILE} : enable
                             #endif
-                            #define APP_SHADER_STAGE_{shaderStage.ToString().ToUpper()} true
-                            #define APP_VENDOR_{GetDeviceInfo().Vendor.ToString().ToUpper()} true
+
+                            // Keep in sync between shader and client code!
+                            #define {ShaderStageShaderInsertion(shaderStage)} 1
+                            #define {VendorToShaderInsertion(GetDeviceInfo().Vendor)} 1
                             #line {lineCountVersionStatement + 1}
 
                             """;
@@ -204,7 +207,7 @@ namespace BBOpenGL
                                     int lineCount = CountLines(source, currentIndex);
 
                                     string newLine = "#line 1";
-                                    if (SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)
+                                    if (SUPPORTS_LINE_SOURCEFILE)
                                     {
                                         newLine += $" \"{path}\"";
                                     }
@@ -216,7 +219,7 @@ namespace BBOpenGL
 
                                     string origionalLine = $"#line {lineCount + 1}";
                                     string safeSourceName = name ?? "No source name given";
-                                    if (SHADER_ERRORS_IN_INCLUDES_WITH_CORRECT_PATH)
+                                    if (SUPPORTS_LINE_SOURCEFILE)
                                     {
                                         origionalLine += $" \"{safeSourceName}\"";
                                     }
@@ -272,7 +275,7 @@ namespace BBOpenGL
                     return lineCount;
                 }
 
-                private static bool EmpiricalCheckGLSLLineDirectiveSupport()
+                private static bool GetGLSLLineSourcefileSupport(out string? requiredGLSLExtension)
                 {
                     // Neither AMD nor NVIDIA report GL_GOOGLE_cpp_style_line_directive,
                     // even though they both support it inside shaders. So we have to check for support like that.
@@ -281,20 +284,62 @@ namespace BBOpenGL
                         """
                         #version 460 core
                         
-                        #extension GL_GOOGLE_cpp_style_line_directive : require
+                        // On AMD with current drivers (24.6.1) includes with source file require this extension
+                        #extension GL_GOOGLE_cpp_style_line_directive : enable
 
-                        #line 1 "filename"
+                        #line 1 "Example-Filename"
                         
                         void main() {}
                         """;
 
+                    GpuVendor vendor = GetGpuVendor();
+                    if (vendor == GpuVendor.AMD)
+                    {
+                        requiredGLSLExtension = "GL_GOOGLE_cpp_style_line_directive";
+                    }
+                    else
+                    {
+                        // On other devices #line "filename" is enabled by GL_ARB_shading_language_include,
+                        // which does not need to be enabled inside GLSL.
+                        requiredGLSLExtension = null;
+                    }
+
                     Shader shader = new Shader(ShaderStage.Fragment, shaderString, """
-                        Check for (#line "Filename") support. If you see this message GL_GOOGLE_cpp_style_line_directive is not supported
-                        and errors in included GLSL shader code will not have the correct filename. The line will still be correct.
-                        Note https://forums.developer.nvidia.com/t/gl-google-cpp-style-line-directive-not-reported-even-though-functionality-is-implemented-driver-bug/294829
+                        If you see this message (#line "filename") is not supported and errors in
+                        included GLSL shader code will not have the correct filename. The line will still be correct.
                         """
                     );
                     return shader.GetCompileStatus();
+                }
+
+                private static string ShaderStageShaderInsertion(ShaderStage shaderStage)
+                {
+                    string insertion = shaderStage switch
+                    {
+                        ShaderStage.Vertex => "VERTEX",
+                        ShaderStage.Geometry => "GEOMETRY",
+                        ShaderStage.Fragment => "FRAGMENT",
+                        ShaderStage.Compute => "COMPUTE",
+                        ShaderStage.TaskNV => "TASK",
+                        ShaderStage.MeshNV => "MESH",
+                        _ => throw new NotSupportedException($"Can not convert {nameof(shaderStage)} = {shaderStage} to {nameof(insertion)}"),
+                    };
+
+                    return $"APP_SHADER_STAGE_{insertion}";
+                }
+
+                private static string VendorToShaderInsertion(GpuVendor gpuVendor)
+                {
+                    string insertion = gpuVendor switch
+                    {
+                        GpuVendor.AMD => "AMD",
+                        GpuVendor.INTEL => "INTEL",
+                        GpuVendor.NVIDIA => "NVIDIA",
+                        GpuVendor.Unknown => "UNKNOWN",
+                        _ => throw new NotSupportedException($"Can not convert {nameof(gpuVendor)} = {gpuVendor} to {nameof(insertion)}"),
+                    };
+
+                    return $"APP_VENDOR_{insertion}";
                 }
             }
 

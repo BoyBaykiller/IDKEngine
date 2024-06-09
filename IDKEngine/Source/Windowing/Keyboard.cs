@@ -35,7 +35,9 @@ namespace IDKEngine.Windowing
             for (int i = 0; i < KeyValues.Length; i++)
             {
                 if (!keyStates.ContainsKey(KeyValues[i]))
+                {
                     keyStates.Add(KeyValues[i], InputState.Released);
+                }
             }
         }
 

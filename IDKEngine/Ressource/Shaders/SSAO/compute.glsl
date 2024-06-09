@@ -1,6 +1,6 @@
 #version 460 core
 
-AppInclude(include/Random.glsl)
+AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)

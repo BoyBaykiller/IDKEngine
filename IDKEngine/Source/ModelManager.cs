@@ -84,7 +84,7 @@ namespace IDKEngine
             BVH = new BVH();
         }
 
-        public void Add(params ModelLoader.Model[] models)
+        public void Add(params ModelLoader.Model?[] models)
         {
             if (models.Length == 0)
             {
@@ -95,51 +95,58 @@ namespace IDKEngine
 
             for (int i = 0; i < models.Length; i++)
             {
+                if (!models[i].HasValue)
+                {
+                    continue;
+                }
+
+                ModelLoader.Model model = models[i].Value;
+
                 // Upon deletion these are the properties that need to be adjusted
-                Helper.ArrayAdd(ref DrawCommands, models[i].DrawCommands);
-                for (int j = DrawCommands.Length - models[i].DrawCommands.Length; j < DrawCommands.Length; j++)
+                Helper.ArrayAdd(ref DrawCommands, model.DrawCommands);
+                for (int j = DrawCommands.Length - model.DrawCommands.Length; j < DrawCommands.Length; j++)
                 {
                     ref BBG.DrawElementsIndirectCommand newDrawCmd = ref DrawCommands[j];
                     newDrawCmd.BaseInstance += MeshInstances.Length;
                     newDrawCmd.BaseVertex += Vertices.Length;
                     newDrawCmd.FirstIndex += VertexIndices.Length;
                 }
-                Helper.ArrayAdd(ref MeshInstances, models[i].MeshInstances);
-                for (int j = MeshInstances.Length - models[i].MeshInstances.Length; j < MeshInstances.Length; j++)
+                Helper.ArrayAdd(ref MeshInstances, model.MeshInstances);
+                for (int j = MeshInstances.Length - model.MeshInstances.Length; j < MeshInstances.Length; j++)
                 {
                     ref GpuMeshInstance newMeshInstance = ref MeshInstances[j];
                     newMeshInstance.MeshIndex += Meshes.Length;
                 }
-                Helper.ArrayAdd(ref Meshes, models[i].Meshes);
-                for (int j = Meshes.Length - models[i].Meshes.Length; j < Meshes.Length; j++)
+                Helper.ArrayAdd(ref Meshes, model.Meshes);
+                for (int j = Meshes.Length - model.Meshes.Length; j < Meshes.Length; j++)
                 {
                     ref GpuMesh newMesh = ref Meshes[j];
                     newMesh.MaterialIndex += Materials.Length;
                     newMesh.MeshletsStart += Meshlets.Length;
                 }
-                Helper.ArrayAdd(ref Meshlets, models[i].Meshlets);
-                for (int j = Meshlets.Length - models[i].Meshlets.Length; j < Meshlets.Length; j++)
+                Helper.ArrayAdd(ref Meshlets, model.Meshlets);
+                for (int j = Meshlets.Length - model.Meshlets.Length; j < Meshlets.Length; j++)
                 {
                     ref GpuMeshlet newMeshlet = ref Meshlets[j];
                     newMeshlet.VertexOffset += (uint)MeshletsVertexIndices.Length;
                     newMeshlet.IndicesOffset += (uint)MeshletsLocalIndices.Length;
                 }
 
-                Helper.ArrayAdd(ref Materials, models[i].Materials);
+                Helper.ArrayAdd(ref Materials, model.Materials);
 
-                Helper.ArrayAdd(ref Vertices, models[i].Vertices);
-                Helper.ArrayAdd(ref VertexPositions, models[i].VertexPositions);
-                Helper.ArrayAdd(ref VertexIndices, models[i].VertexIndices);
+                Helper.ArrayAdd(ref Vertices, model.Vertices);
+                Helper.ArrayAdd(ref VertexPositions, model.VertexPositions);
+                Helper.ArrayAdd(ref VertexIndices, model.VertexIndices);
 
-                Helper.ArrayAdd(ref MeshletTasksCmds, models[i].MeshletTasksCmds);
-                Helper.ArrayAdd(ref MeshletsInfo, models[i].MeshletsInfo);
-                Helper.ArrayAdd(ref MeshletsVertexIndices, models[i].MeshletsVertexIndices);
-                Helper.ArrayAdd(ref MeshletsLocalIndices, models[i].MeshletsLocalIndices);
+                Helper.ArrayAdd(ref MeshletTasksCmds, model.MeshletTasksCmds);
+                Helper.ArrayAdd(ref MeshletsInfo, model.MeshletsInfo);
+                Helper.ArrayAdd(ref MeshletsVertexIndices, model.MeshletsVertexIndices);
+                Helper.ArrayAdd(ref MeshletsLocalIndices, model.MeshletsLocalIndices);
             }
 
             {
-                ReadOnlyMemory<BBG.DrawElementsIndirectCommand> newDrawCommands = new ReadOnlyMemory<BBG.DrawElementsIndirectCommand>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
-                BVH.AddMeshes(newDrawCommands, DrawCommands, MeshInstances, VertexPositions, VertexIndices);
+                ReadOnlySpan<BBG.DrawElementsIndirectCommand> newDrawCommands = new ReadOnlySpan<BBG.DrawElementsIndirectCommand>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
+                BVH.AddMeshes(newDrawCommands, VertexPositions, VertexIndices, DrawCommands, MeshInstances);
 
                 // Adjust root node index in context of all Nodes
                 uint bvhNodesExclusiveSum = 0;

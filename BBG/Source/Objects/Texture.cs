@@ -67,13 +67,17 @@ namespace BBOpenGL
                 D32Float = SizedInternalFormat.DepthComponent32f,
 
                 S8Uint = SizedInternalFormat.StencilIndex8,
+
+                D24UnormS8Uint = SizedInternalFormat.Depth24Stencil8,
             }
 
+            [Flags]
             public enum InternalFormatType : int
             {
-                Color,
-                Depth,
-                Stencil,
+                Color = 1 << 0,
+                Depth = 1 << 1,
+                Stencil = 1 << 2,
+                DepthStencil = Depth | Stencil
             }
 
             public enum PixelFormat : uint
@@ -364,6 +368,11 @@ namespace BBOpenGL
                     return InternalFormatType.Stencil;
                 }
 
+                if (internalFormat == InternalFormat.D24UnormS8Uint)
+                {
+                    return InternalFormatType.DepthStencil;
+                }
+
                 return InternalFormatType.Color;
             }
 
@@ -396,7 +405,7 @@ namespace BBOpenGL
                         return width * height * depth;
 
                     default:
-                        throw new NotSupportedException($"{nameof(format)} = {format} not known");
+                        throw new NotSupportedException($"Unknown {nameof(format)} = {format}");
                 }
             }
 

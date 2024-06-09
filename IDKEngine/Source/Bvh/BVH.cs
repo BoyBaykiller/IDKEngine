@@ -165,12 +165,20 @@ namespace IDKEngine
         /// <param name="newMeshesDrawCommands"></param>
         /// <param name="vertexPositions"></param>
         /// <param name="vertexIndices"></param>
-        public void AddMeshes(ReadOnlyMemory<BBG.DrawElementsIndirectCommand> newMeshesDrawCommands, BBG.DrawElementsIndirectCommand[] drawCommands, GpuMeshInstance[] meshInstances, Vector3[] vertexPositions, uint[] vertexIndices)
+        public void AddMeshes(
+            // New BLASes build info
+            ReadOnlySpan<BBG.DrawElementsIndirectCommand> newMeshesDrawCommands,
+            Vector3[] vertexPositions,
+            ReadOnlySpan<uint> vertexIndices,
+
+            // TLAS build info
+            BBG.DrawElementsIndirectCommand[] drawCommands,
+            GpuMeshInstance[] meshInstances)
         {
             BLAS[] newBlases = new BLAS[newMeshesDrawCommands.Length];
             for (int i = 0; i < newBlases.Length; i++)
             {
-                newBlases[i] = new BLAS(vertexPositions, vertexIndices, newMeshesDrawCommands.Span[i]);
+                newBlases[i] = new BLAS(vertexPositions, vertexIndices, newMeshesDrawCommands[i]);
             }
             Helper.ArrayAdd(ref blases, newBlases);
             BlasesBuild(blases.Length - newBlases.Length, newBlases.Length);

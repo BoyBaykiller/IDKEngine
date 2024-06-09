@@ -8,13 +8,6 @@ uint CompressUR11G11B10(vec3 data)
 
     return compressed;
 }
-
-uint CompressSR11G11B10(vec3 data)
-{
-    data = data * 0.5 + 0.5;
-    return CompressUR11G11B10(data);
-}
-
 vec3 DecompressUR11G11B10(uint data)
 {
     float r = (data >> 0)  & ((1u << 11) - 1);
@@ -28,6 +21,11 @@ vec3 DecompressUR11G11B10(uint data)
     return vec3(r, g, b);
 }
 
+uint CompressSR11G11B10(vec3 data)
+{
+    data = data * 0.5 + 0.5;
+    return CompressUR11G11B10(data);
+}
 vec3 DecompressSR11G11B10(uint data)
 {
     return DecompressUR11G11B10(data) * 2.0 - 1.0;
@@ -36,6 +34,11 @@ vec3 DecompressSR11G11B10(uint data)
 vec4 DecompressUR8G8B8A8(uint data)
 {
     return unpackUnorm4x8(data);
+}
+
+vec4 DecompressSR8G8B8A8(uint data)
+{
+    return DecompressUR8G8B8A8(data) * 2.0 - 1.0;
 }
 
 vec2 SignNotZero(vec2 v)
@@ -62,10 +65,11 @@ vec3 DecodeUnitVec(vec2 e)
 
 // vec2 in range [0.0, 1.0] ->
 // vec3 in range [-1.0, 1.0] with length=1
+// This is useful for getting the normal from a normal map image
 vec3 ReconstructPackedNormal(vec2 v)
 {
     vec3 result;
     result.xy = v * 2.0 - 1.0;
     result.z = sqrt(max(1.0 - dot(v.rg, v.rg), 0.0));
-    return normalize(result);
+    return result;
 }

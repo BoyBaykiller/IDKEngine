@@ -12,7 +12,7 @@
 AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Ray.glsl)
-AppInclude(include/Random.glsl)
+AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
@@ -58,7 +58,7 @@ void main()
 
     vec3 camDir = GetWorldSpaceDirection(perFrameDataUBO.InvProjection, perFrameDataUBO.InvView, ndc);
     vec3 focalPoint = perFrameDataUBO.ViewPos + camDir * settingsUBO.FocalLength;
-    vec3 pointOnLense = (perFrameDataUBO.InvView * vec4(settingsUBO.LenseRadius * UniformSampleDisk(), 0.0, 1.0)).xyz;
+    vec3 pointOnLense = (perFrameDataUBO.InvView * vec4(settingsUBO.LenseRadius * SampleDisk(), 0.0, 1.0)).xyz;
 
     camDir = normalize(focalPoint - pointOnLense);
 
@@ -107,7 +107,8 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         wavefrontRay.Origin += rayDir * hitInfo.T;
 
         Surface surface = GetDefaultSurface();
-        if (hitInfo.VertexIndices != uvec3(0))
+        bool hitLight = hitInfo.VertexIndices == uvec3(0);
+        if (!hitLight)
         {
             GpuVertex v0 = vertexSSBO.Vertices[hitInfo.VertexIndices.x];
             GpuVertex v1 = vertexSSBO.Vertices[hitInfo.VertexIndices.y];

@@ -93,7 +93,7 @@ namespace IDKEngine.Utils
 
             public static Vertex[] GenerateVertices(float width, float depth, int subdivisonX, int subdivisionZ)
             {
-                List<Vertex> positions = new List<Vertex>();
+                List<Vertex> vertices = new List<Vertex>();
                 float stepX = width / subdivisonX;
                 float stepZ = depth / subdivisionZ;
                 
@@ -101,7 +101,7 @@ namespace IDKEngine.Utils
                 {
                     for (float z = -depth / 2.0f; z < depth / 2.0f; z += stepZ)
                     {
-                        positions.AddRange([
+                        vertices.AddRange([
                             new Vertex() { Position = new Vector3(x + stepX / 2.0f, 0.0f,  z + stepZ / 2.0f) },
                             new Vertex() { Position = new Vector3(x + stepX / 2.0f, 0.0f,  z - stepZ / 2.0f) },
                             new Vertex() { Position = new Vector3(x - stepX / 2.0f, 0.0f,  z + stepZ / 2.0f) },
@@ -113,7 +113,7 @@ namespace IDKEngine.Utils
                     }
                 }
 
-                return positions.ToArray();
+                return vertices.ToArray();
             }
         }
     }

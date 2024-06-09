@@ -122,8 +122,9 @@ namespace IDKEngine.Render
 
         public int RayTracingSamples;
 
+        public bool EnableMipBias;
+        public float AdditionalMipBias;
         public int TAASamples;
-        public float FSR2AdditionalMipBias;
 
         // Runs at render presentation resolution
         public TAAResolve TaaResolve;
@@ -226,8 +227,9 @@ namespace IDKEngine.Render
 
             SetSize(renderSize, renderPresentationSize);
 
+            EnableMipBias = true;
             TAASamples = 6;
-            FSR2AdditionalMipBias = 0.25f;
+            AdditionalMipBias = 0.25f;
             TemporalAntiAliasing = TemporalAntiAliasingMode.TAA;
         }
 
@@ -235,29 +237,30 @@ namespace IDKEngine.Render
         {
             // Update Temporal AntiAliasing stuff
             {
-                if (TemporalAntiAliasing == TemporalAntiAliasingMode.None || TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
-                {
-                    gpuTaaData.MipmapBias = 0.0f;
-                }
+                gpuTaaData.MipmapBias = 0.0f;
+                gpuTaaData.Jitter = new Vector2(0.0f);
+                gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasing;
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA)
                 {
+                    gpuTaaData.MipmapBias = TAAResolve.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + AdditionalMipBias;
                     gpuTaaData.SampleCount = TAASamples;
                 }
                 if (TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
-                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + FSR2AdditionalMipBias;
+                    gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + AdditionalMipBias;
                     gpuTaaData.SampleCount = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
                 }
-                if (TemporalAntiAliasing == TemporalAntiAliasingMode.None)
-                {
-                    gpuTaaData.Jitter = new Vector2(0.0f);
-                }
-                else
+                if (TemporalAntiAliasing == TemporalAntiAliasingMode.TAA || 
+                    TemporalAntiAliasing == TemporalAntiAliasingMode.FSR2)
                 {
                     Vector2 jitter = MyMath.GetHalton2D(frameIndex++ % gpuTaaData.SampleCount, 2, 3);
                     gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
                 }
-                gpuTaaData.TemporalAntiAliasingMode = TemporalAntiAliasing;
+                if (!EnableMipBias)
+                {
+                    gpuTaaData.MipmapBias = 0.0f;
+                }
+
                 taaDataBuffer.UploadElements(gpuTaaData);
             }
 
@@ -301,7 +304,7 @@ namespace IDKEngine.Render
                 {
                     BBG.Rendering.Render($"Generate Main View Depth Mipmap level {currentWritelod}", new BBG.Rendering.RenderAttachmentsVerbose()
                     {
-                        DepthAttachment = new BBG.Rendering.DepthAttachment()
+                        DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
                         {
                             Texture = DepthTexture,
                             AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.DontCare,
@@ -340,7 +343,7 @@ namespace IDKEngine.Render
                     Textures = [AlbedoAlphaTexture, NormalTexture, MetallicRoughnessTexture, EmissiveTexture, VelocityTexture],
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
                 },
-                DepthAttachment = new BBG.Rendering.DepthAttachment()
+                DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
                 {
                     Texture = DepthTexture,
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
@@ -364,7 +367,8 @@ namespace IDKEngine.Render
                 }
             });
 
-            // Only needed because of AMD driver bug. Should open bug ticket one day.
+            // The AMD driver fails to detect a dependency between G-Buffer and some of the
+            // following passes like SSAO or ConeTracing. Flush is one possible workarround
             // See discussion https://discord.com/channels/318590007881236480/318783155744145411/1070453712021098548
             if (BBG.GetDeviceInfo().Vendor == BBG.GpuVendor.AMD)
             {
@@ -415,7 +419,7 @@ namespace IDKEngine.Render
                     Textures = [resultBeforeTAA, NormalTexture, EmissiveTexture, VelocityTexture],
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
                 },
-                DepthAttachment = new BBG.Rendering.DepthAttachment()
+                DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
                 {
                     Texture = DepthTexture,
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
@@ -441,7 +445,7 @@ namespace IDKEngine.Render
                     Textures = [resultBeforeTAA, VelocityTexture],
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
                 },
-                DepthAttachment = new BBG.Rendering.DepthAttachment()
+                DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
                 {
                     Texture = DepthTexture,
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,

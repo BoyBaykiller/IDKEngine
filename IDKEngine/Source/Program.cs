@@ -10,7 +10,7 @@ namespace IDKEngine
         {
             Application application = new Application(1280, 720, "IDKEngine");
 
-            // If application is run inside a debugger then we don't catch Exceptions
+            // If application is run inside a debugger then we don't catch Exceptions here
             // as this worsens the debugging experience.
             // Otherwise, if the app is run standalone, then we catch and log the Exception.
             if (Debugger.IsAttached)

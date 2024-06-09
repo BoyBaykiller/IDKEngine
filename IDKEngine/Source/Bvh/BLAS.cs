@@ -35,17 +35,17 @@ namespace IDKEngine
             public uint Z;
         }
 
-        public GpuBlasNode Root => Nodes[0];
+        public ref readonly GpuBlasNode Root => ref Nodes[0];
         public int TriangleCount => GeometryInfo.IndexCount / 3;
         public int MaxTreeDepth { get; private set; }
 
+        public GpuBlasNode[] Nodes;
         public readonly BBG.DrawElementsIndirectCommand GeometryInfo;
         public readonly Vector3[] VertexPositions;
         public readonly IndicesTriplet[] TriangleIndices;
 
         private int unpaddedNodesCount;
-        public GpuBlasNode[] Nodes;
-        public BLAS(Vector3[] vertexPositions, ReadOnlySpan<uint> vertexIndices, BBG.DrawElementsIndirectCommand geometryInfo)
+        public BLAS(Vector3[] vertexPositions, ReadOnlySpan<uint> vertexIndices, in BBG.DrawElementsIndirectCommand geometryInfo)
         {
             GeometryInfo = geometryInfo;
             VertexPositions = vertexPositions;
@@ -191,10 +191,12 @@ namespace IDKEngine
             uint stackTop = 1;
             int stackPtr = 0;
             Span<uint> stack = stackalloc uint[MaxTreeDepth];
+
             while (true)
             {
                 ref readonly GpuBlasNode leftNode = ref Nodes[stackTop];
                 ref readonly GpuBlasNode rightNode = ref Nodes[stackTop + 1];
+
                 bool leftChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
                 bool rightChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
@@ -285,25 +287,6 @@ namespace IDKEngine
             }
         }
 
-        public float ComputeCostOfNode(in GpuBlasNode parentNode)
-        {
-            if (parentNode.IsLeaf)
-            {
-                return CostLeafNode(parentNode.TriCount);
-            }
-
-            ref readonly GpuBlasNode leftChild = ref Nodes[parentNode.TriStartOrChild];
-            ref readonly GpuBlasNode rightChild = ref Nodes[parentNode.TriStartOrChild + 1];
-
-            float areaParent = MyMath.Area(parentNode.Max - parentNode.Min);
-            float probHitLeftChild = Conversions.ToBox(leftChild).Area() / areaParent;
-            float probHitRightChild = Conversions.ToBox(rightChild).Area() / areaParent;
-
-            float cost = CostInternalNode(probHitLeftChild, probHitRightChild, ComputeCostOfNode(leftChild), ComputeCostOfNode(rightChild));
-
-            return cost;
-        }
-
         private bool ShouldSplitNode(in GpuBlasNode parentNode, out int splitAxis, out float splitPos, out float costIfSplit)
         {
             Box areaForSplits = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
@@ -345,6 +328,7 @@ namespace IDKEngine
 
             return splittingIsWorthIt;
         }
+        
         private float EstimateCostOfSplittingNode(in GpuBlasNode parentNode, int splitAxis, float splitPos)
         {
             Box leftBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
@@ -373,7 +357,7 @@ namespace IDKEngine
             float probHitLeftChild = leftBox.Area() / areaParent;
             float probHitRightChild = rightBox.Area() / areaParent;
 
-            // Estimates cost of hitting parentNode if it was split at the evaluted split position
+            // Estimates cost of hitting parentNode if it was split at the evaluated split position
             // The full "Surface Area Heuristic" is recurisve, but in practive we assume
             // the resulting child nodes are leafs
             float surfaceAreaHeuristic = CostInternalNode(
@@ -385,15 +369,7 @@ namespace IDKEngine
 
             return surfaceAreaHeuristic;
         }
-
-        public Triangle GetTriangle(in IndicesTriplet indices)
-        {
-            ref readonly Vector3 p0 = ref VertexPositions[indices.X];
-            ref readonly Vector3 p1 = ref VertexPositions[indices.Y];
-            ref readonly Vector3 v2 = ref VertexPositions[indices.Z];
-
-            return new Triangle() { Position0 = p0, Position1 = p1, Position2 = v2 };
-        }
+        
         public void UpdateNodeBounds(ref GpuBlasNode node)
         {
             Box box = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
@@ -405,35 +381,40 @@ namespace IDKEngine
             node.Min = box.Min;
             node.Max = box.Max;
         }
-        public void InternalNodeGetTriStartAndCount(in GpuBlasNode node, out uint triStart, out uint triCount)
+
+        public float ComputeGlobalCost(in GpuBlasNode parentNode)
         {
-            GpuBlasNode nextNode = node;
-            uint veryLeftLeafTriStart;
-            while (!nextNode.IsLeaf)
+            if (parentNode.IsLeaf)
             {
-                nextNode = Nodes[nextNode.TriStartOrChild];
+                return CostLeafNode(parentNode.TriCount);
             }
-            veryLeftLeafTriStart = nextNode.TriStartOrChild;
 
+            ref readonly GpuBlasNode leftChild = ref Nodes[parentNode.TriStartOrChild];
+            ref readonly GpuBlasNode rightChild = ref Nodes[parentNode.TriStartOrChild + 1];
 
-            nextNode = node;
-            uint veryRightLeafTriEnd;
-            while (!nextNode.IsLeaf)
-            {
-                nextNode = Nodes[nextNode.TriStartOrChild + 1];
-            }
-            veryRightLeafTriEnd = nextNode.TriStartOrChild + nextNode.TriCount;
+            float areaParent = MyMath.Area(parentNode.Max - parentNode.Min);
+            float probHitLeftChild = Conversions.ToBox(leftChild).Area() / areaParent;
+            float probHitRightChild = Conversions.ToBox(rightChild).Area() / areaParent;
 
-            triStart = veryLeftLeafTriStart;
-            triCount = veryRightLeafTriEnd - veryLeftLeafTriStart;
+            float cost = CostInternalNode(probHitLeftChild, probHitRightChild, ComputeGlobalCost(leftChild), ComputeGlobalCost(rightChild));
+
+            return cost;
         }
 
+        public Triangle GetTriangle(in IndicesTriplet indices)
+        {
+            ref readonly Vector3 p0 = ref VertexPositions[indices.X];
+            ref readonly Vector3 p1 = ref VertexPositions[indices.Y];
+            ref readonly Vector3 v2 = ref VertexPositions[indices.Z];
+
+            return new Triangle() { Position0 = p0, Position1 = p1, Position2 = v2 };
+        }
+        
         private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild)
         {
-            return NODE_INTERSECT_COST +
-                   (probabilityHitLeftChild * costLeftChild +
-                   probabilityHitRightChild * costRightChild);
+            return NODE_INTERSECT_COST + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
         }
+        
         private static float CostLeafNode(uint numTriangles)
         {
             return numTriangles * TRIANGLE_INTERSECT_COST;

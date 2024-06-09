@@ -5,7 +5,7 @@
 #define SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV 4u
 #define TILE_SIZE 16
 
-// used in shader and client code - keep in sync!
+// Keep in sync between shader and client code!
 #define DEBUG_MODE_SHADING_RATES 1
 #define DEBUG_MODE_SPEED 2
 #define DEBUG_MODE_LUMINANCE 3

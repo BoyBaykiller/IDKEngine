@@ -11,7 +11,7 @@ namespace IDKEngine.Render
 
         public static readonly bool IS_SUPPORTED = BBG.GetDeviceInfo().ExtensionSupport.VariableRateShading;
 
-        // Used in shader and client code - keep in sync!
+        // Keep in sync between shader and client code!
         public enum DebugMode : int
         {
             None,
@@ -87,7 +87,13 @@ namespace IDKEngine.Render
                 return;
             }
 
-            BBG.Computing.Compute("Debug shading sate attributes", () =>
+            /// Since AMD driver version Vanguard-24.10-RC10-Jun04 it fails to detect a dependency 
+            /// between <see cref="Compute(BBG.Texture)"/> and this pass. Flush is one possible workarround
+            if (BBG.GetDeviceInfo().Vendor == BBG.GpuVendor.AMD)
+            {
+                BBG.Cmd.Flush();
+            }
+            BBG.Computing.Compute("Debug render shading rate attributes", () =>
             {
                 gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
                 gpuSettingsBuffer.UploadElements(Settings);

@@ -8,7 +8,7 @@ namespace IDKEngine.Render
 {
     class PointShadowManager : IDisposable
     {
-        public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 128; // used in shader and client code - keep in sync!
+        public const int GPU_MAX_UBO_POINT_SHADOW_COUNT = 128; // Keep in sync between shader and client code!
 
         private int _count;
         public int Count
@@ -50,7 +50,7 @@ namespace IDKEngine.Render
             {
                 return;
             }
-
+            
             Vector2i commonSize = new Vector2i();
             for (int i = 0; i < Count; i++)
             {
@@ -67,7 +67,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            BBG.Computing.Compute("Debug render shading rate attributes", () =>
+            BBG.Computing.Compute("Generate ray traced point light shadow maps", () =>
             {
                 rayTracedShadowsProgram.Upload(0, samples);
 

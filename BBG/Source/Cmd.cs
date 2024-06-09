@@ -13,6 +13,7 @@ namespace BBOpenGL
                 CommandBarrierBit = OpenTK.Graphics.OpenGL.MemoryBarrierMask.CommandBarrierBit,
                 ShaderImageAccessBarrierBit = OpenTK.Graphics.OpenGL.MemoryBarrierMask.ShaderImageAccessBarrierBit,
                 ShaderStorageBarrierBit = OpenTK.Graphics.OpenGL.MemoryBarrierMask.ShaderStorageBarrierBit,
+                All = OpenTK.Graphics.OpenGL.MemoryBarrierMask.AllBarrierBits,
             }
 
             public static void Finish()

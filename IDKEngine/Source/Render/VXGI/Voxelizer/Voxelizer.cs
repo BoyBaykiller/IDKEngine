@@ -72,11 +72,10 @@ namespace IDKEngine.Render
             BBG.AbstractShaderProgram.SetShaderInsertionValue(nameof(TAKE_FAST_GEOMETRY_SHADER_PATH), TAKE_FAST_GEOMETRY_SHADER_PATH);
 
             {
-                List<BBG.AbstractShader> voxelizeProgramShaders = new List<BBG.AbstractShader>()
-                {
+                List<BBG.AbstractShader> voxelizeProgramShaders = [
                     new BBG.AbstractShader(BBG.ShaderStage.Vertex, "VXGI/Voxelize/Voxelize/vertex.glsl"),
                     new BBG.AbstractShader(BBG.ShaderStage.Fragment, "VXGI/Voxelize/Voxelize/fragment.glsl")
-                };
+                ];
                 if (TAKE_FAST_GEOMETRY_SHADER_PATH)
                 {
                     voxelizeProgramShaders.Add(new BBG.AbstractShader(BBG.ShaderStage.Geometry, "VXGI/Voxelize/Voxelize/geometry.glsl"));

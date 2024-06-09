@@ -156,7 +156,7 @@ namespace IDKEngine.Render
 
             BBG.Rendering.Render("Generate Shadow Cubemap", new BBG.Rendering.RenderAttachments()
             {
-                DepthAttachment = new BBG.Rendering.DepthAttachment()
+                DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
                 {
                     Texture = ShadowMap,
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
@@ -207,7 +207,7 @@ namespace IDKEngine.Render
             if (nearestSampler != null) { nearestSampler.Dispose(); }
             if (ShadowMap != null) { ShadowMap.Dispose(); }
 
-            shadowSampler = new BBG.Sampler(new BBG.Sampler.State()
+            shadowSampler = new BBG.Sampler(new BBG.Sampler.SamplerState()
             {
                 MinFilter = BBG.Sampler.MinFilter.Linear,
                 MagFilter = BBG.Sampler.MagFilter.Linear,
@@ -216,7 +216,7 @@ namespace IDKEngine.Render
                 CompareFunc = BBG.Sampler.CompareFunc.Less,
             });
 
-            nearestSampler = new BBG.Sampler(new BBG.Sampler.State()
+            nearestSampler = new BBG.Sampler(new BBG.Sampler.SamplerState()
             {
                 MinFilter = BBG.Sampler.MinFilter.Nearest,
                 MagFilter = BBG.Sampler.MagFilter.Nearest,

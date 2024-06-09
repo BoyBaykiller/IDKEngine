@@ -34,10 +34,10 @@ namespace BBOpenGL
             public enum DebugSeverity : uint
             {
                 DontCare = OpenTK.Graphics.OpenGL.DebugSeverity.DontCare,
-                DebugSeverityNotification = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityNotification,
-                DebugSeverityHigh = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityHigh,
-                DebugSeverityMedium = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityMedium,
-                DebugSeverityLow = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityLow,
+                Notification = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityNotification,
+                High = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityHigh,
+                Medium = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityMedium,
+                Low = OpenTK.Graphics.OpenGL.DebugSeverity.DebugSeverityLow,
             }
 
             private const uint DEBUG_GROUP_MESSAGE_ID = 0;
