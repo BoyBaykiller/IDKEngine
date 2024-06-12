@@ -107,6 +107,11 @@ namespace IDKEngine.Utils
             return area;
         }
 
+        public static float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMin, float mapMax)
+        {
+            return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
+        }
+
         public static Vector3 MapRangeToAnOther(Vector3 value, Vector3 valueMin, Vector3 valueMax, Vector3 mapMin, Vector3 mapMax)
         {
             return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
@@ -117,38 +122,37 @@ namespace IDKEngine.Utils
             return MapRangeToAnOther(value, rangeMin, rangeMax, new Vector3(0.0f), new Vector3(1.0f));
         }
 
+        public static float MapToZeroOne(float value, float rangeMin, float rangeMax)
+        {
+            return MapRangeToAnOther(value, rangeMin, rangeMax, 0.0f, 1.0f);
+        }
+
         public static int NextMultiple(int num, int multiple)
         {
             return ((num / multiple) + 1) * multiple;
         }
 
-        /// Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
-
-        // Expands a 10-bit integer into 30 bits
-        // by inserting 2 zeros after each bit.
-        private static uint ExpandBits(uint v)
+        /// Source: https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/#For-loop_based_method
+        private static ulong SplitBy3(uint a)
         {
-            v = unchecked((v * 0x00010001u) & 0xFF0000FFu);
-            v = unchecked((v * 0x00000101u) & 0x0F00F00Fu);
-            v = unchecked((v * 0x00000011u) & 0xC30C30C3u);
-            v = unchecked((v * 0x00000005u) & 0x49249249u);
-            return v;
+            ulong x = a & 0x1fffff; // we only look at the first 21 bits
+            x = (x | x << 32) & 0x1f00000000ffff; // shift left 32 bits, OR with self, and 00011111000000000000000000000000000000001111111111111111
+            x = (x | x << 16) & 0x1f0000ff0000ff; // shift left 32 bits, OR with self, and 00011111000000000000000011111111000000000000000011111111
+            x = (x | x << 8) & 0x100f00f00f00f00f; // shift left 32 bits, OR with self, and 0001000000001111000000001111000000001111000000001111000000000000
+            x = (x | x << 4) & 0x10c30c30c30c30c3; // shift left 32 bits, OR with self, and 0001000011000011000011000011000011000011000011000011000100000000
+            x = (x | x << 2) & 0x1249249249249249;
+            return x;
         }
-
-        // Calculates a 30-bit Morton code for the
-        // given 3D point located within the unit cube [0,1].
-        public static uint Morton3D(in Vector3 value)
+        public static ulong GetMorton(in Vector3 value)
         {
-            uint x = Math.Clamp((uint)(value.X * 1024.0f), 0, 1023);
-            uint y = Math.Clamp((uint)(value.Y * 1024.0f), 0, 1023);
-            uint z = Math.Clamp((uint)(value.Z * 1024.0f), 0, 1023);
+            const uint max = (1 << 21) - 1;
+            uint x = Math.Clamp((uint)(value.X * max), 0u, max);
+            uint y = Math.Clamp((uint)(value.Y * max), 0u, max);
+            uint z = Math.Clamp((uint)(value.Z * max), 0u, max);
 
-            uint xx = ExpandBits(x);
-            uint yy = ExpandBits(y);
-            uint zz = ExpandBits(z);
-            uint result = xx * 4 + yy * 2 + zz;
-
-            return result;
+            ulong answer = 0;
+            answer |= SplitBy3(x) | SplitBy3(y) << 1 | SplitBy3(z) << 2;
+            return answer;
         }
     }
 }

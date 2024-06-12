@@ -9,14 +9,14 @@ vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 normalizedD
     return rayWorld;
 }
 
-vec3 Interpolate(vec3 v0, vec3 v1, vec3 v2, vec3 bary)
+vec3 Interpolate(vec3 p0, vec3 p1, vec3 p2, vec3 bary)
 {
-    return v0 * bary.x + v1 * bary.y + v2 * bary.z;
+    return p0 * bary.x + p1 * bary.y + p2 * bary.z;
 }
 
-vec2 Interpolate(vec2 v0, vec2 v1, vec2 v2, vec3 bary)
+vec2 Interpolate(vec2 p0, vec2 p1, vec2 p2, vec3 bary)
 {
-    return v0 * bary.x + v1 * bary.y + v2 * bary.z;
+    return p0 * bary.x + p1 * bary.y + p2 * bary.z;
 }
 
 float GetLogarithmicDepth(float near, float far, float viewZ)

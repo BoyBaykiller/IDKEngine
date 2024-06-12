@@ -60,13 +60,13 @@ bool IntersectBlas(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleIndex,
             {
                 uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
 
-                vec3 v0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 v1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 v2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
+                vec3 p0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 p1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 p2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
 
                 vec3 bary;
                 float hitT;
-                if (RayTriangleIntersect(ray, v0, v1, v2, bary, hitT) && hitT < hitInfo.T)
+                if (RayTriangleIntersect(ray, p0, p1, p2, bary, hitT) && hitT < hitInfo.T)
                 {
                     hit = true;
                     hitInfo.VertexIndices = indices;
@@ -134,13 +134,13 @@ bool IntersectBlasAny(Ray ray, uint blasRootNodeIndex, uint blasFirstTriangleInd
             for (uint j = first; j < first + summedTriCount; j++)
             {
                 uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[blasFirstTriangleIndex + j]);
-                vec3 v0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 v1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 v2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
+                vec3 p0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
+                vec3 p1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
+                vec3 p2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
 
                 vec3 bary;
                 float hitT;
-                if (RayTriangleIntersect(ray, v0, v1, v2, bary, hitT) && hitT < hitInfo.T)
+                if (RayTriangleIntersect(ray, p0, p1, p2, bary, hitT) && hitT < hitInfo.T)
                 {
                     hitInfo.VertexIndices = indices;
                     hitInfo.Bary = bary;
@@ -197,7 +197,6 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
             }
         }
     }
-
 
     #if USE_TLAS
     float tMinLeft;
@@ -268,19 +267,18 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         }
     }
     #else
-    for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
+
+    for (uint i = 0; i < meshInstanceSSBO.MeshInstances.length(); i++)
     {
-        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
-        GpuMesh mesh = meshSSBO.Meshes[i];
-        for (uint j = 0; j < mesh.InstanceCount; j++)
+        GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[i];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+        GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+
+        mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
+        Ray localRay = RayTransform(ray, invModelMatrix);
+        if (IntersectBlas(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
         {
-            uint instanceID = cmd.BaseInstance + j;
-            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[instanceID].InvModelMatrix);
-            Ray localRay = RayTransform(ray, invModelMatrix);
-            if (IntersectBlas(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
-            {
-                hitInfo.InstanceID = instanceID;
-            }
+            hitInfo.InstanceID = i;
         }
     }
     #endif
@@ -389,20 +387,18 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
     }
     #else
 
-    for (uint i = 0; i < meshSSBO.Meshes.length(); i++)
+    for (uint i = 0; i < meshInstanceSSBO.MeshInstances.length(); i++)
     {
-        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[i];
-        GpuMesh mesh = meshSSBO.Meshes[i];
-        for (uint j = 0; j < mesh.InstanceCount; j++)
+        GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[i];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+        GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+
+        mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
+        Ray localRay = RayTransform(ray, invModelMatrix);
+        if (IntersectBlasAny(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
         {
-            uint instanceID = cmd.BaseInstance + j;
-            mat4 invModelMatrix = mat4(meshInstanceSSBO.MeshInstances[instanceID].InvModelMatrix);
-            Ray localRay = RayTransform(ray, invModelMatrix);
-            if (IntersectBlasAny(localRay, mesh.BlasRootNodeIndex, cmd.FirstIndex / 3, hitInfo))
-            {
-                hitInfo.InstanceID = instanceID;
-                return true;
-            }
+            hitInfo.InstanceID = i;
+            return true;
         }
     }
     #endif

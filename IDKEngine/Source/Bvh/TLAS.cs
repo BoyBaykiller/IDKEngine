@@ -9,14 +9,14 @@ namespace IDKEngine
 {
     public class TLAS
     {
-        public GpuTlasNode Root => Nodes[0];
+        public ref readonly GpuTlasNode Root => ref Nodes[0];
 
         public int SearchRadius;
 
-        public GpuMeshInstance[] MeshInstances;
-        public BBG.DrawElementsIndirectCommand[] DrawCommands;
-        public BLAS[] Blases;
         public GpuTlasNode[] Nodes;
+        public readonly GpuMeshInstance[] MeshInstances;
+        public readonly BBG.DrawElementsIndirectCommand[] DrawCommands;
+        public readonly BLAS[] Blases;
         public TLAS(BLAS[] blases, BBG.DrawElementsIndirectCommand[] drawCommands, GpuMeshInstance[] meshInstances)
         {
             Blases = blases;
@@ -55,10 +55,10 @@ namespace IDKEngine
             MemoryExtensions.Sort(initialChildNodes, (GpuTlasNode a, GpuTlasNode b) =>
             {
                 Vector3 mappedA = MyMath.MapToZeroOne((a.Max + a.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
-                ulong mortonCodeA = MyMath.Morton3D(mappedA);
+                ulong mortonCodeA = MyMath.GetMorton(mappedA);
 
                 Vector3 mappedB = MyMath.MapToZeroOne((b.Max + b.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
-                ulong mortonCodeB = MyMath.Morton3D(mappedB);
+                ulong mortonCodeB = MyMath.GetMorton(mappedB);
 
                 if (mortonCodeA < mortonCodeB)
                 {
@@ -112,8 +112,9 @@ namespace IDKEngine
                 //}
 
                 // Merge nodes and create parents
+                // [(activeRangeEnd-activeRangeCount)...(mergedNodesHead-mergedNodes)...mergedNodesHead/activeRangeEnd]
                 int mergedNodesHead = activeRangeEnd;
-                int unmergedNodesHead = activeRangeEnd - mergedNodes;
+                int unmergedNodesHead = mergedNodesHead - mergedNodes;
                 for (int i = 0; i < activeRangeCount; i++)
                 {
                     int nodeAIdLocal = i;
@@ -125,13 +126,13 @@ namespace IDKEngine
                     {
                         if (nodeAIdLocal < nodeBIdLocal)
                         {
-                            ref GpuTlasNode nodeB = ref tempNodes[--mergedNodesHead];
-                            ref GpuTlasNode nodeA = ref tempNodes[--mergedNodesHead];
-
                             int nodeBId = nodeBIdLocal + activeRangeStart;
 
-                            nodeB = Nodes[nodeBId];
-                            nodeA = Nodes[nodeAId];
+                            tempNodes[--mergedNodesHead] = Nodes[nodeBId];
+                            tempNodes[--mergedNodesHead] = Nodes[nodeAId];
+
+                            ref GpuTlasNode nodeA = ref tempNodes[mergedNodesHead + 0];
+                            ref GpuTlasNode nodeB = ref tempNodes[mergedNodesHead + 1];
 
                             Box boundsFittingChildren = Conversions.ToBox(nodeA);
                             boundsFittingChildren.GrowToFit(nodeB.Min);
@@ -151,6 +152,8 @@ namespace IDKEngine
                         tempNodes[--unmergedNodesHead] = Nodes[nodeAId];
                     }
                 }
+
+                // Copy from temp into final array
                 Array.Copy(tempNodes, unmergedNodesHead, Nodes, unmergedNodesHead, activeRangeEnd - unmergedNodesHead);
 
                 // For every merged pair, 2 nodes become inactive and 1 new one gets active
@@ -158,7 +161,6 @@ namespace IDKEngine
                 activeRangeEnd = mergedNodesHead;
             }
         }
-
 
         public bool Intersect(in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
         {

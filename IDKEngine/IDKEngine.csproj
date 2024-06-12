@@ -39,7 +39,7 @@
   <ItemGroup>
     <PackageReference Include="FFX_FSR2" Version="1.0.2" />
     <PackageReference Include="ImGui.NET" Version="1.90.8.1" />
-    <PackageReference Include="Ktx2.NET" Version="1.0.1" />
+    <PackageReference Include="Ktx2.NET" Version="1.0.2" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.4" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
     <PackageReference Include="OpenTK.Graphics" Version="5.0.0-pre.10" />

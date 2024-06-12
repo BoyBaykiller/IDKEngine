@@ -217,10 +217,10 @@ namespace BBOpenGL
                 int imageSize = GetBlockCompressedImageSize(Format, width, height, 1);
                 GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.InternalFormat)Format, imageSize, (nint)pixels);
             }
-            public void UploadCompressed2D(BufferObject bufferObject, int width, int height, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
+            public void UploadCompressed2D(BufferObject bufferObject, int width, int height, nint offset, int level = 0, int xOffset = 0, int yOffset = 0)
             {
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, bufferObject.ID);
-                UploadCompressed2D(width, height, pixels, level, xOffset, yOffset);
+                UploadCompressed2D(width, height, (void*)offset, level, xOffset, yOffset);
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);
             }
 

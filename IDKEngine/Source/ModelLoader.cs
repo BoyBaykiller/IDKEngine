@@ -245,8 +245,8 @@ namespace IDKEngine
                 //nodeTransformations = new Matrix4[5];
                 //for (int i = 0; i < nodeTransformations.Length; i++)
                 //{
-                //    Vector3 trans = Helper.RandomVec3(-15.0f, 15.0f);
-                //    Vector3 rot = Helper.RandomVec3(0.0f, 2.0f * MathF.PI);
+                //    Vector3 trans = RNG.RandomVec3(-15.0f, 15.0f);
+                //    Vector3 rot = RNG.RandomVec3(0.0f, 2.0f * MathF.PI);
                 //    float scale = 1.0f;
                 //    var test = Matrix4.CreateScale(scale) *
                 //            Matrix4.CreateRotationZ(rot.Z) *
@@ -416,9 +416,8 @@ namespace IDKEngine
                         ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
 
                         // Need to copy because of "CS1686: Local variable or its members cannot have their address taken and be used inside an anonymous method or lambda expression."
-                        Ktx2.Texture* ktxTextureCopy;
-                        Ktx2.CreateFromMemory(imageData[0], (nuint)imageData.Length, Ktx2.TextureCreateFlagBits.LoadImageDataBit, &ktxTextureCopy);
-                        if (Ktx2.NeedsTranscoding(ktxTextureCopy) == 0)
+                        Ktx2.CreateFromMemory(imageData[0], (nuint)imageData.Length, Ktx2.TextureCreateFlag.LoadImageDataBit, out Ktx2.Texture* ktxTextureCopy);
+                        if (!Ktx2.NeedsTranscoding(ktxTextureCopy))
                         {
                             Logger.Log(Logger.LogLevel.Error, "KTX textures are expected to require transcoding, meaning they are either ETC1S or UASTC encoded.\n" +
                                                                 $"SupercompressionScheme = {ktxTextureCopy->SupercompressionScheme}");
@@ -513,17 +512,16 @@ namespace IDKEngine
 
                                     Task.Run(() =>
                                     {
-                                        Memory.Copy(ktxTexture->Data, stagingBuffer.MappedMemory, compressedImageSize);
+                                        Memory.Copy(ktxTexture->PData, stagingBuffer.MappedMemory, compressedImageSize);
 
                                         MainThreadQueue.AddToLazyQueue(() =>
                                         {
                                             for (int level = 0; level < levels; level++)
                                             {
-                                                nuint dataOffset;
-                                                Ktx2.GetImageOffset(ktxTexture, (uint)level, 0, 0, &dataOffset);
-
+                                                Ktx2.GetImageOffset(ktxTexture, (uint)level, 0, 0, out nuint dataOffset);
+                                                
                                                 Vector3i size = GLTexture.GetMipmapLevelSize((int)ktxTexture->BaseWidth, (int)ktxTexture->BaseHeight, (int)ktxTexture->BaseDepth, level);
-                                                glTexture.UploadCompressed2D(stagingBuffer, size.X, size.Y, (void*)dataOffset, level);
+                                                glTexture.UploadCompressed2D(stagingBuffer, size.X, size.Y, (nint)dataOffset, level);
                                             }
                                             stagingBuffer.Dispose();
                                             Ktx2.Destroy(ktxTexture);

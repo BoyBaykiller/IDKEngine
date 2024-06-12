@@ -95,28 +95,21 @@ namespace IDKEngine
                 hitInfo = new RayHitInfo();
                 hitInfo.T = tMax;
 
-                for (int i = 0; i < Tlas.Blases.Length; i++)
+                for (int i = 0; i < Tlas.MeshInstances.Length; i++)
                 {
-                    BLAS blas = Tlas.Blases[i];
-                    ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref Tlas.DrawCommands[i];
+                    ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[i];
+                    BLAS blas = Tlas.Blases[meshInstance.MeshIndex];
 
-                    for (int j = 0; j < drawCmd.InstanceCount; j++)
+                    Ray localRay = ray.Transformed(meshInstance.InvModelMatrix);
+                    if (blas.Intersect(localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                     {
-                        int instanceID = drawCmd.BaseInstance + j;
-                        ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
+                        hitInfo.TriangleIndices = blasHitInfo.TriangleIndices;
+                        hitInfo.Bary = blasHitInfo.Bary;
+                        hitInfo.T = blasHitInfo.T;
 
-                        Ray localRay = ray.Transformed(meshInstance.InvModelMatrix);
-                        if (blas.Intersect(localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
-                        {
-                            hitInfo.TriangleIndices = blasHitInfo.TriangleIndices;
-                            hitInfo.Bary = blasHitInfo.Bary;
-                            hitInfo.T = blasHitInfo.T;
-
-                            hitInfo.MeshID = i;
-                            hitInfo.InstanceID = instanceID;
-                        }
+                        hitInfo.MeshID = meshInstance.MeshIndex;
+                        hitInfo.InstanceID = i;
                     }
-
                 }
 
                 return hitInfo.T != tMax;
@@ -132,27 +125,23 @@ namespace IDKEngine
             }
             else
             {
-                for (int i = 0; i < blases.Length; i++)
+                for (int i = 0; i < Tlas.MeshInstances.Length; i++)
                 {
-                    BLAS blas = Tlas.Blases[i];
-                    ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref Tlas.DrawCommands[i];
+                    ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[i];
+                    BLAS blas = Tlas.Blases[meshInstance.MeshIndex];
 
-                    for (int j = 0; j < drawCmd.InstanceCount; j++)
+                    Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
+
+                    int copyMeshIndex = meshInstance.MeshIndex;
+                    blas.Intersect(localBox, (in BLAS.IndicesTriplet hitTriangle) =>
                     {
-                        int instanceID = drawCmd.BaseInstance + j;
-                        ref readonly GpuMeshInstance meshInstance = ref Tlas.MeshInstances[instanceID];
+                        BoxHitInfo hitInfo;
+                        hitInfo.TriangleIndices = hitTriangle;
+                        hitInfo.MeshID = copyMeshIndex;
+                        hitInfo.InstanceID = i;
 
-                        Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
-                        blas.Intersect(localBox, (in BLAS.IndicesTriplet hitTriangle) =>
-                        {
-                            BoxHitInfo hitInfo;
-                            hitInfo.TriangleIndices = hitTriangle;
-                            hitInfo.MeshID = i;
-                            hitInfo.InstanceID = instanceID;
-
-                            intersectFunc(hitInfo);
-                        });
-                    }
+                        intersectFunc(hitInfo);
+                    });
                 }
             }
         }
@@ -255,16 +244,16 @@ namespace IDKEngine
                 BLAS blas = blases[i];
 
                 blasBuffer.UploadElements(uploadedBlasNodes, blas.Nodes.Length, blas.Nodes[0]);
-                blasTriangleIndicesBuffer.UploadElements(uploadedTriangleIndices, blas.TriangleIndices.Length, blas.TriangleIndices[0]);
+                blasTriangleIndicesBuffer.UploadElements(uploadedTriangleIndices, blas.Triangles.Length, blas.Triangles[0]);
 
                 uploadedBlasNodes += blas.Nodes.Length;
-                uploadedTriangleIndices += blas.TriangleIndices.Length;
+                uploadedTriangleIndices += blas.Triangles.Length;
             }
         }
 
         public int GetBlasesTriangleIndicesCount()
         {
-            return blases.Sum(blasInstances => blasInstances.TriangleIndices.Length);
+            return blases.Sum(blasInstances => blasInstances.Triangles.Length);
         }
 
         public int GetBlasesNodeCount()

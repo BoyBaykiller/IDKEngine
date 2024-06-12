@@ -5,3 +5,15 @@ dotnet_style_prefer_collection_expression = false
 
 # CS8632: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 dotnet_diagnostic.CS8632.severity = silent
+
+# Because in development you are likely to temporarily disable code. 
+# CS0162: Unreachable code detected
+dotnet_diagnostic.CS0162.severity = silent
+
+# Because structs that are shared with GPU require fields to be present even when not used on CPU 
+# CS0649: Field 'field' is never assigned to, and will always have its default value 'value'
+dotnet_diagnostic.CS0649.severity = silent
+
+# Because structs that are shared with GPU require fields to be present even when not used on CPU 
+# CS0169: The field 'field' is never used
+dotnet_diagnostic.CS0169.severity = silent

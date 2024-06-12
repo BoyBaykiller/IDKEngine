@@ -1,5 +1,5 @@
-﻿using OpenTK.Mathematics;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using OpenTK.Mathematics;
 
 namespace IDKEngine.GpuTypes
 {
@@ -21,6 +21,7 @@ namespace IDKEngine.GpuTypes
                 isLeafAndChildOrInstanceID = (isLeafNum << 31) | ChildOrInstanceID;
             }
         }
+        
         public uint ChildOrInstanceID
         {
             get

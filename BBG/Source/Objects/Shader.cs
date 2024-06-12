@@ -277,14 +277,11 @@ namespace BBOpenGL
 
                 private static bool GetGLSLLineSourcefileSupport(out string? requiredGLSLExtension)
                 {
-                    // Neither AMD nor NVIDIA report GL_GOOGLE_cpp_style_line_directive,
-                    // even though they both support it inside shaders. So we have to check for support like that.
-
                     string shaderString =
                         """
                         #version 460 core
                         
-                        // On AMD with current drivers (24.6.1) includes with source file require this extension
+                        // On Windows-AMD with current drivers (24.6.1) includes with source file require this extension
                         #extension GL_GOOGLE_cpp_style_line_directive : enable
 
                         #line 1 "Example-Filename"
@@ -299,17 +296,22 @@ namespace BBOpenGL
                     }
                     else
                     {
-                        // On other devices #line "filename" is enabled by GL_ARB_shading_language_include,
+                        // On other devices #line "filename" is enabled by GL_ARB_shading_language_include
                         // which does not need to be enabled inside GLSL.
                         requiredGLSLExtension = null;
                     }
+                    Shader shader = new Shader(ShaderStage.Fragment, shaderString, "Check for (#line \"filename\") support");
+                    if (!shader.GetCompileStatus())
+                    {
+                        Logger.Log(Logger.LogLevel.Warn, 
+                            """
+                            If you see this message (#line \"filename\") is not supported and errors in
+                            included GLSL shader code will not have the correct filename. The line will still be correct.
+                            """);
 
-                    Shader shader = new Shader(ShaderStage.Fragment, shaderString, """
-                        If you see this message (#line "filename") is not supported and errors in
-                        included GLSL shader code will not have the correct filename. The line will still be correct.
-                        """
-                    );
-                    return shader.GetCompileStatus();
+                        return false;
+                    }
+                    return true;
                 }
 
                 private static string ShaderStageShaderInsertion(ShaderStage shaderStage)

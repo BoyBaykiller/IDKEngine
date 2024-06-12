@@ -436,9 +436,8 @@ namespace IDKEngine
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Ressource/Models/HelmetCompressed/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f)).Value;
 
-                //ModelLoader.Model plane = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Plane.gltf", Matrix4.CreateScale(30.0f, 1.0f, 30.0f) * Matrix4.CreateRotationZ(MathF.PI) * Matrix4.CreateTranslation(0.0f, 17.0f, 10.0f));
-                //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroExteriorCompressed\BistroExteriorCompressed.gltf");
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\CornellBox\CornellBox.gltf");
+                //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroExterior\BistroExteriorCompressed\BistroExterior.gltf").Value;
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\Sponza.gltf", Matrix4.CreateScale(1.0f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(7.0f, 2.0f, 0.0f)).Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
 
@@ -462,10 +461,7 @@ namespace IDKEngine
             }
             else
             {
-                ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\NewSponza_Main_glTF_002.gltf").Value;
-                //a.MeshInstances[28].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
-                //a.MeshInstances[89].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
-                //a.MeshInstances[271].ModelMatrix = Matrix4.CreateTranslation(-1000.0f, 0.0f, 0.0f);
+                ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
                 //a.Meshes[288].SpecularBias = 1.0f;
                 //a.Meshes[288].RoughnessBias = -0.64f;
                 //a.Meshes[288].NormalMapStrength = 0.0f;
@@ -492,10 +488,10 @@ namespace IDKEngine
                 //a.Meshes[324].EmissiveBias = 20.0f;
                 //a.Meshes[376].EmissiveBias = 20.0f;
                 //a.Meshes[379].EmissiveBias = 20.0f;
-                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\NewSponza_Curtains_glTF.gltf").Value;
-                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf");
-                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf");
-                //ModelLoader.Model e = ModelLoader.GltfToEngineFormat(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf");
+                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
+                //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
                 ModelManager.Add(a, b);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);

@@ -50,14 +50,14 @@ namespace IDKEngine.Render
                 InstanceID = globalInstanceID;
             }
 
-            public static bool operator ==(SelectedEntityInfo first, SelectedEntityInfo other)
+            public static bool operator ==(in SelectedEntityInfo first, in SelectedEntityInfo other)
             {
                 return (first.EntityType == other.EntityType) &&
                        (first.EntityID == other.EntityID) &&
                        (first.InstanceID == other.InstanceID);
             }
 
-            public static bool operator !=(SelectedEntityInfo first, SelectedEntityInfo other)
+            public static bool operator !=(in SelectedEntityInfo first, in SelectedEntityInfo other)
             {
                 return !(first == other);
             }
@@ -164,7 +164,6 @@ namespace IDKEngine.Render
                     ImGui.Text($"({app.Camera.Velocity.Length})");
                     
                     tempVec2 = new SysVec2(app.Camera.LookX, app.Camera.LookY);
-                    OtkVec2 a = new OtkVec2();
                     if (ImGui.DragFloat2("LookAt", ref tempVec2))
                     {
                         app.Camera.LookX = tempVec2.X;
@@ -1189,6 +1188,19 @@ namespace IDKEngine.Render
         
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray)
         {
+            //Stopwatch sw = Stopwatch.StartNew();
+            //ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
+            //for (int y = 0; y < app.RenderResolution.Y; y++)
+            //{
+            //    for (int x = 0; x < app.RenderResolution.X; x++)
+            //    {
+            //        OtkVec2 ndc = new OtkVec2(x, y) / app.PresentationResolution * 2.0f - new OtkVec2(1.0f);
+            //        Ray worldSpaceRay = Ray.GetWorldSpaceRay(perFrameData.CameraPos, perFrameData.InvProjection, perFrameData.InvView, ndc);
+            //        app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
+            //    }
+            //}
+            //Console.WriteLine(sw.ElapsedMilliseconds);
+
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
 

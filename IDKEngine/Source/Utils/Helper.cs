@@ -28,7 +28,6 @@ namespace IDKEngine.Utils
 
                 case BBG.Debugging.DebugSeverity.Medium:
                     if (FILTER_UNWANTED && messageID == 0) return; // Shader compile warning, Intel
-                    if (FILTER_UNWANTED && messageID == 2) return; // using glNamedBufferSubData(buffer 35, offset 0, size 1668) to update a GL_STATIC_DRAW buffer, AMD radeonsi
                     // if (FILTER_UNWANTED && messageID == 131186) return; // Buffer object is being copied/moved from VIDEO memory to HOST memory, NVIDIA
                     if (FILTER_UNWANTED && messageID == 131154) return; // Pixel-path performance warning: Pixel transfer is synchronized with 3D rendering, NVIDIA
 
