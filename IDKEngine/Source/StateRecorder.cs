@@ -3,6 +3,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using BBLogger;
+using IDKEngine.Utils;
 
 namespace IDKEngine
 {
@@ -82,23 +83,11 @@ namespace IDKEngine
                 return;
             }
 
-            using FileStream fileStream = File.OpenRead(path);
-            if (fileStream.Length % sizeof(T) != 0)
+            if (!Helper.TryReadFromFile(path, out recordedStates))
             {
-                Logger.Log(Logger.LogLevel.Error, $"Cannot load \"{path}\", because file size is not a multiple of {sizeof(T)} bytes");
+                Logger.Log(Logger.LogLevel.Error, $"Error loading \"{path}\"");
                 return;
             }
-
-            if (fileStream.Length == 0)
-            {
-                Logger.Log(Logger.LogLevel.Warn, $"\"{path}\" is an empty file");
-                return;
-            }
-
-            recordedStates = new T[fileStream.Length / sizeof(T)];
-            
-            Span<byte> data = MemoryMarshal.AsBytes<T>(recordedStates);
-            fileStream.Read(data);
 
             StatesCount = recordedStates.Length;
             ReplayStateIndex = 0;
@@ -115,9 +104,7 @@ namespace IDKEngine
                 File.Delete(path);
             }
 
-            using FileStream file = File.OpenWrite(path);
-            ReadOnlySpan<byte> data = MemoryMarshal.AsBytes(new ReadOnlySpan<T>(recordedStates, 0, StatesCount));
-            file.Write(data);
+            Helper.WriteToFile(path, new ReadOnlySpan<T>(recordedStates, 0, StatesCount));
         }
     }
 }

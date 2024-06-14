@@ -54,7 +54,7 @@ namespace IDKEngine.Render
             upscaleProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VolumetricLight/Upscale/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
 
             _resolutionScale = resolutionScale;
             SetSize(size);
@@ -64,7 +64,7 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
+            gpuSettingsBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 7);
             gpuSettingsBuffer.UploadElements(Settings);
 
             BBG.Computing.Compute("Compute Volumetric Lighting", () =>

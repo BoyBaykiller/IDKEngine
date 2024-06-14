@@ -12,7 +12,7 @@ namespace IDKEngine
         public const float TRIANGLE_INTERSECT_COST = 1.1f;
         public const float TRAVERSAL_INTERSECT_COST = 1.0f;
 
-        public const int SAH_SAMPLES = 8;
+        public const int SAH_SAMPLES = 16;
 
         public struct RayHitInfo
         {
@@ -46,18 +46,17 @@ namespace IDKEngine
         }
 
         public ref readonly GpuBlasNode Root => ref Nodes[0];
-        public int TriangleCount => GeometryInfo.IndexCount / 3;
+        public int TriangleCount;
         public int MaxTreeDepth { get; private set; }
 
         public GpuBlasNode[] Nodes;
-        public readonly BBG.DrawElementsIndirectCommand GeometryInfo;
-        public readonly Vector3[] VertexPositions;
-        public readonly IndicesTriplet[] Triangles;
+        public Vector3[] VertexPositions;
+        public IndicesTriplet[] Triangles;
 
         private int unpaddedNodesCount;
         public BLAS(Vector3[] vertexPositions, ReadOnlySpan<uint> vertexIndices, in BBG.DrawElementsIndirectCommand geometryInfo)
         {
-            GeometryInfo = geometryInfo;
+            TriangleCount = geometryInfo.IndexCount / 3;
             VertexPositions = vertexPositions;
             Triangles = new IndicesTriplet[TriangleCount];
             for (int i = 0; i < Triangles.Length; i++)
@@ -319,6 +318,8 @@ namespace IDKEngine
                 areaForSplits.GrowToFit(centroid);
             }
 
+            Span<Bin> bins = stackalloc Bin[SAH_SAMPLES + 1];
+            Span<Box> rightSplitsBoxes = stackalloc Box[bins.Length - 1];
             for (int axis = 0; axis < 3; axis++)
             {
                 // We already know splitting is not worth it in this case and it avoids edge cases
@@ -328,7 +329,6 @@ namespace IDKEngine
                     continue;
                 }
                 
-                Span<Bin> bins = stackalloc Bin[SAH_SAMPLES + 1];
                 bins.Fill(new Bin());
                 for (int i = 0; i < parentNode.TriCount; i++)
                 {
@@ -342,7 +342,6 @@ namespace IDKEngine
                     bins[quantizePos].TriangleBounds.GrowToFit(tri);
                 }
 
-                Span<Box> rightSplitsBoxes = stackalloc Box[bins.Length - 1];
                 rightSplitsBoxes[rightSplitsBoxes.Length - 1] = bins[bins.Length - 1].TriangleBounds;
                 for (int i = rightSplitsBoxes.Length - 2; i >= 0; i--)
                 {

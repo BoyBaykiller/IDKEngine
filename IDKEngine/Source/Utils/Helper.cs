@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using StbImageWriteSharp;
@@ -128,6 +129,37 @@ namespace IDKEngine.Utils
             while (Interlocked.CompareExchange(ref location1, newValue, initialValue) != initialValue);
 
             return initialValue;
+        }
+
+        public static unsafe bool TryReadFromFile<T>(string path, out T[] readData) where T : unmanaged
+        {
+            readData = null;
+
+            using FileStream fileStream = File.OpenRead(path);
+            if (fileStream.Length % sizeof(T) != 0)
+            {
+                Logger.Log(Logger.LogLevel.Error, $"Cannot load \"{path}\", because file size is not a multiple of {sizeof(T)} bytes");
+                return false;
+            }
+            if (fileStream.Length == 0)
+            {
+                Logger.Log(Logger.LogLevel.Warn, $"Cannot load \"{path}\", because it's an empty file");
+                return false;
+            }
+
+            readData = new T[fileStream.Length / sizeof(T)];
+
+            Span<byte> byteData = MemoryMarshal.AsBytes<T>(readData);
+            fileStream.Read(byteData);
+
+            return true;
+        }
+
+        public static void WriteToFile<T>(string path, ReadOnlySpan<T> data) where T : unmanaged
+        {
+            using FileStream file = File.OpenWrite(path);
+            ReadOnlySpan<byte> byteData = MemoryMarshal.AsBytes(data);
+            file.Write(byteData);
         }
 
         public static unsafe void TextureToDiskJpg(BBG.Texture texture, string path, int quality = 100, bool flipVertically = true)

@@ -20,7 +20,7 @@ namespace BBOpenGL
                 GL.DispatchCompute((uint)x, (uint)y, (uint)z);
             }
 
-            public static void DispatchIndirect(BufferObject commandBuffer, nint offset = 0)
+            public static void DispatchIndirect(Buffer commandBuffer, nint offset = 0)
             {
                 GL.BindBuffer(BufferTarget.DispatchIndirectBuffer, commandBuffer.ID);
                 GL.DispatchComputeIndirect(offset);

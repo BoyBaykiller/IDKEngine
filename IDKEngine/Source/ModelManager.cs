@@ -67,19 +67,19 @@ namespace IDKEngine
             meshletsVertexIndicesBuffer = new BBG.TypedBuffer<uint>();
             meshletsPrimitiveIndicesBuffer = new BBG.TypedBuffer<byte>();
 
-            drawCommandBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 0);
-            meshBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 1);
-            meshInstanceBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 2);
-            visibleMeshInstanceBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 3);
-            materialBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 9);
-            vertexBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 10);
-            vertexPositionBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 11);
-            meshletTasksCmdsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 12);
-            meshletTasksCountBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 13);
-            meshletBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 14);
-            meshletInfoBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 15);
-            meshletsVertexIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 16);
-            meshletsPrimitiveIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 17);
+            drawCommandBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 0);
+            meshBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 1);
+            meshInstanceBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 2);
+            visibleMeshInstanceBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 3);
+            materialBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 9);
+            vertexBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 10);
+            vertexPositionBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 11);
+            meshletTasksCmdsBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 12);
+            meshletTasksCountBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 13);
+            meshletBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 14);
+            meshletInfoBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 15);
+            meshletsVertexIndicesBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 16);
+            meshletsPrimitiveIndicesBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 17);
 
             BVH = new BVH();
         }
@@ -218,11 +218,13 @@ namespace IDKEngine
 
         public void UpdateMeshBuffer(int start, int count)
         {
+            if (count == 0) return;
             meshBuffer.UploadElements(start, count, Meshes[start]);
         }
 
         public void UpdateDrawCommandBuffer(int start, int count)
         {
+            if (count == 0) return;
             drawCommandBuffer.UploadElements(start, count, DrawCommands[start]);
         }
 

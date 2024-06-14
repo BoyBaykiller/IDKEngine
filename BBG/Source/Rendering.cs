@@ -178,7 +178,7 @@ namespace BBOpenGL
 
             public struct VertexInputAssembly
             {
-                public BufferObject IndexBuffer;
+                public Buffer IndexBuffer;
                 public VertexDescription? VertexDescription;
             }
 
@@ -190,7 +190,7 @@ namespace BBOpenGL
 
             public struct VertexBuffer
             {
-                public BufferObject Buffer;
+                public Buffer Buffer;
                 public int VertexSize;
                 public int Offset;
             }
@@ -431,7 +431,7 @@ namespace BBOpenGL
                 GL.DrawArraysInstancedBaseInstance((PrimitiveType)topology, first, count, instanceCount, baseInstance);
             }
 
-            public static void MultiDrawIndexed(BufferObject drawCommandBuffer, Topology topology, IndexType indexType, int drawCount, int stride, nint bufferOffset = 0)
+            public static void MultiDrawIndexed(Buffer drawCommandBuffer, Topology topology, IndexType indexType, int drawCount, int stride, nint bufferOffset = 0)
             {
                 GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer.ID);
                 GL.MultiDrawElementsIndirect((PrimitiveType)topology, (DrawElementsType)indexType, bufferOffset, drawCount, stride);
@@ -442,7 +442,7 @@ namespace BBOpenGL
             /// </summary>
             /// <param name="bufferObject"></param>
             /// <param name=""></param>
-            public static void MultiDrawMeshletsCountNV(BufferObject meshletTasksCmdsBuffer, BufferObject meshletTasksCountBuffer, int maxMeshlets, int stride, nint meshletCmdOffset = 0, nint taskCountOffset = 0)
+            public static void MultiDrawMeshletsCountNV(Buffer meshletTasksCmdsBuffer, Buffer meshletTasksCountBuffer, int maxMeshlets, int stride, nint meshletCmdOffset = 0, nint taskCountOffset = 0)
             {
                 GL.BindBuffer(BufferTarget.DrawIndirectBuffer, meshletTasksCmdsBuffer.ID);
                 GL.BindBuffer(BufferTarget.ParameterBuffer, meshletTasksCountBuffer.ID);

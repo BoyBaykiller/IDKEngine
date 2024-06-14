@@ -24,8 +24,8 @@ namespace IDKEngine.Render
         public static void Initialize(SkyBoxMode skyBoxMode, string[] paths = null)
         {
             skyBoxTextureBuffer = new BBG.TypedBuffer<ulong>();
-            skyBoxTextureBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 4);
-            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1, 0);
+            skyBoxTextureBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 4);
+            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1, 0);
 
             Paths = paths;
             SetSkyBoxMode(skyBoxMode);
@@ -59,7 +59,7 @@ namespace IDKEngine.Render
                     externalSkyBoxTexture = null;
                 }
 
-                AtmosphericScatterer = new AtmosphericScatterer(128);
+                AtmosphericScatterer = new AtmosphericScatterer(128, AtmosphericScatterer.GpuSettings.Default);
                 AtmosphericScatterer.Compute();
             }
 

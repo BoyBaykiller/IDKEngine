@@ -107,6 +107,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         wavefrontRay.Origin += rayDir * hitInfo.T;
 
         Surface surface = GetDefaultSurface();
+        vec3 vertexNormal;
         bool hitLight = hitInfo.VertexIndices == uvec3(0);
         if (!hitLight)
         {
@@ -138,6 +139,8 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             mat3 tbn = GetTBN(worldTangent, worldNormal);
             surface.Normal = tbn * surface.Normal;
             surface.Normal = normalize(mix(worldNormal, surface.Normal, mesh.NormalMapStrength));
+
+            vertexNormal = worldNormal;
         }
         else if (settingsUBO.IsTraceLights)
         {
@@ -145,6 +148,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface.Emissive = light.Color;
             surface.Albedo = light.Color;
             surface.Normal = (wavefrontRay.Origin - light.Position) / light.Radius;
+            vertexNormal = surface.Normal;
         }
 
         float cosTheta = dot(-rayDir, surface.Normal);
@@ -161,6 +165,11 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
             wavefrontRay.Throughput = ApplyAbsorption(wavefrontRay.Throughput, surface.Absorbance, hitInfo.T);
         }
+        if (dot(-rayDir, vertexNormal) < 0.0)
+        {
+            vertexNormal *= -1.0;
+        }
+
         cosTheta = clamp(cosTheta, 0.0, 1.0);
 
         wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
@@ -178,7 +187,11 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             return false;
         }
 
-        wavefrontRay.Origin += result.RayDirection * 0.001;
+        if (result.RayType == RAY_TYPE_REFRACTIVE)
+        {
+            vertexNormal *= -1.0;   
+        }
+        wavefrontRay.Origin += vertexNormal * 0.001;
         wavefrontRay.PreviousIOROrDebugNodeCounter = result.NewIor;
 
         vec2 packedDir = EncodeUnitVec(result.RayDirection);

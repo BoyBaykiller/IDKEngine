@@ -205,7 +205,7 @@ namespace BBOpenGL
             {
                 GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, (nint)pixels);
             }
-            public void Upload2D(BufferObject bufferObject, int width, int height, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
+            public void Upload2D(Buffer bufferObject, int width, int height, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
             {
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, bufferObject.ID);
                 Upload2D(width, height, pixelFormat, pixelType, pixels, level, xOffset, yOffset);
@@ -217,7 +217,7 @@ namespace BBOpenGL
                 int imageSize = GetBlockCompressedImageSize(Format, width, height, 1);
                 GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.InternalFormat)Format, imageSize, (nint)pixels);
             }
-            public void UploadCompressed2D(BufferObject bufferObject, int width, int height, nint offset, int level = 0, int xOffset = 0, int yOffset = 0)
+            public void UploadCompressed2D(Buffer bufferObject, int width, int height, nint offset, int level = 0, int xOffset = 0, int yOffset = 0)
             {
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, bufferObject.ID);
                 UploadCompressed2D(width, height, (void*)offset, level, xOffset, yOffset);

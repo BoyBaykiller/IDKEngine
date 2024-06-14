@@ -66,13 +66,13 @@ namespace IDKEngine
         public BVH()
         {
             blasBuffer = new BBG.TypedBuffer<GpuBlasNode>();
-            blasBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 4);
+            blasBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 4);
 
             blasTriangleIndicesBuffer = new BBG.TypedBuffer<BLAS.IndicesTriplet>();
-            blasTriangleIndicesBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 5);
+            blasTriangleIndicesBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 5);
 
             tlasBuffer = new BBG.TypedBuffer<GpuTlasNode>();
-            tlasBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.ShaderStorage, 6);
+            tlasBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 6);
 
             blases = Array.Empty<BLAS>();
             Tlas = new TLAS(blases, Array.Empty<BBG.DrawElementsIndirectCommand>(), Array.Empty<GpuMeshInstance>());
@@ -175,7 +175,7 @@ namespace IDKEngine
             Stopwatch sw = Stopwatch.StartNew();
             Tlas = new TLAS(blases, drawCommands, meshInstances);
             TlasBuild(true);
-            Logger.Log(Logger.LogLevel.Info, $"Created Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
+            Logger.Log(Logger.LogLevel.Info, $"Created and uploaded Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
         }
 
         public void TlasBuild(bool force = false)
@@ -205,7 +205,17 @@ namespace IDKEngine
                 Helper.InterlockedMax(ref maxTreeDepth, blases[i].MaxTreeDepth);
             });
             SetBlasBuffersContent();
-            Logger.Log(Logger.LogLevel.Info, $"Created {count} new Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
+            Logger.Log(Logger.LogLevel.Info, $"Created and uploaded {count} Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
+
+            // if (true)
+            // {
+            //     float totalSAH = 0;
+            //     for (int i = start; i < start + count; i++)
+            //     {
+            //         totalSAH += blases[i].ComputeGlobalCost(blases[i].Root);
+            //     }
+            //     Console.WriteLine(totalSAH);
+            // }
 
             MaxBlasTreeDepth = maxTreeDepth;
         }

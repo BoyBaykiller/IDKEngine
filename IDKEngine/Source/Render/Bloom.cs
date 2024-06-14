@@ -50,7 +50,7 @@ namespace IDKEngine.Render
             shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "Bloom/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
 
             SetSize(size);
 
@@ -60,7 +60,7 @@ namespace IDKEngine.Render
 
         public void Compute(BBG.Texture src)
         {
-            gpuSettingsBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 7);
+            gpuSettingsBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 7);
             gpuSettingsBuffer.UploadElements(Settings);
 
             BBG.Cmd.UseShaderProgram(shaderProgram);

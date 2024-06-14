@@ -74,19 +74,19 @@ namespace IDKEngine.Render
                 new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Light/fragment.glsl"));
 
             lightBufferObject = new BBG.TypedBuffer<GpuLight>();
-            lightBufferObject.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));
-            lightBufferObject.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 1);
+            lightBufferObject.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));
+            lightBufferObject.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 1);
 
             const int SphereLatitudes = 12, SphereLongitudes = 12;
             const float SphereRadius = 1.0f;
 
             Span<ObjectFactory.Sphere.Vertex> vertices = ObjectFactory.Sphere.GenerateVertices(SphereRadius, SphereLatitudes, SphereLongitudes);
             vertexBuffer = new BBG.TypedBuffer<ObjectFactory.Sphere.Vertex>();
-            vertexBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, vertices);
+            vertexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.None, vertices);
 
             Span<uint> indices = ObjectFactory.Sphere.GenerateIndices(SphereLatitudes, SphereLongitudes);
             indexBuffer = new BBG.TypedBuffer<uint>();
-            indexBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.None, indices);
+            indexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.None, indices);
 
             pointShadowManager = new PointShadowManager();
         }

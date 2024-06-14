@@ -13,14 +13,16 @@ layout(binding = 0) restrict writeonly uniform imageCube ImgResult;
 vec2 Rsi(vec3 r0, vec3 rd, float sr);
 vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAtmos, vec3 kRlh, float kMie, float shRlh, float shMie, float g);
 
-uniform vec3 LightPos;
-uniform float LightIntensity;
-uniform int ISteps;
-uniform int JSteps;
-
-uniform mat4 InvViews[6];
-uniform mat4 InvProjection;
-
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    mat4 InvProjection;
+    mat4 InvViews[6];
+    int ISteps;
+    int JSteps;
+    float LightIntensity;
+    float Azimuth;
+    float Elevation;
+} settingsUBO;
 
 void main()
 {
@@ -28,13 +30,14 @@ void main()
     vec2 uv = (imgCoord.xy + 0.5) / imageSize(ImgResult);
     vec2 ndc = uv * 2.0 - 1.0;
     
-    vec3 toCubemap = GetWorldSpaceDirection(InvProjection, InvViews[imgCoord.z], ndc);
+    vec3 toCubemap = GetWorldSpaceDirection(settingsUBO.InvProjection, settingsUBO.InvViews[imgCoord.z], ndc);
+    vec3 lightPos = PolarToCartesian(settingsUBO.Azimuth, settingsUBO.Elevation);
 
     vec3 color = Atmosphere(
         toCubemap,                      // normalized ray direction
         vec3(0, 6376e3, 0),             // ray origin
-        LightPos,                       // position of the sun
-        LightIntensity,                 // intensity of the sun
+        lightPos,                       // position of the sun
+        settingsUBO.LightIntensity,     // intensity of the sun
         6371e3,                         // radius of the planet in meters
         6471e3,                         // radius of the atmosphere in meters
         vec3(5.5e-6, 13.0e-6, 22.4e-6), // Rayleigh scattering coefficient
@@ -73,7 +76,7 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
     vec2 p = Rsi(r0, r, rAtmos);
     if (p.x > p.y) return vec3(0,0,0);
     p.y = min(p.y, Rsi(r0, r, rPlanet).x);
-    float IStepsize = (p.y - p.x) / float(ISteps);
+    float IStepsize = (p.y - p.x) / float(settingsUBO.ISteps);
 
     // Initialize the primary ray time.
     float iTime = 0.0;
@@ -94,7 +97,7 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
     float pMie = 3.0 / (8.0 * PI) * ((1.0 - gg) * (mumu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * g, 1.5) * (2.0 + gg));
 
     // Sample the primary ray.
-    for (int i = 0; i < ISteps; i++) {
+    for (int i = 0; i < settingsUBO.ISteps; i++) {
 
         // Calculate the primary ray sample position.
         vec3 iPos = r0 + r * (iTime + IStepsize * 0.5);
@@ -111,7 +114,7 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
         iOdMie += odStepMie;
 
         // Calculate the step size of the secondary ray.
-        float JStepsize = Rsi(iPos, pSun, rAtmos).y / float(JSteps);
+        float JStepsize = Rsi(iPos, pSun, rAtmos).y / float(settingsUBO.JSteps);
 
         // Initialize the secondary ray time.
         float jTime = 0.0;
@@ -121,7 +124,7 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
         float jOdMie = 0.0;
 
         // Sample the secondary ray.
-        for (int j = 0; j < JSteps; j++) {
+        for (int j = 0; j < settingsUBO.JSteps; j++) {
 
             // Calculate the secondary ray sample position.
             vec3 jPos = iPos + pSun * (jTime + JStepsize * 0.5);

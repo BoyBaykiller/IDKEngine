@@ -260,7 +260,7 @@ namespace IDKEngine
                 for (int i = 0; i < gltfMesh.Primitives.Count; i++)
                 {
                     MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
-
+                    
                     (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertices(gltfMeshPrimitive);
                     uint[] meshIndices = LoadGpuIndices(gltfMeshPrimitive);
 
@@ -508,7 +508,7 @@ namespace IDKEngine
                                     int saved = uncompressedImageSize - compressedImageSize;
 
                                     BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                                    stagingBuffer.ImmutableAllocate(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.MappedIncoherent, compressedImageSize);
+                                    stagingBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, compressedImageSize);
 
                                     Task.Run(() =>
                                     {
@@ -536,7 +536,7 @@ namespace IDKEngine
                         {
                             int imageSize = imageHeader.Width * imageHeader.Height * imageHeader.Channels;
                             BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                            stagingBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.MappedIncoherent, imageSize);
+                            stagingBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, imageSize);
 
                             Task.Run(() =>
                             {
@@ -545,8 +545,8 @@ namespace IDKEngine
 
                                 if (imageResult.RawPixels == null)
                                 {
-                                    Logger.Log(Logger.LogLevel.Error, $"Image \"{gltfTexture.PrimaryImage.Name}\" could not be loaded");       
-                                    stagingBuffer.Dispose();
+                                    Logger.Log(Logger.LogLevel.Error, $"Image \"{gltfTexture.PrimaryImage.Name}\" could not be loaded");
+                                    MainThreadQueue.AddToLazyQueue(() => { stagingBuffer.Dispose(); });
                                     return;
                                 }
                                 Memory.Copy(imageResult.RawPixels, stagingBuffer.MappedMemory, imageSize);

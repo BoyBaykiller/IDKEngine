@@ -391,8 +391,8 @@ namespace IDKEngine
             }
 
             gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
-            gpuPerFrameDataBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
-            gpuPerFrameDataBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 0);
+            gpuPerFrameDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
+            gpuPerFrameDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 0);
             
             SkyBoxManager.Initialize(SkyBoxManager.SkyBoxMode.ExternalAsset, [
                 "Ressource/Textures/EnvironmentMap/1.jpg",
@@ -436,7 +436,7 @@ namespace IDKEngine
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Ressource/Models/HelmetCompressed/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f)).Value;
 
-                //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroExterior\BistroExteriorCompressed\BistroExterior.gltf").Value;
+                //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\Sponza.gltf", Matrix4.CreateScale(1.0f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(7.0f, 2.0f, 0.0f)).Value;
 
                 ModelManager.Add(sponza, lucy, helmet);

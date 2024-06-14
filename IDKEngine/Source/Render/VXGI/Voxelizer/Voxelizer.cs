@@ -95,8 +95,8 @@ namespace IDKEngine.Render
             }
 
             voxelizerDataBuffer = new BBG.TypedBuffer<GpuVoxelizerData>();
-            voxelizerDataBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
-            voxelizerDataBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 5);
+            voxelizerDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
+            voxelizerDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 5);
 
             SetSize(width, height, depth);
 

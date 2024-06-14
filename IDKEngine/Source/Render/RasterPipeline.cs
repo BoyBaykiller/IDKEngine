@@ -201,12 +201,12 @@ namespace IDKEngine.Render
             mergeLightingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
-            taaDataBuffer.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
-            taaDataBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 3);
+            taaDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
+            taaDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 3);
 
             gBufferData = new BBG.TypedBuffer<GpuGBuffer>();
-            gBufferData.ImmutableAllocateElements(BBG.BufferObject.MemLocation.DeviceLocal, BBG.BufferObject.MemAccess.Synced, 1);
-            gBufferData.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 6);
+            gBufferData.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
+            gBufferData.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 6);
 
             SSAO = new SSAO(renderSize, SSAO.GpuSettings.Default);
             SSR = new SSR(renderSize, SSR.GpuSettings.Default);
@@ -494,10 +494,10 @@ namespace IDKEngine.Render
                 FSR2Wrapper.RunFSR2(gpuTaaData.Jitter, resultBeforeTAA, DepthTexture, VelocityTexture, camera, dT * 1000.0f);
 
                 // This is a hack to fix global UBO bindings modified by FSR2
-                taaDataBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 3);
-                SkyBoxManager.skyBoxTextureBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 4);
-                Voxelizer.voxelizerDataBuffer.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 5);
-                gBufferData.BindBufferBase(BBG.BufferObject.BufferTarget.Uniform, 6);
+                taaDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 3);
+                SkyBoxManager.skyBoxTextureBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 4);
+                Voxelizer.voxelizerDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 5);
+                gBufferData.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 6);
             }
         }
 

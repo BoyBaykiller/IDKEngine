@@ -122,7 +122,7 @@ namespace IDKEngine.Render
                 if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
                 {
                     ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbDrawVertices}mb");
-                    ImGui.Text($"  * TriangleIndices ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
+                    ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
                     ImGui.Text($"  * Meshlets ({app.ModelManager.Meshlets.Length}) = {mbMeshlets}mb");
                     ImGui.Text($"  * MeshletsVertexIndices ({app.ModelManager.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
                     ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelManager.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
@@ -759,39 +759,39 @@ namespace IDKEngine.Render
 
                     if (SkyBoxManager.GetSkyBoxMode() == SkyBoxManager.SkyBoxMode.InternalAtmosphericScattering)
                     {
-                        tempFloat = SkyBoxManager.AtmosphericScatterer.Elevation;
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.Settings.Elevation;
                         if (ImGui.SliderFloat("Elevation", ref tempFloat, -MathF.PI, MathF.PI))
                         {
-                            SkyBoxManager.AtmosphericScatterer.Elevation = tempFloat;
+                            SkyBoxManager.AtmosphericScatterer.Settings.Elevation = tempFloat;
                             shouldUpdateSkyBox = true;
                         }
 
-                        tempFloat = SkyBoxManager.AtmosphericScatterer.Azimuth;
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.Settings.Azimuth;
                         if (ImGui.SliderFloat("Azimuth", ref tempFloat, -MathF.PI, MathF.PI))
                         {
-                            SkyBoxManager.AtmosphericScatterer.Azimuth = tempFloat;
+                            SkyBoxManager.AtmosphericScatterer.Settings.Azimuth = tempFloat;
                             shouldUpdateSkyBox = true;
                         }
 
-                        tempFloat = SkyBoxManager.AtmosphericScatterer.LightIntensity;
+                        tempFloat = SkyBoxManager.AtmosphericScatterer.Settings.LightIntensity;
                         if (ImGui.DragFloat("Intensity", ref tempFloat, 0.2f))
                         {
-                            SkyBoxManager.AtmosphericScatterer.LightIntensity = tempFloat;
+                            SkyBoxManager.AtmosphericScatterer.Settings.LightIntensity = tempFloat;
 
                             shouldUpdateSkyBox = true;
                         }
 
-                        tempInt = SkyBoxManager.AtmosphericScatterer.ISteps;
+                        tempInt = SkyBoxManager.AtmosphericScatterer.Settings.ISteps;
                         if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                         {
-                            SkyBoxManager.AtmosphericScatterer.ISteps = tempInt;
+                            SkyBoxManager.AtmosphericScatterer.Settings.ISteps = tempInt;
                             shouldUpdateSkyBox = true;
                         }
 
-                        tempInt = SkyBoxManager.AtmosphericScatterer.JSteps;
+                        tempInt = SkyBoxManager.AtmosphericScatterer.Settings.JSteps;
                         if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
                         {
-                            SkyBoxManager.AtmosphericScatterer.JSteps = tempInt;
+                            SkyBoxManager.AtmosphericScatterer.Settings.JSteps = tempInt;
                             shouldUpdateSkyBox = true;
                         }
 
