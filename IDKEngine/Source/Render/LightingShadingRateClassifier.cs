@@ -132,7 +132,7 @@ namespace IDKEngine.Render
             gpuSettingsBuffer.Dispose();
         }
 
-        public BBG.Rendering.VariableRateShadingNV GetVariableRateShading()
+        public BBG.Rendering.VariableRateShadingNV GetRenderData()
         {
             return new BBG.Rendering.VariableRateShadingNV()
             {

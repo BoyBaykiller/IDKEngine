@@ -20,12 +20,12 @@ namespace IDKEngine.Render
 
 
         private static BBG.Texture externalSkyBoxTexture;
-        public static BBG.TypedBuffer<ulong> skyBoxTextureBuffer;
-        public static void Initialize(SkyBoxMode skyBoxMode, string[] paths = null)
+        public static BBG.TypedBuffer<BBG.Texture.BindlessHandle> skyBoxTextureBuffer;
+        public static unsafe void Initialize(SkyBoxMode skyBoxMode, string[] paths = null)
         {
-            skyBoxTextureBuffer = new BBG.TypedBuffer<ulong>();
+            skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>();
             skyBoxTextureBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 4);
-            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1, 0);
+            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
 
             Paths = paths;
             SetSkyBoxMode(skyBoxMode);

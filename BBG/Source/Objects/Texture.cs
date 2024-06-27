@@ -104,6 +104,11 @@ namespace BBOpenGL
                 A = TextureSwizzle.Alpha,
             }
 
+            public struct BindlessHandle
+            {
+                public ulong GLHandle;
+            }
+
             public readonly int ID;
             public readonly Type TextureType;
             public InternalFormat Format { get; private set; }
@@ -112,8 +117,8 @@ namespace BBOpenGL
             public int Depth { get; private set; }
             public int Levels { get; private set; }
 
-            private readonly List<ulong> associatedTextureHandles = new List<ulong>(0);
-            private readonly List<ulong> associatedImageHandles = new List<ulong>(0);
+            private readonly List<BindlessHandle> bindlessTextureHandles = new List<BindlessHandle>(0);
+            private readonly List<BindlessHandle> bindlessImageHandles = new List<BindlessHandle>(0);
 
             public Texture(Type textureType)
             {
@@ -224,7 +229,7 @@ namespace BBOpenGL
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);
             }
 
-            public void GetImageData(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int bufSize, int level = 0)
+            public void Download(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int bufSize, int level = 0)
             {
                 GL.GetTextureImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, (nint)pixels);
             }
@@ -264,7 +269,7 @@ namespace BBOpenGL
                         break;
 
                     default:
-                        throw new UnreachableException();
+                        throw new UnreachableException($"Unknown {nameof(TextureType)} = {TextureType}");
                 }
                 Format = format;
             }
@@ -273,73 +278,62 @@ namespace BBOpenGL
             /// Requires GL_ARB_bindless_texture
             /// </summary>
             /// <returns></returns>
-            public ulong GetTextureHandleARB()
+            public BindlessHandle GetTextureHandleARB()
             {
-                ulong textureHandle = GL.ARB.GetTextureHandleARB(ID);
-                GL.ARB.MakeTextureHandleResidentARB(textureHandle);
-                associatedTextureHandles.Add(textureHandle);
-                return textureHandle;
+                BindlessHandle bindlessHandle = new BindlessHandle();
+                bindlessHandle.GLHandle = GL.ARB.GetTextureHandleARB(ID);
+
+                GL.ARB.MakeTextureHandleResidentARB(bindlessHandle.GLHandle);
+
+                bindlessTextureHandles.Add(bindlessHandle);
+                return bindlessHandle;
             }
 
             /// <summary>
             /// Requires GL_ARB_bindless_texture
             /// </summary>
             /// <returns></returns>
-            public ulong GetTextureHandleARB(Sampler samplerObject)
+            public BindlessHandle GetTextureHandleARB(Sampler samplerObject)
             {
-                ulong textureHandle = GL.ARB.GetTextureSamplerHandleARB(ID, samplerObject.ID);
-                GL.ARB.MakeTextureHandleResidentARB(textureHandle);
-                associatedTextureHandles.Add(textureHandle);
-                return textureHandle;
+                BindlessHandle bindlessHandle = new BindlessHandle();
+                bindlessHandle.GLHandle = GL.ARB.GetTextureSamplerHandleARB(ID, samplerObject.ID);
+                
+                GL.ARB.MakeTextureHandleResidentARB(bindlessHandle.GLHandle);
+
+                bindlessTextureHandles.Add(bindlessHandle);
+                return bindlessHandle;
             }
 
             /// <summary>
             /// Requires GL_ARB_bindless_texture
             /// </summary>
             /// <returns></returns>
-            public ulong GetImageHandleARB(InternalFormat format, int layer = 0, bool layered = false, int level = 0)
+            public BindlessHandle GetImageHandleARB(InternalFormat format, int layer = 0, bool layered = false, int level = 0)
             {
-                ulong imageHandle = GL.ARB.GetImageHandleARB(ID, level, layered, layer, (OpenTK.Graphics.OpenGL.PixelFormat)format);
+                BindlessHandle bindlessHandle = new BindlessHandle();
+                bindlessHandle.GLHandle = GL.ARB.GetImageHandleARB(ID, level, layered, layer, (OpenTK.Graphics.OpenGL.PixelFormat)format);
 
-                GL.ARB.MakeImageHandleResidentARB(imageHandle, All.ReadWrite);
+                GL.ARB.MakeImageHandleResidentARB(bindlessHandle.GLHandle, All.ReadWrite);
 
-                associatedImageHandles.Add(imageHandle);
-                return imageHandle;
-            }
-
-            /// <summary>
-            /// Requires GL_ARB_bindless_texture
-            /// </summary>
-            /// <returns></returns>
-            private static void UnmakeTextureHandleARB(ulong textureHandle)
-            {
-                GL.ARB.MakeTextureHandleNonResidentARB(textureHandle);
-            }
-
-            /// <summary>
-            /// Requires GL_ARB_bindless_texture
-            /// </summary>
-            /// <returns></returns>
-            private static void UnmakeImageHandleARB(ulong imageHandle)
-            {
-                GL.ARB.MakeImageHandleNonResidentARB(imageHandle);
+                bindlessImageHandles.Add(bindlessHandle);
+                return bindlessHandle;
             }
 
             public void Dispose()
             {
                 FramebufferCache.DeleteFramebuffersWithTexture(this);
 
-                for (int i = 0; i < associatedTextureHandles.Count; i++)
+                for (int i = 0; i < bindlessTextureHandles.Count; i++)
                 {
-                    UnmakeTextureHandleARB(associatedTextureHandles[i]);
+                    GL.ARB.MakeTextureHandleNonResidentARB(bindlessTextureHandles[i].GLHandle);
                 }
-                associatedTextureHandles.Clear();
+                bindlessTextureHandles.Clear();
 
-                for (int i = 0; i < associatedImageHandles.Count; i++)
+                for (int i = 0; i < bindlessImageHandles.Count; i++)
                 {
-                    UnmakeImageHandleARB(associatedImageHandles[i]);
+                    GL.ARB.MakeImageHandleNonResidentARB(bindlessImageHandles[i].GLHandle);
                 }
-                associatedImageHandles.Clear();
+                bindlessImageHandles.Clear();
 
                 GL.DeleteTexture(ID);
             }

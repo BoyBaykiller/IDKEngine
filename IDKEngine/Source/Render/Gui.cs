@@ -37,31 +37,8 @@ namespace IDKEngine.Render
             Replaying,
         }
 
-        public struct SelectedEntityInfo
+        public readonly record struct SelectedEntityInfo(EntityType EntityType, int EntityID, int InstanceID)
         {
-            public EntityType EntityType { get; private set; }
-            public int EntityID { get; private set; }
-            public int InstanceID { get; private set; }
-
-            public SelectedEntityInfo(EntityType entityType, int entityID, int globalInstanceID)
-            {
-                EntityType = entityType;
-                EntityID = entityID;
-                InstanceID = globalInstanceID;
-            }
-
-            public static bool operator ==(in SelectedEntityInfo first, in SelectedEntityInfo other)
-            {
-                return (first.EntityType == other.EntityType) &&
-                       (first.EntityID == other.EntityID) &&
-                       (first.InstanceID == other.InstanceID);
-            }
-
-            public static bool operator !=(in SelectedEntityInfo first, in SelectedEntityInfo other)
-            {
-                return !(first == other);
-            }
-
             public static readonly SelectedEntityInfo None = new SelectedEntityInfo()
             {
                 EntityType = EntityType.None
@@ -523,7 +500,7 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Anti Aliasing"))
                     {
-                        string current = app.RasterizerPipeline.TemporalAntiAliasing.ToString();
+                        string current = app.RasterizerPipeline.TAAMode.ToString();
                         if (ImGui.BeginCombo("Mode", current))
                         {
                             RasterPipeline.TemporalAntiAliasingMode[] options = Enum.GetValues<RasterPipeline.TemporalAntiAliasingMode>();
@@ -534,7 +511,7 @@ namespace IDKEngine.Render
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
                                     current = enumName;
-                                    app.RasterizerPipeline.TemporalAntiAliasing = (RasterPipeline.TemporalAntiAliasingMode)i;
+                                    app.RasterizerPipeline.TAAMode = (RasterPipeline.TemporalAntiAliasingMode)i;
                                 }
 
                                 if (isSelected)
@@ -545,7 +522,7 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.TAA)
+                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.TAA)
                         {
                             ImGui.Checkbox("IsNaiveTaa", ref app.RasterizerPipeline.TaaResolve.IsNaiveTaa);
                             ToolTipForItemAboveHovered(
@@ -561,7 +538,7 @@ namespace IDKEngine.Render
                             }
                         }
                         
-                        if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.FSR2)
+                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.FSR2)
                         {
                             ImGui.Text(
                                 "FSR2 (by AMD) does Anti Aliasing but\n" +
@@ -578,13 +555,13 @@ namespace IDKEngine.Render
                             }
                         }
 
-                        if (app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.TAA || 
-                            app.RasterizerPipeline.TemporalAntiAliasing == RasterPipeline.TemporalAntiAliasingMode.FSR2)
+                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.TAA || 
+                            app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.FSR2)
                         {
-                            ImGui.Checkbox("EnableMipBias", ref app.RasterizerPipeline.EnableMipBias);
-                            if (app.RasterizerPipeline.EnableMipBias)
+                            ImGui.Checkbox("EnableMipBias", ref app.RasterizerPipeline.TAAEnableMipBias);
+                            if (app.RasterizerPipeline.TAAEnableMipBias)
                             {
-                                ImGui.SliderFloat("MipBias", ref app.RasterizerPipeline.AdditionalMipBias, -3.0f, 3.0f);
+                                ImGui.SliderFloat("MipBias", ref app.RasterizerPipeline.TAAAdditionalMipBias, -3.0f, 3.0f);
                                 ToolTipForItemAboveHovered("This bias is applied in addition to the 'optimal' computed bias\n");
                             }
                         }
@@ -1412,25 +1389,6 @@ namespace IDKEngine.Render
 
                         if (loadingTask.DoCompressGltf)
                         {
-                            int workerIndex = -1;
-                            for (int i = 0; i < loadModelContext.CompressionsTasks.Length; i++)
-                            {
-                                if (loadModelContext.CompressionsTasks[i] == null)
-                                {
-                                    workerIndex = i;
-                                    break;
-                                }
-                            }
-                            if (workerIndex == -1)
-                            {
-                                Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
-                                if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
-                                {
-                                    shouldResetPT = true;
-                                }
-                                return;
-                            }
-
                             string fileName = Path.GetFileName(gltfInputPath);
                             string compressedGltfDir = Path.Combine(Path.GetDirectoryName(gltfInputPath), $"{Path.GetFileNameWithoutExtension(gltfInputPath)}Compressed");
                             string compressedGtlfPath = Path.Combine(compressedGltfDir, fileName);
@@ -1441,7 +1399,7 @@ namespace IDKEngine.Render
                             {
                                 Logger.Log(Logger.LogLevel.Error, message);
                                 Logger.Log(Logger.LogLevel.Error, $"An error occured while compressing \"{fileName}\". Falling back to uncompressed model");
-                                loadModelContext.CompressionsTasks[workerIndex] = new Tuple<Task, LoadModelContext.LoadingTask>(Task.CompletedTask, loadModelContext.CurrentGuiDialogLoadingTask);
+                                ModuleLoadModelLoad(app, gltfInputPath, loadModelContext.CurrentGuiDialogLoadingTask.LoadParams);
                             };
                             loadingTask.CompressGltfSettings.ProcessOutput = (string message) =>
                             {
@@ -1452,11 +1410,28 @@ namespace IDKEngine.Render
                             if (task == null)
                             {
                                 Logger.Log(Logger.LogLevel.Error, "Failed compressing. Falling back to uncompressed model");
-                                loadModelContext.CompressionsTasks[workerIndex] = new Tuple<Task, LoadModelContext.LoadingTask>(Task.CompletedTask, loadingTask);
+                                ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams);
                             }
                             else
                             {
-                                loadModelContext.CompressionsTasks[workerIndex] = new Tuple<Task, LoadModelContext.LoadingTask>(task, loadingTask);
+                                bool found = false;
+                                for (int i = 0; i < loadModelContext.CompressionsTasks.Length; i++)
+                                {
+                                    if (loadModelContext.CompressionsTasks[i] == null)
+                                    {
+                                        loadModelContext.CompressionsTasks[i] = new Tuple<Task, LoadModelContext.LoadingTask>(task, loadingTask);
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                if (!found)
+                                {
+                                    Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
+                                    if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
+                                    {
+                                        shouldResetPT = true;
+                                    }
+                                }
                             }
                         }
 

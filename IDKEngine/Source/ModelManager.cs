@@ -152,7 +152,7 @@ namespace IDKEngine
                 uint bvhNodesExclusiveSum = 0;
                 for (int i = 0; i < DrawCommands.Length; i++)
                 {
-                    Meshes[i].BlasRootNodeIndex = bvhNodesExclusiveSum;
+                    Meshes[i].BlasRootNodeOffset = bvhNodesExclusiveSum;
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
 

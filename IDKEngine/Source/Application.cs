@@ -60,26 +60,26 @@ namespace IDKEngine
 
         public float RenderResolutionScale => (float)RenderResolution.Y / PresentationResolution.Y;
 
-        // These will take effect at the beginning of a frame
+        // Will take effect at the beginning of a frame
         public Vector2i? RequestPresentationResolution;
         public float? RequestRenderResolutionScale;
         public RenderMode? RequestRenderMode;
 
-        // Used for Rasterizer and PathTracer RenderMode.
-        // When inactive should be disposed and set to null which is why we signal nullable with "?"
+        // Used for Rasterizer and PathTracer RenderMode
+        // Only one is ever used while the other is disposed and set to null
         public RasterPipeline? RasterizerPipeline;
         public PathTracer? PathTracer;
 
-        // These effects run at presentation resolution and are useful for
+        // Run at presentation resolution and are useful for
         // both Rasterizer and PathTracer RenderMode which is why they are here
         public TonemapAndGammaCorrect TonemapAndGamma;
         public BoxRenderer BoxRenderer;
         public Bloom Bloom;
-        public bool IsBloom = true;
-        private Gui gui;
-        public bool RenderGui = true;
         public VolumetricLighting VolumetricLight;
+        private Gui gui;
+        public bool IsBloom = true;
         public bool IsVolumetricLighting = true;
+        public bool RenderGui = true;
 
         // All models and all lights and Camera (the types of different entities)
         public ModelManager ModelManager;
@@ -208,7 +208,6 @@ namespace IDKEngine
             {
                 BBG.Rendering.CopyTextureToSwapchain(TonemapAndGamma.Result);
             }
-
             PollEvents();
             SwapBuffers();
 
@@ -488,11 +487,11 @@ namespace IDKEngine
                 //a.Meshes[324].EmissiveBias = 20.0f;
                 //a.Meshes[376].EmissiveBias = 20.0f;
                 //a.Meshes[379].EmissiveBias = 20.0f;
-                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+                //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
                 //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
                 //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
                 //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a, b);
+                ModelManager.Add(a);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -588,7 +587,9 @@ namespace IDKEngine
 
             if (renderMode == RenderMode.PathTracer)
             {
+                // We disable time to allow for accumulation by default in case there were any moving objects
                 TimeEnabled = false;
+
                 PathTracer?.Dispose();
                 PathTracer = new PathTracer(renderRes, PathTracer == null ? PathTracer.GpuSettings.Default : PathTracer.GetGpuSettings());
             }

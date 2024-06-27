@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
+using BBOpenGL;
 
 namespace IDKEngine.GpuTypes
 {
     public struct GpuMaterial
     {
-        public static readonly int TEXTURE_COUNT = Enum.GetValues<TextureHandle>().Length;
+        public static readonly int TEXTURE_COUNT = Enum.GetValues<BindlessHandle>().Length;
 
-        public enum TextureHandle : int
+        public enum BindlessHandle : int
         {
             BaseColor,
             MetallicRoughness,
@@ -17,18 +18,18 @@ namespace IDKEngine.GpuTypes
             Transmission,
         }
 
-        public ref ulong this[TextureHandle textureType]
+        public ref BBG.Texture.BindlessHandle this[BindlessHandle textureType]
         {
             get
             {
                 switch (textureType)
                 {
-                    case TextureHandle.BaseColor: return ref Unsafe.AsRef(ref BaseColorTextureHandle);
-                    case TextureHandle.MetallicRoughness: return ref Unsafe.AsRef(ref MetallicRoughnessTextureHandle);
-                    case TextureHandle.Normal: return ref Unsafe.AsRef(ref NormalTextureHandle);
-                    case TextureHandle.Emissive: return ref Unsafe.AsRef(ref EmissiveTextureHandle);
-                    case TextureHandle.Transmission: return ref Unsafe.AsRef(ref TransmissionTextureHandle);
-                    default: throw new NotSupportedException($"Unsupported {nameof(TextureHandle)} {textureType}");
+                    case BindlessHandle.BaseColor: return ref Unsafe.AsRef(ref BaseColorTexture);
+                    case BindlessHandle.MetallicRoughness: return ref Unsafe.AsRef(ref MetallicRoughnessTexture);
+                    case BindlessHandle.Normal: return ref Unsafe.AsRef(ref NormalTexture);
+                    case BindlessHandle.Emissive: return ref Unsafe.AsRef(ref EmissiveTexture);
+                    case BindlessHandle.Transmission: return ref Unsafe.AsRef(ref TransmissionTexture);
+                    default: throw new NotSupportedException($"Unsupported {nameof(BindlessHandle)} {textureType}");
                 }
             }
         }
@@ -44,13 +45,13 @@ namespace IDKEngine.GpuTypes
         public Vector3 Absorbance;
         public float IOR;
 
-        public ulong BaseColorTextureHandle;
-        public ulong MetallicRoughnessTextureHandle;
+        public BBG.Texture.BindlessHandle BaseColorTexture;
+        public BBG.Texture.BindlessHandle MetallicRoughnessTexture;
 
-        public ulong NormalTextureHandle;
-        public ulong EmissiveTextureHandle;
+        public BBG.Texture.BindlessHandle NormalTexture;
+        public BBG.Texture.BindlessHandle EmissiveTexture;
 
-        public ulong TransmissionTextureHandle;
+        public BBG.Texture.BindlessHandle TransmissionTexture;
         public bool DoAlphaBlending;
         private readonly uint _pad0;
     }

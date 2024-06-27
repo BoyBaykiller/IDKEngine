@@ -306,7 +306,7 @@ namespace BBOpenGL
                 for (int i = 0; i < recompiledShaders.Length; i++)
                 {
                     AbstractShader existingShader = shaderProgram.Shaders[i];
-                    recompiledShaders[i] = new AbstractShader(existingShader.ShaderStage, existingShader.LocalShaderPath);
+                    recompiledShaders[i] = new AbstractShader(existingShader.ShaderStage, existingShader.LocalShaderPath, existingShader.DebugSaveAndRunRGA);
                 }
                 shaderProgram.Link(recompiledShaders);
             }

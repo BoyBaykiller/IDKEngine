@@ -355,11 +355,6 @@ namespace IDKEngine
 
         private static unsafe GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadData, bool useExtBc5NormalMetallicRoughness = false)
         {
-            GLTexture defaultTexture = new GLTexture(GLTexture.Type.Texture2D);
-            defaultTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-            defaultTexture.Clear(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
-            ulong defaultTextureHandle = defaultTexture.GetTextureHandleARB(new GLSampler(new GLSampler.SamplerState()));
-
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
             for (int i = 0; i < gpuMaterials.Length; i++)
             {
@@ -379,196 +374,223 @@ namespace IDKEngine
 
                 for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
                 {
-                    GpuMaterial.TextureHandle textureType = (GpuMaterial.TextureHandle)j;
+                    GpuMaterial.BindlessHandle textureType = (GpuMaterial.BindlessHandle)j;
                     GltfTexture gltfTexture = materialLoadData[(MaterialLoadData.TextureType)textureType];
-
-                    // fallback in case texture is null or something goes wrong while loading
-                    gpuMaterial[textureType] = defaultTextureHandle;
 
                     if (gltfTexture == null)
                     {
+                        // By having a pure white fallback we can keep the sampling logic
+                        // the same in shaders and still comply to glTF spec
+                        gpuMaterial[textureType] = FallbackTextures.PureWhite();
                         continue;
                     }
 
-                    Ktx2.Texture* ktxTexture = null;
-                    ImageLoader.ImageHeader imageHeader = new ImageLoader.ImageHeader();
-                    GLTexture.InternalFormat internalFormat = 0;
-                    bool mipmapsRequired = false;
-                    int levels = 0;
-                    if (gltfTexture.PrimaryImage.Content.IsPng || gltfTexture.PrimaryImage.Content.IsJpg)
+                    if (TryAsyncLoadGltfTexture(gltfTexture, textureType, out GLTexture glTexture, out GLSampler glSampler, useExtBc5NormalMetallicRoughness))
                     {
-                        ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
-                        imageHeader = ImageLoader.GetImageHeader(imageData);
-                        levels = GLTexture.GetMaxMipmapLevel(imageHeader.Width, imageHeader.Height, 1);
-
-                        internalFormat = textureType switch
-                        {
-                            GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.R8G8B8A8Srgb,
-                            GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.R8G8B8A8Srgb,
-                            GpuMaterial.TextureHandle.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels :(
-                            GpuMaterial.TextureHandle.Normal => GLTexture.InternalFormat.R8G8Unorm,
-                            GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.R8Unorm,
-                            _ => throw new NotSupportedException($"{nameof(MaterialLoadData.TextureType)} = {textureType} not supported")
-                        };
-                    }
-                    else if (gltfTexture.PrimaryImage.Content.IsKtx2)
-                    {
-                        ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
-
-                        // Need to copy because of "CS1686: Local variable or its members cannot have their address taken and be used inside an anonymous method or lambda expression."
-                        Ktx2.CreateFromMemory(imageData[0], (nuint)imageData.Length, Ktx2.TextureCreateFlag.LoadImageDataBit, out Ktx2.Texture* ktxTextureCopy);
-                        if (!Ktx2.NeedsTranscoding(ktxTextureCopy))
-                        {
-                            Logger.Log(Logger.LogLevel.Error, "KTX textures are expected to require transcoding, meaning they are either ETC1S or UASTC encoded.\n" +
-                                                                $"SupercompressionScheme = {ktxTextureCopy->SupercompressionScheme}");
-                            continue;
-                        }
-
-                        ktxTexture = ktxTextureCopy;
-                        imageHeader.Width = (int)ktxTexture->BaseWidth;
-                        imageHeader.Height = (int)ktxTexture->BaseHeight;
-                        imageHeader.Channels = (int)Ktx2.GetNumComponents(ktxTexture);
-                        levels = (int)ktxTexture->NumLevels;
-
-                        internalFormat = textureType switch
-                        {
-                            GpuMaterial.TextureHandle.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
-                            GpuMaterial.TextureHandle.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
-
-                            // BC5 support added with gltfpack fork (https://github.com/BoyBaykiller/meshoptimizer) implementing IDK_BC5_normal_metallicRoughness
-                            GpuMaterial.TextureHandle.MetallicRoughness => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
-                            GpuMaterial.TextureHandle.Normal => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
-
-                            GpuMaterial.TextureHandle.Transmission => GLTexture.InternalFormat.BC4RUnorm,
-                            _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
-                        };
+                        GLTexture.BindlessHandle bindlessHandle = glTexture.GetTextureHandleARB(glSampler);
+                        gpuMaterial[textureType] = bindlessHandle;
                     }
                     else
                     {
-                        Logger.Log(Logger.LogLevel.Error, $"Unsupported MimeType = {gltfTexture.PrimaryImage.Content.MimeType}");
-                        continue;
-                    }
-
-                    GLSampler glSampler = new GLSampler(GetGLSamplerState(gltfTexture.Sampler));
-                    GLTexture glTexture = new GLTexture(GLTexture.Type.Texture2D);
-                    if (textureType == GpuMaterial.TextureHandle.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
-                    {
-                        // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
-                        // We move metallic from B into R channel, unless IDK_BC5_normal_metallicRoughness is used where this is already standard behaviour.
-                        glTexture.SetSwizzleR(GLTexture.Swizzle.B);
-                    }
-
-                    mipmapsRequired = GLSampler.IsMipmapFilter(glSampler.State.MinFilter);
-                    levels = mipmapsRequired ? levels : 1;
-                    glTexture.ImmutableAllocate(imageHeader.Width, imageHeader.Height, 1, internalFormat, levels);
-                    
-                    gpuMaterial[textureType] = glTexture.GetTextureHandleARB(glSampler);
-
-                    MainThreadQueue.AddToLazyQueue(() =>
-                    {
-                        /* For compressed textures:
-                         * 1. Transcode the KTX texture into GPU compressed format in parallel 
-                         * 2. Create staging buffer on main thread
-                         * 3. Copy compressed pixels to staging buffer in parallel
-                         * 4. Copy from staging buffer to texture on main thread
-                         */
-
-                        /* For uncompressed textures:
-                         * 1. Create staging buffer on main thread
-                         * 2. Decode image and copy the pixels into staging buffer in parallel
-                         * 3. Copy from staging buffer to texture on main thread
-                         */
-
-                        // TODO: If the main thread is in Sleep State (for example when waiting on Parallel.For() to finish)
-                        //       it may end up participating as a worker in the ThreadPool.
-                        //       We want the main thread to only run the render loop only and not some random
-                        //       ThreadPool work (like loading texturs in this case), because it causes frame stutters. Fix!
-                        int threadPoolThreads = Math.Max(Environment.ProcessorCount / 2, 1);
-                        ThreadPool.SetMinThreads(threadPoolThreads, 1);
-                        ThreadPool.SetMaxThreads(threadPoolThreads, 1);
-
-                        bool isKtx = ktxTexture != null;
-                        if (isKtx)
+                        if (textureType == GpuMaterial.BindlessHandle.BaseColor)
                         {
-                            Task.Run(() =>
-                            {
-                                //int supercompressedImageSize = (int)ktxTexture->DataSize; // Supercompressed Size (Size on Disk, minus additional Metadata)
-
-                                Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxFormat(glTexture.Format), Ktx2.TranscodeFlagBits.HighQuality);
-                                if (errorCode != Ktx2.ErrorCode.Success)
-                                {
-                                    Logger.Log(Logger.LogLevel.Error, $"Ktx {nameof(Ktx2.TranscodeBasis)} returned {errorCode}");
-                                    return;
-                                }
-
-                                MainThreadQueue.AddToLazyQueue(() =>
-                                {
-                                    int compressedImageSize = (int)ktxTexture->DataSize; // Compressed Size (Size in Vram)
-                                    int uncompressedImageSize = imageHeader.Width * imageHeader.Height * imageHeader.Channels;
-                                    int saved = uncompressedImageSize - compressedImageSize;
-
-                                    BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                                    stagingBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, compressedImageSize);
-
-                                    Task.Run(() =>
-                                    {
-                                        Memory.Copy(ktxTexture->PData, stagingBuffer.MappedMemory, compressedImageSize);
-
-                                        MainThreadQueue.AddToLazyQueue(() =>
-                                        {
-                                            for (int level = 0; level < levels; level++)
-                                            {
-                                                Ktx2.GetImageOffset(ktxTexture, (uint)level, 0, 0, out nuint dataOffset);
-                                                
-                                                Vector3i size = GLTexture.GetMipmapLevelSize((int)ktxTexture->BaseWidth, (int)ktxTexture->BaseHeight, (int)ktxTexture->BaseDepth, level);
-                                                glTexture.UploadCompressed2D(stagingBuffer, size.X, size.Y, (nint)dataOffset, level);
-                                            }
-                                            stagingBuffer.Dispose();
-                                            Ktx2.Destroy(ktxTexture);
-
-                                            TextureLoaded?.Invoke();
-                                        });
-                                    });
-                                });
-                            });
+                            gpuMaterial[textureType] = FallbackTextures.PurpleBlack();
                         }
                         else
                         {
-                            int imageSize = imageHeader.Width * imageHeader.Height * imageHeader.Channels;
-                            BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                            stagingBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, imageSize);
-
-                            Task.Run(() =>
-                            {
-                                ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
-                                using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, imageHeader.Channels);
-
-                                if (imageResult.RawPixels == null)
-                                {
-                                    Logger.Log(Logger.LogLevel.Error, $"Image \"{gltfTexture.PrimaryImage.Name}\" could not be loaded");
-                                    MainThreadQueue.AddToLazyQueue(() => { stagingBuffer.Dispose(); });
-                                    return;
-                                }
-                                Memory.Copy(imageResult.RawPixels, stagingBuffer.MappedMemory, imageSize);
-
-                                MainThreadQueue.AddToLazyQueue(() =>
-                                {
-                                    glTexture.Upload2D(stagingBuffer, imageHeader.Width, imageHeader.Height, GLTexture.NumChannelsToPixelFormat(imageHeader.Channels), GLTexture.PixelType.UByte, null);
-                                    if (mipmapsRequired)
-                                    {
-                                        glTexture.GenerateMipmap();
-                                    }
-                                    stagingBuffer.Dispose();
-
-                                    TextureLoaded?.Invoke();
-                                });
-                            });
+                            gpuMaterial[textureType] = FallbackTextures.PureWhite();
                         }
-                    });
+                    }
                 }
             };
 
             return gpuMaterials;
+        }
+
+        private static unsafe bool TryAsyncLoadGltfTexture(GltfTexture gltfTexture, GpuMaterial.BindlessHandle textureType, out GLTexture glTexture, out GLSampler glSampler, bool useExtBc5NormalMetallicRoughness = false)
+        {
+            glTexture = null;
+            glSampler = null;
+
+            Ktx2.Texture* ktxTexture = null;
+            ImageLoader.ImageHeader imageHeader = new ImageLoader.ImageHeader();
+            GLTexture.InternalFormat internalFormat = 0;
+            bool mipmapsRequired = false;
+            int levels = 0;
+            if (gltfTexture.PrimaryImage.Content.IsPng || gltfTexture.PrimaryImage.Content.IsJpg)
+            {
+                ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
+                if (!ImageLoader.TryGetImageHeader(imageData, out imageHeader))
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Error parsing header for image \"{gltfTexture.PrimaryImage.Name}\"");
+                    return false;
+                }
+                levels = GLTexture.GetMaxMipmapLevel(imageHeader.Width, imageHeader.Height, 1);
+
+                internalFormat = textureType switch
+                {
+                    GpuMaterial.BindlessHandle.BaseColor => GLTexture.InternalFormat.R8G8B8A8Srgb,
+                    GpuMaterial.BindlessHandle.Emissive => GLTexture.InternalFormat.R8G8B8A8Srgb,
+                    GpuMaterial.BindlessHandle.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels :(
+                    GpuMaterial.BindlessHandle.Normal => GLTexture.InternalFormat.R8G8Unorm,
+                    GpuMaterial.BindlessHandle.Transmission => GLTexture.InternalFormat.R8Unorm,
+                    _ => throw new NotSupportedException($"{nameof(MaterialLoadData.TextureType)} = {textureType} not supported")
+                };
+            }
+            else if (gltfTexture.PrimaryImage.Content.IsKtx2)
+            {
+                ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
+                
+                Ktx2.CreateFromMemory(imageData[0], (nuint)imageData.Length, Ktx2.TextureCreateFlag.LoadImageDataBit, out Ktx2.Texture* ktxTextureCopy);
+                if (!Ktx2.NeedsTranscoding(ktxTextureCopy))
+                {
+                    Logger.Log(Logger.LogLevel.Error, "KTX textures are expected to require transcoding, meaning they are either ETC1S or UASTC encoded.\n" +
+                                                        $"SupercompressionScheme = {ktxTextureCopy->SupercompressionScheme}");
+                    return false;
+                }
+
+                ktxTexture = ktxTextureCopy;
+                imageHeader.Width = (int)ktxTexture->BaseWidth;
+                imageHeader.Height = (int)ktxTexture->BaseHeight;
+                imageHeader.Channels = (int)Ktx2.GetNumComponents(ktxTexture);
+                levels = (int)ktxTexture->NumLevels;
+
+                internalFormat = textureType switch
+                {
+                    GpuMaterial.BindlessHandle.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
+                    GpuMaterial.BindlessHandle.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
+
+                    // BC5 support added with gltfpack fork (https://github.com/BoyBaykiller/meshoptimizer) implementing IDK_BC5_normal_metallicRoughness
+                    GpuMaterial.BindlessHandle.MetallicRoughness => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
+                    GpuMaterial.BindlessHandle.Normal => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
+
+                    GpuMaterial.BindlessHandle.Transmission => GLTexture.InternalFormat.BC4RUnorm,
+                    _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
+                };
+            }
+            else
+            {
+                Logger.Log(Logger.LogLevel.Error, $"Unsupported MimeType = {gltfTexture.PrimaryImage.Content.MimeType}");
+                return false;
+            }
+
+            glSampler = new GLSampler(GetGLSamplerState(gltfTexture.Sampler));
+            glTexture = new GLTexture(GLTexture.Type.Texture2D);
+            if (textureType == GpuMaterial.BindlessHandle.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
+            {
+                // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
+                // We move metallic from B into R channel, unless IDK_BC5_normal_metallicRoughness is used where this is already standard behaviour.
+                glTexture.SetSwizzleR(GLTexture.Swizzle.B);
+            }
+
+            mipmapsRequired = GLSampler.IsMipmapFilter(glSampler.State.MinFilter);
+            levels = mipmapsRequired ? levels : 1;
+            glTexture.ImmutableAllocate(imageHeader.Width, imageHeader.Height, 1, internalFormat, levels);
+
+            GLTexture glTextureCopy = glTexture;
+            MainThreadQueue.AddToLazyQueue(() =>
+            {
+                /* For compressed textures:
+                 * 1. Transcode the KTX texture into GPU compressed format in parallel 
+                 * 2. Create staging buffer on main thread
+                 * 3. Copy compressed pixels to staging buffer in parallel
+                 * 4. Copy from staging buffer to texture on main thread
+                 */
+
+                /* For uncompressed textures:
+                 * 1. Create staging buffer on main thread
+                 * 2. Decode image and copy the pixels into staging buffer in parallel
+                 * 3. Copy from staging buffer to texture on main thread
+                 */
+
+                // TODO: If the main thread is in Sleep State (for example when waiting on Parallel.For() to finish)
+                //       it may end up participating as a worker in the ThreadPool.
+                //       We want the main thread to only run the render loop only and not some random
+                //       ThreadPool work (like loading texturs in this case), because it causes frame stutters. Fix!
+                int threadPoolThreads = Math.Max(Environment.ProcessorCount / 2, 1);
+                ThreadPool.SetMinThreads(threadPoolThreads, 1);
+                ThreadPool.SetMaxThreads(threadPoolThreads, 1);
+
+                bool isKtx = ktxTexture != null;
+                if (isKtx)
+                {
+                    Task.Run(() =>
+                    {
+                        //int supercompressedImageSize = (int)ktxTexture->DataSize; // Supercompressed Size (Size on Disk, minus additional Metadata)
+
+                        Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxFormat(glTextureCopy.Format), Ktx2.TranscodeFlagBits.HighQuality);
+                        if (errorCode != Ktx2.ErrorCode.Success)
+                        {
+                            Logger.Log(Logger.LogLevel.Error, $"Ktx {nameof(Ktx2.TranscodeBasis)} returned {errorCode}");
+                            return;
+                        }
+
+                        MainThreadQueue.AddToLazyQueue(() =>
+                        {
+                            int compressedImageSize = (int)ktxTexture->DataSize; // Compressed Size (Size in Vram)
+                            int uncompressedImageSize = imageHeader.Width * imageHeader.Height * imageHeader.Channels;
+                            int saved = uncompressedImageSize - compressedImageSize;
+
+                            BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
+                            stagingBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, compressedImageSize);
+
+                            Task.Run(() =>
+                            {
+                                Memory.Copy(ktxTexture->PData, stagingBuffer.MappedMemory, compressedImageSize);
+
+                                MainThreadQueue.AddToLazyQueue(() =>
+                                {
+                                    for (int level = 0; level < levels; level++)
+                                    {
+                                        Ktx2.GetImageOffset(ktxTexture, (uint)level, 0, 0, out nuint dataOffset);
+
+                                        Vector3i size = GLTexture.GetMipmapLevelSize((int)ktxTexture->BaseWidth, (int)ktxTexture->BaseHeight, (int)ktxTexture->BaseDepth, level);
+                                        glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, (nint)dataOffset, level);
+                                    }
+                                    stagingBuffer.Dispose();
+                                    Ktx2.Destroy(ktxTexture);
+
+                                    TextureLoaded?.Invoke();
+                                });
+                            });
+                        });
+                    });
+                }
+                else
+                {
+                    int imageSize = imageHeader.Width * imageHeader.Height * imageHeader.Channels;
+                    BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
+                    stagingBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, imageSize);
+
+                    Task.Run(() =>
+                    {
+                        ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
+                        using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, imageHeader.Channels);
+
+                        if (imageResult.RawPixels == null)
+                        {
+                            Logger.Log(Logger.LogLevel.Error, $"Image \"{gltfTexture.PrimaryImage.Name}\" could not be loaded");
+                            MainThreadQueue.AddToLazyQueue(() => { stagingBuffer.Dispose(); });
+                            return;
+                        }
+                        Memory.Copy(imageResult.RawPixels, stagingBuffer.MappedMemory, imageSize);
+
+                        MainThreadQueue.AddToLazyQueue(() =>
+                        {
+                            glTextureCopy.Upload2D(stagingBuffer, imageHeader.Width, imageHeader.Height, GLTexture.NumChannelsToPixelFormat(imageHeader.Channels), GLTexture.PixelType.UByte, null);
+                            if (mipmapsRequired)
+                            {
+                                glTextureCopy.GenerateMipmap();
+                            }
+                            stagingBuffer.Dispose();
+
+                            TextureLoaded?.Invoke();
+                        });
+                    });
+                }
+            });
+            
+            return true;
         }
 
         private static MaterialLoadData[] GetMaterialLoadDataFromGltf(IReadOnlyList<Material> gltfMaterials)
@@ -1122,6 +1144,52 @@ namespace IDKEngine
                     }
                 }
                 return false;
+            }
+        }
+
+        private static class FallbackTextures
+        {
+            private static GLTexture pureWhiteTexture;
+            private static GLTexture.BindlessHandle pureWhiteTextureHandle;
+
+            private static GLTexture purpleBlackTexture;
+            private static GLTexture.BindlessHandle purpleBlackTextureHandle;
+
+            public static GLTexture.BindlessHandle PureWhite()
+            {
+                if (pureWhiteTexture == null)
+                {
+                    pureWhiteTexture = new GLTexture(GLTexture.Type.Texture2D);
+                    pureWhiteTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                    pureWhiteTexture.Clear(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
+                    pureWhiteTextureHandle = pureWhiteTexture.GetTextureHandleARB(new GLSampler(new GLSampler.SamplerState()));
+                }
+                return pureWhiteTextureHandle;
+            }
+
+            public static GLTexture.BindlessHandle PurpleBlack()
+            {
+                if (purpleBlackTexture == null)
+                {
+                    purpleBlackTexture = new GLTexture(GLTexture.Type.Texture2D);
+                    purpleBlackTexture.ImmutableAllocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                    purpleBlackTexture.Upload2D(2, 2, GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4[]
+                    {
+                        // Source: https://en.wikipedia.org/wiki/File:Minecraft_missing_texture_block.svg
+                        new Vector4(251.0f / 255.0f, 62.0f / 255.0f, 249.0f / 255.0f, 1.0f), // Purple
+                        new Vector4(0.0f, 0.0f, 0.0f, 1.0f), // Black
+                        new Vector4(0.0f, 0.0f, 0.0f, 1.0f), // Black
+                        new Vector4(251.0f / 255.0f, 62.0f / 255.0f, 249.0f / 255.0f, 1.0f), // Purple
+                    }[0]);
+
+                    purpleBlackTextureHandle = purpleBlackTexture.GetTextureHandleARB(new GLSampler(new GLSampler.SamplerState()
+                    {
+                        WrapModeS = GLSampler.WrapMode.Repeat,
+                        WrapModeT = GLSampler.WrapMode.Repeat
+                    }));
+                }
+
+                return purpleBlackTextureHandle;
             }
         }
     }

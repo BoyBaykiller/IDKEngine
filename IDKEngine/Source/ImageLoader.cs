@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
-using ReFuel.Stb;
+using ReFuel.Stb.Native;
 
 namespace IDKEngine
 {
@@ -64,21 +64,22 @@ namespace IDKEngine
             return imageResult;
         }
 
-        public static ImageHeader GetImageHeader(ReadOnlySpan<byte> imageData)
+        public static bool TryGetImageHeader(ReadOnlySpan<byte> imageData, out ImageHeader imageHeader)
         {
             fixed (byte* ptr = imageData)
             {
-                return GetImageHeader(ptr, imageData.Length);
+                return TryGetImageHeader(ptr, imageData.Length, out imageHeader);
             }
         }
 
-        public static ImageHeader GetImageHeader(byte* data, int size)
+        public static bool TryGetImageHeader(byte* data, int size, out ImageHeader imageHeader)
         {
-            ImageHeader imageHeader = new ImageHeader();
+            ImageHeader imageHeaderCopy = new ImageHeader();
 
-            Stbi.info_from_memory(data, size, &imageHeader.Width, &imageHeader.Height, &imageHeader.Channels);
+            int success = Stbi.info_from_memory(data, size, &imageHeaderCopy.Width, &imageHeaderCopy.Height, &imageHeaderCopy.Channels);
 
-            return imageHeader;
+            imageHeader = imageHeaderCopy;
+            return success == 1;
         }
 
         public static string? GetFailureReason()

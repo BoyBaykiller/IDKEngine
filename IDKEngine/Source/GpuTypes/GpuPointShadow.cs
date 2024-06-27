@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
+using BBOpenGL;
 
 namespace IDKEngine.GpuTypes
 {
@@ -32,8 +33,8 @@ namespace IDKEngine.GpuTypes
             }
         }
 
-        public ulong Texture;
-        public ulong ShadowTexture;
+        public BBG.Texture.BindlessHandle Texture;
+        public BBG.Texture.BindlessHandle ShadowTexture;
 
         public Matrix4 PosX;
         public Matrix4 NegX;
@@ -45,7 +46,7 @@ namespace IDKEngine.GpuTypes
         public Vector3 Position;
         public float NearPlane;
 
-        public ulong RayTracedShadowTexture;
+        public BBG.Texture.BindlessHandle RayTracedShadowTexture;
         public float FarPlane;
         public int LightIndex;
     }

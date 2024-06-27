@@ -10,7 +10,7 @@ namespace IDKEngine
     public class BLAS
     {
         public const float TRIANGLE_INTERSECT_COST = 1.1f;
-        public const float TRAVERSAL_INTERSECT_COST = 1.0f;
+        public const float TRAVERSAL_COST = 1.0f;
 
         public const int SAH_SAMPLES = 16;
 
@@ -328,7 +328,7 @@ namespace IDKEngine
                 {
                     continue;
                 }
-                
+
                 bins.Fill(new Bin());
                 for (int i = 0; i < parentNode.TriCount; i++)
                 {
@@ -394,7 +394,7 @@ namespace IDKEngine
 
             return splittingIsWorthIt;
         }
-        
+
         public void UpdateNodeBounds(ref GpuBlasNode node)
         {
             Box box = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
@@ -418,8 +418,8 @@ namespace IDKEngine
             ref readonly GpuBlasNode rightChild = ref Nodes[parentNode.TriStartOrChild + 1];
 
             float areaParent = MyMath.Area(parentNode.Max - parentNode.Min);
-            float probHitLeftChild = Conversions.ToBox(leftChild).Area() / areaParent;
-            float probHitRightChild = Conversions.ToBox(rightChild).Area() / areaParent;
+            float probHitLeftChild = MyMath.Area(leftChild.Max - rightChild.Min) / areaParent;
+            float probHitRightChild = MyMath.Area(rightChild.Max - rightChild.Min) / areaParent;
 
             float cost = CostInternalNode(probHitLeftChild, probHitRightChild, ComputeGlobalCost(leftChild), ComputeGlobalCost(rightChild));
 
@@ -437,7 +437,7 @@ namespace IDKEngine
         
         private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild)
         {
-            return TRAVERSAL_INTERSECT_COST + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
+            return TRAVERSAL_COST + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
         }
         
         private static float CostLeafNode(uint numTriangles)

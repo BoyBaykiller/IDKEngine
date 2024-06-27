@@ -40,6 +40,12 @@ bool RayBoxIntersect(Ray ray, Box box, out float t1, out float t2)
     return t1 <= t2 && t2 > 0.0;
 }
 
+bool RayBoxIntersect(Ray ray, Box box, out float t1)
+{
+    float t2;
+    return RayBoxIntersect(ray, box, t1, t2);
+}
+
 bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out float t2)
 {
     // Source: https://antongerdelan.net/opengl/raycasting.html

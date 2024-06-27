@@ -28,7 +28,7 @@ namespace IDKEngine.Render
             IsSharpening = true;
         }
 
-        public void RunFSR2(Vector2 jitter, BBG.Texture color, BBG.Texture depth, BBG.Texture velocity, Camera camera, float deltaMilliseconds)
+        public void Run(BBG.Texture color, BBG.Texture depth, BBG.Texture velocity, Camera camera, Vector2 jitter, float deltaSeconds)
         {
             BBG.Debugging.PushDebugGroup("Run FSR2");
 
@@ -49,7 +49,7 @@ namespace IDKEngine.Render
                 RenderSize = new FSR2Types.Dimensions2D() { Width = (uint)renderSize.X, Height = (uint)renderSize.Y },
                 EnableSharpening = IsSharpening ? (byte)1 : (byte)0,
                 Sharpness = Sharpness,
-                FrameTimeDelta = deltaMilliseconds,
+                FrameTimeDelta = deltaSeconds,
                 PreExposure = 1.0f,
                 Reset = 0,
                 CameraNear = camera.NearPlane,

@@ -83,7 +83,7 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv)
 void SurfaceApplyModificatons(inout Surface surface, GpuMesh mesh)
 {
     surface.Emissive = surface.Emissive * SURFACE_EMISSIVE_FACTOR + mesh.EmissiveBias * surface.Albedo;
-    surface.Absorbance = max(surface.Absorbance + mesh.AbsorbanceBias, vec3(0.0)); 
+    surface.Absorbance = max(surface.Absorbance + mesh.AbsorbanceBias, vec3(0.0));
 
     surface.Metallic = clamp(surface.Metallic + mesh.SpecularBias, 0.0, 1.0);
     surface.Roughness = clamp(surface.Roughness + mesh.RoughnessBias, 0.0, 1.0);

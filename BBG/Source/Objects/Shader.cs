@@ -72,10 +72,11 @@ namespace BBOpenGL
 
             public readonly string LocalShaderPath;
 
-            public AbstractShader(ShaderStage shaderStage, string localShaderPath, bool __debugSaveAndRunRGA = false)
+            public readonly bool DebugSaveAndRunRGA;
+            public AbstractShader(ShaderStage shaderStage, string localShaderPath, bool debugSaveAndRunRGA = false)
                 : this(shaderStage, File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath)), localShaderPath)
             {
-                if (__debugSaveAndRunRGA && GetCompileStatus())
+                if (debugSaveAndRunRGA && GetCompileStatus())
                 {
                     // This is ugly but only relevant for development.
                     // Runs Radeon GPU Analyzer on the shader code and writes the results + preprocess code to disk
@@ -85,6 +86,7 @@ namespace BBOpenGL
                     __DebugSaveAndRunRGA(shaderStage, shaderCode, outPath);
                 }
 
+                DebugSaveAndRunRGA = debugSaveAndRunRGA;
                 LocalShaderPath = localShaderPath;
             }
 
@@ -97,8 +99,8 @@ namespace BBOpenGL
 
             public static class Preprocessor
             {
-                public static readonly string? GLSL_EXTENSION_NAME_LINE_SOURCEFILE; // The required GLSL-extension that enables #line "filename" or null if none
                 public static readonly bool SUPPORTS_LINE_SOURCEFILE = GetGLSLLineSourcefileSupport(out GLSL_EXTENSION_NAME_LINE_SOURCEFILE);
+                private static readonly string? GLSL_EXTENSION_NAME_LINE_SOURCEFILE; // The required GLSL-extension that enables #line "filename" or null if none
 
                 public enum Keyword : int
                 {
@@ -133,7 +135,7 @@ namespace BBOpenGL
                         string toInsert =
                             $"""
                             #extension GL_ARB_bindless_texture : require
-                            #extension GL_EXT_shader_image_load_formatted : enable
+                            #extension GL_EXT_shader_image_load_formatted : require
                             #if {(GLSL_EXTENSION_NAME_LINE_SOURCEFILE != null ? 1 : 0)}
                                 #extension {GLSL_EXTENSION_NAME_LINE_SOURCEFILE} : enable
                             #endif
@@ -277,41 +279,42 @@ namespace BBOpenGL
 
                 private static bool GetGLSLLineSourcefileSupport(out string? requiredGLSLExtension)
                 {
+                    ref readonly DeviceInfo device = ref GetDeviceInfo();
+
+                    if (device.ExtensionSupport.ShadingLanguageInclude)
+                    {
+                        requiredGLSLExtension = "GL_ARB_shading_language_include";
+                        return true;
+                    }
+
+                    // On Windows-AMD with current drivers (24.6.1) includes with source file require
+                    // this extension which is supported but not advertised by the driver so we check for it empirically
+                    requiredGLSLExtension = "GL_GOOGLE_cpp_style_line_directive";
                     string shaderString =
-                        """
+                        $$"""
                         #version 460 core
                         
-                        // On Windows-AMD with current drivers (24.6.1) includes with source file require this extension
-                        #extension GL_GOOGLE_cpp_style_line_directive : enable
+                        #extension {{requiredGLSLExtension}} : require
 
                         #line 1 "Example-Filename"
                         
                         void main() {}
                         """;
 
-                    GpuVendor vendor = GetGpuVendor();
-                    if (vendor == GpuVendor.AMD)
+                    Shader shader = new Shader(ShaderStage.Fragment, shaderString, "Check for (#line \"filename\") support");
+                    if (shader.GetCompileStatus())
                     {
-                        requiredGLSLExtension = "GL_GOOGLE_cpp_style_line_directive";
+                        return true;
                     }
                     else
                     {
-                        // On other devices #line "filename" is enabled by GL_ARB_shading_language_include
-                        // which does not need to be enabled inside GLSL.
-                        requiredGLSLExtension = null;
-                    }
-                    Shader shader = new Shader(ShaderStage.Fragment, shaderString, "Check for (#line \"filename\") support");
-                    if (!shader.GetCompileStatus())
-                    {
-                        Logger.Log(Logger.LogLevel.Warn, 
-                            """
+                        Logger.Log(Logger.LogLevel.Warn, """
                             If you see this message (#line \"filename\") is not supported and errors in
                             included GLSL shader code will not have the correct filename. The line will still be correct.
                             """);
 
                         return false;
                     }
-                    return true;
                 }
 
                 private static string ShaderStageShaderInsertion(ShaderStage shaderStage)

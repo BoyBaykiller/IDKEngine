@@ -92,7 +92,7 @@ struct GpuMesh
     vec3 AbsorbanceBias;
     uint MeshletCount;
     uint InstanceCount;
-    uint BlasRootNodeIndex;
+    uint BlasRootNodeOffset;
     vec2 _pad0;
 };
 

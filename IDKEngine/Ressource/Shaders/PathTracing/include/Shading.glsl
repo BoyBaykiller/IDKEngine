@@ -55,8 +55,8 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
         reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, surface.Roughness));
         
         result.RayDirection = reflectionRayDir;
-        result.Bsdf = LambertianBrdf(surface.Albedo);
-        result.Pdf = lambertianPdf;
+        result.Bsdf = LambertianBrdf(surface.Albedo); // surface.Albedo
+        result.Pdf = lambertianPdf; // 1.0
 
         result.RayDirection = reflectionRayDir;
         result.RayTypeProbability = surface.Metallic;

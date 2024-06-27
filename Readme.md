@@ -257,14 +257,14 @@ With this method you can have your textures gradually load in at run-time withou
 The technique works like this:
 
 0. Get image extends & channels (main thread)
-1. Allocate "staging" buffer with size of image (main thread)
+1. Allocate "staging buffer" to store pixels (main thread)
 2. Decode image and copy the pixels into staging buffer (worker thread)
 3. Transfer pixels from staging buffer into texture (main thread)
 
 You might wonder what Buffer Objects have to do with any of this. They are used because we can upload data to them from any thread by using (persistently) mapped memory. The transfer from buffer into texture happens on the main thread but because the data is already on the GPU it should be pretty fast.
 Here's an example:
 ```cs
-// 1. Allocate buffer to hold pixels
+// 1. Allocate buffer to store pixels
 var flags = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapWriteBit;
 GL.CreateBuffers(1, out int stagingBuffer);
 GL.NamedBufferStorage(stagingBuffer, imageSize, IntPtr.Zero, flags);
@@ -730,6 +730,6 @@ void main() {
 ```
 
 Each thread grabs a mesh builds a frustum and then compares it against the aabb.
-`drawCommandSSBO` holds the draw commands used by `MultiDrawElementsIndirect`.
+`drawCommandSSBO` stores the draw commands used by `MultiDrawElementsIndirect`.
 If the test fails, `InstanceCount` is set to 0 otherwise 1.
 A mesh with `InstanceCount = 0` will not cause any vertex shader invocations later when things are drawn, saving a lot of computations.

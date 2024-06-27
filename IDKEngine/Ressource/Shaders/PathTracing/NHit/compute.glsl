@@ -4,8 +4,6 @@
 
 #if GL_AMD_gpu_shader_half_float_fetch
 #define MATERIAL_SAMPLER_2D_TYPE f16sampler2D
-#else
-#define MATERIAL_SAMPLER_2D_TYPE sampler2D
 #endif
 
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
@@ -82,16 +80,18 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
         Surface surface = GetDefaultSurface();
         vec3 vertexNormal;
-        bool hitLight = hitInfo.VertexIndices == uvec3(0);
+        bool hitLight = hitInfo.TriangleID == ~0u;
         if (!hitLight)
         {
-            GpuVertex v0 = vertexSSBO.Vertices[hitInfo.VertexIndices.x];
-            GpuVertex v1 = vertexSSBO.Vertices[hitInfo.VertexIndices.y];
-            GpuVertex v2 = vertexSSBO.Vertices[hitInfo.VertexIndices.z];
+            uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[hitInfo.TriangleID]);
+            GpuVertex v0 = vertexSSBO.Vertices[indices.x];
+            GpuVertex v1 = vertexSSBO.Vertices[indices.y];
+            GpuVertex v2 = vertexSSBO.Vertices[indices.z];
 
-            vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, hitInfo.Bary);
-            vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), hitInfo.Bary));
-            vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), hitInfo.Bary));
+            vec3 bary = vec3(hitInfo.BaryXY.xy, 1.0 - hitInfo.BaryXY.x - hitInfo.BaryXY.y);
+            vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, bary);
+            vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), bary));
+            vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), bary));
 
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];

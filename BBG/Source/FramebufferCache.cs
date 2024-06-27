@@ -11,23 +11,11 @@ namespace BBOpenGL
             public const int MAX_COLOR_ATTACHMENTS = 8;
             public const int MAX_FRAMEBUFFER_ATTACHMENTS = MAX_COLOR_ATTACHMENTS + 2; // 8color + 1depth + 1stencil
 
-            public struct Attachment
+            public record struct Attachment
             {
                 public Texture Texture;
                 public int Level;
                 public FramebufferAttachment AttachmentPoint;
-
-                public static bool operator==(in Attachment lhs, in Attachment rhs)
-                {
-                    return lhs.Texture == rhs.Texture && 
-                           lhs.Level == rhs.Level &&
-                           lhs.AttachmentPoint == rhs.AttachmentPoint;
-                }
-
-                public static bool operator !=(in Attachment lhs, in Attachment rhs)
-                {
-                    return !(lhs == rhs);
-                }
             }
 
             public struct FramebufferDesc

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
-using StbImageWriteSharp;
+using ReFuel.Stb;
 using BBLogger;
 using BBOpenGL;
 
@@ -167,13 +167,20 @@ namespace IDKEngine.Utils
             int nChannels = 3;
 
             byte* pixels = Memory.Malloc<byte>(texture.Width * texture.Height * nChannels);
-            texture.GetImageData(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
+            texture.Download(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
 
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
-            ImageWriter imageWriter = new ImageWriter();
 
-            StbImageWrite.stbi_flip_vertically_on_write(flipVertically ? 1 : 0);
-            imageWriter.WriteJpg(pixels, texture.Width, texture.Height, ColorComponents.RedGreenBlue, fileStream, quality);
+            StbImage.FlipVerticallyOnSave = flipVertically;
+            StbImage.WriteJpg(
+                new ReadOnlySpan<byte>(pixels, texture.Width * texture.Height * nChannels),
+                texture.Width,
+                texture.Height,
+                StbiImageFormat.Rgb,
+                fileStream,
+                quality,
+                false
+            );
 
             Memory.Free(pixels);
         }
