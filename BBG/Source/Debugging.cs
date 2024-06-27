@@ -8,7 +8,7 @@ namespace BBOpenGL
         public static class Debugging
         {
             // False by default because of AMD driver bug: https://gist.github.com/BoyBaykiller/4918880dd86a9f544c3254479b6d6190
-            public static bool EnableDebugGroups = false;
+            public static bool EnableDebugGroups = true;
 
             public enum DebugSource : uint
             {
