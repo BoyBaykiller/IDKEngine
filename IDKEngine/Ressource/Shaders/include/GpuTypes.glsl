@@ -1,3 +1,20 @@
+// NVIDIA driver bug: https://forums.developer.nvidia.com/t/driver-bug-bindless-image2d-in-std140-buffer/287957
+#define NV_BUG_WORKARROUND 1
+
+#if NV_BUG_WORKARROUND
+
+// As a workarround we don't store image2D directly but rather uvec2
+// and then cast later to image2D upon retrieval
+#define CAST_TO_IMAGE_2D(x) image2D(x)
+#define BINDLESS_IMAGE_2D uvec2
+
+#else
+
+#define CAST_TO_IMAGE_2D(x) x
+#define BINDLESS_IMAGE_2D image2D
+
+#endif
+
 struct PackedVec3
 {
     float x, y, z;
@@ -72,9 +89,8 @@ struct GpuPointShadow
     vec3 Position;
     float NearPlane;
 
-    // We don't store image2D itself but instead uvec2
-    // and cast later because of NVIDIA driver bug: https://forums.developer.nvidia.com/t/driver-bug-bindless-image2d-in-std140-buffer/287957
-    uvec2 RayTracedShadowMapImage;
+    BINDLESS_IMAGE_2D RayTracedShadowMapImage;
+
     float FarPlane;
     int LightIndex;
 };

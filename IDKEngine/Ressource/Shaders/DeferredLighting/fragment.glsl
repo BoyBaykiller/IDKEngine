@@ -86,7 +86,7 @@ void main()
             else if (ShadowMode == SHADOW_MODE_RAY_TRACED)
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
-                shadow = imageLoad(image2D(pointShadow.RayTracedShadowMapImage), imgCoord).r;
+                shadow = imageLoad(CAST_TO_IMAGE_2D(pointShadow.RayTracedShadowMapImage), imgCoord).r;
             }
 
             contribution *= (1.0 - shadow);

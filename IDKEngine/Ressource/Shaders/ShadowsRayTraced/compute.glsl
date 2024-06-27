@@ -28,14 +28,14 @@ void main()
     GpuPointShadow pointShadow = shadowsUBO.PointShadows[gl_GlobalInvocationID.z];
 
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
-    if (depth == 0.0 || any(greaterThanEqual(imgCoord, imageSize(image2D(pointShadow.RayTracedShadowMapImage)))))
+    if (depth == 0.0 || any(greaterThanEqual(imgCoord, imageSize(CAST_TO_IMAGE_2D(pointShadow.RayTracedShadowMapImage)))))
     {
         return;
     }
 
     GpuLight light = lightsUBO.Lights[pointShadow.LightIndex]; 
 
-    vec2 uv = (imgCoord + 0.5) / imageSize(image2D(pointShadow.RayTracedShadowMapImage));
+    vec2 uv = (imgCoord + 0.5) / imageSize(CAST_TO_IMAGE_2D(pointShadow.RayTracedShadowMapImage));
     vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
     vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
@@ -44,7 +44,7 @@ void main()
     float cosTheta = dot(normal, sampleToLightDir);
     if (cosTheta <= 0.0)
     {
-        imageStore(image2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(0.0));
+        imageStore(CAST_TO_IMAGE_2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(0.0));
         return;
     }
     
@@ -73,5 +73,5 @@ void main()
     }
     shadow /= RayTracingSamples;
 
-    imageStore(image2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(shadow));
+    imageStore(CAST_TO_IMAGE_2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(shadow));
 }
