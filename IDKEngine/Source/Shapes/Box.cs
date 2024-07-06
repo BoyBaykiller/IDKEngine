@@ -1,6 +1,7 @@
 ﻿using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
+using IDKEngine.Bvh;
 
 namespace IDKEngine.Shapes
 {
@@ -78,11 +79,13 @@ namespace IDKEngine.Shapes
             return size.X * size.Y * size.Z;
         }
 
-        public float Area()
+        public float HalfArea()
         {
             Vector3 size = Size();
-            return 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
+            float area = (size.X + size.Y) * size.Z + size.X * size.Y;
+            return area;
         }
+        
 
         public void Transform(in Matrix4 matrix)
         {
@@ -91,7 +94,8 @@ namespace IDKEngine.Shapes
 
         public static Box Transformed(in Box box, in Matrix4 matrix)
         {
-            Box newBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            // TODO: This function is unreasonable slow in debugger. The indexer and the matrix muls take time
+            Box newBox = Empty();
             for (int i = 0; i < 8; i++)
             {
                 newBox.GrowToFit((new Vector4(box[i], 1.0f) * matrix).Xyz);
@@ -108,6 +112,11 @@ namespace IDKEngine.Shapes
             Vector3 extends = addedSize - boundingBox.Size();
 
             return extends;
+        }
+
+        public static Box Empty()
+        {
+            return new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
         }
     }
 }

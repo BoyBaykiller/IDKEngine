@@ -1,4 +1,4 @@
-// Implementation of: http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare, Slides: 145-162
+// Implementation of http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare, Slides: 145-162
 
 #version 460 core
 #define DOWNSAMPLE_STAGE 0

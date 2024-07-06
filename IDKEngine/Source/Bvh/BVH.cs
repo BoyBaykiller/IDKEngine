@@ -9,7 +9,7 @@ using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 
-namespace IDKEngine
+namespace IDKEngine.Bvh
 {
     public class BVH : IDisposable
     {
@@ -175,7 +175,7 @@ namespace IDKEngine
             Stopwatch sw = Stopwatch.StartNew();
             Tlas = new TLAS(blases, drawCommands, meshInstances);
             TlasBuild(true);
-            Logger.Log(Logger.LogLevel.Info, $"Created and uploaded Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
+            Logger.Log(Logger.LogLevel.Info, $"Build and uploaded Top Level Acceleration Structures (TLAS) for {Tlas.MeshInstances.Length} instances in {sw.ElapsedMilliseconds} milliseconds");
         }
 
         public void TlasBuild(bool force = false)
@@ -194,29 +194,46 @@ namespace IDKEngine
 
         public void BlasesBuild(int start, int count)
         {
-            Stopwatch sw = Stopwatch.StartNew();
+            {
+                Stopwatch swBuilding = Stopwatch.StartNew();
+                Parallel.For(start, start + count, i =>
+                //for (int i = start; i < start + count; i++)
+                {
+                    blases[i].Build();
+                });
+                swBuilding.Stop();
+
+                Stopwatch swOptimization = Stopwatch.StartNew();
+                Parallel.For(start, start + count, i =>
+                //for (int i = start; i < start + count; i++)
+                {
+                    blases[i].Optimize(new BLAS.OptimizationSettings());
+                });
+
+                swOptimization.Stop();
+
+                Logger.Log(Logger.LogLevel.Info, 
+                    $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms(Build) + {swOptimization.ElapsedMilliseconds}ms(Optimization) = " +
+                    $"{swBuilding.ElapsedMilliseconds + swOptimization.ElapsedMilliseconds}ms"
+                );
+
+                if (true)
+                {
+                    float totalSAH = 0;
+                    for (int i = start; i < start + count; i++)
+                    {
+                        totalSAH += blases[i].ComputeGlobalCost(blases[i].Root);
+                    }
+                    Logger.Log(Logger.LogLevel.Info, $"Added SAH of all BLAS'es = {totalSAH}");
+                }
+            }
+            SetBlasBuffersContent();
 
             int maxTreeDepth = MaxBlasTreeDepth;
-
-            Parallel.For(start, start + count, i =>
-            //for (int i = start; i < start + count; i++)
+            for (int i = start; i < start + count; i++)
             {
-                blases[i].Build();
-                Helper.InterlockedMax(ref maxTreeDepth, blases[i].MaxTreeDepth);
-            });
-            SetBlasBuffersContent();
-            Logger.Log(Logger.LogLevel.Info, $"Created and uploaded {count} Bottom Level Acceleration Structures (BLAS) in {sw.ElapsedMilliseconds} milliseconds");
-
-            // if (true)
-            // {
-            //     float totalSAH = 0;
-            //     for (int i = start; i < start + count; i++)
-            //     {
-            //         totalSAH += blases[i].ComputeGlobalCost(blases[i].Root);
-            //     }
-            //     Console.WriteLine(totalSAH);
-            // }
-
+                maxTreeDepth = Math.Max(maxTreeDepth, blases[i].MaxTreeDepth);
+            }
             MaxBlasTreeDepth = maxTreeDepth;
         }
 
@@ -240,6 +257,7 @@ namespace IDKEngine
 
                 uploadedBlasNodes += blas.Nodes.Length;
             }
+            SetBlasBuffersContent();
         }
 
         private unsafe void SetBlasBuffersContent()
@@ -254,16 +272,16 @@ namespace IDKEngine
                 BLAS blas = blases[i];
 
                 blasBuffer.UploadElements(uploadedBlasNodes, blas.Nodes.Length, blas.Nodes[0]);
-                blasTriangleIndicesBuffer.UploadElements(uploadedTriangleIndices, blas.Triangles.Length, blas.Triangles[0]);
+                blasTriangleIndicesBuffer.UploadElements(uploadedTriangleIndices, blas.TriangleIndices.Length, blas.TriangleIndices[0]);
 
                 uploadedBlasNodes += blas.Nodes.Length;
-                uploadedTriangleIndices += blas.Triangles.Length;
+                uploadedTriangleIndices += blas.TriangleIndices.Length;
             }
         }
 
         public int GetBlasesTriangleIndicesCount()
         {
-            return blases.Sum(blasInstances => blasInstances.Triangles.Length);
+            return blases.Sum(blasInstances => blasInstances.TriangleIndices.Length);
         }
 
         public int GetBlasesNodeCount()

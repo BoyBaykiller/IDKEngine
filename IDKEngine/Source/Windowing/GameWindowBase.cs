@@ -55,9 +55,8 @@ namespace IDKEngine.Windowing
                 WindowVSync = _isVSync;
             }
         }
-        
-        private float _time;
-        public float WindowTime => _time;
+
+        public float WindowTime { get; private set; }
 
         private Vector2i _framebufferSize;
         public Vector2i WindowFramebufferSize
@@ -168,19 +167,31 @@ namespace IDKEngine.Windowing
 
         public void Run()
         {
-            Stopwatch sw = Stopwatch.StartNew();
-
             OnStart();
+
+            float maxDt = 1.0f / 30.0f;
+            float frameTime = maxDt; // always run update on first iteration
+
             while (!GLFW.WindowShouldClose(window))
             {
-                sw.Restart();
+                Stopwatch sw = Stopwatch.StartNew();
 
-                KeyboardState.Update();
-                MouseState.Update();
-                GameLoop();
+                float timeToSimulate = frameTime;
+                while (timeToSimulate > 0.0f)
+                {
+                    float thisDt = Math.Min(timeToSimulate, maxDt);
 
-                float elapsed = (float)sw.Elapsed.TotalMilliseconds;
-                _time += elapsed;
+                    KeyboardState.Update();
+                    MouseState.Update();
+                    Update(thisDt);
+
+                    timeToSimulate -= thisDt;
+                    WindowTime += thisDt;
+                }
+
+
+                Render(frameTime);
+                frameTime = (float)sw.Elapsed.TotalSeconds;
             }
         }
 
@@ -199,7 +210,8 @@ namespace IDKEngine.Windowing
             GLFW.SetWindowShouldClose(window, true);
         }
 
-        protected abstract void GameLoop();
+        protected abstract void Render(float dT);
+        protected abstract void Update(float dT);
         protected abstract void OnStart();
         protected abstract void OnWindowResize();
         protected abstract void OnKeyPress(char key);

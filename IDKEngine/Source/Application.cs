@@ -97,29 +97,21 @@ namespace IDKEngine
         public Intersections.SceneVsMovingSphereSettings SceneVsCamCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
         {
             IsEnabled = true,
-            TestSteps = 12,
+            TestSteps = 3,
             RecursiveSteps = 12,
             EpsilonNormalOffset = 0.001f
         };
 
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
-        private float lastRenderTime = 1.0f / 144.0f;
         public Application(int width, int height, string title)
             : base(width, height, title, 4, 6)
         {
         }
 
-        protected override void GameLoop()
+        protected override void Render(float dT)
         {
-            Stopwatch sw = Stopwatch.StartNew();
-            Render(lastRenderTime);
-            lastRenderTime = (float)sw.Elapsed.TotalSeconds;
-        }
-
-        private void Render(float dT)
-        {
-            Update(dT);
+            RenderPrepare(dT);
 
             if (RequestPresentationResolution.HasValue || RequestRenderResolutionScale.HasValue)
             {
@@ -172,6 +164,7 @@ namespace IDKEngine
                     Bloom.Compute(PathTracer.Result);
                 }
 
+                TonemapAndGamma.Settings.IsAgXTonemaping = !PathTracer.IsDebugBVHTraversal;
                 TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
@@ -202,116 +195,29 @@ namespace IDKEngine
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderGui)
             {
-                gui.Draw(this, dT);
+                gui.Draw(this);
             }
             else
             {
                 BBG.Rendering.CopyTextureToSwapchain(TonemapAndGamma.Result);
             }
+
             PollEvents();
             SwapBuffers();
 
             fpsCounter++;
+            if (fpsTimer.ElapsedMilliseconds >= 1000)
+            {
+                FramesPerSecond = fpsCounter;
+                WindowTitle = $"IDKEngine FPS: {FramesPerSecond}";
+                fpsCounter = 0;
+                fpsTimer.Restart();
+            }
         }
 
-        private void Update(float dT)
+        private void RenderPrepare(float dT)
         {
             MainThreadQueue.Execute();
-
-            gui.Update(this);
-
-            {
-                if (KeyboardState[Keys.Escape] == Keyboard.InputState.Pressed)
-                {
-                    ShouldClose();
-                }
-                if (KeyboardState[Keys.V] == Keyboard.InputState.Touched)
-                {
-                    WindowVSync = !WindowVSync;
-                }
-                if (KeyboardState[Keys.G] == Keyboard.InputState.Touched)
-                {
-                    RenderGui = !RenderGui;
-                    if (!RenderGui)
-                    {
-                        RequestPresentationResolution = WindowFramebufferSize;
-                    }
-                }
-                if (KeyboardState[Keys.F11] == Keyboard.InputState.Touched)
-                {
-                    WindowFullscreen = !WindowFullscreen;
-                }
-                if (KeyboardState[Keys.T] == Keyboard.InputState.Touched)
-                {
-                    TimeEnabled = !TimeEnabled;
-                }
-                if (KeyboardState[Keys.D1] == Keyboard.InputState.Touched)
-                {
-                    BBG.AbstractShaderProgram.RecompileAll();
-                    PathTracer?.ResetRenderProcess();
-                }
-            }
-
-            if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
-            {
-                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                {
-                    if (MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
-                    {
-                        Vector3 force = Camera.ViewDir * 5.0f;
-
-                        CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, RNG.RandomVec3(32.0f, 88.0f), 0.3f);
-                        newLight.Velocity = Camera.Velocity;
-                        newLight.AddImpulse(force);
-
-                        Camera.AddImpulse(-force);
-
-                        if (LightManager.AddLight(newLight))
-                        {
-                            int newLightIndex = LightManager.Count - 1;
-                            CpuPointShadow pointShadow = new CpuPointShadow(256, RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
-                            if (!LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
-                            {
-                                pointShadow.Dispose();
-                            }
-                        }
-                    }
-
-                    Camera.ProcessInputs(KeyboardState, MouseState);
-                    Camera.AdvanceSimulation(dT);
-                }
-
-                if (TimeEnabled)
-                {
-                    LightManager.AdvanceSimulation(dT, ModelManager);
-                }
-
-                if (KeyboardState[Keys.E] == Keyboard.InputState.Touched && !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
-                {
-                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorNormal;
-                        Camera.Velocity = Vector3.Zero;
-                    }
-                    else
-                    {
-                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
-                    }
-                }
-            }
-
-            Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
-            Vector3 prevSpherePos = movingSphere.Center;
-            Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
-            {
-                Vector3 deltaStep = Camera.Position - prevSpherePos;
-                Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
-                Camera.Position = movingSphere.Center + slidedDeltaStep;
-
-                Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane); 
-
-                prevSpherePos = movingSphere.Center;
-            });
 
             {
                 Camera.ProjectionSize = RenderResolution;
@@ -339,27 +245,141 @@ namespace IDKEngine
                 gpuPerFrameDataBuffer.UploadElements(gpuPerFrameData);
             }
 
-            Camera.SetPrevToCurrentPosition();
-            LightManager.Update(out bool anyLightMoved);
-            ModelManager.Update(out bool anyMeshInstanceMoved);
+            LightManager.UpdateBuffer(out bool anyLightMoved);
+            ModelManager.UpdateMeshInstanceBufferBatched(out bool anyMeshInstanceMoved);
             ModelManager.BVH.TlasBuild();
-            
+
             bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
             if ((RenderPath == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
             {
                 PathTracer.ResetRenderProcess();
             }
-            
-            if (fpsTimer.ElapsedMilliseconds >= 1000)
-            {
-                FramesPerSecond = fpsCounter;
-                WindowTitle = $"IDKEngine FPS: {FramesPerSecond}";
-                fpsCounter = 0;
-                fpsTimer.Restart();
-            }
         }
 
-        protected unsafe override void OnStart()
+        protected override void Update(float dT)
+        {
+            gui.Update(this, dT);
+
+            if (KeyboardState[Keys.Escape] == Keyboard.InputState.Pressed)
+            {
+                ShouldClose();
+            }
+
+            if (!ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+            {
+                if (KeyboardState[Keys.V] == Keyboard.InputState.Touched)
+                {
+                    WindowVSync = !WindowVSync;
+                }
+                if (KeyboardState[Keys.G] == Keyboard.InputState.Touched)
+                {
+                    RenderGui = !RenderGui;
+                    if (!RenderGui)
+                    {
+                        RequestPresentationResolution = WindowFramebufferSize;
+                    }
+                }
+                if (KeyboardState[Keys.F11] == Keyboard.InputState.Touched)
+                {
+                    WindowFullscreen = !WindowFullscreen;
+                }
+                if (KeyboardState[Keys.T] == Keyboard.InputState.Touched)
+                {
+                    TimeEnabled = !TimeEnabled;
+                }
+                if (KeyboardState[Keys.D1] == Keyboard.InputState.Touched)
+                {
+                    BBG.AbstractShaderProgram.RecompileAll();
+                    PathTracer?.ResetRenderProcess();
+                }
+                if (KeyboardState[Keys.E] == Keyboard.InputState.Touched)
+                {
+                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                    {
+                        MouseState.CursorMode = CursorModeValue.CursorNormal;
+                        Camera.Velocity = Vector3.Zero;
+                    }
+                    else
+                    {
+                        MouseState.CursorMode = CursorModeValue.CursorDisabled;
+                    }
+                }
+            }
+            if (!ImGuiNET.ImGui.GetIO().WantCaptureMouse)
+            {
+                if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
+                {
+                    if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                    {
+                        if (MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
+                        {
+                            Vector3 force = Camera.ViewDir * 5.0f;
+
+                            CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, RNG.RandomVec3(32.0f, 88.0f), 0.3f);
+                            newLight.Velocity = Camera.Velocity;
+                            newLight.AddImpulse(force);
+
+                            Camera.AddImpulse(-force);
+
+                            if (LightManager.AddLight(newLight))
+                            {
+                                int newLightIndex = LightManager.Count - 1;
+                                CpuPointShadow pointShadow = new CpuPointShadow(256, RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
+                                if (!LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
+                                {
+                                    pointShadow.Dispose();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
+            {
+                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                {
+                    Camera.ProcessInputs(KeyboardState, MouseState);
+                    Camera.AdvanceSimulation(dT);
+                }
+
+                if (TimeEnabled)
+                {
+                    LightManager.AdvanceSimulation(dT, ModelManager);
+                }
+            }
+
+            Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
+            Vector3 prevSpherePos = movingSphere.Center;
+            Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
+            {
+                Vector3 deltaStep = Camera.Position - prevSpherePos;
+                Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
+                Camera.Position = movingSphere.Center + slidedDeltaStep;
+
+                Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane); 
+
+                prevSpherePos = movingSphere.Center;
+            });
+
+            //{
+            //    int meshID = 0;
+            //    int verticesStart = ModelManager.DrawCommands[meshID].BaseVertex;
+            //    int verticesCount = ModelManager.GetMeshVertexCount(meshID);
+            //    for (int i = verticesStart; i < verticesStart + verticesCount; i++)
+            //    {
+            //        ModelManager.VertexPositions[i].X += 2f * dT;
+            //    }
+
+            //    ModelManager.UpdateVertexPositions(verticesStart, verticesCount);
+            //    ModelManager.BVH.BlasesRefit(meshID, 1);
+            //    //ModelSystem.BVH.TlasBuild();
+            //}
+
+            Camera.SetPrevToCurrentPosition();
+        }
+
+        protected override unsafe void OnStart()
         {
             BBG.Initialize(Helper.GLDebugCallback);
 
@@ -409,8 +429,9 @@ namespace IDKEngine
 
             ModelManager = new ModelManager();
             LightManager = new LightManager();
-            
-            Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), -165.4f, 7.4f);
+
+            Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), 360.0f - 165.4f, 90.0f - 7.4f);
+            //Camera = new Camera(WindowFramebufferSize, new Vector3(7.0f, 5.0f, -5.0f), 95.0f, 90.0f);
             if (true)
             {
                 ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Ressource/Models/SponzaCompressed/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f)).Value;
@@ -445,6 +466,8 @@ namespace IDKEngine
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), /*new Vector3(-4.0f, 0.0f, 0.0f), */new Vector3(8.773416f, 22.459948f, 533.77466f), 0.3f));
+
+                //LightManager.AddLight(new CpuLight(new Vector3(-14.054f, 14.142f, -0.361f), Camera.GetViewDirFromAngles(1.1f, 90.0f + 36.61f) * 10.0f, new Vector3(1.0f), 0.3f));
 
                 for (int i = 0; i < 3; i++)
                 {

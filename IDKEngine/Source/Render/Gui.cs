@@ -9,6 +9,7 @@ using ImGuiNET;
 using BBLogger;
 using BBOpenGL;
 using NativeFileDialogSharp;
+using IDKEngine.Bvh;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
@@ -74,10 +75,10 @@ namespace IDKEngine.Render
             RecordingVars.Timer = Stopwatch.StartNew();
         }
 
-        public unsafe void Draw(Application app, float frameTime)
+        public unsafe void Draw(Application app)
         {
-            backend.Update(app, frameTime);
-            
+            ImGui.NewFrame();
+
             ImGui.DockSpaceOverViewport();
 
             int tempInt;
@@ -113,7 +114,7 @@ namespace IDKEngine.Render
                 float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
                 if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
                 {
-                    ImGui.Text($"  * Vertex Indices ({app.ModelManager.BVH.GetBlasesTriangleIndicesCount() * 3}) = {mbBlasTrianglesIndices}mb");
+                    ImGui.Text($"  * Triangles ({app.ModelManager.BVH.GetBlasesTriangleIndicesCount()}) = {mbBlasTrianglesIndices}mb");
                     ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
                     ImGui.Text($"  * Tlas Nodes ({app.ModelManager.BVH.Tlas.Nodes.Length}) = {mbBTlasNodes}mb");
 
@@ -157,7 +158,7 @@ namespace IDKEngine.Render
                     }
 
                     ImGui.SliderFloat("NearPlane", ref app.Camera.NearPlane, 0.001f, 5.0f);
-                    ImGui.SliderFloat("FarPlane", ref app.Camera.FarPlane, 5.0f, 1000.0f);
+                    ImGui.SliderFloat("FarPlane", ref app.Camera.FarPlane, 5.0f, 2000.0f);
 
                     ImGui.Separator();
 
@@ -839,7 +840,7 @@ namespace IDKEngine.Render
                     bool shouldUpdateMesh = false;
                     ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[SelectedEntity.EntityID];
                     ref GpuMesh mesh = ref app.ModelManager.Meshes[SelectedEntity.EntityID];
-                    ref GpuMeshInstance meshInstance = ref app.ModelManager.MeshInstances[SelectedEntity.InstanceID];
+                    GpuMeshInstance meshInstance = app.ModelManager.MeshInstances[SelectedEntity.InstanceID];
 
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance}");
@@ -916,6 +917,7 @@ namespace IDKEngine.Render
                     {
                         shouldResetPT = true;
                         app.ModelManager.UpdateMeshBuffer(SelectedEntity.EntityID, 1);
+                        app.ModelManager.SetMeshInstance(SelectedEntity.InstanceID, meshInstance);
                     }
                 }
                 else if (SelectedEntity.EntityType == EntityType.Light)
@@ -1039,8 +1041,10 @@ namespace IDKEngine.Render
             }
         }
 
-        public void Update(Application app)
+        public void Update(Application app, float dT)
         {
+            backend.Update(app, dT);
+
             if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
             {
                 backend.IsIgnoreMouseInput = true;

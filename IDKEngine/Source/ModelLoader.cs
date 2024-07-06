@@ -184,9 +184,9 @@ namespace IDKEngine
             sw.Stop();
 
             nint totalIndicesCount = 0;
-            for (int i = 0; i < model.MeshInstances.Length; i++)
+            for (int i = 0; i < model.DrawCommands.Length; i++)
             {
-                ref readonly BBG.DrawElementsIndirectCommand cmd = ref model.DrawCommands[model.MeshInstances[i].MeshIndex];
+                ref readonly BBG.DrawElementsIndirectCommand cmd = ref model.DrawCommands[i];
                 totalIndicesCount += cmd.IndexCount * cmd.InstanceCount;
             }
             Logger.Log(Logger.LogLevel.Info, $"Loaded \"{fileName}\" in {sw.ElapsedMilliseconds}ms (Triangles = {totalIndicesCount / 3})");
@@ -385,7 +385,7 @@ namespace IDKEngine
                         continue;
                     }
 
-                    if (TryAsyncLoadGltfTexture(gltfTexture, textureType, out GLTexture glTexture, out GLSampler glSampler, useExtBc5NormalMetallicRoughness))
+                    if (TryAsyncLoadGltfTexture(gltfTexture, textureType, useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler))
                     {
                         GLTexture.BindlessHandle bindlessHandle = glTexture.GetTextureHandleARB(glSampler);
                         gpuMaterial[textureType] = bindlessHandle;
@@ -407,12 +407,12 @@ namespace IDKEngine
             return gpuMaterials;
         }
 
-        private static unsafe bool TryAsyncLoadGltfTexture(GltfTexture gltfTexture, GpuMaterial.BindlessHandle textureType, out GLTexture glTexture, out GLSampler glSampler, bool useExtBc5NormalMetallicRoughness = false)
+        private static unsafe bool TryAsyncLoadGltfTexture(GltfTexture gltfTexture, GpuMaterial.BindlessHandle textureType, bool useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler)
         {
             glTexture = null;
             glSampler = null;
 
-            Ktx2.Texture* ktxTexture = null;
+            Ktx2Texture ktx2Texture = null;
             ImageLoader.ImageHeader imageHeader = new ImageLoader.ImageHeader();
             GLTexture.InternalFormat internalFormat = 0;
             bool mipmapsRequired = false;
@@ -441,19 +441,23 @@ namespace IDKEngine
             {
                 ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
                 
-                Ktx2.CreateFromMemory(imageData[0], (nuint)imageData.Length, Ktx2.TextureCreateFlag.LoadImageDataBit, out Ktx2.Texture* ktxTextureCopy);
-                if (!Ktx2.NeedsTranscoding(ktxTextureCopy))
+                Ktx2.ErrorCode errorCode = Ktx2Texture.FromMemory(imageData, Ktx2.TextureCreateFlag.LoadImageDataBit, out ktx2Texture);
+                if (errorCode != Ktx2.ErrorCode.Success)
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Failed to load KTX texture. {nameof(Ktx2Texture.FromMemory)} returned {errorCode}");
+                    return false;
+                }
+                if (!ktx2Texture.NeedsTranscoding)
                 {
                     Logger.Log(Logger.LogLevel.Error, "KTX textures are expected to require transcoding, meaning they are either ETC1S or UASTC encoded.\n" +
-                                                        $"SupercompressionScheme = {ktxTextureCopy->SupercompressionScheme}");
+                                                        $"SupercompressionScheme = {ktx2Texture.SupercompressionScheme}");
                     return false;
                 }
 
-                ktxTexture = ktxTextureCopy;
-                imageHeader.Width = (int)ktxTexture->BaseWidth;
-                imageHeader.Height = (int)ktxTexture->BaseHeight;
-                imageHeader.Channels = (int)Ktx2.GetNumComponents(ktxTexture);
-                levels = (int)ktxTexture->NumLevels;
+                imageHeader.Width = ktx2Texture.BaseWidth;
+                imageHeader.Height = ktx2Texture.BaseHeight;
+                imageHeader.Channels = ktx2Texture.Channels;
+                levels = ktx2Texture.Levels;
 
                 internalFormat = textureType switch
                 {
@@ -511,44 +515,41 @@ namespace IDKEngine
                 ThreadPool.SetMinThreads(threadPoolThreads, 1);
                 ThreadPool.SetMaxThreads(threadPoolThreads, 1);
 
-                bool isKtx = ktxTexture != null;
+                bool isKtx = ktx2Texture != null;
                 if (isKtx)
                 {
                     Task.Run(() =>
                     {
-                        //int supercompressedImageSize = (int)ktxTexture->DataSize; // Supercompressed Size (Size on Disk, minus additional Metadata)
-
-                        Ktx2.ErrorCode errorCode = Ktx2.TranscodeBasis(ktxTexture, GLFormatToKtxFormat(glTextureCopy.Format), Ktx2.TranscodeFlagBits.HighQuality);
+                        //int supercompressedImageSize = (int)ktxTexture->DataSize; // Supercompressed size before transcoding
+                        Ktx2.ErrorCode errorCode = ktx2Texture.Transcode(GLFormatToKtxFormat(glTextureCopy.Format), Ktx2.TranscodeFlagBits.HighQuality);
                         if (errorCode != Ktx2.ErrorCode.Success)
                         {
-                            Logger.Log(Logger.LogLevel.Error, $"Ktx {nameof(Ktx2.TranscodeBasis)} returned {errorCode}");
+                            Logger.Log(Logger.LogLevel.Error, $"Failed to transcode KTX texture. {nameof(ktx2Texture.Transcode)} returned {errorCode}");
                             return;
                         }
 
                         MainThreadQueue.AddToLazyQueue(() =>
                         {
-                            int compressedImageSize = (int)ktxTexture->DataSize; // Compressed Size (Size in Vram)
-                            int uncompressedImageSize = imageHeader.Width * imageHeader.Height * imageHeader.Channels;
-                            int saved = uncompressedImageSize - compressedImageSize;
+                            int compressedImageSize = ktx2Texture.DataSize; // Compressed size after transcoding
 
                             BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
                             stagingBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, compressedImageSize);
 
                             Task.Run(() =>
                             {
-                                Memory.Copy(ktxTexture->PData, stagingBuffer.MappedMemory, compressedImageSize);
+                                Memory.Copy(ktx2Texture.Data, stagingBuffer.MappedMemory, compressedImageSize);
 
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
                                     for (int level = 0; level < levels; level++)
                                     {
-                                        Ktx2.GetImageOffset(ktxTexture, (uint)level, 0, 0, out nuint dataOffset);
+                                        ktx2Texture.GetImageOffset(level, out nint dataOffset);
 
-                                        Vector3i size = GLTexture.GetMipmapLevelSize((int)ktxTexture->BaseWidth, (int)ktxTexture->BaseHeight, (int)ktxTexture->BaseDepth, level);
-                                        glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, (nint)dataOffset, level);
+                                        Vector3i size = GLTexture.GetMipmapLevelSize(ktx2Texture.BaseWidth, ktx2Texture.BaseHeight, ktx2Texture.BaseDepth, level);
+                                        glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
                                     }
                                     stagingBuffer.Dispose();
-                                    Ktx2.Destroy(ktxTexture);
+                                    ktx2Texture.Dispose();
 
                                     TextureLoaded?.Invoke();
                                 });
@@ -764,7 +765,7 @@ namespace IDKEngine
                 gpuMeshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
                 gpuMeshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
 
-                Box meshletBoundingBox = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+                Box meshletBoundingBox = Box.Empty();
                 for (uint j = gpuMeshlet.VertexOffset; j < gpuMeshlet.VertexOffset + gpuMeshlet.VertexCount; j++)
                 {
                     uint vertexIndex = meshMeshletsData.VertexIndices[j];
@@ -942,7 +943,7 @@ namespace IDKEngine
         }
         private static unsafe MeshletData GenerateMeshlets(ReadOnlySpan<Vector3> meshVertexPositions, ReadOnlySpan<uint> meshIndices)
         {
-            const float coneWeight = 0.0f;
+            const float CONE_WEIGHT = 0.0f;
 
             /// Keep in sync between shader and client code!
             // perfectly fits 4 32-sized subgroups
@@ -968,7 +969,7 @@ namespace IDKEngine
                 (nuint)sizeof(Vector3),
                 MESHLET_MAX_VERTEX_COUNT,
                 MESHLET_MAX_TRIANGLE_COUNT,
-                coneWeight
+                CONE_WEIGHT
             );
 
             for (int i = 0; i < meshlets.Length; i++)

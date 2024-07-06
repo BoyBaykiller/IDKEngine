@@ -1,4 +1,5 @@
 ﻿using IDKEngine.Shapes;
+using IDKEngine.Bvh;
 
 namespace IDKEngine.GpuTypes
 {

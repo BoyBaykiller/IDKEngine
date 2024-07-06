@@ -22,8 +22,8 @@ Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted
 
 Notes:
  * If [gltfpack](https://github.com/BoyBaykiller/meshoptimizer) is found in PATH or working dir you are given the option to automatically compress glTF files on load
- * Crashes on AMD drivers newer than 23.12.1 because of [driver bug](https://community.amd.com/t5/opengl-vulkan/opengl-bug-imagesize-causes-crash-when-using-gl-arb-bindless/m-p/668942#M5125)
  * Doesn't fully work on Mesa radeonsi driver
+ * I no longer have access to a NVIDIA GPU, so I can't guarantee NVIDIA exclusive features work at any given point
 
 
 # Controls

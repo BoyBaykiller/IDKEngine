@@ -5,7 +5,7 @@ namespace IDKEngine.Render
 {
     class CpuLight
     {
-        public const float MASS = 0.5f; // can easily make more dynamic in future
+        public const float MASS = 0.5f;
 
         public GpuLight GpuLight;
 
@@ -71,6 +71,11 @@ namespace IDKEngine.Render
         public bool HasPointShadow()
         {
             return GpuLight.PointShadowIndex >= 0;
+        }
+
+        public void ConnectPointShadow(int pointShadowIndex)
+        {
+            GpuLight.PointShadowIndex = pointShadowIndex;
         }
 
         public void DisconnectPointShadow()

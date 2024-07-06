@@ -10,5 +10,12 @@ namespace IDKEngine.GpuTypes
         public uint TriCount;
 
         public bool IsLeaf => TriCount > 0;
+
+        public float HalfArea()
+        {
+            Vector3 size = Max - Min;
+            float area = (size.X + size.Y) * size.Z + size.X * size.Y;
+            return area;
+        }
     }
 }

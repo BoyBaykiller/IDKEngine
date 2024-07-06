@@ -8,7 +8,7 @@ namespace IDKEngine
 {
     class Camera
     {
-        public const float MASS = 60.0f; // can easily make more dynamic in future
+        public const float MASS = 60.0f;
 
         public Vector3 ViewDir => GetViewDirFromAngles(LookX, LookY);
         public Vector3 PrevPosition { get; private set; }
@@ -38,8 +38,8 @@ namespace IDKEngine
 
             set
             {
-                _lookY = Math.Min(value, 89.999f);
-                _lookY = Math.Max(_lookY, -89.99f);
+                _lookY = Math.Min(value, 180.0f - 0.01f);
+                _lookY = Math.Max(_lookY, 0.0f + 0.01f);
             }
         }
 
@@ -55,7 +55,7 @@ namespace IDKEngine
         public float FarPlane = 250.0f;
         public float FovY = MathHelper.DegreesToRadians(102.0f);
 
-        public Camera(Vector2i size, Vector3 position, float lookX = -90.0f, float lookY = 0.0f)
+        public Camera(Vector2i size, Vector3 position, float lookX = 270.0f, float lookY = 0.0f)
         {
             Position = position;
             PrevPosition = position;
@@ -77,7 +77,7 @@ namespace IDKEngine
             Vector2 mouseDelta = mouse.Position - mouse.LastPosition;
 
             LookX += mouseDelta.X * MouseSensitivity;
-            LookY -= mouseDelta.Y * MouseSensitivity;
+            LookY += mouseDelta.Y * MouseSensitivity;
 
             Vector3 force = new Vector3();
             if (keyboard[Keys.W] == Keyboard.InputState.Pressed)
@@ -156,10 +156,10 @@ namespace IDKEngine
 
         public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
         {
-            Vector3 viewDir;
-            viewDir.X = MathF.Cos(MathHelper.DegreesToRadians(lookX)) * MathF.Cos(MathHelper.DegreesToRadians(lookY));
-            viewDir.Y = MathF.Sin(MathHelper.DegreesToRadians(lookY));
-            viewDir.Z = MathF.Sin(MathHelper.DegreesToRadians(lookX)) * MathF.Cos(MathHelper.DegreesToRadians(lookY));
+            float radiansX = MathHelper.DegreesToRadians(lookX);
+            float radiansY = MathHelper.DegreesToRadians(lookY);
+
+            Vector3 viewDir = MyMath.PolarToCartesian(radiansX, radiansY);
 
             return viewDir;
         }

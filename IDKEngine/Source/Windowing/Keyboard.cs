@@ -20,7 +20,7 @@ namespace IDKEngine.Windowing
         }
 
         
-        public static readonly Keys[] KeyValues = Enum.GetValues<Keys>();
+        private static readonly Keys[] keyValues = Enum.GetValues<Keys>();
 
         // Keys aren't layed out sequentialy so I decided to use a dictionary instead of InputState[]
         private readonly Dictionary<Keys, InputState> keyStates;
@@ -32,27 +32,27 @@ namespace IDKEngine.Windowing
 
             keyStates = new Dictionary<Keys, InputState>();
 
-            for (int i = 0; i < KeyValues.Length; i++)
+            for (int i = 0; i < keyValues.Length; i++)
             {
-                if (!keyStates.ContainsKey(KeyValues[i]))
+                if (!keyStates.ContainsKey(keyValues[i]))
                 {
-                    keyStates.Add(KeyValues[i], InputState.Released);
+                    keyStates.Add(keyValues[i], InputState.Released);
                 }
             }
         }
 
         public void Update()
         {
-            for (int i = 0; i < KeyValues.Length; i++)
+            for (int i = 0; i < keyValues.Length; i++)
             {
-                InputAction action = GLFW.GetKey(window, KeyValues[i]);
-                if (action == InputAction.Press && keyStates[KeyValues[i]] == InputState.Released)
+                InputAction action = GLFW.GetKey(window, keyValues[i]);
+                if (action == InputAction.Press && keyStates[keyValues[i]] == InputState.Released)
                 {
-                    keyStates[KeyValues[i]] = InputState.Touched;
+                    keyStates[keyValues[i]] = InputState.Touched;
                 }
                 else
                 {
-                    keyStates[KeyValues[i]] = (InputState)action;
+                    keyStates[keyValues[i]] = (InputState)action;
                 }
             }
         }

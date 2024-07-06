@@ -13,6 +13,7 @@ namespace IDKEngine.Render
             public float Linear;
             public float Peak;
             public float Compression;
+            public bool IsAgXTonemaping;
 
             public static GpuSettings Default = new GpuSettings()
             {
@@ -20,7 +21,8 @@ namespace IDKEngine.Render
                 Saturation = 1.06f,
                 Linear = 0.18f,
                 Peak = 1.0f,
-                Compression = 0.10f
+                Compression = 0.10f,
+                IsAgXTonemaping = true,
             };
         }
 

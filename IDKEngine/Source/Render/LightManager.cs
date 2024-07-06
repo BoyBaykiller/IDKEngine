@@ -159,7 +159,7 @@ namespace IDKEngine.Render
                 if (affectedLight.HasPointShadow())
                 {
                     pointShadowManager.TryGetPointShadow(affectedLight.GpuLight.PointShadowIndex, out CpuPointShadow pointShadow);
-                    pointShadow.SetConnectedLight(index);
+                    pointShadow.ConnectLight(index);
                 }
             }
         }
@@ -180,8 +180,8 @@ namespace IDKEngine.Render
 
             if (pointShadowManager.TryAddPointShadow(pointShadow, out int pointShadowIndex))
             {
-                pointShadow.SetConnectedLight(lightIndex);
-                lights[lightIndex].GpuLight.PointShadowIndex = pointShadowIndex;
+                pointShadow.ConnectLight(lightIndex);
+                lights[lightIndex].ConnectPointShadow(pointShadowIndex);
                 return true;
             }
             return false;
@@ -214,7 +214,7 @@ namespace IDKEngine.Render
                     return;
                 }
 
-                affectedLight.GpuLight.PointShadowIndex = pointShadowIndex;
+                affectedLight.ConnectPointShadow(pointShadowIndex);
             }
         }
 
@@ -230,8 +230,8 @@ namespace IDKEngine.Render
                 Intersections.SceneVsMovingSphereCollisionRoutine(modelManager, SceneVsSphereCollisionSettings, ref movingSphere, cpuLight.GpuLight.Position, (in Intersections.SceneHitInfo hitInfo) =>
                 {
                     Vector3 deltaStep = cpuLight.GpuLight.Position - prevSpherePos;
-                    Vector3 slidedDeltaStep = Plane.Reflect(deltaStep, hitInfo.SlidingPlane);
-                    cpuLight.GpuLight.Position = movingSphere.Center + slidedDeltaStep;
+                    Vector3 reflected = Plane.Reflect(deltaStep, hitInfo.SlidingPlane);
+                    cpuLight.GpuLight.Position = movingSphere.Center + reflected;
 
                     cpuLight.Velocity = Plane.Reflect(cpuLight.Velocity, hitInfo.SlidingPlane);
 
@@ -239,59 +239,61 @@ namespace IDKEngine.Render
                 });
             }
 
-
-            for (int i = 0; i < MovingLightsCollisionSetting.RecursiveSteps && MovingLightsCollisionSetting.IsEnabled; i++)
+            if (MovingLightsCollisionSetting.IsEnabled)
             {
-                for (int j = 0; j < Count; j++)
+                for (int i = 0; i < MovingLightsCollisionSetting.RecursiveSteps; i++)
                 {
-                    CpuLight light = lights[j];
-
-                    float intersectionTime = float.MaxValue;
-                    int bestOtherLightIndex = -1;
-
-                    for (int k = j + 1; k < Count; k++)
+                    for (int j = 0; j < Count; j++)
                     {
-                        CpuLight otherLight = lights[k];
+                        CpuLight light = lights[j];
 
-                        if (Intersections.MovingSphereVsSphere(
-                            Conversions.ToSphere(light.GpuLight), light.GpuLight.PrevPosition,
-                            Conversions.ToSphere(otherLight.GpuLight), otherLight.GpuLight.PrevPosition,
-                            out float t1, out float t2, out float tScale))
+                        float intersectionTime = float.MaxValue;
+                        int bestOtherLightIndex = -1;
+
+                        for (int k = j + 1; k < Count; k++)
                         {
-                            t1 /= tScale;
-                            t2 /= tScale;
+                            CpuLight otherLight = lights[k];
 
-                            float thisIntersectionTime = t1;
-
-                            bool invertBias = false;
-                            if (thisIntersectionTime < 0.0f)
+                            if (Intersections.MovingSphereVsSphere(
+                                Conversions.ToSphere(light.GpuLight), light.GpuLight.PrevPosition,
+                                Conversions.ToSphere(otherLight.GpuLight), otherLight.GpuLight.PrevPosition,
+                                out float t1, out float t2, out float tScale))
                             {
-                                if (MathF.Abs(t1) > MathF.Abs(t2))
+                                t1 /= tScale;
+                                t2 /= tScale;
+
+                                float thisIntersectionTime = t1;
+
+                                bool invertBias = false;
+                                if (thisIntersectionTime < 0.0f)
                                 {
-                                    invertBias = true;
-                                    thisIntersectionTime = t2;
+                                    if (MathF.Abs(t1) > MathF.Abs(t2))
+                                    {
+                                        invertBias = true;
+                                        thisIntersectionTime = t2;
+                                    }
+                                }
+
+                                if (thisIntersectionTime > 1.0f)
+                                {
+                                    // collision happens in the future
+                                    continue;
+                                }
+
+                                thisIntersectionTime -= (invertBias ? -MovingLightsCollisionSetting.EpsilonOffset : MovingLightsCollisionSetting.EpsilonOffset) / tScale;
+                                if (thisIntersectionTime < intersectionTime)
+                                {
+                                    intersectionTime = thisIntersectionTime;
+                                    bestOtherLightIndex = k;
                                 }
                             }
-
-                            if (thisIntersectionTime > 1.0f)
-                            {
-                                // collision happens in the future
-                                continue;
-                            }
-
-                            thisIntersectionTime -= (invertBias ? -MovingLightsCollisionSetting.EpsilonOffset : MovingLightsCollisionSetting.EpsilonOffset) / tScale;
-                            if (thisIntersectionTime < intersectionTime)
-                            {
-                                intersectionTime = thisIntersectionTime;
-                                bestOtherLightIndex = k;
-                            }
                         }
-                    }
 
-                    if (bestOtherLightIndex != -1)
-                    {
-                        CpuLight otherLight = lights[bestOtherLightIndex];
-                        CollisionResponse(light, otherLight, intersectionTime);
+                        if (bestOtherLightIndex != -1)
+                        {
+                            CpuLight otherLight = lights[bestOtherLightIndex];
+                            CollisionResponse(light, otherLight, intersectionTime);
+                        }
                     }
                 }
             }
@@ -306,7 +308,7 @@ namespace IDKEngine.Render
                 Vector3 lightLostDisplacement = light.GpuLight.Position - newLightPosition;
                 Vector3 otherLightLostDisplacement = otherLight.GpuLight.Position - newOtherLightPosition;
 
-                // TOOD: Changing PrevPosition here makes gpu velocity values wrong, maybe fix?
+                // TODO: Changing PrevPosition here makes gpu velocity values wrong, maybe fix?
                 light.GpuLight.Position = newLightPosition;
                 light.GpuLight.PrevPosition = light.GpuLight.Position;
 
@@ -339,7 +341,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public void Update(out bool anyLightMoved)
+        public void UpdateBuffer(out bool anyLightMoved)
         {
             // Update PointShadows
             for (int i = 0; i < pointShadowManager.Count; i++)
@@ -349,7 +351,7 @@ namespace IDKEngine.Render
                 CpuLight light = lights[pointShadow.GetGpuPointShadow().LightIndex];
                 pointShadow.Position = light.GpuLight.Position;
             }
-            pointShadowManager.Update();
+            pointShadowManager.UpdateBuffer();
 
             // Update lights
             anyLightMoved = false;

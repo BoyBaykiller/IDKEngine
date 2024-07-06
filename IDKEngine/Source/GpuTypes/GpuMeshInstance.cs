@@ -11,7 +11,7 @@ namespace IDKEngine.GpuTypes
         // (x, y, z, 0.0)
         // (x, y, z, 1.0)
         // We can't store Matrix4x3 as GLSL-std430 requires vec4 alignment (vec3s would add padding). For that reason we store a Matrix3x4.
-        // We get this Matrix3x4 by taking the Matrix4x4, constructing a Matrix4x3 by removing the useless W and then transposing.
+        // We get this Matrix3x4 by taking the Matrix4x4, constructing a Matrix4x3 by removing the useless W, and then transposing. In GLSL we then specify row_major.
 
         public Matrix4 ModelMatrix
         {
@@ -22,7 +22,9 @@ namespace IDKEngine.GpuTypes
                 modelMatrix3x4 = Mat4x4ToMat3x4Transposed(value);
             }
         }
+        
         public Matrix4 InvModelMatrix => Mat3x4ToMat4x4Tranposed(invModelMatrix3x4);
+        
         public Matrix4 PrevModelMatrix => Mat3x4ToMat4x4Tranposed(prevModelMatrix3x4);
 
         private Matrix3x4 _modelMatrix3x4;
@@ -33,8 +35,6 @@ namespace IDKEngine.GpuTypes
             set
             {
                 _modelMatrix3x4 = value;
-
-                IsDirty = true;
                 invModelMatrix3x4 = Matrix3x4.Invert(modelMatrix3x4);
             }
         }
@@ -43,8 +43,9 @@ namespace IDKEngine.GpuTypes
         private Matrix3x4 prevModelMatrix3x4;
 
         public int MeshIndex;
-        public bool IsDirty { get; private set; }
-        private readonly Vector2 _pad0;
+        private readonly float _pad0;
+        private readonly float _pad1;
+        private readonly float _pad2;
 
         public bool DidMove()
         {
@@ -53,13 +54,7 @@ namespace IDKEngine.GpuTypes
 
         public void SetPrevToCurrentMatrix()
         {
-            IsDirty = true;
             prevModelMatrix3x4 = modelMatrix3x4;
-        }
-
-        public void ResetDirtyFlag()
-        {
-            IsDirty = false;
         }
 
         private static bool FastMatrix3x4Equal(in Matrix3x4 a, in Matrix3x4 b)

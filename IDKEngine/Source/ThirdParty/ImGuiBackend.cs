@@ -16,15 +16,11 @@ namespace IDKEngine.ThirdParty
     {
         public bool IsIgnoreMouseInput = false;
 
-        private bool _frameBegun;
-
         private int _vertexArray;
         private int _vertexBuffer;
         private int _vertexBufferSize;
         private int _indexBuffer;
         private int _indexBufferSize;
-
-        //private Texture _fontTexture;
 
         private int _fontTexture;
 
@@ -74,7 +70,6 @@ namespace IDKEngine.ThirdParty
             SetStyle();
 
             ImGui.NewFrame();
-            _frameBegun = true;
         }
 
         public void WindowResized(int width, int height)
@@ -207,12 +202,8 @@ void main()
         /// </summary>
         public void Render()
         {
-            if (_frameBegun)
-            {
-                _frameBegun = false;
-                ImGui.Render();
-                RenderImDrawData(ImGui.GetDrawData());
-            }
+            ImGui.Render();
+            RenderImDrawData(ImGui.GetDrawData());
         }
 
         /// <summary>
@@ -220,16 +211,8 @@ void main()
         /// </summary>
         public void Update(GameWindowBase wnd, float deltaSeconds)
         {
-            if (_frameBegun)
-            {
-                ImGui.Render();
-            }
-
             SetPerFrameImGuiData(deltaSeconds);
             UpdateImGuiInput(wnd);
-
-            _frameBegun = true;
-            ImGui.NewFrame();
         }
 
         /// <summary>

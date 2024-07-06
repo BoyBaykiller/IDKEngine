@@ -14,6 +14,7 @@ layout(std140, binding = 7) uniform SettingsUBO
     float Linear;
     float Peak;
     float Compression;
+    bool IsAgXTonemap;
 } settingsUBO;
 
 vec3 LinearToSrgb(vec3 rgb);
@@ -29,7 +30,16 @@ void main()
     hdrColor += texture(Sampler1, uv).rgb;
     hdrColor += texture(Sampler2, uv).rgb;
 
-    vec3 ldrColor = AgX_DS(hdrColor, settingsUBO.Exposure, settingsUBO.Saturation, settingsUBO.Linear, settingsUBO.Peak, settingsUBO.Compression);
+    vec3 ldrColor;
+    if (settingsUBO.IsAgXTonemap)
+    {
+        ldrColor = AgX_DS(hdrColor, settingsUBO.Exposure, settingsUBO.Saturation, settingsUBO.Linear, settingsUBO.Peak, settingsUBO.Compression);
+    }
+    else
+    {
+        ldrColor = clamp(hdrColor, vec3(0.0), vec3(1.0));
+    }
+
     vec3 srgbColor = LinearToSrgb(ldrColor);
 
     srgbColor = Dither(srgbColor, imgCoord);

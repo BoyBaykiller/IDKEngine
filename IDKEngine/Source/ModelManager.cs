@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections;
 using OpenTK.Mathematics;
 using BBOpenGL;
+using IDKEngine.Bvh;
 using IDKEngine.Utils;
 using IDKEngine.GpuTypes;
 
@@ -9,15 +11,15 @@ namespace IDKEngine
     public class ModelManager : IDisposable
     {
         public BBG.DrawElementsIndirectCommand[] DrawCommands = Array.Empty<BBG.DrawElementsIndirectCommand>();
-        public readonly BBG.TypedBuffer<BBG.DrawElementsIndirectCommand> drawCommandBuffer;
+        private readonly BBG.TypedBuffer<BBG.DrawElementsIndirectCommand> drawCommandBuffer;
 
         public GpuMesh[] Meshes = Array.Empty<GpuMesh>();
         private readonly BBG.TypedBuffer<GpuMesh> meshBuffer;
 
-        public GpuMeshInstance[] MeshInstances = Array.Empty<GpuMeshInstance>();
+        public ReadOnlyArray<GpuMeshInstance> MeshInstances => new ReadOnlyArray<GpuMeshInstance>(meshInstances);
+        private GpuMeshInstance[] meshInstances = Array.Empty<GpuMeshInstance>();
         private readonly BBG.TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
 
-        public uint[] VisibleMeshInstances = Array.Empty<uint>();
         private readonly BBG.TypedBuffer<uint> visibleMeshInstanceBuffer;
 
         public GpuMaterial[] Materials = Array.Empty<GpuMaterial>();
@@ -50,6 +52,8 @@ namespace IDKEngine
         private readonly BBG.TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
 
         public BVH BVH;
+
+        private BitArray meshInstancesDirty;
         public ModelManager()
         {
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
@@ -107,14 +111,14 @@ namespace IDKEngine
                 for (int j = DrawCommands.Length - model.DrawCommands.Length; j < DrawCommands.Length; j++)
                 {
                     ref BBG.DrawElementsIndirectCommand newDrawCmd = ref DrawCommands[j];
-                    newDrawCmd.BaseInstance += MeshInstances.Length;
+                    newDrawCmd.BaseInstance += meshInstances.Length;
                     newDrawCmd.BaseVertex += Vertices.Length;
                     newDrawCmd.FirstIndex += VertexIndices.Length;
                 }
-                Helper.ArrayAdd(ref MeshInstances, model.MeshInstances);
-                for (int j = MeshInstances.Length - model.MeshInstances.Length; j < MeshInstances.Length; j++)
+                Helper.ArrayAdd(ref meshInstances, model.MeshInstances);
+                for (int j = meshInstances.Length - model.MeshInstances.Length; j < meshInstances.Length; j++)
                 {
-                    ref GpuMeshInstance newMeshInstance = ref MeshInstances[j];
+                    ref GpuMeshInstance newMeshInstance = ref meshInstances[j];
                     newMeshInstance.MeshIndex += Meshes.Length;
                 }
                 Helper.ArrayAdd(ref Meshes, model.Meshes);
@@ -146,7 +150,7 @@ namespace IDKEngine
 
             {
                 ReadOnlySpan<BBG.DrawElementsIndirectCommand> newDrawCommands = new ReadOnlySpan<BBG.DrawElementsIndirectCommand>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
-                BVH.AddMeshes(newDrawCommands, VertexPositions, VertexIndices, DrawCommands, MeshInstances);
+                BVH.AddMeshes(newDrawCommands, VertexPositions, VertexIndices, DrawCommands, meshInstances);
 
                 // Adjust root node index in context of all Nodes
                 uint bvhNodesExclusiveSum = 0;
@@ -159,6 +163,8 @@ namespace IDKEngine
             }
 
             UploadAllModelData();
+
+            meshInstancesDirty = new BitArray(meshInstances.Length, true);
         }
 
         public unsafe void Draw()
@@ -179,30 +185,34 @@ namespace IDKEngine
             BBG.Rendering.MultiDrawMeshletsCountNV(meshletTasksCmdsBuffer, meshletTasksCountBuffer, maxMeshlets, sizeof(BBG.DrawMeshTasksIndirectCommandNV));
         }
 
-        public void Update(out bool anyMeshInstanceMoved)
+        public void SetMeshInstance(int index, in GpuMeshInstance meshInstance)
+        {
+            meshInstances[index] = meshInstance;
+            meshInstancesDirty[index] = true;
+        }
+
+        public void UpdateMeshInstanceBufferBatched(out bool anyMeshInstanceMoved)
         {
             anyMeshInstanceMoved = false;
 
             int batchedUploadSize = 1 << 8;
-            for (int i = 0; i < MeshInstances.Length;)
+            int start = 0;
+            int count = meshInstances.Length;
+            int end = start + count;
+            for (int i = start; i < end;)
             {
-                bool uploadBatch = false;
-                if (MeshInstances[i].IsDirty)
-                {
-                    uploadBatch = true;
-                }
-
-                if (uploadBatch)
+                if (meshInstancesDirty[i])
                 {
                     int batchStart = i;
-                    int batchEnd = Math.Min(MyMath.NextMultiple(i, batchedUploadSize), MeshInstances.Length);
+                    int batchEnd = Math.Min(MyMath.NextMultiple(i, batchedUploadSize), end);
 
                     UpdateMeshInstanceBuffer(batchStart, batchEnd - batchStart);
                     for (int j = batchStart; j < batchEnd; j++)
                     {
-                        if (MeshInstances[j].DidMove())
+                        if (meshInstances[j].DidMove())
                         {
-                            MeshInstances[j].SetPrevToCurrentMatrix();
+                            meshInstances[j].SetPrevToCurrentMatrix();
+                            meshInstancesDirty[i] = true;
                             anyMeshInstanceMoved = true;
                         }
                     }
@@ -230,10 +240,10 @@ namespace IDKEngine
 
         public void UpdateMeshInstanceBuffer(int start, int count)
         {
-            meshInstanceBuffer.UploadElements(start, count, MeshInstances[start]);
-            for (int i = start; i < start + count; i++)
+            meshInstanceBuffer.UploadElements(start, count, meshInstances[start]);
+            for (int i = 0; i < count; i++)
             {
-                MeshInstances[i].ResetDirtyFlag();
+                meshInstancesDirty[start + i] = false;
             }
         }
 
@@ -264,8 +274,8 @@ namespace IDKEngine
         {
             drawCommandBuffer.MutableAllocateElements(DrawCommands);
             meshBuffer.MutableAllocateElements(Meshes);
-            meshInstanceBuffer.MutableAllocateElements(MeshInstances);
-            visibleMeshInstanceBuffer.MutableAllocateElements(MeshInstances.Length * 6); // * 6 for PointShadow cubemap culling
+            meshInstanceBuffer.MutableAllocateElements(meshInstances);
+            visibleMeshInstanceBuffer.MutableAllocateElements(meshInstances.Length * 6); // * 6 for PointShadow cubemap culling
             materialBuffer.MutableAllocateElements(Materials);
 
             vertexBuffer.MutableAllocateElements(Vertices);

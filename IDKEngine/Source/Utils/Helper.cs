@@ -10,7 +10,7 @@ using BBOpenGL;
 
 namespace IDKEngine.Utils
 {
-    static class Helper
+    public static class Helper
     {
         public static void GLDebugCallback(
             BBG.Debugging.DebugSource source,
@@ -56,6 +56,11 @@ namespace IDKEngine.Utils
         }
 
         public static unsafe int SizeInBytes<T>(this T[] data) where T : unmanaged
+        {
+            return sizeof(T) * data.Length;
+        }
+
+        public static unsafe int SizeInBytes<T>(this ReadOnlyArray<T> data) where T : unmanaged
         {
             return sizeof(T) * data.Length;
         }
@@ -183,6 +188,70 @@ namespace IDKEngine.Utils
             );
 
             Memory.Free(pixels);
+        }
+
+        /// <summary>
+        /// Given an ascending sorted array and a value, returns the first index of the array where the new value is greather than all previous,
+        /// excluding the value at the index itself. Returns -1 if no index satisfies the conditon
+        /// </summary>
+        public static int BinarySearchLowerBound<T>(ReadOnlySpan<T> arr, in T value, Comparison<T> comparison)
+        {
+            int lo = 0;
+            int hi = arr.Length - 1;
+            while (lo < hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+                if (comparison(arr[mid], value) < 0)
+                {
+                    lo = mid + 1;
+                }
+                else
+                {
+                    hi = mid - 1;
+                }
+            }
+            if (comparison(arr[lo], value) > 0)
+            {
+                lo--;
+            }
+
+            return lo;
+        }
+
+        public static bool MaintainSortedArray<T>(Span<T> arr, in T newValue, Comparison<T> comparison)
+        {
+            if (arr.Length == 0)
+            {
+                return false;
+            }
+
+            int newIndex = BinarySearchLowerBound(arr, newValue, comparison);
+            if (newIndex == -1)
+            {
+                return false;
+            }
+
+            arr[newIndex] = newValue;
+            return true;
+        }
+
+
+        public delegate bool FuncLeftSide<T>(in T v);
+        public static int Partition<T>(Span<T> arr, int start, int end, FuncLeftSide<T> func)
+        {
+            while (start < end)
+            {
+                ref T indices = ref arr[start];
+                if (func(indices))
+                {
+                    start++;
+                }
+                else
+                {
+                    MathHelper.Swap(ref indices, ref arr[--end]);
+                }
+            }
+            return start;
         }
     }
 }

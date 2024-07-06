@@ -25,7 +25,7 @@ layout(std140, binding = 7) uniform SettingsUBO
     bool IsAlwaysTintWithAlbedo;
 } settingsUBO;
 
-vec3 SpectralJet(float a);
+vec3 TurboColormap(float x);
 
 void main()
 {
@@ -37,9 +37,8 @@ void main()
     vec3 irradiance = wavefrontRay.Radiance;
     if (settingsUBO.IsDebugBVHTraversal)
     {
-        // use visible light spectrum as heatmap
-        float a = min(wavefrontRay.PreviousIOROrDebugNodeCounter / 150.0, 1.0);
-        vec3 col = SpectralJet(a);
+        float x = wavefrontRay.PreviousIOROrDebugNodeCounter / 150.0;
+        vec3 col = TurboColormap(x);
         irradiance = col;
     }
 
@@ -59,26 +58,23 @@ void main()
     }
 }
 
-vec3 SpectralJet(float a)
+vec3 TurboColormap(float x)
 {
-    // Source: https://www.shadertoy.com/view/ls2Bz1
+    // Source: https://research.google/blog/turbo-an-improved-rainbow-colormap-for-visualization/
     
-    vec3 c;
-    if (a < 0.25)
-    {
-        c = vec3(0.0, 4.0 * a, 1.0);
-    }
-    else if (a < 0.5)
-    {
-        c = vec3(0.0, 1.0, 1.0 + 4.0 * (0.25 - a));
-    }
-    else if (a < 0.75)
-    {
-        c = vec3(4.0 * (a - 0.5), 1.0, 0.0);
-    }
-    else
-    {
-        c = vec3(1.0, 1.0 + 4.0 * (0.75 - a), 0.0);
-    }
-    return clamp(c, vec3(0.0), vec3(1.0));
+    const vec4 kRedVec4 = vec4(0.13572138, 4.61539260, -42.66032258, 132.13108234);
+    const vec4 kGreenVec4 = vec4(0.09140261, 2.19418839, 4.84296658, -14.18503333);
+    const vec4 kBlueVec4 = vec4(0.10667330, 12.64194608, -60.58204836, 110.36276771);
+    const vec2 kRedVec2 = vec2(-152.94239396, 59.28637943);
+    const vec2 kGreenVec2 = vec2(4.27729857, 2.82956604);
+    const vec2 kBlueVec2 = vec2(-89.90310912, 27.34824973);
+
+    x = clamp(x, 0, 1);
+    vec4 v4 = vec4( 1.0, x, x * x, x * x * x);
+    vec2 v2 = v4.zw * v4.z;
+    return vec3(
+      dot(v4, kRedVec4)   + dot(v2, kRedVec2),
+      dot(v4, kGreenVec4) + dot(v2, kGreenVec2),
+      dot(v4, kBlueVec4)  + dot(v2, kBlueVec2)
+    );
 }

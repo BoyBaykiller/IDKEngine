@@ -108,7 +108,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public void Update()
+        public void UpdateBuffer()
         {
             for (int i = 0; i < Count; i++)
             {

@@ -5,7 +5,7 @@ using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 
-namespace IDKEngine
+namespace IDKEngine.Bvh
 {
     public class TLAS
     {
@@ -23,7 +23,7 @@ namespace IDKEngine
             DrawCommands = drawCommands;
             MeshInstances = meshInstances;
 
-            Nodes = new GpuTlasNode[Math.Max(2 * meshInstances.Length - 1, 1)];
+            Nodes = new GpuTlasNode[Math.Max(2 * meshInstances.Length - 1, 0)];
             SearchRadius = 15;
         }
 
@@ -32,7 +32,7 @@ namespace IDKEngine
             Span<GpuTlasNode> initialChildNodes = new Span<GpuTlasNode>(Nodes, Nodes.Length - MeshInstances.Length, MeshInstances.Length);
 
             // Place initial nodes at the end of array
-            Box globalBounds = new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            Box globalBounds = Box.Empty();
             for (int i = 0; i < initialChildNodes.Length; i++)
             {
                 ref readonly GpuMeshInstance meshInstance = ref MeshInstances[i];
@@ -60,16 +60,9 @@ namespace IDKEngine
                 Vector3 mappedB = MyMath.MapToZeroOne((b.Max + b.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
                 ulong mortonCodeB = MyMath.GetMorton(mappedB);
 
-                if (mortonCodeA < mortonCodeB)
-                {
-                    return -1;
-                }
-                if (mortonCodeA > mortonCodeB)
-                {
-                    return 1;
-                }
-
-                return 0;
+                if (mortonCodeA > mortonCodeB) return 1;
+                if (mortonCodeA == mortonCodeB) return 0;
+                return -1;
             });
 
             int activeRangeCount = MeshInstances.Length;
@@ -85,14 +78,14 @@ namespace IDKEngine
                 {
                     int nodeAId = activeRangeStart + i;
                     int searchStart = Math.Max(nodeAId - SearchRadius, activeRangeStart);
-                    int searchEnd = Math.Min(nodeAId + SearchRadius, activeRangeEnd);
+                    int searchEnd = Math.Min(nodeAId + SearchRadius + 1, activeRangeEnd);
                     int nodeBId = FindBestMatch(Nodes, searchStart, searchEnd, nodeAId);
                     int nodeBIdLocal = nodeBId - activeRangeStart;
                     preferedNbors[i] = nodeBIdLocal;
                 }
 
                 // Find number of merged nodes in advance so we know where to insert new parent nodes
-                int mergedNodes = 0;
+                int mergedNodesCount = 0;
                 for (int i = 0; i < activeRangeCount; i++)
                 {
                     int nodeAIdLocal = i;
@@ -101,20 +94,16 @@ namespace IDKEngine
 
                     if (nodeAIdLocal == nodeCIdLocal && nodeAIdLocal < nodeBIdLocal)
                     {
-                        mergedNodes += 2;
+                        mergedNodesCount += 2;
                     }
                 }
 
-                // TODO: When search radius is very low, like 5, we sometimes end up never finding a node, causing infinite loop.
-                //if (mergedNodes == 0)
-                //{
-                //    System.Diagnostics.Debugger.Break();
-                //}
+                int unmergedNodesCount = activeRangeCount - mergedNodesCount;
+                int newNodesCount = mergedNodesCount / 2;
 
-                // Merge nodes and create parents
-                // [(activeRangeEnd-activeRangeCount)...(mergedNodesHead-mergedNodes)...mergedNodesHead/activeRangeEnd]
-                int mergedNodesHead = activeRangeEnd;
-                int unmergedNodesHead = mergedNodesHead - mergedNodes;
+                int mergedNodesHead = activeRangeEnd - mergedNodesCount;
+                int newBegin = mergedNodesHead - unmergedNodesCount - newNodesCount;
+                int unmergedNodesHead = newBegin;
                 for (int i = 0; i < activeRangeCount; i++)
                 {
                     int nodeAIdLocal = i;
@@ -128,8 +117,8 @@ namespace IDKEngine
                         {
                             int nodeBId = nodeBIdLocal + activeRangeStart;
 
-                            tempNodes[--mergedNodesHead] = Nodes[nodeBId];
-                            tempNodes[--mergedNodesHead] = Nodes[nodeAId];
+                            tempNodes[mergedNodesHead + 0] = Nodes[nodeAId];
+                            tempNodes[mergedNodesHead + 1] = Nodes[nodeBId];
 
                             ref GpuTlasNode nodeA = ref tempNodes[mergedNodesHead + 0];
                             ref GpuTlasNode nodeB = ref tempNodes[mergedNodesHead + 1];
@@ -144,21 +133,24 @@ namespace IDKEngine
                             newNode.IsLeaf = false;
                             newNode.ChildOrInstanceID = (uint)mergedNodesHead;
 
-                            tempNodes[--unmergedNodesHead] = newNode;
+                            tempNodes[unmergedNodesHead] = newNode;
+
+                            unmergedNodesHead++;
+                            mergedNodesHead += 2;
                         }
                     }
                     else
                     {
-                        tempNodes[--unmergedNodesHead] = Nodes[nodeAId];
+                        tempNodes[unmergedNodesHead++] = Nodes[nodeAId];
                     }
                 }
 
                 // Copy from temp into final array
-                Array.Copy(tempNodes, unmergedNodesHead, Nodes, unmergedNodesHead, activeRangeEnd - unmergedNodesHead);
+                Array.Copy(tempNodes, newBegin, Nodes, newBegin, activeRangeEnd - newBegin);
 
                 // For every merged pair, 2 nodes become inactive and 1 new one gets active
-                activeRangeCount -= mergedNodes / 2;
-                activeRangeEnd = mergedNodesHead;
+                activeRangeCount -= mergedNodesCount / 2;
+                activeRangeEnd -= mergedNodesCount;
             }
         }
 
@@ -166,6 +158,10 @@ namespace IDKEngine
         {
             hitInfo = new BVH.RayHitInfo();
             hitInfo.T = tMax;
+            if (Nodes.Length == 0)
+            {
+                return false;
+            }
 
             int stackPtr = 0;
             uint stackTop = 0;
@@ -207,7 +203,7 @@ namespace IDKEngine
                     {
                         bool leftCloser = tMinLeft < tMinRight;
                         stackTop = leftCloser ? leftChild : rightChild;
-                        stack[stackPtr++] = leftCloser ? rightChild : leftChild;   
+                        stack[stackPtr++] = leftCloser ? rightChild : leftChild;
                     }
                     else
                     {
@@ -226,6 +222,11 @@ namespace IDKEngine
 
         public void Intersect(in Box box, BVH.FuncIntersectLeafNode intersectFunc)
         {
+            if (Nodes.Length == 0)
+            {
+                return;
+            }
+
             int stackPtr = 0;
             uint stackTop = 0;
             Span<uint> stack = stackalloc uint[32];
@@ -299,7 +300,7 @@ namespace IDKEngine
                 fittingBox.GrowToFit(otherNode.Min);
                 fittingBox.GrowToFit(otherNode.Max);
 
-                float area = MyMath.Area(fittingBox.Max - fittingBox.Min);
+                float area = fittingBox.HalfArea();
                 if (area < smallestArea)
                 {
                     smallestArea = area;

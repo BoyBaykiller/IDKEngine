@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "Renderer": {
+    "IDKEngine": {
       "commandName": "Project",
       "workingDirectory": "$(ProjectDir)",
       "nativeDebugging": false,

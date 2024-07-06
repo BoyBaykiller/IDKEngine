@@ -101,12 +101,6 @@ namespace IDKEngine.Utils
             return MathF.Abs(a - b) < epsilon;
         }
 
-        public static float Area(in Vector3 size)
-        {
-            float area = 2.0f * (size.X * size.Y + size.X * size.Z + size.Z * size.Y);
-            return area;
-        }
-
         public static float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMin, float mapMax)
         {
             return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;

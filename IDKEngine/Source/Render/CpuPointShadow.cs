@@ -196,7 +196,7 @@ namespace IDKEngine.Render
             return ref gpuPointShadow;
         }
 
-        public void SetConnectedLight(int lightIndex)
+        public void ConnectLight(int lightIndex)
         {
             gpuPointShadow.LightIndex = lightIndex;
         }
