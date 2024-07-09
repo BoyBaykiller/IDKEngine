@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
@@ -12,7 +13,7 @@ namespace IDKEngine.Bvh
         public struct OptimizationSettings
         {
             public int Iterations = 3;
-            public float NodePercentage = 0.05f;
+            public float CandidatesPercentage = 0.05f;
 
             public OptimizationSettings()
             {
@@ -29,21 +30,11 @@ namespace IDKEngine.Bvh
                 new ReinsertionOptimizer(blas).Optimize(settings);
             }
 
-            private struct Reinsertion : MyComparer.IComparisons<Reinsertion>
+            private struct Reinsertion
             {
                 public int In;
                 public int Out;
                 public float AreaDecrease;
-
-                public static bool operator >(in Reinsertion lhs, in Reinsertion rhs)
-                {
-                    return lhs.AreaDecrease > rhs.AreaDecrease;
-                }
-
-                public static bool operator <(in Reinsertion lhs, in Reinsertion rhs)
-                {
-                    return lhs.AreaDecrease < rhs.AreaDecrease;
-                }
             }
 
             private struct Candidate : MyComparer.IComparisons<Candidate>
@@ -72,41 +63,10 @@ namespace IDKEngine.Bvh
 
             private void Optimize(in OptimizationSettings settings)
             {
+                Candidate[] candidatesMem = GetCandidatesMem();
                 for (int i = 0; i < settings.Iterations; i++)
                 {
-                    Candidate[] candidates = FindCandidates((int)(blas.Nodes.Length * settings.NodePercentage));
-
-                    //BitArray touchedNodes = new BitArray(blas.Nodes.Length);
-                    //List<Reinsertion> reinsertions = new List<Reinsertion>(candidates.Length);
-
-                    //for (int j = 0; j < candidates.Length; j++)
-                    //{
-                    //    reinsertions.Add(FindReinsertion(candidates[j].NodeId));
-                    //}
-
-                    //reinsertions.RemoveAll(it => it.AreaDecrease <= 0.0f);
-                    //reinsertions.Sort(MyComparer.GreaterThan);
-
-                    //for (int j = 0; j < reinsertions.Count; j++)
-                    //{
-                    //    Reinsertion reinsertion = reinsertions[j];
-
-                    //    int[] nodeConflicts = GetConflicts(reinsertion);
-                    //    for (int k = 0; k < nodeConflicts.Length; k++)
-                    //    {
-                    //        if (touchedNodes[nodeConflicts[k]])
-                    //        {
-                    //            continue;
-                    //        }
-                    //    }
-                    //    for (int k = 0; k < nodeConflicts.Length; k++)
-                    //    {
-                    //        touchedNodes[nodeConflicts[k]] = true;
-                    //    }
-
-                    //    ReinsertNode(reinsertion.In, reinsertion.Out);
-                    //}
-                    //continue;
+                    Span<Candidate> candidates = PopulateCandidates(candidatesMem, settings.CandidatesPercentage);
 
                     for (int j = 0; j < candidates.Length; j++)
                     {
@@ -161,24 +121,17 @@ namespace IDKEngine.Bvh
                 RefitFrom(outId); // Refit new parent of 'in'   
             }
 
-            private Candidate[] FindCandidates(int num)
+            private Candidate[] GetCandidatesMem()
             {
-                if (num == 0) return Array.Empty<Candidate>();
-                int searchCount = Math.Min(blas.Nodes.Length - 1, num);
+                return new Candidate[blas.Nodes.Length - 1];
+            }
 
-                //Candidate[] candidates = new Candidate[blas.Nodes.Length - 1];
-                //for (int i = 1; i < candidates.Length + 1; i++)
-                //{
-                //    Candidate candidate = new Candidate();
-                //    candidate.Cost = blas.Nodes[i].HalfArea();
-                //    candidate.NodeId = i;
-                //    candidates[i - 1] = candidate;
-                //}
-                //Array.Sort(candidates, MyComparer.GreaterThan);
-                //Array.Resize(ref candidates, searchCount);
+            private Span<Candidate> PopulateCandidates(Candidate[] candidates, float percentage)
+            {
+                int count = Math.Min(blas.Nodes.Length - 1, (int)(blas.Nodes.Length * percentage));
+                if (count == 0) return Array.Empty<Candidate>();
 
-                Candidate[] candidates = new Candidate[searchCount];
-                for (int i = 1; i < searchCount + 1; i++)
+                for (int i = 1; i < candidates.Length + 1; i++)
                 {
                     Candidate candidate = new Candidate();
                     candidate.Cost = blas.Nodes[i].HalfArea();
@@ -186,28 +139,41 @@ namespace IDKEngine.Bvh
                     candidates[i - 1] = candidate;
                 }
 
-                Array.Sort(candidates, MyComparer.LessThan);
+                Helper.PartialSort<Candidate>(candidates, 0, candidates.Length, 0, count, MyComparer.GreaterThan);
 
-                for (int i = searchCount + 1; i < blas.Nodes.Length; i++)
-                {
-                    float cost = blas.Nodes[i].HalfArea();
-                    float lowestCost = candidates[0].Cost;
-                    if (cost > lowestCost)
-                    {
-                        Candidate newCandidate = new Candidate();
-                        newCandidate.Cost = cost;
-                        newCandidate.NodeId = i;
-                        Helper.MaintainSortedArray(candidates, newCandidate, MyComparer.LessThan);
-                    }
-                }
+                return new Span<Candidate>(candidates, 0, count);
 
-                return candidates;
+                //Candidate[] candidates = new Candidate[searchCount];
+                //for (int i = 1; i < searchCount + 1; i++)
+                //{
+                //    Candidate candidate = new Candidate();
+                //    candidate.Cost = blas.Nodes[i].HalfArea();
+                //    candidate.NodeId = i;
+                //    candidates[i - 1] = candidate;
+                //}
+
+                //Array.Sort(candidates, MyComparer.GreaterThan);
+
+                //for (int i = searchCount + 1; i < blas.Nodes.Length; i++)
+                //{
+                //    float cost = blas.Nodes[i].HalfArea();
+                //    float lowestCost = candidates[candidates.Length - 1].Cost;
+                //    if (cost > lowestCost)
+                //    {
+                //        Candidate newCandidate = new Candidate();
+                //        newCandidate.Cost = cost;
+                //        newCandidate.NodeId = i;
+                //        Helper.MaintainDescendingArray(candidates, newCandidate, MyComparer.GreaterThan);
+                //    }
+                //}
+
+                //return candidates;
             }
 
             private Reinsertion FindReinsertion(int nodeId)
             {
                 // Source: https://github.com/madmann91/bvh/blob/3490634ae822e5081e41f09498fcce03bc1419e3/src/bvh/v2/reinsertion_optimizer.h#L107
-
+               
                 Reinsertion bestReinsertion = new Reinsertion();
                 bestReinsertion.In = nodeId;
 
@@ -290,8 +256,7 @@ namespace IDKEngine.Bvh
                         mergedBox.GrowToFit(rightChild.Min);
                         mergedBox.GrowToFit(rightChild.Max);
 
-                        node.Min = mergedBox.Min;
-                        node.Max = mergedBox.Max;
+                        node.SetBounds(mergedBox);
                     }
                     if (nodeId == 0)
                     {
@@ -301,41 +266,34 @@ namespace IDKEngine.Bvh
                 }
             }
 
-            private int[] GetConflicts(in Reinsertion reinsertion)
-            {
-                int[] conflicts = new int[6];
-                conflicts[0] = reinsertion.In;
-                conflicts[1] = GetSiblingId(reinsertion.In);
-                conflicts[2] = parentIds[reinsertion.In];
-
-                conflicts[3] = reinsertion.Out;
-                conflicts[4] = parentIds[reinsertion.Out];
-
-                // TODO: Why does https://github.com/madmann91/bvh/blob/3490634ae822e5081e41f09498fcce03bc1419e3/src/bvh/v2/reinsertion_optimizer.h#L227 not have this conflict? It's listed in the paper
-                conflicts[5] = parentIds[parentIds[reinsertion.In]]; 
-
-                return conflicts;
-            }
-
             /// <summary>
-            /// Reorders the tree to match the output of a typical top-down builder and makes sure the primitives of two leafs
-            /// form a continuous range in memory. However the right child may store the range beginning.
+            /// Makes sure the root always always points to index 1 as its left child and
+            /// that primitives of two leafs always form a continuous range in memory.
             /// </summary>
             private void RestoreTreeQualities()
             {
-                IndicesTriplet[] newTriIndices = new IndicesTriplet[blas.TriangleCount];
-                GpuBlasNode[] newNodes = new GpuBlasNode[blas.Nodes.Length];
-                uint triCounter = 0;
-                uint nodesCounter = 0;
-                newNodes[nodesCounter++] = blas.Nodes[0];
+                // Always make node 0 point to 1, as this is expected by traversal and
+                // always make node 1 point to 3, as this is good memory access
+                if (blas.Nodes[0].TriStartOrChild != 1)
+                {
+                    SwapChildren(0, parentIds[1]);
+                }
+                if (!blas.Nodes[1].IsLeaf && blas.Nodes[1].TriStartOrChild != 3)
+                {
+                    SwapChildren(1, parentIds[3]);
+                }
 
-                Span<ValueTuple<uint, uint>> stack = stackalloc ValueTuple<uint, uint>[32];
+                IndicesTriplet[] newTriIndices = new IndicesTriplet[blas.TriangleCount];
+                uint triCounter = 0;
+
+                Span<uint> stack = stackalloc uint[32];
                 int stackPtr = 0;
-                stack[stackPtr++] = (blas.Nodes[0].TriStartOrChild, 0);
+                stack[stackPtr++] = 1;
 
                 while (stackPtr > 0)
                 {
-                    (uint stackTop, uint newParent) = stack[--stackPtr];
+                    uint stackTop = stack[--stackPtr];
+
                     ref GpuBlasNode leftChild = ref blas.Nodes[stackTop];
                     ref GpuBlasNode rightChild = ref blas.Nodes[stackTop + 1];
 
@@ -352,24 +310,37 @@ namespace IDKEngine.Bvh
                         triCounter += rightChild.TriCount;
                     }
 
-                    newNodes[newParent].TriStartOrChild = nodesCounter;
-
                     if (!leftChild.IsLeaf)
                     {
-                        stack[stackPtr++] = (leftChild.TriStartOrChild, nodesCounter);
+                        stack[stackPtr++] = leftChild.TriStartOrChild;
                     }
-                    newNodes[nodesCounter++] = leftChild;
 
                     if (!rightChild.IsLeaf)
                     {
-                        stack[stackPtr++] = (rightChild.TriStartOrChild, nodesCounter);
+                        stack[stackPtr++] = rightChild.TriStartOrChild;
                     }
-                    newNodes[nodesCounter++] = rightChild;
                 }
 
-                blas.Nodes = newNodes;
                 blas.TriangleIndices = newTriIndices;
-                blas.MaxTreeDepth = ComputeTreeDepth(newNodes);
+                blas.MaxTreeDepth = ComputeTreeDepth(blas.Nodes);
+            }
+
+            private void SwapChildren(int inParent, int outParent)
+            {
+                uint inLeftChildId = blas.Nodes[inParent].TriStartOrChild;
+                uint inRightChildId = blas.Nodes[inParent].TriStartOrChild + 1;
+
+                uint outLeftChildId = blas.Nodes[outParent].TriStartOrChild;
+                uint outRightChildId = blas.Nodes[outParent].TriStartOrChild + 1;
+
+                blas.Nodes[inParent].TriStartOrChild = outLeftChildId;
+                blas.Nodes[outParent].TriStartOrChild = inLeftChildId;
+
+                MathHelper.Swap(ref blas.Nodes[inLeftChildId], ref blas.Nodes[outLeftChildId]);
+                MathHelper.Swap(ref blas.Nodes[inRightChildId], ref blas.Nodes[outRightChildId]);
+
+                MathHelper.Swap(ref parentIds[inLeftChildId], ref parentIds[outLeftChildId]);
+                MathHelper.Swap(ref parentIds[inRightChildId], ref parentIds[outRightChildId]);
             }
 
             private static int[] GetParentIndices(ReadOnlySpan<GpuBlasNode> nodes)

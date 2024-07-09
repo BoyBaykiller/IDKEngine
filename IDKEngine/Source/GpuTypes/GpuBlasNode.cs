@@ -1,4 +1,5 @@
 ﻿using OpenTK.Mathematics;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.GpuTypes
 {
@@ -10,6 +11,12 @@ namespace IDKEngine.GpuTypes
         public uint TriCount;
 
         public bool IsLeaf => TriCount > 0;
+
+        public void SetBounds(in Box box)
+        {
+            Min = box.Min;
+            Max = box.Max;
+        }
 
         public float HalfArea()
         {

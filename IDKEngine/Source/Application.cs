@@ -21,7 +21,7 @@ namespace IDKEngine
             PathTracer
         }
 
-        public RenderMode RenderPath
+        public RenderMode CRenderMode
         {
             get
             {
@@ -44,17 +44,17 @@ namespace IDKEngine
         {
             get
             {
-                if (RenderPath == RenderMode.Rasterizer)
+                if (CRenderMode == RenderMode.Rasterizer)
                 {
                     return RasterizerPipeline.RenderResolution;
                 }
 
-                if (RenderPath == RenderMode.PathTracer)
+                if (CRenderMode == RenderMode.PathTracer)
                 {
                     return PathTracer.RenderResolution;
                 }
 
-                throw new UnreachableException($"Unknown {nameof(RenderPath)} = {RenderPath}");
+                throw new UnreachableException($"Unknown {nameof(CRenderMode)} = {CRenderMode}");
             }
         }
 
@@ -109,7 +109,7 @@ namespace IDKEngine
         {
         }
 
-        protected override void Render(float dT)
+        protected override void OnRender(float dT)
         {
             RenderPrepare(dT);
 
@@ -130,7 +130,7 @@ namespace IDKEngine
                 RequestRenderMode = null;
             }
 
-            if (RenderPath == RenderMode.Rasterizer)
+            if (CRenderMode == RenderMode.Rasterizer)
             {
                 RasterizerPipeline.Render(ModelManager, LightManager, Camera, dT);
                 if (RasterizerPipeline.IsConfigureGridMode)
@@ -155,7 +155,7 @@ namespace IDKEngine
                 }
             }
             
-            if (RenderPath == RenderMode.PathTracer)
+            if (CRenderMode == RenderMode.PathTracer)
             {
                 PathTracer.Compute();
 
@@ -250,13 +250,13 @@ namespace IDKEngine
             ModelManager.BVH.TlasBuild();
 
             bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
-            if ((RenderPath == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
+            if ((CRenderMode == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
             {
                 PathTracer.ResetRenderProcess();
             }
         }
 
-        protected override void Update(float dT)
+        protected override void OnUpdate(float dT)
         {
             gui.Update(this, dT);
 
@@ -431,7 +431,6 @@ namespace IDKEngine
             LightManager = new LightManager();
 
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), 360.0f - 165.4f, 90.0f - 7.4f);
-            //Camera = new Camera(WindowFramebufferSize, new Vector3(7.0f, 5.0f, -5.0f), 95.0f, 90.0f);
             if (true)
             {
                 ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Ressource/Models/SponzaCompressed/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f)).Value;
@@ -467,8 +466,6 @@ namespace IDKEngine
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(4.5f, 5.7f, -2.0f), /*new Vector3(-4.0f, 0.0f, 0.0f), */new Vector3(8.773416f, 22.459948f, 533.77466f), 0.3f));
 
-                //LightManager.AddLight(new CpuLight(new Vector3(-14.054f, 14.142f, -0.361f), Camera.GetViewDirFromAngles(1.1f, 90.0f + 36.61f) * 10.0f, new Vector3(1.0f), 0.3f));
-
                 for (int i = 0; i < 3; i++)
                 {
                     if (LightManager.TryGetLight(i, out CpuLight light))
@@ -477,54 +474,17 @@ namespace IDKEngine
                         LightManager.CreatePointShadowForLight(pointShadow, i);
                     }
                 }
-
-                //LightManager.AddLight(new CpuLight(new Vector3(-12.25f, 7.8f, 0.3f), new Vector3(72.77023f, 36.716278f, 18.192558f) * (0.6f / 0.09f), 0.3f));
-                //LightManager.CreatePointShadowForLight(new PointShadow(512, WindowFramebufferSize, new Vector2(0.5f, 60.0f)), LightManager.Count - 1);
             }
             else
             {
                 ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
-                //a.Meshes[288].SpecularBias = 1.0f;
-                //a.Meshes[288].RoughnessBias = -0.64f;
-                //a.Meshes[288].NormalMapStrength = 0.0f;
-                //a.Meshes[272].SpecularBias = 1.0f;
-                //a.Meshes[272].RoughnessBias = -0.82f;
-                //a.Meshes[93].EmissiveBias = 20.0f;
-                //a.Meshes[96].EmissiveBias = 20.0f;
-                //a.Meshes[99].EmissiveBias = 20.0f;
-                //a.Meshes[102].EmissiveBias = 20.0f;
-                //a.Meshes[105].EmissiveBias = 20.0f;
-                //a.Meshes[108].EmissiveBias = 20.0f;
-                //a.Meshes[111].EmissiveBias = 20.0f;
-                //a.Meshes[246].EmissiveBias = 20.0f;
-                //a.Meshes[291].EmissiveBias = 20.0f;
-                //a.Meshes[294].EmissiveBias = 20.0f;
-                //a.Meshes[297].EmissiveBias = 20.0f;
-                //a.Meshes[300].EmissiveBias = 20.0f;
-                //a.Meshes[303].EmissiveBias = 20.0f;
-                //a.Meshes[306].EmissiveBias = 20.0f;
-                //a.Meshes[312].EmissiveBias = 20.0f;
-                //a.Meshes[315].EmissiveBias = 20.0f;
-                //a.Meshes[318].EmissiveBias = 20.0f;
-                //a.Meshes[321].EmissiveBias = 20.0f;
-                //a.Meshes[324].EmissiveBias = 20.0f;
-                //a.Meshes[376].EmissiveBias = 20.0f;
-                //a.Meshes[379].EmissiveBias = 20.0f;
-                //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+                ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
                 //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
                 //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a);
+                ModelManager.Add(a, b, c);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
-
-                RasterizerPipeline.IsVXGI = false;
-                RasterizerPipeline.Voxelizer.GridMin = new Vector3(-18.0f, -1.2f, -11.9f);
-                RasterizerPipeline.Voxelizer.GridMax = new Vector3(21.3f, 19.7f, 17.8f);
-                RasterizerPipeline.ConeTracer.Settings.MaxSamples = 4;
-
-                LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
-                LightManager.CreatePointShadowForLight(new CpuPointShadow(512, WindowFramebufferSize, new Vector2(0.1f, 60.0f)), 0);
             }
 
             gui = new Gui(WindowFramebufferSize.X, WindowFramebufferSize.Y);
@@ -578,7 +538,7 @@ namespace IDKEngine
             RasterizerPipeline?.SetSize(renderRes, presentRes);
             PathTracer?.SetSize(renderRes);
 
-            if (RenderPath == RenderMode.Rasterizer || RenderPath == RenderMode.PathTracer)
+            if (CRenderMode == RenderMode.Rasterizer || CRenderMode == RenderMode.PathTracer)
             {
                 if (VolumetricLight != null) VolumetricLight.SetSize(presentRes);
                 if (Bloom != null) Bloom.SetSize(presentRes);
@@ -594,8 +554,8 @@ namespace IDKEngine
         /// </summary>
         private void SetRenderMode(RenderMode renderMode, Vector2i renderRes, Vector2i presentRes)
         {
-            // On AMD driver Vanguard-24.10-RC5-May22 and newer (and not 23.12.1 or earlier) setting the render mode
-            // may cause a crash, especially during texture loading.
+            // On AMD driver Vanguard-24.10-RC5-May22 and newer (and not 23.12.1 or earlier) setting the
+            // Rasterizer render mode may cause a crash, especially during texture loading.
 
             if (renderMode == RenderMode.Rasterizer)
             {

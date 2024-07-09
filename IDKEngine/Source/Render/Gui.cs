@@ -245,7 +245,7 @@ namespace IDKEngine.Render
                     }
                     ImGui.Separator();
 
-                    if (app.RenderPath == Application.RenderMode.PathTracer)
+                    if (app.CRenderMode == Application.RenderMode.PathTracer)
                     {
                         tempInt = RecordingVars.RasterizerFPSGoal;
                         if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
@@ -309,7 +309,7 @@ namespace IDKEngine.Render
                 }
 
                 {
-                    string current = app.RenderPath.ToString();
+                    string current = app.CRenderMode.ToString();
                     if (ImGui.BeginCombo("Render Mode", current))
                     {
                         Application.RenderMode[] renderModes = Enum.GetValues<Application.RenderMode>();
@@ -333,7 +333,7 @@ namespace IDKEngine.Render
                     ImGui.Separator();
                 }
                 
-                if (app.RenderPath == Application.RenderMode.Rasterizer)
+                if (app.CRenderMode == Application.RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
 
@@ -653,11 +653,11 @@ namespace IDKEngine.Render
                         }
                     }
                 }
-                if (app.RenderPath == Application.RenderMode.PathTracer)
+                if (app.CRenderMode == Application.RenderMode.PathTracer)
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
-                        if (app.RenderPath == Application.RenderMode.PathTracer)
+                        if (app.CRenderMode == Application.RenderMode.PathTracer)
                         {
                             ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
                         }
@@ -1069,7 +1069,7 @@ namespace IDKEngine.Render
 
             if (RecordingVars.FrameRecState == FrameRecorderState.Replaying)
             {
-                if (app.RenderPath == Application.RenderMode.Rasterizer || (app.RenderPath == Application.RenderMode.PathTracer && app.PathTracer.AccumulatedSamples >= RecordingVars.PathTracingSamplesGoal))
+                if (app.CRenderMode == Application.RenderMode.Rasterizer || (app.CRenderMode == Application.RenderMode.PathTracer && app.PathTracer.AccumulatedSamples >= RecordingVars.PathTracingSamplesGoal))
                 {
                     app.FrameStateRecorder.ReplayStateIndex++;
                     if (RecordingVars.IsOutputFrames)
@@ -1185,7 +1185,7 @@ namespace IDKEngine.Render
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
 
-            if (app.RenderPath == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights)
+            if (app.CRenderMode == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights)
             {
                 hitLight = false;
             }

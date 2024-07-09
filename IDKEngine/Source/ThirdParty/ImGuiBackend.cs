@@ -14,7 +14,7 @@ namespace IDKEngine.ThirdParty
 {
     class ImGuiBackend : IDisposable
     {
-        public bool IsIgnoreMouseInput = false;
+        public bool IsIgnoreMouseInput;
 
         private int _vertexArray;
         private int _vertexBuffer;
@@ -33,7 +33,7 @@ namespace IDKEngine.ThirdParty
 
         private System.Numerics.Vector2 _scaleFactor = System.Numerics.Vector2.One;
 
-        private static bool KHRDebugAvailable = false;
+        private static bool KHRDebugAvailable;
 
         private int GLVersion;
         private bool CompatibilityProfile;

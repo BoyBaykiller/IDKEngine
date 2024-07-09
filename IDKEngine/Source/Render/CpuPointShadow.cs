@@ -97,7 +97,7 @@ namespace IDKEngine.Render
         private BBG.Sampler shadowSampler;
         private GpuPointShadow gpuPointShadow;
 
-        private static bool isLazyInitialized = false;
+        private static bool isLazyInitialized;
         private static BBG.AbstractShaderProgram renderShadowMapProgram;
         private static BBG.AbstractShaderProgram cullingProgram;
 

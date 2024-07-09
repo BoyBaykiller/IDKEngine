@@ -190,10 +190,7 @@ namespace IDKEngine.Utils
             Memory.Free(pixels);
         }
 
-        /// <summary>
-        /// Given an ascending sorted array and a value, returns the first index of the array where the new value is greather than all previous,
-        /// excluding the value at the index itself. Returns -1 if no index satisfies the conditon
-        /// </summary>
+
         public static int BinarySearchLowerBound<T>(ReadOnlySpan<T> arr, in T value, Comparison<T> comparison)
         {
             int lo = 0;
@@ -210,15 +207,11 @@ namespace IDKEngine.Utils
                     hi = mid - 1;
                 }
             }
-            if (comparison(arr[lo], value) > 0)
-            {
-                lo--;
-            }
 
             return lo;
         }
 
-        public static bool MaintainSortedArray<T>(Span<T> arr, in T newValue, Comparison<T> comparison)
+        public static bool MaintainDescendingArray<T>(Span<T> arr, in T newValue, Comparison<T> comparison)
         {
             if (arr.Length == 0)
             {
@@ -226,7 +219,15 @@ namespace IDKEngine.Utils
             }
 
             int newIndex = BinarySearchLowerBound(arr, newValue, comparison);
-            if (newIndex == -1)
+            if (comparison(arr[newIndex], newValue) <= 0)
+            {
+                newIndex++;
+            }
+            while (newIndex < arr.Length && comparison(arr[newIndex], newValue) == 0)
+            {
+                newIndex++;
+            }
+            if (newIndex == arr.Length)
             {
                 return false;
             }
@@ -252,6 +253,74 @@ namespace IDKEngine.Utils
                 }
             }
             return start;
+        }
+
+        public static void PartialSort<T>(Span<T> arr, int first, int last, int sortRangeMin, int sortRangeMax, Comparison<T> comparison)
+        {
+            // Source: https://github.com/stephentoub/corefx/blob/a6aff797a33e606a60ec0c9ca034a161c609620f/src/System.Linq/src/System/Linq/OrderedEnumerable.cs#L590
+            do
+            {
+                int i = first;
+                int j = last - 1;
+                T x = arr[i + ((j - i) >> 1)];
+                do
+                {
+                    while (i < arr.Length && comparison(x, arr[i]) > 0)
+                    {
+                        i++;
+                    }
+
+                    while (j >= 0 && comparison(x, arr[j]) < 0)
+                    {
+                        j--;
+                    }
+
+                    if (i > j)
+                    {
+                        break;
+                    }
+
+                    if (i < j)
+                    {
+                        T temp = arr[i];
+                        arr[i] = arr[j];
+                        arr[j] = temp;
+                    }
+
+                    i++;
+                    j--;
+                }
+                while (i <= j);
+
+                if (sortRangeMin >= i)
+                {
+                    first = i + 1;
+                }
+                else if (sortRangeMax <= j)
+                {
+                    last = j - 1;
+                }
+
+                if (j - first <= last - i)
+                {
+                    if (first < j)
+                    {
+                        PartialSort(arr, first, j, sortRangeMin, sortRangeMax, comparison);
+                    }
+
+                    first = i;
+                }
+                else
+                {
+                    if (i < last)
+                    {
+                        PartialSort(arr, i, last, sortRangeMin, sortRangeMax, comparison);
+                    }
+
+                    last = j;
+                }
+            }
+            while (first < last);
         }
     }
 }

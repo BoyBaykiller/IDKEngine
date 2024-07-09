@@ -91,7 +91,7 @@ namespace IDKEngine.Windowing
         private Vector2i cachedWindowPos;
         private Vector2i cachedWindowSize;
 
-        private static bool glfwInitialized = false;
+        private static bool glfwInitialized;
 
         private readonly VideoMode* videoMode;
         private readonly Monitor* monitor;
@@ -183,19 +183,19 @@ namespace IDKEngine.Windowing
 
                     KeyboardState.Update();
                     MouseState.Update();
-                    Update(thisDt);
+                    OnUpdate(thisDt);
 
                     timeToSimulate -= thisDt;
                     WindowTime += thisDt;
                 }
 
 
-                Render(frameTime);
+                OnRender(frameTime);
                 frameTime = (float)sw.Elapsed.TotalSeconds;
             }
         }
 
-        public void PollEvents()
+        public static void PollEvents()
         {
             GLFW.PollEvents();
         }
@@ -210,8 +210,8 @@ namespace IDKEngine.Windowing
             GLFW.SetWindowShouldClose(window, true);
         }
 
-        protected abstract void Render(float dT);
-        protected abstract void Update(float dT);
+        protected abstract void OnRender(float dT);
+        protected abstract void OnUpdate(float dT);
         protected abstract void OnStart();
         protected abstract void OnWindowResize();
         protected abstract void OnKeyPress(char key);

@@ -42,8 +42,7 @@ namespace IDKEngine.Bvh
                 globalBounds.GrowToFit(worldSpaceBounds);
 
                 GpuTlasNode newNode = new GpuTlasNode();
-                newNode.Min = worldSpaceBounds.Min;
-                newNode.Max = worldSpaceBounds.Max;
+                newNode.SetBox(worldSpaceBounds);
                 newNode.IsLeaf = true;
                 newNode.ChildOrInstanceID = (uint)i;
 
@@ -123,13 +122,12 @@ namespace IDKEngine.Bvh
                             ref GpuTlasNode nodeA = ref tempNodes[mergedNodesHead + 0];
                             ref GpuTlasNode nodeB = ref tempNodes[mergedNodesHead + 1];
 
-                            Box boundsFittingChildren = Conversions.ToBox(nodeA);
-                            boundsFittingChildren.GrowToFit(nodeB.Min);
-                            boundsFittingChildren.GrowToFit(nodeB.Max);
+                            Box mergedBox = Conversions.ToBox(nodeA);
+                            mergedBox.GrowToFit(nodeB.Min);
+                            mergedBox.GrowToFit(nodeB.Max);
 
                             GpuTlasNode newNode = new GpuTlasNode();
-                            newNode.Min = boundsFittingChildren.Min;
-                            newNode.Max = boundsFittingChildren.Max;
+                            newNode.SetBox(mergedBox);
                             newNode.IsLeaf = false;
                             newNode.ChildOrInstanceID = (uint)mergedNodesHead;
 

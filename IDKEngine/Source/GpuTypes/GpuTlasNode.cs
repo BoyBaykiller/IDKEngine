@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using OpenTK.Mathematics;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.GpuTypes
 {
@@ -10,6 +11,12 @@ namespace IDKEngine.GpuTypes
 
         public Vector3 Max;
         private readonly float _pad0;
+
+        public void SetBox(in Box box)
+        {
+            Min = box.Min;
+            Max = box.Max;
+        }
 
         public bool IsLeaf
         {

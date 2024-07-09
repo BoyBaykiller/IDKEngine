@@ -65,7 +65,7 @@ namespace IDKEngine.Render
 
         private FSR2.Context fsr2Context;
         private byte[] fsr2ScratchMemory;
-        private bool isFsr2Initialized = false;
+        private bool isFsr2Initialized;
         public unsafe void SetSize(Vector2i inputSize, Vector2i outputSize)
         {
             if (Result != null) Result.Dispose();

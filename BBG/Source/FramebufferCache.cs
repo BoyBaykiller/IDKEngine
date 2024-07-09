@@ -72,11 +72,10 @@ namespace BBOpenGL
                 return newFramebuffer.GLRessource;
             }
 
-            public static void DeleteFramebuffersWithTexture(Texture texture)
+            public static int DeleteFramebuffersWithTexture(Texture texture)
             {
-                int count = framebuffers.Length;
-                int i = 0;
-                while (i < count)
+                int aliveFbos = framebuffers.Length;
+                for (int i = 0; i < aliveFbos;)
                 {
                     bool deletedFramebuffer = false;
 
@@ -88,10 +87,10 @@ namespace BBOpenGL
                         {
                             GL.DeleteFramebuffer(framebuffer.GLRessource);
                             
-                            if (count > 0)
+                            if (aliveFbos > 0)
                             {
                                 // move deleted framebuffer to end of array
-                                MathHelper.Swap(ref framebuffers[i], ref framebuffers[--count]);
+                                MathHelper.Swap(ref framebuffers[i], ref framebuffers[--aliveFbos]);
                             }
 
                             deletedFramebuffer = true;
@@ -104,7 +103,11 @@ namespace BBOpenGL
                         i++;
                     }
                 }
-                Array.Resize(ref framebuffers, count);
+
+                int deleted = framebuffers.Length - aliveFbos;
+                Array.Resize(ref framebuffers, aliveFbos);
+
+                return deleted;
             }
 
             private static FramebufferRessorce CreateFramebuffer(in FramebufferDesc framebufferDesc)
