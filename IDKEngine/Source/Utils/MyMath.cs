@@ -137,12 +137,13 @@ namespace IDKEngine.Utils
             x = (x | x << 2) & 0x1249249249249249;
             return x;
         }
-        public static ulong GetMorton(in Vector3 value)
+
+        public static ulong GetMorton(in Vector3 normalizedV)
         {
             const uint max = (1 << 21) - 1;
-            uint x = Math.Clamp((uint)(value.X * max), 0u, max);
-            uint y = Math.Clamp((uint)(value.Y * max), 0u, max);
-            uint z = Math.Clamp((uint)(value.Z * max), 0u, max);
+            uint x = Math.Clamp((uint)(normalizedV.X * max), 0u, max);
+            uint y = Math.Clamp((uint)(normalizedV.Y * max), 0u, max);
+            uint z = Math.Clamp((uint)(normalizedV.Z * max), 0u, max);
 
             ulong answer = 0;
             answer |= SplitBy3(x) | SplitBy3(y) << 1 | SplitBy3(z) << 2;

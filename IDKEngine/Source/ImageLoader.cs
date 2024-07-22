@@ -7,11 +7,32 @@ namespace IDKEngine
 {
     public static unsafe class ImageLoader
     {
+        public enum ColorComponents : int
+        {
+            R,
+            RA,
+            RGB,
+            RGBA,
+        }
+
         public struct ImageHeader
         {
             public int Width;
             public int Height;
             public int Channels;
+
+            public void SetChannels(ColorComponents colorComponents)
+            {
+                int channels = colorComponents switch
+                {
+                    ColorComponents.R => 1,
+                    ColorComponents.RA => 2,
+                    ColorComponents.RGB => 3,
+                    ColorComponents.RGBA => 4,
+                    _ => throw new NotSupportedException($"Can not convert {nameof(colorComponents)} = {colorComponents} to {nameof(channels)}"),
+                };
+                Channels = channels;
+            }
         }
 
         public struct ImageResult : IDisposable

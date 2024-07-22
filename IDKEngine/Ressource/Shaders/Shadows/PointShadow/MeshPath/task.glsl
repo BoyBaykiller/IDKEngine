@@ -45,7 +45,7 @@ void main()
     uint workgroupFirstMeshlet = mesh.MeshletsStart + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
     uint workgroupThisMeshlet = workgroupFirstMeshlet + localMeshlet;
 
-    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
     GpuMeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
     
     mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceID];

@@ -194,38 +194,35 @@ namespace IDKEngine.Bvh
 
         public void BlasesBuild(int start, int count)
         {
+            Stopwatch swBuilding = Stopwatch.StartNew();
+            Parallel.For(start, start + count, i =>
+            //for (int i = start; i < start + count; i++)
             {
-                Stopwatch swBuilding = Stopwatch.StartNew();
-                Parallel.For(start, start + count, i =>
-                //for (int i = start; i < start + count; i++)
+                blases[i].Build();
+            });
+            swBuilding.Stop();
+
+            Stopwatch swOptimization = Stopwatch.StartNew();
+            Parallel.For(start, start + count, i =>
+            //for (int i = start; i < start + count; i++)
+            {
+                blases[i].Optimize(new BLAS.OptimizationSettings());
+            });
+            swOptimization.Stop();
+
+            Logger.Log(Logger.LogLevel.Info, 
+                $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms(Build) + {swOptimization.ElapsedMilliseconds}ms(Optimization) = " +
+                $"{swBuilding.ElapsedMilliseconds + swOptimization.ElapsedMilliseconds}ms"
+            );
+
+            if (true)
+            {
+                float totalSAH = 0;
+                for (int i = start; i < start + count; i++)
                 {
-                    blases[i].Build();
-                });
-                swBuilding.Stop();
-
-                Stopwatch swOptimization = Stopwatch.StartNew();
-                Parallel.For(start, start + count, i =>
-                //for (int i = start; i < start + count; i++)
-                {
-                    blases[i].Optimize(new BLAS.OptimizationSettings());
-                });
-
-                swOptimization.Stop();
-
-                Logger.Log(Logger.LogLevel.Info, 
-                    $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms(Build) + {swOptimization.ElapsedMilliseconds}ms(Optimization) = " +
-                    $"{swBuilding.ElapsedMilliseconds + swOptimization.ElapsedMilliseconds}ms"
-                );
-
-                if (true)
-                {
-                    float totalSAH = 0;
-                    for (int i = start; i < start + count; i++)
-                    {
-                        totalSAH += blases[i].ComputeGlobalCost(blases[i].Root);
-                    }
-                    Logger.Log(Logger.LogLevel.Info, $"Added SAH of all BLAS'es = {totalSAH}");
+                    totalSAH += blases[i].ComputeGlobalCost(blases[i].Root);
                 }
+                Logger.Log(Logger.LogLevel.Info, $"Added SAH of all BLAS'es = {totalSAH}");
             }
             SetBlasBuffersContent();
 

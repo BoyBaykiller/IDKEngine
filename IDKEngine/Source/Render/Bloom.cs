@@ -47,7 +47,7 @@ namespace IDKEngine.Render
         private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
         public unsafe Bloom(Vector2i size, in GpuSettings settings, int minusLods = 3)
         {
-            shaderProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "Bloom/compute.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "Bloom/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
             gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);

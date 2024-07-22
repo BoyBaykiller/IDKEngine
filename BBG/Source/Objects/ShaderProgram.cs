@@ -63,7 +63,6 @@ namespace BBOpenGL
                 }
             }
 
-
             public bool GetLinkStatus()
             {
                 int success = 0;
@@ -78,56 +77,12 @@ namespace BBOpenGL
                     GL.ProgramUniformMatrix4fv(ID, location, count, transpose, ptr);
                 }
             }
-            public unsafe void Upload(string name, in Matrix4 matrix4, int count = 1, bool transpose = false)
-            {
-                fixed (float* ptr = &matrix4.Row0.X)
-                {
-                    GL.ProgramUniformMatrix4fv(ID, GetUniformLocation(name), count, transpose, ptr);
-                }
-            }
-
-            public unsafe void Upload(int location, in Vector4 vector4, int count = 1)
-            {
-                fixed (float* ptr = &vector4.X)
-                {
-                    GL.ProgramUniform4fv(ID, location, count, ptr);
-                }
-            }
-            public unsafe void Upload(string name, in Vector4 vector4, int count = 1)
-            {
-                fixed (float* ptr = &vector4.X)
-                {
-                    GL.ProgramUniform4fv(ID, GetUniformLocation(name), count, ptr);
-                }
-            }
 
             public unsafe void Upload(int location, in Vector3 vector3, int count = 1)
             {
                 fixed (float* ptr = &vector3.X)
                 {
                     GL.ProgramUniform3fv(ID, location, count, ptr);
-                }
-            }
-            public unsafe void Upload(string name, in Vector3 vector3, int count = 1)
-            {
-                fixed (float* ptr = &vector3.X)
-                {
-                    GL.ProgramUniform3fv(ID, GetUniformLocation(name), count, ptr);
-                }
-            }
-
-            public unsafe void Upload(int location, in Vector2 vector2, int count = 1)
-            {
-                fixed (float* ptr = &vector2.X)
-                {
-                    GL.ProgramUniform2fv(ID, location, count, ptr);
-                }
-            }
-            public unsafe void Upload(string name, in Vector2 vector2, int count = 1)
-            {
-                fixed (float* ptr = &vector2.X)
-                {
-                    GL.ProgramUniform2fv(ID, GetUniformLocation(name), count, ptr);
                 }
             }
 
@@ -153,15 +108,7 @@ namespace BBOpenGL
             {
                 GL.ProgramUniform1uiv(ID, location, count, &x);
             }
-            public unsafe void Upload(string name, uint x, int count = 1)
-            {
-                GL.ProgramUniform1uiv(ID, GetUniformLocation(name), count, &x);
-            }
 
-            public void Upload(int location, bool x)
-            {
-                Upload(location, x ? 1 : 0);
-            }
             public void Upload(string name, bool x)
             {
                 Upload(name, x ? 1 : 0);
@@ -306,7 +253,7 @@ namespace BBOpenGL
                 for (int i = 0; i < recompiledShaders.Length; i++)
                 {
                     AbstractShader existingShader = shaderProgram.Shaders[i];
-                    recompiledShaders[i] = new AbstractShader(existingShader.ShaderStage, existingShader.LocalShaderPath, existingShader.DebugSaveAndRunRGA);
+                    recompiledShaders[i] = AbstractShader.FromFile(existingShader.ShaderStage, existingShader.LocalShaderPath, existingShader.DebugSaveAndRunRGA);
                 }
                 shaderProgram.Link(recompiledShaders);
             }

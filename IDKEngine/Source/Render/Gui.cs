@@ -64,9 +64,9 @@ namespace IDKEngine.Render
 
         private readonly ImGuiBackend backend;
         private SysVec2 viewportHeaderSize;
-        public Gui(int width, int height)
+        public Gui(Vector2i windowSize)
         {
-            backend = new ImGuiBackend(width, height);
+            backend = new ImGuiBackend(windowSize);
 
             RecordingVars = new RecordingSettings();
             RecordingVars.RasterizerFPSGoal = 10000;
@@ -1219,7 +1219,7 @@ namespace IDKEngine.Render
 
         public void SetSize(Vector2i size)
         {
-            backend.WindowResized(size.X, size.Y);
+            backend.SetWindowSize(size);
         }
         
         public void PressChar(char key)
@@ -1275,19 +1275,24 @@ namespace IDKEngine.Render
 
     partial class Gui
     {
-        private struct LoadModelContext
+        private struct GuiModelLoad
         {
             public const string IMGUI_ID_POPUP_MODAL = "ModelLoadDialog";
 
+            public enum ModelPreprocessingMode : int
+            {
+                gltfpack,
+                meshoptimizer,
+            }
+
             public struct LoadingTask
             {
-                public ModelLoader.CompressionUtils.CompressGltfSettings CompressGltfSettings;
-                public bool DoCompressGltf;
                 public LoadParams LoadParams;
+                public ModelLoader.GtlfpackWrapper.GltfpackSettings CompressGltfSettings;
 
                 public LoadingTask(string modelPath)
                 {
-                    CompressGltfSettings = new ModelLoader.CompressionUtils.CompressGltfSettings();
+                    CompressGltfSettings = new ModelLoader.GtlfpackWrapper.GltfpackSettings();
                     CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
                     CompressGltfSettings.UseInstancing = true;
                     CompressGltfSettings.InputPath = modelPath;
@@ -1305,20 +1310,30 @@ namespace IDKEngine.Render
             {
                 public bool SpawnInCamera = true;
                 public OtkVec3 Scale = new OtkVec3(1.0f);
+                public ModelLoader.OptimizationSettings ModelOptimizationSettings = ModelLoader.OptimizationSettings.Recommended;
 
                 public LoadParams()
                 {
                 }
             }
 
-            public bool IsLoadModelDialog;
             public Tuple<Task, LoadingTask>?[] CompressionsTasks = new Tuple<Task, LoadingTask>[10];
-            private readonly Queue<LoadingTask> queuedLoadingTasks = new Queue<LoadingTask>();
-
             public LoadingTask CurrentGuiDialogLoadingTask;
 
-            public LoadModelContext()
+            public bool IsLoadModelDialog;
+            public ModelPreprocessingMode PreprocessMode;
+
+            private readonly Queue<LoadingTask> queuedLoadingTasks = new Queue<LoadingTask>();
+            public GuiModelLoad()
             {
+                if (ModelLoader.GtlfpackWrapper.IsCLIFound)
+                {
+                    PreprocessMode = ModelPreprocessingMode.gltfpack;
+                }
+                else
+                {
+                    PreprocessMode = ModelPreprocessingMode.meshoptimizer;
+                }
             }
 
             public bool HandleNextLoadingTask()
@@ -1331,8 +1346,7 @@ namespace IDKEngine.Render
                 queuedLoadingTasks.Enqueue(new LoadingTask(modelPath));
             }
         }
-
-        private LoadModelContext loadModelContext = new LoadModelContext();
+        private GuiModelLoad loadModelContext = new GuiModelLoad();
 
         public void AddModelDialog(string path)
         {
@@ -1354,18 +1368,71 @@ namespace IDKEngine.Render
 
             if (loadModelContext.IsLoadModelDialog)
             {
-                ref LoadModelContext.LoadingTask loadingTask = ref loadModelContext.CurrentGuiDialogLoadingTask;
+                ref GuiModelLoad.LoadingTask loadingTask = ref loadModelContext.CurrentGuiDialogLoadingTask;
 
                 if (loadModelContext.IsLoadModelDialog && ImGui.BeginPopupModal(loadingTask.GetPopupModalName(), ref loadModelContext.IsLoadModelDialog, ImGuiWindowFlags.NoNavInputs))
                 {
-                    ImGui.Checkbox("Compress glTF using gltfpack? (fails if not provided)", ref loadingTask.DoCompressGltf);
-                    if (loadingTask.DoCompressGltf)
+                    GuiModelLoad.ModelPreprocessingMode current = loadModelContext.PreprocessMode;
+                    if (ImGui.BeginCombo("Preprocessing", current.ToString()))
+                    {
+                        GuiModelLoad.ModelPreprocessingMode[] preprocesModes = Enum.GetValues<GuiModelLoad.ModelPreprocessingMode>();
+                        for (int i = 0; i < preprocesModes.Length; i++)
+                        {
+                            GuiModelLoad.ModelPreprocessingMode it = preprocesModes[i];
+
+                            bool isDisabled = it == GuiModelLoad.ModelPreprocessingMode.gltfpack && !ModelLoader.GtlfpackWrapper.IsCLIFound;
+                            if (isDisabled)
+                            {
+                                ImGui.BeginDisabled();
+                            }
+                            bool isSelected = current == it;
+                            if (ImGui.Selectable(it.ToString(), isSelected))
+                            {
+                                current = it;
+                                loadModelContext.PreprocessMode = it;
+                            }
+                            if (isDisabled)
+                            {
+                                ImGui.EndDisabled();
+                            }
+
+                            if (it == GuiModelLoad.ModelPreprocessingMode.gltfpack)
+                            {
+                                if (isDisabled)
+                                {
+                                    ToolTipForItemAboveHovered("gltfpack exe needs to be in PATH or WORKING DIR");
+                                }
+                                else
+                                {
+                                    ToolTipForItemAboveHovered("Does optimization + compression + more");
+                                }
+                            }
+                            if (it == GuiModelLoad.ModelPreprocessingMode.meshoptimizer)
+                            {
+                                ToolTipForItemAboveHovered("Subset of gltfpack. Does not require external CLI");
+                            }
+
+                            if (isSelected)
+                            {
+                                ImGui.SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui.EndCombo();
+                    }
+
+                    if (loadModelContext.PreprocessMode == GuiModelLoad.ModelPreprocessingMode.gltfpack)
                     {
                         ImGui.Checkbox("UseInstancing", ref loadingTask.CompressGltfSettings.UseInstancing);
                         ImGui.Checkbox("KeepMeshPrimitives (requires gltfpack fork)", ref loadingTask.CompressGltfSettings.KeepMeshPrimitives);
                         ImGui.SliderInt("Threads", ref loadingTask.CompressGltfSettings.ThreadsUsed, 1, Environment.ProcessorCount);
-                        ImGui.Separator();
                     }
+                    if (loadModelContext.PreprocessMode == GuiModelLoad.ModelPreprocessingMode.meshoptimizer)
+                    {
+                        ImGui.Checkbox("VertexRemapOptimization", ref loadingTask.LoadParams.ModelOptimizationSettings.VertexRemapOptimization);
+                        ImGui.Checkbox("VertexCacheOptimization", ref loadingTask.LoadParams.ModelOptimizationSettings.VertexCacheOptimization);
+                        ImGui.Checkbox("VertexFetchOptimization", ref loadingTask.LoadParams.ModelOptimizationSettings.VertexFetchOptimization);
+                    }
+                    ImGui.Separator();
 
                     ImGui.Checkbox("SpawnInCamera", ref loadingTask.LoadParams.SpawnInCamera);
 
@@ -1383,15 +1450,14 @@ namespace IDKEngine.Render
                     {
                         string gltfInputPath = loadingTask.CompressGltfSettings.InputPath;
 
-                        if (!loadingTask.DoCompressGltf)
+                        if (loadModelContext.PreprocessMode != GuiModelLoad.ModelPreprocessingMode.gltfpack)
                         {
                             if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
                             {
                                 shouldResetPT = true;
                             }
                         }
-
-                        if (loadingTask.DoCompressGltf)
+                        if (loadModelContext.PreprocessMode == GuiModelLoad.ModelPreprocessingMode.gltfpack)
                         {
                             string fileName = Path.GetFileName(gltfInputPath);
                             string compressedGltfDir = Path.Combine(Path.GetDirectoryName(gltfInputPath), $"{Path.GetFileNameWithoutExtension(gltfInputPath)}Compressed");
@@ -1402,18 +1468,17 @@ namespace IDKEngine.Render
                             loadingTask.CompressGltfSettings.ProcessError = (string message) =>
                             {
                                 Logger.Log(Logger.LogLevel.Error, message);
-                                Logger.Log(Logger.LogLevel.Error, $"An error occured while compressing \"{fileName}\". Falling back to uncompressed model");
-                                ModuleLoadModelLoad(app, gltfInputPath, loadModelContext.CurrentGuiDialogLoadingTask.LoadParams);
+                                Logger.Log(Logger.LogLevel.Error, $"An error occured while running gltfpack on \"{fileName}\"");
                             };
                             loadingTask.CompressGltfSettings.ProcessOutput = (string message) =>
                             {
                                 Logger.Log(Logger.LogLevel.Info, message);
                             };
 
-                            Task? task = ModelLoader.CompressionUtils.CompressGltf(loadingTask.CompressGltfSettings);
+                            Task? task = ModelLoader.GtlfpackWrapper.Run(loadingTask.CompressGltfSettings);
                             if (task == null)
                             {
-                                Logger.Log(Logger.LogLevel.Error, "Failed compressing. Falling back to uncompressed model");
+                                Logger.Log(Logger.LogLevel.Error, "Failed to start gltfpack. Falling back to normal model");
                                 ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams);
                             }
                             else
@@ -1423,14 +1488,18 @@ namespace IDKEngine.Render
                                 {
                                     if (loadModelContext.CompressionsTasks[i] == null)
                                     {
-                                        loadModelContext.CompressionsTasks[i] = new Tuple<Task, LoadModelContext.LoadingTask>(task, loadingTask);
+                                        // We override with optimizations turned off, as we know gltfpack is run on the model
+                                        // which already applies all optimizations
+                                        loadingTask.LoadParams.ModelOptimizationSettings = ModelLoader.OptimizationSettings.AllTurnedOff;
+
+                                        loadModelContext.CompressionsTasks[i] = new Tuple<Task, GuiModelLoad.LoadingTask>(task, loadingTask);
                                         found = true;
                                         break;
                                     }
                                 }
                                 if (!found)
                                 {
-                                    Logger.Log(Logger.LogLevel.Error, "Too many glTF file compressions happening at once. Falling back to uncompressed model");
+                                    Logger.Log(Logger.LogLevel.Error, "Too many gltfpack instances running at once. Falling back to normal model");
                                     if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
                                     {
                                         shouldResetPT = true;
@@ -1453,7 +1522,7 @@ namespace IDKEngine.Render
                     continue;
                 }
 
-                (Task task, LoadModelContext.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
+                (Task task, GuiModelLoad.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
                 if (!task.IsCompleted)
                 {
                     ImGui.Text($"Compressing {Path.GetFileName(loadingTask.CompressGltfSettings.InputPath)}...\n");
@@ -1470,7 +1539,7 @@ namespace IDKEngine.Render
                     continue;
                 }
 
-                (Task task, LoadModelContext.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
+                (Task task, GuiModelLoad.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
                 if (task.IsCompletedSuccessfully)
                 {
                     if (ModuleLoadModelLoad(app, loadingTask.CompressGltfSettings.OutputPath, loadingTask.LoadParams))
@@ -1483,12 +1552,14 @@ namespace IDKEngine.Render
             }
         }
         
-        private bool ModuleLoadModelLoad(Application app, string modelPath, in LoadModelContext.LoadParams loadParams)
+        private bool ModuleLoadModelLoad(Application app, string modelPath, in GuiModelLoad.LoadParams loadParams)
         {
             OtkVec3 modelPos = loadParams.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
-            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, Matrix4.CreateScale(loadParams.Scale) * Matrix4.CreateTranslation(modelPos));
+            Matrix4 modelRoot = Matrix4.CreateScale(loadParams.Scale) * Matrix4.CreateTranslation(modelPos);
+            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, modelRoot, loadParams.ModelOptimizationSettings);
             if (!newModel.HasValue)
             {
+                Logger.Log(Logger.LogLevel.Error, $"Failed loading model \"{modelPath}\"");
                 return false;
             }
 

@@ -34,15 +34,15 @@ namespace IDKEngine.Render
                 if (TakeMeshShaderPath)
                 {
                     renderShadowMapProgram = new BBG.AbstractShaderProgram(
-                       new BBG.AbstractShader(BBG.ShaderStage.TaskNV, "Shadows/PointShadow/MeshPath/task.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderStage.MeshNV, "Shadows/PointShadow/MeshPath/mesh.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Shadows/PointShadow/fragment.glsl"));
+                       BBG.AbstractShader.FromFile(BBG.ShaderStage.TaskNV, "Shadows/PointShadow/MeshPath/task.glsl"),
+                       BBG.AbstractShader.FromFile(BBG.ShaderStage.MeshNV, "Shadows/PointShadow/MeshPath/mesh.glsl"),
+                       BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "Shadows/PointShadow/fragment.glsl"));
                 }
                 else
                 {
                     renderShadowMapProgram = new BBG.AbstractShaderProgram(
-                        new BBG.AbstractShader(BBG.ShaderStage.Vertex, "Shadows/PointShadow/VertexPath/vertex.glsl"),
-                        new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Shadows/PointShadow/fragment.glsl"));
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "Shadows/PointShadow/VertexPath/vertex.glsl"),
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "Shadows/PointShadow/fragment.glsl"));
                 }
             }
         }
@@ -101,12 +101,12 @@ namespace IDKEngine.Render
         private static BBG.AbstractShaderProgram renderShadowMapProgram;
         private static BBG.AbstractShaderProgram cullingProgram;
 
-        public CpuPointShadow(int shadowMapSize, Vector2i rayTracedShadowMapSize, Vector2 clippingPlanes)
+        public CpuPointShadow(int shadowMapSize, in Vector2i rayTracedShadowMapSize, in Vector2 clippingPlanes)
         {
             if (!isLazyInitialized)
             {
                 TakeMeshShaderPath = false;
-                cullingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "MeshCulling/PointShadow/compute.glsl"));
+                cullingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "MeshCulling/PointShadow/compute.glsl"));
                 isLazyInitialized = true;
             }
 

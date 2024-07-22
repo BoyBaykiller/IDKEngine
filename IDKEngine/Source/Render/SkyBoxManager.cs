@@ -36,12 +36,6 @@ namespace IDKEngine.Render
         {
             if (skyBoxMode == SkyBoxMode.ExternalAsset)
             {
-                if (AtmosphericScatterer != null)
-                {
-                    AtmosphericScatterer.Dispose();
-                    AtmosphericScatterer = null;
-                }
-
                 externalSkyBoxTexture = new BBG.Texture(BBG.Texture.Type.Cubemap);
                 externalSkyBoxTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
 
@@ -50,17 +44,27 @@ namespace IDKEngine.Render
                     skyBoxMode = SkyBoxMode.InternalAtmosphericScattering;
                 }
             }
-
-            if (skyBoxMode == SkyBoxMode.InternalAtmosphericScattering)
+            else
             {
                 if (externalSkyBoxTexture != null)
                 {
                     externalSkyBoxTexture.Dispose();
                     externalSkyBoxTexture = null;
                 }
+            }
 
+            if (skyBoxMode == SkyBoxMode.InternalAtmosphericScattering)
+            {
                 AtmosphericScatterer = new AtmosphericScatterer(128, AtmosphericScatterer.GpuSettings.Default);
                 AtmosphericScatterer.Compute();
+            }
+            else
+            {
+                if (AtmosphericScatterer != null)
+                {
+                    AtmosphericScatterer.Dispose();
+                    AtmosphericScatterer = null;
+                }
             }
 
             SkyBoxTexture.TryEnableSeamlessCubemap(true);

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
@@ -117,23 +116,19 @@ namespace IDKEngine.Utils
             return Unsafe.As<System.Numerics.Matrix4x4, Matrix4>(ref matrix4x4);
         }
 
+        public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 matrix4x4)
+        {
+            return Unsafe.As<Matrix4, System.Numerics.Matrix4x4>(ref matrix4x4);
+        }
+
+        public static Quaternion ToOpenTK(this System.Numerics.Quaternion quaternion)
+        {
+            return Unsafe.As<System.Numerics.Quaternion, Quaternion>(ref quaternion);
+        }
+
         public static string ToOnOff(this bool val)
         {
             return val ? "On" : "Off";
-        }
-
-        public static int InterlockedMax(ref int location1, int value)
-        {
-            int initialValue;
-            int newValue;
-            do
-            {
-                initialValue = location1;
-                newValue = Math.Max(initialValue, value);
-            }
-            while (Interlocked.CompareExchange(ref location1, newValue, initialValue) != initialValue);
-
-            return initialValue;
         }
 
         public static unsafe bool TryReadFromFile<T>(string path, out T[] readData) where T : unmanaged
@@ -190,7 +185,6 @@ namespace IDKEngine.Utils
             Memory.Free(pixels);
         }
 
-
         public static int BinarySearchLowerBound<T>(ReadOnlySpan<T> arr, in T value, Comparison<T> comparison)
         {
             int lo = 0;
@@ -235,7 +229,6 @@ namespace IDKEngine.Utils
             arr[newIndex] = newValue;
             return true;
         }
-
 
         public delegate bool FuncLeftSide<T>(in T v);
         public static int Partition<T>(Span<T> arr, int start, int end, FuncLeftSide<T> func)

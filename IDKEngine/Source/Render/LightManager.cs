@@ -70,8 +70,8 @@ namespace IDKEngine.Render
             lights = new CpuLight[GPU_MAX_UBO_LIGHT_COUNT];
 
             shaderProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "Light/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "Light/fragment.glsl"));
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "Light/vertex.glsl"),
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "Light/fragment.glsl"));
 
             lightBufferObject = new BBG.TypedBuffer<GpuLight>();
             lightBufferObject.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));

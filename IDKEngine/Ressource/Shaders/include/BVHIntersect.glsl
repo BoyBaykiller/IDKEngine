@@ -55,21 +55,21 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
         if (summedTriCount > 0)
         {
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+            first += triangleOffset;
             for (uint i = first; i < first + summedTriCount; i++)
             {
-                uint triangleID = triangleOffset + i;
-                uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[triangleID]);
+                uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[i]);
 
-                vec3 p0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 p1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 p2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
+                vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
+                vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);
+                vec3 p2 = Unpack(vertexPositionsSSBO.Positions[indices.z]);
 
                 vec3 bary;
                 float hitT;
                 if (RayTriangleIntersect(ray, p0, p1, p2, bary, hitT) && hitT < hitInfo.T)
                 {
                     hit = true;
-                    hitInfo.TriangleID = triangleID;
+                    hitInfo.TriangleID = i;
                     hitInfo.BaryXY = bary.xy;
                     hitInfo.T = hitT;
                 }
@@ -130,19 +130,19 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
         if (summedTriCount > 0)
         {
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+            first += triangleOffset;
             for (uint i = first; i < first + summedTriCount; i++)
             {
-                uint triangleID = triangleOffset + i;
-                uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[triangleID]);
-                vec3 p0 = Unpack(vertexPositionsSSBO.VertexPositions[indices.x]);
-                vec3 p1 = Unpack(vertexPositionsSSBO.VertexPositions[indices.y]);
-                vec3 p2 = Unpack(vertexPositionsSSBO.VertexPositions[indices.z]);
+                uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[i]);
+                vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
+                vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);
+                vec3 p2 = Unpack(vertexPositionsSSBO.Positions[indices.z]);
 
                 vec3 bary;
                 float hitT;
                 if (RayTriangleIntersect(ray, p0, p1, p2, bary, hitT) && hitT < hitInfo.T)
                 {
-                    hitInfo.TriangleID = triangleID;
+                    hitInfo.TriangleID = i;
                     hitInfo.BaryXY = bary.xy;
                     hitInfo.T = hitT;
 
@@ -221,7 +221,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         if (isLeaf)
         {
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
-            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
 
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
@@ -270,7 +270,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
     for (uint i = 0; i < meshInstanceSSBO.MeshInstances.length(); i++)
     {
         GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[i];
-        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
         GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
 
         mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
@@ -337,7 +337,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         if (isLeaf)
         {
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
-            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
 
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
@@ -388,7 +388,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
     for (uint i = 0; i < meshInstanceSSBO.MeshInstances.length(); i++)
     {
         GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[i];
-        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.DrawCommands[meshInstance.MeshIndex];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
         GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
 
         mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);

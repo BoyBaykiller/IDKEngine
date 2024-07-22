@@ -73,25 +73,25 @@ namespace IDKEngine.Render
 
             {
                 List<BBG.AbstractShader> voxelizeProgramShaders = [
-                    new BBG.AbstractShader(BBG.ShaderStage.Vertex, "VXGI/Voxelize/Voxelize/vertex.glsl"),
-                    new BBG.AbstractShader(BBG.ShaderStage.Fragment, "VXGI/Voxelize/Voxelize/fragment.glsl")
+                    BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "VXGI/Voxelize/Voxelize/vertex.glsl"),
+                    BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "VXGI/Voxelize/Voxelize/fragment.glsl")
                 ];
                 if (TAKE_FAST_GEOMETRY_SHADER_PATH)
                 {
-                    voxelizeProgramShaders.Add(new BBG.AbstractShader(BBG.ShaderStage.Geometry, "VXGI/Voxelize/Voxelize/geometry.glsl"));
+                    voxelizeProgramShaders.Add(BBG.AbstractShader.FromFile(BBG.ShaderStage.Geometry, "VXGI/Voxelize/Voxelize/geometry.glsl"));
                 }
 
                 voxelizeProgram = new BBG.AbstractShaderProgram(voxelizeProgramShaders.ToArray());
 
-                clearTexturesProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/Clear/compute.glsl"));
+                clearTexturesProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/Voxelize/Clear/compute.glsl"));
             }
 
-            mipmapProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/Mipmap/compute.glsl"));
-            visualizeDebugProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
+            mipmapProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/Voxelize/Mipmap/compute.glsl"));
+            visualizeDebugProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
             if (!TAKE_ATOMIC_FP16_PATH)
             {
                 intermediateResultRbg = new BBG.Texture[3];
-                mergeIntermediatesProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
+                mergeIntermediatesProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
             }
 
             voxelizerDataBuffer = new BBG.TypedBuffer<GpuVoxelizerData>();

@@ -24,7 +24,7 @@ layout(location = 0) uniform int RenderAxis;
 void main()
 {
     GpuVertex vertex = vertexSSBO.Vertices[gl_VertexID];
-    vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
+    vec3 vertexPosition = Unpack(vertexPositionsSSBO.Positions[gl_VertexID]);
 
     GpuMesh mesh = meshSSBO.Meshes[gl_DrawID];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];

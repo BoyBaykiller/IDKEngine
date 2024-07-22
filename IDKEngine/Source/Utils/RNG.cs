@@ -9,20 +9,25 @@ namespace IDKEngine.Utils
 
         public static Vector3 RandomVec3(float min, float max)
         {
-            return new Vector3(min) + new Vector3(GetRandomFloat01(), GetRandomFloat01(), GetRandomFloat01()) * (max - min);
+            return new Vector3(min) + new Vector3(RandomFloat01(), RandomFloat01(), RandomFloat01()) * (max - min);
         }
 
         public static Vector3 RandomVec3(in Vector3 min, in Vector3 max)
         {
-            return new Vector3(GetRandomFloat(min.X, max.X), GetRandomFloat(min.Y, max.Y), GetRandomFloat(min.Z, max.Z));
+            return new Vector3(RandomFloat(min.X, max.X), RandomFloat(min.Y, max.Y), RandomFloat(min.Z, max.Z));
         }
 
-        public static float GetRandomFloat01()
+        public static float RandomFloat01()
         {
             return rng.NextSingle();
         }
 
-        public static float GetRandomFloat(float min, float max)
+        public static int RandomInt(int min, int max)
+        {
+            return rng.Next(min, max);
+        }
+
+        public static float RandomFloat(float min, float max)
         {
             return min + rng.NextSingle() * (max - min);
         }
@@ -46,7 +51,7 @@ namespace IDKEngine.Utils
 
         public static Vector3 SampleHemisphere(in Vector3 normal)
         {
-            return SampleHemisphere(normal, GetRandomFloat01(), GetRandomFloat01());
+            return SampleHemisphere(normal, RandomFloat01(), RandomFloat01());
         }
     }
 }

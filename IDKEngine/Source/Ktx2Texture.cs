@@ -29,12 +29,12 @@ namespace IDKEngine
             return Ktx2.TranscodeBasis(texture, format, flags);
         }
 
-        public Ktx2.ErrorCode GetImageOffset(int level, out nint dataOffset)
+        public Ktx2.ErrorCode GetImageDataOffset(int level, out nint dataOffset)
         {
-            return GetImageOffset(level, 0, 0, out dataOffset);
+            return GetImageDataOffset(level, 0, 0, out dataOffset);
         }
 
-        public Ktx2.ErrorCode GetImageOffset(int level, int layer, int faceSlide, out nint dataOffset)
+        public Ktx2.ErrorCode GetImageDataOffset(int level, int layer, int faceSlide, out nint dataOffset)
         {
             Ktx2.ErrorCode errorCode = Ktx2.GetImageOffset(texture, (uint)level, (uint)layer, (uint)faceSlide, out nuint dataOffsetLocal);
             dataOffset = (nint)dataOffsetLocal;

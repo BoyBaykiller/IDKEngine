@@ -33,7 +33,7 @@ namespace IDKEngine.Render
             BBG.Debugging.PushDebugGroup("Run FSR2");
 
             Vector2i renderSize = new Vector2i(color.Width, color.Height);
-            Vector2 jitterUsedThisFrame = jitter / 2.0f * renderSize;
+            jitter = jitter / 2.0f * renderSize;
 
             FSR2.DispatchDescription dispatchDesc = new FSR2.DispatchDescription()
             {
@@ -44,7 +44,7 @@ namespace IDKEngine.Render
                 Reactive = new FSR2Types.Resource(),
                 TransparencyAndComposition = new FSR2Types.Resource(),
                 Output = FSR2.GL.GetTextureResource((uint)Result.ID, (uint)Result.Width, (uint)Result.Height, (uint)Result.Format),
-                JitterOffset = new FSR2Types.FloatCoords2D() { X = jitterUsedThisFrame.X, Y = jitterUsedThisFrame.Y },
+                JitterOffset = new FSR2Types.FloatCoords2D() { X = jitter.X, Y = jitter.Y },
                 MotionVectorScale = new FSR2Types.FloatCoords2D() { X = -renderSize.X, Y = -renderSize.Y },
                 RenderSize = new FSR2Types.Dimensions2D() { Width = (uint)renderSize.X, Height = (uint)renderSize.Y },
                 EnableSharpening = IsSharpening ? (byte)1 : (byte)0,
@@ -73,7 +73,6 @@ namespace IDKEngine.Render
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
             Result.ImmutableAllocate(outputSize.X, outputSize.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
-
 
             if (isFsr2Initialized)
             {

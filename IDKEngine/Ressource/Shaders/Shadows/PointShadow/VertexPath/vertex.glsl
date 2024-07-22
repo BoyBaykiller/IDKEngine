@@ -15,7 +15,7 @@ layout(location = 0) uniform int ShadowIndex;
 
 void main()
 {
-    vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
+    vec3 vertexPosition = Unpack(vertexPositionsSSBO.Positions[gl_VertexID]);
 
     uint faceAndMeshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance * 6];
     uint faceID = faceAndMeshInstanceID >> 29;

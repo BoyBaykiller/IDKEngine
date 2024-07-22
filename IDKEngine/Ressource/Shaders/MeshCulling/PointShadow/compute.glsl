@@ -28,7 +28,7 @@ void main()
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
     uint meshID = meshInstance.MeshIndex;
     
-    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
     GpuBlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeOffset];
 
     for (int i = 0; i < NumVisibleFaces; i++)
@@ -53,11 +53,11 @@ void main()
             const uint taskShaderWorkGroupSize = 32;
             uint meshletCount = meshSSBO.Meshes[meshID].MeshletCount;
             uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
-            meshletTaskCmdSSBO.TaskCommands[meshletTaskID].Count = meshletsWorkGroupCount;
+            meshletTaskCmdSSBO.Commands[meshletTaskID].Count = meshletsWorkGroupCount;
 
         #else
 
-            uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshID].InstanceCount, 1u);
+            uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshID].InstanceCount, 1u);
             visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance * 6 + index] = faceAndMeshInstanceID;
 
         #endif

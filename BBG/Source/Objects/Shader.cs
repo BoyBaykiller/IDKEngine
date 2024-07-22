@@ -30,7 +30,7 @@ namespace BBOpenGL
             public readonly int ID;
             public readonly ShaderStage ShaderStage;
             public readonly string Name;
-            public Shader(ShaderStage stage, string srcCode, string name = null)
+            public Shader(ShaderStage stage, string source, string name = null)
             {
                 ShaderStage = stage;
 
@@ -38,7 +38,7 @@ namespace BBOpenGL
 
                 Name = name ?? stage.ToString();
 
-                GL.ShaderSource(ID, srcCode);
+                GL.ShaderSource(ID, source);
                 GL.CompileShader(ID);
 
                 GL.GetShaderInfoLog(ID, out string shaderInfoLog);
@@ -66,35 +66,34 @@ namespace BBOpenGL
 
         public class AbstractShader : Shader
         {
-            public const string SHADER_PATH = "Ressource/Shaders/";
+            public static string SHADER_PATH = "Ressource/Shaders/";
 
             public string FullShaderPath => Path.Combine(SHADER_PATH, LocalShaderPath);
 
             public readonly string LocalShaderPath;
-
             public readonly bool DebugSaveAndRunRGA;
-            public AbstractShader(ShaderStage shaderStage, string localShaderPath, bool debugSaveAndRunRGA = false)
-                : this(shaderStage, File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath)), localShaderPath)
+
+            public static AbstractShader FromFile(ShaderStage shaderStage, string localShaderPath, bool debugSaveAndRunRGA = false)
+            {
+                string source = File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath));
+                AbstractShader result = new AbstractShader(shaderStage, source, localShaderPath, debugSaveAndRunRGA);
+
+                return result;
+            }
+
+            private AbstractShader(ShaderStage shaderStage, string source, string localShaderPath, bool debugSaveAndRunRGA = false)
+                : base(shaderStage, Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath), localShaderPath)
             {
                 if (debugSaveAndRunRGA && GetCompileStatus())
                 {
-                    // This is ugly but only relevant for development.
-                    // Runs Radeon GPU Analyzer on the shader code and writes the results + preprocess code to disk
-                    string srcCode = File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath));
-                    string shaderCode = Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath);
+                    // This is only relevant for development.
+                    // Runs Radeon GPU Analyzer on the shader code and writes the results + preprocessed code to disk
                     string outPath = Path.Combine(SHADER_PATH, "bin", localShaderPath);
+                    string shaderCode = Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath);
                     __DebugSaveAndRunRGA(shaderStage, shaderCode, outPath);
                 }
-
-                DebugSaveAndRunRGA = debugSaveAndRunRGA;
                 LocalShaderPath = localShaderPath;
-            }
-
-            private AbstractShader(ShaderStage shaderStage, string srcCode, string name)
-                : base(shaderStage, Preprocessor.PreProcess(srcCode, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, name), name)
-            {
-                // We currently dont allow public construction from just a srcCode
-                // as that would make the LocalShaderPath variable meaningless, which we need for shader recompilation.
+                DebugSaveAndRunRGA = debugSaveAndRunRGA;
             }
 
             public static class Preprocessor
@@ -114,47 +113,38 @@ namespace BBOpenGL
                     public string[] UsedAppInsertionKeys;
                 }
 
-                public static string PreProcess(string srcCode, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, string name = null)
+                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, string name = null)
                 {
-                    return PreProcess(srcCode, shaderInsertions, shaderStage, out _, name);
+                    return PreProcess(source, shaderInsertions, shaderStage, out _, name);
                 }
 
-                public static string PreProcess(string srcCode, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, out PreProcessInfo preProcessInfo, string name = null)
+                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, out PreProcessInfo preProcessInfo, string name = null)
                 {
                     List<string> usedAppInsertions = new List<string>();
                     List<string> pathsAlreadyIncluded = new List<string>();
-                    StringBuilder result = RecursiveResolveKeywords(srcCode, name);
+                    string result = RecursiveResolveKeywords(source, name).ToString();
 
-                    {
-                        string copy = result.ToString();
-                        Match match = Regex.Match(copy, "#version .*\n*"); // detect GLSL version statement up to line break
-                        int afterVersionStatement = match.Index + match.Length; // 0 if not found
+                    Match match = Regex.Match(result, "#version .*\n*"); // detect GLSL version statement up to line break
+                    int afterVersionStatement = match.Index + match.Length; // 0 if not found
+                    int versionStatementLineCount = CountLines(result, afterVersionStatement);
+                    result = result.Insert(afterVersionStatement,
+                        $"""
+                        #extension GL_ARB_bindless_texture : require
+                        #extension GL_EXT_shader_image_load_formatted : require
+                        #if {(GLSL_EXTENSION_NAME_LINE_SOURCEFILE != null ? 1 : 0)}
+                            #extension {GLSL_EXTENSION_NAME_LINE_SOURCEFILE} : enable
+                        #endif
 
-                        int lineCountVersionStatement = CountLines(copy, afterVersionStatement);
+                        // Keep in sync between shader and client code!
+                        #define {ShaderStageShaderInsertion(shaderStage)} 1
+                        #define {VendorToShaderInsertion(GetDeviceInfo().Vendor)} 1
+                        #line {versionStatementLineCount + 1}
 
-                        string toInsert =
-                            $"""
-                            #extension GL_ARB_bindless_texture : require
-                            #extension GL_EXT_shader_image_load_formatted : require
-                            #if {(GLSL_EXTENSION_NAME_LINE_SOURCEFILE != null ? 1 : 0)}
-                                #extension {GLSL_EXTENSION_NAME_LINE_SOURCEFILE} : enable
-                            #endif
-
-                            // Keep in sync between shader and client code!
-                            #define {ShaderStageShaderInsertion(shaderStage)} 1
-                            #define {VendorToShaderInsertion(GetDeviceInfo().Vendor)} 1
-                            #line {lineCountVersionStatement + 1}
-
-                            """;
-
-                        result = result.Insert(afterVersionStatement, toInsert);
-                    }
+                        """
+                    );
 
                     preProcessInfo.UsedAppInsertionKeys = usedAppInsertions.ToArray();
-                    
-                    string preprocessed = result.ToString();
-
-                    return preprocessed;
+                    return result;
 
                     StringBuilder RecursiveResolveKeywords(string source, string name = null)
                     {

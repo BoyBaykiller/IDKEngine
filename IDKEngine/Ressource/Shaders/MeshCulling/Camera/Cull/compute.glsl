@@ -61,13 +61,13 @@ void main()
         const uint taskShaderWorkGroupSize = 32;
         uint meshletCount = meshSSBO.Meshes[meshID].MeshletCount;
         uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
-        meshletTaskCmdSSBO.TaskCommands[meshletTaskID].Count = meshletsWorkGroupCount;
+        meshletTaskCmdSSBO.Commands[meshletTaskID].Count = meshletsWorkGroupCount;
 
     #else
 
-        GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+        GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
 
-        uint index = atomicAdd(drawElementsCmdSSBO.DrawCommands[meshID].InstanceCount, 1u);
+        uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshID].InstanceCount, 1u);
         visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceID;
 
     #endif

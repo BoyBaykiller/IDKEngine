@@ -83,15 +83,15 @@ namespace IDKEngine.Render
                 if (TakeMeshShaderPath)
                 {
                     gBufferProgram = new BBG.AbstractShaderProgram(
-                       new BBG.AbstractShader(BBG.ShaderStage.TaskNV, "GBuffer/MeshPath/task.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderStage.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
-                       new BBG.AbstractShader(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
+                       BBG.AbstractShader.FromFile(BBG.ShaderStage.TaskNV, "GBuffer/MeshPath/task.glsl"),
+                       BBG.AbstractShader.FromFile(BBG.ShaderStage.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
+                       BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
                 }
                 else
                 {
                     gBufferProgram = new BBG.AbstractShaderProgram(
-                        new BBG.AbstractShader(BBG.ShaderStage.Vertex, "GBuffer/VertexPath/vertex.glsl"),
-                        new BBG.AbstractShader(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "GBuffer/VertexPath/vertex.glsl"),
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
                 }
             }
         }
@@ -193,20 +193,20 @@ namespace IDKEngine.Render
             IsHiZCulling = false;
 
             deferredLightingProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "ToScreen/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "DeferredLighting/fragment.glsl"));
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "ToScreen/vertex.glsl"),
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "DeferredLighting/fragment.glsl"));
 
             skyBoxProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "SkyBox/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "SkyBox/fragment.glsl"));
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "SkyBox/vertex.glsl"),
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "SkyBox/fragment.glsl"));
 
             hiZGenerateProgram = new BBG.AbstractShaderProgram(
-                new BBG.AbstractShader(BBG.ShaderStage.Vertex, "ToScreen/vertex.glsl"),
-                new BBG.AbstractShader(BBG.ShaderStage.Fragment, "MeshCulling/Camera/HiZGenerate/fragment.glsl"));
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "ToScreen/vertex.glsl"),
+                BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "MeshCulling/Camera/HiZGenerate/fragment.glsl"));
 
-            cullingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "MeshCulling/Camera/Cull/compute.glsl"));
+            cullingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "MeshCulling/Camera/Cull/compute.glsl"));
 
-            mergeLightingProgram = new BBG.AbstractShaderProgram(new BBG.AbstractShader(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
+            mergeLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
             taaDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);

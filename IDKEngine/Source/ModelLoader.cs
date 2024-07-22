@@ -5,12 +5,11 @@ using System.Threading;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
-using Ktx;
 using SharpGLTF.Schema2;
 using SharpGLTF.Materials;
+using Ktx;
 using Meshoptimizer;
 using BBLogger;
 using BBOpenGL;
@@ -49,11 +48,51 @@ namespace IDKEngine
             public uint[] VertexIndices;
 
             // Meshlet-rendering specific data
-            public BBG.DrawMeshTasksIndirectCommandNV[] MeshletTasksCmds;
             public GpuMeshlet[] Meshlets;
             public GpuMeshletInfo[] MeshletsInfo;
             public uint[] MeshletsVertexIndices;
             public byte[] MeshletsLocalIndices;
+
+            // Animations
+            public uint[] JointIndices;
+            public float[] JointWeights;
+            public Matrix4[] JointMatrices;
+        }
+
+        /// <summary>
+        /// See <see href="https://github.com/zeux/meshoptimizer"></see> for details.
+        /// When gltfpack is run these optimizations are already applied so doing them again would be useless
+        /// </summary>
+        public struct OptimizationSettings
+        {
+            /// <summary>
+            /// <see href="https://github.com/zeux/meshoptimizer/tree/master?tab=readme-ov-file#indexing"></see>
+            /// </summary>
+            public bool VertexRemapOptimization;
+
+            /// <summary>
+            /// <see href="https://github.com/zeux/meshoptimizer/tree/master?tab=readme-ov-file#vertex-cache-optimization"></see>
+            /// </summary>
+            public bool VertexCacheOptimization;
+
+            /// <summary>
+            /// <see href="https://github.com/zeux/meshoptimizer/tree/master?tab=readme-ov-file#vertex-fetch-optimization"></see>
+            /// </summary>
+            public bool VertexFetchOptimization;
+
+            public static OptimizationSettings AllTurnedOff = new OptimizationSettings()
+            {
+                VertexRemapOptimization = false,
+                VertexCacheOptimization = false,
+                VertexFetchOptimization = false,
+            };
+
+            public static OptimizationSettings Recommended = new OptimizationSettings()
+            {
+                VertexRemapOptimization = false,
+                VertexCacheOptimization = true,
+                VertexFetchOptimization = false,
+            };
         }
 
         private struct MaterialLoadData
@@ -138,6 +177,18 @@ namespace IDKEngine
             public byte[] LocalIndices;
             public int LocalIndicesLength;
         }
+        private struct VertexData
+        {
+            public GpuVertex[] Vertices;
+            public Vector3[] Positons;
+
+            public uint[] JointIndices;
+            public float[] JointWeights;
+        }
+        private unsafe struct USVec4
+        {
+            public fixed ushort Data[4];
+        }
 
         public static event Action? TextureLoaded;
         public static Model? LoadGltfFromFile(string path)
@@ -145,7 +196,12 @@ namespace IDKEngine
             return LoadGltfFromFile(path, Matrix4.Identity);
         }
 
-        public static Model? LoadGltfFromFile(string path, Matrix4 rootTransform)
+        public static Model? LoadGltfFromFile(string path, in Matrix4 rootTransform)
+        {
+            return LoadGltfFromFile(path, rootTransform, OptimizationSettings.AllTurnedOff);
+        }
+
+        public static Model? LoadGltfFromFile(string path, in Matrix4 rootTransform, OptimizationSettings optimizationSettings)
         {
             if (!File.Exists(path))
             {
@@ -167,7 +223,7 @@ namespace IDKEngine
                 }
             }
 
-            if (!CompressionUtils.IsCompressedGltf(gltf))
+            if (!GtlfpackWrapper.IsCompressed(gltf))
             {
                 Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" is uncompressed");
             }
@@ -180,7 +236,7 @@ namespace IDKEngine
             }
 
             Stopwatch sw = Stopwatch.StartNew();
-            Model model = GltfToEngineFormat(gltf, rootTransform);
+            Model model = GltfToEngineFormat(gltf, rootTransform, optimizationSettings);
             sw.Stop();
 
             nint totalIndicesCount = 0;
@@ -194,7 +250,7 @@ namespace IDKEngine
             return model;
         }
 
-        private static Model GltfToEngineFormat(ModelRoot gltf, Matrix4 rootTransform)
+        private static Model GltfToEngineFormat(ModelRoot gltf, in Matrix4 rootTransform, OptimizationSettings optimizationSettings)
         {
             MaterialLoadData[] materialsLoadData = GetMaterialLoadDataFromGltf(gltf.LogicalMaterials);
             List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(materialsLoadData, gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness")));
@@ -205,13 +261,15 @@ namespace IDKEngine
             List<GpuVertex> listVertices = new List<GpuVertex>();
             List<Vector3> listVertexPositions = new List<Vector3>();
             List<uint> listIndices = new List<uint>();
-            List<BBG.DrawMeshTasksIndirectCommandNV> listMeshetTasksCmd = new List<BBG.DrawMeshTasksIndirectCommandNV>();
             List<GpuMeshlet> listMeshlets = new List<GpuMeshlet>();
             List<GpuMeshletInfo> listMeshletsInfo = new List<GpuMeshletInfo>();
             List<uint> listMeshletsVertexIndices = new List<uint>();
             List<byte> listMeshletsLocalIndices = new List<byte>();
-
-            Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>();
+            List<uint> listJointIndices = new List<uint>();
+            List<float> listJointWeights = new List<float>();
+            List<Matrix4> listJointMatrices = new List<Matrix4>();
+            
+            Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>(gltf.LogicalNodes.Count);
             foreach (Node node in gltf.DefaultScene.VisualChildren)
             {
                 nodeStack.Push((node, rootTransform));
@@ -223,7 +281,7 @@ namespace IDKEngine
 
                 Matrix4 nodeLocalTransform = node.LocalMatrix.ToOpenTK();
                 Matrix4 nodeGlobalTransform = nodeLocalTransform * parentNodeGlobalTransform;
-
+                
                 foreach (Node child in node.VisualChildren)
                 {
                     nodeStack.Push((child, nodeGlobalTransform));
@@ -235,39 +293,27 @@ namespace IDKEngine
                     continue;
                 }
 
-                bool nodeUsesInstancing = TryLoadInstancedNodes(node, out Matrix4[] nodeTransformations);
-                if (!nodeUsesInstancing)
+                if (node.Skin != null)
                 {
-                    // If node does not define transformations using EXT_mesh_gpu_instancing extension we must use standard local transform
-                    nodeTransformations = [nodeLocalTransform];
+                    IterateAccessor(node.Skin.GetInverseBindMatricesAccessor(), (in Matrix4 jointInverseTransform, int i) =>
+                    {
+                        listJointMatrices.Add(jointInverseTransform * nodeGlobalTransform);
+                    });
                 }
 
-                //nodeTransformations = new Matrix4[5];
-                //for (int i = 0; i < nodeTransformations.Length; i++)
-                //{
-                //    Vector3 trans = RNG.RandomVec3(-15.0f, 15.0f);
-                //    Vector3 rot = RNG.RandomVec3(0.0f, 2.0f * MathF.PI);
-                //    float scale = 1.0f;
-                //    var test = Matrix4.CreateScale(scale) *
-                //            Matrix4.CreateRotationZ(rot.Z) *
-                //               Matrix4.CreateRotationY(rot.Y) *
-                //               Matrix4.CreateRotationX(rot.X) *
-                //               Matrix4.CreateTranslation(trans);
-
-                //    nodeTransformations[i] = test;
-                //}
-
+                Matrix4[] nodeTransformations = GetNodeInstances(node.UseGpuInstancing(), nodeLocalTransform);
+                
                 for (int i = 0; i < gltfMesh.Primitives.Count; i++)
                 {
                     MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
-                    
-                    (GpuVertex[] meshVertices, Vector3[] meshVertexPositions) = LoadGpuVertices(gltfMeshPrimitive);
+
+                    VertexData meshVertexData = LoadGpuVertices(gltfMeshPrimitive);
                     uint[] meshIndices = LoadGpuIndices(gltfMeshPrimitive);
 
-                    OptimizeMesh(ref meshVertices, ref meshVertexPositions, meshIndices);
+                    OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
 
-                    MeshletData meshletData = GenerateMeshlets(meshVertexPositions, meshIndices);
-                    (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexPositions);
+                    MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
+                    (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);
                     for (int j = 0; j < meshMeshlets.Length; j++)
                     {
                         ref GpuMeshlet myMeshlet = ref meshMeshlets[j];
@@ -303,16 +349,11 @@ namespace IDKEngine
                     }
 
                     GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
-                    BBG.DrawMeshTasksIndirectCommandNV[] meshletTaskCmds = new BBG.DrawMeshTasksIndirectCommandNV[mesh.InstanceCount];
                     for (int j = 0; j < meshInstances.Length; j++)
                     {
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
                         meshInstance.ModelMatrix = nodeTransformations[j] * parentNodeGlobalTransform;
                         meshInstance.MeshIndex = listMeshes.Count;
-
-                        ref BBG.DrawMeshTasksIndirectCommandNV meshletTaskCmd = ref meshletTaskCmds[j];
-                        meshletTaskCmd.First = 0;
-                        meshletTaskCmd.Count = (int)MathF.Ceiling(meshMeshlets.Length / 32.0f); // divide by task shader work group size
                     }
 
                     BBG.DrawElementsIndirectCommand drawCmd = new BBG.DrawElementsIndirectCommand();
@@ -322,8 +363,8 @@ namespace IDKEngine
                     drawCmd.BaseVertex = listVertices.Count;
                     drawCmd.BaseInstance = listMeshInstances.Count;
 
-                    listVertices.AddRange(meshVertices);
-                    listVertexPositions.AddRange(meshVertexPositions);
+                    listVertices.AddRange(meshVertexData.Vertices);
+                    listVertexPositions.AddRange(meshVertexData.Positons);
                     listIndices.AddRange(meshIndices);
                     listMeshes.Add(mesh);
                     listMeshInstances.AddRange(meshInstances);
@@ -332,7 +373,8 @@ namespace IDKEngine
                     listMeshletsInfo.AddRange(meshMeshletsInfo);
                     listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshletData.VertexIndices, 0, meshletData.VertexIndicesLength));
                     listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshletData.LocalIndices, 0, meshletData.LocalIndicesLength));
-                    listMeshetTasksCmd.AddRange(meshletTaskCmds);
+                    listJointIndices.AddRange(meshVertexData.JointIndices);
+                    listJointWeights.AddRange(meshVertexData.JointWeights);
                 }
             }
 
@@ -344,16 +386,18 @@ namespace IDKEngine
             model.Vertices = listVertices.ToArray();
             model.VertexPositions = listVertexPositions.ToArray();
             model.VertexIndices = listIndices.ToArray();
-            model.MeshletTasksCmds = listMeshetTasksCmd.ToArray();
             model.Meshlets = listMeshlets.ToArray();
             model.MeshletsInfo = listMeshletsInfo.ToArray();
             model.MeshletsVertexIndices = listMeshletsVertexIndices.ToArray();
             model.MeshletsLocalIndices = listMeshletsLocalIndices.ToArray();
+            model.JointIndices = listJointIndices.ToArray();
+            model.JointWeights = listJointWeights.ToArray();
+            model.JointMatrices = listJointMatrices.ToArray();
 
             return model;
         }
 
-        private static unsafe GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadData, bool useExtBc5NormalMetallicRoughness = false)
+        private static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialLoadData> materialsLoadData, bool useExtBc5NormalMetallicRoughness = false)
         {
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
             for (int i = 0; i < gpuMaterials.Length; i++)
@@ -380,8 +424,8 @@ namespace IDKEngine
                     if (gltfTexture == null)
                     {
                         // By having a pure white fallback we can keep the sampling logic
-                        // the same in shaders and still comply to glTF spec
-                        gpuMaterial[textureType] = FallbackTextures.PureWhite();
+                        // in shaders the same and still comply to glTF spec
+                        gpuMaterial[textureType] = FallbackTextures.White();
                         continue;
                     }
 
@@ -398,7 +442,7 @@ namespace IDKEngine
                         }
                         else
                         {
-                            gpuMaterial[textureType] = FallbackTextures.PureWhite();
+                            gpuMaterial[textureType] = FallbackTextures.White();
                         }
                     }
                 }
@@ -415,7 +459,6 @@ namespace IDKEngine
             Ktx2Texture ktx2Texture = null;
             ImageLoader.ImageHeader imageHeader = new ImageLoader.ImageHeader();
             GLTexture.InternalFormat internalFormat = 0;
-            bool mipmapsRequired = false;
             int levels = 0;
             if (gltfTexture.PrimaryImage.Content.IsPng || gltfTexture.PrimaryImage.Content.IsJpg)
             {
@@ -436,6 +479,14 @@ namespace IDKEngine
                     GpuMaterial.BindlessHandle.Transmission => GLTexture.InternalFormat.R8Unorm,
                     _ => throw new NotSupportedException($"{nameof(MaterialLoadData.TextureType)} = {textureType} not supported")
                 };
+                if (textureType == GpuMaterial.BindlessHandle.Transmission)
+                {
+                    imageHeader.SetChannels(ImageLoader.ColorComponents.R);
+                }
+                if (textureType == GpuMaterial.BindlessHandle.Emissive || textureType == GpuMaterial.BindlessHandle.MetallicRoughness)
+                {
+                    imageHeader.SetChannels(ImageLoader.ColorComponents.RGB);
+                }
             }
             else if (gltfTexture.PrimaryImage.Content.IsKtx2)
             {
@@ -453,10 +504,6 @@ namespace IDKEngine
                                                         $"SupercompressionScheme = {ktx2Texture.SupercompressionScheme}");
                     return false;
                 }
-
-                imageHeader.Width = ktx2Texture.BaseWidth;
-                imageHeader.Height = ktx2Texture.BaseHeight;
-                imageHeader.Channels = ktx2Texture.Channels;
                 levels = ktx2Texture.Levels;
 
                 internalFormat = textureType switch
@@ -487,9 +534,14 @@ namespace IDKEngine
                 glTexture.SetSwizzleR(GLTexture.Swizzle.B);
             }
 
-            mipmapsRequired = GLSampler.IsMipmapFilter(glSampler.State.MinFilter);
+            bool isKtxCompressed = ktx2Texture != null;
+            bool mipmapsRequired = GLSampler.IsMipmapFilter(glSampler.State.MinFilter);
             levels = mipmapsRequired ? levels : 1;
-            glTexture.ImmutableAllocate(imageHeader.Width, imageHeader.Height, 1, internalFormat, levels);
+            glTexture.ImmutableAllocate(
+                isKtxCompressed ? ktx2Texture.BaseWidth : imageHeader.Width,
+                isKtxCompressed ? ktx2Texture.BaseHeight : imageHeader.Height,
+                1, internalFormat, levels
+            );
 
             GLTexture glTextureCopy = glTexture;
             MainThreadQueue.AddToLazyQueue(() =>
@@ -515,8 +567,7 @@ namespace IDKEngine
                 ThreadPool.SetMinThreads(threadPoolThreads, 1);
                 ThreadPool.SetMaxThreads(threadPoolThreads, 1);
 
-                bool isKtx = ktx2Texture != null;
-                if (isKtx)
+                if (isKtxCompressed)
                 {
                     Task.Run(() =>
                     {
@@ -541,9 +592,9 @@ namespace IDKEngine
 
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
-                                    for (int level = 0; level < levels; level++)
+                                    for (int level = 0; level < glTextureCopy.Levels; level++)
                                     {
-                                        ktx2Texture.GetImageOffset(level, out nint dataOffset);
+                                        ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
 
                                         Vector3i size = GLTexture.GetMipmapLevelSize(ktx2Texture.BaseWidth, ktx2Texture.BaseHeight, ktx2Texture.BaseDepth, level);
                                         glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
@@ -670,55 +721,52 @@ namespace IDKEngine
             return state;
         }
 
-        private static bool TryLoadInstancedNodes(Node node, out Matrix4[] nodeInstances)
+        private static Matrix4[] GetNodeInstances(MeshGpuInstancing gpuInstancing, in Matrix4 localTransform)
         {
-            MeshGpuInstancing gltfGpuInstancing = node.UseGpuInstancing();
-            if (gltfGpuInstancing.Count == 0)
+            if (gpuInstancing.Count == 0)
             {
-                nodeInstances = null;
-                return false;
+                // If node does not define transformations using EXT_mesh_gpu_instancing we must use local transform
+                return [localTransform];
             }
 
-            // Gets node instances defined using EXT_mesh_gpu_instancing extension
-            nodeInstances = new Matrix4[gltfGpuInstancing.Count];
+            Matrix4[] nodeInstances = new Matrix4[gpuInstancing.Count];
             for (int i = 0; i < nodeInstances.Length; i++)
             {
-                nodeInstances[i] = gltfGpuInstancing.GetLocalMatrix(i).ToOpenTK();
+                nodeInstances[i] = gpuInstancing.GetLocalMatrix(i).ToOpenTK();
             }
 
-            return true;
+            return nodeInstances;
         }
-        private static ValueTuple<GpuVertex[], Vector3[]> LoadGpuVertices(MeshPrimitive meshPrimitive)
+        private static unsafe VertexData LoadGpuVertices(MeshPrimitive meshPrimitive)
         {
-            const string GLTF_POSITION_ATTRIBUTE = "POSITION";
-            const string GLTF_NORMAL_ATTRIBUTE = "NORMAL";
-            const string GLTF_TEXCOORD_0_ATTRIBUTE = "TEXCOORD_0";
+            Accessor positonAccessor = meshPrimitive.VertexAccessors["POSITION"];
+            bool hasNormals = meshPrimitive.VertexAccessors.TryGetValue("NORMAL", out Accessor normalAccessor);
+            bool hasTexCoords = meshPrimitive.VertexAccessors.TryGetValue("TEXCOORD_0", out Accessor texCoordAccessor);
+            bool hasJoints = meshPrimitive.VertexAccessors.TryGetValue("JOINTS_0", out Accessor jointsAccessor);
+            bool hasWeights = meshPrimitive.VertexAccessors.TryGetValue("WEIGHTS_0", out Accessor weightsAccessor);
 
-            Accessor positonAccessor = meshPrimitive.VertexAccessors[GLTF_POSITION_ATTRIBUTE];
-            bool hasNormals = meshPrimitive.VertexAccessors.TryGetValue(GLTF_NORMAL_ATTRIBUTE, out Accessor normalAccessor);
-            bool hasTexCoords = meshPrimitive.VertexAccessors.TryGetValue(GLTF_TEXCOORD_0_ATTRIBUTE, out Accessor texCoordAccessor);
+            VertexData vertexData;
+            vertexData.Vertices = new GpuVertex[positonAccessor.Count];
+            vertexData.Positons = new Vector3[positonAccessor.Count];
+            vertexData.JointIndices = Array.Empty<uint>();
+            vertexData.JointWeights = Array.Empty<float>();
 
-            Vector3[] vertexPositions = new Vector3[positonAccessor.Count];
-            GpuVertex[] vertices = new GpuVertex[positonAccessor.Count];
-
+            IterateAccessor(positonAccessor, (in Vector3 pos, int i) =>
             {
-                Span<Vector3> positions = MemoryMarshal.Cast<byte, Vector3>(positonAccessor.SourceBufferView.Content.AsSpan(positonAccessor.ByteOffset, positonAccessor.ByteLength));
-                positions.CopyTo(vertexPositions);
-            }
+                vertexData.Positons[i] = pos;
+            });
 
             if (hasNormals)
             {
-                Span<Vector3> normals = MemoryMarshal.Cast<byte, Vector3>(normalAccessor.SourceBufferView.Content.AsSpan(normalAccessor.ByteOffset, normalAccessor.ByteLength));
-                for (int i = 0; i < normals.Length; i++)
+                IterateAccessor(normalAccessor, (in Vector3 normal, int i) =>
                 {
-                    Vector3 normal = normals[i];
-                    vertices[i].Normal = Compression.CompressSR11G11B10(normal);
+                    vertexData.Vertices[i].Normal = Compression.CompressSR11G11B10(normal);
 
                     Vector3 c1 = Vector3.Cross(normal, Vector3.UnitZ);
                     Vector3 c2 = Vector3.Cross(normal, Vector3.UnitY);
                     Vector3 tangent = Vector3.Dot(c1, c1) > Vector3.Dot(c2, c2) ? c1 : c2;
-                    vertices[i].Tangent = Compression.CompressSR11G11B10(tangent);
-                }
+                    vertexData.Vertices[i].Tangent = Compression.CompressSR11G11B10(tangent);
+                });
             }
             else
             {
@@ -727,29 +775,101 @@ namespace IDKEngine
 
             if (hasTexCoords)
             {
-                Span<Vector2> texCoords = MemoryMarshal.Cast<byte, Vector2>(texCoordAccessor.SourceBufferView.Content.AsSpan(texCoordAccessor.ByteOffset, texCoordAccessor.ByteLength));
-                for (int i = 0; i < texCoords.Length; i++)
+                if (texCoordAccessor.Encoding == EncodingType.FLOAT)
                 {
-                    vertices[i].TexCoord = texCoords[i];
+                    IterateAccessor(texCoordAccessor, (in Vector2 texCoord, int i) =>
+                    {
+                        vertexData.Vertices[i].TexCoord = texCoord;
+                    });
+                }
+                else
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Unsupported {nameof(texCoordAccessor.Encoding)} = {texCoordAccessor.Encoding}");
                 }
             }
 
-            return (vertices, vertexPositions);
+            if (hasJoints)
+            {
+                if (jointsAccessor.Encoding == EncodingType.UNSIGNED_SHORT)
+                {
+                    vertexData.JointIndices = new uint[jointsAccessor.Count * 4];
+                    IterateAccessor(jointsAccessor, (in USVec4 usvec4, int i) =>
+                    {
+                        vertexData.JointIndices[i * 4 + 0] = usvec4.Data[0];
+                        vertexData.JointIndices[i * 4 + 1] = usvec4.Data[1];
+                        vertexData.JointIndices[i * 4 + 2] = usvec4.Data[2];
+                        vertexData.JointIndices[i * 4 + 3] = usvec4.Data[2];
+                    });
+                }
+                else
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Unsupported {nameof(jointsAccessor.Encoding)} = {jointsAccessor.Encoding}");
+                }
+            }
+
+            if (hasWeights)
+            {
+                if (weightsAccessor.Encoding == EncodingType.FLOAT)
+                {
+                    vertexData.JointWeights = new float[weightsAccessor.Count * 4];
+                    IterateAccessor(weightsAccessor, (in Vector4 weights, int i) =>
+                    {
+                        vertexData.JointWeights[i * 4 + 0] = weights[0];
+                        vertexData.JointWeights[i * 4 + 1] = weights[1];
+                        vertexData.JointWeights[i * 4 + 2] = weights[2];
+                        vertexData.JointWeights[i * 4 + 3] = weights[3];
+                    });
+                }
+                else
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Unsupported {nameof(weightsAccessor.Encoding)} = {weightsAccessor.Encoding}");
+                }
+            }
+
+            return vertexData;
         }
         private static uint[] LoadGpuIndices(MeshPrimitive meshPrimitive)
         {
             Accessor accessor = meshPrimitive.IndexAccessor;
             uint[] vertexIndices = new uint[accessor.Count];
-            int componentSize = ComponentTypeToSize(accessor.Encoding);
-
-            Span<byte> rawData = accessor.SourceBufferView.Content.AsSpan(accessor.ByteOffset, accessor.ByteLength);
-            for (int i = 0; i < vertexIndices.Length; i++)
+            IterateAccessor(accessor, (in uint index, int i) =>
             {
-                Memory.Copy(rawData[componentSize * i], ref vertexIndices[i], componentSize);
-            }
+                vertexIndices[i] = index;
+            });
 
             return vertexIndices;
         }
+
+        private delegate void FuncAccessorItem<T>(in T item, int index);
+        private static unsafe void IterateAccessor<T>(Accessor accessor, FuncAccessorItem<T> funcItem) where T : unmanaged
+        {
+            if (accessor.IsSparse)
+            {
+                throw new ArgumentException("Sparse accessor is not supported");
+            }
+
+            int itemSize = EncodingToSize(accessor.Encoding) * DimensionsToNum(accessor.Dimensions);
+            int stride = accessor.SourceBufferView.ByteStride == 0 ? itemSize : accessor.SourceBufferView.ByteStride;
+
+            if (sizeof(T) < itemSize)
+            {
+                throw new ArgumentException($"{nameof(T)} is smaller than a single item in the accessor ({nameof(itemSize)} = {itemSize})");
+            }
+
+            Span<byte> data = accessor.SourceBufferView.Content.AsSpan(accessor.ByteOffset, accessor.ByteLength);
+            fixed (byte* ptr = data)
+            {
+                for (int i = 0; i < accessor.Count; i++)
+                {
+                    T t;
+                    byte* head = ptr + i * stride;
+                    Memory.Copy(head, &t, itemSize);
+
+                    funcItem(t, i);
+                }
+            }
+        }
+
         private static ValueTuple<GpuMeshlet[], GpuMeshletInfo[]> LoadGpuMeshlets(in MeshletData meshMeshletsData, ReadOnlySpan<Vector3> meshVertexPositions)
         {
             GpuMeshlet[] gpuMeshlets = new GpuMeshlet[meshMeshletsData.MeshletsLength];
@@ -888,7 +1008,7 @@ namespace IDKEngine
                     throw new NotSupportedException($"Can not convert {nameof(internalFormat)} = {internalFormat} to {nameof(Ktx2.TranscodeFormat)}");
             }
         }
-        private static int ComponentTypeToSize(EncodingType encodingType)
+        private static int EncodingToSize(EncodingType encodingType)
         {
             int size = encodingType switch
             {
@@ -899,38 +1019,47 @@ namespace IDKEngine
             };
             return size;
         }
-
-        private static unsafe void OptimizeMesh(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices)
+        private static int DimensionsToNum(DimensionType dimensionType)
         {
-            const bool VERTEX_REMAP_OPTIMIZATION = false;
-            const bool VERTEX_CACHE_OPTIMIZATION = true;
-            const bool VERTEX_FETCH_OPTIMIZATION = false;
-
-            uint[] remapTable = new uint[meshVertices.Length];
-            if (VERTEX_REMAP_OPTIMIZATION)
+            int num = dimensionType switch
             {
-                nuint optimizedVertexCount = 0;
+                DimensionType.SCALAR => 1,
+                DimensionType.VEC2 => 2,
+                DimensionType.VEC3 => 3,
+                DimensionType.VEC4 => 4,
+                DimensionType.MAT4 => 16,
+                _ => throw new NotSupportedException($"Can not convert {nameof(dimensionType)} = {dimensionType} to {nameof(num)}"),
+            };
+            return num;
+        }
+        private static unsafe void OptimizeMesh(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices, OptimizationSettings optimizationSettings)
+        {
+            if (optimizationSettings.VertexRemapOptimization)
+            {
+                uint[] remapTable = new uint[meshVertices.Length];
+                int optimizedVertexCount = 0;
                 fixed (void* meshVerticesPtr = meshVertices, meshPositionsPtr = meshVertexPositions)
                 {
                     Span<Meshopt.Stream> vertexStreams = stackalloc Meshopt.Stream[2];
                     vertexStreams[0] = new Meshopt.Stream() { Data = meshVerticesPtr, Size = (nuint)sizeof(GpuVertex), Stride = (nuint)sizeof(GpuVertex) };
                     vertexStreams[1] = new Meshopt.Stream() { Data = meshPositionsPtr, Size = (nuint)sizeof(Vector3), Stride = (nuint)sizeof(Vector3) };
 
-                    optimizedVertexCount = Meshopt.GenerateVertexRemapMulti(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length, vertexStreams[0], (nuint)vertexStreams.Length);
+                    optimizedVertexCount = (int)Meshopt.GenerateVertexRemapMulti(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length, vertexStreams[0], (nuint)vertexStreams.Length);
 
                     Meshopt.RemapIndexBuffer(ref meshIndices[0], meshIndices[0], (nuint)meshIndices.Length, remapTable[0]);
                     Meshopt.RemapVertexBuffer(vertexStreams[0].Data, vertexStreams[0].Data, (nuint)meshVertices.Length, vertexStreams[0].Stride, remapTable[0]);
                     Meshopt.RemapVertexBuffer(vertexStreams[1].Data, vertexStreams[1].Data, (nuint)meshVertexPositions.Length, vertexStreams[1].Stride, remapTable[0]);
                 }
-                Array.Resize(ref meshVertices, (int)optimizedVertexCount);
-                Array.Resize(ref meshVertexPositions, (int)optimizedVertexCount);
+                Array.Resize(ref meshVertices, optimizedVertexCount);
+                Array.Resize(ref meshVertexPositions, optimizedVertexCount);
             }
-            if (VERTEX_CACHE_OPTIMIZATION)
+            if (optimizationSettings.VertexCacheOptimization)
             {
                 Meshopt.OptimizeVertexCache(ref meshIndices[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length);
             }
-            if (VERTEX_FETCH_OPTIMIZATION)
+            if (optimizationSettings.VertexFetchOptimization)
             {
+                uint[] remapTable = new uint[meshVertices.Length];
                 fixed (void* meshVerticesPtr = meshVertices, meshPositionsPtr = meshVertexPositions)
                 {
                     Meshopt.OptimizeVertexFetchRemap(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length);
@@ -1002,11 +1131,24 @@ namespace IDKEngine
             return result;
         }
 
-        public static class CompressionUtils
+        public static class GtlfpackWrapper
         {
-            public const string COMPRESSION_TOOL_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer
+            public const string CLI_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer
 
-            public struct CompressGltfSettings
+            private static bool? _isAvailableCached;
+            public static bool IsCLIFound
+            {
+                get
+                {
+                    if (!_isAvailableCached.HasValue)
+                    {
+                        _isAvailableCached = FindGltfpack();
+                    }
+                   return _isAvailableCached.Value;
+                }
+            }
+
+            public struct GltfpackSettings
             {
                 public string InputPath;
                 public string OutputPath;
@@ -1019,25 +1161,32 @@ namespace IDKEngine
                 public Action<string>? ProcessError;
                 public Action<string>? ProcessOutput;
             }
-            public static Task? CompressGltf(CompressGltfSettings settings)
+
+            public static Task? Run(GltfpackSettings settings)
             {
+                if (!IsCLIFound)
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Can't run {CLI_NAME}. Tool is not found");
+                    return null;
+                }
+
                 // -v         = verbose output
-                // -noq       = no mesh quanization (KHR_mesh_quantization)
+                // -noq       = no mesh quantization (KHR_mesh_quantization)
                 // -ac        = keep constant animation tracks even if they don't modify the node transform
-                // -tc        = do KTX2 texture comression (KHR_texture_basisu)
+                // -tc        = do KTX2 texture compression (KHR_texture_basisu)
                 // -tq        = texture quality
                 // -mi        = use instancing (EXT_mesh_gpu_instancing)
                 // -kp        = disable mesh primitive merging (added in gltfpack fork)
                 // -tj        = number of threads to use when compressing textures
                 string arguments = $"-v -noq -ac -tc -tq 10 " +
-                                   $"{Argument("-mi", settings.UseInstancing)} " +
-                                   $"{Argument("-kp", settings.KeepMeshPrimitives)} " +
+                                   $"{MaybeArgument("-mi", settings.UseInstancing)} " +
+                                   $"{MaybeArgument("-kp", settings.KeepMeshPrimitives)} " +
                                    $"-tj {settings.ThreadsUsed} " +
                                    $"-i {settings.InputPath} -o {settings.OutputPath}";
 
                 ProcessStartInfo startInfo = new ProcessStartInfo()
                 {
-                    FileName = COMPRESSION_TOOL_NAME,
+                    FileName = CLI_NAME,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     Arguments = arguments,
@@ -1045,7 +1194,7 @@ namespace IDKEngine
 
                 try
                 {
-                    Logger.Log(Logger.LogLevel.Info, $"Running \"{COMPRESSION_TOOL_NAME} {arguments}\"");
+                    Logger.Log(Logger.LogLevel.Info, $"Running \"{CLI_NAME} {arguments}\"");
 
                     Process? proc = Process.Start(startInfo);
 
@@ -1058,7 +1207,7 @@ namespace IDKEngine
                             return;
                         }
 
-                        settings.ProcessError?.Invoke($"{COMPRESSION_TOOL_NAME}: {e.Data}");
+                        settings.ProcessError?.Invoke($"{CLI_NAME}: {e.Data}");
                     };
                     proc.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
                     {
@@ -1067,18 +1216,18 @@ namespace IDKEngine
                             return;
                         }
 
-                        settings.ProcessOutput?.Invoke($"{COMPRESSION_TOOL_NAME}: {e.Data}");
+                        settings.ProcessOutput?.Invoke($"{CLI_NAME}: {e.Data}");
                     };
 
                     return proc.WaitForExitAsync();
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    Logger.Log(Logger.LogLevel.Error, $"Failed to create process. Be sure to provide a {COMPRESSION_TOOL_NAME} binary (https://github.com/BoyBaykiller/meshoptimizer) in working dir or PATH");
+                    Logger.Log(Logger.LogLevel.Error, $"Failed to create process. {ex}");
                     return null;
                 }
 
-                static string Argument(string argument, bool yes)
+                static string MaybeArgument(string argument, bool yes)
                 {
                     if (yes)
                     {
@@ -1089,7 +1238,25 @@ namespace IDKEngine
                 }
             }
 
-            public static bool CompressionToolAvailable()
+            public static bool IsCompressed(ModelRoot gltf)
+            {
+                if (gltf.LogicalTextures.Count == 0)
+                {
+                    return true;
+                }
+
+                foreach (string ext in gltf.ExtensionsUsed)
+                {
+                    // The definition of wether a glTF is compressed may be expanded in the future
+                    if (ext == "KHR_texture_basisu")
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private static bool FindGltfpack()
             {
                 List<string> pathsToSearch = [Directory.GetCurrentDirectory()];
                 {
@@ -1111,7 +1278,7 @@ namespace IDKEngine
                         continue;
                     }
 
-                    string[] results = Directory.GetFiles(envPath, $"{COMPRESSION_TOOL_NAME}.*");
+                    string[] results = Directory.GetFiles(envPath, $"{CLI_NAME}.*");
                     if (results.Length > 0)
                     {
                         return true;
@@ -1128,24 +1295,6 @@ namespace IDKEngine
 
                 return false;
             }
-
-            public static bool IsCompressedGltf(ModelRoot gltf)
-            {
-                if (gltf.LogicalTextures.Count == 0)
-                {
-                    return true;
-                }
-
-                foreach (string ext in gltf.ExtensionsUsed)
-                {
-                    // The definition of wether a glTF is compressed may be expanded in the future
-                    if (ext == "KHR_texture_basisu")
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
         }
 
         private static class FallbackTextures
@@ -1156,7 +1305,7 @@ namespace IDKEngine
             private static GLTexture purpleBlackTexture;
             private static GLTexture.BindlessHandle purpleBlackTextureHandle;
 
-            public static GLTexture.BindlessHandle PureWhite()
+            public static GLTexture.BindlessHandle White()
             {
                 if (pureWhiteTexture == null)
                 {

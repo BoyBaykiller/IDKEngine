@@ -17,7 +17,7 @@ out InOutData
 void main()
 {
     GpuVertex vertex = vertexSSBO.Vertices[gl_VertexID];
-    vec3 vertexPosition = Unpack(vertexPositionsSSBO.VertexPositions[gl_VertexID]);
+    vec3 vertexPosition = Unpack(vertexPositionsSSBO.Positions[gl_VertexID]);
     
     uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
@@ -32,8 +32,8 @@ void main()
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.Tangent = normalize(unitVecToWorld * tangent);
     outData.TexCoord = vertex.TexCoord;
-    outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(vertexPosition, 1.0);
     outData.MeshID = gl_DrawID;
+    outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(vertexPosition, 1.0);
     
     vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(vertexPosition, 1.0);
 
@@ -42,5 +42,4 @@ void main()
     jitteredClipPos.xy += taaDataUBO.Jitter * jitteredClipPos.w;
 
     gl_Position = jitteredClipPos;
-
 }

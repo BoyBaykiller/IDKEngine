@@ -35,7 +35,7 @@ namespace BBOpenGL
 
             /// <summary>
             /// GL_EXT_shader_image_load_formatted
-            /// This extension is not advertised by AMD drivers even though it is supported, see
+            /// This extension is not advertised by older AMD drivers even though it is supported, see
             /// <see href="https://community.amd.com/t5/opengl-vulkan/opengl-bug-gl-ext-shader-image-load-formatted-not-reported-even/m-p/676326#M5140">this</see>
             /// </summary>
             public bool ImageLoadFormatted;

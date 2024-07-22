@@ -83,40 +83,32 @@ namespace IDKEngine.Bvh
             while (stackPtr > 0)
             {
                 ref GpuBlasNode parentNode = ref Nodes[stack[--stackPtr]];
-                if (!TrySplit(parentNode, out int partitonPivot))
+                
+                if (TrySplit(parentNode) is var partitonPivot && partitonPivot.HasValue)
                 {
-                    continue;
+                    GpuBlasNode newLeftNode = new GpuBlasNode();
+                    newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
+                    newLeftNode.TriCount = (uint)(partitonPivot - newLeftNode.TriStartOrChild);
+                    newLeftNode.SetBounds(ComputeBoundingBox(newLeftNode.TriStartOrChild, newLeftNode.TriCount));
+
+                    GpuBlasNode newRightNode = new GpuBlasNode();
+                    newRightNode.TriStartOrChild = (uint)partitonPivot;
+                    newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
+                    newRightNode.SetBounds(ComputeBoundingBox(newRightNode.TriStartOrChild, newRightNode.TriCount));
+
+                    int leftNodeId = nodesUsed + 0;
+                    int rightNodeId = nodesUsed + 1;
+
+                    Nodes[leftNodeId] = newLeftNode;
+                    Nodes[rightNodeId] = newRightNode;
+
+                    parentNode.TriStartOrChild = (uint)leftNodeId;
+                    parentNode.TriCount = 0;
+                    nodesUsed += 2;
+
+                    stack[stackPtr++] = leftNodeId;
+                    stack[stackPtr++] = rightNodeId;
                 }
-
-                GpuBlasNode newLeftNode = new GpuBlasNode();
-                newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
-                newLeftNode.TriCount = (uint)(partitonPivot - newLeftNode.TriStartOrChild);
-                newLeftNode.SetBounds(ComputeBoundingBox(newLeftNode.TriStartOrChild, newLeftNode.TriCount));
-
-                GpuBlasNode newRightNode = new GpuBlasNode();
-                newRightNode.TriStartOrChild = (uint)partitonPivot;
-                newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
-                newRightNode.SetBounds(ComputeBoundingBox(newRightNode.TriStartOrChild, newRightNode.TriCount));
-
-                int leftNodeId = nodesUsed + 0;
-                int rightNodeId = nodesUsed + 1;
-
-                Nodes[leftNodeId] = newLeftNode;
-                Nodes[rightNodeId] = newRightNode;
-
-                parentNode.TriStartOrChild = (uint)leftNodeId;
-                parentNode.TriCount = 0;
-                nodesUsed += 2;
-
-                // Processing the child with smaller area first somehow makes reinsertion optimization
-                // more effective and producer trees with smaller depth
-                //if (newLeftNode.HalfArea() > newRightNode.HalfArea())
-                //{
-                //    MathHelper.Swap(ref leftNodeId, ref rightNodeId);
-                //}
-
-                stack[stackPtr++] = leftNodeId;
-                stack[stackPtr++] = rightNodeId;
             }
 
             unpaddedNodesCount = nodesUsed;
@@ -142,10 +134,6 @@ namespace IDKEngine.Bvh
 
         public void Optimize(in OptimizationSettings settings)
         {
-            if (Nodes.Length <= 3)
-            {
-                return;
-            }
             ReinsertionOptimizer.Optimize(this, settings);
         }
 
@@ -227,7 +215,7 @@ namespace IDKEngine.Bvh
                 uint summedTriCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
                 if (summedTriCount > 0)
                 {
-                    uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+                    uint first = (leftChildHit && leftNode.IsLeaf) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                     for (uint i = first; i < first + summedTriCount; i++)
                     {
                         ref readonly IndicesTriplet indicesTriplet = ref TriangleIndices[i];
@@ -254,12 +242,11 @@ namespace IDKEngine.Bvh
             }
         }
 
-        private bool TrySplit(in GpuBlasNode parentNode, out int pivot)
+        private int? TrySplit(in GpuBlasNode parentNode)
         {
-            pivot = 0;
             if (parentNode.TriCount <= 1)
             {
-                return false;
+                return null;
             }
 
             Box areaForSplits = Box.Empty();
@@ -273,7 +260,7 @@ namespace IDKEngine.Bvh
 
             if (areaForSplits.HalfArea() == 0.0f)
             {
-                return false;
+                return null;
             }
 
             int splitAxis = 0;
@@ -283,7 +270,6 @@ namespace IDKEngine.Bvh
             Span<Box> rightSplitsBoxes = stackalloc Box[bins.Length - 1];
             for (int axis = 0; axis < 3; axis++)
             {
-                // We already know splitting is not worth it in this case and it avoids edge cases
                 float minMaxLength = MathF.Abs(areaForSplits.Max[axis] - areaForSplits.Min[axis]);
                 if (minMaxLength == 0.0f)
                 {
@@ -350,22 +336,20 @@ namespace IDKEngine.Bvh
                 }
             }
 
-
             float costIfNotSplit = CostLeafNode(parentNode.TriCount);
             if (costIfSplit >= costIfNotSplit)
             {
                 if (parentNode.TriCount <= MAX_LEAF_TRIANGLE_COUNT)
                 {
-                    return false;
+                    return null;
                 }
 
-                pivot = FallbackSplit(parentNode);
-                return true;
+                return FallbackSplit(parentNode);
             }
             
             int start = (int)parentNode.TriStartOrChild;
             int end = start + (int)parentNode.TriCount;
-            pivot = Helper.Partition(TriangleIndices, start, end, (in IndicesTriplet triangleIndices) =>
+            int pivot = Helper.Partition(TriangleIndices, start, end, (in IndicesTriplet triangleIndices) =>
             {
                 Triangle tri = GetTriangle(triangleIndices);
                 float posOnSplitAxis = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;
@@ -373,11 +357,10 @@ namespace IDKEngine.Bvh
             });
             if (pivot == start || pivot == end)
             {
-                pivot = FallbackSplit(parentNode);
-                return true;
+                return FallbackSplit(parentNode);
             }
 
-            return true;
+            return pivot;
         }
 
         private int FallbackSplit(in GpuBlasNode parentNode)
@@ -507,7 +490,8 @@ namespace IDKEngine.Bvh
 
             while (stackPtr > 0)
             {
-                treeDepth = Math.Max(stackPtr, treeDepth);
+                // +1 because we skip root
+                treeDepth = Math.Max(stackPtr + 1, treeDepth);
 
                 int stackTop = stack[--stackPtr];
                 ref readonly GpuBlasNode leftChild = ref nodes[stackTop];

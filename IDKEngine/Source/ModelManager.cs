@@ -34,7 +34,6 @@ namespace IDKEngine
         public uint[] VertexIndices = Array.Empty<uint>();
         private readonly BBG.TypedBuffer<uint> vertexIndicesBuffer;
 
-        public BBG.DrawMeshTasksIndirectCommandNV[] MeshletTasksCmds = Array.Empty<BBG.DrawMeshTasksIndirectCommandNV>();
         private readonly BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV> meshletTasksCmdsBuffer;
 
         private readonly BBG.TypedBuffer<int> meshletTasksCountBuffer;
@@ -50,6 +49,15 @@ namespace IDKEngine
 
         public byte[] MeshletsLocalIndices = Array.Empty<byte>();
         private readonly BBG.TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
+
+        public uint[] JointIndices = Array.Empty<uint>();
+        private readonly BBG.TypedBuffer<uint> jointIndicesBuffer;
+
+        public float[] JointWeights = Array.Empty<float>();
+        private readonly BBG.TypedBuffer<float> jointWeightsBuffer;
+
+        public Matrix4[] JointMatrices = Array.Empty<Matrix4>();
+        private readonly BBG.TypedBuffer<Matrix4> jointInverseMatrices;
 
         public BVH BVH;
 
@@ -70,6 +78,9 @@ namespace IDKEngine
             meshletInfoBuffer = new BBG.TypedBuffer<GpuMeshletInfo>();
             meshletsVertexIndicesBuffer = new BBG.TypedBuffer<uint>();
             meshletsPrimitiveIndicesBuffer = new BBG.TypedBuffer<byte>();
+            jointIndicesBuffer = new BBG.TypedBuffer<uint>();
+            jointWeightsBuffer = new BBG.TypedBuffer<float>();
+            jointInverseMatrices = new BBG.TypedBuffer<Matrix4>();
 
             drawCommandBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 0);
             meshBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 1);
@@ -84,6 +95,9 @@ namespace IDKEngine
             meshletInfoBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 15);
             meshletsVertexIndicesBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 16);
             meshletsPrimitiveIndicesBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 17);
+            jointIndicesBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 18);
+            jointWeightsBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 19);
+            jointInverseMatrices.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 20);
 
             BVH = new BVH();
         }
@@ -96,7 +110,6 @@ namespace IDKEngine
             }
 
             int prevDrawCommandsLength = DrawCommands.Length;
-
             for (int i = 0; i < models.Length; i++)
             {
                 if (!models[i].HasValue)
@@ -142,10 +155,12 @@ namespace IDKEngine
                 Helper.ArrayAdd(ref VertexPositions, model.VertexPositions);
                 Helper.ArrayAdd(ref VertexIndices, model.VertexIndices);
 
-                Helper.ArrayAdd(ref MeshletTasksCmds, model.MeshletTasksCmds);
                 Helper.ArrayAdd(ref MeshletsInfo, model.MeshletsInfo);
                 Helper.ArrayAdd(ref MeshletsVertexIndices, model.MeshletsVertexIndices);
                 Helper.ArrayAdd(ref MeshletsLocalIndices, model.MeshletsLocalIndices);
+                Helper.ArrayAdd(ref JointIndices, model.JointIndices);
+                Helper.ArrayAdd(ref JointWeights, model.JointWeights);
+                Helper.ArrayAdd(ref JointMatrices, model.JointMatrices);
             }
 
             {
@@ -159,11 +174,9 @@ namespace IDKEngine
                     Meshes[i].BlasRootNodeOffset = bvhNodesExclusiveSum;
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
-
             }
 
             UploadAllModelData();
-
             meshInstancesDirty = new BitArray(meshInstances.Length, true);
         }
 
@@ -275,20 +288,24 @@ namespace IDKEngine
             drawCommandBuffer.MutableAllocateElements(DrawCommands);
             meshBuffer.MutableAllocateElements(Meshes);
             meshInstanceBuffer.MutableAllocateElements(meshInstances);
-            visibleMeshInstanceBuffer.MutableAllocateElements(meshInstances.Length * 6); // * 6 for PointShadow cubemap culling
             materialBuffer.MutableAllocateElements(Materials);
-
             vertexBuffer.MutableAllocateElements(Vertices);
             vertexPositionBuffer.MutableAllocateElements(VertexPositions);
             vertexIndicesBuffer.MutableAllocateElements(VertexIndices);
 
-            meshletTasksCmdsBuffer.MutableAllocateElements(MeshletTasksCmds.Length * 6); // * 6 for PointShadow cubemap culling
-            meshletTasksCmdsBuffer.UploadElements(MeshletTasksCmds);
-            meshletTasksCountBuffer.MutableAllocateElements(1);
             meshletBuffer.MutableAllocateElements(Meshlets);
             meshletInfoBuffer.MutableAllocateElements(MeshletsInfo);
             meshletsVertexIndicesBuffer.MutableAllocateElements(MeshletsVertexIndices);
             meshletsPrimitiveIndicesBuffer.MutableAllocateElements(MeshletsLocalIndices);
+
+            jointIndicesBuffer.MutableAllocateElements(JointIndices);
+            jointWeightsBuffer.MutableAllocateElements(JointWeights);
+            jointInverseMatrices.MutableAllocateElements(JointMatrices);
+
+            // Buffers are populated by culling shader, *6 to have space for PointShadow cubemap culling
+            visibleMeshInstanceBuffer.MutableAllocateElements(meshInstances.Length * 6); 
+            meshletTasksCmdsBuffer.MutableAllocateElements(meshInstances.Length * 6);
+            meshletTasksCountBuffer.MutableAllocateElements(1);
         }
 
         public int GetMeshVertexCount(int meshID)

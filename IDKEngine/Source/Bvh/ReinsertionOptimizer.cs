@@ -27,6 +27,10 @@ namespace IDKEngine.Bvh
         {
             public static void Optimize(BLAS blas, in OptimizationSettings settings)
             {
+                if (blas.Nodes.Length <= 3)
+                {
+                    return;
+                }
                 new ReinsertionOptimizer(blas).Optimize(settings);
             }
 
@@ -272,15 +276,15 @@ namespace IDKEngine.Bvh
             /// </summary>
             private void RestoreTreeQualities()
             {
-                // Always make node 0 point to 1, as this is expected by traversal and
-                // always make node 1 point to 3, as this is good memory access
+                // Always make node 0 point to 1, as this is expected by traversal
+                // Always make node 1 point to 3, as this is good memory access
                 if (blas.Nodes[0].TriStartOrChild != 1)
                 {
-                    SwapChildren(0, parentIds[1]);
+                    SwapChildrenInMem(0, parentIds[1]);
                 }
                 if (!blas.Nodes[1].IsLeaf && blas.Nodes[1].TriStartOrChild != 3)
                 {
-                    SwapChildren(1, parentIds[3]);
+                    SwapChildrenInMem(1, parentIds[3]);
                 }
 
                 IndicesTriplet[] newTriIndices = new IndicesTriplet[blas.TriangleCount];
@@ -325,7 +329,7 @@ namespace IDKEngine.Bvh
                 blas.MaxTreeDepth = ComputeTreeDepth(blas.Nodes);
             }
 
-            private void SwapChildren(int inParent, int outParent)
+            private void SwapChildrenInMem(int inParent, int outParent)
             {
                 uint inLeftChildId = blas.Nodes[inParent].TriStartOrChild;
                 uint inRightChildId = blas.Nodes[inParent].TriStartOrChild + 1;
@@ -333,14 +337,37 @@ namespace IDKEngine.Bvh
                 uint outLeftChildId = blas.Nodes[outParent].TriStartOrChild;
                 uint outRightChildId = blas.Nodes[outParent].TriStartOrChild + 1;
 
-                blas.Nodes[inParent].TriStartOrChild = outLeftChildId;
-                blas.Nodes[outParent].TriStartOrChild = inLeftChildId;
-
                 MathHelper.Swap(ref blas.Nodes[inLeftChildId], ref blas.Nodes[outLeftChildId]);
                 MathHelper.Swap(ref blas.Nodes[inRightChildId], ref blas.Nodes[outRightChildId]);
 
-                MathHelper.Swap(ref parentIds[inLeftChildId], ref parentIds[outLeftChildId]);
-                MathHelper.Swap(ref parentIds[inRightChildId], ref parentIds[outRightChildId]);
+                blas.Nodes[inParent].TriStartOrChild = outLeftChildId;
+
+                if (inLeftChildId == outParent)
+                {
+                    outParent = (int)outLeftChildId;
+                }
+                if (inRightChildId == outParent)
+                {
+                    outParent = (int)outRightChildId;
+                }
+                blas.Nodes[outParent].TriStartOrChild = inLeftChildId;
+
+                UpdateChildParentIds(inParent);
+                UpdateChildParentIds(outParent);
+                UpdateChildParentIds((int)inLeftChildId);
+                UpdateChildParentIds((int)inRightChildId);
+                UpdateChildParentIds((int)outLeftChildId);
+                UpdateChildParentIds((int)outRightChildId);
+
+                void UpdateChildParentIds(int parentNodeId)
+                {
+                    ref readonly GpuBlasNode parent = ref blas.Nodes[parentNodeId];
+                    if (!parent.IsLeaf)
+                    {
+                        parentIds[parent.TriStartOrChild + 0] = parentNodeId;
+                        parentIds[parent.TriStartOrChild + 1] = parentNodeId;
+                    }
+                }
             }
 
             private static int[] GetParentIndices(ReadOnlySpan<GpuBlasNode> nodes)

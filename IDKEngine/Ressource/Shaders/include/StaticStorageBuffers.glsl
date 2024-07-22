@@ -8,7 +8,7 @@ AppInclude(include/GpuTypes.glsl)
 
 layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
 {
-    GpuDrawElementsCmd DrawCommands[];
+    GpuDrawElementsCmd Commands[];
 } drawElementsCmdSSBO;
 
 layout(std430, binding = 1) restrict readonly buffer MeshSSBO
@@ -31,7 +31,7 @@ layout(std430, binding = 4) restrict readonly buffer BlasSSBO
     GpuBlasNode Nodes[];
 } blasSSBO;
 
-#ifdef DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS // used only in bvh traversal code
+#ifdef DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS // Only used for BVH traversal
 layout(std430, binding = 5) restrict readonly buffer BlasTriangleIndicesSSBO
 {
     PackedUVec3 Indices[];
@@ -69,13 +69,13 @@ layout(std430, binding = 10) restrict readonly buffer VertexSSBO
 
 layout(std430, binding = 11) restrict readonly buffer VertexPositionsSSBO
 {
-    PackedVec3 VertexPositions[];
+    PackedVec3 Positions[];
 } vertexPositionsSSBO;
 
-#ifdef DECLARE_MESHLET_STORAGE_BUFFERS // used only when mesh shader path is taken
+#ifdef DECLARE_MESHLET_STORAGE_BUFFERS // Only used when mesh shader path is taken
 layout(std430, binding = 12) restrict buffer MeshletTaskCmdSSBO
 {
-    GpuMeshletTaskCmd TaskCommands[];
+    GpuMeshletTaskCmd Commands[];
 } meshletTaskCmdSSBO;
 
 layout(std430, binding = 13) restrict buffer MeshletTasksCountSSBO

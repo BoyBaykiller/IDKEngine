@@ -41,26 +41,35 @@ vec4 DecompressSR8G8B8A8(uint data)
     return DecompressUR8G8B8A8(data) * 2.0 - 1.0;
 }
 
-vec2 SignNotZero(vec2 v)
-{
-    return vec2((v.x >= 0.0) ? +1.0 : -1.0, (v.y >= 0.0) ? +1.0 : -1.0);
+vec2 OctWrap(vec2 v) {
+    vec2 w = 1.0 - abs(v.yx);
+    if (v.x < 0.0) w.x = -w.x;
+    if (v.y < 0.0) w.y = -w.y;
+    return w;
 }
 
+/// Source: https://www.shadertoy.com/view/cljGD1
 // vec3 in range [-1.0, 1.0] with length=1 ->
-// vec2 in range [-1.0, 1.0]
-vec2 EncodeUnitVec(vec3 v)
+// vec2 in range [ 0.0, 1.0]
+vec2 EncodeUnitVec(vec3 n)
 {
-    vec2 p = vec2(v.x, v.y) * (1.0 / (abs(v.x) + abs(v.y) + abs(v.z)));
-    return (v.z <= 0.0) ? ((1.0 - abs(vec2(p.y, p.x))) * SignNotZero(p)) : p;
+    n /= (abs(n.x) + abs(n.y) + abs(n.z));
+    n.xy = n.z > 0.0 ? n.xy : OctWrap(n.xy);
+    n.xy = n.xy * 0.5 + 0.5;
+    return n.xy;
 }
-
-// vec2 in range [-1.0, 1.0] ->
+// vec2 in range [ 0.0, 1.0] ->
 // vec3 in range [-1.0, 1.0] with length=1
-vec3 DecodeUnitVec(vec2 e)
+vec3 DecodeUnitVec(vec2 f)
 {
-    vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
-    if (v.z < 0) v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
-    return normalize(v);
+    f = f * 2.0 - 1.0;
+
+    // https://twitter.com/Stubbesaurus/status/937994790553227264
+    vec3 n = vec3(f.xy, 1.0 - abs(f.x) - abs(f.y));
+    float t = max(-n.z, 0.0);
+    n.x += n.x >= 0.0 ? -t : t;
+    n.y += n.y >= 0.0 ? -t : t;
+    return normalize(n);
 }
 
 // vec2 in range [0.0, 1.0] ->

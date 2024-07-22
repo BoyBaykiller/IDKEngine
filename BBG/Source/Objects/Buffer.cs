@@ -146,6 +146,7 @@ namespace BBOpenGL
 
             public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> data)
             {
+                if (data.Length == 0) return;
                 ImmutableAllocateElements(memLocation, memAccess, data.Length, data[0]);
             }
             public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
@@ -162,6 +163,7 @@ namespace BBOpenGL
 
             public void MutableAllocateElements(ReadOnlySpan<T> data)
             {
+                if (data.Length == 0) return;
                 MutableAllocateElements(data.Length, data[0]);
             }
             public void MutableAllocateElements(nint count, in T data)
@@ -178,6 +180,7 @@ namespace BBOpenGL
 
             public void UploadElements(ReadOnlySpan<T> data, nint startIndex = 0)
             {
+                if (data.Length == 0) return;
                 UploadElements(startIndex, data.Length, data[0]);
             }
             public void UploadElements(in T data, nint startIndex = 0)

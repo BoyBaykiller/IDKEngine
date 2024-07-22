@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-
-namespace IDKEngine.GpuTypes
+﻿namespace IDKEngine.GpuTypes
 {
     public struct GpuMeshlet
     {

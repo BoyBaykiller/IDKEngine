@@ -117,8 +117,8 @@ namespace BBOpenGL
             public int Depth { get; private set; }
             public int Levels { get; private set; }
 
-            private readonly List<BindlessHandle> bindlessTextureHandles = new List<BindlessHandle>(0);
-            private readonly List<BindlessHandle> bindlessImageHandles = new List<BindlessHandle>(0);
+            private List<BindlessHandle> bindlessTextureHandles = new List<BindlessHandle>(0);
+            private List<BindlessHandle> bindlessImageHandles = new List<BindlessHandle>(0);
 
             public Texture(Type textureType)
             {
@@ -327,13 +327,13 @@ namespace BBOpenGL
                 {
                     GL.ARB.MakeTextureHandleNonResidentARB(bindlessTextureHandles[i].GLHandle);
                 }
-                bindlessTextureHandles.Clear();
+                bindlessTextureHandles = null;
 
                 for (int i = 0; i < bindlessImageHandles.Count; i++)
                 {
                     GL.ARB.MakeImageHandleNonResidentARB(bindlessImageHandles[i].GLHandle);
                 }
-                bindlessImageHandles.Clear();
+                bindlessImageHandles = null;
 
                 GL.DeleteTexture(ID);
             }

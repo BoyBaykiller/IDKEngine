@@ -22,7 +22,7 @@ Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted
 
 Notes:
  * If [gltfpack](https://github.com/BoyBaykiller/meshoptimizer) is found in PATH or working dir you are given the option to automatically compress glTF files on load
- * Doesn't fully work on Mesa radeonsi driver
+ * Doesn't work on Mesa radeonsi or Intel driver
  * I no longer have access to a NVIDIA GPU, so I can't guarantee NVIDIA exclusive features work at any given point
 
 
@@ -590,8 +590,8 @@ The final draw could then be as simple as:
 ```cs
 public void Draw()
 {
-    vao.Bind(); // contains merged vertex and indices array + vertex format
-    drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer); // contains DrawCommand[Meshes.Length]
+    GL.BindVertexArray(vao); // contains merged vertex and indices array + vertex format
+    GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer); // contains DrawCommand[Meshes.Length]
 
     GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
 }
@@ -600,19 +600,18 @@ While this renders all geometry just fine, you might be wondering how to access 
 
 ### 2.0 Bindless Textures
 
-First of all `ARB_bindless_texture` is not a core extension. Nevertheless, almost all AMD and NVIDIA GPUs implement it, as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately RenderDoc doesn't support it.
+First of all [`ARB_bindless_texture`](https://registry.khronos.org/OpenGL/extensions/ARB/ARB_bindless_texture.txt) is not a core extension. Nevertheless, almost all AMD and NVIDIA GPUs implement it, as you can see [here](https://opengl.gpuinfo.org/listreports.php?extension=GL_ARB_bindless_texture). Unfortunately RenderDoc doesn't support it.
 
-The main idea behind bindless textures is the ability to generate a unique 64 bit handle from any texture, which can then be used to represent it inside glsl and thus no longer depend on previous state based mechanics.
-Specifically, this means that you no longer call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a glsl texture unit.
-Instead, generate a handle and somehow communicate it to the GPU (most likely with a buffer).
+The main idea behind Bindless Textures is the ability to generate a unique 64 bit handle from any texture, which can then be used to uniquely identify it inside GLSL. This means that you no longer have to call `BindTextureUnit` (or the older `ActiveTexture` + `BindTexture`) to bind a texture to a texture unit.
+Instead, generate the handle and somehow communicate it to the GPU in what ever way you like (commonly through a SSBO).
 
 Example:
 ```cs
-long handle = GL.Arb.GetTextureHandle(texture);
+ulong handle = GL.Arb.GetTextureHandle(texture);
 GL.Arb.MakeTextureHandleResident(handle);
 
 GL.CreateBuffers(1, out int buffer);
-GL.NamedBufferStorage(buffer, sizeof(long), ref handle, BufferStorageFlags.DynamicStorageBit);
+GL.NamedBufferStorage(buffer, sizeof(ulong), handle, BufferStorageFlags.DynamicStorageBit);
 GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0, buffer);
 ```
 ```glsl
@@ -682,14 +681,14 @@ Basically, the CPU side of things is as simple this:
 void Render()
 {
     // Frustum Culling
-    frustumCullingProgram.Use();
+    GL.UseProgram(frustumCullingProgram);
     GL.DispatchCompute((Meshes.Length + 64 - 1) / 64, 1, 1);
     GL.MemoryBarrier(MemoryBarrierFlags.CommandBarrierBit);
 
     // Drawing
-    drawingProgram.Use();
-    vao.Bind(); 
-    drawCommandBuffer.Bind(BufferTarget.DrawIndirectBuffer);
+    GL.BindVertexArray(vao);
+    GL.UseProgram(drawingProgram);
+    GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer);
     GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
 }
 ```

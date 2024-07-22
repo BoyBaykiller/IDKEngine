@@ -456,7 +456,7 @@ namespace IDKEngine
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Ressource/Models/HelmetCompressed/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f)).Value;
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\Sponza.gltf", Matrix4.CreateScale(1.0f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(7.0f, 2.0f, 0.0f)).Value;
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\SimpleSkin\glTF\\SimpleSkin.gltf").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
 
@@ -487,7 +487,7 @@ namespace IDKEngine
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
             }
 
-            gui = new Gui(WindowFramebufferSize.X, WindowFramebufferSize.Y);
+            gui = new Gui(WindowFramebufferSize);
             WindowVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorNormal;
             FrameStateRecorder = new StateRecorder<FrameState>();

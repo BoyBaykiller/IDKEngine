@@ -36,7 +36,7 @@ void main()
     uint instanceID = inData.InstanceID;
     uint meshletID = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x]; 
 
-    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.DrawCommands[meshID];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[instanceID];
     GpuMeshlet meshlet = meshletSSBO.Meshlets[meshletID];
 
@@ -47,7 +47,7 @@ void main()
         uint meshVertexID = meshlet.VertexOffset + meshletVertexID;
         uint globalVertexID = drawCmd.BaseVertex + meshletVertexIndicesSSBO.VertexIndices[meshVertexID];
 
-        PackedVec3 vertexPosition = vertexPositionsSSBO.VertexPositions[globalVertexID];
+        PackedVec3 vertexPosition = vertexPositionsSSBO.Positions[globalVertexID];
         vec3 position = vec3(vertexPosition.x, vertexPosition.y, vertexPosition.z);
 
         mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
