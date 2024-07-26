@@ -106,12 +106,19 @@ namespace IDKEngine.Utils
             return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
         }
 
-        public static Vector3 MapRangeToAnOther(Vector3 value, Vector3 valueMin, Vector3 valueMax, Vector3 mapMin, Vector3 mapMax)
+        public static Vector3 MapRangeToAnOther(in Vector3 value, in Vector3 valueMin, in Vector3 valueMax, in Vector3 mapMin, in Vector3 mapMax)
         {
-            return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
+            Vector3 temp = (valueMax - valueMin);
+            Vector3 result = (value - valueMin) / temp * (mapMax - mapMin) + mapMin;
+
+            if (temp.X == 0.0f) result.X = 0.0f; 
+            if (temp.Y == 0.0f) result.Y = 0.0f;
+            if (temp.Z == 0.0f) result.Z = 0.0f;
+
+            return result;
         }
 
-        public static Vector3 MapToZeroOne(Vector3 value, Vector3 rangeMin, Vector3 rangeMax)
+        public static Vector3 MapToZeroOne(in Vector3 value, in Vector3 rangeMin, in Vector3 rangeMax)
         {
             return MapRangeToAnOther(value, rangeMin, rangeMax, new Vector3(0.0f), new Vector3(1.0f));
         }

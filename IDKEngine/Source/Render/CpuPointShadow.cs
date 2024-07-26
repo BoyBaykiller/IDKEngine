@@ -232,7 +232,7 @@ namespace IDKEngine.Render
 
         public void SetSizeRayTracedShadowMap(Vector2i size)
         {
-            /// We only create the ressources and not handle computation for <see cref="RayTracedShadowMap"/>
+            /// We only create the resources and not handle computation for <see cref="RayTracedShadowMap"/>
             /// as this can be done more efficiently in <see cref="PointShadowManager"/>
 
             if (RayTracedShadowMap != null) RayTracedShadowMap.Dispose();

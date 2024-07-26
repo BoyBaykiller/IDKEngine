@@ -201,7 +201,7 @@ namespace IDKEngine.Bvh
         public delegate void FuncIntersectLeafNode(in IndicesTriplet leafNodeTriangle);
         public void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
         {
-            Span<uint> stack = stackalloc uint[MaxTreeDepth];
+            Span<uint> stack = stackalloc uint[32];
             int stackPtr = 0;
             uint stackTop = 1;
 
@@ -490,8 +490,7 @@ namespace IDKEngine.Bvh
 
             while (stackPtr > 0)
             {
-                // +1 because we skip root
-                treeDepth = Math.Max(stackPtr + 1, treeDepth);
+                treeDepth = Math.Max(stackPtr, treeDepth);
 
                 int stackTop = stack[--stackPtr];
                 ref readonly GpuBlasNode leftChild = ref nodes[stackTop];

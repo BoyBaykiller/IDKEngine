@@ -222,7 +222,7 @@ namespace IDKEngine.Bvh
                 {
                     totalSAH += blases[i].ComputeGlobalCost(blases[i].Root);
                 }
-                Logger.Log(Logger.LogLevel.Info, $"Added SAH of all BLAS'es = {totalSAH}");
+                Logger.Log(Logger.LogLevel.Info, $"Added SAH of all new BLAS'es = {totalSAH}");
             }
             SetBlasBuffersContent();
 

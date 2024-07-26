@@ -22,7 +22,6 @@ namespace IDKEngine.Windowing
         
         private static readonly Keys[] keyValues = Enum.GetValues<Keys>();
 
-        // Keys aren't layed out sequentialy so I decided to use a dictionary instead of InputState[]
         private readonly Dictionary<Keys, InputState> keyStates;
 
         private readonly Window* window;
@@ -34,7 +33,7 @@ namespace IDKEngine.Windowing
 
             for (int i = 0; i < keyValues.Length; i++)
             {
-                keyStates.TryAdd(keyValues[i], InputState.Released);
+                keyStates[keyValues[i]] = InputState.Released;
             }
         }
 

@@ -50,7 +50,7 @@ namespace BBOpenGL
             private struct FramebufferRessorce
             {
                 public FramebufferDesc FramebufferDesc;
-                public int GLRessource;
+                public int GLResource;
             }
 
             private static FramebufferRessorce[] framebuffers = Array.Empty<FramebufferRessorce>();
@@ -62,14 +62,14 @@ namespace BBOpenGL
                     ref readonly FramebufferRessorce framebuffer = ref framebuffers[i];
                     if (framebuffer.FramebufferDesc == framebufferDesc)
                     {
-                        return framebuffer.GLRessource;
+                        return framebuffer.GLResource;
                     }
                 }
 
                 FramebufferRessorce newFramebuffer = CreateFramebuffer(framebufferDesc);
                 framebuffers = framebuffers.Concat([newFramebuffer]).ToArray();
 
-                return newFramebuffer.GLRessource;
+                return newFramebuffer.GLResource;
             }
 
             public static int DeleteFramebuffersWithTexture(Texture texture)
@@ -85,7 +85,7 @@ namespace BBOpenGL
                         ref readonly Attachment attachment = ref framebuffer.FramebufferDesc.Attachments[j];
                         if (attachment.Texture == texture)
                         {
-                            GL.DeleteFramebuffer(framebuffer.GLRessource);
+                            GL.DeleteFramebuffer(framebuffer.GLResource);
                             
                             if (aliveFbos > 0)
                             {
@@ -114,7 +114,7 @@ namespace BBOpenGL
             {
                 FramebufferRessorce newFramebuffer = new FramebufferRessorce();
                 newFramebuffer.FramebufferDesc = framebufferDesc;
-                GL.CreateFramebuffers(1, ref newFramebuffer.GLRessource);
+                GL.CreateFramebuffers(1, ref newFramebuffer.GLResource);
 
                 Span<ColorBuffer> drawBuffers = stackalloc ColorBuffer[MAX_COLOR_ATTACHMENTS];
                 int numColorAttachments = 0;
@@ -122,7 +122,7 @@ namespace BBOpenGL
                 {
                     ref readonly Attachment attachment = ref framebufferDesc.Attachments[i];
 
-                    GL.NamedFramebufferTexture(newFramebuffer.GLRessource, attachment.AttachmentPoint, attachment.Texture.ID, attachment.Level);
+                    GL.NamedFramebufferTexture(newFramebuffer.GLResource, attachment.AttachmentPoint, attachment.Texture.ID, attachment.Level);
 
                     if (IsColorAttachment(attachment.AttachmentPoint))
                     {
@@ -130,7 +130,7 @@ namespace BBOpenGL
                         numColorAttachments++;
                     }
                 }
-                GL.NamedFramebufferDrawBuffers(newFramebuffer.GLRessource, numColorAttachments, drawBuffers[0]);
+                GL.NamedFramebufferDrawBuffers(newFramebuffer.GLResource, numColorAttachments, drawBuffers[0]);
 
                 return newFramebuffer;
             }

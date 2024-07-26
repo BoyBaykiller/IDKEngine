@@ -104,7 +104,7 @@ namespace BBOpenGL
                 A = TextureSwizzle.Alpha,
             }
 
-            public struct BindlessHandle
+            public record struct BindlessHandle
             {
                 public ulong GLHandle;
             }

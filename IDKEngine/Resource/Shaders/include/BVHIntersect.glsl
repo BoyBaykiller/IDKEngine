@@ -1,7 +1,7 @@
 #define USE_TLAS AppInsert(USE_TLAS)
 
 #define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH) - 1, 1) // -1 because of speical traversal algorithm
-#define MAX_TLAS_TREE_DEPTH max(26 - 1, 1)
+#define MAX_TLAS_TREE_DEPTH max(24, 1)
 
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)

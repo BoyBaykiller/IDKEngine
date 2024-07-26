@@ -825,7 +825,6 @@ namespace IDKEngine.Render
                         AddModelDialog(result.Path);
                     }
                 }
-                ModuleLoadModelRender(app, ref shouldResetPT);
             }
             ImGui.End();
 
@@ -1033,6 +1032,9 @@ namespace IDKEngine.Render
             ImGui.PopStyleVar();
             ImGui.End();
 
+            ModuleLoadModelRender(app, ref shouldResetPT);
+            ModuleLoadModelUpdate(app, ref shouldResetPT);
+
             backend.Render();
 
             if (shouldResetPT)
@@ -1065,7 +1067,6 @@ namespace IDKEngine.Render
             }
 
             bool shouldResetPT = false;
-            ModuleLoadModelUpdate(app, ref shouldResetPT);
 
             if (RecordingVars.FrameRecState == FrameRecorderState.Replaying)
             {
@@ -1326,7 +1327,7 @@ namespace IDKEngine.Render
             private readonly Queue<LoadingTask> queuedLoadingTasks = new Queue<LoadingTask>();
             public GuiModelLoad()
             {
-                if (ModelLoader.GtlfpackWrapper.IsCLIFound)
+                if (ModelLoader.GtlfpackWrapper.IsCLIFoundCached)
                 {
                     PreprocessMode = ModelPreprocessingMode.gltfpack;
                 }
@@ -1380,7 +1381,7 @@ namespace IDKEngine.Render
                         {
                             GuiModelLoad.ModelPreprocessingMode it = preprocesModes[i];
 
-                            bool isDisabled = it == GuiModelLoad.ModelPreprocessingMode.gltfpack && !ModelLoader.GtlfpackWrapper.IsCLIFound;
+                            bool isDisabled = it == GuiModelLoad.ModelPreprocessingMode.gltfpack && !ModelLoader.GtlfpackWrapper.IsCLIFoundCached;
                             if (isDisabled)
                             {
                                 ImGui.BeginDisabled();
@@ -1555,8 +1556,8 @@ namespace IDKEngine.Render
         private bool ModuleLoadModelLoad(Application app, string modelPath, in GuiModelLoad.LoadParams loadParams)
         {
             OtkVec3 modelPos = loadParams.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
-            Matrix4 modelRoot = Matrix4.CreateScale(loadParams.Scale) * Matrix4.CreateTranslation(modelPos);
-            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, modelRoot, loadParams.ModelOptimizationSettings);
+            Transformation transformation = new Transformation().WithScale(loadParams.Scale).WithTranslation(modelPos);
+            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.Matrix, loadParams.ModelOptimizationSettings);
             if (!newModel.HasValue)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Failed loading model \"{modelPath}\"");

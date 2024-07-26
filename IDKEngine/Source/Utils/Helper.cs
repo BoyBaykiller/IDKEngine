@@ -88,6 +88,19 @@ namespace IDKEngine.Utils
             Array.Resize(ref array, array.Length - count);
         }
 
+        public static void FillIncreasing(Span<uint> array, uint startValue = 0u)
+        {
+            FillIncreasing(array, 0, array.Length, startValue);
+        }
+
+        public static void FillIncreasing(Span<uint> array, int start, int count, uint startValue = 0u)
+        {
+            for (int i = start; i < start + count; i++)
+            {
+                array[i] = (uint)(startValue + i);
+            }
+        }
+
         public static Vector4 ToOpenTK(this System.Numerics.Vector4 vector4)
         {
             return Unsafe.As<System.Numerics.Vector4, Vector4>(ref vector4);
@@ -111,14 +124,14 @@ namespace IDKEngine.Utils
             return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
         }
 
-        public static Matrix4 ToOpenTK(this System.Numerics.Matrix4x4 matrix4x4)
+        public static Matrix4 ToOpenTK(this System.Numerics.Matrix4x4 Matrix4x4)
         {
-            return Unsafe.As<System.Numerics.Matrix4x4, Matrix4>(ref matrix4x4);
+            return Unsafe.As<System.Numerics.Matrix4x4, Matrix4>(ref Matrix4x4);
         }
 
-        public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 matrix4x4)
+        public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 Matrix4x4)
         {
-            return Unsafe.As<Matrix4, System.Numerics.Matrix4x4>(ref matrix4x4);
+            return Unsafe.As<Matrix4, System.Numerics.Matrix4x4>(ref Matrix4x4);
         }
 
         public static Quaternion ToOpenTK(this System.Numerics.Quaternion quaternion)
@@ -183,51 +196,6 @@ namespace IDKEngine.Utils
             );
 
             Memory.Free(pixels);
-        }
-
-        public static int BinarySearchLowerBound<T>(ReadOnlySpan<T> arr, in T value, Comparison<T> comparison)
-        {
-            int lo = 0;
-            int hi = arr.Length - 1;
-            while (lo < hi)
-            {
-                int mid = lo + (hi - lo) / 2;
-                if (comparison(arr[mid], value) < 0)
-                {
-                    lo = mid + 1;
-                }
-                else
-                {
-                    hi = mid - 1;
-                }
-            }
-
-            return lo;
-        }
-
-        public static bool MaintainDescendingArray<T>(Span<T> arr, in T newValue, Comparison<T> comparison)
-        {
-            if (arr.Length == 0)
-            {
-                return false;
-            }
-
-            int newIndex = BinarySearchLowerBound(arr, newValue, comparison);
-            if (comparison(arr[newIndex], newValue) <= 0)
-            {
-                newIndex++;
-            }
-            while (newIndex < arr.Length && comparison(arr[newIndex], newValue) == 0)
-            {
-                newIndex++;
-            }
-            if (newIndex == arr.Length)
-            {
-                return false;
-            }
-
-            arr[newIndex] = newValue;
-            return true;
         }
 
         public delegate bool FuncLeftSide<T>(in T v);

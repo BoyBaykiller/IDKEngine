@@ -7,6 +7,11 @@ namespace IDKEngine.Utils
     {
         private static readonly Random rng = new Random();
 
+        public static Vector3 RandomVec3()
+        {
+            return RandomVec3(0.0f, 1.0f);
+        }
+
         public static Vector3 RandomVec3(float min, float max)
         {
             return new Vector3(min) + new Vector3(RandomFloat01(), RandomFloat01(), RandomFloat01()) * (max - min);

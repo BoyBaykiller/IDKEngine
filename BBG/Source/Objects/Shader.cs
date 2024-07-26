@@ -66,7 +66,7 @@ namespace BBOpenGL
 
         public class AbstractShader : Shader
         {
-            public static string SHADER_PATH = "Ressource/Shaders/";
+            public static string SHADER_PATH = "Resource/Shaders/";
 
             public string FullShaderPath => Path.Combine(SHADER_PATH, LocalShaderPath);
 

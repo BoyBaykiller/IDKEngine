@@ -70,9 +70,9 @@ namespace BBOpenGL
                 return success == 1;
             }
 
-            public unsafe void Upload(int location, in Matrix4 matrix4, int count = 1, bool transpose = false)
+            public unsafe void Upload(int location, in Matrix4 Matrix4, int count = 1, bool transpose = false)
             {
-                fixed (float* ptr = &matrix4.Row0.X)
+                fixed (float* ptr = &Matrix4.Row0.X)
                 {
                     GL.ProgramUniformMatrix4fv(ID, location, count, transpose, ptr);
                 }

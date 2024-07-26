@@ -17,7 +17,13 @@ namespace IDKEngine
 
         public int Channels => (int)Ktx2.GetNumComponents(texture);
         public bool NeedsTranscoding => Ktx2.NeedsTranscoding(texture);
-        
+
+        public static Ktx2.ErrorCode FromFile(string filename, Ktx2.TextureCreateFlag createFlags, out Ktx2Texture ktx2Texture)
+        {
+            ktx2Texture = new Ktx2Texture();
+            return Ktx2.CreateFromNamedFile(filename, createFlags, out ktx2Texture.texture);
+        }
+
         public static Ktx2.ErrorCode FromMemory(ReadOnlySpan<byte> memory, Ktx2.TextureCreateFlag createFlags, out Ktx2Texture ktx2Texture)
         {
             ktx2Texture = new Ktx2Texture();

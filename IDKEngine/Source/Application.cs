@@ -414,12 +414,12 @@ namespace IDKEngine
             gpuPerFrameDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 0);
             
             SkyBoxManager.Initialize(SkyBoxManager.SkyBoxMode.ExternalAsset, [
-                "Ressource/Textures/EnvironmentMap/1.jpg",
-                "Ressource/Textures/EnvironmentMap/2.jpg",
-                "Ressource/Textures/EnvironmentMap/3.jpg",
-                "Ressource/Textures/EnvironmentMap/4.jpg",
-                "Ressource/Textures/EnvironmentMap/5.jpg",
-                "Ressource/Textures/EnvironmentMap/6.jpg"
+                "Resource/Textures/EnvironmentMap/1.jpg",
+                "Resource/Textures/EnvironmentMap/2.jpg",
+                "Resource/Textures/EnvironmentMap/3.jpg",
+                "Resource/Textures/EnvironmentMap/4.jpg",
+                "Resource/Textures/EnvironmentMap/5.jpg",
+                "Resource/Textures/EnvironmentMap/6.jpg"
             ]);
 
             ModelLoader.TextureLoaded += () =>
@@ -433,7 +433,7 @@ namespace IDKEngine
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), 360.0f - 165.4f, 90.0f - 7.4f);
             if (true)
             {
-                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Ressource/Models/SponzaCompressed/Sponza.gltf", Matrix4.CreateScale(1.815f) * Matrix4.CreateTranslation(0.0f, -1.0f, 0.0f)).Value;
+                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Resource/Models/SponzaCompressed/Sponza.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).Matrix).Value;
                 sponza.Meshes[63].EmissiveBias = 10.0f;
                 sponza.Meshes[70].EmissiveBias = 20.0f;
                 sponza.Meshes[3].EmissiveBias = 12.0f;
@@ -446,14 +446,14 @@ namespace IDKEngine
                 //sponza.Meshes[46].SpecularBias = 1.0f;
                 //sponza.Meshes[46].RoughnessBias = -0.436f;
 
-                ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Ressource/Models/LucyCompressed/Lucy.gltf", Matrix4.CreateScale(0.8f) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(90.0f)) * Matrix4.CreateTranslation(-1.68f, 2.3f, 0.0f)).Value;
+                ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).Matrix).Value;
                 lucy.Meshes[0].SpecularBias = -1.0f;
                 lucy.Meshes[0].TransmissionBias = 0.98f;
                 lucy.Meshes[0].IORBias = 0.174f;
                 lucy.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.Meshes[0].RoughnessBias = -1.0f;
 
-                ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Ressource/Models/HelmetCompressed/Helmet.gltf", Matrix4.CreateRotationY(MathF.PI / 4.0f)).Value;
+                ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).Matrix).Value;
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\SimpleSkin\glTF\\SimpleSkin.gltf").Value;

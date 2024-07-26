@@ -5,6 +5,7 @@ using System.Threading;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using SharpGLTF.Schema2;
@@ -59,9 +60,56 @@ namespace IDKEngine
             public Matrix4[] JointMatrices;
         }
 
+        public class MyNode
+        {
+            public MyNode Parent;
+            public MyNode[] Children = Array.Empty<MyNode>();
+
+            public string Name = string.Empty;
+
+            public Range? MeshInstanceIds = null;
+
+            public Transformation LocalTransformation = new Transformation();
+            public Matrix4 GlobalTransform = Matrix4.Identity; // local * parent.Global
+
+            public void UpdateHierachy(Action<MyNode> action)
+            {
+                if (Parent == null)
+                {
+                    GlobalTransform = LocalTransformation.Matrix;
+                }
+                else
+                {
+                    GlobalTransform = LocalTransformation.Matrix * Parent.GlobalTransform;
+                }
+
+                action(this);
+                if (Children.Length == 0)
+                {
+                    return;
+                }
+
+                Stack<MyNode> nodeStack = new Stack<MyNode>(Children.Length);
+                nodeStack.Push(this);
+                while (nodeStack.Count > 0)
+                {
+                    MyNode parent = nodeStack.Pop();
+                    for (int i = 0; i < parent.Children.Length; i++)
+                    {
+                        MyNode child = parent.Children[i];
+                        child.GlobalTransform = child.LocalTransformation.Matrix * parent.GlobalTransform;
+
+                        action(child);
+
+                        nodeStack.Push(child);
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// See <see href="https://github.com/zeux/meshoptimizer"></see> for details.
-        /// When gltfpack is run these optimizations are already applied so doing them again would be useless
+        /// When gltfpack is run these optimizations are already applied so doing them again is useless
         /// </summary>
         public struct OptimizationSettings
         {
@@ -142,6 +190,7 @@ namespace IDKEngine
                 MaterialParams = MaterialParams.Default,
             };
         }
+
         private struct MaterialParams
         {
             public Vector3 EmissiveFactor;
@@ -166,6 +215,17 @@ namespace IDKEngine
                 IOR = 1.0f, // by spec 1.5 IOR would be correct
             };
         }
+
+        private struct MeshGeometry
+        {
+            public MeshletData MeshletData;
+            public GpuMeshlet[] Meshlets;
+            public GpuMeshletInfo[] MeshletsInfo;
+
+            public VertexData VertexData;
+            public uint[] VertexIndices;
+        }
+
         private struct MeshletData
         {
             public Meshopt.Meshlet[] Meshlets;
@@ -177,6 +237,7 @@ namespace IDKEngine
             public byte[] LocalIndices;
             public int LocalIndicesLength;
         }
+
         private struct VertexData
         {
             public GpuVertex[] Vertices;
@@ -185,6 +246,27 @@ namespace IDKEngine
             public uint[] JointIndices;
             public float[] JointWeights;
         }
+
+        private record struct GltfMeshPrimitiveDesc
+        {
+            public bool HasNormalAccessor => NormalAccessor != -1;
+            public bool HasTexCoordAccessor => TexCoordAccessor != -1;
+            public bool HasJointsAccessor => JointsAccessor != -1;
+            public bool HasWeightsAccessor => WeightsAccessor != -1;
+            public bool HasIndexAccessor => IndexAccessor != -1;
+
+            public int PositionAccessor;
+            public int NormalAccessor = -1;
+            public int TexCoordAccessor = -1;
+            public int JointsAccessor = -1;
+            public int WeightsAccessor = -1;
+            public int IndexAccessor = -1;
+
+            public GltfMeshPrimitiveDesc()
+            {
+            }
+        }
+
         private unsafe struct USVec4
         {
             public fixed ushort Data[4];
@@ -208,7 +290,7 @@ namespace IDKEngine
                 Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
                 return null;
             }
-
+            
             ModelRoot gltf = ModelRoot.Load(path, new ReadSettings() { Validation = SharpGLTF.Validation.ValidationMode.Skip });
             string fileName = Path.GetFileName(path);
             foreach (string ext in gltf.ExtensionsUsed)
@@ -228,7 +310,8 @@ namespace IDKEngine
                 Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" is uncompressed");
             }
 
-            if (gltf.ExtensionsUsed.Contains("KHR_texture_basisu") && !gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness"))
+            bool usesExtBc5NormalMetallicRoughness = gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness");
+            if (gltf.ExtensionsUsed.Contains("KHR_texture_basisu") && !usesExtBc5NormalMetallicRoughness)
             {
                 Logger.Log(Logger.LogLevel.Warn, $"Model \"{fileName}\" uses extension KHR_texture_basisu without IDK_BC5_normal_metallicRoughness,\n" +
                                                   "causing normal and metallicRoughness textures with a suboptimal format (BC7) and potentially visible error.\n" +
@@ -236,7 +319,7 @@ namespace IDKEngine
             }
 
             Stopwatch sw = Stopwatch.StartNew();
-            Model model = GltfToEngineFormat(gltf, rootTransform, optimizationSettings);
+            Model model = GltfToEngineFormat(gltf, rootTransform, optimizationSettings, usesExtBc5NormalMetallicRoughness, Path.GetFileName(path));
             sw.Stop();
 
             nint totalIndicesCount = 0;
@@ -250,11 +333,10 @@ namespace IDKEngine
             return model;
         }
 
-        private static Model GltfToEngineFormat(ModelRoot gltf, in Matrix4 rootTransform, OptimizationSettings optimizationSettings)
+        private static Model GltfToEngineFormat(ModelRoot gltf, in Matrix4 rootTransform, OptimizationSettings optimizationSettings, bool useExtBc5NormalMetallicRoughness, string modelName)
         {
-            MaterialLoadData[] materialsLoadData = GetMaterialLoadDataFromGltf(gltf.LogicalMaterials);
-            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(materialsLoadData, gltf.ExtensionsUsed.Contains("IDK_BC5_normal_metallicRoughness")));
-
+            Dictionary<GltfMeshPrimitiveDesc, MeshGeometry> meshPrimitivesGeometry = LoadMeshPrimitivesGeometry(gltf, optimizationSettings);
+            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(GetMaterialLoadDataFromGltf(gltf.LogicalMaterials), useExtBc5NormalMetallicRoughness));
             List<GpuMesh> listMeshes = new List<GpuMesh>();
             List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
             List<BBG.DrawElementsIndirectCommand> listDrawCommands = new List<BBG.DrawElementsIndirectCommand>();
@@ -269,54 +351,74 @@ namespace IDKEngine
             List<float> listJointWeights = new List<float>();
             List<Matrix4> listJointMatrices = new List<Matrix4>();
             
-            Stack<ValueTuple<Node, Matrix4>> nodeStack = new Stack<ValueTuple<Node, Matrix4>>(gltf.LogicalNodes.Count);
-            foreach (Node node in gltf.DefaultScene.VisualChildren)
+            MyNode myRoot = new MyNode();
+            myRoot.Name = modelName;
+            myRoot.LocalTransformation = Transformation.FromMatrix(rootTransform);
+            myRoot.GlobalTransform = rootTransform;
+
+            Stack<(Node Node, MyNode MyNode)> nodeStack = new Stack<ValueTuple<Node, MyNode>>(gltf.LogicalNodes.Count);
             {
-                nodeStack.Push((node, rootTransform));
+                Node[] gltfChildren = gltf.DefaultScene.VisualChildren.ToArray();
+                myRoot.Children = new MyNode[gltfChildren.Length];
+                for (int i = 0; i < gltfChildren.Length; i++)
+                {
+                    MyNode myNode = new MyNode();
+                    myNode.Parent = myRoot;
+                    myNode.Name = $"gltf_root_{i}";
+                    myRoot.Children[i] = myNode;
+
+                    nodeStack.Push((gltfChildren[i], myNode));
+                }
             }
 
             while (nodeStack.Count > 0)
             {
-                (Node node, Matrix4 parentNodeGlobalTransform) = nodeStack.Pop();
+                (Node gltfNode, MyNode myNode) = nodeStack.Pop();
 
-                Matrix4 nodeLocalTransform = node.LocalMatrix.ToOpenTK();
-                Matrix4 nodeGlobalTransform = nodeLocalTransform * parentNodeGlobalTransform;
-                
-                foreach (Node child in node.VisualChildren)
+                myNode.LocalTransformation = Transformation.FromMatrix(gltfNode.LocalMatrix.ToOpenTK());
+                myNode.GlobalTransform = myNode.LocalTransformation.Matrix * myNode.Parent.GlobalTransform;
+
                 {
-                    nodeStack.Push((child, nodeGlobalTransform));
+                    Node[] gltfChildren = gltfNode.VisualChildren.ToArray();
+                    myNode.Children = new MyNode[gltfChildren.Length];
+                    for (int i = 0; i < gltfChildren.Length; i++)
+                    {
+                        MyNode myChild = new MyNode();
+                        myChild.Name = gltfNode.Name;
+                        myChild.Parent = myNode;
+                        myNode.Children[i] = myChild;
+
+                        nodeStack.Push((gltfChildren[i], myChild));
+                    }
                 }
 
-                Mesh gltfMesh = node.Mesh;
+                Mesh gltfMesh = gltfNode.Mesh;
                 if (gltfMesh == null)
                 {
                     continue;
                 }
 
-                if (node.Skin != null)
+                if (gltfNode.Skin != null)
                 {
-                    IterateAccessor(node.Skin.GetInverseBindMatricesAccessor(), (in Matrix4 jointInverseTransform, int i) =>
+                    IterateAccessor(gltfNode.Skin.GetInverseBindMatricesAccessor(), (in Matrix4 jointInverseTransform, int i) =>
                     {
-                        listJointMatrices.Add(jointInverseTransform * nodeGlobalTransform);
+                        listJointMatrices.Add(jointInverseTransform * myNode.GlobalTransform);
                     });
                 }
 
-                Matrix4[] nodeTransformations = GetNodeInstances(node.UseGpuInstancing(), nodeLocalTransform);
-                
+                Matrix4[] nodeTransformations = GetNodeInstances(gltfNode.UseGpuInstancing(), myNode.LocalTransformation.Matrix);
+
+                Range meshInstanceIdsRange = new Range();
+                meshInstanceIdsRange.Start = listMeshInstances.Count;
+
                 for (int i = 0; i < gltfMesh.Primitives.Count; i++)
                 {
                     MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
 
-                    VertexData meshVertexData = LoadGpuVertices(gltfMeshPrimitive);
-                    uint[] meshIndices = LoadGpuIndices(gltfMeshPrimitive);
-
-                    OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
-
-                    MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
-                    (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);
-                    for (int j = 0; j < meshMeshlets.Length; j++)
+                    MeshGeometry meshGeometry = meshPrimitivesGeometry[GetMeshDesc(gltfMeshPrimitive)];
+                    for (int j = 0; j < meshGeometry.Meshlets.Length; j++)
                     {
-                        ref GpuMeshlet myMeshlet = ref meshMeshlets[j];
+                        ref GpuMeshlet myMeshlet = ref meshGeometry.Meshlets[j];
 
                         // Adjust offsets in context of all meshlets
                         myMeshlet.VertexOffset += (uint)listMeshletsVertexIndices.Count;
@@ -330,12 +432,12 @@ namespace IDKEngine
                     mesh.RoughnessBias = 0.0f;
                     mesh.TransmissionBias = 0.0f;
                     mesh.MeshletsStart = listMeshlets.Count;
-                    mesh.MeshletCount = meshMeshlets.Length;
+                    mesh.MeshletCount = meshGeometry.Meshlets.Length;
                     mesh.IORBias = 0.0f;
                     mesh.AbsorbanceBias = new Vector3(0.0f);
                     if (gltfMeshPrimitive.Material != null)
                     {
-                        bool hasNormalMap = materialsLoadData[gltfMeshPrimitive.Material.LogicalIndex].NormalTexture != null;
+                        bool hasNormalMap = listMaterials[gltfMeshPrimitive.Material.LogicalIndex].NormalTexture != FallbackTextures.White();
                         mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
                         mesh.MaterialIndex = gltfMeshPrimitive.Material.LogicalIndex;
                     }
@@ -352,30 +454,33 @@ namespace IDKEngine
                     for (int j = 0; j < meshInstances.Length; j++)
                     {
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
-                        meshInstance.ModelMatrix = nodeTransformations[j] * parentNodeGlobalTransform;
+                        meshInstance.ModelMatrix = nodeTransformations[j] * myNode.Parent.GlobalTransform;
                         meshInstance.MeshIndex = listMeshes.Count;
                     }
 
                     BBG.DrawElementsIndirectCommand drawCmd = new BBG.DrawElementsIndirectCommand();
-                    drawCmd.IndexCount = meshIndices.Length;
+                    drawCmd.IndexCount = meshGeometry.VertexIndices.Length;
                     drawCmd.InstanceCount = meshInstances.Length;
                     drawCmd.FirstIndex = listIndices.Count;
                     drawCmd.BaseVertex = listVertices.Count;
                     drawCmd.BaseInstance = listMeshInstances.Count;
 
-                    listVertices.AddRange(meshVertexData.Vertices);
-                    listVertexPositions.AddRange(meshVertexData.Positons);
-                    listIndices.AddRange(meshIndices);
+                    listVertices.AddRange(meshGeometry.VertexData.Vertices);
+                    listVertexPositions.AddRange(meshGeometry.VertexData.Positons);
+                    listIndices.AddRange(meshGeometry.VertexIndices);
                     listMeshes.Add(mesh);
                     listMeshInstances.AddRange(meshInstances);
                     listDrawCommands.Add(drawCmd);
-                    listMeshlets.AddRange(meshMeshlets);
-                    listMeshletsInfo.AddRange(meshMeshletsInfo);
-                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshletData.VertexIndices, 0, meshletData.VertexIndicesLength));
-                    listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshletData.LocalIndices, 0, meshletData.LocalIndicesLength));
-                    listJointIndices.AddRange(meshVertexData.JointIndices);
-                    listJointWeights.AddRange(meshVertexData.JointWeights);
+                    listMeshlets.AddRange(meshGeometry.Meshlets);
+                    listMeshletsInfo.AddRange(meshGeometry.MeshletsInfo);
+                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshGeometry.MeshletData.VertexIndices, 0, meshGeometry.MeshletData.VertexIndicesLength));
+                    listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshGeometry.MeshletData.LocalIndices, 0, meshGeometry.MeshletData.LocalIndicesLength));
+                    listJointIndices.AddRange(meshGeometry.VertexData.JointIndices);
+                    listJointWeights.AddRange(meshGeometry.VertexData.JointWeights);
                 }
+
+                meshInstanceIdsRange.End = listMeshInstances.Count;
+                myNode.MeshInstanceIds = meshInstanceIdsRange;
             }
 
             Model model = new Model();
@@ -393,6 +498,17 @@ namespace IDKEngine
             model.JointIndices = listJointIndices.ToArray();
             model.JointWeights = listJointWeights.ToArray();
             model.JointMatrices = listJointMatrices.ToArray();
+
+            //myRoot.RecomputeGlobalTransforms((MyNode node) =>
+            //{
+            //    if (node.MeshInstanceIds.HasValue)
+            //    {
+            //        for (int i = node.MeshInstanceIds.Value.Start; i < node.MeshInstanceIds.Value.Start + node.MeshInstanceIds.Value.Count; i++)
+            //        {
+            //            model.MeshInstances[i].ModelMatrix = node.GlobalTransform;
+            //        }
+            //    }
+            //});
 
             return model;
         }
@@ -491,11 +607,11 @@ namespace IDKEngine
             else if (gltfTexture.PrimaryImage.Content.IsKtx2)
             {
                 ReadOnlySpan<byte> imageData = gltfTexture.PrimaryImage.Content.Content.Span;
-                
-                Ktx2.ErrorCode errorCode = Ktx2Texture.FromMemory(imageData, Ktx2.TextureCreateFlag.LoadImageDataBit, out ktx2Texture);
-                if (errorCode != Ktx2.ErrorCode.Success)
+
+                Ktx2.ErrorCode errCode = Ktx2Texture.FromMemory(imageData, Ktx2.TextureCreateFlag.LoadImageDataBit, out ktx2Texture);
+                if (errCode != Ktx2.ErrorCode.Success)
                 {
-                    Logger.Log(Logger.LogLevel.Error, $"Failed to load KTX texture. {nameof(Ktx2Texture.FromMemory)} returned {errorCode}");
+                    Logger.Log(Logger.LogLevel.Error, $"Failed to load KTX texture. {nameof(Ktx2Texture.FromMemory)} returned {errCode}");
                     return false;
                 }
                 if (!ktx2Texture.NeedsTranscoding)
@@ -571,12 +687,15 @@ namespace IDKEngine
                 {
                     Task.Run(() =>
                     {
-                        //int supercompressedImageSize = (int)ktxTexture->DataSize; // Supercompressed size before transcoding
-                        Ktx2.ErrorCode errorCode = ktx2Texture.Transcode(GLFormatToKtxFormat(glTextureCopy.Format), Ktx2.TranscodeFlagBits.HighQuality);
-                        if (errorCode != Ktx2.ErrorCode.Success)
+                        if (ktx2Texture.NeedsTranscoding)
                         {
-                            Logger.Log(Logger.LogLevel.Error, $"Failed to transcode KTX texture. {nameof(ktx2Texture.Transcode)} returned {errorCode}");
-                            return;
+                            //int supercompressedImageSize = ktx2Texture.DataSize; // Supercompressed size before transcoding
+                            Ktx2.ErrorCode errCode = ktx2Texture.Transcode(GLFormatToKtxFormat(glTextureCopy.Format), Ktx2.TranscodeFlagBits.HighQuality);
+                            if (errCode != Ktx2.ErrorCode.Success)
+                            {
+                                Logger.Log(Logger.LogLevel.Error, $"Failed to transcode KTX texture. {nameof(ktx2Texture.Transcode)} returned {errCode}");
+                                return;
+                            }
                         }
 
                         MainThreadQueue.AddToLazyQueue(() =>
@@ -595,7 +714,6 @@ namespace IDKEngine
                                     for (int level = 0; level < glTextureCopy.Levels; level++)
                                     {
                                         ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
-
                                         Vector3i size = GLTexture.GetMipmapLevelSize(ktx2Texture.BaseWidth, ktx2Texture.BaseHeight, ktx2Texture.BaseDepth, level);
                                         glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
                                     }
@@ -644,7 +762,7 @@ namespace IDKEngine
             
             return true;
         }
-
+        
         private static MaterialLoadData[] GetMaterialLoadDataFromGltf(IReadOnlyList<Material> gltfMaterials)
         {
             MaterialLoadData[] materialsLoadData = new MaterialLoadData[gltfMaterials.Count];
@@ -667,7 +785,8 @@ namespace IDKEngine
 
             return materialsLoadData;
         }
-        private static GltfTexture GetGltfTexture(Material material, MaterialLoadData.TextureType textureType)
+        
+        private static GltfTexture? GetGltfTexture(Material material, MaterialLoadData.TextureType textureType)
         {
             KnownChannel channel = textureType switch
             {
@@ -680,7 +799,6 @@ namespace IDKEngine
             };
 
             MaterialChannel? materialChannel = material.FindChannel(channel.ToString());
-
             if (materialChannel.HasValue)
             {
                 return materialChannel.Value.Texture;
@@ -688,6 +806,7 @@ namespace IDKEngine
 
             return null;
         }
+        
         private static GLSampler.SamplerState GetGLSamplerState(GltfSampler sampler)
         {
             GLSampler.SamplerState state = new GLSampler.SamplerState();
@@ -737,13 +856,77 @@ namespace IDKEngine
 
             return nodeInstances;
         }
-        private static unsafe VertexData LoadGpuVertices(MeshPrimitive meshPrimitive)
+        
+        private static Dictionary<GltfMeshPrimitiveDesc, MeshGeometry> LoadMeshPrimitivesGeometry(ModelRoot modelRoot, OptimizationSettings optimizationSettings)
+        {
+            int totalMeshPrimitives = modelRoot.LogicalMeshes.Sum(it => it.Primitives.Count);
+
+            Task[] tasks = new Task[totalMeshPrimitives];
+            Dictionary<GltfMeshPrimitiveDesc, MeshGeometry> uniqueMeshPrimitives = new Dictionary<GltfMeshPrimitiveDesc, MeshGeometry>(totalMeshPrimitives);
+
+            int uniqueMeshPrimitivesCount = 0;
+            for (int i = 0; i < modelRoot.LogicalMeshes.Count; i++)
+            {
+                Mesh mesh = modelRoot.LogicalMeshes[i];
+                for (int j = 0; j < mesh.Primitives.Count; j++)
+                {
+                    MeshPrimitive meshPrimitive = mesh.Primitives[j];
+                    GltfMeshPrimitiveDesc meshDesc = GetMeshDesc(meshPrimitive);
+                    if (uniqueMeshPrimitives.TryAdd(meshDesc, new MeshGeometry()))
+                    {
+                        tasks[uniqueMeshPrimitivesCount++] = Task.Run(() =>
+                        {
+                            (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(modelRoot.LogicalAccessors, meshDesc);
+                            OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
+
+                            MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
+                            (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);
+
+                            ref MeshGeometry meshGeometry = ref CollectionsMarshal.GetValueRefOrNullRef(uniqueMeshPrimitives, meshDesc);
+                            meshGeometry.VertexData = meshVertexData;
+                            meshGeometry.VertexIndices = meshIndices;
+                            meshGeometry.MeshletData = meshletData;
+                            meshGeometry.Meshlets = meshMeshlets;
+                            meshGeometry.MeshletsInfo = meshMeshletsInfo;
+                        });
+                    }
+                }
+            }
+            //int deduplicatedCount = totalMeshPrimitives - uniqueMeshPrimitivesCount;
+            while (uniqueMeshPrimitivesCount < tasks.Length)
+            {
+                tasks[uniqueMeshPrimitivesCount++] = Task.CompletedTask;
+            }
+
+            Task.WaitAll(tasks);
+            uniqueMeshPrimitives.TrimExcess();
+
+            return uniqueMeshPrimitives;
+        }
+
+        private static GltfMeshPrimitiveDesc GetMeshDesc(MeshPrimitive meshPrimitive)
         {
             Accessor positonAccessor = meshPrimitive.VertexAccessors["POSITION"];
             bool hasNormals = meshPrimitive.VertexAccessors.TryGetValue("NORMAL", out Accessor normalAccessor);
             bool hasTexCoords = meshPrimitive.VertexAccessors.TryGetValue("TEXCOORD_0", out Accessor texCoordAccessor);
             bool hasJoints = meshPrimitive.VertexAccessors.TryGetValue("JOINTS_0", out Accessor jointsAccessor);
             bool hasWeights = meshPrimitive.VertexAccessors.TryGetValue("WEIGHTS_0", out Accessor weightsAccessor);
+            bool hasIndices = meshPrimitive.IndexAccessor != null;
+
+            GltfMeshPrimitiveDesc meshDesc = new GltfMeshPrimitiveDesc();
+            meshDesc.PositionAccessor = positonAccessor.LogicalIndex;
+            if (hasNormals) meshDesc.NormalAccessor = normalAccessor.LogicalIndex;
+            if (hasTexCoords) meshDesc.TexCoordAccessor = texCoordAccessor.LogicalIndex;
+            if (hasJoints) meshDesc.JointsAccessor = jointsAccessor.LogicalIndex;
+            if (hasWeights) meshDesc.WeightsAccessor = weightsAccessor.LogicalIndex;
+            if (hasIndices) meshDesc.IndexAccessor = meshPrimitive.IndexAccessor.LogicalIndex;
+
+            return meshDesc;
+        }
+
+        private static unsafe ValueTuple<VertexData, uint[]> LoadVertexAndIndices(IReadOnlyList<Accessor> accessors, GltfMeshPrimitiveDesc meshDesc)
+        {
+            Accessor positonAccessor = accessors[meshDesc.PositionAccessor];
 
             VertexData vertexData;
             vertexData.Vertices = new GpuVertex[positonAccessor.Count];
@@ -756,8 +939,9 @@ namespace IDKEngine
                 vertexData.Positons[i] = pos;
             });
 
-            if (hasNormals)
+            if (meshDesc.HasNormalAccessor)
             {
+                Accessor normalAccessor = accessors[meshDesc.NormalAccessor];
                 IterateAccessor(normalAccessor, (in Vector3 normal, int i) =>
                 {
                     vertexData.Vertices[i].Normal = Compression.CompressSR11G11B10(normal);
@@ -773,8 +957,9 @@ namespace IDKEngine
                 Logger.Log(Logger.LogLevel.Error, "Mesh provides no vertex normals");
             }
 
-            if (hasTexCoords)
+            if (meshDesc.HasTexCoordAccessor)
             {
+                Accessor texCoordAccessor = accessors[meshDesc.TexCoordAccessor];
                 if (texCoordAccessor.Encoding == EncodingType.FLOAT)
                 {
                     IterateAccessor(texCoordAccessor, (in Vector2 texCoord, int i) =>
@@ -788,8 +973,9 @@ namespace IDKEngine
                 }
             }
 
-            if (hasJoints)
+            if (meshDesc.HasJointsAccessor)
             {
+                Accessor jointsAccessor = accessors[meshDesc.JointsAccessor];
                 if (jointsAccessor.Encoding == EncodingType.UNSIGNED_SHORT)
                 {
                     vertexData.JointIndices = new uint[jointsAccessor.Count * 4];
@@ -807,8 +993,9 @@ namespace IDKEngine
                 }
             }
 
-            if (hasWeights)
+            if (meshDesc.HasWeightsAccessor)
             {
+                Accessor weightsAccessor = accessors[meshDesc.WeightsAccessor];
                 if (weightsAccessor.Encoding == EncodingType.FLOAT)
                 {
                     vertexData.JointWeights = new float[weightsAccessor.Count * 4];
@@ -826,48 +1013,23 @@ namespace IDKEngine
                 }
             }
 
-            return vertexData;
-        }
-        private static uint[] LoadGpuIndices(MeshPrimitive meshPrimitive)
-        {
-            Accessor accessor = meshPrimitive.IndexAccessor;
-            uint[] vertexIndices = new uint[accessor.Count];
-            IterateAccessor(accessor, (in uint index, int i) =>
+            uint[] vertexIndices = null;
+            if (meshDesc.HasIndexAccessor)
             {
-                vertexIndices[i] = index;
-            });
-
-            return vertexIndices;
-        }
-
-        private delegate void FuncAccessorItem<T>(in T item, int index);
-        private static unsafe void IterateAccessor<T>(Accessor accessor, FuncAccessorItem<T> funcItem) where T : unmanaged
-        {
-            if (accessor.IsSparse)
-            {
-                throw new ArgumentException("Sparse accessor is not supported");
-            }
-
-            int itemSize = EncodingToSize(accessor.Encoding) * DimensionsToNum(accessor.Dimensions);
-            int stride = accessor.SourceBufferView.ByteStride == 0 ? itemSize : accessor.SourceBufferView.ByteStride;
-
-            if (sizeof(T) < itemSize)
-            {
-                throw new ArgumentException($"{nameof(T)} is smaller than a single item in the accessor ({nameof(itemSize)} = {itemSize})");
-            }
-
-            Span<byte> data = accessor.SourceBufferView.Content.AsSpan(accessor.ByteOffset, accessor.ByteLength);
-            fixed (byte* ptr = data)
-            {
-                for (int i = 0; i < accessor.Count; i++)
+                Accessor accessor = accessors[meshDesc.IndexAccessor];
+                vertexIndices = new uint[accessor.Count];
+                IterateAccessor(accessor, (in uint index, int i) =>
                 {
-                    T t;
-                    byte* head = ptr + i * stride;
-                    Memory.Copy(head, &t, itemSize);
-
-                    funcItem(t, i);
-                }
+                    vertexIndices[i] = index;
+                });
             }
+            else
+            {
+                vertexIndices = new uint[positonAccessor.Count];
+                Helper.FillIncreasing(vertexIndices);
+            }
+
+            return (vertexData, vertexIndices);
         }
 
         private static ValueTuple<GpuMeshlet[], GpuMeshletInfo[]> LoadGpuMeshlets(in MeshletData meshMeshletsData, ReadOnlySpan<Vector3> meshVertexPositions)
@@ -876,23 +1038,23 @@ namespace IDKEngine
             GpuMeshletInfo[] gpuMeshletsInfo = new GpuMeshletInfo[gpuMeshlets.Length];
             for (int i = 0; i < gpuMeshlets.Length; i++)
             {
-                ref GpuMeshlet gpuMeshlet = ref gpuMeshlets[i];
-                ref GpuMeshletInfo gpuMeshletInfo = ref gpuMeshletsInfo[i];
+                ref GpuMeshlet meshlet = ref gpuMeshlets[i];
+                ref GpuMeshletInfo meshletInfo = ref gpuMeshletsInfo[i];
                 ref readonly Meshopt.Meshlet meshOptMeshlet = ref meshMeshletsData.Meshlets[i];
 
-                gpuMeshlet.VertexOffset = meshOptMeshlet.VertexOffset;
-                gpuMeshlet.VertexCount = (byte)meshOptMeshlet.VertexCount;
-                gpuMeshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
-                gpuMeshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
+                meshlet.VertexOffset = meshOptMeshlet.VertexOffset;
+                meshlet.VertexCount = (byte)meshOptMeshlet.VertexCount;
+                meshlet.IndicesOffset = meshOptMeshlet.TriangleOffset;
+                meshlet.TriangleCount = (byte)meshOptMeshlet.TriangleCount;
 
                 Box meshletBoundingBox = Box.Empty();
-                for (uint j = gpuMeshlet.VertexOffset; j < gpuMeshlet.VertexOffset + gpuMeshlet.VertexCount; j++)
+                for (uint j = meshlet.VertexOffset; j < meshlet.VertexOffset + meshlet.VertexCount; j++)
                 {
                     uint vertexIndex = meshMeshletsData.VertexIndices[j];
                     meshletBoundingBox.GrowToFit(meshVertexPositions[(int)vertexIndex]);
                 }
-                gpuMeshletInfo.Min = meshletBoundingBox.Min;
-                gpuMeshletInfo.Max = meshletBoundingBox.Max;
+                meshletInfo.Min = meshletBoundingBox.Min;
+                meshletInfo.Max = meshletBoundingBox.Max;
             }
 
             return (gpuMeshlets, gpuMeshletsInfo);
@@ -970,6 +1132,7 @@ namespace IDKEngine
 
             return materialParams;
         }
+        
         private static T GetMaterialChannelParam<T>(MaterialChannel materialChannel, KnownProperty property)
         {
             foreach (IMaterialParameter param in materialChannel.Parameters)
@@ -1008,6 +1171,7 @@ namespace IDKEngine
                     throw new NotSupportedException($"Can not convert {nameof(internalFormat)} = {internalFormat} to {nameof(Ktx2.TranscodeFormat)}");
             }
         }
+        
         private static int EncodingToSize(EncodingType encodingType)
         {
             int size = encodingType switch
@@ -1019,6 +1183,7 @@ namespace IDKEngine
             };
             return size;
         }
+        
         private static int DimensionsToNum(DimensionType dimensionType)
         {
             int num = dimensionType switch
@@ -1032,6 +1197,7 @@ namespace IDKEngine
             };
             return num;
         }
+        
         private static unsafe void OptimizeMesh(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices, OptimizationSettings optimizationSettings)
         {
             if (optimizationSettings.VertexRemapOptimization)
@@ -1070,6 +1236,7 @@ namespace IDKEngine
                 }
             }
         }
+
         private static unsafe MeshletData GenerateMeshlets(ReadOnlySpan<Vector3> meshVertexPositions, ReadOnlySpan<uint> meshIndices)
         {
             const float CONE_WEIGHT = 0.0f;
@@ -1131,20 +1298,51 @@ namespace IDKEngine
             return result;
         }
 
+
+        private delegate void FuncAccessorItem<T>(in T item, int index);
+        private static unsafe void IterateAccessor<T>(Accessor accessor, FuncAccessorItem<T> funcItem) where T : unmanaged
+        {
+            if (accessor.IsSparse)
+            {
+                throw new ArgumentException("Sparse accessor is not supported");
+            }
+
+            int itemSize = EncodingToSize(accessor.Encoding) * DimensionsToNum(accessor.Dimensions);
+            int stride = accessor.SourceBufferView.ByteStride == 0 ? itemSize : accessor.SourceBufferView.ByteStride;
+
+            if (sizeof(T) < itemSize)
+            {
+                throw new ArgumentException($"{nameof(T)} is smaller than a single item in the accessor ({nameof(itemSize)} = {itemSize})");
+            }
+
+            Span<byte> data = accessor.SourceBufferView.Content.AsSpan(accessor.ByteOffset, accessor.ByteLength);
+            fixed (byte* ptr = data)
+            {
+                for (int i = 0; i < accessor.Count; i++)
+                {
+                    T t;
+                    byte* head = ptr + i * stride;
+                    Memory.Copy(head, &t, itemSize);
+
+                    funcItem(t, i);
+                }
+            }
+        }
+
         public static class GtlfpackWrapper
         {
             public const string CLI_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer
 
-            private static bool? _isAvailableCached;
-            public static bool IsCLIFound
+            private static bool? _isCliFoundCached;
+            public static bool IsCLIFoundCached
             {
                 get
                 {
-                    if (!_isAvailableCached.HasValue)
+                    if (!_isCliFoundCached.HasValue)
                     {
-                        _isAvailableCached = FindGltfpack();
+                        _isCliFoundCached = FindGltfpack();
                     }
-                   return _isAvailableCached.Value;
+                   return _isCliFoundCached.Value;
                 }
             }
 
@@ -1164,7 +1362,7 @@ namespace IDKEngine
 
             public static Task? Run(GltfpackSettings settings)
             {
-                if (!IsCLIFound)
+                if (!IsCLIFoundCached)
                 {
                     Logger.Log(Logger.LogLevel.Error, $"Can't run {CLI_NAME}. Tool is not found");
                     return null;
