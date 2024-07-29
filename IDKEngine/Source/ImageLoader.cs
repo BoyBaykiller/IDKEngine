@@ -15,7 +15,7 @@ namespace IDKEngine
             RGBA,
         }
 
-        public struct ImageHeader
+        public record struct ImageHeader
         {
             public int Width;
             public int Height;

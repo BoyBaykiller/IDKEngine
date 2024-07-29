@@ -8,7 +8,7 @@ namespace IDKEngine.Utils
     {
         public static class Sphere
         {
-            public struct Vertex
+            public record struct Vertex
             {
                 public Vector3 Position;
                 public Vector2 TexCoord;
@@ -86,7 +86,7 @@ namespace IDKEngine.Utils
 
         public static class Plane
         {
-            public struct Vertex
+            public record struct Vertex
             {
                 public Vector3 Position;
             }

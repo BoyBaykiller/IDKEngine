@@ -99,7 +99,7 @@ namespace IDKEngine.Render
             }
         }
 
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public float FocalLength;
             public float LenseRadius;

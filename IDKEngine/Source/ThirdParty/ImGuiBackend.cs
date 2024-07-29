@@ -12,7 +12,7 @@ namespace IDKEngine.ThirdParty
 {
     unsafe class ImGuiBackend : IDisposable
     {
-        public bool IsIgnoreMouseInput;
+        public bool IgnoreMouseInput;
 
         private int glVertexArray;
         private int glVertexBuffer;
@@ -28,7 +28,7 @@ namespace IDKEngine.ThirdParty
         private Vector2i windowSize;
         private Vector2 scaleFactor = Vector2.One;
 
-        private readonly List<char> pressedKeysBuf = new List<char>();
+        private readonly List<uint> pressedKeysBuf = new List<uint>();
 
         private static readonly Keys[] keysEnumValues = Enum.GetValues<Keys>();
 
@@ -76,7 +76,7 @@ namespace IDKEngine.ThirdParty
             io.MouseWheel = (float)wnd.MouseState.ScrollX;
             io.MouseWheelH = (float)wnd.MouseState.ScrollY;
 
-            if (IsIgnoreMouseInput)
+            if (IgnoreMouseInput)
             {
                 io.MousePos = new System.Numerics.Vector2(-1.0f);
             }
@@ -93,9 +93,8 @@ namespace IDKEngine.ThirdParty
                     continue;
                 }
 
-                ImGuiKey imGuiKey = TranslateKey(key);
                 bool isDown = KeyboardState[key] == Keyboard.InputState.Pressed;
-                io.AddKeyEvent(imGuiKey, isDown);
+                io.AddKeyEvent(TranslateKey(key), isDown);
             }
 
             for (int i = 0; i < pressedKeysBuf.Count; i++)
@@ -110,7 +109,7 @@ namespace IDKEngine.ThirdParty
             io.KeySuper = KeyboardState[Keys.LeftSuper] == Keyboard.InputState.Pressed || KeyboardState[Keys.RightSuper] == Keyboard.InputState.Pressed;
         }
         
-        public void PressChar(char key)
+        public void PressChar(uint key)
         {
             pressedKeysBuf.Add(key);
         }

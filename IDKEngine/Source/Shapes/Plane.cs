@@ -2,7 +2,7 @@
 
 namespace IDKEngine.Shapes
 {
-    public struct Plane
+    public record struct Plane
     {
         public Vector3 Normal;
 

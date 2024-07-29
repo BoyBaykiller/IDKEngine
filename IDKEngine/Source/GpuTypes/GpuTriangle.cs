@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine.GpuTypes
 {
-    public struct GpuTriangle
+    public record struct GpuTriangle
     {
         public GpuVertex Vertex0;
         public GpuVertex Vertex1;

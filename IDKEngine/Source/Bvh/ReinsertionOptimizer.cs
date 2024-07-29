@@ -10,7 +10,7 @@ namespace IDKEngine.Bvh
 {
     public partial class BLAS
     {
-        public struct OptimizationSettings
+        public record struct OptimizationSettings
         {
             public int Iterations = 3;
             public float CandidatesPercentage = 0.05f;
@@ -34,14 +34,14 @@ namespace IDKEngine.Bvh
                 new ReinsertionOptimizer(blas).Optimize(settings);
             }
 
-            private struct Reinsertion
+            private record struct Reinsertion
             {
                 public int In;
                 public int Out;
                 public float AreaDecrease;
             }
 
-            private struct Candidate : MyComparer.IComparisons<Candidate>
+            private record struct Candidate : MyComparer.IComparisons<Candidate>
             {
                 public int NodeId;
                 public float Cost;

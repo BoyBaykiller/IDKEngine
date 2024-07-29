@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine.GpuTypes
 {
-    public struct GpuMeshlet
+    public record struct GpuMeshlet
     {
         public uint VertexOffset;
         public uint IndicesOffset;

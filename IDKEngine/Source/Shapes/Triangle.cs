@@ -2,7 +2,7 @@
 
 namespace IDKEngine.Shapes
 {
-    public struct Triangle
+    public record struct Triangle
     {
         public Vector3 Normal
         {

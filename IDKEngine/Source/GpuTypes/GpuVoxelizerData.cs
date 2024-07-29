@@ -2,7 +2,7 @@
 
 namespace IDKEngine.GpuTypes
 {
-    struct GpuVoxelizerData
+    record struct GpuVoxelizerData
     {
         public Vector3 GridMin = new Vector3(float.MinValue);
         private readonly float _pad0;

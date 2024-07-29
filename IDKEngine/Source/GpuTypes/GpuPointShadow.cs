@@ -5,7 +5,7 @@ using BBOpenGL;
 
 namespace IDKEngine.GpuTypes
 {
-    struct GpuPointShadow
+    record struct GpuPointShadow
     {
         public enum RenderMatrix : int
         {

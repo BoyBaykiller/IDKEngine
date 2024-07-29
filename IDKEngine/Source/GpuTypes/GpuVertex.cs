@@ -2,7 +2,7 @@
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuVertex
+    public record struct GpuVertex
     {
         public Vector2 TexCoord;
         public uint Tangent;

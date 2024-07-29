@@ -1,6 +1,6 @@
 #define USE_TLAS AppInsert(USE_TLAS)
 
-#define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH) - 1, 1) // -1 because of speical traversal algorithm
+#define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH) - 1, 1) // -1 because we skip root
 #define MAX_TLAS_TREE_DEPTH max(24, 1)
 
 #define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
@@ -11,7 +11,7 @@ AppInclude(include/StaticUniformBuffers.glsl)
 
 struct HitInfo
 {
-    vec2 BaryXY;
+    vec2 BaryXY; // z = 1.0 - bary.x - bary.y
     float T;
     uint TriangleID;
     uint InstanceID;

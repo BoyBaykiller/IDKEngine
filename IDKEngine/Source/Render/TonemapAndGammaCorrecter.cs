@@ -6,7 +6,7 @@ namespace IDKEngine.Render
 {
     class TonemapAndGammaCorrect : IDisposable
     {
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public float Exposure;
             public float Saturation;

@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    public struct FrameState
+    public record struct FrameState
     {
         public Vector3 Position;
         public Vector3 UpVector;

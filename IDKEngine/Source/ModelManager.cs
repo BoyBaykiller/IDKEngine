@@ -59,9 +59,12 @@ namespace IDKEngine
         public Matrix4[] JointMatrices = Array.Empty<Matrix4>();
         private readonly BBG.TypedBuffer<Matrix4> jointInverseMatrices;
 
+        public ModelLoader.Node[] ModelRootNodes = Array.Empty<ModelLoader.Node>();
+
         public BVH BVH;
 
         private BitArray meshInstancesDirty;
+        
         public ModelManager()
         {
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
@@ -102,7 +105,7 @@ namespace IDKEngine
             BVH = new BVH();
         }
 
-        public void Add(params ModelLoader.Model?[] models)
+        public void Add(params ModelLoader.CpuModel?[] models)
         {
             if (models.Length == 0)
             {
@@ -117,9 +120,22 @@ namespace IDKEngine
                     continue;
                 }
 
-                ModelLoader.Model model = models[i].Value;
+                ModelLoader.CpuModel cpuModel = models[i].Value;
+                ModelLoader.GpuModel model = cpuModel.Model;
+
+                ModelLoader.Node rootNode = cpuModel.RootNode.DeepClone();
+                Helper.ArrayAdd(ref ModelRootNodes, [rootNode]);
 
                 // Upon deletion these are the properties that need to be adjusted
+                ModelLoader.Node.TraverseUpdate(rootNode, (ModelLoader.Node myNode) =>
+                {
+                    ref Range range = ref myNode.MeshInstanceIds;
+                    if (range.Count > 0)
+                    {
+                        range.Start += meshInstances.Length;
+                    }
+                });
+
                 Helper.ArrayAdd(ref DrawCommands, model.DrawCommands);
                 for (int j = DrawCommands.Length - model.DrawCommands.Length; j < DrawCommands.Length; j++)
                 {
@@ -167,10 +183,10 @@ namespace IDKEngine
                 ReadOnlySpan<BBG.DrawElementsIndirectCommand> newDrawCommands = new ReadOnlySpan<BBG.DrawElementsIndirectCommand>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
                 BVH.AddMeshes(newDrawCommands, VertexPositions, VertexIndices, DrawCommands, meshInstances);
 
-                // Adjust root node index in context of all Nodes
                 uint bvhNodesExclusiveSum = 0;
                 for (int i = 0; i < DrawCommands.Length; i++)
                 {
+                    // Adjust root node index in context of all Nodes
                     Meshes[i].BlasRootNodeOffset = bvhNodesExclusiveSum;
                     bvhNodesExclusiveSum += (uint)BVH.Tlas.Blases[i].Nodes.Length;
                 }
@@ -204,9 +220,9 @@ namespace IDKEngine
             meshInstancesDirty[index] = true;
         }
 
-        public void UpdateMeshInstanceBufferBatched(out bool anyMeshInstanceMoved)
+        public void UpdateMeshInstanceBufferBatched(out bool anyMeshInstancedUploaded)
         {
-            anyMeshInstanceMoved = false;
+            anyMeshInstancedUploaded = false;
 
             int batchedUploadSize = 1 << 8;
             int start = 0;
@@ -226,7 +242,7 @@ namespace IDKEngine
                         {
                             meshInstances[j].SetPrevToCurrentMatrix();
                             meshInstancesDirty[i] = true;
-                            anyMeshInstanceMoved = true;
+                            anyMeshInstancedUploaded = true;
                         }
                     }
 

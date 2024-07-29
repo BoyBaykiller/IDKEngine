@@ -3,7 +3,7 @@ using OpenTK.Mathematics;
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuMeshInstance
+    public record struct GpuMeshInstance
     {
         // In a typical 4x4 matrix the W component is useless:
         // (x, y, z, 0.0)
@@ -15,11 +15,11 @@ namespace IDKEngine.GpuTypes
 
         public Matrix4 ModelMatrix
         {
-            get => Mat3x4ToMat4x4Tranposed(modelMatrix3x4);
+            get => Mat3x4ToMat4x4Tranposed(ModelMatrix3x4);
 
             set
             {
-                modelMatrix3x4 = Mat4x4ToMat3x4Transposed(value);
+                ModelMatrix3x4 = Mat4x4ToMat3x4Transposed(value);
             }
         }
         
@@ -27,18 +27,18 @@ namespace IDKEngine.GpuTypes
         
         public Matrix4 PrevModelMatrix => Mat3x4ToMat4x4Tranposed(prevModelMatrix3x4);
 
-        private Matrix3x4 _modelMatrix3x4;
-        private Matrix3x4 modelMatrix3x4
+        public Matrix3x4 ModelMatrix3x4
         {
-            get => _modelMatrix3x4;
+            get => modelMatrix3x4;
 
-            set
+            private set
             {
-                _modelMatrix3x4 = value;
-                invModelMatrix3x4 = Matrix3x4.Invert(modelMatrix3x4);
+                modelMatrix3x4 = value;
+                invModelMatrix3x4 = Matrix3x4.Invert(ModelMatrix3x4);
             }
         }
 
+        private Matrix3x4 modelMatrix3x4;
         private Matrix3x4 invModelMatrix3x4;
         private Matrix3x4 prevModelMatrix3x4;
 
@@ -49,24 +49,12 @@ namespace IDKEngine.GpuTypes
 
         public bool DidMove()
         {
-            return !FastMatrix3x4Equal(prevModelMatrix3x4, modelMatrix3x4);
+            return !FastMatrix3x4Equal(prevModelMatrix3x4, ModelMatrix3x4);
         }
 
         public void SetPrevToCurrentMatrix()
         {
-            prevModelMatrix3x4 = modelMatrix3x4;
-        }
-
-        private static bool FastMatrix3x4Equal(in Matrix3x4 a, in Matrix3x4 b)
-        {
-            // Soon gets implemented in OpenTK https://github.com/opentk/opentk/pull/1721
-            Vector256<float> aLo = Vector256.LoadUnsafe(in a.Row0.X);
-            Vector256<float> bLo = Vector256.LoadUnsafe(in b.Row0.X);
-
-            Vector128<float> aHi = Vector128.LoadUnsafe(in a.Row2.X);
-            Vector128<float> bHi = Vector128.LoadUnsafe(in b.Row2.X);
-
-            return aLo == bLo && aHi == bHi;
+            prevModelMatrix3x4 = ModelMatrix3x4;
         }
 
         public static Matrix3x4 Mat4x4ToMat3x4Transposed(in Matrix4 model)
@@ -95,6 +83,18 @@ namespace IDKEngine.GpuTypes
             );
 
             return result;
+        }
+
+        private static bool FastMatrix3x4Equal(in Matrix3x4 lhs, in Matrix3x4 rhs)
+        {
+            // Soon gets implemented in OpenTK https://github.com/opentk/opentk/pull/1721
+            Vector256<float> aLo = Vector256.LoadUnsafe(in lhs.Row0.X);
+            Vector256<float> bLo = Vector256.LoadUnsafe(in rhs.Row0.X);
+
+            Vector128<float> aHi = Vector128.LoadUnsafe(in lhs.Row2.X);
+            Vector128<float> bHi = Vector128.LoadUnsafe(in rhs.Row2.X);
+
+            return aLo == bLo && aHi == bHi;
         }
     }
 }

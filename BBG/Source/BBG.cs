@@ -12,21 +12,21 @@ namespace BBOpenGL
             INTEL,
         }
 
-        public struct ContextInfo
+        public record struct ContextInfo
         {
             public string Name;
             public double GLVersion;
             public DeviceInfo DeviceInfo;
         }
 
-        public struct DeviceInfo
+        public record struct DeviceInfo
         {
             public string Name;
             public GpuVendor Vendor;
             public ExtensionSupport ExtensionSupport;
         }
 
-        public struct ExtensionSupport
+        public record struct ExtensionSupport
         {
             /// <summary>
             /// GL_ARB_bindless_texture
@@ -81,13 +81,13 @@ namespace BBOpenGL
             public bool ShadingLanguageInclude;
         }
 
-        public struct DrawMeshTasksIndirectCommandNV
+        public record struct DrawMeshTasksIndirectCommandNV
         {
             public int Count;
             public int First;
         }
 
-        public struct DrawElementsIndirectCommand
+        public record struct DrawElementsIndirectCommand
         {
             public int IndexCount;
             public int InstanceCount;
@@ -96,7 +96,7 @@ namespace BBOpenGL
             public int BaseInstance;
         }
 
-        public struct DispatchIndirectCommand
+        public record struct DispatchIndirectCommand
         {
             public uint NumGroupsX;
             public uint NumGroupsY;

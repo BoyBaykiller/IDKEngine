@@ -214,7 +214,7 @@ namespace IDKEngine.Windowing
         protected abstract void OnUpdate(float dT);
         protected abstract void OnStart();
         protected abstract void OnWindowResize();
-        protected abstract void OnKeyPress(char key);
+        protected abstract void OnKeyPress(uint key);
         protected abstract void OnFilesDrop(string[] paths);
 
 
@@ -245,7 +245,7 @@ namespace IDKEngine.Windowing
         private readonly GLFWCallbacks.CharCallback windowCharFuncPtr;
         private void WindowCharCallback(Window* window, uint codepoint)
         {
-            OnKeyPress((char)codepoint);
+            OnKeyPress(codepoint);
         }
 
         private readonly GLFWCallbacks.DropCallback windowDropCallback;

@@ -9,7 +9,7 @@ namespace BBOpenGL
         private static class FramebufferCache
         {
             public const int MAX_COLOR_ATTACHMENTS = 8;
-            public const int MAX_FRAMEBUFFER_ATTACHMENTS = MAX_COLOR_ATTACHMENTS + 2; // 8color + 1depth + 1stencil
+            public const int MAX_FRAMEBUFFER_ATTACHMENTS = MAX_COLOR_ATTACHMENTS + 1; // 8Color + 1DepthStencil
 
             public record struct Attachment
             {
@@ -47,7 +47,7 @@ namespace BBOpenGL
                 }
             }
 
-            private struct FramebufferRessorce
+            private record struct FramebufferRessorce
             {
                 public FramebufferDesc FramebufferDesc;
                 public int GLResource;
@@ -141,8 +141,8 @@ namespace BBOpenGL
                        framebufferAttachment <= FramebufferAttachment.ColorAttachment16;
             }
 
-            [InlineArray(MAX_FRAMEBUFFER_ATTACHMENTS)] // Assumed max color attachments
-            public struct AttachmentArray
+            [InlineArray(MAX_FRAMEBUFFER_ATTACHMENTS)]
+            public record struct AttachmentArray
             {
                 private Attachment _framebufferAttachment;
             }

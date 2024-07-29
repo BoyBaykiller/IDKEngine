@@ -394,7 +394,7 @@ namespace IDKEngine.Shapes
             return RayVsSphere(ray, new Sphere(sphereBPrevPos, combinedRadius), out t1, out t2);
         }
 
-        private struct ScalarProjection
+        private record struct ScalarProjection
         {
             public float MinScaler;
             public float MaxScaler;
@@ -470,14 +470,14 @@ namespace IDKEngine.Shapes
         }
 
 
-        public struct SceneVsMovingSphereSettings
+        public record struct SceneVsMovingSphereSettings
         {
             public bool IsEnabled;
             public int TestSteps;
             public int RecursiveSteps;
             public float EpsilonNormalOffset;
         }
-        public struct SceneHitInfo
+        public record struct SceneHitInfo
         {
             public Plane SlidingPlane;
             public Vector3 TriNormal;

@@ -12,7 +12,7 @@ namespace IDKEngine.Render
             Upsample,
         }
 
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public float Threshold;
             public float MaxColor;

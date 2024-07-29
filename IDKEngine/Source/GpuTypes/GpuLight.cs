@@ -2,7 +2,7 @@
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuLight
+    public record struct GpuLight
     {
         public Vector3 PrevPosition
         {

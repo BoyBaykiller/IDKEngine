@@ -2,7 +2,7 @@
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuMesh
+    public record struct GpuMesh
     {
         public int MaterialIndex;
         public float NormalMapStrength;

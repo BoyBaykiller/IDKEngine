@@ -5,7 +5,7 @@ using BBOpenGL;
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuMaterial
+    public record struct GpuMaterial
     {
         public static readonly int TEXTURE_COUNT = Enum.GetValues<BindlessHandle>().Length;
 

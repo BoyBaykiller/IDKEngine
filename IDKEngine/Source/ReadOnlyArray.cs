@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    public struct ReadOnlyArray<T>
+    public record struct ReadOnlyArray<T>
     {
         public int Length => array.Length;
 

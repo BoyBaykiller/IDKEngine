@@ -7,7 +7,7 @@ namespace IDKEngine.Render
 {
     class AtmosphericScatterer : IDisposable
     {
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public Matrix4 InvProjection;
             public InvViewProjectionArray_6 InvViewArray;
@@ -84,7 +84,7 @@ namespace IDKEngine.Render
         }
 
         [InlineArray(6)]
-        public struct InvViewProjectionArray_6
+        public record struct InvViewProjectionArray_6
         {
             private Matrix4 _invViewProjection;
         }

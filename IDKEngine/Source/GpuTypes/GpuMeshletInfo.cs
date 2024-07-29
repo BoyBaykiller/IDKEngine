@@ -3,7 +3,7 @@
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuMeshletInfo
+    public record struct GpuMeshletInfo
     {
         public Vector3 Min;
         private readonly float _pad0;

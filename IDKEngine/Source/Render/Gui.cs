@@ -29,24 +29,44 @@ namespace IDKEngine.Render
             None,
             Mesh,
             Light,
+            Node,
         }
 
         public enum FrameRecorderState : int
         {
-            Nothing,
+            None,
             Recording,
             Replaying,
         }
 
-        public readonly record struct SelectedEntityInfo(EntityType EntityType, int EntityID, int InstanceID)
+        public readonly record struct SelectedEntityInfo
         {
-            public static readonly SelectedEntityInfo None = new SelectedEntityInfo()
+            public readonly EntityType EntityType = EntityType.None;
+
+            // Only used when EntityType != Node
+            public readonly int EntityID;
+            public readonly int InstanceID;
+
+            // Only used when EntityType == Node
+            public readonly ModelLoader.Node? Node; 
+
+            public static readonly SelectedEntityInfo None = new SelectedEntityInfo();
+
+            public SelectedEntityInfo(EntityType entityType, int entityId, int instanceID)
             {
-                EntityType = EntityType.None
-            };
+                EntityType = entityType;
+                EntityID = entityId;
+                InstanceID = instanceID;
+            }
+
+            public SelectedEntityInfo(ModelLoader.Node node)
+            {
+                EntityType = EntityType.Node;
+                Node = node;
+            }
         }
 
-        public struct RecordingSettings
+        public record struct RecordingSettings
         {
             public const string FRAME_RECORDER_FILE_PATH = "frameRecordData.frd";
             public const string RECORDED_FRAME_DATA_OUT_DIR = "RecordedFrames";
@@ -71,22 +91,77 @@ namespace IDKEngine.Render
             RecordingVars = new RecordingSettings();
             RecordingVars.RasterizerFPSGoal = 10000;
             RecordingVars.PathTracingSamplesGoal = 1;
-            RecordingVars.FrameRecState = FrameRecorderState.Nothing;
+            RecordingVars.FrameRecState = FrameRecorderState.None;
             RecordingVars.Timer = Stopwatch.StartNew();
         }
 
         public unsafe void Draw(Application app)
         {
-            ImGui.NewFrame();
-
-            ImGui.DockSpaceOverViewport();
-
             int tempInt;
             bool tempBool;
             float tempFloat;
             SysVec2 tempVec2;
             SysVec3 tempVec3;
-            bool shouldResetPT = false;
+            bool resetPathTracer = false;
+
+            ImGui.NewFrame();
+            ImGui.DockSpaceOverViewport();
+
+            bool openModelLoadPopup = false;
+            if (ImGui.BeginMainMenuBar())
+            {
+                if (ImGui.BeginMenu("Add"))
+                {
+                    if (ImGui.MenuItem("Load glTF (drop-in supported)"))
+                    {
+                        openModelLoadPopup = true;
+                    }
+
+                    if (ImGui.MenuItem("Add Light"))
+                    {
+                        ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
+                        Ray worldSpaceRay = Ray.GetWorldSpaceRay(perFrameData.CameraPos, perFrameData.InvProjection, perFrameData.InvView, new OtkVec2(0.0f));
+                        OtkVec3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
+
+                        CpuLight newLight = new CpuLight(spawnPoint, RNG.RandomVec3(32.0f, 88.0f), 0.3f);
+                        if (app.LightManager.AddLight(newLight))
+                        {
+                            int newLightIndex = app.LightManager.Count - 1;
+                            CpuPointShadow pointShadow = new CpuPointShadow(128, app.RenderResolution, new OtkVec2(newLight.GpuLight.Radius, 60.0f));
+                            if (!app.LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
+                            {
+                                pointShadow.Dispose();
+                            }
+
+                            SelectedEntity = new SelectedEntityInfo(EntityType.Light, newLightIndex, 0);
+                            resetPathTracer = true;
+                        }
+                    }
+                    ImGui.EndMenu();
+                }
+                ImGui.EndMainMenuBar();
+            }
+
+            // This is here because https://github.com/ocornut/imgui/issues/2200#issuecomment-440701567
+            if (openModelLoadPopup)
+            {
+                if (app.WindowFullscreen)
+                {
+                    // Need to end fullscreen otherwise file explorer is not visible
+                    app.WindowFullscreen = false;
+                }
+
+                DialogResult result = Dialog.FileOpen("gltf,glb");
+                if (result.IsError)
+                {
+                    Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
+                }
+                else if (result.IsOk)
+                {
+                    AddModelDialog(result.Path);
+                }
+                openModelLoadPopup = false;
+            }
 
             if (ImGui.Begin("Stats"))
             {
@@ -215,16 +290,13 @@ namespace IDKEngine.Render
                     if (RecordingVars.FrameRecState == FrameRecorderState.Recording)
                     {
                         ImGui.Text($"   * Recorded frames: {app.FrameStateRecorder.StatesCount}");
-                        unsafe
-                        {
-                            ImGui.Text($"   * File size: {app.FrameStateRecorder.StatesCount * sizeof(FrameState) / 1000}kb");
-                        }
+                        ImGui.Text($"   * File size: {app.FrameStateRecorder.StatesCount * sizeof(FrameState) / 1000}kb");
                     }
                     ImGui.Separator();
                 }
                 
                 bool isReplaying = RecordingVars.FrameRecState == FrameRecorderState.Replaying;
-                if ((RecordingVars.FrameRecState == FrameRecorderState.Nothing && app.FrameStateRecorder.AreStatesLoaded) || isReplaying)
+                if ((RecordingVars.FrameRecState == FrameRecorderState.None && app.FrameStateRecorder.AreStatesLoaded) || isReplaying)
                 {
                     ImGui.Text($"Is Replaying (Press {Keys.LeftControl} + {Keys.Space}): {isReplaying}");
                     ImGui.Checkbox("Is Infite Replay", ref RecordingVars.IsInfiniteReplay);
@@ -256,7 +328,7 @@ namespace IDKEngine.Render
                     ImGui.Separator();
                 }
 
-                if (RecordingVars.FrameRecState == FrameRecorderState.Nothing)
+                if (RecordingVars.FrameRecState == FrameRecorderState.None)
                 {
                     if (ImGui.Button($"Save"))
                     {
@@ -309,17 +381,15 @@ namespace IDKEngine.Render
                 }
 
                 {
-                    string current = app.CRenderMode.ToString();
-                    if (ImGui.BeginCombo("Render Mode", current))
+                    if (ImGui.BeginCombo("Render Mode", app.CRenderMode.ToString()))
                     {
                         Application.RenderMode[] renderModes = Enum.GetValues<Application.RenderMode>();
                         for (int i = 0; i < renderModes.Length; i++)
                         {
+                            bool isSelected = app.CRenderMode == renderModes[i];
                             string enumName = renderModes[i].ToString();
-                            bool isSelected = current == enumName;
                             if (ImGui.Selectable(enumName, isSelected))
                             {
-                                current = enumName;
                                 app.RequestRenderMode = (Application.RenderMode)i;
                             }
 
@@ -458,18 +528,15 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Shadows"))
                     {
-                        string current = app.RasterizerPipeline.ShadowMode.ToString();
-                        if (ImGui.BeginCombo("ShadowMode", current))
+                        if (ImGui.BeginCombo("ShadowMode", app.RasterizerPipeline.ShadowMode.ToString()))
                         {
                             RasterPipeline.ShadowTechnique[] shadowTechniques = Enum.GetValues<RasterPipeline.ShadowTechnique>();
                             for (int i = 0; i < shadowTechniques.Length; i++)
                             {
+                                bool isSelected = app.RasterizerPipeline.ShadowMode == shadowTechniques[i];
                                 string enumName = shadowTechniques[i].ToString();
-
-                                bool isSelected = current == enumName;
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
-                                    current = enumName;
                                     app.RasterizerPipeline.ShadowMode = (RasterPipeline.ShadowTechnique)i;
                                 }
 
@@ -501,17 +568,15 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Anti Aliasing"))
                     {
-                        string current = app.RasterizerPipeline.TAAMode.ToString();
-                        if (ImGui.BeginCombo("Mode", current))
+                        if (ImGui.BeginCombo("Mode", app.RasterizerPipeline.TAAMode.ToString()))
                         {
                             RasterPipeline.TemporalAntiAliasingMode[] options = Enum.GetValues<RasterPipeline.TemporalAntiAliasingMode>();
                             for (int i = 0; i < options.Length; i++)
                             {
+                                bool isSelected = app.RasterizerPipeline.TAAMode == options[i];
                                 string enumName = options[i].ToString();
-                                bool isSelected = current == enumName;
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
-                                    current = enumName;
                                     app.RasterizerPipeline.TAAMode = (RasterPipeline.TemporalAntiAliasingMode)i;
                                 }
 
@@ -604,18 +669,15 @@ namespace IDKEngine.Render
 
                         CheckBoxEnabled("IsVariableRateShading", ref app.RasterizerPipeline.IsVariableRateShading, LightingShadingRateClassifier.IS_SUPPORTED);
 
-                        string current = app.RasterizerPipeline.LightingVRS.Settings.DebugValue.ToString();
-                        if (ImGui.BeginCombo("DebugMode", current))
+                        if (ImGui.BeginCombo("DebugMode", app.RasterizerPipeline.LightingVRS.Settings.DebugValue.ToString()))
                         {
                             LightingShadingRateClassifier.DebugMode[] debugModes = Enum.GetValues<LightingShadingRateClassifier.DebugMode>();
                             for (int i = 0; i < debugModes.Length; i++)
                             {
+                                bool isSelected = app.RasterizerPipeline.LightingVRS.Settings.DebugValue == debugModes[i];
                                 string enumName = debugModes[i].ToString();
-
-                                bool isSelected = current == enumName;
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
-                                    current = enumName;
                                     app.RasterizerPipeline.LightingVRS.Settings.DebugValue = (LightingShadingRateClassifier.DebugMode)i;
                                 }
 
@@ -725,14 +787,14 @@ namespace IDKEngine.Render
 
                 if (ImGui.CollapsingHeader("SkyBox"))
                 {
-                    bool shouldUpdateSkyBox = false;
+                    bool modified = false;
 
                     tempBool = SkyBoxManager.GetSkyBoxMode() == SkyBoxManager.SkyBoxMode.ExternalAsset;
                     if (ImGui.Checkbox("IsExternalSkyBox", ref tempBool))
                     {
                         SkyBoxManager.SetSkyBoxMode(tempBool ? SkyBoxManager.SkyBoxMode.ExternalAsset : SkyBoxManager.SkyBoxMode.InternalAtmosphericScattering);
 
-                        shouldResetPT = true;
+                        resetPathTracer = true;
                     }
 
                     if (SkyBoxManager.GetSkyBoxMode() == SkyBoxManager.SkyBoxMode.InternalAtmosphericScattering)
@@ -741,14 +803,14 @@ namespace IDKEngine.Render
                         if (ImGui.SliderFloat("Elevation", ref tempFloat, -MathF.PI, MathF.PI))
                         {
                             SkyBoxManager.AtmosphericScatterer.Settings.Elevation = tempFloat;
-                            shouldUpdateSkyBox = true;
+                            modified = true;
                         }
 
                         tempFloat = SkyBoxManager.AtmosphericScatterer.Settings.Azimuth;
                         if (ImGui.SliderFloat("Azimuth", ref tempFloat, -MathF.PI, MathF.PI))
                         {
                             SkyBoxManager.AtmosphericScatterer.Settings.Azimuth = tempFloat;
-                            shouldUpdateSkyBox = true;
+                            modified = true;
                         }
 
                         tempFloat = SkyBoxManager.AtmosphericScatterer.Settings.LightIntensity;
@@ -756,26 +818,26 @@ namespace IDKEngine.Render
                         {
                             SkyBoxManager.AtmosphericScatterer.Settings.LightIntensity = tempFloat;
 
-                            shouldUpdateSkyBox = true;
+                            modified = true;
                         }
 
                         tempInt = SkyBoxManager.AtmosphericScatterer.Settings.ISteps;
                         if (ImGui.SliderInt("InScatteringSamples", ref tempInt, 1, 100))
                         {
                             SkyBoxManager.AtmosphericScatterer.Settings.ISteps = tempInt;
-                            shouldUpdateSkyBox = true;
+                            modified = true;
                         }
 
                         tempInt = SkyBoxManager.AtmosphericScatterer.Settings.JSteps;
                         if (ImGui.SliderInt("DensitySamples", ref tempInt, 1, 40))
                         {
                             SkyBoxManager.AtmosphericScatterer.Settings.JSteps = tempInt;
-                            shouldUpdateSkyBox = true;
+                            modified = true;
                         }
 
-                        if (shouldUpdateSkyBox)
+                        if (modified)
                         {
-                            shouldResetPT = true;
+                            resetPathTracer = true;
                             SkyBoxManager.AtmosphericScatterer.Compute();
                         }
                     }
@@ -784,144 +846,91 @@ namespace IDKEngine.Render
             }
             ImGui.End();
 
-            if (ImGui.Begin("Entity Add"))
-            {
-                if (ImGui.Button("Add light"))
-                {
-                    ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
-                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(perFrameData.CameraPos, perFrameData.InvProjection, perFrameData.InvView, new OtkVec2(0.0f));
-                    OtkVec3 spawnPoint = worldSpaceRay.Origin + worldSpaceRay.Direction * 1.5f;
-
-                    CpuLight newLight = new CpuLight(spawnPoint, RNG.RandomVec3(32.0f, 88.0f), 0.3f);
-                    if (app.LightManager.AddLight(newLight))
-                    {
-                        int newLightIndex = app.LightManager.Count - 1;
-                        CpuPointShadow pointShadow = new CpuPointShadow(128, app.RenderResolution, new OtkVec2(newLight.GpuLight.Radius, 60.0f));
-                        if (!app.LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
-                        {
-                            pointShadow.Dispose();
-                        }
-
-                        SelectedEntity = new SelectedEntityInfo(EntityType.Light, newLightIndex, 0);
-
-                        shouldResetPT = true;
-                    }
-                }
-                if (ImGui.Button("Load glTF"))
-                {
-                    if (app.WindowFullscreen)
-                    {
-                        // Need to end fullscreen otherwise file explorer is not visible
-                        app.WindowFullscreen = false;
-                    }
-
-                    DialogResult result = Dialog.FileOpen("gltf,glb");
-                    if (result.IsError)
-                    {
-                        Logger.Log(Logger.LogLevel.Error, result.ErrorMessage);
-                    }
-                    else if (result.IsOk)
-                    {
-                        AddModelDialog(result.Path);
-                    }
-                }
-            }
-            ImGui.End();
-
             if (ImGui.Begin("Entity Properties"))
             {
-                if (SelectedEntity.EntityType != EntityType.None)
-                {
-                    ImGui.Text($"{SelectedEntity.EntityType}ID: {SelectedEntity.EntityID}");
-                }
                 if (SelectedEntity.EntityType == EntityType.Mesh)
                 {
-                    bool shouldUpdateMesh = false;
+                    bool modified = false;
                     ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[SelectedEntity.EntityID];
                     ref GpuMesh mesh = ref app.ModelManager.Meshes[SelectedEntity.EntityID];
                     GpuMeshInstance meshInstance = app.ModelManager.MeshInstances[SelectedEntity.InstanceID];
 
-                    ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
-                    ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance}");
-                    ImGui.Text($"Triangle Count: {cmd.IndexCount / 3}");
+                    Transformation meshInstanceTransform = Transformation.FromMatrix(meshInstance.ModelMatrix);
 
-                    OtkVec3 beforeTranslation = meshInstance.ModelMatrix.ExtractTranslation();
-                    tempVec3 = beforeTranslation.ToNumerics();
+                    tempVec3 = meshInstanceTransform.Translation.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
                     {
-                        shouldUpdateMesh = true;
-                        OtkVec3 dif = tempVec3.ToOpenTK() - beforeTranslation;
-                        meshInstance.ModelMatrix = meshInstance.ModelMatrix * Matrix4.CreateTranslation(dif);
+                        modified = true;
+                        meshInstanceTransform.Translation = tempVec3.ToOpenTK();
                     }
 
-                    tempVec3 = meshInstance.ModelMatrix.ExtractScale().ToNumerics();
+                    tempVec3 = meshInstanceTransform.Scale.ToNumerics();
                     if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
                     {
-                        shouldUpdateMesh = true;
-                        OtkVec3 temp = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
-                        meshInstance.ModelMatrix = Matrix4.CreateScale(temp) * meshInstance.ModelMatrix.ClearScale();
+                        modified = true;
+                        meshInstanceTransform.Scale = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
                     }
 
-                    meshInstance.ModelMatrix.ExtractRotation().ToEulerAngles(out OtkVec3 beforeAngles);
-                    tempVec3 = beforeAngles.ToNumerics();
+                    tempVec3 = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
                     if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
                     {
-                        shouldUpdateMesh = true;
-                        OtkVec3 dif = tempVec3.ToOpenTK() - beforeAngles;
-
-                        meshInstance.ModelMatrix = Matrix4.CreateRotationZ(dif.Z) *
-                                                    Matrix4.CreateRotationY(dif.Y) *
-                                                    Matrix4.CreateRotationX(dif.X) *
-                                                    meshInstance.ModelMatrix;
+                        modified = true;
+                        meshInstanceTransform.Rotation = Quaternion.FromEulerAngles(tempVec3.ToOpenTK());
                     }
+
+                    ImGui.Separator();
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
                     {
-                        shouldUpdateMesh = true;
+                        modified = true;
                     }
-
                     if (ImGui.SliderFloat("EmissiveBias", ref mesh.EmissiveBias, 0.0f, 20.0f))
                     {
-                        shouldUpdateMesh = true;
+                        modified = true;
                     }
-
                     if (ImGui.SliderFloat("SpecularBias", ref mesh.SpecularBias, -1.0f, 1.0f))
                     {
-                        shouldUpdateMesh = true;
+                        modified = true;
                     }
-
                     if (ImGui.SliderFloat("RoughnessBias", ref mesh.RoughnessBias, -1.0f, 1.0f))
                     {
-                        shouldUpdateMesh = true;
+                        modified = true;
                     }
-
                     if (ImGui.SliderFloat("TransmissionBias", ref mesh.TransmissionBias, -1.0f, 1.0f))
                     {
-                        shouldUpdateMesh = true;
+                        modified = true;
                     }
-
                     if (ImGui.SliderFloat("IORBias", ref mesh.IORBias, -2.0f, 5.0f))
                     {
-                        shouldUpdateMesh = true;
+                        modified = true;
                     }
 
                     tempVec3 = mesh.AbsorbanceBias.ToNumerics();
                     if (ImGui.DragFloat3("AbsorbanceBias", ref tempVec3))
                     {
+                        modified = true;
                         mesh.AbsorbanceBias = tempVec3.ToOpenTK();
-                        shouldUpdateMesh = true;
                     }
 
-                    if (shouldUpdateMesh)
+                    ImGui.Text($"MeshID: {SelectedEntity.EntityID}");
+                    ImGui.SameLine();
+                    ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
+                    ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance}");
+                    ImGui.SameLine();
+                    ImGui.Text($"Triangle Count: {cmd.IndexCount / 3}");
+
+                    if (modified)
                     {
-                        shouldResetPT = true;
+                        meshInstance.ModelMatrix = meshInstanceTransform.Matrix;
+
+                        resetPathTracer = true;
                         app.ModelManager.UpdateMeshBuffer(SelectedEntity.EntityID, 1);
                         app.ModelManager.SetMeshInstance(SelectedEntity.InstanceID, meshInstance);
                     }
                 }
                 else if (SelectedEntity.EntityType == EntityType.Light)
                 {
-                    bool shouldUpdateLight = false;
+                    bool modified = false;
                     
                     app.LightManager.TryGetLight(SelectedEntity.EntityID, out CpuLight cpuLight);
                     ref GpuLight gpuLight = ref cpuLight.GpuLight;
@@ -930,7 +939,7 @@ namespace IDKEngine.Render
                     {
                         app.LightManager.DeleteLight(SelectedEntity.EntityID);
                         SelectedEntity = SelectedEntityInfo.None;
-                        shouldResetPT = true;
+                        resetPathTracer = true;
                     }
                     else
                     {
@@ -956,13 +965,13 @@ namespace IDKEngine.Render
                         tempVec3 = gpuLight.Color.ToNumerics();
                         if (ImGui.DragFloat3("Color", ref tempVec3, 0.1f, 0.0f))
                         {
-                            shouldUpdateLight = true;
+                            modified = true;
                             gpuLight.Color = tempVec3.ToOpenTK();
                         }
 
                         if (ImGui.DragFloat("Radius", ref gpuLight.Radius, 0.05f, 0.01f, 30.0f))
                         {
-                            shouldUpdateLight = true;
+                            modified = true;
                         }
 
                         ImGui.Separator();
@@ -1000,15 +1009,117 @@ namespace IDKEngine.Render
                             }
                         }
 
-                        if (shouldUpdateLight)
+                        if (modified)
                         {
-                            shouldResetPT = true;
+                            resetPathTracer = true;
                         }
                     }
+
+                    ImGui.Text($"LightID: {SelectedEntity.EntityID}");
+                }
+                else if (SelectedEntity.EntityType == EntityType.Node)
+                {
+                    Transformation meshInstanceTransform = SelectedEntity.Node.LocalTransform;
+                    bool modified = false;
+
+                    tempVec3 = meshInstanceTransform.Translation.ToNumerics();
+                    if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
+                    {
+                        modified = true;
+                        meshInstanceTransform.Translation = tempVec3.ToOpenTK();
+                    }
+
+                    tempVec3 = meshInstanceTransform.Scale.ToNumerics();
+                    if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
+                    {
+                        modified = true;
+                        meshInstanceTransform.Scale = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
+                    }
+
+                    tempVec3 = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
+                    if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
+                    {
+                        modified = true;
+                        meshInstanceTransform.Rotation = Quaternion.FromEulerAngles(tempVec3.ToOpenTK());
+                    }
+
+                    if (modified)
+                    {
+                        SelectedEntity.Node.LocalTransform = meshInstanceTransform;
+                        resetPathTracer = true;
+                    }
+
+                    ImGui.Text($"Node: {SelectedEntity.Node.Name}");
                 }
                 else
                 {
-                    BothAxisCenteredText("PRESS E TO TOGGLE FREE CAMERA AND SELECT AN ENTITY");
+                    BothAxisCenteredText("SELECT AN ENTITY TO VIEW DETAILS");
+                }
+            }
+            ImGui.End();
+
+            if (ImGui.Begin("Scene Graph"))
+            {
+                for (int i = 0; i < app.ModelManager.ModelRootNodes.Length; i++)
+                {
+                    ModelLoader.Node node = app.ModelManager.ModelRootNodes[i];
+                    RenderNodesGraph(node);
+
+                    void RenderNodesGraph(ModelLoader.Node node)
+                    {
+                        ImGui.PushID(node.GetHashCode());
+
+                        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
+                        if (node.IsLeaf && node.MeshInstanceIds.Count == 0)
+                        {
+                            flags |= ImGuiTreeNodeFlags.Leaf;
+                        }
+
+                        bool nodeOpen = ImGui.TreeNodeEx(node.Name, flags);
+                        if (ImGui.IsItemClicked())
+                        {
+                            SelectedEntity = new SelectedEntityInfo(node);
+                        }
+
+                        if (nodeOpen)
+                        {
+                            for (int i = 0; i < node.Children.Length; i++)
+                            {
+                                RenderNodesGraph(node.Children[i]);
+                            }
+                            for (int i = node.MeshInstanceIds.Start; i < node.MeshInstanceIds.End; i++)
+                            {
+                                if (ImGui.TreeNodeEx($"MeshInstance_{i}", ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf))
+                                {
+                                    ImGui.TreePop();
+                                }
+                                if (ImGui.IsItemClicked())
+                                {
+                                    SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, app.ModelManager.MeshInstances[i].MeshIndex, i);
+                                }
+                            }
+                            ImGui.TreePop();
+                        }
+
+                        ImGui.PopID();
+                    }
+                }
+
+                if (ImGui.TreeNodeEx("Lights"))
+                {
+                    for (int i = 0; i < app.LightManager.Count; i++)
+                    {
+                        if (ImGui.TreeNodeEx($"Light_{i}", ImGuiTreeNodeFlags.Leaf))
+                        {
+                            ImGui.TreePop();
+                        }
+                        if (ImGui.IsItemClicked())
+                        {
+                            SelectedEntity = new SelectedEntityInfo(EntityType.Light, i, 0);
+                        }
+
+                    }
+                    ImGui.TreePop();
                 }
             }
             ImGui.End();
@@ -1032,12 +1143,12 @@ namespace IDKEngine.Render
             ImGui.PopStyleVar();
             ImGui.End();
 
-            ModuleLoadModelRender(app, ref shouldResetPT);
-            ModuleLoadModelUpdate(app, ref shouldResetPT);
+            ModuleLoadModelRender(app, ref resetPathTracer);
+            ModuleLoadModelUpdate(app, ref resetPathTracer);
 
             backend.Render();
 
-            if (shouldResetPT)
+            if (resetPathTracer)
             {
                 app.PathTracer?.ResetRenderProcess();
             }
@@ -1049,11 +1160,11 @@ namespace IDKEngine.Render
 
             if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
             {
-                backend.IsIgnoreMouseInput = true;
+                backend.IgnoreMouseInput = true;
             }
             else
             {
-                backend.IsIgnoreMouseInput = false;
+                backend.IgnoreMouseInput = false;
             }
 
             void TakeScreenshot()
@@ -1066,7 +1177,7 @@ namespace IDKEngine.Render
                 Helper.TextureToDiskJpg(app.TonemapAndGamma.Result, $"{RecordingSettings.RECORDED_FRAME_DATA_OUT_DIR}/{frameIndex}");
             }
 
-            bool shouldResetPT = false;
+            bool resetPathTracer = false;
 
             if (RecordingVars.FrameRecState == FrameRecorderState.Replaying)
             {
@@ -1081,7 +1192,7 @@ namespace IDKEngine.Render
                 
                 if (!RecordingVars.IsInfiniteReplay && app.FrameStateRecorder.ReplayStateIndex == 0)
                 {
-                    RecordingVars.FrameRecState = FrameRecorderState.Nothing;
+                    RecordingVars.FrameRecState = FrameRecorderState.None;
                 }
             }
 
@@ -1103,7 +1214,7 @@ namespace IDKEngine.Render
             {
                 if (RecordingVars.FrameRecState == FrameRecorderState.Recording)
                 {
-                    RecordingVars.FrameRecState = FrameRecorderState.Nothing;
+                    RecordingVars.FrameRecState = FrameRecorderState.None;
                 }
                 else
                 {
@@ -1116,7 +1227,7 @@ namespace IDKEngine.Render
                 app.KeyboardState[Keys.Space] == Keyboard.InputState.Touched &&
                 app.KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
             {
-                RecordingVars.FrameRecState = RecordingVars.FrameRecState == FrameRecorderState.Replaying ? FrameRecorderState.Nothing : FrameRecorderState.Replaying;
+                RecordingVars.FrameRecState = RecordingVars.FrameRecState == FrameRecorderState.Replaying ? FrameRecorderState.None : FrameRecorderState.Replaying;
                 if (RecordingVars.FrameRecState == FrameRecorderState.Replaying)
                 {
                     app.SceneVsCamCollisionSettings.IsEnabled = false;
@@ -1162,7 +1273,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            if (shouldResetPT)
+            if (resetPathTracer)
             {
                 app.PathTracer?.ResetRenderProcess();
             }
@@ -1223,7 +1334,7 @@ namespace IDKEngine.Render
             backend.SetWindowSize(size);
         }
         
-        public void PressChar(char key)
+        public void PressChar(uint key)
         {
             backend.PressChar(key);
         }
@@ -1276,7 +1387,7 @@ namespace IDKEngine.Render
 
     partial class Gui
     {
-        private struct GuiModelLoad
+        private record struct GuiModelLoad
         {
             public const string IMGUI_ID_POPUP_MODAL = "ModelLoadDialog";
 
@@ -1286,7 +1397,7 @@ namespace IDKEngine.Render
                 meshoptimizer,
             }
 
-            public struct LoadingTask
+            public record struct LoadingTask
             {
                 public LoadParams LoadParams;
                 public ModelLoader.GtlfpackWrapper.GltfpackSettings CompressGltfSettings;
@@ -1307,7 +1418,7 @@ namespace IDKEngine.Render
                 }
             }
 
-            public struct LoadParams
+            public record struct LoadParams
             {
                 public bool SpawnInCamera = true;
                 public OtkVec3 Scale = new OtkVec3(1.0f);
@@ -1354,7 +1465,7 @@ namespace IDKEngine.Render
             loadModelContext.AddLoadingTask(path);
         }
 
-        public void ModuleLoadModelRender(Application app, ref bool shouldResetPT)
+        public void ModuleLoadModelRender(Application app, ref bool resetPathTracer)
         {
             SysVec3 tempVec3;
 
@@ -1363,6 +1474,7 @@ namespace IDKEngine.Render
                 if (loadModelContext.HandleNextLoadingTask())
                 {
                     loadModelContext.IsLoadModelDialog = true;
+                    app.MouseState.CursorMode = CursorModeValue.CursorNormal;
                     ImGui.OpenPopup(loadModelContext.CurrentGuiDialogLoadingTask.GetPopupModalName());
                 }
             }
@@ -1371,7 +1483,7 @@ namespace IDKEngine.Render
             {
                 ref GuiModelLoad.LoadingTask loadingTask = ref loadModelContext.CurrentGuiDialogLoadingTask;
 
-                if (loadModelContext.IsLoadModelDialog && ImGui.BeginPopupModal(loadingTask.GetPopupModalName(), ref loadModelContext.IsLoadModelDialog, ImGuiWindowFlags.NoNavInputs))
+                if (ImGui.BeginPopupModal(loadingTask.GetPopupModalName(), ref loadModelContext.IsLoadModelDialog, ImGuiWindowFlags.NoNavInputs))
                 {
                     GuiModelLoad.ModelPreprocessingMode current = loadModelContext.PreprocessMode;
                     if (ImGui.BeginCombo("Preprocessing", current.ToString()))
@@ -1455,7 +1567,7 @@ namespace IDKEngine.Render
                         {
                             if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
                             {
-                                shouldResetPT = true;
+                                resetPathTracer = true;
                             }
                         }
                         if (loadModelContext.PreprocessMode == GuiModelLoad.ModelPreprocessingMode.gltfpack)
@@ -1503,7 +1615,7 @@ namespace IDKEngine.Render
                                     Logger.Log(Logger.LogLevel.Error, "Too many gltfpack instances running at once. Falling back to normal model");
                                     if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
                                     {
-                                        shouldResetPT = true;
+                                        resetPathTracer = true;
                                     }
                                 }
                             }
@@ -1531,7 +1643,7 @@ namespace IDKEngine.Render
             }
         }
         
-        public void ModuleLoadModelUpdate(Application app, ref bool shouldResetPT)
+        public void ModuleLoadModelUpdate(Application app, ref bool resetPathTracer)
         {
             for (int i = 0; i < loadModelContext.CompressionsTasks.Length; i++)
             {
@@ -1545,7 +1657,7 @@ namespace IDKEngine.Render
                 {
                     if (ModuleLoadModelLoad(app, loadingTask.CompressGltfSettings.OutputPath, loadingTask.LoadParams))
                     {
-                        shouldResetPT = true;
+                        resetPathTracer = true;
                     }
 
                     loadModelContext.CompressionsTasks[i] = null;
@@ -1557,7 +1669,7 @@ namespace IDKEngine.Render
         {
             OtkVec3 modelPos = loadParams.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
             Transformation transformation = new Transformation().WithScale(loadParams.Scale).WithTranslation(modelPos);
-            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.Matrix, loadParams.ModelOptimizationSettings);
+            ModelLoader.CpuModel? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.Matrix, loadParams.ModelOptimizationSettings);
             if (!newModel.HasValue)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Failed loading model \"{modelPath}\"");

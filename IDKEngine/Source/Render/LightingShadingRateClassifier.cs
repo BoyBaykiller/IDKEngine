@@ -21,7 +21,7 @@ namespace IDKEngine.Render
             LuminanceVariance,
         }
 
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public DebugMode DebugValue;
             public float SpeedFactor;

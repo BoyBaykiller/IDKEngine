@@ -2,7 +2,7 @@
 
 namespace IDKEngine
 {
-    public struct Transformation
+    public record struct Transformation
     {
         public Vector3 Translation;
         public Quaternion Rotation = Quaternion.Identity;
@@ -55,6 +55,24 @@ namespace IDKEngine
             transformation.Translation = mat.ExtractTranslation();
 
             return transformation;
+        }
+
+        public static Transformation operator +(in Transformation lhs, in Transformation rhs)
+        {
+            Transformation result;
+            result.Translation = lhs.Translation + rhs.Translation;
+            result.Scale = lhs.Scale + rhs.Scale;
+            result.Rotation = lhs.Rotation + rhs.Rotation;
+            return result;
+        }
+
+        public static Transformation operator -(in Transformation lhs, in Transformation rhs)
+        {
+            Transformation result;
+            result.Translation = lhs.Translation - rhs.Translation;
+            result.Scale = lhs.Scale - rhs.Scale;
+            result.Rotation = lhs.Rotation - rhs.Rotation;
+            return result;
         }
     }
 }

@@ -3,7 +3,7 @@ using IDKEngine.Shapes;
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuBlasNode
+    public record struct GpuBlasNode
     {
         public Vector3 Min;
         public uint TriStartOrChild;

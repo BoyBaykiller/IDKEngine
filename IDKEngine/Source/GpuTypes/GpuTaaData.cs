@@ -3,7 +3,7 @@ using IDKEngine.Render;
 
 namespace IDKEngine.GpuTypes
 {
-    struct GpuTaaData
+    record struct GpuTaaData
     {
         public Vector2 Jitter;
         public int SampleCount;

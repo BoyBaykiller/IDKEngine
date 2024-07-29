@@ -1,6 +1,6 @@
 ﻿namespace IDKEngine
 {
-    public struct Range
+    public record struct Range
     {
         public int Start;
         public int Count;

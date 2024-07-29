@@ -2,7 +2,7 @@
 
 namespace IDKEngine.GpuTypes
 {
-    struct GpuPerFrameData
+    record struct GpuPerFrameData
     {
         public Matrix4 ProjView;
         public Matrix4 View;

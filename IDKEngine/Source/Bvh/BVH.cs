@@ -38,7 +38,7 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public struct RayHitInfo
+        public record struct RayHitInfo
         {
             public BLAS.IndicesTriplet TriangleIndices;
             public Vector3 Bary;
@@ -47,7 +47,7 @@ namespace IDKEngine.Bvh
             public int InstanceID;
         }
 
-        public struct BoxHitInfo
+        public record struct BoxHitInfo
         {
             public BLAS.IndicesTriplet TriangleIndices;
             public int MeshID;

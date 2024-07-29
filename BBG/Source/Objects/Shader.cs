@@ -108,7 +108,7 @@ namespace BBOpenGL
                     AppInclude,
                 }
 
-                public struct PreProcessInfo
+                public record struct PreProcessInfo
                 {
                     public string[] UsedAppInsertionKeys;
                 }

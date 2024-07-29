@@ -127,13 +127,13 @@ namespace BBOpenGL
                 Float = VertexAttribType.Float,
             }
 
-            public struct RenderAttachments
+            public record struct RenderAttachments
             {
                 public ColorAttachments? ColorAttachments;
                 public DepthStencilAttachment? DepthStencilAttachment;
             }
 
-            public struct RenderAttachmentsVerbose
+            public record struct RenderAttachmentsVerbose
             {
                 public ColorAttachment[]? ColorAttachments;
                 public DepthStencilAttachment? DepthStencilAttachment;
@@ -142,14 +142,14 @@ namespace BBOpenGL
             /// <summary>
             /// Similar to <see cref="ColorAttachment"/> but less verbose - allows for simpler API
             /// </summary>
-            public struct ColorAttachments
+            public record struct ColorAttachments
             {
                 public Texture[] Textures;
                 public AttachmentLoadOp AttachmentLoadOp;
                 public Vector4 ClearColor;
             }
 
-            public struct ColorAttachment
+            public record struct ColorAttachment
             {
                 public Texture Texture;
                 public AttachmentLoadOp AttachmentLoadOp;
@@ -157,7 +157,7 @@ namespace BBOpenGL
                 public Vector4 ClearColor;
             }
 
-            public struct DepthStencilAttachment
+            public record struct DepthStencilAttachment
             {
                 public Texture Texture;
                 public AttachmentLoadOp AttachmentLoadOp;
@@ -170,32 +170,32 @@ namespace BBOpenGL
                 }
             }
 
-            public struct NoRenderAttachmentsParams
+            public record struct NoRenderAttachmentsParams
             {
                 public int Width;
                 public int Height;
             }
 
-            public struct VertexInputAssembly
+            public record struct VertexInputAssembly
             {
                 public Buffer IndexBuffer;
                 public VertexDescription? VertexDescription;
             }
 
-            public struct VertexDescription
+            public record struct VertexDescription
             {
                 public VertexBuffer[] VertexBuffers;
                 public VertexAttribute[] VertexAttributes;
             }
 
-            public struct VertexBuffer
+            public record struct VertexBuffer
             {
                 public Buffer Buffer;
                 public int VertexSize;
                 public int Offset;
             }
 
-            public struct VertexAttribute
+            public record struct VertexAttribute
             {
                 public int BufferIndex;
                 public nint RelativeOffset;
@@ -208,7 +208,7 @@ namespace BBOpenGL
             /// <summary>
             /// Requires GL_NV_viewport_swizzle
             /// </summary>
-            public struct ViewportSwizzleNV
+            public record struct ViewportSwizzleNV
             {
                 public ViewportSwizzleAxisNV X = ViewportSwizzleAxisNV.PositiveX;
                 public ViewportSwizzleAxisNV Y = ViewportSwizzleAxisNV.PositiveY;
@@ -223,13 +223,13 @@ namespace BBOpenGL
             /// <summary>
             /// Requires GL_NV_shading_rate_image
             /// </summary>
-            public struct VariableRateShadingNV
+            public record struct VariableRateShadingNV
             {
                 public ShadingRateNV[] ShadingRatePalette;
                 public Texture ShadingRateImage;
             }
 
-            public struct Viewport
+            public record struct Viewport
             {
                 public Vector2 Size;
                 public Vector2 LowerLeftCorner;
@@ -241,7 +241,7 @@ namespace BBOpenGL
                 }
             }
 
-            public struct GraphicsPipelineState
+            public record struct GraphicsPipelineState
             {
                 public Capability[] EnabledCapabilities = Array.Empty<Capability>();
 

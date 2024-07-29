@@ -6,7 +6,7 @@ namespace IDKEngine.Render
 {
     class SSAO : IDisposable
     {
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public int SampleCount;
             public float Radius;

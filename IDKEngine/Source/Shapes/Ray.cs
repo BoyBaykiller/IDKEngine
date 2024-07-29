@@ -2,7 +2,7 @@
 
 namespace IDKEngine.Shapes
 {
-    public struct Ray
+    public record struct Ray
     {
         public Vector3 Origin;
         public Vector3 Direction;

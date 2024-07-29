@@ -8,7 +8,7 @@ namespace IDKEngine
     {
         private static void Main()
         {
-            Application application = new Application(1280, 720, "IDKEngine");
+            Application application = new Application(1600, 800, "IDKEngine");
 
             // If application is run inside a debugger then we don't catch Exceptions here
             // as this worsens the debugging experience.

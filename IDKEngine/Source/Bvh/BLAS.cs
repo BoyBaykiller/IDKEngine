@@ -14,28 +14,28 @@ namespace IDKEngine.Bvh
         public const float TRIANGLE_INTERSECT_COST = 1.1f;
         public const float TRAVERSAL_COST = 1.0f;
 
-        public struct RayHitInfo
+        public record struct RayHitInfo
         {
             public IndicesTriplet TriangleIndices;
             public Vector3 Bary;
             public float T;
         }
 
-        public struct Triangle
+        public record struct Triangle
         {
             public Vector3 Position0;
             public Vector3 Position1;
             public Vector3 Position2;
         }
 
-        public struct IndicesTriplet
+        public record struct IndicesTriplet
         {
             public uint X;
             public uint Y;
             public uint Z;
         }
 
-        private struct Bin
+        private record struct Bin
         {
             public Box TriangleBounds = Box.Empty();
             public uint TriangleCount;
@@ -83,7 +83,7 @@ namespace IDKEngine.Bvh
             while (stackPtr > 0)
             {
                 ref GpuBlasNode parentNode = ref Nodes[stack[--stackPtr]];
-                
+
                 if (TrySplit(parentNode) is var partitonPivot && partitonPivot.HasValue)
                 {
                     GpuBlasNode newLeftNode = new GpuBlasNode();
@@ -490,7 +490,8 @@ namespace IDKEngine.Bvh
 
             while (stackPtr > 0)
             {
-                treeDepth = Math.Max(stackPtr, treeDepth);
+                // + 1 because we skip root
+                treeDepth = Math.Max(stackPtr + 1, treeDepth);
 
                 int stackTop = stack[--stackPtr];
                 ref readonly GpuBlasNode leftChild = ref nodes[stackTop];

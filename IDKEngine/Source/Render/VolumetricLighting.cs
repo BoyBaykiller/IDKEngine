@@ -6,7 +6,7 @@ namespace IDKEngine.Render
 {
     class VolumetricLighting : IDisposable
     {
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public Vector3 Absorbance;
             public int SampleCount;

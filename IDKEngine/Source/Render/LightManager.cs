@@ -17,7 +17,7 @@ namespace IDKEngine.Render
 
         public const int GPU_MAX_UBO_LIGHT_COUNT = 256; // Keep in sync between shader and client code!
 
-        public struct RayHitInfo
+        public record struct RayHitInfo
         {
             public float T;
             public int LightID;
@@ -35,7 +35,7 @@ namespace IDKEngine.Render
             get => _count;
         }
 
-        public struct MovingLightsCollisionSettings
+        public record struct MovingLightsCollisionSettings
         {
             public bool IsEnabled;
             public int RecursiveSteps;

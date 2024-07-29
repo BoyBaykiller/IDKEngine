@@ -2,7 +2,7 @@
 
 namespace IDKEngine.Shapes
 {
-    public struct Frustum
+    public record struct Frustum
     {
         // left, right, up, down, front, back
         public Vector4[] Planes;

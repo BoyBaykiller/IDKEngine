@@ -46,7 +46,7 @@ namespace BBOpenGL
                 Less = All.Less
             }
 
-            public struct SamplerState
+            public record struct SamplerState
             {
                 public MinFilter MinFilter;
                 public MagFilter MagFilter;

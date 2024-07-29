@@ -6,7 +6,7 @@ namespace IDKEngine.Render
 {
     class ConeTracer : IDisposable
     {
-        public struct GpuSettings
+        public record struct GpuSettings
         {
             public int MaxSamples;
             public float StepMultiplier;

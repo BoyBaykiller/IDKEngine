@@ -6,7 +6,7 @@ using IDKEngine.Bvh;
 namespace IDKEngine.Shapes
 {
     [StructLayout(LayoutKind.Explicit)]
-    public struct Box
+    public record struct Box
     {
         public Vector3 this[int index]
         {

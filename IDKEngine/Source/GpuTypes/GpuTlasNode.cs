@@ -4,7 +4,7 @@ using IDKEngine.Shapes;
 
 namespace IDKEngine.GpuTypes
 {
-    public struct GpuTlasNode
+    public record struct GpuTlasNode
     {
         public Vector3 Min;
         private uint isLeafAndChildOrInstanceID;
