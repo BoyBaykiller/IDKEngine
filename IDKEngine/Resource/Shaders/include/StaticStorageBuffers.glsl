@@ -1,10 +1,12 @@
+// A couple rarely used SSBOs need to be manually "enabled" by defining macros
+// This is so that the limit of 16 SSBOs inside a shader on nvidia isnt hit
+// Please https://forums.developer.nvidia.com/t/increase-maximum-allowed-shader-storage-blocks/293755/1
+
 #ifdef DECLARE_MESHLET_STORAGE_BUFFERS
     #define DECLARE_MESHLET_RENDERING_TYPES
 #endif
-AppInclude(include/GpuTypes.glsl)
 
-// A couple rarely used SSBOs need to be manually "enabled" by defining macros
-// This is so that the limit of 16 SSBOs inside a shader on nvidia isnt hit
+AppInclude(include/GpuTypes.glsl)
 
 layout(std430, binding = 0) restrict buffer DrawElementsCmdSSBO
 {
@@ -62,12 +64,12 @@ layout(std430, binding = 9) restrict readonly buffer MaterialSSBO
     GpuMaterial Materials[];
 } materialSSBO;
 
-layout(std430, binding = 10) restrict readonly buffer VertexSSBO
+layout(std430, binding = 10) restrict buffer VertexSSBO
 {
     GpuVertex Vertices[];
 } vertexSSBO;
 
-layout(std430, binding = 11) restrict readonly buffer VertexPositionsSSBO
+layout(std430, binding = 11) restrict buffer VertexPositionsSSBO
 {
     PackedVec3 Positions[];
 } vertexPositionsSSBO;
@@ -102,4 +104,32 @@ layout(std430, binding = 17) restrict readonly buffer MeshletLocalIndicesSSBO
 {
     uint PackedIndices[];
 } meshletLocalIndicesSSBO;
+#endif
+
+#ifdef DECLARE_SKINNING_STORAGE_BUFFERS
+layout(std430, binding = 18) restrict readonly buffer JointIndicesSSBO
+{
+    uvec4 Indices[];
+} jointIndicesSSBO;
+
+layout(std430, binding = 19) restrict readonly buffer JointWeightsSSBO
+{
+    vec4 Weights[];
+} jointWeightsSSBO;
+
+layout(std430, binding = 20, row_major) restrict readonly buffer JointMatricesSSBO
+{
+    mat4x3 Matrices[];
+} jointMatricesSSBO;
+
+layout(std430, binding = 21) restrict buffer UnskinnedVertexSSBO
+{
+    UnskinnedVertex Vertices[];
+} unskinnedVertexSSBO;
+
+layout(std430, binding = 22) restrict buffer PrevVertexPositionSSBO
+{
+    PackedVec3 Positions[];
+} prevVertexPositionSSBO;
+
 #endif

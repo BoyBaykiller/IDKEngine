@@ -14,7 +14,7 @@ namespace BBOpenGL
 
         public record struct ContextInfo
         {
-            public string Name;
+            public string APIName;
             public double GLVersion;
             public DeviceInfo DeviceInfo;
         }
@@ -93,7 +93,15 @@ namespace BBOpenGL
             public int InstanceCount;
             public int FirstIndex;
             public int BaseVertex;
-            public int BaseInstance;
+            public uint BaseInstance;
+        }
+
+        public record struct DrawArraysIndirectCommand
+        {
+            public int Count;
+            public int InstanceCount;
+            public int First;
+            public uint BaseInstance;
         }
 
         public record struct DispatchIndirectCommand
@@ -125,17 +133,17 @@ namespace BBOpenGL
             // set default graphics pipeline state
             Rendering.SetGraphicsPipelineState(new Rendering.GraphicsPipelineState());
 
-            // ideally should be a paramater in pixel pack/unpack functions
+            // ideally should be paramaters in pixel pack/unpack functions
             GL.PixelStorei(PixelStoreParameter.PackAlignment, 1);
             GL.PixelStorei(PixelStoreParameter.UnpackAlignment, 1);
 
-            contextInfo.Name = GL.GetString(StringName.Version);
+            contextInfo.APIName = GL.GetString(StringName.Version);
             contextInfo.GLVersion = Convert.ToDouble($"{GL.GetInteger(GetPName.MajorVersion)}.{GL.GetInteger(GetPName.MinorVersion)}");
 
             ref DeviceInfo deviceInfo = ref contextInfo.DeviceInfo;
             deviceInfo.Name = GL.GetString(StringName.Renderer);
             deviceInfo.Vendor = GetGpuVendor();
-            deviceInfo.ExtensionSupport = GetSupportedExtensions();
+            deviceInfo.ExtensionSupport = GetExtensionSupport();
         }
 
         private static GpuVendor GetGpuVendor()
@@ -161,7 +169,7 @@ namespace BBOpenGL
             return GpuVendor.Unknown;
         }
 
-        private static ExtensionSupport GetSupportedExtensions()
+        private static ExtensionSupport GetExtensionSupport()
         {
             ExtensionSupport extensionSupport = new ExtensionSupport();
 

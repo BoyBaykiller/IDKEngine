@@ -53,8 +53,7 @@ namespace BBOpenGL
 
             public bool GetCompileStatus()
             {
-                int success = 0;
-                GL.GetShaderi(ID, ShaderParameterName.CompileStatus, ref success);
+                GL.GetShaderi(ID, ShaderParameterName.CompileStatus, out int success);
                 return success == 1;
             }
 
@@ -225,7 +224,7 @@ namespace BBOpenGL
                         return result;
                     }
                 }
-                
+
                 private static int AdvanceToNextKeyword(string source, int startIndex, out int expressionLength, out Keyword keyword, out string value)
                 {
                     expressionLength = 0;
@@ -341,7 +340,7 @@ namespace BBOpenGL
             /// <summary>
             /// This is only meant to be used in development. It invokes the "rga" tool for shader analysis
             /// </summary>
-            private static void __DebugSaveAndRunRGA(ShaderStage shaderStage, string shaderCode,  string outPath)
+            private static void __DebugSaveAndRunRGA(ShaderStage shaderStage, string shaderCode, string outPath)
             {
                 const string SHADER_ANALYZER_TOOL_NAME = "rga"; // https://github.com/GPUOpen-Tools/radeon_gpu_analyzer
 
@@ -357,10 +356,9 @@ namespace BBOpenGL
                 string outDir = Path.GetDirectoryName(outPath);
                 Directory.CreateDirectory(outDir);
 
-                string namePreprocessed = outPath;
-                File.WriteAllText(namePreprocessed, shaderCode);
+                File.WriteAllText(outPath, shaderCode);
 
-                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {namePreprocessed} " +
+                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {outPath} " +
                                    $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
                                    $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
                 

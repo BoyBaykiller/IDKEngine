@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Diagnostics;
 using BBLogger;
+using IDKEngine;
 
-namespace IDKEngine
+namespace Program
 {
     class Program
     {
         private static void Main()
         {
-            Application application = new Application(1600, 800, "IDKEngine");
+            using Application application = new Application(1600, 800, "IDKEngine");
 
             // If application is run inside a debugger then we don't catch Exceptions here
             // as this worsens the debugging experience.
@@ -28,7 +29,6 @@ namespace IDKEngine
                     Logger.Log(Logger.LogLevel.Fatal, ex.Message);
                 }
             }
-
         }
     }
 }

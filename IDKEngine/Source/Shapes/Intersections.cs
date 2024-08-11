@@ -418,11 +418,6 @@ namespace IDKEngine.Shapes
         }
         private static bool ProjectionsIntersect(in ScalarProjection projA, in ScalarProjection projB)
         {
-            static bool FloatInRange(float x, in ScalarProjection projection)
-            {
-                return projection.MinScaler < x && projection.MaxScaler > x;
-            }
-
             if (
                 FloatInRange(projB.MinScaler, projA) ||
                 FloatInRange(projB.MaxScaler, projA) ||
@@ -435,6 +430,11 @@ namespace IDKEngine.Shapes
             }
 
             return false;
+
+            static bool FloatInRange(float x, in ScalarProjection projection)
+            {
+                return projection.MinScaler < x && projection.MaxScaler > x;
+            }
         }
         public static bool ConvexSATIntersect(in Frustum frustum1, in Frustum frustum2, ReadOnlySpan<Vector3> vertices1, ReadOnlySpan<Vector3> vertices2)
         {
@@ -442,7 +442,7 @@ namespace IDKEngine.Shapes
 
             for (int i = 0; i < frustum1.Planes.Length; i++)
             {
-                Vector3 normal = frustum1.Planes[i].Xyz.Normalized();
+                Vector3 normal = Vector3.NormalizeFast(frustum1.Planes[i].Xyz);
 
                 ScalarProjection projection1 = ScalarProjectVerticesOnToAxis(vertices1, normal);
                 ScalarProjection projection2 = ScalarProjectVerticesOnToAxis(vertices2, normal);
@@ -455,7 +455,7 @@ namespace IDKEngine.Shapes
 
             for (int i = 0; i < frustum2.Planes.Length; i++)
             {
-                Vector3 normal = frustum2.Planes[i].Xyz.Normalized();
+                Vector3 normal = Vector3.Normalize(frustum2.Planes[i].Xyz);
 
                 ScalarProjection projection1 = ScalarProjectVerticesOnToAxis(vertices1, normal);
                 ScalarProjection projection2 = ScalarProjectVerticesOnToAxis(vertices2, normal);
@@ -472,7 +472,6 @@ namespace IDKEngine.Shapes
 
         public record struct SceneVsMovingSphereSettings
         {
-            public bool IsEnabled;
             public int TestSteps;
             public int RecursiveSteps;
             public float EpsilonNormalOffset;
@@ -487,20 +486,17 @@ namespace IDKEngine.Shapes
         public delegate void FuncIntersect(in SceneHitInfo hitInfo);
         public static void SceneVsMovingSphereCollisionRoutine(ModelManager modelManager, in SceneVsMovingSphereSettings settings, ref Sphere movingSphere, in Vector3 sphereDestination, FuncIntersect intersectFunc)
         {
-            if (settings.IsEnabled)
+            for (int i = 0; i < settings.RecursiveSteps; i++)
             {
-                for (int i = 0; i < settings.RecursiveSteps; i++)
+                bool hit = SceneVsMovingSphere(modelManager, settings.TestSteps, sphereDestination, ref movingSphere, out SceneHitInfo hitInfo);
+                if (hit)
                 {
-                    bool hit = SceneVsMovingSphere(modelManager, settings.TestSteps, sphereDestination, ref movingSphere, out SceneHitInfo hitInfo);
-                    if (hit)
-                    {
-                        movingSphere.Center += hitInfo.SlidingPlane.Normal * settings.EpsilonNormalOffset;
-                        intersectFunc(hitInfo);
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    movingSphere.Center += hitInfo.SlidingPlane.Normal * settings.EpsilonNormalOffset;
+                    intersectFunc(hitInfo);
+                }
+                else
+                {
+                    break;
                 }
             }
         }
@@ -545,8 +541,8 @@ namespace IDKEngine.Shapes
                     Matrix4 modelMatrix = modelManager.MeshInstances[hitInfo.InstanceID].ModelMatrix;
                     Triangle worldSpaceTri = Triangle.Transformed(triangle, modelMatrix);
 
-                    bool intersect = SphereVsTriangle(movingSphereCopy, worldSpaceTri, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth);
-                    if (!intersect || distance >= bestTriDistance)
+                    bool intersects = SphereVsTriangle(movingSphereCopy, worldSpaceTri, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth);
+                    if (!intersects || distance >= bestTriDistance)
                     {
                         return;
                     }

@@ -2,6 +2,10 @@ struct PackedVec3
 {
     float x, y, z;
 };
+PackedVec3 Pack(vec3 floats)
+{
+    return PackedVec3(floats.x, floats.y, floats.z);
+}
 vec3 Unpack(PackedVec3 floats)
 {
     return vec3(floats.x, floats.y, floats.z);
@@ -195,3 +199,10 @@ struct GpuMeshletInfo
     float _pad1;
 };
 #endif
+
+struct UnskinnedVertex
+{
+    PackedVec3 Position;
+    uint Tangent;
+    uint Normal;
+};

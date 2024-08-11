@@ -12,6 +12,8 @@ namespace IDKEngine.ThirdParty
 {
     unsafe class ImGuiBackend : IDisposable
     {
+        private static readonly Keys[] keysEnumValues = Enum.GetValues<Keys>();
+
         public bool IgnoreMouseInput;
 
         private int glVertexArray;
@@ -29,10 +31,7 @@ namespace IDKEngine.ThirdParty
         private Vector2 scaleFactor = Vector2.One;
 
         private readonly List<uint> pressedKeysBuf = new List<uint>();
-
-        private static readonly Keys[] keysEnumValues = Enum.GetValues<Keys>();
-
-        public ImGuiBackend(in Vector2i windowSize)
+        public ImGuiBackend(Vector2i windowSize)
         {
             this.windowSize = windowSize;
 
@@ -48,13 +47,19 @@ namespace IDKEngine.ThirdParty
             SetStyle();
         }
         
-        public void Render()
+        public void BeginFrame(GameWindowBase wnd, float dtSeconds)
+        {
+            UpdateIO(wnd, dtSeconds);
+            ImGui.NewFrame();
+        }
+
+        public void EndFrame()
         {
             ImGui.Render();
             RenderDrawData(ImGui.GetDrawData());
         }
-        
-        public void Update(GameWindowBase wnd, float dTSeconds)
+
+        private void UpdateIO(GameWindowBase wnd, float dTSeconds)
         {
             ImGuiIOPtr io = ImGui.GetIO();
             {
@@ -114,7 +119,7 @@ namespace IDKEngine.ThirdParty
             pressedKeysBuf.Add(key);
         }
 
-        public void SetWindowSize(in Vector2i size)
+        public void SetWindowSize(Vector2i size)
         {
             windowSize = size;
         }
@@ -189,7 +194,7 @@ namespace IDKEngine.ThirdParty
                         GL.Scissor((int)clip.X, windowSize.Y - (int)clip.W, (int)(clip.Z - clip.X), (int)(clip.W - clip.Y));
 
                         GL.BindTextureUnit(glFontTextureUnit, (int)pcmd.TextureId);
-                        GL.DrawElementsBaseVertex(PrimitiveType.Triangles, (int)pcmd.ElemCount, DrawElementsType.UnsignedShort, (nint)pcmd.IdxOffset * sizeof(ushort), (int)pcmd.VtxOffset);
+                        GL.DrawElementsBaseVertex(PrimitiveType.Triangles, (int)pcmd.ElemCount, DrawElementsType.UnsignedShort, (void*)(pcmd.IdxOffset * sizeof(ushort)), (int)pcmd.VtxOffset);
                     }
                 }
             }
@@ -274,7 +279,7 @@ namespace IDKEngine.ThirdParty
 
             ImGuiIOPtr io = ImGui.GetIO();
             io.Fonts.GetTexDataAsRGBA32(out byte* pixels, out int width, out int height);
-            io.Fonts.SetTexID(glFontTexture);
+            io.Fonts.SetTexID((nint)glFontTexture);
 
             GL.TextureStorage2D(glFontTexture, 1, SizedInternalFormat.Rgba8, width, height);
             GL.TextureSubImage2D(glFontTexture, 0, 0, 0, width, height, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
@@ -295,7 +300,7 @@ namespace IDKEngine.ThirdParty
             GL.DeleteProgram(glShaderProgram);
         }
 
-        private static int CreateProgram(string vertexSource, string fragmentSource)
+        private int CreateProgram(string vertexSource, string fragmentSource)
         {
             int program = GL.CreateProgram();
             int vertex = CompileShader(ShaderType.VertexShader, vertexSource);
@@ -321,7 +326,7 @@ namespace IDKEngine.ThirdParty
             return program;
         }
 
-        private static int CompileShader(ShaderType type, string source)
+        private int CompileShader(ShaderType type, string source)
         {
             int shader = GL.CreateShader(type);
             GL.ShaderSource(shader, source);

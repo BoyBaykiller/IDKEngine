@@ -375,12 +375,13 @@ namespace IDKEngine.Render
                 }
             });
 
-            // The AMD driver fails to detect a dependency between G-Buffer and some of the
-            // following passes like SSAO or ConeTracing. Flush is one possible workarround
+            // The AMD driver fails to detect a write-read dependency between G-Buffer and some of the
+            // following passes like RayTraced shadows. Likely because the G-Buffer is bindless textures.
+            // Flush/TextureBarrier are two possible workarrounds.
             // See discussion https://discord.com/channels/318590007881236480/318783155744145411/1070453712021098548
             if (BBG.GetDeviceInfo().Vendor == BBG.GpuVendor.AMD)
             {
-                BBG.Cmd.Flush();
+                BBG.Cmd.TextureBarrier();
             }
 
             if (ShadowMode == ShadowTechnique.RayTraced)

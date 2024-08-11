@@ -57,7 +57,7 @@ namespace IDKEngine.Render
 
 
         public BBG.Texture ResultVoxels;
-        private readonly BBG.Texture[] intermediateResultRbg; // only used if no support for GL_NV_shader_atomic_fp16_vector
+        private readonly BBG.Texture[] intermediateResultsRbg; // only used if no support for GL_NV_shader_atomic_fp16_vector
         private readonly BBG.AbstractShaderProgram mergeIntermediatesProgram; // only used if no support for GL_NV_shader_atomic_fp16_vector
         private readonly BBG.AbstractShaderProgram clearTexturesProgram;
         private readonly BBG.AbstractShaderProgram voxelizeProgram;
@@ -90,7 +90,7 @@ namespace IDKEngine.Render
             visualizeDebugProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/Voxelize/DebugVisualization/compute.glsl"));
             if (!TAKE_ATOMIC_FP16_PATH)
             {
-                intermediateResultRbg = new BBG.Texture[3];
+                intermediateResultsRbg = new BBG.Texture[3];
                 mergeIntermediatesProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
             }
 
@@ -121,9 +121,9 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindImageUnit(ResultVoxels, 0, 0, true);
                 if (!TAKE_ATOMIC_FP16_PATH)
                 {
-                    BBG.Cmd.BindImageUnit(intermediateResultRbg[0], 1, 0, true);
-                    BBG.Cmd.BindImageUnit(intermediateResultRbg[1], 2, 0, true);
-                    BBG.Cmd.BindImageUnit(intermediateResultRbg[2], 3, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[0], 1, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[1], 2, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[2], 3, 0, true);
                 }
 
                 BBG.Cmd.UseShaderProgram(clearTexturesProgram);
@@ -167,9 +167,9 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindImageUnit(ResultVoxels, 0, 0, true);
                 if (!TAKE_ATOMIC_FP16_PATH)
                 {
-                    BBG.Cmd.BindImageUnit(intermediateResultRbg[0], BBG.Texture.InternalFormat.R32Uint, 1, 0, true);
-                    BBG.Cmd.BindImageUnit(intermediateResultRbg[1], BBG.Texture.InternalFormat.R32Uint, 2, 0, true);
-                    BBG.Cmd.BindImageUnit(intermediateResultRbg[2], BBG.Texture.InternalFormat.R32Uint, 3, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[0], BBG.Texture.InternalFormat.R32Uint, 1, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[1], BBG.Texture.InternalFormat.R32Uint, 2, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[2], BBG.Texture.InternalFormat.R32Uint, 3, 0, true);
                 }
 
                 BBG.Cmd.UseShaderProgram(voxelizeProgram);
@@ -197,9 +197,9 @@ namespace IDKEngine.Render
                 BBG.Computing.Compute("Merge intermediate textures", () =>
                 {
                     BBG.Cmd.BindImageUnit(ResultVoxels, 0, 0, true);
-                    BBG.Cmd.BindTextureUnit(intermediateResultRbg[0], 0);
-                    BBG.Cmd.BindTextureUnit(intermediateResultRbg[1], 1);
-                    BBG.Cmd.BindTextureUnit(intermediateResultRbg[2], 2);
+                    BBG.Cmd.BindTextureUnit(intermediateResultsRbg[0], 0);
+                    BBG.Cmd.BindTextureUnit(intermediateResultsRbg[1], 1);
+                    BBG.Cmd.BindTextureUnit(intermediateResultsRbg[2], 2);
                     BBG.Cmd.UseShaderProgram(mergeIntermediatesProgram);
 
                     BBG.Computing.Dispatch((ResultVoxels.Width + 4 - 1) / 4, (ResultVoxels.Height + 4 - 1) / 4, (ResultVoxels.Depth + 4 - 1) / 4);
@@ -258,10 +258,10 @@ namespace IDKEngine.Render
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    if (intermediateResultRbg[i] != null) intermediateResultRbg[i].Dispose();
-                    intermediateResultRbg[i] = new BBG.Texture(BBG.Texture.Type.Texture3D);
-                    intermediateResultRbg[i].SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
-                    intermediateResultRbg[i].ImmutableAllocate(width, height, depth, BBG.Texture.InternalFormat.R32Float);
+                    if (intermediateResultsRbg[i] != null) intermediateResultsRbg[i].Dispose();
+                    intermediateResultsRbg[i] = new BBG.Texture(BBG.Texture.Type.Texture3D);
+                    intermediateResultsRbg[i].SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
+                    intermediateResultsRbg[i].ImmutableAllocate(width, height, depth, BBG.Texture.InternalFormat.R32Float);
                 }
             }
         }
@@ -273,7 +273,7 @@ namespace IDKEngine.Render
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    intermediateResultRbg[i].Dispose();
+                    intermediateResultsRbg[i].Dispose();
                 }
                 mergeIntermediatesProgram.Dispose();
             }

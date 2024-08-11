@@ -196,7 +196,7 @@ namespace BBOpenGL
             }
             public void Upload3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
             {
-                GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, (nint)pixels);
+                GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
             }
 
             public void Upload2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
@@ -208,7 +208,7 @@ namespace BBOpenGL
             }
             public void Upload2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
             {
-                GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, (nint)pixels);
+                GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
             }
             public void Upload2D(Buffer bufferObject, int width, int height, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
             {
@@ -220,7 +220,7 @@ namespace BBOpenGL
             public void UploadCompressed2D(int width, int height, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
             {
                 int imageSize = GetBlockCompressedImageSize(Format, width, height, 1);
-                GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.InternalFormat)Format, imageSize, (nint)pixels);
+                GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.InternalFormat)Format, imageSize, pixels);
             }
             public void UploadCompressed2D(Buffer bufferObject, int width, int height, nint offset, int level = 0, int xOffset = 0, int yOffset = 0)
             {
@@ -231,7 +231,7 @@ namespace BBOpenGL
 
             public void Download(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int bufSize, int level = 0)
             {
-                GL.GetTextureImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, (nint)pixels);
+                GL.GetTextureImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, pixels);
             }
 
             public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, in T value, int level = 0) where T : unmanaged
@@ -243,7 +243,7 @@ namespace BBOpenGL
             }
             public void Clear(PixelFormat pixelFormat, PixelType pixelType, void* data, int level = 0)
             {
-                GL.ClearTexImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, (nint)data);
+                GL.ClearTexImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, data);
             }
 
             public void GenerateMipmap()
@@ -325,13 +325,19 @@ namespace BBOpenGL
 
                 for (int i = 0; i < bindlessTextureHandles.Count; i++)
                 {
-                    GL.ARB.MakeTextureHandleNonResidentARB(bindlessTextureHandles[i].GLHandle);
+                    if (GL.ARB.IsTextureHandleResidentARB(bindlessTextureHandles[i].GLHandle))
+                    {
+                        GL.ARB.MakeTextureHandleNonResidentARB(bindlessTextureHandles[i].GLHandle);
+                    }
                 }
                 bindlessTextureHandles = null;
 
                 for (int i = 0; i < bindlessImageHandles.Count; i++)
                 {
-                    GL.ARB.MakeImageHandleNonResidentARB(bindlessImageHandles[i].GLHandle);
+                    if (GL.ARB.IsImageHandleResidentARB(bindlessImageHandles[i].GLHandle))
+                    {
+                        GL.ARB.MakeImageHandleNonResidentARB(bindlessImageHandles[i].GLHandle);
+                    }
                 }
                 bindlessImageHandles = null;
 

@@ -22,8 +22,7 @@ namespace BBOpenGL
             {
                 GL.EndQuery(QueryTarget.TimeElapsed);
 
-                long resultNanoSec = 0;
-                GL.GetQueryObjecti64(ID, QueryObjectParameterName.QueryResult, ref resultNanoSec);
+                GL.GetQueryObjecti64(ID, QueryObjectParameterName.QueryResult, out long resultNanoSec);
                 MeasuredMilliseconds = resultNanoSec / 1000000.0f;
             }
 

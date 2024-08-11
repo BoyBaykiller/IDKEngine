@@ -61,7 +61,7 @@ namespace IDKEngine.Utils
             return new Vector2((v.X >= 0.0f) ? +1.0f : -1.0f, (v.Y >= 0.0f) ? +1.0f : -1.0f);
         }
         
-        private static Vector2 Abs(in Vector2 v)
+        private static Vector2 Abs(Vector2 v)
         {
             return new Vector2(MathF.Abs(v.X), MathF.Abs(v.Y));
         }

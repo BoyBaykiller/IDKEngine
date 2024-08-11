@@ -65,8 +65,7 @@ namespace BBOpenGL
 
             public bool GetLinkStatus()
             {
-                int success = 0;
-                GL.GetProgrami(ID, ProgramProperty.LinkStatus, ref success);
+                GL.GetProgrami(ID, ProgramProperty.LinkStatus, out int success);
                 return success == 1;
             }
 

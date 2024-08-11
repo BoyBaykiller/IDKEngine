@@ -1,6 +1,5 @@
 ﻿using OpenTK.Mathematics;
 
-
 namespace IDKEngine.GpuTypes
 {
     public record struct GpuMeshletInfo

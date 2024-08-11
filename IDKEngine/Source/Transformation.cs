@@ -1,4 +1,5 @@
 ﻿using OpenTK.Mathematics;
+using IDKEngine.Utils;
 
 namespace IDKEngine
 {
@@ -38,7 +39,7 @@ namespace IDKEngine
 
         public Transformation WithRotationDeg(float x, float y, float z)
         {
-            return WithRotationRad(MathHelper.DegreesToRadians(x), MathHelper.DegreesToRadians(y), MathHelper.DegreesToRadians(z));
+            return WithRotationRad(MyMath.DegreesToRadians(x), MyMath.DegreesToRadians(y), MyMath.DegreesToRadians(z));
         }
 
         public Transformation WithRotationRad(float x, float y, float z)
@@ -47,7 +48,7 @@ namespace IDKEngine
             return this;
         }
 
-        public static Transformation FromMatrix(in Matrix4 mat)
+       public static Transformation FromMatrix(in Matrix4 mat)
         {
             Transformation transformation;
             transformation.Scale = mat.ExtractScale();

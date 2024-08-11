@@ -91,15 +91,30 @@ namespace IDKEngine
         private GpuPerFrameData gpuPerFrameData;
         private BBG.TypedBuffer<GpuPerFrameData> gpuPerFrameDataBuffer;
 
-        public int FramesPerSecond { get; private set; }
+        public int MeasuredFramesPerSecond { get; private set; }
 
-        public bool TimeEnabled = true;
-        public Intersections.SceneVsMovingSphereSettings SceneVsCamCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
+        private bool _timeEnabled = true;
+        public bool TimeEnabled
+        {
+            get => _timeEnabled;
+
+            set
+            {
+                _timeEnabled = value;
+                LightManager.DoAdvanceSimulation = TimeEnabled;
+                ModelManager.RunAnimations = TimeEnabled;
+            }
+        }
+
+        public SceneVsMovingSphereCollisionSettings SceneVsCamCollisionSettings = new SceneVsMovingSphereCollisionSettings()
         {
             IsEnabled = true,
-            TestSteps = 3,
-            RecursiveSteps = 12,
-            EpsilonNormalOffset = 0.001f
+            Collision = new Intersections.SceneVsMovingSphereSettings()
+            { 
+                TestSteps = 3,
+                RecursiveSteps = 12,
+                EpsilonNormalOffset = 0.001f
+            }
         };
 
         private int fpsCounter;
@@ -112,7 +127,6 @@ namespace IDKEngine
         protected override void OnRender(float dT)
         {
             RenderPrepare(dT);
-
             if (RequestPresentationResolution.HasValue || RequestRenderResolutionScale.HasValue)
             {
                 float newResolutionScale = RequestRenderResolutionScale ?? RenderResolutionScale;
@@ -129,6 +143,9 @@ namespace IDKEngine
                 SetRenderMode(RequestRenderMode.Value, RenderResolution, PresentationResolution);
                 RequestRenderMode = null;
             }
+
+            ModelManager.ComputeSkinnedPositions();
+            ModelManager.BVH.TlasBuild();
 
             if (CRenderMode == RenderMode.Rasterizer)
             {
@@ -154,7 +171,7 @@ namespace IDKEngine
                     RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
                 }
             }
-            
+
             if (CRenderMode == RenderMode.PathTracer)
             {
                 PathTracer.Compute();
@@ -195,7 +212,7 @@ namespace IDKEngine
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderGui)
             {
-                gui.Draw(this);
+                gui.Draw(this, dT);
             }
             else
             {
@@ -208,8 +225,8 @@ namespace IDKEngine
             fpsCounter++;
             if (fpsTimer.ElapsedMilliseconds >= 1000)
             {
-                FramesPerSecond = fpsCounter;
-                WindowTitle = $"IDKEngine FPS: {FramesPerSecond}";
+                MeasuredFramesPerSecond = fpsCounter;
+                WindowTitle = $"IDKEngine FPS: {MeasuredFramesPerSecond}";
                 fpsCounter = 0;
                 fpsTimer.Restart();
             }
@@ -218,7 +235,7 @@ namespace IDKEngine
         private void RenderPrepare(float dT)
         {
             MainThreadQueue.Execute();
-
+            
             {
                 Camera.ProjectionSize = RenderResolution;
 
@@ -226,13 +243,13 @@ namespace IDKEngine
                 gpuPerFrameData.PrevProjView = gpuPerFrameData.ProjView;
 
                 gpuPerFrameData.Projection = Camera.GetProjectionMatrix();
-                gpuPerFrameData.InvProjection = gpuPerFrameData.Projection.Inverted();
+                gpuPerFrameData.InvProjection = Matrix4.Invert(gpuPerFrameData.Projection);
 
                 gpuPerFrameData.View = Camera.GetViewMatrix();
-                gpuPerFrameData.InvView = gpuPerFrameData.View.Inverted();
+                gpuPerFrameData.InvView = Matrix4.Invert(gpuPerFrameData.View);
 
                 gpuPerFrameData.ProjView = gpuPerFrameData.View * gpuPerFrameData.Projection;
-                gpuPerFrameData.InvProjView = gpuPerFrameData.ProjView.Inverted();
+                gpuPerFrameData.InvProjView = Matrix4.Invert(gpuPerFrameData.ProjView);
 
                 gpuPerFrameData.CameraPos = Camera.Position;
                 gpuPerFrameData.NearPlane = Camera.NearPlane;
@@ -245,32 +262,22 @@ namespace IDKEngine
                 gpuPerFrameDataBuffer.UploadElements(gpuPerFrameData);
             }
 
-            for (int i = 0; i < ModelManager.ModelRootNodes.Length; i++)
+            LightManager.Update(out bool anyLightMoved);
+            ModelManager.Update(out bool anyMeshInstanceMoved);
+
             {
-                ModelLoader.Node.TraverseUpdate(ModelManager.ModelRootNodes[i], (ModelLoader.Node node) =>
-                {
-                    Transformation nodeTransformBefore = Transformation.FromMatrix(node.GlobalTransform);
-                    node.UpdateGlobalTransform();
+                //int meshID = 0;
+                //int verticesStart = ModelManager.DrawCommands[meshID].BaseVertex;
+                //int verticesCount = ModelManager.GetMeshVertexCount(meshID);
+                //for (int i = verticesStart; i < verticesStart + verticesCount; i++)
+                //{
+                //    ModelManager.VertexPositions[i].X += 2f * dT;
+                //}
 
-                    if (node.MeshInstanceIds.Count > 0)
-                    {
-                        Transformation nodeTransformAfter = Transformation.FromMatrix(node.GlobalTransform);
-                        for (int j = node.MeshInstanceIds.Start; j < node.MeshInstanceIds.End; j++)
-                        {
-                            GpuMeshInstance meshInstance = ModelManager.MeshInstances[j];
-                            Transformation transformDiff = Transformation.FromMatrix(meshInstance.ModelMatrix) - nodeTransformBefore;
-                            Transformation adjustedTransform = nodeTransformAfter + transformDiff;
-
-                            meshInstance.ModelMatrix = adjustedTransform.Matrix;
-                            ModelManager.SetMeshInstance(j, meshInstance);
-                        }
-                    }
-                });
+                //ModelManager.UpdateVertexPositions(verticesStart, verticesCount);
+                //ModelManager.BVH.BlasesRefit(meshID, 1);
+                ////ModelSystem.BVH.TlasBuild();
             }
-
-            LightManager.UpdateBuffer(out bool anyLightMoved);
-            ModelManager.UpdateMeshInstanceBufferBatched(out bool anyMeshInstanceMoved);
-            ModelManager.BVH.TlasBuild();
 
             bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
             if ((CRenderMode == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
@@ -281,7 +288,7 @@ namespace IDKEngine
 
         protected override void OnUpdate(float dT)
         {
-            gui.Update(this, dT);
+            gui.Update(this);
 
             if (KeyboardState[Keys.Escape] == Keyboard.InputState.Pressed)
             {
@@ -366,49 +373,35 @@ namespace IDKEngine
                     Camera.AdvanceSimulation(dT);
                 }
 
-                if (TimeEnabled)
-                {
-                    LightManager.AdvanceSimulation(dT, ModelManager);
-                }
+                LightManager.Update(dT, ModelManager);
             }
 
-            Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
-            Vector3 prevSpherePos = movingSphere.Center;
-            Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
+            if (SceneVsCamCollisionSettings.IsEnabled)
             {
-                Vector3 deltaStep = Camera.Position - prevSpherePos;
-                Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
-                Camera.Position = movingSphere.Center + slidedDeltaStep;
+                Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
+                Vector3 prevSpherePos = movingSphere.Center;
+                Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings.Collision, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
+                {
+                    Vector3 deltaStep = Camera.Position - prevSpherePos;
+                    Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
+                    Camera.Position = movingSphere.Center + slidedDeltaStep;
 
-                Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane); 
+                    Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane); 
 
-                prevSpherePos = movingSphere.Center;
-            });
-
-            //{
-            //    int meshID = 0;
-            //    int verticesStart = ModelManager.DrawCommands[meshID].BaseVertex;
-            //    int verticesCount = ModelManager.GetMeshVertexCount(meshID);
-            //    for (int i = verticesStart; i < verticesStart + verticesCount; i++)
-            //    {
-            //        ModelManager.VertexPositions[i].X += 2f * dT;
-            //    }
-
-            //    ModelManager.UpdateVertexPositions(verticesStart, verticesCount);
-            //    ModelManager.BVH.BlasesRefit(meshID, 1);
-            //    //ModelSystem.BVH.TlasBuild();
-            //}
+                    prevSpherePos = movingSphere.Center;
+                });
+            }
 
             Camera.SetPrevToCurrentPosition();
         }
-
+       
         protected override unsafe void OnStart()
         {
             BBG.Initialize(Helper.GLDebugCallback);
 
             ref readonly BBG.ContextInfo glContextInfo = ref BBG.GetContextInfo();
 
-            Logger.Log(Logger.LogLevel.Info, $"API: {glContextInfo.Name}");
+            Logger.Log(Logger.LogLevel.Info, $"API: {glContextInfo.APIName}");
             Logger.Log(Logger.LogLevel.Info, $"GPU: {glContextInfo.DeviceInfo.Name}");
             Logger.Log(Logger.LogLevel.Info, $"{nameof(BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_SOURCEFILE)} = {BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_SOURCEFILE}");
 
@@ -435,7 +428,7 @@ namespace IDKEngine
             gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
             gpuPerFrameDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
             gpuPerFrameDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 0);
-            
+
             SkyBoxManager.Initialize(SkyBoxManager.SkyBoxMode.ExternalAsset, [
                 "Resource/Textures/EnvironmentMap/1.jpg",
                 "Resource/Textures/EnvironmentMap/2.jpg",
@@ -456,34 +449,33 @@ namespace IDKEngine
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), 360.0f - 165.4f, 90.0f - 7.4f);
             if (true)
             {
-                ModelLoader.CpuModel sponza = ModelLoader.LoadGltfFromFile("Resource/Models/SponzaCompressed/Sponza.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).Matrix).Value;
-                sponza.Model.Meshes[63].EmissiveBias = 10.0f;
-                sponza.Model.Meshes[70].EmissiveBias = 20.0f;
-                sponza.Model.Meshes[3].EmissiveBias = 12.0f;
-                sponza.Model.Meshes[99].EmissiveBias = 15.0f;
-                sponza.Model.Meshes[97].EmissiveBias = 9.0f;
-                sponza.Model.Meshes[42].EmissiveBias = 20.0f;
-                sponza.Model.Meshes[38].EmissiveBias = 20.0f;
-                sponza.Model.Meshes[40].EmissiveBias = 20.0f;
-                sponza.Model.Meshes[42].EmissiveBias = 20.0f;
-                //sponza.Meshes[46].SpecularBias = 1.0f;
-                //sponza.Meshes[46].RoughnessBias = -0.436f;
+                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Resource/Models/SponzaCompressed/Sponza.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).Matrix).Value;
+                sponza.GpuModel.Meshes[63].EmissiveBias = 10.0f;
+                sponza.GpuModel.Meshes[70].EmissiveBias = 20.0f;
+                sponza.GpuModel.Meshes[3].EmissiveBias = 12.0f;
+                sponza.GpuModel.Meshes[99].EmissiveBias = 15.0f;
+                sponza.GpuModel.Meshes[97].EmissiveBias = 9.0f;
+                sponza.GpuModel.Meshes[42].EmissiveBias = 20.0f;
+                sponza.GpuModel.Meshes[38].EmissiveBias = 20.0f;
+                sponza.GpuModel.Meshes[40].EmissiveBias = 20.0f;
+                sponza.GpuModel.Meshes[42].EmissiveBias = 20.0f;
+                //sponza.GpuModel.Meshes[46].SpecularBias = 1.0f;
+                //sponza.GpuModel.Meshes[46].RoughnessBias = -0.436f; // -0.665
+                //sponza.GpuModel.Meshes[46].NormalMapStrength = 0.0f;
 
-                ModelLoader.CpuModel lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).Matrix).Value;
-                lucy.Model.Meshes[0].SpecularBias = -1.0f;
-                lucy.Model.Meshes[0].TransmissionBias = 0.98f;
-                lucy.Model.Meshes[0].IORBias = 0.174f;
-                lucy.Model.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
-                lucy.Model.Meshes[0].RoughnessBias = -1.0f;
+                ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).Matrix).Value;
+                lucy.GpuModel.Meshes[0].SpecularBias = -1.0f;
+                lucy.GpuModel.Meshes[0].TransmissionBias = 0.98f;
+                lucy.GpuModel.Meshes[0].IORBias = 0.174f;
+                lucy.GpuModel.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
+                lucy.GpuModel.Meshes[0].RoughnessBias = -1.0f;
 
-                ModelLoader.CpuModel helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).Matrix).Value;
+                ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).Matrix).Value;
 
-                //ModelLoader.CpuModel bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
-                //ModelLoader.CpuModel sk = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\SimpleSkin\glTF\\SimpleSkin.gltf", new Transformation().WithTranslation(-5.0f, 0.0f, 0.0f).Matrix).Value;
-                //ModelLoader.CpuModel mm = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Test2\Test2.gltf").Value;
+                //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
-
+                
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
@@ -501,12 +493,12 @@ namespace IDKEngine
             }
             else
             {
-                ModelLoader.CpuModel a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
-                ModelLoader.CpuModel b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-                ModelLoader.CpuModel c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
-                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
-                //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a, b, c);
+                ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
+                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+                //ModelLoader.CpuModel d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
+                //ModelLoader.CpuModel e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
+                ModelManager.Add(a, b);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
             }

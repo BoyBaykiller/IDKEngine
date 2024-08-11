@@ -349,7 +349,7 @@ namespace IDKEngine.Bvh
             
             int start = (int)parentNode.TriStartOrChild;
             int end = start + (int)parentNode.TriCount;
-            int pivot = Helper.Partition(TriangleIndices, start, end, (in IndicesTriplet triangleIndices) =>
+            int pivot = Algorithms.Partition(TriangleIndices, start, end, (in IndicesTriplet triangleIndices) =>
             {
                 Triangle tri = GetTriangle(triangleIndices);
                 float posOnSplitAxis = (tri.Position0[splitAxis] + tri.Position1[splitAxis] + tri.Position2[splitAxis]) / 3.0f;

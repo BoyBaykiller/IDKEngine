@@ -38,6 +38,7 @@ namespace BBOpenGL
 
             public enum Topology : uint
             {
+                Points = PrimitiveType.Points,
                 Triangles = PrimitiveType.Triangles,
                 Quads = PrimitiveType.Quads,
             }
@@ -431,8 +432,16 @@ namespace BBOpenGL
                 GL.DrawArraysInstancedBaseInstance((PrimitiveType)topology, first, count, instanceCount, baseInstance);
             }
 
+            public static void MultiDrawNonIndexed(Buffer drawCommandBuffer, Topology topology, int drawCount, int stride, nint bufferOffset = 0)
+            {
+                if (drawCount == 0) return;
+                GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer.ID);
+                GL.MultiDrawArraysIndirect((PrimitiveType)topology, bufferOffset, drawCount, stride);
+            }
+
             public static void MultiDrawIndexed(Buffer drawCommandBuffer, Topology topology, IndexType indexType, int drawCount, int stride, nint bufferOffset = 0)
             {
+                if (drawCount == 0) return;
                 GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer.ID);
                 GL.MultiDrawElementsIndirect((PrimitiveType)topology, (DrawElementsType)indexType, bufferOffset, drawCount, stride);
             }

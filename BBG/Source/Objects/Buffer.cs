@@ -1,4 +1,5 @@
-﻿using OpenTK.Graphics.OpenGL;
+﻿using System.Runtime.InteropServices;
+using OpenTK.Graphics.OpenGL;
 
 namespace BBOpenGL
 {
@@ -68,7 +69,7 @@ namespace BBOpenGL
 
             public void ImmutableAllocate(MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
             {
-                GL.NamedBufferStorage(ID, size, (nint)data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
+                GL.NamedBufferStorage(ID, size, data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
                 Size = size;
 
                 MappedMemory = null;
@@ -85,13 +86,13 @@ namespace BBOpenGL
 
             public void MutableAllocate(nint size, void* data = null)
             {
-                GL.NamedBufferData(ID, size, (nint)data, VertexBufferObjectUsage.StaticDraw);
+                GL.NamedBufferData(ID, size, data, VertexBufferObjectUsage.StaticDraw);
                 Size = size;
             }
 
             public void UploadData(nint offset, nint size, void* data)
             {
-                GL.NamedBufferSubData(ID, offset, size, (nint)data);
+                GL.NamedBufferSubData(ID, offset, size, data);
             }
 
             public void UploadData<T>(nint offset, nint size, in T data) where T : unmanaged
@@ -104,16 +105,16 @@ namespace BBOpenGL
 
             public void DownloadData(nint offset, nint size, void* data)
             {
-                GL.GetNamedBufferSubData(ID, offset, size, (nint)data);
+                GL.GetNamedBufferSubData(ID, offset, size, data);
             }
 
-            public void SimpleClear(nint offset, nint size, float* data)
+            public void Clear(nint offset, nint size, float* data)
             {
-                Clear(SizedInternalFormat.R32f, PixelFormat.Red, PixelType.Float, offset, size, data);
+                Clear(Texture.InternalFormat.R32Float, PixelFormat.Red, PixelType.Float, offset, size, data);
             }
-            public void Clear(SizedInternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType, nint offset, nint size, void* data)
+            public void Clear(Texture.InternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType, nint offset, nint size, void* data)
             {
-                GL.ClearNamedBufferSubData(ID, internalFormat, offset, size, pixelFormat, pixelType, (nint)data);
+                GL.ClearNamedBufferSubData(ID, (SizedInternalFormat)internalFormat, offset, size, pixelFormat, pixelType, data);
             }
 
             public void FlushMemory(nint offset, nint size)
@@ -146,8 +147,7 @@ namespace BBOpenGL
 
             public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> data)
             {
-                if (data.Length == 0) return;
-                ImmutableAllocateElements(memLocation, memAccess, data.Length, data[0]);
+                ImmutableAllocateElements(memLocation, memAccess, data.Length, MemoryMarshal.GetReference(data));
             }
             public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
             {
@@ -158,13 +158,13 @@ namespace BBOpenGL
             }
             public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, void* data = null)
             {
+                if (count == 0) return;
                 ImmutableAllocate(memLocation, memAccess, sizeof(T) * count, data);
             }
 
             public void MutableAllocateElements(ReadOnlySpan<T> data)
             {
-                if (data.Length == 0) return;
-                MutableAllocateElements(data.Length, data[0]);
+                MutableAllocateElements(data.Length, MemoryMarshal.GetReference(data));
             }
             public void MutableAllocateElements(nint count, in T data)
             {
@@ -175,13 +175,13 @@ namespace BBOpenGL
             }
             public void MutableAllocateElements(nint count, void* data = null)
             {
+                if (count == 0) return;
                 MutableAllocate(sizeof(T) * count, data);
             }
 
             public void UploadElements(ReadOnlySpan<T> data, nint startIndex = 0)
             {
-                if (data.Length == 0) return;
-                UploadElements(startIndex, data.Length, data[0]);
+                UploadElements(startIndex, data.Length, MemoryMarshal.GetReference(data));
             }
             public void UploadElements(in T data, nint startIndex = 0)
             {
@@ -189,6 +189,7 @@ namespace BBOpenGL
             }
             public void UploadElements(nint startIndex, nint count, in T data)
             {
+                if (count == 0) return;
                 fixed (void* ptr = &data)
                 {
                     UploadData(startIndex * sizeof(T), count * sizeof(T), ptr);
@@ -197,7 +198,7 @@ namespace BBOpenGL
 
             public void DownloadElements(Span<T> data, nint startIndex = 0)
             {
-                DownloadElements(startIndex, data.Length, ref data[0]);
+                DownloadElements(startIndex, data.Length, ref MemoryMarshal.GetReference(data));
             }
             public void DownloadElements(nint startIndex, nint count, ref T data)
             {

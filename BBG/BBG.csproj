@@ -4,10 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenTK.Graphics" Version="5.0.0-pre.10" />
+    <PackageReference Include="OpenTK.Graphics" Version="5.0.0-pre.11" />
   </ItemGroup>
 
   <ItemGroup>

@@ -48,28 +48,20 @@ namespace BBOpenGL
 
             public record struct SamplerState
             {
-                public MinFilter MinFilter;
-                public MagFilter MagFilter;
+                public MinFilter MinFilter = MinFilter.Nearest;
+                public MagFilter MagFilter = MagFilter.Nearest;
 
-                public WrapMode WrapModeS;
-                public WrapMode WrapModeT;
-                public WrapMode WrapModeR;
+                public WrapMode WrapModeS = WrapMode.ClampToEdge;
+                public WrapMode WrapModeT = WrapMode.ClampToEdge;
+                public WrapMode WrapModeR = WrapMode.ClampToEdge;
 
-                public Anisotropy Anisotropy;
+                public Anisotropy Anisotropy = Anisotropy.Samples1x;
 
-                public CompareMode CompareMode;
-                public CompareFunc CompareFunc;
+                public CompareMode CompareMode = CompareMode.None;
+                public CompareFunc CompareFunc = CompareFunc.Always;
 
                 public SamplerState()
                 {
-                    MinFilter = MinFilter.Nearest;
-                    MagFilter = MagFilter.Nearest;
-                    WrapModeS = WrapMode.ClampToEdge;
-                    WrapModeT = WrapMode.ClampToEdge;
-                    WrapModeR = WrapMode.ClampToEdge;
-                    Anisotropy = Anisotropy.Samples1x;
-                    CompareMode = CompareMode.None;
-                    CompareFunc = CompareFunc.Always;
                 }
             }
 

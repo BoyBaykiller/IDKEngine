@@ -203,7 +203,7 @@ namespace IDKEngine.Render
             if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
             wavefrontPTBuffer = new BBG.Buffer();
             wavefrontPTBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
-            wavefrontPTBuffer.SimpleClear(0, sizeof(GpuWavefrontPTHeader), &clear);
+            wavefrontPTBuffer.Clear(0, sizeof(GpuWavefrontPTHeader), &clear);
             wavefrontPTBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 8);
 
             ResetRenderProcess();

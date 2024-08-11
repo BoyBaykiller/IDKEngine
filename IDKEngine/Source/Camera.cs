@@ -53,7 +53,7 @@ namespace IDKEngine
         public Vector2i ProjectionSize;
         public float NearPlane = 0.1f;
         public float FarPlane = 250.0f;
-        public float FovY = MathHelper.DegreesToRadians(102.0f);
+        public float FovY = MyMath.DegreesToRadians(102.0f);
 
         public Camera(Vector2i size, Vector3 position, float lookX = 270.0f, float lookY = 0.0f)
         {
@@ -90,11 +90,13 @@ namespace IDKEngine
             }
             if (keyboard[Keys.D] == Keyboard.InputState.Pressed)
             {
-                force += Vector3.Cross(ViewDir, UpVector).Normalized() * KeyboardAccelerationSpeed;
+                Vector3 dir = Vector3.Normalize(Vector3.Cross(ViewDir, UpVector));
+                force += dir * KeyboardAccelerationSpeed;
             }
             if (keyboard[Keys.A] == Keyboard.InputState.Pressed)
             {
-                force -= Vector3.Cross(ViewDir, UpVector).Normalized() * KeyboardAccelerationSpeed;
+                Vector3 dir = Vector3.Normalize(Vector3.Cross(ViewDir, UpVector));
+                force -= dir * KeyboardAccelerationSpeed;
             }
 
             const float optionalBoost = 5.0f;
@@ -156,8 +158,8 @@ namespace IDKEngine
 
         public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
         {
-            float radiansX = MathHelper.DegreesToRadians(lookX);
-            float radiansY = MathHelper.DegreesToRadians(lookY);
+            float radiansX = MyMath.DegreesToRadians(lookX);
+            float radiansY = MyMath.DegreesToRadians(lookY);
 
             Vector3 viewDir = MyMath.PolarToCartesian(radiansX, radiansY);
 

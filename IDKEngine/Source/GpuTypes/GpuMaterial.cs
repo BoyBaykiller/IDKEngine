@@ -7,9 +7,9 @@ namespace IDKEngine.GpuTypes
 {
     public record struct GpuMaterial
     {
-        public static readonly int TEXTURE_COUNT = Enum.GetValues<BindlessHandle>().Length;
+        public static readonly int TEXTURE_COUNT = Enum.GetValues<TextureType>().Length;
 
-        public enum BindlessHandle : int
+        public enum TextureType : int
         {
             BaseColor,
             MetallicRoughness,
@@ -18,18 +18,18 @@ namespace IDKEngine.GpuTypes
             Transmission,
         }
 
-        public ref BBG.Texture.BindlessHandle this[BindlessHandle textureType]
+        public ref BBG.Texture.BindlessHandle this[TextureType textureType]
         {
             get
             {
                 switch (textureType)
                 {
-                    case BindlessHandle.BaseColor: return ref Unsafe.AsRef(ref BaseColorTexture);
-                    case BindlessHandle.MetallicRoughness: return ref Unsafe.AsRef(ref MetallicRoughnessTexture);
-                    case BindlessHandle.Normal: return ref Unsafe.AsRef(ref NormalTexture);
-                    case BindlessHandle.Emissive: return ref Unsafe.AsRef(ref EmissiveTexture);
-                    case BindlessHandle.Transmission: return ref Unsafe.AsRef(ref TransmissionTexture);
-                    default: throw new NotSupportedException($"Unsupported {nameof(BindlessHandle)} {textureType}");
+                    case TextureType.BaseColor: return ref Unsafe.AsRef(ref BaseColorTexture);
+                    case TextureType.MetallicRoughness: return ref Unsafe.AsRef(ref MetallicRoughnessTexture);
+                    case TextureType.Normal: return ref Unsafe.AsRef(ref NormalTexture);
+                    case TextureType.Emissive: return ref Unsafe.AsRef(ref EmissiveTexture);
+                    case TextureType.Transmission: return ref Unsafe.AsRef(ref TransmissionTexture);
+                    default: throw new NotSupportedException($"Unsupported {nameof(TextureType)} {textureType}");
                 }
             }
         }

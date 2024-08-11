@@ -6,9 +6,9 @@ using System.Collections.Generic;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using ImGuiNET;
+using NativeFileDialogSharp;
 using BBLogger;
 using BBOpenGL;
-using NativeFileDialogSharp;
 using IDKEngine.Bvh;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
@@ -82,11 +82,11 @@ namespace IDKEngine.Render
         public SelectedEntityInfo SelectedEntity;
         public RecordingSettings RecordingVars;
 
-        private readonly ImGuiBackend backend;
+        private readonly ImGuiBackend guiBackend;
         private SysVec2 viewportHeaderSize;
         public Gui(Vector2i windowSize)
         {
-            backend = new ImGuiBackend(windowSize);
+            guiBackend = new ImGuiBackend(windowSize);
 
             RecordingVars = new RecordingSettings();
             RecordingVars.RasterizerFPSGoal = 10000;
@@ -95,7 +95,14 @@ namespace IDKEngine.Render
             RecordingVars.Timer = Stopwatch.StartNew();
         }
 
-        public unsafe void Draw(Application app)
+        public void Draw(Application app, float dT)
+        {
+            guiBackend.BeginFrame(app, dT);
+            DrawMyGui(app);
+            guiBackend.EndFrame();
+        }
+
+        private unsafe void DrawMyGui(Application app)
         {
             int tempInt;
             bool tempBool;
@@ -104,7 +111,6 @@ namespace IDKEngine.Render
             SysVec3 tempVec3;
             bool resetPathTracer = false;
 
-            ImGui.NewFrame();
             ImGui.DockSpaceOverViewport();
 
             bool openModelLoadPopup = false;
@@ -165,35 +171,52 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Stats"))
             {
-                float mbDrawVertices = (app.ModelManager.Vertices.SizeInBytes() + app.ModelManager.VertexPositions.SizeInBytes()) / 1000000.0f;
-                float mbDrawIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
-                float mbMeshlets = app.ModelManager.Meshlets.SizeInBytes() / 1000000.0f;
-                float mbMeshletsVertexIndices = app.ModelManager.MeshletsVertexIndices.SizeInBytes() / 1000000.0f;
-                float mbMeshletsLocalIndices = app.ModelManager.MeshletsLocalIndices.SizeInBytes() / 1000000.0f;
-                float mbMeshInstances = app.ModelManager.MeshInstances.SizeInBytes() / 1000000.0f;
-                float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshlets + mbMeshletsVertexIndices + mbMeshletsLocalIndices + mbMeshInstances;
-                if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
                 {
-                    ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbDrawVertices}mb");
-                    ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
-                    ImGui.Text($"  * Meshlets ({app.ModelManager.Meshlets.Length}) = {mbMeshlets}mb");
-                    ImGui.Text($"  * MeshletsVertexIndices ({app.ModelManager.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
-                    ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelManager.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
-                    ImGui.Text($"  * MeshInstances ({app.ModelManager.MeshInstances.Length}) = {mbMeshInstances}mb");
-                    ImGui.TreePop();
+                    float mbDrawVertices = (app.ModelManager.Vertices.SizeInBytes() + app.ModelManager.VertexPositions.SizeInBytes()) / 1000000.0f;
+                    float mbDrawIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
+                    float mbMeshlets = app.ModelManager.Meshlets.SizeInBytes() / 1000000.0f;
+                    float mbMeshletsVertexIndices = app.ModelManager.MeshletsVertexIndices.SizeInBytes() / 1000000.0f;
+                    float mbMeshletsLocalIndices = app.ModelManager.MeshletsLocalIndices.SizeInBytes() / 1000000.0f;
+                    float mbMeshInstances = app.ModelManager.MeshInstances.SizeInBytes() / 1000000.0f;
+                    float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshlets + mbMeshletsVertexIndices + mbMeshletsLocalIndices + mbMeshInstances;
+                    if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
+                    {
+                        ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbDrawVertices}mb");
+                        ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
+                        ImGui.Text($"  * Meshlets ({app.ModelManager.Meshlets.Length}) = {mbMeshlets}mb");
+                        ImGui.Text($"  * MeshletsVertexIndices ({app.ModelManager.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
+                        ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelManager.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
+                        ImGui.Text($"  * MeshInstances ({app.ModelManager.MeshInstances.Length}) = {mbMeshInstances}mb");
+                        ImGui.TreePop();
+                    }
                 }
 
-                float mbBlasTrianglesIndices = app.ModelManager.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet) / 1000000.0f;
-                float mbBlasNodes = app.ModelManager.BVH.GetBlasesNodeCount() * sizeof(GpuBlasNode) / 1000000.0f;
-                float mbBTlasNodes = app.ModelManager.BVH.Tlas.Nodes.SizeInBytes() / 1000000.0f;
-                float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
-                if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
                 {
-                    ImGui.Text($"  * Triangles ({app.ModelManager.BVH.GetBlasesTriangleIndicesCount()}) = {mbBlasTrianglesIndices}mb");
-                    ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
-                    ImGui.Text($"  * Tlas Nodes ({app.ModelManager.BVH.Tlas.Nodes.Length}) = {mbBTlasNodes}mb");
+                    float mbBlasTrianglesIndices = app.ModelManager.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet) / 1000000.0f;
+                    float mbBlasNodes = app.ModelManager.BVH.GetBlasesNodeCount() * sizeof(GpuBlasNode) / 1000000.0f;
+                    float mbBTlasNodes = app.ModelManager.BVH.Tlas.Nodes.SizeInBytes() / 1000000.0f;
+                    float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
+                    if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
+                    {
+                        ImGui.Text($"  * Triangles ({app.ModelManager.BVH.GetBlasesTriangleIndicesCount()}) = {mbBlasTrianglesIndices}mb");
+                        ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
+                        ImGui.Text($"  * Tlas Nodes ({app.ModelManager.BVH.Tlas.Nodes.Length}) = {mbBTlasNodes}mb");
+                        ImGui.TreePop();
+                    }
+                }
 
-                    ImGui.TreePop();
+                {
+                    float mbJointMatrices = app.ModelManager.JointMatrices.SizeInBytes() / 1000000.0f;
+                    float mbJointWeights = app.ModelManager.JointWeights.SizeInBytes() / 1000000.0f;
+                    float mbJointIndices = app.ModelManager.JointIndices.SizeInBytes() / 1000000.0f;
+                    float mbTotalAnimations = mbJointMatrices + mbJointWeights + mbJointIndices;
+                    if (ImGui.TreeNode($"Animations total = {mbTotalAnimations}mb"))
+                    {
+                        ImGui.Text($"  * JointMatrices ({app.ModelManager.JointMatrices.Length}) = {mbJointMatrices}mb");
+                        ImGui.Text($"  * JointWeights ({app.ModelManager.JointWeights.Length}) = {mbJointWeights}mb");
+                        ImGui.Text($"  * JointIndices ({app.ModelManager.JointIndices.Length}) = {mbJointIndices}mb");
+                        ImGui.TreePop();
+                    }
                 }
             }
             ImGui.End();
@@ -215,7 +238,7 @@ namespace IDKEngine.Render
                     }
                     ImGui.SameLine();
                     ImGui.Text($"({app.Camera.Velocity.Length})");
-                    
+
                     tempVec2 = new SysVec2(app.Camera.LookX, app.Camera.LookY);
                     if (ImGui.DragFloat2("LookAt", ref tempVec2))
                     {
@@ -226,10 +249,10 @@ namespace IDKEngine.Render
                     ImGui.SliderFloat("AccelerationSpeed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f * Camera.MASS);
                     ImGui.SliderFloat("Sensitivity", ref app.Camera.MouseSensitivity, 0.0f, 0.2f);
 
-                    tempFloat = MathHelper.RadiansToDegrees(app.Camera.FovY);
+                    tempFloat = MyMath.RadiansToDegrees(app.Camera.FovY);
                     if (ImGui.SliderFloat("FovY", ref tempFloat, 10.0f, 130.0f))
                     {
-                        app.Camera.FovY = MathHelper.DegreesToRadians(tempFloat);
+                        app.Camera.FovY = MyMath.DegreesToRadians(tempFloat);
                     }
 
                     ImGui.SliderFloat("NearPlane", ref app.Camera.NearPlane, 0.001f, 5.0f);
@@ -240,9 +263,9 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("Collision##Camera", ref app.SceneVsCamCollisionSettings.IsEnabled);
                     if (app.SceneVsCamCollisionSettings.IsEnabled)
                     {
-                        ImGui.SliderInt("TestSteps##Camera", ref app.SceneVsCamCollisionSettings.TestSteps, 1, 20);
-                        ImGui.SliderInt("RecursiveSteps##Camera", ref app.SceneVsCamCollisionSettings.RecursiveSteps, 1, 20);
-                        ImGui.SliderFloat("NormalOffset##Camera", ref app.SceneVsCamCollisionSettings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
+                        ImGui.SliderInt("TestSteps##Camera", ref app.SceneVsCamCollisionSettings.Collision.TestSteps, 1, 20);
+                        ImGui.SliderInt("RecursiveSteps##Camera", ref app.SceneVsCamCollisionSettings.Collision.RecursiveSteps, 1, 20);
+                        ImGui.SliderFloat("NormalOffset##Camera", ref app.SceneVsCamCollisionSettings.Collision.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
                     }
 
                     ImGui.Separator();
@@ -260,16 +283,16 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("SceneCollision##Lights", ref app.LightManager.SceneVsSphereCollisionSettings.IsEnabled);
                     if (app.LightManager.SceneVsSphereCollisionSettings.IsEnabled)
                     {
-                        ImGui.SliderInt("TestSteps##Lights##Scene", ref app.LightManager.SceneVsSphereCollisionSettings.TestSteps, 1, 20);
-                        ImGui.SliderInt("RecursiveSteps##Lights##Scene", ref app.LightManager.SceneVsSphereCollisionSettings.RecursiveSteps, 1, 20);
-                        ImGui.SliderFloat("NormalOffset##Lights##Scene", ref app.LightManager.SceneVsSphereCollisionSettings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
+                        ImGui.SliderInt("TestSteps##Lights##Scene", ref app.LightManager.SceneVsSphereCollisionSettings.Collision.TestSteps, 1, 20);
+                        ImGui.SliderInt("RecursiveSteps##Lights##Scene", ref app.LightManager.SceneVsSphereCollisionSettings.Collision.RecursiveSteps, 1, 20);
+                        ImGui.SliderFloat("NormalOffset##Lights##Scene", ref app.LightManager.SceneVsSphereCollisionSettings.Collision.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
                     }
 
-                    ImGui.Checkbox("LightsCollision", ref app.LightManager.MovingLightsCollisionSetting.IsEnabled);
-                    if (app.LightManager.MovingLightsCollisionSetting.IsEnabled)
+                    ImGui.Checkbox("LightsCollision", ref app.LightManager.LightVsLightCollisionSetting.IsEnabled);
+                    if (app.LightManager.LightVsLightCollisionSetting.IsEnabled)
                     {
-                        ImGui.SliderInt("RecursiveSteps##Lights##Lights", ref app.LightManager.MovingLightsCollisionSetting.RecursiveSteps, 1, 20);
-                        ImGui.SliderFloat("NormalOffset##Lights##Lights", ref app.LightManager.MovingLightsCollisionSetting.EpsilonOffset, 0.0f, 0.01f, "%.4g");
+                        ImGui.SliderInt("RecursiveSteps##Lights##Lights", ref app.LightManager.LightVsLightCollisionSetting.RecursiveSteps, 1, 20);
+                        ImGui.SliderFloat("NormalOffset##Lights##Lights", ref app.LightManager.LightVsLightCollisionSetting.EpsilonOffset, 0.0f, 0.01f, "%.4g");
                     }
                 }
             }
@@ -294,13 +317,13 @@ namespace IDKEngine.Render
                     }
                     ImGui.Separator();
                 }
-                
+
                 bool isReplaying = RecordingVars.FrameRecState == FrameRecorderState.Replaying;
                 if ((RecordingVars.FrameRecState == FrameRecorderState.None && app.FrameStateRecorder.AreStatesLoaded) || isReplaying)
                 {
                     ImGui.Text($"Is Replaying (Press {Keys.LeftControl} + {Keys.Space}): {isReplaying}");
                     ImGui.Checkbox("Is Infite Replay", ref RecordingVars.IsInfiniteReplay);
-                    
+
                     ImGui.Checkbox("Is Video Render", ref RecordingVars.IsOutputFrames);
                     ToolTipForItemAboveHovered("When enabled rendered images are saved into a folder.");
 
@@ -346,7 +369,7 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Renderer"))
             {
-                ImGui.Text($"{app.FramesPerSecond}FPS | {app.PresentationResolution.X}x{app.PresentationResolution.Y} | VSync: {app.WindowVSync.ToOnOff()} | Time: {app.TimeEnabled.ToOnOff()}");
+                ImGui.Text($"{app.MeasuredFramesPerSecond}FPS | {app.PresentationResolution.X}x{app.PresentationResolution.Y} | VSync: {app.WindowVSync.ToOnOff()} | Time: {app.TimeEnabled.ToOnOff()}");
                 ImGui.Text($"{BBG.GetDeviceInfo().Name}");
 
                 bool gpuUseTlas = app.ModelManager.BVH.GpuUseTlas;
@@ -402,7 +425,7 @@ namespace IDKEngine.Render
                     }
                     ImGui.Separator();
                 }
-                
+
                 if (app.CRenderMode == Application.RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
@@ -603,7 +626,7 @@ namespace IDKEngine.Render
                                 ImGui.SliderFloat("PreferAliasingOverBlur", ref app.RasterizerPipeline.TaaResolve.PreferAliasingOverBlur, 0.0f, 1.0f);
                             }
                         }
-                        
+
                         if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.FSR2)
                         {
                             ImGui.Text(
@@ -621,7 +644,7 @@ namespace IDKEngine.Render
                             }
                         }
 
-                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.TAA || 
+                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.TAA ||
                             app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.FSR2)
                         {
                             ImGui.Checkbox("EnableMipBias", ref app.RasterizerPipeline.TAAEnableMipBias);
@@ -719,10 +742,7 @@ namespace IDKEngine.Render
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
-                        if (app.CRenderMode == Application.RenderMode.PathTracer)
-                        {
-                            ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
-                        }
+                        ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
 
                         tempBool = app.PathTracer.IsDebugBVHTraversal;
                         if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
@@ -931,7 +951,7 @@ namespace IDKEngine.Render
                 else if (SelectedEntity.EntityType == EntityType.Light)
                 {
                     bool modified = false;
-                    
+
                     app.LightManager.TryGetLight(SelectedEntity.EntityID, out CpuLight cpuLight);
                     ref GpuLight gpuLight = ref cpuLight.GpuLight;
 
@@ -1050,6 +1070,8 @@ namespace IDKEngine.Render
                     }
 
                     ImGui.Text($"Node: {SelectedEntity.Node.Name}");
+                    ImGui.SameLine();
+                    ImGui.Text($"NodeId: {SelectedEntity.Node.ArrayIndex}");
                 }
                 else
                 {
@@ -1060,10 +1082,10 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Scene Graph"))
             {
-                for (int i = 0; i < app.ModelManager.ModelRootNodes.Length; i++)
+                for (int i = 0; i < app.ModelManager.Models.Length; i++)
                 {
-                    ModelLoader.Node node = app.ModelManager.ModelRootNodes[i];
-                    RenderNodesGraph(node);
+                    ref readonly ModelManager.CpuModel cpuModel = ref app.ModelManager.Models[i];
+                    RenderNodesGraph(cpuModel.Root);
 
                     void RenderNodesGraph(ModelLoader.Node node)
                     {
@@ -1129,7 +1151,7 @@ namespace IDKEngine.Render
             {
                 OtkVec2 content = ImGui.GetContentRegionAvail().ToOpenTK();
 
-                if (content != app.PresentationResolution)
+                if ((Vector2i)content != app.PresentationResolution)
                 {
                     // Viewport changed, inform app of the new resolution
                     app.RequestPresentationResolution = (Vector2i)content;
@@ -1138,15 +1160,13 @@ namespace IDKEngine.Render
                 SysVec2 tileBar = ImGui.GetCursorPos();
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
-                ImGui.Image(app.TonemapAndGamma.Result.ID, content.ToNumerics(), new SysVec2(0.0f, 1.0f), new SysVec2(1.0f, 0.0f));
+                ImGui.Image((nint)app.TonemapAndGamma.Result.ID, content.ToNumerics(), new SysVec2(0.0f, 1.0f), new SysVec2(1.0f, 0.0f));
             }
             ImGui.PopStyleVar();
             ImGui.End();
 
-            ModuleLoadModelRender(app, ref resetPathTracer);
-            ModuleLoadModelUpdate(app, ref resetPathTracer);
-
-            backend.Render();
+            RenderLoadModelDialog(app, ref resetPathTracer);
+            UpdateLoadModelDialog(app, ref resetPathTracer);
 
             if (resetPathTracer)
             {
@@ -1154,17 +1174,15 @@ namespace IDKEngine.Render
             }
         }
 
-        public void Update(Application app, float dT)
+        public void Update(Application app)
         {
-            backend.Update(app, dT);
-
             if (app.MouseState.CursorMode == CursorModeValue.CursorDisabled)
             {
-                backend.IgnoreMouseInput = true;
+                guiBackend.IgnoreMouseInput = true;
             }
             else
             {
-                backend.IgnoreMouseInput = false;
+                guiBackend.IgnoreMouseInput = false;
             }
 
             void TakeScreenshot()
@@ -1253,7 +1271,7 @@ namespace IDKEngine.Render
                 }
                 clickedPixel.Y = app.TonemapAndGamma.Result.Height - clickedPixel.Y;
 
-                OtkVec2 ndc = clickedPixel / app.PresentationResolution * 2.0f - new OtkVec2(1.0f);
+                OtkVec2 ndc = clickedPixel / (Vector2)app.PresentationResolution * 2.0f - new OtkVec2(1.0f);
                 bool clickedInsideViewport = ndc.X < 1.0f && ndc.Y < 1.0f && ndc.X > -1.0f && ndc.Y > -1.0f;
                 if (clickedInsideViewport)
                 {
@@ -1281,7 +1299,7 @@ namespace IDKEngine.Render
         
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray)
         {
-            //Stopwatch sw = Stopwatch.StartNew();
+            //Stopwatch globalAnimationsTimer = Stopwatch.StartNew();
             //ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
             //for (int y = 0; y < app.RenderResolution.Y; y++)
             //{
@@ -1292,7 +1310,7 @@ namespace IDKEngine.Render
             //        app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
             //    }
             //}
-            //Console.WriteLine(sw.ElapsedMilliseconds);
+            //Console.WriteLine(globalAnimationsTimer.ElapsedMilliseconds);
 
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
@@ -1331,17 +1349,17 @@ namespace IDKEngine.Render
 
         public void SetSize(Vector2i size)
         {
-            backend.SetWindowSize(size);
+            guiBackend.SetWindowSize(size);
         }
         
         public void PressChar(uint key)
         {
-            backend.PressChar(key);
+            guiBackend.PressChar(key);
         }
 
         public void Dispose()
         {
-            backend.Dispose();
+            guiBackend.Dispose();
         }
 
         private static void ToolTipForItemAboveHovered(string text, ImGuiHoveredFlags imGuiHoveredFlags = ImGuiHoveredFlags.AllowWhenDisabled)
@@ -1351,6 +1369,7 @@ namespace IDKEngine.Render
                 ImGui.SetTooltip(text);
             }
         }
+        
         private static void BothAxisCenteredText(string text)
         {
             SysVec2 size = ImGui.GetWindowSize();
@@ -1358,6 +1377,7 @@ namespace IDKEngine.Render
             ImGui.SetCursorPos((size - textWidth) * 0.5f);
             ImGui.Text(text);
         }
+        
         private static void HorizontallyCenteredText(string text)
         {
             SysVec2 size = ImGui.GetWindowSize();
@@ -1365,6 +1385,7 @@ namespace IDKEngine.Render
             ImGui.SetCursorPos(new SysVec2((size - textWidth).X * 0.5f, ImGui.GetCursorPos().Y));
             ImGui.Text(text);
         }
+        
         private static bool CheckBoxEnabled(string name, ref bool value, bool enabled)
         {
             if (!enabled) 
@@ -1387,7 +1408,7 @@ namespace IDKEngine.Render
 
     partial class Gui
     {
-        private record struct GuiModelLoad
+        private record struct GuiLoadModel
         {
             public const string IMGUI_ID_POPUP_MODAL = "ModelLoadDialog";
 
@@ -1436,16 +1457,9 @@ namespace IDKEngine.Render
             public ModelPreprocessingMode PreprocessMode;
 
             private readonly Queue<LoadingTask> queuedLoadingTasks = new Queue<LoadingTask>();
-            public GuiModelLoad()
+            public GuiLoadModel()
             {
-                if (ModelLoader.GtlfpackWrapper.IsCLIFoundCached)
-                {
-                    PreprocessMode = ModelPreprocessingMode.gltfpack;
-                }
-                else
-                {
-                    PreprocessMode = ModelPreprocessingMode.meshoptimizer;
-                }
+                PreprocessMode = ModelPreprocessingMode.meshoptimizer;
             }
 
             public bool HandleNextLoadingTask()
@@ -1458,14 +1472,15 @@ namespace IDKEngine.Render
                 queuedLoadingTasks.Enqueue(new LoadingTask(modelPath));
             }
         }
-        private GuiModelLoad loadModelContext = new GuiModelLoad();
+        
+        private GuiLoadModel loadModelContext = new GuiLoadModel();
 
         public void AddModelDialog(string path)
         {
             loadModelContext.AddLoadingTask(path);
         }
 
-        public void ModuleLoadModelRender(Application app, ref bool resetPathTracer)
+        public void RenderLoadModelDialog(Application app, ref bool resetPathTracer)
         {
             SysVec3 tempVec3;
 
@@ -1481,19 +1496,19 @@ namespace IDKEngine.Render
 
             if (loadModelContext.IsLoadModelDialog)
             {
-                ref GuiModelLoad.LoadingTask loadingTask = ref loadModelContext.CurrentGuiDialogLoadingTask;
+                ref GuiLoadModel.LoadingTask loadingTask = ref loadModelContext.CurrentGuiDialogLoadingTask;
 
                 if (ImGui.BeginPopupModal(loadingTask.GetPopupModalName(), ref loadModelContext.IsLoadModelDialog, ImGuiWindowFlags.NoNavInputs))
                 {
-                    GuiModelLoad.ModelPreprocessingMode current = loadModelContext.PreprocessMode;
+                    GuiLoadModel.ModelPreprocessingMode current = loadModelContext.PreprocessMode;
                     if (ImGui.BeginCombo("Preprocessing", current.ToString()))
                     {
-                        GuiModelLoad.ModelPreprocessingMode[] preprocesModes = Enum.GetValues<GuiModelLoad.ModelPreprocessingMode>();
+                        GuiLoadModel.ModelPreprocessingMode[] preprocesModes = Enum.GetValues<GuiLoadModel.ModelPreprocessingMode>();
                         for (int i = 0; i < preprocesModes.Length; i++)
                         {
-                            GuiModelLoad.ModelPreprocessingMode it = preprocesModes[i];
+                            GuiLoadModel.ModelPreprocessingMode it = preprocesModes[i];
 
-                            bool isDisabled = it == GuiModelLoad.ModelPreprocessingMode.gltfpack && !ModelLoader.GtlfpackWrapper.IsCLIFoundCached;
+                            bool isDisabled = it == GuiLoadModel.ModelPreprocessingMode.gltfpack && !ModelLoader.GtlfpackWrapper.IsCLIFoundCached;
                             if (isDisabled)
                             {
                                 ImGui.BeginDisabled();
@@ -1509,18 +1524,18 @@ namespace IDKEngine.Render
                                 ImGui.EndDisabled();
                             }
 
-                            if (it == GuiModelLoad.ModelPreprocessingMode.gltfpack)
+                            if (it == GuiLoadModel.ModelPreprocessingMode.gltfpack)
                             {
                                 if (isDisabled)
                                 {
-                                    ToolTipForItemAboveHovered("gltfpack exe needs to be in PATH or WORKING DIR");
+                                    ToolTipForItemAboveHovered("gltfpack exe needs to be found");
                                 }
                                 else
                                 {
                                     ToolTipForItemAboveHovered("Does optimization + compression + more");
                                 }
                             }
-                            if (it == GuiModelLoad.ModelPreprocessingMode.meshoptimizer)
+                            if (it == GuiLoadModel.ModelPreprocessingMode.meshoptimizer)
                             {
                                 ToolTipForItemAboveHovered("Subset of gltfpack. Does not require external CLI");
                             }
@@ -1533,13 +1548,13 @@ namespace IDKEngine.Render
                         ImGui.EndCombo();
                     }
 
-                    if (loadModelContext.PreprocessMode == GuiModelLoad.ModelPreprocessingMode.gltfpack)
+                    if (loadModelContext.PreprocessMode == GuiLoadModel.ModelPreprocessingMode.gltfpack)
                     {
                         ImGui.Checkbox("UseInstancing", ref loadingTask.CompressGltfSettings.UseInstancing);
                         ImGui.Checkbox("KeepMeshPrimitives (requires gltfpack fork)", ref loadingTask.CompressGltfSettings.KeepMeshPrimitives);
                         ImGui.SliderInt("Threads", ref loadingTask.CompressGltfSettings.ThreadsUsed, 1, Environment.ProcessorCount);
                     }
-                    if (loadModelContext.PreprocessMode == GuiModelLoad.ModelPreprocessingMode.meshoptimizer)
+                    if (loadModelContext.PreprocessMode == GuiLoadModel.ModelPreprocessingMode.meshoptimizer)
                     {
                         ImGui.Checkbox("VertexRemapOptimization", ref loadingTask.LoadParams.ModelOptimizationSettings.VertexRemapOptimization);
                         ImGui.Checkbox("VertexCacheOptimization", ref loadingTask.LoadParams.ModelOptimizationSettings.VertexCacheOptimization);
@@ -1563,14 +1578,14 @@ namespace IDKEngine.Render
                     {
                         string gltfInputPath = loadingTask.CompressGltfSettings.InputPath;
 
-                        if (loadModelContext.PreprocessMode != GuiModelLoad.ModelPreprocessingMode.gltfpack)
+                        if (loadModelContext.PreprocessMode != GuiLoadModel.ModelPreprocessingMode.gltfpack)
                         {
-                            if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
+                            if (LoadModel(app, gltfInputPath, loadingTask.LoadParams))
                             {
                                 resetPathTracer = true;
                             }
                         }
-                        if (loadModelContext.PreprocessMode == GuiModelLoad.ModelPreprocessingMode.gltfpack)
+                        if (loadModelContext.PreprocessMode == GuiLoadModel.ModelPreprocessingMode.gltfpack)
                         {
                             string fileName = Path.GetFileName(gltfInputPath);
                             string compressedGltfDir = Path.Combine(Path.GetDirectoryName(gltfInputPath), $"{Path.GetFileNameWithoutExtension(gltfInputPath)}Compressed");
@@ -1592,7 +1607,7 @@ namespace IDKEngine.Render
                             if (task == null)
                             {
                                 Logger.Log(Logger.LogLevel.Error, "Failed to start gltfpack. Falling back to normal model");
-                                ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams);
+                                LoadModel(app, gltfInputPath, loadingTask.LoadParams);
                             }
                             else
                             {
@@ -1605,7 +1620,7 @@ namespace IDKEngine.Render
                                         // which already applies all optimizations
                                         loadingTask.LoadParams.ModelOptimizationSettings = ModelLoader.OptimizationSettings.AllTurnedOff;
 
-                                        loadModelContext.CompressionsTasks[i] = new Tuple<Task, GuiModelLoad.LoadingTask>(task, loadingTask);
+                                        loadModelContext.CompressionsTasks[i] = new Tuple<Task, GuiLoadModel.LoadingTask>(task, loadingTask);
                                         found = true;
                                         break;
                                     }
@@ -1613,7 +1628,7 @@ namespace IDKEngine.Render
                                 if (!found)
                                 {
                                     Logger.Log(Logger.LogLevel.Error, "Too many gltfpack instances running at once. Falling back to normal model");
-                                    if (ModuleLoadModelLoad(app, gltfInputPath, loadingTask.LoadParams))
+                                    if (LoadModel(app, gltfInputPath, loadingTask.LoadParams))
                                     {
                                         resetPathTracer = true;
                                     }
@@ -1635,7 +1650,7 @@ namespace IDKEngine.Render
                     continue;
                 }
 
-                (Task task, GuiModelLoad.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
+                (Task task, GuiLoadModel.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
                 if (!task.IsCompleted)
                 {
                     ImGui.Text($"Compressing {Path.GetFileName(loadingTask.CompressGltfSettings.InputPath)}...\n");
@@ -1643,7 +1658,7 @@ namespace IDKEngine.Render
             }
         }
         
-        public void ModuleLoadModelUpdate(Application app, ref bool resetPathTracer)
+        public void UpdateLoadModelDialog(Application app, ref bool resetPathTracer)
         {
             for (int i = 0; i < loadModelContext.CompressionsTasks.Length; i++)
             {
@@ -1652,10 +1667,10 @@ namespace IDKEngine.Render
                     continue;
                 }
 
-                (Task task, GuiModelLoad.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
+                (Task task, GuiLoadModel.LoadingTask loadingTask) = loadModelContext.CompressionsTasks[i];
                 if (task.IsCompletedSuccessfully)
                 {
-                    if (ModuleLoadModelLoad(app, loadingTask.CompressGltfSettings.OutputPath, loadingTask.LoadParams))
+                    if (LoadModel(app, loadingTask.CompressGltfSettings.OutputPath, loadingTask.LoadParams))
                     {
                         resetPathTracer = true;
                     }
@@ -1665,11 +1680,11 @@ namespace IDKEngine.Render
             }
         }
         
-        private bool ModuleLoadModelLoad(Application app, string modelPath, in GuiModelLoad.LoadParams loadParams)
+        private bool LoadModel(Application app, string modelPath, in GuiLoadModel.LoadParams loadParams)
         {
             OtkVec3 modelPos = loadParams.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
             Transformation transformation = new Transformation().WithScale(loadParams.Scale).WithTranslation(modelPos);
-            ModelLoader.CpuModel? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.Matrix, loadParams.ModelOptimizationSettings);
+            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.Matrix, loadParams.ModelOptimizationSettings);
             if (!newModel.HasValue)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Failed loading model \"{modelPath}\"");
@@ -1680,7 +1695,7 @@ namespace IDKEngine.Render
 
             int newMeshIndex = app.ModelManager.Meshes.Length - 1;
             ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[newMeshIndex];
-            SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, cmd.BaseInstance);
+            SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, (int)cmd.BaseInstance);
 
             return true;
         }

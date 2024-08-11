@@ -74,7 +74,7 @@ namespace IDKEngine.Render
                 gpuPointShadow.NearPlane = MathF.Min(gpuPointShadow.NearPlane, gpuPointShadow.FarPlane - 0.001f);
                 gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, gpuPointShadow.NearPlane + 0.001f);
 
-                projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(MathHelper.DegreesToRadians(90.0f), 1.0f, gpuPointShadow.NearPlane, gpuPointShadow.FarPlane);
+                projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(MyMath.DegreesToRadians(90.0f), 1.0f, gpuPointShadow.NearPlane, gpuPointShadow.FarPlane);
             }
         }
 
@@ -101,7 +101,7 @@ namespace IDKEngine.Render
         private static BBG.AbstractShaderProgram renderShadowMapProgram;
         private static BBG.AbstractShaderProgram cullingProgram;
 
-        public CpuPointShadow(int shadowMapSize, in Vector2i rayTracedShadowMapSize, in Vector2 clippingPlanes)
+        public CpuPointShadow(int shadowMapSize, Vector2i rayTracedShadowMapSize, Vector2 clippingPlanes)
         {
             if (!isLazyInitialized)
             {
@@ -117,9 +117,11 @@ namespace IDKEngine.Render
 
         public void RenderShadowMap(ModelManager modelManager, Camera camera, int gpuPointShadowIndex)
         {
+            Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
+            Span<Vector3> cameraFrustumVertices = stackalloc Vector3[8];
+
             Matrix4 cameraProjView = camera.GetViewMatrix() * camera.GetProjectionMatrix();
             Frustum cameraFrustum = new Frustum(cameraProjView);
-            Span<Vector3> cameraFrustumVertices = stackalloc Vector3[8];
             MyMath.GetFrustumPoints(Matrix4.Invert(cameraProjView), cameraFrustumVertices);
 
             int numVisibleFaces = 0;
@@ -130,7 +132,6 @@ namespace IDKEngine.Render
 
                 Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + (int)i];
                 Frustum shadowFaceFrustum = new Frustum(faceMatrix);
-                Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
                 MyMath.GetFrustumPoints(Matrix4.Invert(faceMatrix), shadowFrustumVertices);
                 bool frustaIntersect = Intersections.ConvexSATIntersect(cameraFrustum, shadowFaceFrustum, cameraFrustumVertices, shadowFrustumVertices);
 

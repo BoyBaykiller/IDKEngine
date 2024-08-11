@@ -17,3 +17,13 @@ dotnet_diagnostic.CS0649.severity = silent
 # Because structs that are shared with GPU require fields to be present even when not used on CPU 
 # CS0169: The field 'field' is never used
 dotnet_diagnostic.CS0169.severity = silent
+
+# Because it decreases chances of forgeting to call Dispose
+# CA2213: Disposable fields should be disposed
+dotnet_diagnostic.CA2213.severity = warning
+
+# IDE0090: Use 'new(...)'
+csharp_style_implicit_object_creation_when_type_is_apparent = false
+
+# IDE0017: Simplify object initialization
+dotnet_style_object_initializer = false

@@ -77,6 +77,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.UseShaderProgram(shaderProgram);
 
                 BBG.Computing.Dispatch((shaded.Width + TILE_SIZE - 1) / TILE_SIZE, (shaded.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
         }
 
@@ -87,12 +88,6 @@ namespace IDKEngine.Render
                 return;
             }
 
-            /// Since AMD driver version Vanguard-24.10-RC10-Jun04 it fails to detect a dependency 
-            /// between <see cref="Compute(BBG.Texture)"/> and this pass. Flush is one possible workarround
-            if (BBG.GetDeviceInfo().Vendor == BBG.GpuVendor.AMD)
-            {
-                BBG.Cmd.Flush();
-            }
             BBG.Computing.Compute("Debug render shading rate attributes", () =>
             {
                 gpuSettingsBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 7);
@@ -104,6 +99,7 @@ namespace IDKEngine.Render
 
                 BBG.Cmd.UseShaderProgram(debugProgram);
                 BBG.Computing.Dispatch((dest.Width + TILE_SIZE - 1) / TILE_SIZE, (dest.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
         }
 

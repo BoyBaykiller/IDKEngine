@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
-using IDKEngine.Source.Utils;
 
 namespace IDKEngine.Bvh
 {
@@ -143,7 +141,7 @@ namespace IDKEngine.Bvh
                     candidates[i - 1] = candidate;
                 }
 
-                Helper.PartialSort<Candidate>(candidates, 0, candidates.Length, 0, count, MyComparer.GreaterThan);
+                Algorithms.PartialSort<Candidate>(candidates, 0, candidates.Length, 0, count, MyComparer.GreaterThan);
 
                 return new Span<Candidate>(candidates, 0, count);
 
@@ -337,8 +335,8 @@ namespace IDKEngine.Bvh
                 uint outLeftChildId = blas.Nodes[outParent].TriStartOrChild;
                 uint outRightChildId = blas.Nodes[outParent].TriStartOrChild + 1;
 
-                MathHelper.Swap(ref blas.Nodes[inLeftChildId], ref blas.Nodes[outLeftChildId]);
-                MathHelper.Swap(ref blas.Nodes[inRightChildId], ref blas.Nodes[outRightChildId]);
+                Algorithms.Swap(ref blas.Nodes[inLeftChildId], ref blas.Nodes[outLeftChildId]);
+                Algorithms.Swap(ref blas.Nodes[inRightChildId], ref blas.Nodes[outRightChildId]);
 
                 blas.Nodes[inParent].TriStartOrChild = outLeftChildId;
 

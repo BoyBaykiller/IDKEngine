@@ -26,6 +26,11 @@ namespace BBOpenGL
                 GL.Flush();
             }
 
+            public static void TextureBarrier()
+            {
+                GL.TextureBarrier();
+            }
+
             public static void MemoryBarrier(MemoryBarrierMask memoryBarrierMask)
             {
                 GL.MemoryBarrier((OpenTK.Graphics.OpenGL.MemoryBarrierMask)memoryBarrierMask);

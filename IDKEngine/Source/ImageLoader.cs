@@ -20,8 +20,14 @@ namespace IDKEngine
             public int Width;
             public int Height;
             public int Channels;
+            public ColorComponents ColorComponents => ChannelsToColorComponents(Channels);
 
             public void SetChannels(ColorComponents colorComponents)
+            {
+                Channels = ColorComponentsToChannels(colorComponents);
+            }
+
+            public static int ColorComponentsToChannels(ColorComponents colorComponents)
             {
                 int channels = colorComponents switch
                 {
@@ -31,7 +37,19 @@ namespace IDKEngine
                     ColorComponents.RGBA => 4,
                     _ => throw new NotSupportedException($"Can not convert {nameof(colorComponents)} = {colorComponents} to {nameof(channels)}"),
                 };
-                Channels = channels;
+                return channels;
+            }
+
+            public static ColorComponents ChannelsToColorComponents(int channels)
+            {
+                ColorComponents colorComponents = channels switch
+                {
+                    1 => ColorComponents.R,
+                    2 => ColorComponents.RA,
+                    3 => ColorComponents.RGB,
+                    4 => ColorComponents.RGBA,
+                    _ => throw new NotSupportedException($"Can not convert {nameof(channels)} = {channels} to {nameof(colorComponents)}"),
+                };return colorComponents;
             }
         }
 

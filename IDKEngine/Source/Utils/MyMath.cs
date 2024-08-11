@@ -156,5 +156,45 @@ namespace IDKEngine.Utils
             answer |= SplitBy3(x) | SplitBy3(y) << 1 | SplitBy3(z) << 2;
             return answer;
         }
+
+        public static float DegreesToRadians(float degrees)
+        {
+            const float degToRad = MathF.PI / 180.0f;
+            return degrees * degToRad;
+        }
+
+        public static float RadiansToDegrees(float radians)
+        {
+            const float radToDeg = 180.0f / MathF.PI;
+            return radians * radToDeg;
+        }
+
+        public static Matrix3x4 Matrix4x4ToTranposed3x4(in Matrix4 model)
+        {
+            Matrix4x3 fourByThree = new Matrix4x3(
+                model.Row0.Xyz,
+                model.Row1.Xyz,
+                model.Row2.Xyz,
+                model.Row3.Xyz
+            );
+
+            Matrix3x4 result = Matrix4x3.Transpose(fourByThree);
+
+            return result;
+        }
+
+        public static Matrix4 Matrix3x4ToTransposed4x4(in Matrix3x4 model)
+        {
+            Matrix4x3 tranposed = Matrix3x4.Transpose(model);
+
+            Matrix4 result = new Matrix4(
+                new Vector4(tranposed.Row0, 0.0f),
+                new Vector4(tranposed.Row1, 0.0f),
+                new Vector4(tranposed.Row2, 0.0f),
+                new Vector4(tranposed.Row3, 1.0f)
+            );
+
+            return result;
+        }
     }
 }

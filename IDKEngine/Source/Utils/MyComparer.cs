@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-
-namespace IDKEngine.Source.Utils
+﻿namespace IDKEngine.Utils
 {
     public static class MyComparer
     {

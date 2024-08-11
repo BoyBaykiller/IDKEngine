@@ -42,21 +42,25 @@ namespace IDKEngine.Render
             public float EpsilonOffset;
         }
 
-
-        public MovingLightsCollisionSettings MovingLightsCollisionSetting = new MovingLightsCollisionSettings()
+        public MovingLightsCollisionSettings LightVsLightCollisionSetting = new MovingLightsCollisionSettings()
         {
             IsEnabled = true,
             EpsilonOffset = 0.001f,
             RecursiveSteps = 8,
         };
         
-        public Intersections.SceneVsMovingSphereSettings SceneVsSphereCollisionSettings = new Intersections.SceneVsMovingSphereSettings()
+        public SceneVsMovingSphereCollisionSettings SceneVsSphereCollisionSettings = new SceneVsMovingSphereCollisionSettings()
         {
             IsEnabled = true,
-            TestSteps = 1,
-            RecursiveSteps = 8,
-            EpsilonNormalOffset = 0.001f,
+            Collision = new Intersections.SceneVsMovingSphereSettings()
+            {
+                TestSteps = 1,
+                RecursiveSteps = 8,
+                EpsilonNormalOffset = 0.001f,
+            }
         };
+
+        public bool DoAdvanceSimulation = true;
 
         private readonly CpuLight[] lights;
 
@@ -218,30 +222,41 @@ namespace IDKEngine.Render
             }
         }
 
-        public void AdvanceSimulation(float dT, ModelManager modelManager)
+        public void Update(float dT, ModelManager modelManager)
         {
-            for (int i = 0; i < Count; i++)
+            if (DoAdvanceSimulation)
             {
-                CpuLight cpuLight = lights[i];
-                cpuLight.AdvanceSimulation(dT);
-
-                Sphere movingSphere = new Sphere(cpuLight.GpuLight.PrevPosition, cpuLight.GpuLight.Radius);
-                Vector3 prevSpherePos = movingSphere.Center;
-                Intersections.SceneVsMovingSphereCollisionRoutine(modelManager, SceneVsSphereCollisionSettings, ref movingSphere, cpuLight.GpuLight.Position, (in Intersections.SceneHitInfo hitInfo) =>
+                for (int i = 0; i < Count; i++)
                 {
-                    Vector3 deltaStep = cpuLight.GpuLight.Position - prevSpherePos;
-                    Vector3 reflected = Plane.Reflect(deltaStep, hitInfo.SlidingPlane);
-                    cpuLight.GpuLight.Position = movingSphere.Center + reflected;
-
-                    cpuLight.Velocity = Plane.Reflect(cpuLight.Velocity, hitInfo.SlidingPlane);
-
-                    prevSpherePos = movingSphere.Center;
-                });
+                    CpuLight cpuLight = lights[i];
+                    cpuLight.AdvanceSimulation(dT);
+                }
             }
 
-            if (MovingLightsCollisionSetting.IsEnabled)
+            if (SceneVsSphereCollisionSettings.IsEnabled)
             {
-                for (int i = 0; i < MovingLightsCollisionSetting.RecursiveSteps; i++)
+                for (int i = 0; i < Count; i++)
+                {
+                    CpuLight cpuLight = lights[i];
+
+                    Sphere movingSphere = new Sphere(cpuLight.GpuLight.PrevPosition, cpuLight.GpuLight.Radius);
+                    Vector3 prevSpherePos = movingSphere.Center;
+                    Intersections.SceneVsMovingSphereCollisionRoutine(modelManager, SceneVsSphereCollisionSettings.Collision, ref movingSphere, cpuLight.GpuLight.Position, (in Intersections.SceneHitInfo hitInfo) =>
+                    {
+                        Vector3 deltaStep = cpuLight.GpuLight.Position - prevSpherePos;
+                        Vector3 reflected = Plane.Reflect(deltaStep, hitInfo.SlidingPlane);
+                        cpuLight.GpuLight.Position = movingSphere.Center + reflected;
+
+                        cpuLight.Velocity = Plane.Reflect(cpuLight.Velocity, hitInfo.SlidingPlane);
+
+                        prevSpherePos = movingSphere.Center;
+                    });
+                }
+            }
+
+            if (LightVsLightCollisionSetting.IsEnabled)
+            {
+                for (int i = 0; i < LightVsLightCollisionSetting.RecursiveSteps; i++)
                 {
                     for (int j = 0; j < Count; j++)
                     {
@@ -280,7 +295,7 @@ namespace IDKEngine.Render
                                     continue;
                                 }
 
-                                thisIntersectionTime -= (invertBias ? -MovingLightsCollisionSetting.EpsilonOffset : MovingLightsCollisionSetting.EpsilonOffset) / tScale;
+                                thisIntersectionTime -= (invertBias ? -LightVsLightCollisionSetting.EpsilonOffset : LightVsLightCollisionSetting.EpsilonOffset) / tScale;
                                 if (thisIntersectionTime < intersectionTime)
                                 {
                                     intersectionTime = thisIntersectionTime;
@@ -301,47 +316,43 @@ namespace IDKEngine.Render
 
         private static void CollisionResponse(CpuLight light, CpuLight otherLight, float intersectionTime)
         {
-            {
-                Vector3 newLightPosition = Vector3.Lerp(light.GpuLight.PrevPosition, light.GpuLight.Position, intersectionTime);
-                Vector3 newOtherLightPosition = Vector3.Lerp(otherLight.GpuLight.PrevPosition, otherLight.GpuLight.Position, intersectionTime);
+            Vector3 newLightPosition = Vector3.Lerp(light.GpuLight.PrevPosition, light.GpuLight.Position, intersectionTime);
+            Vector3 newOtherLightPosition = Vector3.Lerp(otherLight.GpuLight.PrevPosition, otherLight.GpuLight.Position, intersectionTime);
 
-                Vector3 lightLostDisplacement = light.GpuLight.Position - newLightPosition;
-                Vector3 otherLightLostDisplacement = otherLight.GpuLight.Position - newOtherLightPosition;
+            Vector3 lightLostDisplacement = light.GpuLight.Position - newLightPosition;
+            Vector3 otherLightLostDisplacement = otherLight.GpuLight.Position - newOtherLightPosition;
 
-                // TODO: Changing PrevPosition here makes gpu velocity values wrong, maybe fix?
-                light.GpuLight.Position = newLightPosition;
-                light.GpuLight.PrevPosition = light.GpuLight.Position;
+            // TODO: Changing PrevPosition here makes gpu velocity values wrong, maybe fix?
+            light.GpuLight.Position = newLightPosition;
+            light.GpuLight.PrevPosition = light.GpuLight.Position;
 
-                otherLight.GpuLight.Position = newOtherLightPosition;
-                otherLight.GpuLight.PrevPosition = otherLight.GpuLight.Position;
+            otherLight.GpuLight.Position = newOtherLightPosition;
+            otherLight.GpuLight.PrevPosition = otherLight.GpuLight.Position;
 
-                light.GpuLight.Position += lightLostDisplacement + otherLightLostDisplacement;
-                otherLight.GpuLight.Position += otherLightLostDisplacement + lightLostDisplacement;
-            }
+            light.GpuLight.Position += lightLostDisplacement + otherLightLostDisplacement;
+            otherLight.GpuLight.Position += otherLightLostDisplacement + lightLostDisplacement;
 
-            {
-                // Source: https://physics.stackexchange.com/questions/296767/multiple-colliding-balls, https://en.wikipedia.org/wiki/Coefficient_of_restitution
+            // Source: https://physics.stackexchange.com/questions/296767/multiple-colliding-balls, https://en.wikipedia.org/wiki/Coefficient_of_restitution
 
-                float coeffOfRestitution = 1.0f;
-                float light1Mass = CpuLight.MASS;
-                float light2Mass = CpuLight.MASS;
-                float combinedMass = light1Mass + light2Mass;
+            float coeffOfRestitution = 1.0f;
+            float light1Mass = CpuLight.MASS;
+            float light2Mass = CpuLight.MASS;
+            float combinedMass = light1Mass + light2Mass;
 
-                Vector3 otherLightNormal = Vector3.Normalize(light.GpuLight.Position - otherLight.GpuLight.Position);
-                Vector3 lightNormal = -otherLightNormal;
+            Vector3 otherLightNormal = Vector3.Normalize(light.GpuLight.Position - otherLight.GpuLight.Position);
+            Vector3 lightNormal = -otherLightNormal;
 
-                float ua = Vector3.Dot(-light.Velocity, lightNormal);
-                float ub = Vector3.Dot(-otherLight.Velocity, lightNormal);
+            float ua = Vector3.Dot(-light.Velocity, lightNormal);
+            float ub = Vector3.Dot(-otherLight.Velocity, lightNormal);
 
-                float newVelA = (coeffOfRestitution * light2Mass * (ub - ua) + light1Mass * ua + light2Mass * ub) / combinedMass;
-                float newVelB = (coeffOfRestitution * light1Mass * (ua - ub) + light1Mass * ua + light2Mass * ub) / combinedMass;
+            float newVelA = (coeffOfRestitution * light2Mass * (ub - ua) + light1Mass * ua + light2Mass * ub) / combinedMass;
+            float newVelB = (coeffOfRestitution * light1Mass * (ua - ub) + light1Mass * ua + light2Mass * ub) / combinedMass;
 
-                light.Velocity += lightNormal * (ua - newVelA);
-                otherLight.Velocity += lightNormal * (ub - newVelB);
-            }
+            light.Velocity += lightNormal * (ua - newVelA);
+            otherLight.Velocity += lightNormal * (ub - newVelB);
         }
 
-        public void UpdateBuffer(out bool anyLightMoved)
+        public void Update(out bool anyLightMoved)
         {
             // Update PointShadows
             for (int i = 0; i < pointShadowManager.Count; i++)
