@@ -30,6 +30,7 @@ namespace BBOpenGL
                 R16Float = SizedInternalFormat.R16f,
 
                 R32Float = SizedInternalFormat.R32f,
+                R32Int = SizedInternalFormat.R32i,
                 R32Uint = SizedInternalFormat.R32ui,
 
                 R8G8Unorm = SizedInternalFormat.Rg8,
@@ -83,6 +84,7 @@ namespace BBOpenGL
             public enum PixelFormat : uint
             {
                 R = OpenTK.Graphics.OpenGL.PixelFormat.Red,
+                RInteger = OpenTK.Graphics.OpenGL.PixelFormat.RedInteger,
                 RG = OpenTK.Graphics.OpenGL.PixelFormat.Rg,
                 RGB = OpenTK.Graphics.OpenGL.PixelFormat.Rgb,
                 RGBA = OpenTK.Graphics.OpenGL.PixelFormat.Rgba,
@@ -91,6 +93,7 @@ namespace BBOpenGL
             public enum PixelType : uint
             {
                 UByte = OpenTK.Graphics.OpenGL.PixelType.UnsignedByte,
+                Int = OpenTK.Graphics.OpenGL.PixelType.Int,
                 Float = OpenTK.Graphics.OpenGL.PixelType.Float,
             }
 

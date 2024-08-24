@@ -1,49 +1,44 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace IDKEngine.Utils
 {
-    public static class Memory
+    public static unsafe class Memory
     {
-        public static unsafe T* Malloc<T>(nint count = 1) where T : unmanaged
+        public static T* Malloc<T>(nint count = 1) where T : unmanaged
         {
             return (T*)NativeMemory.Alloc((nuint)(sizeof(T) * count));
         }
 
-        public static unsafe T* Malloc<T>(int count = 1) where T : unmanaged
+        public static T* Malloc<T>(int count = 1) where T : unmanaged
         {
             return (T*)NativeMemory.Alloc((nuint)(sizeof(T) * count));
         }
 
-        public static unsafe void Free(void* ptr)
+        public static void Free(void* ptr)
         {
             NativeMemory.Free(ptr);
         }
 
-        public static unsafe void Fill(void* ptr, byte value, nint byteCount)
+        public static void Fill(void* ptr, byte value, nint byteCount)
         {
             NativeMemory.Fill(ptr, (nuint)byteCount, value);
         }
 
-        public static unsafe void Copy<T1, T2>(in T1 src, ref T2 dest, nint byteCount)
-            where T1 : unmanaged
-            where T2 : unmanaged
+        public static void CopyElements<T>(in T src, ref T dest, nint numElements) where T : unmanaged
         {
-            fixed (void* srcPtr = &src, destPtr = &dest)
+            fixed (T* srcPtr = &src, destPtr = &dest)
             {
-                Copy(srcPtr, destPtr, byteCount);
+                CopyElements(srcPtr, destPtr, numElements);
             }
         }
 
-        public static unsafe void Copy<T1>(in T1 src, T1* dest, nint byteCount)
-            where T1 : unmanaged
+        public static void CopyElements<T>(T* src, T* dest, nint numElements) where T : unmanaged
         {
-            fixed (void* srcPtr = &src)
-            {
-                Copy(srcPtr, dest, byteCount);
-            }
+            Copy(src, dest, sizeof(T) * numElements);
         }
 
-        public static unsafe void Copy(void* src, void* dest, nint byteCount)
+        public static void Copy(void* src, void* dest, nint byteCount)
         {
             NativeMemory.Copy(src, dest, (nuint)byteCount);
         }

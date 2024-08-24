@@ -21,7 +21,7 @@ layout(triangles, max_primitives = MESHLET_MAX_TRIANGLE_COUNT + 1, max_vertices 
 
 taskNV in InOutData
 {
-    uint MeshID;
+    uint MeshId;
     uint InstanceID;
     uint8_t FaceID;
     uint MeshletsStart;
@@ -32,7 +32,7 @@ layout(location = 0) uniform int ShadowIndex;
 
 void main()
 {
-    uint meshID = inData.MeshID;
+    uint meshID = inData.MeshId;
     uint instanceID = inData.InstanceID;
     uint meshletID = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x]; 
 

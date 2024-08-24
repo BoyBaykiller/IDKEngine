@@ -38,6 +38,11 @@ namespace IDKEngine.Shapes
             SIMDMin = Vector128.Min(SIMDMin, point);
             SIMDMax = Vector128.Max(SIMDMax, point);
         }
+        public void GrowToFit(in Box box)
+        {
+            SIMDMin = Vector128.Min(SIMDMin, box.SIMDMin);
+            SIMDMax = Vector128.Max(SIMDMax, box.SIMDMax);
+        }
 
         public void GrowToFit(in Vector3 point)
         {
@@ -45,12 +50,6 @@ namespace IDKEngine.Shapes
             GrowToFit(p);
         }
 
-        public void GrowToFit(in Box box)
-        {
-            GrowToFit(box.SIMDMin);
-            GrowToFit(box.SIMDMax);
-        }
-        
         public void GrowToFit(in BLAS.Triangle tri)
         {
             GrowToFit(tri.Position0);

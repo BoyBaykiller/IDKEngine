@@ -78,19 +78,19 @@ namespace IDKEngine.Render
                 BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "Light/fragment.glsl"));
 
             lightBufferObject = new BBG.TypedBuffer<GpuLight>();
-            lightBufferObject.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, lights.Length * sizeof(GpuLight) + sizeof(int));
-            lightBufferObject.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 1);
+            lightBufferObject.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, lights.Length * sizeof(GpuLight) + sizeof(int));
+            lightBufferObject.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 1);
 
             const int SphereLatitudes = 12, SphereLongitudes = 12;
             const float SphereRadius = 1.0f;
 
             Span<ObjectFactory.Sphere.Vertex> vertices = ObjectFactory.Sphere.GenerateVertices(SphereRadius, SphereLatitudes, SphereLongitudes);
             vertexBuffer = new BBG.TypedBuffer<ObjectFactory.Sphere.Vertex>();
-            vertexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.None, vertices);
+            vertexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertices);
 
             Span<uint> indices = ObjectFactory.Sphere.GenerateIndices(SphereLatitudes, SphereLongitudes);
             indexBuffer = new BBG.TypedBuffer<uint>();
-            indexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.None, indices);
+            indexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, indices);
 
             pointShadowManager = new PointShadowManager();
         }
@@ -374,8 +374,8 @@ namespace IDKEngine.Render
                 if (light.GpuLight.DidMove())
                 {
                     anyLightMoved = true;
+                    light.GpuLight.SetPrevToCurrentPosition();
                 }
-                light.GpuLight.SetPrevToCurrentPosition();
             }
         }
 

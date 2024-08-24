@@ -3,9 +3,11 @@
 Feature list:
  - Wavefront Path Tracer
  - Real-Time Voxel Global Illumination
- - Mesh Shaders + Multi Draw Indirect + Bindless Textures + other extensions
+ - Two-Level BVH with [Reinsertion Optimization](https://meistdan.github.io/publications/prbvh/paper.pdf) and GPU Refitting
  - [AMD FSR2](https://github.com/JuanDiegoMontoya/FidelityFX-FSR2-OpenGL) and Temporal Anti Aliasing
- - Lights & Camera Collision Detection against arbitrary triangle meshes
+ - Mesh Shaders + Multi Draw Indirect + Bindless Textures + lots of OpenGL...
+ - glTF support including animations and various extensions
+ - Collision Detection against triangle meshes
  - CoD-Modern-Warfare Bloom
  - Ray Traced Shadows
  - Variable Rate Shading
@@ -15,7 +17,6 @@ Feature list:
  - Screen Space Ambient Occlusion
  - Atmospheric Scattering
  - Asynchronous texture loading
- - glTF loader supporting various extensions
  - Camera capture and playback with video output
 
 Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)

@@ -19,12 +19,12 @@ in InOutData
     vec4 PrevClipPos;
     vec3 Normal;
     vec3 Tangent;
-    flat uint MeshID;
+    flat uint MeshId;
 } inData;
 
 void main()
 {
-    GpuMesh mesh = meshSSBO.Meshes[inData.MeshID];
+    GpuMesh mesh = meshSSBO.Meshes[inData.MeshId];
     GpuMaterial material = materialSSBO.Materials[mesh.MaterialIndex];
     
     Surface surface = GetSurface(material, inData.TexCoord, taaDataUBO.MipmapBias);

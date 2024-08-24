@@ -93,7 +93,7 @@ namespace IDKEngine
 
         public int MeasuredFramesPerSecond { get; private set; }
 
-        private bool _timeEnabled = true;
+        private bool _timeEnabled;
         public bool TimeEnabled
         {
             get => _timeEnabled;
@@ -103,6 +103,7 @@ namespace IDKEngine
                 _timeEnabled = value;
                 LightManager.DoAdvanceSimulation = TimeEnabled;
                 ModelManager.RunAnimations = TimeEnabled;
+                ModelManager.BVH.RefitBlas = TimeEnabled;
             }
         }
 
@@ -126,7 +127,28 @@ namespace IDKEngine
 
         protected override void OnRender(float dT)
         {
-            RenderPrepare(dT);
+            MainThreadQueue.Execute();
+
+            Camera.ProjectionSize = RenderResolution;
+            gpuPerFrameData.PrevView = gpuPerFrameData.View;
+            gpuPerFrameData.PrevProjView = gpuPerFrameData.ProjView;
+            gpuPerFrameData.Projection = Camera.GetProjectionMatrix();
+            gpuPerFrameData.InvProjection = Matrix4.Invert(gpuPerFrameData.Projection);
+            gpuPerFrameData.View = Camera.GetViewMatrix();
+            gpuPerFrameData.InvView = Matrix4.Invert(gpuPerFrameData.View);
+            gpuPerFrameData.ProjView = gpuPerFrameData.View * gpuPerFrameData.Projection;
+            gpuPerFrameData.InvProjView = Matrix4.Invert(gpuPerFrameData.ProjView);
+            gpuPerFrameData.CameraPos = Camera.Position;
+            gpuPerFrameData.NearPlane = Camera.NearPlane;
+            gpuPerFrameData.FarPlane = Camera.FarPlane;
+            gpuPerFrameData.DeltaRenderTime = dT;
+            gpuPerFrameData.Time = WindowTime;
+            gpuPerFrameData.Frame++;
+            gpuPerFrameDataBuffer.UploadElements(gpuPerFrameData);
+
+            LightManager.Update(out bool anyLightMoved);
+            ModelManager.Update(out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved);
+
             if (RequestPresentationResolution.HasValue || RequestRenderResolutionScale.HasValue)
             {
                 float newResolutionScale = RequestRenderResolutionScale ?? RenderResolutionScale;
@@ -143,9 +165,6 @@ namespace IDKEngine
                 SetRenderMode(RequestRenderMode.Value, RenderResolution, PresentationResolution);
                 RequestRenderMode = null;
             }
-
-            ModelManager.ComputeSkinnedPositions();
-            ModelManager.BVH.TlasBuild();
 
             if (CRenderMode == RenderMode.Rasterizer)
             {
@@ -174,6 +193,12 @@ namespace IDKEngine
 
             if (CRenderMode == RenderMode.PathTracer)
             {
+                bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
+                if (cameraMoved || anyAnimatedNodeMoved || anyMeshInstanceMoved || anyLightMoved)
+                {
+                    PathTracer.ResetAccumulation();
+                }
+
                 PathTracer.Compute();
 
                 if (IsBloom)
@@ -190,7 +215,7 @@ namespace IDKEngine
                 Box boundingBox = new Box();
                 if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
                 {
-                    GpuBlasNode node = ModelManager.BVH.Tlas.Blases[gui.SelectedEntity.EntityID].Root;
+                    GpuBlasNode node = ModelManager.BVH.GetBlas(gui.SelectedEntity.EntityID).Root;
                     boundingBox.Min = node.Min;
                     boundingBox.Max = node.Max;
 
@@ -232,60 +257,6 @@ namespace IDKEngine
             }
         }
 
-        private void RenderPrepare(float dT)
-        {
-            MainThreadQueue.Execute();
-            
-            {
-                Camera.ProjectionSize = RenderResolution;
-
-                gpuPerFrameData.PrevView = gpuPerFrameData.View;
-                gpuPerFrameData.PrevProjView = gpuPerFrameData.ProjView;
-
-                gpuPerFrameData.Projection = Camera.GetProjectionMatrix();
-                gpuPerFrameData.InvProjection = Matrix4.Invert(gpuPerFrameData.Projection);
-
-                gpuPerFrameData.View = Camera.GetViewMatrix();
-                gpuPerFrameData.InvView = Matrix4.Invert(gpuPerFrameData.View);
-
-                gpuPerFrameData.ProjView = gpuPerFrameData.View * gpuPerFrameData.Projection;
-                gpuPerFrameData.InvProjView = Matrix4.Invert(gpuPerFrameData.ProjView);
-
-                gpuPerFrameData.CameraPos = Camera.Position;
-                gpuPerFrameData.NearPlane = Camera.NearPlane;
-                gpuPerFrameData.FarPlane = Camera.FarPlane;
-
-                gpuPerFrameData.DeltaRenderTime = dT;
-                gpuPerFrameData.Time = WindowTime;
-                gpuPerFrameData.Frame++;
-
-                gpuPerFrameDataBuffer.UploadElements(gpuPerFrameData);
-            }
-
-            LightManager.Update(out bool anyLightMoved);
-            ModelManager.Update(out bool anyMeshInstanceMoved);
-
-            {
-                //int meshID = 0;
-                //int verticesStart = ModelManager.DrawCommands[meshID].BaseVertex;
-                //int verticesCount = ModelManager.GetMeshVertexCount(meshID);
-                //for (int i = verticesStart; i < verticesStart + verticesCount; i++)
-                //{
-                //    ModelManager.VertexPositions[i].X += 2f * dT;
-                //}
-
-                //ModelManager.UpdateVertexPositions(verticesStart, verticesCount);
-                //ModelManager.BVH.BlasesRefit(meshID, 1);
-                ////ModelSystem.BVH.TlasBuild();
-            }
-
-            bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
-            if ((CRenderMode == RenderMode.PathTracer) && (cameraMoved || anyMeshInstanceMoved || anyLightMoved))
-            {
-                PathTracer.ResetRenderProcess();
-            }
-        }
-
         protected override void OnUpdate(float dT)
         {
             gui.Update(this);
@@ -320,7 +291,7 @@ namespace IDKEngine
                 if (KeyboardState[Keys.D1] == Keyboard.InputState.Touched)
                 {
                     BBG.AbstractShaderProgram.RecompileAll();
-                    PathTracer?.ResetRenderProcess();
+                    PathTracer?.ResetAccumulation();
                 }
                 if (KeyboardState[Keys.E] == Keyboard.InputState.Touched)
                 {
@@ -394,7 +365,7 @@ namespace IDKEngine
 
             Camera.SetPrevToCurrentPosition();
         }
-       
+
         protected override unsafe void OnStart()
         {
             BBG.Initialize(Helper.GLDebugCallback);
@@ -426,8 +397,8 @@ namespace IDKEngine
             }
 
             gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
-            gpuPerFrameDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
-            gpuPerFrameDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 0);
+            gpuPerFrameDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            gpuPerFrameDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 0);
 
             SkyBoxManager.Initialize(SkyBoxManager.SkyBoxMode.ExternalAsset, [
                 "Resource/Textures/EnvironmentMap/1.jpg",
@@ -440,7 +411,7 @@ namespace IDKEngine
 
             ModelLoader.TextureLoaded += () =>
             {
-                PathTracer?.ResetRenderProcess();
+                PathTracer?.ResetAccumulation();
             };
 
             ModelManager = new ModelManager();
@@ -471,11 +442,11 @@ namespace IDKEngine
                 lucy.GpuModel.Meshes[0].RoughnessBias = -1.0f;
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).Matrix).Value;
-
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Assets\\Models\\CesiumMan\\glTF\\CesiumMan.gltf", new Transformation().WithTranslation(5.0f, 0.0f, 0.0f).WithScale(2.0f).Matrix).Value;
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
-                
+
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
@@ -495,18 +466,22 @@ namespace IDKEngine
             {
                 ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
                 ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
-                //ModelLoader.CpuModel d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
-                //ModelLoader.CpuModel e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
+                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\CpuModels\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+                //ModelLoader.CpuModel d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\CpuModels\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
+                //ModelLoader.CpuModel e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\CpuModels\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
                 ModelManager.Add(a, b);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
+
+                //LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
+                //LightManager.CreatePointShadowForLight(new CpuPointShadow(512, WindowFramebufferSize, new Vector2(0.1f, 60.0f)), 0);
             }
 
             gui = new Gui(WindowFramebufferSize);
-            WindowVSync = true;
             MouseState.CursorMode = CursorModeValue.CursorNormal;
             FrameStateRecorder = new StateRecorder<FrameState>();
+            WindowVSync = true;
+            TimeEnabled = true;
 
             GC.Collect();
         }
@@ -546,7 +521,7 @@ namespace IDKEngine
 
         /// <summary>
         /// We should avoid random resolution changes inside a frame so if you can use
-        /// <seealso cref="RequestPresentationResolution"/> instead.
+        /// <see cref="RequestPresentationResolution"/> instead.
         /// It will always make the change at the beginning of a frame.
         /// </summary>
         private void SetResolutions(Vector2i renderRes, Vector2i presentRes)
@@ -565,7 +540,7 @@ namespace IDKEngine
 
         /// <summary>
         /// We should avoid random render mode changes inside a frame so if you can use
-        /// <seealso cref="RequestRenderMode"/> instead.
+        /// <see cref="RequestRenderMode"/> instead.
         /// It will always make the change at the beginning of a frame.
         /// </summary>
         private void SetRenderMode(RenderMode renderMode, Vector2i renderRes, Vector2i presentRes)

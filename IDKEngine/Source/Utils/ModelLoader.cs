@@ -1,4 +1,5 @@
-﻿using System;
+﻿#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type. Workarround to C# Lambda-Functions skill issue
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -182,7 +183,7 @@ namespace IDKEngine.Utils
 
             /// <summary>
             /// Traverses into all dirty parents and marks them as no longer dirty. The caller is expected to call
-            /// <seealso cref="UpdateGlobalTransform"/> inside <paramref name="updateParent"/>
+            /// <see cref="UpdateGlobalTransform"/> inside <paramref name="updateParent"/>
             /// </summary>
             /// <param name="parent"></param>
             /// <param name="updateParent"></param>
@@ -213,9 +214,6 @@ namespace IDKEngine.Utils
 
             public static unsafe void HierarchyToArray(Node parent, Span<Node> nodes)
             {
-#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
-
-                // Workarround for not being able to access Span inside. Please give stack allocated lamdas
                 fixed (Node* ptrNodes = nodes)
                 {
                     Node* copyPtrNodes = ptrNodes;
@@ -224,7 +222,6 @@ namespace IDKEngine.Utils
                         copyPtrNodes[node.ArrayIndex] = node;
                     });
                 }
-#pragma warning restore CS8500
             }
         }
 
@@ -488,7 +485,7 @@ namespace IDKEngine.Utils
             // If regular Image is used
             public ImageLoader.ImageHeader ImageHeader;
             public ImageLoader.ColorComponents ImageLoadChannels; // e.g for "Transmissive" we only load R instead of RGB
-            public ReadOnlyMemory<byte> ImageData;
+            public ReadOnlyMemory<byte> EncodedImageData;
         }
 
         private record struct MeshPrimitiveDesc
@@ -599,9 +596,7 @@ namespace IDKEngine.Utils
             List<byte> listMeshletsLocalIndices = new List<byte>();
             List<Vector4i> listJointIndices = new List<Vector4i>();
             List<Vector4> listJointWeights = new List<Vector4>();
-
-            //int myNodeCounter = 0;
-
+            
             Node myRoot = new Node();
             myRoot.Name = modelName;
             myRoot.LocalTransform = Transformation.FromMatrix(rootTransform);
@@ -624,7 +619,6 @@ namespace IDKEngine.Utils
                 }
             }
 
-            int jointsCount = 0;
             Dictionary<GltfNode, Node> gltfNodeToMyNode = new Dictionary<GltfNode, Node>(gltf.LogicalNodes.Count);
             while (nodeStack.Count > 0)
             {
@@ -672,11 +666,6 @@ namespace IDKEngine.Utils
                         continue;
                     }
 
-                    for (int j = 0; j < meshGeometry.VertexData.JointIndices.Length; j++)
-                    {
-                        meshGeometry.VertexData.JointIndices[j] += new Vector4i(jointsCount);
-                    }
-
                     for (int j = 0; j < meshGeometry.Meshlets.Length; j++)
                     {
                         ref GpuMeshlet myMeshlet = ref meshGeometry.Meshlets[j];
@@ -716,7 +705,7 @@ namespace IDKEngine.Utils
                     {
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
                         meshInstance.ModelMatrix = nodeTransformations[j] * myNode.Parent.GlobalTransform;
-                        meshInstance.MeshIndex = listMeshes.Count;
+                        meshInstance.MeshId = listMeshes.Count;
                     }
 
                     BBG.DrawElementsIndirectCommand drawCmd = new BBG.DrawElementsIndirectCommand();
@@ -739,16 +728,10 @@ namespace IDKEngine.Utils
                     listJointIndices.AddRange(meshGeometry.VertexData.JointIndices);
                     listJointWeights.AddRange(meshGeometry.VertexData.JointWeights);
                 }
-
-                if (gltfNode.Skin != null)
-                {
-                    jointsCount += gltfNode.Skin.JointsCount;
-                }
                 
                 meshInstanceIdsRange.End = listMeshInstances.Count;
                 myNode.MeshInstanceIds = meshInstanceIdsRange;
             }
-
 
             GpuModel gpuModel = new GpuModel();
             gpuModel.Meshes = listMeshes.ToArray();
@@ -768,8 +751,6 @@ namespace IDKEngine.Utils
             Node[] myNodes = new Node[gltf.LogicalNodes.Count + 1];
             Node.HierarchyToArray(myRoot, myNodes);
 
-            // Exclude our artifical root thats not part of the glTF.
-            // That way GltfNode.LogicalIndex can be used to find my corresponding Node
             LoadNodeSkins(gltf.LogicalNodes, gltfNodeToMyNode);
             Animation[] animations = LoadAnimations(gltf, gltfNodeToMyNode);
 
@@ -817,7 +798,7 @@ namespace IDKEngine.Utils
 
                     if (!uniqueBindlessHandles.TryGetValue(sampledImage, out GLTexture.BindlessHandle bindlessHandle))
                     {
-                        if (StartAsyncLoadGltfTexture(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler))
+                        if (StartAsyncLoadGLTexture(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler))
                         {
                             bindlessHandle = glTexture.GetTextureHandleARB(glSampler);
                             uniqueBindlessHandles[sampledImage] = bindlessHandle;
@@ -841,7 +822,7 @@ namespace IDKEngine.Utils
             return gpuMaterials;
         }
 
-        private static unsafe bool StartAsyncLoadGltfTexture(SampledImage sampledImage, GpuMaterial.TextureType textureType, bool useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler)
+        private static unsafe bool StartAsyncLoadGLTexture(SampledImage sampledImage, GpuMaterial.TextureType textureType, bool useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler)
         {
             if (!TryGetGLTextureLoadData(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out GLTextureLoadData textureLoadData))
             {
@@ -906,7 +887,6 @@ namespace IDKEngine.Utils
                                 return;
                             }
                         }
-
                         MainThreadQueue.AddToLazyQueue(() =>
                         {
                             int compressedImageSize = textureLoadData.Ktx2Texture.DataSize; // Compressed size after transcoding
@@ -943,7 +923,7 @@ namespace IDKEngine.Utils
 
                     Task.Run(() =>
                     {
-                        ReadOnlySpan<byte> imageData = textureLoadData.ImageData.Span;
+                        ReadOnlySpan<byte> imageData = textureLoadData.EncodedImageData.Span;
                         using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, textureLoadData.ImageHeader.Channels);
 
                         if (imageResult.RawPixels == null)
@@ -979,8 +959,8 @@ namespace IDKEngine.Utils
 
             if (gltfImage.Content.IsPng || gltfImage.Content.IsJpg)
             {
-                textureLoadData.ImageData = gltfImage.Content.Content;
-                if (!ImageLoader.TryGetImageHeader(textureLoadData.ImageData.Span, out textureLoadData.ImageHeader))
+                textureLoadData.EncodedImageData = gltfImage.Content.Content;
+                if (!ImageLoader.TryGetImageHeader(textureLoadData.EncodedImageData.Span, out textureLoadData.ImageHeader))
                 {
                     Logger.Log(Logger.LogLevel.Error, $"Error parsing header of image \"{gltfImage.Name}\"");
                     return false;
@@ -1641,21 +1621,20 @@ namespace IDKEngine.Utils
             if (optimizationSettings.VertexRemapOptimization)
             {
                 uint[] remapTable = new uint[meshVertices.Length];
-                int optimizedVertexCount = 0;
                 fixed (void* meshVerticesPtr = meshVertices, meshPositionsPtr = meshVertexPositions)
                 {
                     Span<Meshopt.Stream> vertexStreams = stackalloc Meshopt.Stream[2];
                     vertexStreams[0] = new Meshopt.Stream() { Data = meshVerticesPtr, Size = (nuint)sizeof(GpuVertex), Stride = (nuint)sizeof(GpuVertex) };
                     vertexStreams[1] = new Meshopt.Stream() { Data = meshPositionsPtr, Size = (nuint)sizeof(Vector3), Stride = (nuint)sizeof(Vector3) };
 
-                    optimizedVertexCount = (int)Meshopt.GenerateVertexRemapMulti(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length, vertexStreams[0], (nuint)vertexStreams.Length);
+                    int optimizedVertexCount = (int)Meshopt.GenerateVertexRemapMulti(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length, vertexStreams[0], (nuint)vertexStreams.Length);
+                    Array.Resize(ref meshVertices, optimizedVertexCount);
+                    Array.Resize(ref meshVertexPositions, optimizedVertexCount);
 
                     Meshopt.RemapIndexBuffer(ref meshIndices[0], meshIndices[0], (nuint)meshIndices.Length, remapTable[0]);
                     Meshopt.RemapVertexBuffer(vertexStreams[0].Data, vertexStreams[0].Data, (nuint)meshVertices.Length, vertexStreams[0].Stride, remapTable[0]);
                     Meshopt.RemapVertexBuffer(vertexStreams[1].Data, vertexStreams[1].Data, (nuint)meshVertexPositions.Length, vertexStreams[1].Stride, remapTable[0]);
                 }
-                Array.Resize(ref meshVertices, optimizedVertexCount);
-                Array.Resize(ref meshVertexPositions, optimizedVertexCount);
             }
             if (optimizationSettings.VertexCacheOptimization)
             {
@@ -1666,7 +1645,9 @@ namespace IDKEngine.Utils
                 uint[] remapTable = new uint[meshVertices.Length];
                 fixed (void* meshVerticesPtr = meshVertices, meshPositionsPtr = meshVertexPositions)
                 {
-                    Meshopt.OptimizeVertexFetchRemap(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length);
+                    int optimizedVertexCount = (int)Meshopt.OptimizeVertexFetchRemap(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length);
+                    Array.Resize(ref meshVertices, optimizedVertexCount);
+                    Array.Resize(ref meshVertexPositions, optimizedVertexCount);
 
                     Meshopt.RemapIndexBuffer(ref meshIndices[0], meshIndices[0], (nuint)meshIndices.Length, remapTable[0]);
                     Meshopt.RemapVertexBuffer(meshVerticesPtr, meshVerticesPtr, (nuint)meshVertices.Length, (nuint)sizeof(GpuVertex), remapTable[0]);

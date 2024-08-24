@@ -105,7 +105,7 @@ struct GpuMeshInstance
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
-    uint MeshIndex;
+    uint MeshId;
     uint _pad0;
     uint _pad1;
     uint _pad2;

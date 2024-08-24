@@ -1,7 +1,5 @@
 #version 460 core
 
-#define DECLARE_SKINNING_STORAGE_BUFFERS
-
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
@@ -13,7 +11,7 @@ out InOutData
     vec4 PrevClipPos;
     vec3 Normal;
     vec3 Tangent;
-    uint MeshID;
+    uint MeshId;
 } outData;
 
 void main()
@@ -34,7 +32,7 @@ void main()
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.Tangent = normalize(unitVecToWorld * tangent);
     outData.TexCoord = vertex.TexCoord;
-    outData.MeshID = gl_DrawID;
+    outData.MeshId = gl_DrawID;
 
     vec3 prevVertexPosition = Unpack(prevVertexPositionSSBO.Positions[gl_VertexID]);
     outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(prevVertexPosition, 1.0);

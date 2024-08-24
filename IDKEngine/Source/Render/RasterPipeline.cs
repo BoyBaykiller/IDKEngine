@@ -209,12 +209,12 @@ namespace IDKEngine.Render
             mergeLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
-            taaDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
-            taaDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 3);
+            taaDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
 
             bindlessGBufferBuffer = new BBG.TypedBuffer<GpuBindlessGBuffer>();
-            bindlessGBufferBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
-            bindlessGBufferBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 6);
+            bindlessGBufferBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
 
             SSAO = new SSAO(renderSize, SSAO.GpuSettings.Default);
             SSR = new SSR(renderSize, SSR.GpuSettings.Default);
@@ -377,11 +377,12 @@ namespace IDKEngine.Render
 
             // The AMD driver fails to detect a write-read dependency between G-Buffer and some of the
             // following passes like RayTraced shadows. Likely because the G-Buffer is bindless textures.
-            // Flush/TextureBarrier are two possible workarrounds.
+            // TextureBarrier fixes it only on newer drivers (somewhere arround 24.9.2 RC1)
+            // Flush works on both older and newer driver.
             // See discussion https://discord.com/channels/318590007881236480/318783155744145411/1070453712021098548
             if (BBG.GetDeviceInfo().Vendor == BBG.GpuVendor.AMD)
             {
-                BBG.Cmd.TextureBarrier();
+                BBG.Cmd.Flush();
             }
 
             if (ShadowMode == ShadowTechnique.RayTraced)
@@ -503,10 +504,10 @@ namespace IDKEngine.Render
                 FSR2Wrapper.Run(beforeTAATexture, DepthTexture, VelocityTexture, camera, gpuTaaData.Jitter, dT * 1000.0f);
 
                 // This is a hack to fix global UBO bindings modified by FSR2
-                taaDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 3);
-                SkyBoxManager.skyBoxTextureBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 4);
-                Voxelizer.voxelizerDataBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 5);
-                bindlessGBufferBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 6);
+                taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
+                SkyBoxManager.skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
+                Voxelizer.voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
+                bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
             }
         }
 

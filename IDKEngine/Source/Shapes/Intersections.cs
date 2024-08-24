@@ -513,7 +513,7 @@ namespace IDKEngine.Shapes
         /// <param name="movingSphere">The previous position of the sphere and its radius</param>
         /// <param name="sceneHitInfo">Contains useful hit info data</param>
         /// <returns></returns>
-        public static bool SceneVsMovingSphere(ModelManager modelManager, int testSteps, in Vector3 sphereDestination, ref Sphere movingSphere, out SceneHitInfo sceneHitInfo)
+        private static bool SceneVsMovingSphere(ModelManager modelManager, int testSteps, in Vector3 sphereDestination, ref Sphere movingSphere, out SceneHitInfo sceneHitInfo)
         {
             sceneHitInfo = new SceneHitInfo();
 

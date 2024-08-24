@@ -37,7 +37,7 @@ namespace IDKEngine.Render
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "AtmosphericScattering/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             Settings = settings;
             Settings.InvProjection = Matrix4.Invert(Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90.0f), 1.0f, 69.0f, 420.0f));
@@ -57,7 +57,7 @@ namespace IDKEngine.Render
             {
                 Settings.LightIntensity = MathF.Max(Settings.LightIntensity, 0.0f);
 
-                gpuSettingsBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 7);
+                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
                 gpuSettingsBuffer.UploadElements(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0, 0, true);

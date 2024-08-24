@@ -1,44 +1,41 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
-using BBOpenGL;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Bvh
 {
-    public class TLAS
+    public static class TLAS
     {
-        public ref readonly GpuTlasNode Root => ref Nodes[0];
-
-        public int SearchRadius;
-
-        public GpuTlasNode[] Nodes;
-        public readonly GpuMeshInstance[] MeshInstances;
-        public readonly BBG.DrawElementsIndirectCommand[] DrawCommands;
-        public readonly BLAS[] Blases;
-        public TLAS(BLAS[] blases, BBG.DrawElementsIndirectCommand[] drawCommands, GpuMeshInstance[] meshInstances)
+        public record struct BuildSettings
         {
-            Blases = blases;
-            DrawCommands = drawCommands;
-            MeshInstances = meshInstances;
+            public int SearchRadius = 15;
 
-            Nodes = new GpuTlasNode[Math.Max(2 * meshInstances.Length - 1, 0)];
-            SearchRadius = 15;
+            public BuildSettings()
+            {
+            }
         }
 
-        public void Build()
-        {
-            Span<GpuTlasNode> initialChildNodes = new Span<GpuTlasNode>(Nodes, Nodes.Length - MeshInstances.Length, MeshInstances.Length);
+        // TODO: Investigate if .NET 9 allows ref struct in ValueTuple
+        public delegate void FuncGetBlas(int instanceId, out BLAS.BuildResult blas, out Matrix4 worldTransform);
+        public delegate void FuncGetBlasAndGeometry(int instanceId, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
-            // Place initial nodes at the end of array
+        public static void Build(Span<GpuTlasNode> nodes, FuncGetBlas funcGetBlas, int primitiveCount, BuildSettings buildSettings)
+        {
+            if (nodes.Length == 0) return;
+
+            Span<GpuTlasNode> initialChildNodes = MemoryMarshal.CreateSpan(ref nodes[nodes.Length - primitiveCount], primitiveCount);
+
+            // Place initial tlasNodes at the end of array
             Box globalBounds = Box.Empty();
             for (int i = 0; i < initialChildNodes.Length; i++)
             {
-                ref readonly GpuMeshInstance meshInstance = ref MeshInstances[i];
-                BLAS blas = Blases[meshInstance.MeshIndex];
+                funcGetBlas(i, out BLAS.BuildResult blas, out Matrix4 worldTransform);
 
-                Box worldSpaceBounds = Box.Transformed(Conversions.ToBox(blas.Root), meshInstance.ModelMatrix);
+                Box localBounds = Conversions.ToBox(blas.Root);
+                Box worldSpaceBounds = Box.Transformed(localBounds, worldTransform);
                 globalBounds.GrowToFit(worldSpaceBounds);
 
                 GpuTlasNode newNode = new GpuTlasNode();
@@ -49,8 +46,8 @@ namespace IDKEngine.Bvh
                 initialChildNodes[i] = newNode;
             }
 
-            // Sort the initial child nodes according to space filling morton curve.
-            // That means nodes which are spatially close will also be close in memory.
+            // Sort the initial child tlasNodes according to space filling morton curve.
+            // That means tlasNodes which are spatially close will also be close in memory.
             MemoryExtensions.Sort(initialChildNodes, (GpuTlasNode a, GpuTlasNode b) =>
             {
                 Vector3 mappedA = MyMath.MapToZeroOne((a.Max + a.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
@@ -64,9 +61,9 @@ namespace IDKEngine.Bvh
                 return -1;
             });
 
-            int activeRangeCount = MeshInstances.Length;
-            int activeRangeEnd = Nodes.Length;
-            GpuTlasNode[] tempNodes = new GpuTlasNode[Nodes.Length];
+            int activeRangeCount = primitiveCount;
+            int activeRangeEnd = nodes.Length;
+            GpuTlasNode[] tempNodes = new GpuTlasNode[nodes.Length];
             int[] preferedNbors = new int[activeRangeCount];
             while (activeRangeCount > 1)
             {
@@ -76,14 +73,14 @@ namespace IDKEngine.Bvh
                 for (int i = 0; i < activeRangeCount; i++)
                 {
                     int nodeAId = activeRangeStart + i;
-                    int searchStart = Math.Max(nodeAId - SearchRadius, activeRangeStart);
-                    int searchEnd = Math.Min(nodeAId + SearchRadius + 1, activeRangeEnd);
-                    int nodeBId = FindBestMatch(Nodes, searchStart, searchEnd, nodeAId);
+                    int searchStart = Math.Max(nodeAId - buildSettings.SearchRadius, activeRangeStart);
+                    int searchEnd = Math.Min(nodeAId + buildSettings.SearchRadius + 1, activeRangeEnd);
+                    int nodeBId = FindBestMatch(nodes, searchStart, searchEnd, nodeAId);
                     int nodeBIdLocal = nodeBId - activeRangeStart;
                     preferedNbors[i] = nodeBIdLocal;
                 }
 
-                // Find number of merged nodes in advance so we know where to insert new parent nodes
+                // Find number of merged tlasNodes in advance so we know where to insert new parent tlasNodes
                 int mergedNodesCount = 0;
                 for (int i = 0; i < activeRangeCount; i++)
                 {
@@ -116,15 +113,14 @@ namespace IDKEngine.Bvh
                         {
                             int nodeBId = nodeBIdLocal + activeRangeStart;
 
-                            tempNodes[mergedNodesHead + 0] = Nodes[nodeAId];
-                            tempNodes[mergedNodesHead + 1] = Nodes[nodeBId];
+                            tempNodes[mergedNodesHead + 0] = nodes[nodeAId];
+                            tempNodes[mergedNodesHead + 1] = nodes[nodeBId];
 
                             ref GpuTlasNode nodeA = ref tempNodes[mergedNodesHead + 0];
                             ref GpuTlasNode nodeB = ref tempNodes[mergedNodesHead + 1];
 
                             Box mergedBox = Conversions.ToBox(nodeA);
-                            mergedBox.GrowToFit(nodeB.Min);
-                            mergedBox.GrowToFit(nodeB.Max);
+                            mergedBox.GrowToFit(Conversions.ToBox(nodeB));
 
                             GpuTlasNode newNode = new GpuTlasNode();
                             newNode.SetBox(mergedBox);
@@ -139,48 +135,47 @@ namespace IDKEngine.Bvh
                     }
                     else
                     {
-                        tempNodes[unmergedNodesHead++] = Nodes[nodeAId];
+                        tempNodes[unmergedNodesHead++] = nodes[nodeAId];
                     }
                 }
 
                 // Copy from temp into final array
-                Array.Copy(tempNodes, newBegin, Nodes, newBegin, activeRangeEnd - newBegin);
+                Memory.CopyElements(tempNodes[newBegin], ref nodes[newBegin], activeRangeEnd - newBegin);
 
-                // For every merged pair, 2 nodes become inactive and 1 new one gets active
+                // For every merged pair, 2 tlasNodes become inactive and 1 new one gets active
                 activeRangeCount -= mergedNodesCount / 2;
                 activeRangeEnd -= mergedNodesCount;
             }
         }
 
-        public bool Intersect(in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
+        public static bool Intersect(
+            ReadOnlySpan<GpuTlasNode> tlasNodes,
+            FuncGetBlasAndGeometry funcGetBlasAndGeometry,
+            in Ray ray, out BVH.RayHitInfo hitInfo, float tMax = float.MaxValue)
         {
             hitInfo = new BVH.RayHitInfo();
             hitInfo.T = tMax;
-            if (Nodes.Length == 0)
-            {
-                return false;
-            }
+
+            if (tlasNodes.Length == 0) return false;
 
             int stackPtr = 0;
-            uint stackTop = 0;
-            Span<uint> stack = stackalloc uint[32];
+            int stackTop = 0;
+            Span<int> stack = stackalloc int[32];
             while (true)
             {
-                ref readonly GpuTlasNode parent = ref Nodes[stackTop];
+                ref readonly GpuTlasNode parent = ref tlasNodes[stackTop];
                 if (parent.IsLeaf)
                 {
-                    uint instanceID = parent.ChildOrInstanceID;
-                    ref readonly GpuMeshInstance meshInstance = ref MeshInstances[instanceID];
-                    BLAS blas = Blases[meshInstance.MeshIndex];
+                    int instanceID = (int)parent.ChildOrInstanceID;
+                    funcGetBlasAndGeometry(instanceID, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
-                    Ray localRay = ray.Transformed(MeshInstances[instanceID].InvModelMatrix);
-                    if (blas.Intersect(localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
+                    Ray localRay = ray.Transformed(invWorldTransform);
+                    if (BLAS.Intersect(blas, geometry, localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                     {
                         hitInfo.TriangleIndices = blasHitInfo.TriangleIndices;
                         hitInfo.Bary = blasHitInfo.Bary;
                         hitInfo.T = blasHitInfo.T;
-                        hitInfo.MeshID = meshInstance.MeshIndex;
-                        hitInfo.InstanceID = (int)instanceID;
+                        hitInfo.InstanceID = instanceID;
                     }
 
                     if (stackPtr == 0) break;
@@ -188,10 +183,10 @@ namespace IDKEngine.Bvh
                     continue;
                 }
 
-                uint leftChild = parent.ChildOrInstanceID;
-                uint rightChild = leftChild + 1;
-                ref readonly GpuTlasNode leftNode = ref Nodes[leftChild];
-                ref readonly GpuTlasNode rightNode = ref Nodes[rightChild];
+                int leftChild = (int)parent.ChildOrInstanceID;
+                int rightChild = leftChild + 1;
+                ref readonly GpuTlasNode leftNode = ref tlasNodes[leftChild];
+                ref readonly GpuTlasNode rightNode = ref tlasNodes[rightChild];
                 bool leftChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
                 bool rightChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
 
@@ -218,35 +213,30 @@ namespace IDKEngine.Bvh
             return hitInfo.T != tMax;
         }
 
-        public void Intersect(in Box box, BVH.FuncIntersectLeafNode intersectFunc)
+        public static void Intersect(
+            ReadOnlySpan<GpuTlasNode> tlasNodes,
+            FuncGetBlasAndGeometry funcGetBlasAndGeometry,
+            in Box box, BVH.FuncIntersectLeafNode intersectFunc)
         {
-            if (Nodes.Length == 0)
-            {
-                return;
-            }
+            if (tlasNodes.Length == 0) return;
 
             int stackPtr = 0;
-            uint stackTop = 0;
-            Span<uint> stack = stackalloc uint[32];
+            int stackTop = 0;
+            Span<int> stack = stackalloc int[32];
             while (true)
             {
-                ref readonly GpuTlasNode parent = ref Nodes[stackTop];
+                ref readonly GpuTlasNode parent = ref tlasNodes[stackTop];
                 if (parent.IsLeaf)
                 {
-                    uint instanceID = parent.ChildOrInstanceID;
-                    ref readonly GpuMeshInstance meshInstance = ref MeshInstances[instanceID];
-                    BLAS blas = Blases[meshInstance.MeshIndex];
+                    int instanceID = (int)parent.ChildOrInstanceID;
+                    funcGetBlasAndGeometry(instanceID, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
-                    // Copy out/ref paramters for access from inside the lambda function. This is needed because of "CS1628 - Cannot use in ref or out parameter inside an anonymous method, lambda expression, or query expression."
-                    int meshIndexCopy = meshInstance.MeshIndex;
-
-                    Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
-                    blas.Intersect(localBox, (in BLAS.IndicesTriplet leafNodeTriangle) =>
+                    Box localBox = Box.Transformed(box, invWorldTransform);
+                    BLAS.Intersect(blas, geometry, localBox, (in BLAS.IndicesTriplet leafNodeTriangle) =>
                     {
                         BVH.BoxHitInfo hitInfo;
                         hitInfo.TriangleIndices = leafNodeTriangle;
-                        hitInfo.MeshID = meshIndexCopy;
-                        hitInfo.InstanceID = (int)instanceID;
+                        hitInfo.InstanceID = instanceID;
 
                         intersectFunc(hitInfo);
                     });
@@ -256,10 +246,10 @@ namespace IDKEngine.Bvh
                     continue;
                 }
 
-                uint leftChild = parent.ChildOrInstanceID;
-                uint rightChild = leftChild + 1;
-                ref readonly GpuTlasNode leftNode = ref Nodes[leftChild];
-                ref readonly GpuTlasNode rightNode = ref Nodes[rightChild];
+                int leftChild = (int)parent.ChildOrInstanceID;
+                int rightChild = leftChild + 1;
+                ref readonly GpuTlasNode leftNode = ref tlasNodes[leftChild];
+                ref readonly GpuTlasNode rightNode = ref tlasNodes[rightChild];
                 bool leftChildHit = Intersections.BoxVsBox(Conversions.ToBox(leftNode), box);
                 bool rightChildHit = Intersections.BoxVsBox(Conversions.ToBox(rightNode), box);
 
@@ -277,6 +267,11 @@ namespace IDKEngine.Bvh
                     stackTop = stack[--stackPtr];
                 }
             }
+        }
+
+        public static GpuTlasNode[] AllocateRequiresNodes(int leafNodesCount)
+        {
+            return new GpuTlasNode[Math.Max(2 * leafNodesCount - 1, 0)];
         }
 
         private static int FindBestMatch(ReadOnlySpan<GpuTlasNode> nodes, int start, int end, int nodeIndex)

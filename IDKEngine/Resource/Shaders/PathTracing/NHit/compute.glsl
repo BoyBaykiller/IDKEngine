@@ -6,13 +6,11 @@
 #define MATERIAL_SAMPLER_2D_TYPE f16sampler2D
 #endif
 
-#define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
-AppInclude(include/StaticStorageBuffers.glsl)
-
 AppInclude(include/Ray.glsl)
 AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
 
@@ -94,7 +92,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), bary));
 
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
-            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
             GpuMaterial material = materialSSBO.Materials[mesh.MaterialIndex];
 
             surface = GetSurface(material, interpTexCoord);

@@ -6,6 +6,11 @@ struct Box
     vec3 Max;
 };
 
+Box CreateBoxEmpty()
+{
+    return Box(vec3(FLOAT_MAX), vec3(FLOAT_MIN));
+}
+
 vec3 BoxSize(Box box)
 {
     return box.Max - box.Min;
@@ -36,11 +41,15 @@ void BoxGrowToFit(inout Box box, vec3 point)
     box.Max = max(box.Max, point);
 }
 
+void BoxGrowToFit(inout Box box, Box otherBox)
+{
+    box.Min = min(box.Min, otherBox.Min);
+    box.Max = max(box.Max, otherBox.Max);
+}
+
 Box BoxTransform(Box box, mat4 matrix)
 {
-    Box newBox = box;
-    newBox.Min = vec3(FLOAT_MAX);
-    newBox.Max = vec3(FLOAT_MIN);
+    Box newBox = CreateBoxEmpty();
     
     for (int i = 0; i < 8; i++)
     {
@@ -53,9 +62,7 @@ Box BoxTransform(Box box, mat4 matrix)
 
 Box BoxTransformPerspective(Box box, mat4 matrix, out bool vertexBehindFrustum)
 {
-    Box newBox = box;
-    newBox.Min = vec3(FLOAT_MAX);
-    newBox.Max = vec3(FLOAT_MIN);
+    Box newBox = CreateBoxEmpty();
     vertexBehindFrustum = false;
 
     for (int i = 0; i < 8; i++)

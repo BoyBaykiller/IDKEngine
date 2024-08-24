@@ -19,7 +19,7 @@ namespace IDKEngine.Render
             set
             {
                 _rayDepth = value;
-                ResetRenderProcess();
+                ResetAccumulation();
             }
         }
 
@@ -52,7 +52,7 @@ namespace IDKEngine.Render
                 {
                     RayDepth = cachedRayDepth;
                 }
-                ResetRenderProcess();
+                ResetAccumulation();
             }
         }
 
@@ -63,7 +63,7 @@ namespace IDKEngine.Render
             set
             {
                 gpuSettings.IsTraceLights = value ? 1 : 0;
-                ResetRenderProcess();
+                ResetAccumulation();
             }
         }
 
@@ -74,7 +74,7 @@ namespace IDKEngine.Render
             set
             {
                 gpuSettings.FocalLength = value;
-                ResetRenderProcess();
+                ResetAccumulation();
             }
         }
 
@@ -85,7 +85,7 @@ namespace IDKEngine.Render
             set
             {
                 gpuSettings.LenseRadius = value;
-                ResetRenderProcess();
+                ResetAccumulation();
             }
         }
         public bool IsAlwaysTintWithAlbedo
@@ -95,7 +95,7 @@ namespace IDKEngine.Render
             set
             {
                 gpuSettings.IsAlwaysTintWithAlbedo = value ? 1 : 0;
-                ResetRenderProcess();
+                ResetAccumulation();
             }
         }
 
@@ -134,7 +134,7 @@ namespace IDKEngine.Render
             finalDrawProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/FinalDraw/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
+            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -145,7 +145,7 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            gpuSettingsBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 7);
+            gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
             gpuSettingsBuffer.UploadElements(gpuSettings);
 
             BBG.Computing.Compute($"PathTrace Primary Rays", () =>
@@ -186,30 +186,28 @@ namespace IDKEngine.Render
 
         public unsafe void SetSize(Vector2i size)
         {
-            float clear = 0.0f;
-
             if (Result != null) Result.Dispose();
             Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
             Result.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
-            Result.Clear(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.Float, clear);
+            Result.Clear(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.Float, 0.0f);
 
             if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
             wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>();
-            wavefrontRayBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.None, size.X * size.Y);
-            wavefrontRayBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 7);
+            wavefrontRayBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, size.X * size.Y);
+            wavefrontRayBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 30);
 
             if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
             wavefrontPTBuffer = new BBG.Buffer();
-            wavefrontPTBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
-            wavefrontPTBuffer.Clear(0, sizeof(GpuWavefrontPTHeader), &clear);
-            wavefrontPTBuffer.BindBufferBase(BBG.Buffer.BufferTarget.ShaderStorage, 8);
+            wavefrontPTBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
+            wavefrontPTBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 31);
+            wavefrontPTBuffer.Clear(0, sizeof(GpuWavefrontPTHeader), 0.0f);
 
-            ResetRenderProcess();
+            ResetAccumulation();
         }
 
-        public void ResetRenderProcess()
+        public void ResetAccumulation()
         {
             AccumulatedSamples = 0;
         }

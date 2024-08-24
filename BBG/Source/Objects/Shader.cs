@@ -121,7 +121,9 @@ namespace BBOpenGL
                 {
                     List<string> usedAppInsertions = new List<string>();
                     List<string> pathsAlreadyIncluded = new List<string>();
+
                     string result = RecursiveResolveKeywords(source, name).ToString();
+                    result = RemoveUnusedShaderStorageBlocks(result).ToString();
 
                     Match match = Regex.Match(result, "#version .*\n*"); // detect GLSL version statement up to line break
                     int afterVersionStatement = match.Index + match.Length; // 0 if not found
@@ -225,14 +227,59 @@ namespace BBOpenGL
                     }
                 }
 
+                /// <summary>
+                /// Removes GLSL Shader Storage Blocks declaration which are not referenced by their interface name.
+                /// This function exists to avoid hitting the limit of 16 Shader Storage Blocks on NVIDIA
+                /// https://forums.developer.nvidia.com/t/increase-maximum-allowed-shader-storage-blocks/293755/1.
+                /// Note that it messes up "#line X" preprocessor statements, but it is assumed that
+                /// all Shader Storage Blocks are defined in their own file that is included so it only affects that file.
+                /// </summary>
+                /// <param name="text"></param>
+                /// <returns></returns>
+                private static StringBuilder RemoveUnusedShaderStorageBlocks(string text)
+                {
+                    StringBuilder result = new StringBuilder(text.Length);
+                    Regex searchDeclaration = new Regex(@"layout\s*\([^)]*\)\s*(?:\b\w+\b\s*)*buffer\b[\s\S]*?}\s*(\w+)\s*;");
+                    int numReferencedDeclarations = 0;
+
+                    int currentIndex = 0;
+                    while (true)
+                    {
+                        Match match = searchDeclaration.Match(text, currentIndex);
+                        if (match.Success)
+                        {
+                            Group shaderStorageBlock = match.Groups[0];
+                            Group instanceName = match.Groups[1];
+
+                            bool instanceNameReferenced = new Regex($@"\b{instanceName.Value}\.").Match(text, currentIndex).Success;
+                            int end = shaderStorageBlock.Index;
+                            if (instanceNameReferenced)
+                            {
+                                end += shaderStorageBlock.Length;
+                                numReferencedDeclarations++;
+                            }
+                            result.Append(text, currentIndex, end - currentIndex);
+
+                            currentIndex = shaderStorageBlock.Index + shaderStorageBlock.Length;
+                        }
+                        else
+                        {
+                            result.Append(text, currentIndex, text.Length - currentIndex);
+                            break;
+                        }
+                    }
+
+                    return result;
+                }
+
                 private static int AdvanceToNextKeyword(string source, int startIndex, out int expressionLength, out Keyword keyword, out string value)
                 {
                     expressionLength = 0;
                     keyword = Keyword.None;
                     value = null;
 
-                    Regex regex = new Regex(@$"(?<!\/\/.*?)({Keyword.AppInsert}|{Keyword.AppInclude})\((.*?)\)");
-                    Match match = regex.Match(source, startIndex);
+                    Regex searchKeywords = new Regex(@$"(?<!\/\/.*?)({Keyword.AppInsert}|{Keyword.AppInclude})\((.*?)\)");
+                    Match match = searchKeywords.Match(source, startIndex);
                     if (match.Success)
                     {
                         expressionLength = match.Groups[0].Length;

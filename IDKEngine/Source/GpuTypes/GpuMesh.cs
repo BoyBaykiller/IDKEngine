@@ -18,7 +18,7 @@ namespace IDKEngine.GpuTypes
         public int MeshletCount;
 
         public int InstanceCount;
-        public uint BlasRootNodeOffset;
+        public int BlasRootNodeOffset;
         public Vector2 _pad0;
     }
 }

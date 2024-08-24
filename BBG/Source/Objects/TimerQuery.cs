@@ -13,6 +13,14 @@ namespace BBOpenGL
                 GL.CreateQueries(QueryTarget.TimeElapsed, 1, ref ID);
             }
 
+            public static TimerQuery BeginNew()
+            {
+                TimerQuery timer = new TimerQuery();
+                timer.Begin();
+
+                return timer;
+            }
+
             public void Begin()
             {
                 GL.BeginQuery(QueryTarget.TimeElapsed, ID);

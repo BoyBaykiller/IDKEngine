@@ -3,9 +3,7 @@
 #define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH) - 1, 1) // -1 because we skip root
 #define MAX_TLAS_TREE_DEPTH max(24, 1)
 
-#define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
 AppInclude(include/StaticStorageBuffers.glsl)
-
 AppInclude(include/IntersectionRoutines.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
@@ -33,7 +31,7 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
     float tMinRight;
     
     #if !USE_TLAS
-    GpuBlasNode rootNode = blasSSBO.Nodes[rootNodeOffset];
+    GpuBlasNode rootNode = blasNodeSSBO.Nodes[rootNodeOffset];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -45,8 +43,8 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
     while (true)
     {
         debugNodeCounter++;
-        GpuBlasNode leftNode = blasSSBO.Nodes[rootNodeOffset + stackTop];
-        GpuBlasNode rightNode = blasSSBO.Nodes[rootNodeOffset + stackTop + 1];
+        GpuBlasNode leftNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop];
+        GpuBlasNode rightNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop + 1];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight <= hitInfo.T;
@@ -109,7 +107,7 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
     float tMinRight;
     
     #if !USE_TLAS
-    GpuBlasNode rootNode = blasSSBO.Nodes[rootNodeOffset];
+    GpuBlasNode rootNode = blasNodeSSBO.Nodes[rootNodeOffset];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -120,8 +118,8 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
     uint stackTop = 1;
     while (true)
     {
-        GpuBlasNode leftNode = blasSSBO.Nodes[rootNodeOffset + stackTop];
-        GpuBlasNode rightNode = blasSSBO.Nodes[rootNodeOffset + stackTop + 1];
+        GpuBlasNode leftNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop];
+        GpuBlasNode rightNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop + 1];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight <= hitInfo.T;
@@ -221,8 +219,8 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         if (isLeaf)
         {
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
-            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
-            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshId];
+            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
 
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
@@ -270,8 +268,8 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
     for (uint i = 0; i < meshInstanceSSBO.MeshInstances.length(); i++)
     {
         GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[i];
-        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
-        GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshId];
+        GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
 
         mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
         Ray localRay = RayTransform(ray, invModelMatrix);
@@ -337,8 +335,8 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         if (isLeaf)
         {
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
-            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
-            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+            GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshId];
+            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
 
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
@@ -388,8 +386,8 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
     for (uint i = 0; i < meshInstanceSSBO.MeshInstances.length(); i++)
     {
         GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[i];
-        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshIndex];
-        GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshIndex];
+        GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshId];
+        GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
 
         mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
         Ray localRay = RayTransform(ray, invModelMatrix);

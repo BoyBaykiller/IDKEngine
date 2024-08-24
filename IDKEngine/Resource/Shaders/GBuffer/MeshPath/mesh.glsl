@@ -26,12 +26,12 @@ out InOutData
     vec4 PrevClipPos;
     vec3 Normal;
     vec3 Tangent;
-    perprimitiveNV uint MeshID;
+    perprimitiveNV uint MeshId;
 } outData[MESHLET_MAX_VERTEX_COUNT];
 
 taskNV in InOutData
 {
-    uint MeshID;
+    uint MeshId;
     uint InstanceID;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[32];
@@ -39,7 +39,7 @@ taskNV in InOutData
 
 void main()
 {
-    uint meshID = inData.MeshID;
+    uint meshID = inData.MeshId;
     uint instanceID = inData.InstanceID;
     uint meshletID = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x];
 
@@ -96,7 +96,7 @@ void main()
     {
         uint8_t meshletTriangleID = uint8_t(min(gl_LocalInvocationIndex + i * gl_WorkGroupSize.x, meshlet.TriangleCount - 1u));
 
-        outData[meshletTriangleID].MeshID = meshID;
+        outData[meshletTriangleID].MeshId = meshID;
     }
 
     if (gl_LocalInvocationIndex == 0)

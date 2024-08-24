@@ -6,7 +6,10 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Bvh
 {
-    public partial class BLAS
+    /// <summary>
+    /// Implementation of https://meistdan.github.io/publications/prbvh/paper.pdf
+    /// </summary>
+    public ref struct ReinsertionOptimizer
     {
         public record struct OptimizationSettings
         {
@@ -18,371 +21,298 @@ namespace IDKEngine.Bvh
             }
         }
 
-        /// <summary>
-        /// Implementation of https://meistdan.github.io/publications/prbvh/paper.pdf
-        /// </summary>
-        private class ReinsertionOptimizer
+        private record struct Reinsertion
         {
-            public static void Optimize(BLAS blas, in OptimizationSettings settings)
+            public int In;
+            public int Out;
+            public float AreaDecrease;
+        }
+
+        private record struct Candidate : MyComparer.IComparisons<Candidate>
+        {
+            public int NodeId;
+            public float Cost;
+
+            public static bool operator >(in Candidate lhs, in Candidate rhs)
             {
-                if (blas.Nodes.Length <= 3)
-                {
-                    return;
-                }
-                new ReinsertionOptimizer(blas).Optimize(settings);
+                return lhs.Cost > rhs.Cost;
             }
 
-            private record struct Reinsertion
+            public static bool operator <(in Candidate lhs, in Candidate rhs)
             {
-                public int In;
-                public int Out;
-                public float AreaDecrease;
+                return lhs.Cost < rhs.Cost;
             }
+        }
 
-            private record struct Candidate : MyComparer.IComparisons<Candidate>
+        public static void Optimize(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles, in OptimizationSettings settings)
+        {
+            if (nodes.Length <= 3)
             {
-                public int NodeId;
-                public float Cost;
-
-                public static bool operator >(in Candidate lhs, in Candidate rhs)
-                {
-                    return lhs.Cost > rhs.Cost;
-                }
-
-                public static bool operator <(in Candidate lhs, in Candidate rhs)
-                {
-                    return lhs.Cost < rhs.Cost;
-                }
+                return;
             }
+            new ReinsertionOptimizer(nodes, parentIds, triangles).Optimize(settings);
+        }
 
-            private readonly BLAS blas;
-            private readonly int[] parentIds;
-            private ReinsertionOptimizer(BLAS blas)
-            {
-                this.blas = blas;
-                parentIds = GetParentIndices(blas.Nodes);
-            }
+        private readonly Span<GpuBlasNode> nodes;
+        private readonly Span<int> parentIds;
+        private readonly Span<BLAS.IndicesTriplet> triangles;
+        private ReinsertionOptimizer(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles)
+        {
+            this.nodes = nodes;
+            this.parentIds = parentIds;
+            this.triangles = triangles;
+        }
 
-            private void Optimize(in OptimizationSettings settings)
+        private void Optimize(in OptimizationSettings settings)
+        {
+            Candidate[] candidatesMem = GetCandidatesMem();
+            for (int i = 0; i < settings.Iterations; i++)
             {
-                Candidate[] candidatesMem = GetCandidatesMem();
-                for (int i = 0; i < settings.Iterations; i++)
+                Span<Candidate> candidates = PopulateCandidates(candidatesMem, settings.CandidatesPercentage);
+
+                for (int j = 0; j < candidates.Length; j++)
                 {
-                    Span<Candidate> candidates = PopulateCandidates(candidatesMem, settings.CandidatesPercentage);
+                    ref readonly Candidate candidate = ref candidates[j];
+                    Reinsertion reinsertion = FindReinsertion(candidate.NodeId);
 
-                    for (int j = 0; j < candidates.Length; j++)
+                    if (reinsertion.AreaDecrease > 0.0f)
                     {
-                        ref readonly Candidate candidate = ref candidates[j];
-                        Reinsertion reinsertion = FindReinsertion(candidate.NodeId);
-
-                        if (reinsertion.AreaDecrease > 0.0f)
-                        {
-                            ReinsertNode(reinsertion.In, reinsertion.Out);
-                        }
-                    }
-                }
-
-                RestoreTreeQualities();
-            }
-
-            private void ReinsertNode(int inId, int outId)
-            {
-                // See Figure.2 https://meistdan.github.io/publications/prbvh/paper.pdf
-
-                int siblingId = GetSiblingId(inId);
-                int parentId = parentIds[inId];
-                GpuBlasNode siblingNode = blas.Nodes[siblingId];
-                GpuBlasNode outNode = blas.Nodes[outId];
-
-                // Parent of 'in' becomes sibling of 'in'
-                blas.Nodes[parentId] = siblingNode;
-
-                // Sibling of 'in' becomes 'out'
-                blas.Nodes[siblingId] = outNode;
-
-                // 'siblingNode' and 'outNode' have moved. Notify their children of the new parentId
-                if (!siblingNode.IsLeaf)
-                {
-                    parentIds[siblingNode.TriStartOrChild + 0] = parentId;
-                    parentIds[siblingNode.TriStartOrChild + 1] = parentId;
-                }
-                if (!outNode.IsLeaf)
-                {
-                    parentIds[outNode.TriStartOrChild + 0] = siblingId;
-                    parentIds[outNode.TriStartOrChild + 1] = siblingId;
-                }
-
-                // Link 'out' to it's new children 'in' & 'sibling' and update their parentId
-                blas.Nodes[outId].TriStartOrChild = (uint)GetLeftSiblingId(inId);
-                blas.Nodes[outId].TriCount = 0; // mark as internal ndoe
-
-                parentIds[inId] = outId;
-                parentIds[siblingId] = outId;
-
-                RefitFrom(parentId); // Refit old parent of 'in'
-                RefitFrom(outId); // Refit new parent of 'in'   
-            }
-
-            private Candidate[] GetCandidatesMem()
-            {
-                return new Candidate[blas.Nodes.Length - 1];
-            }
-
-            private Span<Candidate> PopulateCandidates(Candidate[] candidates, float percentage)
-            {
-                int count = Math.Min(blas.Nodes.Length - 1, (int)(blas.Nodes.Length * percentage));
-                if (count == 0) return Array.Empty<Candidate>();
-
-                for (int i = 1; i < candidates.Length + 1; i++)
-                {
-                    Candidate candidate = new Candidate();
-                    candidate.Cost = blas.Nodes[i].HalfArea();
-                    candidate.NodeId = i;
-                    candidates[i - 1] = candidate;
-                }
-
-                Algorithms.PartialSort<Candidate>(candidates, 0, candidates.Length, 0, count, MyComparer.GreaterThan);
-
-                return new Span<Candidate>(candidates, 0, count);
-
-                //Candidate[] candidates = new Candidate[searchCount];
-                //for (int i = 1; i < searchCount + 1; i++)
-                //{
-                //    Candidate candidate = new Candidate();
-                //    candidate.Cost = blas.Nodes[i].HalfArea();
-                //    candidate.NodeId = i;
-                //    candidates[i - 1] = candidate;
-                //}
-
-                //Array.Sort(candidates, MyComparer.GreaterThan);
-
-                //for (int i = searchCount + 1; i < blas.Nodes.Length; i++)
-                //{
-                //    float cost = blas.Nodes[i].HalfArea();
-                //    float lowestCost = candidates[candidates.Length - 1].Cost;
-                //    if (cost > lowestCost)
-                //    {
-                //        Candidate newCandidate = new Candidate();
-                //        newCandidate.Cost = cost;
-                //        newCandidate.NodeId = i;
-                //        Helper.MaintainDescendingArray(candidates, newCandidate, MyComparer.GreaterThan);
-                //    }
-                //}
-
-                //return candidates;
-            }
-
-            private Reinsertion FindReinsertion(int nodeId)
-            {
-                // Source: https://github.com/madmann91/bvh/blob/3490634ae822e5081e41f09498fcce03bc1419e3/src/bvh/v2/reinsertion_optimizer.h#L107
-               
-                Reinsertion bestReinsertion = new Reinsertion();
-                bestReinsertion.In = nodeId;
-
-                int parentId = parentIds[nodeId];
-                int pivotId = parentId;
-                int siblingId = GetSiblingId(nodeId);
-
-                ref readonly GpuBlasNode inputNode = ref blas.Nodes[nodeId];
-                float nodeArea = inputNode.HalfArea();
-                float areaDecrease = blas.Nodes[parentId].HalfArea();
-
-                Box pivotBox = Conversions.ToBox(blas.Nodes[siblingId]);
-
-                // areaDecrease, nodeId
-                Stack<ValueTuple<float, int>> stack = new Stack<ValueTuple<float, int>>();
-                do
-                {
-                    stack.Push((areaDecrease, siblingId));
-                    while (stack.Count > 0)
-                    {
-                        ValueTuple<float, int> stackTop = stack.Pop();
-                        if (stackTop.Item1 - nodeArea <= bestReinsertion.AreaDecrease)
-                        {
-                            continue;
-                        }
-
-                        ref readonly GpuBlasNode outNode = ref blas.Nodes[stackTop.Item2];
-
-                        Box mergedBox = Conversions.ToBox(inputNode);
-                        mergedBox.GrowToFit(outNode.Min);
-                        mergedBox.GrowToFit(outNode.Max);
-
-                        float mergedArea = mergedBox.HalfArea();
-                        float thisAreaDecrease = stackTop.Item1 - mergedArea;
-                        if (thisAreaDecrease > bestReinsertion.AreaDecrease)
-                        {
-                            bestReinsertion.Out = stackTop.Item2;
-                            bestReinsertion.AreaDecrease = thisAreaDecrease;
-                        }
-
-                        if (!outNode.IsLeaf)
-                        {
-                            float childArea = thisAreaDecrease + outNode.HalfArea();
-                            stack.Push((childArea, (int)outNode.TriStartOrChild + 0));
-                            stack.Push((childArea, (int)outNode.TriStartOrChild + 1));
-                        }
-
-                        if (pivotId != parentId)
-                        {
-                            pivotBox.GrowToFit(Conversions.ToBox(blas.Nodes[siblingId]));
-                            areaDecrease += blas.Nodes[pivotId].HalfArea() - pivotBox.HalfArea();
-                        }
-                    }
-
-                    siblingId = GetSiblingId(pivotId);
-                    pivotId = parentIds[pivotId];
-
-                } while (pivotId != 0);
-
-                if (bestReinsertion.Out == GetSiblingId(bestReinsertion.In) ||
-                    bestReinsertion.Out == parentIds[bestReinsertion.In])
-                {
-                    bestReinsertion = new Reinsertion();
-                }
-
-                return bestReinsertion;
-            }
-
-            private void RefitFrom(int nodeId)
-            {
-                while (true)
-                {
-                    ref GpuBlasNode node = ref blas.Nodes[nodeId];
-                    if (!node.IsLeaf)
-                    {
-                        ref readonly GpuBlasNode leftChild = ref blas.Nodes[node.TriStartOrChild];
-                        ref readonly GpuBlasNode rightChild = ref blas.Nodes[node.TriStartOrChild + 1];
-
-                        Box mergedBox = Conversions.ToBox(leftChild);
-                        mergedBox.GrowToFit(rightChild.Min);
-                        mergedBox.GrowToFit(rightChild.Max);
-
-                        node.SetBounds(mergedBox);
-                    }
-                    if (nodeId == 0)
-                    {
-                        break;
-                    }
-                    nodeId = parentIds[nodeId];
-                }
-            }
-
-            /// <summary>
-            /// Makes sure the root always always points to index 1 as its left child and
-            /// that primitives of two leafs always form a continuous range in memory.
-            /// </summary>
-            private void RestoreTreeQualities()
-            {
-                // Always make node 0 point to 1, as this is expected by traversal
-                // Always make node 1 point to 3, as this is good memory access
-                if (blas.Nodes[0].TriStartOrChild != 1)
-                {
-                    SwapChildrenInMem(0, parentIds[1]);
-                }
-                if (!blas.Nodes[1].IsLeaf && blas.Nodes[1].TriStartOrChild != 3)
-                {
-                    SwapChildrenInMem(1, parentIds[3]);
-                }
-
-                IndicesTriplet[] newTriIndices = new IndicesTriplet[blas.TriangleCount];
-                uint triCounter = 0;
-
-                Span<uint> stack = stackalloc uint[32];
-                int stackPtr = 0;
-                stack[stackPtr++] = 1;
-
-                while (stackPtr > 0)
-                {
-                    uint stackTop = stack[--stackPtr];
-
-                    ref GpuBlasNode leftChild = ref blas.Nodes[stackTop];
-                    ref GpuBlasNode rightChild = ref blas.Nodes[stackTop + 1];
-
-                    if (leftChild.IsLeaf)
-                    {
-                        Array.Copy(blas.TriangleIndices, leftChild.TriStartOrChild, newTriIndices, triCounter, leftChild.TriCount);
-                        leftChild.TriStartOrChild = triCounter;
-                        triCounter += leftChild.TriCount;
-                    }
-                    if (rightChild.IsLeaf)
-                    {
-                        Array.Copy(blas.TriangleIndices, rightChild.TriStartOrChild, newTriIndices, triCounter, rightChild.TriCount);
-                        rightChild.TriStartOrChild = triCounter;
-                        triCounter += rightChild.TriCount;
-                    }
-
-                    if (!leftChild.IsLeaf)
-                    {
-                        stack[stackPtr++] = leftChild.TriStartOrChild;
-                    }
-
-                    if (!rightChild.IsLeaf)
-                    {
-                        stack[stackPtr++] = rightChild.TriStartOrChild;
-                    }
-                }
-
-                blas.TriangleIndices = newTriIndices;
-                blas.MaxTreeDepth = ComputeTreeDepth(blas.Nodes);
-            }
-
-            private void SwapChildrenInMem(int inParent, int outParent)
-            {
-                uint inLeftChildId = blas.Nodes[inParent].TriStartOrChild;
-                uint inRightChildId = blas.Nodes[inParent].TriStartOrChild + 1;
-
-                uint outLeftChildId = blas.Nodes[outParent].TriStartOrChild;
-                uint outRightChildId = blas.Nodes[outParent].TriStartOrChild + 1;
-
-                Algorithms.Swap(ref blas.Nodes[inLeftChildId], ref blas.Nodes[outLeftChildId]);
-                Algorithms.Swap(ref blas.Nodes[inRightChildId], ref blas.Nodes[outRightChildId]);
-
-                blas.Nodes[inParent].TriStartOrChild = outLeftChildId;
-
-                if (inLeftChildId == outParent)
-                {
-                    outParent = (int)outLeftChildId;
-                }
-                if (inRightChildId == outParent)
-                {
-                    outParent = (int)outRightChildId;
-                }
-                blas.Nodes[outParent].TriStartOrChild = inLeftChildId;
-
-                UpdateChildParentIds(inParent);
-                UpdateChildParentIds(outParent);
-                UpdateChildParentIds((int)inLeftChildId);
-                UpdateChildParentIds((int)inRightChildId);
-                UpdateChildParentIds((int)outLeftChildId);
-                UpdateChildParentIds((int)outRightChildId);
-
-                void UpdateChildParentIds(int parentNodeId)
-                {
-                    ref readonly GpuBlasNode parent = ref blas.Nodes[parentNodeId];
-                    if (!parent.IsLeaf)
-                    {
-                        parentIds[parent.TriStartOrChild + 0] = parentNodeId;
-                        parentIds[parent.TriStartOrChild + 1] = parentNodeId;
+                        ReinsertNode(reinsertion.In, reinsertion.Out);
                     }
                 }
             }
 
-            private static int[] GetParentIndices(ReadOnlySpan<GpuBlasNode> nodes)
+            RestoreTreeQualities();
+        }
+
+        private void ReinsertNode(int inId, int outId)
+        {
+            // See Figure.2 https://meistdan.github.io/publications/prbvh/paper.pdf
+
+            int siblingId = BLAS.GetSiblingId(inId);
+            int parentId = parentIds[inId];
+            GpuBlasNode siblingNode = nodes[siblingId];
+            GpuBlasNode outNode = nodes[outId];
+
+            // Parent of 'in' becomes sibling of 'in'
+            nodes[parentId] = siblingNode;
+
+            // Sibling of 'in' becomes 'out'
+            nodes[siblingId] = outNode;
+
+            // 'siblingNode' and 'outNode' have moved. Notify their children of the new parentId
+            if (!siblingNode.IsLeaf)
             {
-                int[] parents = new int[nodes.Length];
-                parents[0] = 0;
-                for (int i = 0; i < nodes.Length; i++)
+                parentIds[siblingNode.TriStartOrChild + 0] = parentId;
+                parentIds[siblingNode.TriStartOrChild + 1] = parentId;
+            }
+            if (!outNode.IsLeaf)
+            {
+                parentIds[outNode.TriStartOrChild + 0] = siblingId;
+                parentIds[outNode.TriStartOrChild + 1] = siblingId;
+            }
+
+            // Link 'out' to it's new children 'in' & 'sibling' and update their parentId
+            nodes[outId].TriStartOrChild = BLAS.GetLeftSiblingId(inId);
+            nodes[outId].TriCount = 0; // mark as internal ndoe
+
+            parentIds[inId] = outId;
+            parentIds[siblingId] = outId;
+
+            BLAS.RefitFromNode(parentId, nodes, parentIds); // Refit old parent of 'in'
+            BLAS.RefitFromNode(outId, nodes, parentIds); // Refit new parent of 'in'   
+        }
+
+        private Candidate[] GetCandidatesMem()
+        {
+            return new Candidate[nodes.Length - 1];
+        }
+
+        private Span<Candidate> PopulateCandidates(Candidate[] candidates, float percentage)
+        {
+            int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
+            if (count == 0) return Array.Empty<Candidate>();
+
+            for (int i = 1; i < candidates.Length + 1; i++)
+            {
+                Candidate candidate = new Candidate();
+                candidate.Cost = nodes[i].HalfArea();
+                candidate.NodeId = i;
+                candidates[i - 1] = candidate;
+            }
+
+            Algorithms.PartialSort<Candidate>(candidates, 0, candidates.Length, 0, count, MyComparer.GreaterThan);
+
+            return new Span<Candidate>(candidates, 0, count);
+        }
+
+        private Reinsertion FindReinsertion(int nodeId)
+        {
+            // Source: https://github.com/madmann91/bvh/blob/3490634ae822e5081e41f09498fcce03bc1419e3/src/bvh/v2/reinsertion_optimizer.h#L107
+
+            Reinsertion bestReinsertion = new Reinsertion();
+            bestReinsertion.In = nodeId;
+
+            int parentId = parentIds[nodeId];
+            int pivotId = parentId;
+            int siblingId = BLAS.GetSiblingId(nodeId);
+
+            ref readonly GpuBlasNode inputNode = ref nodes[nodeId];
+            float nodeArea = inputNode.HalfArea();
+            float areaDecrease = nodes[parentId].HalfArea();
+
+            Box pivotBox = Conversions.ToBox(nodes[siblingId]);
+
+            // areaDecrease, nodeId
+            Stack<ValueTuple<float, int>> stack = new Stack<ValueTuple<float, int>>();
+            do
+            {
+                stack.Push((areaDecrease, siblingId));
+                while (stack.Count > 0)
                 {
-                    ref readonly GpuBlasNode node = ref nodes[i];
-                    if (!node.IsLeaf)
+                    ValueTuple<float, int> stackTop = stack.Pop();
+                    if (stackTop.Item1 - nodeArea <= bestReinsertion.AreaDecrease)
                     {
-                        parents[node.TriStartOrChild + 0] = i;
-                        parents[node.TriStartOrChild + 1] = i;
+                        continue;
+                    }
+
+                    ref readonly GpuBlasNode outNode = ref nodes[stackTop.Item2];
+
+                    Box mergedBox = Conversions.ToBox(inputNode);
+                    mergedBox.GrowToFit(Conversions.ToBox(outNode));
+
+                    float mergedArea = mergedBox.HalfArea();
+                    float thisAreaDecrease = stackTop.Item1 - mergedArea;
+                    if (thisAreaDecrease > bestReinsertion.AreaDecrease)
+                    {
+                        bestReinsertion.Out = stackTop.Item2;
+                        bestReinsertion.AreaDecrease = thisAreaDecrease;
+                    }
+
+                    if (!outNode.IsLeaf)
+                    {
+                        float childArea = thisAreaDecrease + outNode.HalfArea();
+                        stack.Push((childArea, outNode.TriStartOrChild + 0));
+                        stack.Push((childArea, outNode.TriStartOrChild + 1));
+                    }
+
+                    if (pivotId != parentId)
+                    {
+                        pivotBox.GrowToFit(Conversions.ToBox(nodes[siblingId]));
+                        areaDecrease += nodes[pivotId].HalfArea() - pivotBox.HalfArea();
                     }
                 }
 
-                return parents;
+                siblingId = BLAS.GetSiblingId(pivotId);
+                pivotId = parentIds[pivotId];
+
+            } while (pivotId != -1);
+
+            if (bestReinsertion.Out == BLAS.GetSiblingId(bestReinsertion.In) ||
+                bestReinsertion.Out == parentIds[bestReinsertion.In])
+            {
+                bestReinsertion = new Reinsertion();
+            }
+
+            return bestReinsertion;
+        }
+
+        /// <summary>
+        /// Makes sure the root always always points to index 1 as its left child and
+        /// that primitives of two leafs always form a continuous range in memory.
+        /// </summary>
+        private void RestoreTreeQualities()
+        {
+            // Always make node 0 point to 1, as this is expected by traversal
+            // Always make node 1 point to 3, as this is good memory access
+            if (nodes[0].TriStartOrChild != 1)
+            {
+                SwapChildrenInMem(0, parentIds[1]);
+            }
+            if (!nodes[1].IsLeaf && nodes[1].TriStartOrChild != 3)
+            {
+                SwapChildrenInMem(1, parentIds[3]);
+            }
+
+            BLAS.IndicesTriplet[] newTriIndices = new BLAS.IndicesTriplet[triangles.Length];
+            int triCounter = 0;
+
+            Span<int> stack = stackalloc int[32];
+            int stackPtr = 0;
+            stack[stackPtr++] = 1;
+
+            while (stackPtr > 0)
+            {
+                int stackTop = stack[--stackPtr];
+
+                ref GpuBlasNode leftChild = ref nodes[stackTop];
+                ref GpuBlasNode rightChild = ref nodes[stackTop + 1];
+
+                if (leftChild.IsLeaf)
+                {
+                    Memory.CopyElements(triangles[leftChild.TriStartOrChild], ref newTriIndices[triCounter], leftChild.TriCount);
+                    leftChild.TriStartOrChild = triCounter;
+                    triCounter += leftChild.TriCount;
+                }
+                if (rightChild.IsLeaf)
+                {
+                    Memory.CopyElements(triangles[rightChild.TriStartOrChild], ref newTriIndices[triCounter], rightChild.TriCount);
+                    rightChild.TriStartOrChild = triCounter;
+                    triCounter += rightChild.TriCount;
+                }
+
+                if (!leftChild.IsLeaf)
+                {
+                    stack[stackPtr++] = leftChild.TriStartOrChild;
+                }
+
+                if (!rightChild.IsLeaf)
+                {
+                    stack[stackPtr++] = rightChild.TriStartOrChild;
+                }
+            }
+
+            newTriIndices.CopyTo(triangles);
+        }
+
+        private void SwapChildrenInMem(int inParent, int outParent)
+        {
+            int inLeftChildId = nodes[inParent].TriStartOrChild;
+            int inRightChildId = nodes[inParent].TriStartOrChild + 1;
+
+            int outLeftChildId = nodes[outParent].TriStartOrChild;
+            int outRightChildId = nodes[outParent].TriStartOrChild + 1;
+
+            Algorithms.Swap(ref nodes[inLeftChildId], ref nodes[outLeftChildId]);
+            Algorithms.Swap(ref nodes[inRightChildId], ref nodes[outRightChildId]);
+
+            nodes[inParent].TriStartOrChild = outLeftChildId;
+
+            if (inLeftChildId == outParent)
+            {
+                outParent = outLeftChildId;
+            }
+            if (inRightChildId == outParent)
+            {
+                outParent = outRightChildId;
+            }
+            nodes[outParent].TriStartOrChild = inLeftChildId;
+
+            UpdateChildParentIds(nodes, parentIds, inParent);
+            UpdateChildParentIds(nodes, parentIds, outParent);
+            UpdateChildParentIds(nodes, parentIds, inLeftChildId);
+            UpdateChildParentIds(nodes, parentIds, inRightChildId);
+            UpdateChildParentIds(nodes, parentIds, outLeftChildId);
+            UpdateChildParentIds(nodes, parentIds, outRightChildId);
+
+            void UpdateChildParentIds(Span<GpuBlasNode> nodes, Span<int> parentIds, int parentNodeId)
+            {
+                ref readonly GpuBlasNode parent = ref nodes[parentNodeId];
+                if (!parent.IsLeaf)
+                {
+                    parentIds[parent.TriStartOrChild + 0] = parentNodeId;
+                    parentIds[parent.TriStartOrChild + 1] = parentNodeId;
+                }
             }
         }
     }

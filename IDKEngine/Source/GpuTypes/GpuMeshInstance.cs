@@ -42,7 +42,7 @@ namespace IDKEngine.GpuTypes
         private Matrix3x4 invModelMatrix3x4;
         private Matrix3x4 prevModelMatrix3x4;
 
-        public int MeshIndex;
+        public int MeshId;
         private readonly float _pad0;
         private readonly float _pad1;
         private readonly float _pad2;

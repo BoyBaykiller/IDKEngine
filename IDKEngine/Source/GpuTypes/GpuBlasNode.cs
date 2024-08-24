@@ -6,9 +6,9 @@ namespace IDKEngine.GpuTypes
     public record struct GpuBlasNode
     {
         public Vector3 Min;
-        public uint TriStartOrChild;
+        public int TriStartOrChild;
         public Vector3 Max;
-        public uint TriCount;
+        public int TriCount;
 
         public bool IsLeaf => TriCount > 0;
 

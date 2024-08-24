@@ -1,11 +1,9 @@
 #version 460 core
 
-#define DECLARE_BVH_TRAVERSAL_STORAGE_BUFFERS
-AppInclude(include/StaticStorageBuffers.glsl)
-
 AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Transformations.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
 #define LOCAL_SIZE_X 8

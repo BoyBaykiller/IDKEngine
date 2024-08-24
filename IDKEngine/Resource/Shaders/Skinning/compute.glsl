@@ -1,15 +1,24 @@
 #version 460 core
 
-#define DECLARE_SKINNING_STORAGE_BUFFERS
-
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(location = 0) uniform uint InputVertexOffset;
+layout(location = 1) uniform uint OutputVertexOffset;
+layout(location = 2) uniform uint VertexCount;
+
 void main()
 {
-    uint inIndex = gl_VertexID;
-    uint outIndex = gl_BaseInstance + gl_VertexID;
+    if (gl_GlobalInvocationID.x >= VertexCount)
+    {
+        return;
+    }
+
+    uint inIndex = InputVertexOffset + gl_GlobalInvocationID.x;
+    uint outIndex = OutputVertexOffset + gl_GlobalInvocationID.x;
 
     UnskinnedVertex unskinnedVertex = unskinnedVertexSSBO.Vertices[inIndex];
 
@@ -34,8 +43,4 @@ void main()
     vertexPositionsSSBO.Positions[outIndex] = Pack(position);
     vertexSSBO.Vertices[outIndex].Normal = CompressSR11G11B10(normal);
     vertexSSBO.Vertices[outIndex].Tangent = CompressSR11G11B10(tangent);
-
-    // Outputting NaN to cull vertices is explicitly recommended by vendors https://gpuopen.com/learn/rdna-performance-guide/#shaders
-    // and I do see it improving performance here.
-    gl_Position = vec4(FLOAT_NAN);
 }

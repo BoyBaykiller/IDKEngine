@@ -174,47 +174,39 @@ namespace IDKEngine.Render
                 {
                     float mbDrawVertices = (app.ModelManager.Vertices.SizeInBytes() + app.ModelManager.VertexPositions.SizeInBytes()) / 1000000.0f;
                     float mbDrawIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
-                    float mbMeshlets = app.ModelManager.Meshlets.SizeInBytes() / 1000000.0f;
-                    float mbMeshletsVertexIndices = app.ModelManager.MeshletsVertexIndices.SizeInBytes() / 1000000.0f;
-                    float mbMeshletsLocalIndices = app.ModelManager.MeshletsLocalIndices.SizeInBytes() / 1000000.0f;
                     float mbMeshInstances = app.ModelManager.MeshInstances.SizeInBytes() / 1000000.0f;
-                    float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshlets + mbMeshletsVertexIndices + mbMeshletsLocalIndices + mbMeshInstances;
+                    float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshInstances;
                     if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
                     {
                         ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbDrawVertices}mb");
                         ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
-                        ImGui.Text($"  * Meshlets ({app.ModelManager.Meshlets.Length}) = {mbMeshlets}mb");
-                        ImGui.Text($"  * MeshletsVertexIndices ({app.ModelManager.MeshletsVertexIndices.Length}) = {mbMeshletsVertexIndices}mb");
-                        ImGui.Text($"  * MeshletsPrimitiveIndices ({app.ModelManager.MeshletsLocalIndices.Length}) = {mbMeshletsLocalIndices}mb");
                         ImGui.Text($"  * MeshInstances ({app.ModelManager.MeshInstances.Length}) = {mbMeshInstances}mb");
                         ImGui.TreePop();
                     }
                 }
 
                 {
-                    float mbBlasTrianglesIndices = app.ModelManager.BVH.GetBlasesTriangleIndicesCount() * (nint)sizeof(BLAS.IndicesTriplet) / 1000000.0f;
-                    float mbBlasNodes = app.ModelManager.BVH.GetBlasesNodeCount() * sizeof(GpuBlasNode) / 1000000.0f;
-                    float mbBTlasNodes = app.ModelManager.BVH.Tlas.Nodes.SizeInBytes() / 1000000.0f;
-                    float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
+                    float mbBlasTrianglesIndices = app.ModelManager.BVH.BlasTriangles.SizeInBytes() / 1000000.0f;
+                    float mbBlasNodes = app.ModelManager.BVH.BlasNodes.SizeInBytes() / 1000000.0f;
+                    float mbBlasLeafIndices = app.ModelManager.BVH.BlasLeafIds.SizeInBytes() / 1000000.0f;
+                    float mbBTlasNodes = app.ModelManager.BVH.TlasNodes.SizeInBytes() / 1000000.0f;
+                    float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBlasLeafIndices + mbBTlasNodes;
                     if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
                     {
-                        ImGui.Text($"  * Triangles ({app.ModelManager.BVH.GetBlasesTriangleIndicesCount()}) = {mbBlasTrianglesIndices}mb");
-                        ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.GetBlasesNodeCount()}) = {mbBlasNodes}mb");
-                        ImGui.Text($"  * Tlas Nodes ({app.ModelManager.BVH.Tlas.Nodes.Length}) = {mbBTlasNodes}mb");
+                        ImGui.Text($"  * Triangles ({app.ModelManager.BVH.BlasTriangles.Length}) = {mbBlasTrianglesIndices}mb");
+                        ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.BlasNodes.Length}) = {mbBlasNodes}mb");
+                        ImGui.Text($"  * Tlas Nodes ({app.ModelManager.BVH.TlasNodes.Length}) = {mbBTlasNodes}mb");
+                        ImGui.Text($"  * Blas Leaf Indices ({app.ModelManager.BVH.BlasLeafIds.Length}) = {mbBlasLeafIndices}mb");
                         ImGui.TreePop();
                     }
                 }
 
                 {
                     float mbJointMatrices = app.ModelManager.JointMatrices.SizeInBytes() / 1000000.0f;
-                    float mbJointWeights = app.ModelManager.JointWeights.SizeInBytes() / 1000000.0f;
-                    float mbJointIndices = app.ModelManager.JointIndices.SizeInBytes() / 1000000.0f;
-                    float mbTotalAnimations = mbJointMatrices + mbJointWeights + mbJointIndices;
+                    float mbTotalAnimations = mbJointMatrices;
                     if (ImGui.TreeNode($"Animations total = {mbTotalAnimations}mb"))
                     {
                         ImGui.Text($"  * JointMatrices ({app.ModelManager.JointMatrices.Length}) = {mbJointMatrices}mb");
-                        ImGui.Text($"  * JointWeights ({app.ModelManager.JointWeights.Length}) = {mbJointWeights}mb");
-                        ImGui.Text($"  * JointIndices ({app.ModelManager.JointIndices.Length}) = {mbJointIndices}mb");
                         ImGui.TreePop();
                     }
                 }
@@ -379,17 +371,17 @@ namespace IDKEngine.Render
                 }
                 ToolTipForItemAboveHovered(
                     "This increases GPU BVH traversal performance when there exist a lot of instances.\n" +
-                    $"You probably want this together with {nameof(app.ModelManager.BVH.UpdateTlas)}"
+                    $"You probably want this together with {nameof(app.ModelManager.BVH.RebuildTlas)}"
                 );
 
                 ImGui.SameLine();
                 ImGui.Checkbox("CpuUseTlas", ref app.ModelManager.BVH.CpuUseTlas);
                 ToolTipForItemAboveHovered(
                     "This increases CPU BVH traversal performance when there exist a lot of instances.\n" +
-                    $"You probably want this together with {nameof(app.ModelManager.BVH.UpdateTlas)}"
+                    $"You probably want this together with {nameof(app.ModelManager.BVH.RebuildTlas)}"
                 );
                 ImGui.SameLine();
-                ImGui.Checkbox("UpdateTlas", ref app.ModelManager.BVH.UpdateTlas);
+                ImGui.Checkbox("RebuildTlas", ref app.ModelManager.BVH.RebuildTlas);
 
                 ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.0f, 4.0f);
                 ImGui.SliderFloat("Saturation", ref app.TonemapAndGamma.Settings.Saturation, 0.0f, 1.5f);
@@ -932,7 +924,7 @@ namespace IDKEngine.Render
                         mesh.AbsorbanceBias = tempVec3.ToOpenTK();
                     }
 
-                    ImGui.Text($"MeshID: {SelectedEntity.EntityID}");
+                    ImGui.Text($"MeshId: {SelectedEntity.EntityID}");
                     ImGui.SameLine();
                     ImGui.Text($"MaterialID: {mesh.MaterialIndex}");
                     ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance}");
@@ -1082,9 +1074,9 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Scene Graph"))
             {
-                for (int i = 0; i < app.ModelManager.Models.Length; i++)
+                for (int i = 0; i < app.ModelManager.CpuModels.Length; i++)
                 {
-                    ref readonly ModelManager.CpuModel cpuModel = ref app.ModelManager.Models[i];
+                    ref readonly ModelManager.CpuModel cpuModel = ref app.ModelManager.CpuModels[i];
                     RenderNodesGraph(cpuModel.Root);
 
                     void RenderNodesGraph(ModelLoader.Node node)
@@ -1117,7 +1109,7 @@ namespace IDKEngine.Render
                                 }
                                 if (ImGui.IsItemClicked())
                                 {
-                                    SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, app.ModelManager.MeshInstances[i].MeshIndex, i);
+                                    SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, app.ModelManager.MeshInstances[i].MeshId, i);
                                 }
                             }
                             ImGui.TreePop();
@@ -1170,7 +1162,7 @@ namespace IDKEngine.Render
 
             if (resetPathTracer)
             {
-                app.PathTracer?.ResetRenderProcess();
+                app.PathTracer?.ResetAccumulation();
             }
         }
 
@@ -1293,13 +1285,13 @@ namespace IDKEngine.Render
 
             if (resetPathTracer)
             {
-                app.PathTracer?.ResetRenderProcess();
+                app.PathTracer?.ResetAccumulation();
             }
         }
         
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray)
         {
-            //Stopwatch globalAnimationsTimer = Stopwatch.StartNew();
+            //Stopwatch sw = Stopwatch.StartNew();
             //ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
             //for (int y = 0; y < app.RenderResolution.Y; y++)
             //{
@@ -1310,7 +1302,7 @@ namespace IDKEngine.Render
             //        app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
             //    }
             //}
-            //Console.WriteLine(globalAnimationsTimer.ElapsedMilliseconds);
+            //Console.WriteLine(sw.ElapsedMilliseconds);
 
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
@@ -1337,7 +1329,7 @@ namespace IDKEngine.Render
 
             if (meshHitInfo.T < lightHitInfo.T)
             {
-                hitEntity = new SelectedEntityInfo(EntityType.Mesh, meshHitInfo.MeshID, meshHitInfo.InstanceID);
+                hitEntity = new SelectedEntityInfo(EntityType.Mesh, app.ModelManager.MeshInstances[meshHitInfo.InstanceID].MeshId, meshHitInfo.InstanceID);
             }
             else
             {

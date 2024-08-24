@@ -16,7 +16,7 @@ layout(local_size_x = MESHLETS_PER_WORKGROUP) in;
 
 taskNV out InOutData
 {
-    uint MeshID;
+    uint MeshId;
     uint InstanceID;
     uint8_t FaceID;
     uint MeshletsStart;
@@ -33,7 +33,7 @@ void main()
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
 
-    uint meshID = meshInstance.MeshIndex;
+    uint meshID = meshInstance.MeshId;
     GpuMesh mesh = meshSSBO.Meshes[meshID];
 
     if (gl_GlobalInvocationID.x >= mesh.MeshletCount)
@@ -63,7 +63,7 @@ void main()
 
     if (gl_LocalInvocationIndex == 0)
     {
-        outData.MeshID = meshID;
+        outData.MeshId = meshID;
         outData.InstanceID = meshInstanceID;
         outData.FaceID = faceID;
         outData.MeshletsStart = workgroupFirstMeshlet;

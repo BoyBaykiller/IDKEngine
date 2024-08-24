@@ -24,8 +24,8 @@ namespace IDKEngine.Render
         public static unsafe void Initialize(SkyBoxMode skyBoxMode, string[] paths = null)
         {
             skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>();
-            skyBoxTextureBuffer.BindBufferBase(BBG.Buffer.BufferTarget.Uniform, 4);
-            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.Synced, 1);
+            skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
+            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             Paths = paths;
             SetSkyBoxMode(skyBoxMode);

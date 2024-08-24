@@ -18,9 +18,9 @@ namespace IDKEngine
             get => ref array[index];
         }
 
-        public static implicit operator ReadOnlySpan<T>(in ReadOnlyArray<T> segment)
+        public static implicit operator ReadOnlySpan<T>(in ReadOnlyArray<T> arr)
         {
-            return new ReadOnlySpan<T>(segment.array, 0, segment.Length);
+            return new ReadOnlySpan<T>(arr.array, 0, arr.Length);
         }
     }
 }

@@ -26,10 +26,10 @@ void main()
     }
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
-    uint meshID = meshInstance.MeshIndex;
+    uint meshID = meshInstance.MeshId;
     
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
-    GpuBlasNode node = blasSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeOffset];
+    GpuBlasNode node = blasNodeSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeOffset];
 
     for (int i = 0; i < NumVisibleFaces; i++)
     {
