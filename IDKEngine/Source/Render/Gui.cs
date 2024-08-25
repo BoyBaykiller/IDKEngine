@@ -188,15 +188,13 @@ namespace IDKEngine.Render
                 {
                     float mbBlasTrianglesIndices = app.ModelManager.BVH.BlasTriangles.SizeInBytes() / 1000000.0f;
                     float mbBlasNodes = app.ModelManager.BVH.BlasNodes.SizeInBytes() / 1000000.0f;
-                    float mbBlasLeafIndices = app.ModelManager.BVH.BlasLeafIds.SizeInBytes() / 1000000.0f;
                     float mbBTlasNodes = app.ModelManager.BVH.TlasNodes.SizeInBytes() / 1000000.0f;
-                    float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBlasLeafIndices + mbBTlasNodes;
+                    float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
                     if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
                     {
                         ImGui.Text($"  * Triangles ({app.ModelManager.BVH.BlasTriangles.Length}) = {mbBlasTrianglesIndices}mb");
                         ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.BlasNodes.Length}) = {mbBlasNodes}mb");
                         ImGui.Text($"  * Tlas Nodes ({app.ModelManager.BVH.TlasNodes.Length}) = {mbBTlasNodes}mb");
-                        ImGui.Text($"  * Blas Leaf Indices ({app.ModelManager.BVH.BlasLeafIds.Length}) = {mbBlasLeafIndices}mb");
                         ImGui.TreePop();
                     }
                 }

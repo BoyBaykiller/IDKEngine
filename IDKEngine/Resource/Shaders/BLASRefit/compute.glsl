@@ -14,7 +14,6 @@ layout(location = 1) uniform uint TriangleOffset;
 layout(location = 2) uniform uint LeafIndicesOffset;
 layout(location = 3) uniform uint LeafIndicesCount;
 
-
 void main()
 {
     if (gl_GlobalInvocationID.x >= LeafIndicesCount)
@@ -26,14 +25,7 @@ void main()
 
     GpuBlasNode leafNode = blasNodeSSBO.Nodes[RootNodeOffset + leafId];
     Box bounds = ComputeBoundingBox(TriangleOffset + leafNode.TriStartOrChild, leafNode.TriCount);
-    leafNode.Min = bounds.Min;
-    leafNode.Max = bounds.Max;
-
-    blasNodeSSBO.Nodes[RootNodeOffset + leafId] = leafNode;
-
-    // Writing only to Min & Max fields here (with SetNodeBounds(RootNodeOffset + leafId, bounds)) 
-    // makes this shader run much slower for some reason
-    blasNodesHostSSBO.Nodes[RootNodeOffset + leafId] = leafNode;
+    SetNodeBounds(RootNodeOffset + leafId, bounds);
 
     int parentId = blasParentIndicesSSBO.Indices[RootNodeOffset + leafId];
     do
@@ -61,10 +53,6 @@ void SetNodeBounds(uint index, Box bounds)
 {
     blasNodeSSBO.Nodes[index].Min = bounds.Min;
     blasNodeSSBO.Nodes[index].Max = bounds.Max;
-
-    // Also copy to CPU
-    blasNodesHostSSBO.Nodes[index].Min = bounds.Max;
-    blasNodesHostSSBO.Nodes[index].Max = bounds.Min;
 }
 
 Box ComputeBoundingBox(uint start, uint count)

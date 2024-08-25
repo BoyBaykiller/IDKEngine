@@ -23,5 +23,10 @@
             Start = start;
             Count = count;
         }
+
+        public static Range operator +(int num, Range range)
+        {
+            return new Range(range.Start + num, range.Count);
+        }
     }
 }

@@ -442,7 +442,7 @@ namespace IDKEngine
                 lucy.GpuModel.Meshes[0].RoughnessBias = -1.0f;
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).Matrix).Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Assets\\Models\\CesiumMan\\glTF\\CesiumMan.gltf", new Transformation().WithTranslation(5.0f, 0.0f, 0.0f).WithScale(2.0f).Matrix).Value;
+                ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Assets\\Models\\CesiumMan\\glTF\\CesiumMan.gltf", new Transformation().WithTranslation(5.0f, 0.0f, 0.0f).WithScale(2.0f).Matrix).Value;
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);

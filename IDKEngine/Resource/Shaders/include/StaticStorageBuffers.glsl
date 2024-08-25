@@ -121,11 +121,6 @@ layout(std430, binding = 24) restrict buffer BlasRefitLocksSSBO
     uint Locks[];
 } blasRefitLocksSSBO;
 
-layout(std430, binding = 25) restrict writeonly buffer BlasNodesHostSSBO
-{
-    GpuBlasNode Nodes[];
-} blasNodesHostSSBO;
-
 layout(std430, binding = 26) restrict readonly buffer TlasSSBO
 {
     GpuTlasNode Nodes[];

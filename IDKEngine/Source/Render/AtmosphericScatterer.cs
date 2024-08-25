@@ -84,7 +84,7 @@ namespace IDKEngine.Render
         }
 
         [InlineArray(6)]
-        public record struct InvViewProjectionArray_6
+        public struct InvViewProjectionArray_6
         {
             private Matrix4 _invViewProjection;
         }
