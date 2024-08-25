@@ -8,6 +8,8 @@
     <RootNamespace>IDKEngine</RootNamespace>
     <StartupObject></StartupObject>
     <!-- <PublishAOT>true</PublishAOT> -->
+    <!-- <OptimizationPreference>Speed</OptimizationPreference>
+    <IlcInstructionSet>native</IlcInstructionSet> -->
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

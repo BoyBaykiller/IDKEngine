@@ -56,6 +56,7 @@ void main()
 
         GpuVertex meshVertex = vertexSSBO.Vertices[globalVertexID];
         PackedVec3 vertexPosition = vertexPositionsSSBO.Positions[globalVertexID];
+        vec3 prevVertexPosition = Unpack(prevVertexPositionSSBO.Positions[globalVertexID]);
 
         outData[meshletVertexID].TexCoord = meshVertex.TexCoord;
 
@@ -69,7 +70,7 @@ void main()
 
         outData[meshletVertexID].Normal = normalize(unitVecToWorld * normal);
         outData[meshletVertexID].Tangent = normalize(unitVecToWorld * tangent);
-        outData[meshletVertexID].PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(position, 1.0);
+        outData[meshletVertexID].PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(prevVertexPosition, 1.0);
 
         vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(position, 1.0);
 

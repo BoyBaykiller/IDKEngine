@@ -18,6 +18,7 @@ void main()
 {
     GpuVertex vertex = vertexSSBO.Vertices[gl_VertexID];
     vec3 vertexPosition = Unpack(vertexPositionsSSBO.Positions[gl_VertexID]);
+    vec3 prevVertexPosition = Unpack(prevVertexPositionSSBO.Positions[gl_VertexID]);
     
     uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
@@ -33,8 +34,6 @@ void main()
     outData.Tangent = normalize(unitVecToWorld * tangent);
     outData.TexCoord = vertex.TexCoord;
     outData.MeshId = gl_DrawID;
-
-    vec3 prevVertexPosition = Unpack(prevVertexPositionSSBO.Positions[gl_VertexID]);
     outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(prevVertexPosition, 1.0);
     
     vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(vertexPosition, 1.0);

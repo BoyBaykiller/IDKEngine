@@ -1,6 +1,6 @@
 #define USE_TLAS AppInsert(USE_TLAS)
 
-#define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH) - 1, 1) // -1 because we skip root
+#define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH), 1)
 #define MAX_TLAS_TREE_DEPTH max(24, 1)
 
 AppInclude(include/StaticStorageBuffers.glsl)
