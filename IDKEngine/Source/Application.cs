@@ -21,6 +21,25 @@ namespace IDKEngine
             PathTracer
         }
 
+        public enum FrameRecorderState : int
+        {
+            None,
+            Recording,
+            Replaying,
+        }
+
+        public record struct RecordingSettings
+        {
+            public const string FRAME_STATES_INPUT_FILE = "frameRecordData.frd";
+            public const string FRAMES_OUTPUT_FOLDER = "RecordedFrames";
+
+            public int FPSGoal;
+            public int PathTracingSamplesGoal;
+            public bool IsOutputFrames;
+            public FrameRecorderState State;
+            public Stopwatch FrameTimer;
+        }
+
         public RenderMode CRenderMode
         {
             get
@@ -87,6 +106,7 @@ namespace IDKEngine
         public Camera Camera;
 
         public StateRecorder<FrameState> FrameStateRecorder;
+        public RecordingSettings RecorderVars;
 
         private GpuPerFrameData gpuPerFrameData;
         private BBG.TypedBuffer<GpuPerFrameData> gpuPerFrameDataBuffer;
@@ -148,6 +168,8 @@ namespace IDKEngine
 
             LightManager.Update(out bool anyLightMoved);
             ModelManager.Update(out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved);
+
+            HandleFrameRecorderLogic();
 
             if (RequestPresentationResolution.HasValue || RequestRenderResolutionScale.HasValue)
             {
@@ -237,6 +259,7 @@ namespace IDKEngine
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderGui)
             {
+                gui.Update(this);
                 gui.Draw(this, dT);
             }
             else
@@ -259,8 +282,6 @@ namespace IDKEngine
 
         protected override void OnUpdate(float dT)
         {
-            gui.Update(this);
-
             if (KeyboardState[Keys.Escape] == Keyboard.InputState.Pressed)
             {
                 ShouldClose();
@@ -308,7 +329,7 @@ namespace IDKEngine
             }
             if (!ImGuiNET.ImGui.GetIO().WantCaptureMouse)
             {
-                if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
+                if (RecorderVars.State != FrameRecorderState.Replaying)
                 {
                     if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                     {
@@ -336,7 +357,7 @@ namespace IDKEngine
                 }
             }
 
-            if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
+            if (RecorderVars.State != FrameRecorderState.Replaying)
             {
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
@@ -483,6 +504,12 @@ namespace IDKEngine
             WindowVSync = true;
             TimeEnabled = true;
 
+            RecorderVars = new RecordingSettings();
+            RecorderVars.FPSGoal = 10000; // unlimited
+            RecorderVars.PathTracingSamplesGoal = 50;
+            RecorderVars.State = FrameRecorderState.None;
+            RecorderVars.FrameTimer = Stopwatch.StartNew();
+
             GC.Collect();
         }
 
@@ -586,6 +613,89 @@ namespace IDKEngine
 
                 if (VolumetricLight != null) VolumetricLight.Dispose();
                 VolumetricLight = new VolumetricLighting(presentRes, VolumetricLight == null ? VolumetricLighting.GpuSettings.Default : VolumetricLight.Settings);
+            }
+        }
+
+        private void HandleFrameRecorderLogic()
+        {
+            bool resetPathTracer = false;
+
+            if (RecorderVars.State == FrameRecorderState.Replaying)
+            {
+                if (CRenderMode == RenderMode.Rasterizer ||
+                    (CRenderMode == RenderMode.PathTracer && PathTracer.AccumulatedSamples >= RecorderVars.PathTracingSamplesGoal))
+                {
+                    if (RecorderVars.IsOutputFrames && FrameStateRecorder.ReplayStateIndex >= 1)
+                    {
+                        string path = $"{RecordingSettings.FRAMES_OUTPUT_FOLDER}/{FrameStateRecorder.ReplayStateIndex}";
+                        Directory.CreateDirectory(RecordingSettings.FRAMES_OUTPUT_FOLDER);
+                        Helper.TextureToDiskJpg(TonemapAndGamma.Result, path);
+                    }
+
+                    FrameState state = FrameStateRecorder.Replay();
+                    Camera.Position = state.Position;
+                    Camera.UpVector = state.UpVector;
+                    Camera.LookX = state.LookX;
+                    Camera.LookY = state.LookY;
+
+                    // Stop replaying when we are at the first frame again
+                    if (FrameStateRecorder.ReplayStateIndex == 0)
+                    {
+                        RecorderVars.State = FrameRecorderState.None;
+                    }
+                }
+            }
+            else if (RecorderVars.State == FrameRecorderState.Recording)
+            {
+                if (RecorderVars.FrameTimer.Elapsed.TotalMilliseconds >= (1000.0f / RecorderVars.FPSGoal))
+                {
+                    FrameState state = new FrameState();
+                    state.Position = Camera.Position;
+                    state.UpVector = Camera.UpVector;
+                    state.LookX = Camera.LookX;
+                    state.LookY = Camera.LookY;
+
+                    FrameStateRecorder.Record(state);
+                    RecorderVars.FrameTimer.Restart();
+                }
+            }
+
+            if (RecorderVars.State != FrameRecorderState.Replaying &&
+                KeyboardState[Keys.R] == Keyboard.InputState.Touched &&
+                KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
+            {
+                // Start/Stop recording
+                if (RecorderVars.State == FrameRecorderState.Recording)
+                {
+                    RecorderVars.State = FrameRecorderState.None;
+                }
+                else
+                {
+                    RecorderVars.State = FrameRecorderState.Recording;
+                    FrameStateRecorder.Clear();
+                }
+            }
+
+            if (RecorderVars.State != FrameRecorderState.Recording && FrameStateRecorder.AreStatesLoaded &&
+                KeyboardState[Keys.Space] == Keyboard.InputState.Touched &&
+                KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
+            {
+                // Start/Stop replaying
+                if (RecorderVars.State == FrameRecorderState.Replaying)
+                {
+                    RecorderVars.State = FrameRecorderState.None;
+                }
+                else
+                {
+                    RecorderVars.State = FrameRecorderState.Replaying;
+                    MouseState.CursorMode = CursorModeValue.CursorNormal;
+                    SceneVsCamCollisionSettings.IsEnabled = false;
+                }
+            }
+
+            if (resetPathTracer)
+            {
+                PathTracer?.ResetAccumulation();
             }
         }
 

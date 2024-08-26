@@ -198,7 +198,7 @@ namespace IDKEngine.Utils
             texture.Download(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
 
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
-
+            
             StbImage.FlipVerticallyOnSave = flipVertically;
             StbImage.WriteJpg(
                 new ReadOnlySpan<byte>(pixels, texture.Width * texture.Height * nChannels),

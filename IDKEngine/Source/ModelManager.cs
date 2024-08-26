@@ -369,14 +369,6 @@ namespace IDKEngine
             if (fenceCopiedSkinnedVerticesToHost.HasValue && fenceCopiedSkinnedVerticesToHost.Value.TryWait())
             {
                 // Read the skinned vertices with one frame delay to avoid sync
-                // and refit their BLASes. Refitting on GPU is done elsewhere.
-
-                int threadPoolThreads = Math.Max(Environment.ProcessorCount / 2, 1);
-                ThreadPool.SetMinThreads(threadPoolThreads, 1);
-                ThreadPool.SetMaxThreads(threadPoolThreads, 1);
-
-                Task[] tasks = new Task[skinningCmds.Sum(it => CpuModels[it.CpuModelId].MeshRange.Count)];
-                int taskCounter = 0;
                 for (int i = 0; i < skinningCmds.Length; i++)
                 {
                     SkinningCmd cmd = skinningCmds[i];
@@ -389,18 +381,7 @@ namespace IDKEngine
                     {
                         Memory.CopyElements(skinnedVertexPositionsHostBuffer.MappedMemory + cmd.InputVertexOffset, dest + outputVertexOffset, vertexCount);
                     }
-
-                    for (int j = meshRange.Start; j < meshRange.End; j++)
-                    {
-                        BVH.BlasDesc blasDesc = BVH.BlasesDesc[j];
-
-                        tasks[taskCounter++] = Task.Run(() =>
-                        {
-                            BLAS.Refit(BVH.GetBlas(blasDesc), BVH.GetBlasGeometry(blasDesc.GeometryDesc));
-                        });
-                    }
                 }
-                Task.WaitAll(tasks);
 
                 fenceCopiedSkinnedVerticesToHost.Value.Dispose();
                 fenceCopiedSkinnedVerticesToHost = null;
