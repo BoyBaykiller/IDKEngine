@@ -12,7 +12,7 @@ layout(binding = 1) uniform sampler2D SamplerDebugOtherData; // speed, luminance
 
 layout(std140, binding = 7) uniform SettingsUBO
 {
-    int DebugMode;
+    ENUM_DEBUG_MODE DebugMode;
     float SpeedFactor;
     float LumVarianceFactor;
 } settingsUBO;
@@ -26,47 +26,47 @@ void main()
     vec2 scaledUv = ivec2(uv * imgSize) / vec2(imgSize); 
 
     vec3 debugColor = vec3(0.0);
-    if (settingsUBO.DebugMode == DEBUG_MODE_SHADING_RATES)
+    if (settingsUBO.DebugMode == ENUM_DEBUG_MODE_SHADING_RATES)
     {
         uint shadingRate = texture(SamplerDebugShadingRate, scaledUv).r;
         vec3 srcColor = texelFetch(SamplerSrc, imgCoord, 0).rgb;
-        if (shadingRate == SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
+        if (shadingRate == ENUM_SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV)
         {
             debugColor += vec3(4, 0, 0);
         }
-        else if (shadingRate == SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
+        else if (shadingRate == ENUM_SHADING_RATE_1_INVOCATION_PER_4X2_PIXELS_NV)
         {
             debugColor += vec3(4, 4, 0);
         }
-        else if (shadingRate == SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
+        else if (shadingRate == ENUM_SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV)
         {
             debugColor += vec3(0, 4, 0);
         }
-        else if (shadingRate == SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
+        else if (shadingRate == ENUM_SHADING_RATE_1_INVOCATION_PER_2X1_PIXELS_NV)
         {
             debugColor += vec3(0, 0, 4);
         }
-        else if (shadingRate == SHADING_RATE_1_INVOCATION_PER_PIXEL_NV)
+        else if (shadingRate == ENUM_SHADING_RATE_1_INVOCATION_PER_PIXEL_NV)
         {
             debugColor = srcColor;
         }
 
-        if (shadingRate != SHADING_RATE_1_INVOCATION_PER_PIXEL_NV)
+        if (shadingRate != ENUM_SHADING_RATE_1_INVOCATION_PER_PIXEL_NV)
         {
             debugColor = mix(debugColor, srcColor, vec3(0.5));
         }
     }
-    else if (settingsUBO.DebugMode == DEBUG_MODE_LUMINANCE)
+    else if (settingsUBO.DebugMode == ENUM_DEBUG_MODE_LUMINANCE)
     {
         float meanLuminance = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(meanLuminance);
     }
-    else if (settingsUBO.DebugMode == DEBUG_MODE_LUMINANCE_VARIANCE)
+    else if (settingsUBO.DebugMode == ENUM_DEBUG_MODE_LUMINANCE_VARIANCE)
     {
         float coeffOfVariation = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(coeffOfVariation) * 0.2;
     }
-    else if (settingsUBO.DebugMode == DEBUG_MODE_SPEED)
+    else if (settingsUBO.DebugMode == ENUM_DEBUG_MODE_SPEED)
     {
         float meanSpeed = texture(SamplerDebugOtherData, scaledUv).r;
         debugColor = vec3(meanSpeed);

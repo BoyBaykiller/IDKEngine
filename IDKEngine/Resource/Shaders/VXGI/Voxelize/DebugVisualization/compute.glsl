@@ -1,6 +1,4 @@
 #version 460 core
-#define FLOAT_MAX 3.4028235e+38
-#define FLOAT_MIN -FLOAT_MAX
 
 AppInclude(include/TraceCone.glsl)
 AppInclude(include/Transformations.glsl)

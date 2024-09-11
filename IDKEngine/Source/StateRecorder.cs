@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using BBLogger;
 using IDKEngine.Utils;
 
@@ -8,102 +10,90 @@ namespace IDKEngine
 {
     class StateRecorder<T> where T : unmanaged
     {
-        public ref readonly T this[int index]
-        {
-            get
-            {
-                Debug.Assert(index < StatesCount);
-                return ref recordedStates[index];
-            }
-        }
-
         private int _replayStateIndex;
         public int ReplayStateIndex
         {
             get => _replayStateIndex;
+            
             set
             {
-                if (StatesCount == 0)
+                if (Count == 0)
                 {
                     _replayStateIndex = 0;
                     return;
                 }
-                _replayStateIndex = value % StatesCount;
+                _replayStateIndex = value % Count;
             }
         }
 
-        public bool AreStatesLoaded => StatesCount > 0;
+        public int Count => recordedStates.Count;
 
-        public int StatesCount { get; private set; }
-
-        private T[] recordedStates;
+        private readonly List<T> recordedStates;
         public StateRecorder()
         {
-            
+            recordedStates = new List<T>();
         }
 
-        public void Record(T state)
+        public StateRecorder(ReadOnlySpan<T> values)
+            : this()
         {
-            if (recordedStates == null)
+            recordedStates.AddRange(values);
+        }
+
+        public static StateRecorder<T> Load(string path)
+        {
+            if (!File.Exists(path))
             {
-                recordedStates = new T[240];
-                recordedStates[StatesCount++] = state;
-                return;
+                Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
+                return new StateRecorder<T>();
             }
 
-            if (StatesCount >= recordedStates.Length)
+            if (!Helper.TryReadFromFile(path, out T[] recordedStates))
             {
-                Array.Resize(ref recordedStates, (int)(recordedStates.Length * 1.5f));
+                Logger.Log(Logger.LogLevel.Error, $"Error loading \"{path}\"");
+                return new StateRecorder<T>();
             }
-            recordedStates[StatesCount++] = state;
+            return new StateRecorder<T>(recordedStates);
+        }
+
+        public T this[int index]
+        {
+            get
+            {
+                Debug.Assert(index < Count);
+                return recordedStates[index];
+            }
+        }
+
+        public void Record(in T state)
+        {
+            recordedStates.Add(state);
         }
 
         public T Replay()
         {
-            if (StatesCount == 0)
-            {
-                Logger.Log(Logger.LogLevel.Warn, "Cannot replay anything, because there is no state data loaded");
-                return new T();
-            }
             return recordedStates[ReplayStateIndex++];
         }
 
         public void Clear()
         {
             ReplayStateIndex = 0;
-            StatesCount = 0;
-        }
-
-        public unsafe void Load(string path)
-        {
-            if (!File.Exists(path))
-            {
-                Logger.Log(Logger.LogLevel.Error, $"File \"{path}\" does not exist");
-                return;
-            }
-
-            if (!Helper.TryReadFromFile(path, out recordedStates))
-            {
-                Logger.Log(Logger.LogLevel.Error, $"Error loading \"{path}\"");
-                return;
-            }
-
-            StatesCount = recordedStates.Length;
-            ReplayStateIndex = 0;
+            recordedStates.Clear();
         }
 
         public void SaveToFile(string path)
         {
-            if (recordedStates == null || recordedStates.Length == 0)
+            if (recordedStates == null || recordedStates.Count == 0)
             {
                 return;
             }
+
             if (File.Exists(path))
             {
                 File.Delete(path);
             }
 
-            Helper.WriteToFile(path, new ReadOnlySpan<T>(recordedStates, 0, StatesCount));
+            Helper.WriteToFile<T>(path, CollectionsMarshal.AsSpan(recordedStates));
         }
     }
 }

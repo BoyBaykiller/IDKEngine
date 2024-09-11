@@ -54,20 +54,17 @@ void main()
     vec3 emissive = texelFetch(gBufferDataUBO.Emissive, imgCoord, 0).rgb;
     float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
 
+    Surface surface = GetDefaultSurface();
+    surface.Albedo = albedo;
+    surface.Normal = normal;
+    surface.Metallic = specular;
+    surface.Roughness = roughness;
+    surface.IOR = 1.0;
+
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)
     {
         GpuLight light = lightsUBO.Lights[i];
-
-        Surface surface = GetDefaultSurface();
-        surface.Albedo = albedo;
-        surface.Normal = normal;
-        surface.Metallic = specular;
-        surface.Roughness = roughness;
-
-        // TODO: Use real value
-        surface.IOR = 1.0;
-
         vec3 contribution = EvaluateLighting(light, surface, fragPos, perFrameDataUBO.ViewPos, ambientOcclusion);
         
         if (contribution != vec3(0.0))

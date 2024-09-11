@@ -22,7 +22,7 @@ namespace IDKEngine.Shapes
         public Vector3 P1;
         public Vector3 P2;
 
-        public Triangle(in Vector3 p0, in Vector3 p1, in Vector3 p2)
+        public Triangle(Vector3 p0, Vector3 p1, Vector3 p2)
         {
             P0 = p0;
             P1 = p1;

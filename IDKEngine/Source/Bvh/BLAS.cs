@@ -280,6 +280,27 @@ namespace IDKEngine.Bvh
             }
         }
 
+        public static void Refit(in BuildResult buildResult, in Geometry geometry)
+        {
+            for (int i = buildResult.UnpaddedNodesCount - 1; i >= 0; i--)
+            {
+                ref GpuBlasNode parent = ref buildResult.Nodes[i];
+                if (parent.IsLeaf)
+                {
+                    parent.SetBounds(ComputeBoundingBox(parent.TriStartOrChild, parent.TriCount, geometry));
+                    continue;
+                }
+
+                ref readonly GpuBlasNode leftChild = ref buildResult.Nodes[parent.TriStartOrChild];
+                ref readonly GpuBlasNode rightChild = ref buildResult.Nodes[parent.TriStartOrChild + 1];
+
+                Box mergedBox = Conversions.ToBox(leftChild);
+                mergedBox.GrowToFit(Conversions.ToBox(rightChild));
+
+                parent.SetBounds(mergedBox);
+            }
+        }
+
         public static void RefitFromNode(int parentId, Span<GpuBlasNode> nodes, ReadOnlySpan<int> parentIds)
         {
             do
@@ -405,30 +426,9 @@ namespace IDKEngine.Bvh
             return IsLeftSibling(nodeId) ? nodeId : nodeId - 1;
         }
 
-        public static GpuBlasNode[] AllocateUpperBoundsNodes(int triangleCount)
+        public static GpuBlasNode[] AllocateUpperBoundNodes(int triangleCount)
         {
             return new GpuBlasNode[Math.Max(2 * triangleCount - 1, 3)];
-        }
-
-        public static void Refit(in BuildResult buildResult, in Geometry geometry)
-        {
-            for (int i = buildResult.UnpaddedNodesCount - 1; i >= 0; i--)
-            {
-                ref GpuBlasNode parent = ref buildResult.Nodes[i];
-                if (parent.IsLeaf)
-                {
-                    parent.SetBounds(ComputeBoundingBox(parent.TriStartOrChild, parent.TriCount, geometry));
-                    continue;
-                }
-
-                ref readonly GpuBlasNode leftChild = ref buildResult.Nodes[parent.TriStartOrChild];
-                ref readonly GpuBlasNode rightChild = ref buildResult.Nodes[parent.TriStartOrChild + 1];
-
-                Box mergedBox = Conversions.ToBox(leftChild);
-                mergedBox.GrowToFit(Conversions.ToBox(rightChild));
-
-                parent.SetBounds(mergedBox);
-            }
         }
 
         private static unsafe int? TrySplit(in GpuBlasNode parentNode, Geometry geometry, in BuildSettings settings)
@@ -534,7 +534,7 @@ namespace IDKEngine.Bvh
                     return null;
                 }
 
-                return FallbackSplit(parentNode, geometry);
+                return MedianSplit(parentNode, geometry);
             }
             
             Geometry* geometryPtr = &geometry;
@@ -549,13 +549,14 @@ namespace IDKEngine.Bvh
 
             if (pivot == start || pivot == end)
             {
-                return FallbackSplit(parentNode, geometry);
+                // All triangles ended up on the same side, just split at the median
+                return MedianSplit(parentNode, geometry);
             }
 
             return pivot;
         }
 
-        private static unsafe int FallbackSplit(in GpuBlasNode parentNode, Geometry geometry)
+        private static unsafe int MedianSplit(in GpuBlasNode parentNode, Geometry geometry)
         {
             // Sort all triangles on the largest axis based on centroids and split at the median (not the middle!)
             
@@ -563,11 +564,10 @@ namespace IDKEngine.Bvh
             int largestAxis = size.Y > size.X ? 1 : 0;
             largestAxis = size.Z > size[largestAxis] ? 2 : largestAxis;
 
-            // Note: Could use PartialSort, but I've found full Sort to cause a slight decrease in SAH
             int start = parentNode.TriStartOrChild;
             int end = start + parentNode.TriCount;
             Geometry* geometryPtr = &geometry;
-            MemoryExtensions.Sort(MemoryMarshal.CreateSpan(ref geometry.Triangles[start], end - start), (IndicesTriplet a, IndicesTriplet b) =>
+            MemoryExtensions.Sort(geometry.Triangles.GetSpan(start, end - start), (IndicesTriplet a, IndicesTriplet b) =>
             {
                 Triangle triA = geometryPtr->GetTriangle(a);
                 float posOnSplitAxisA = (triA.Position0[largestAxis] + triA.Position1[largestAxis] + triA.Position2[largestAxis]) / 3.0f;
@@ -579,8 +579,8 @@ namespace IDKEngine.Bvh
                 if (posOnSplitAxisA == posOnSplitAxisB) return 0;
                 return -1;
             });
-
             int pivot = (start + end + 1) / 2;
+
             return pivot;
         }
 

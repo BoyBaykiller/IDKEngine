@@ -17,7 +17,7 @@ namespace IDKEngine.Utils
             return new Vector3(min) + new Vector3(RandomFloat01(), RandomFloat01(), RandomFloat01()) * (max - min);
         }
 
-        public static Vector3 RandomVec3(in Vector3 min, in Vector3 max)
+        public static Vector3 RandomVec3(Vector3 min, Vector3 max)
         {
             return new Vector3(RandomFloat(min.X, max.X), RandomFloat(min.Y, max.Y), RandomFloat(min.Z, max.Z));
         }
@@ -48,13 +48,13 @@ namespace IDKEngine.Utils
             return new Vector3(x, y, z);
         }
 
-        public static Vector3 SampleHemisphere(in Vector3 normal, float rnd0, float rnd1)
+        public static Vector3 SampleHemisphere(Vector3 normal, float rnd0, float rnd1)
         {
             Vector3 dir = SampleSphere(rnd0, rnd1);
             return dir * MathF.Sign(Vector3.Dot(dir, normal));
         }
 
-        public static Vector3 SampleHemisphere(in Vector3 normal)
+        public static Vector3 SampleHemisphere(Vector3 normal)
         {
             return SampleHemisphere(normal, RandomFloat01(), RandomFloat01());
         }

@@ -88,13 +88,14 @@ namespace IDKEngine.Render
                 ResetAccumulation();
             }
         }
-        public bool IsAlwaysTintWithAlbedo
+        
+        public bool TintOnTransmissiveRay
         {
-            get => gpuSettings.IsAlwaysTintWithAlbedo == 1;
+            get => gpuSettings.TintOnTransmissiveRay == 1;
 
             set
             {
-                gpuSettings.IsAlwaysTintWithAlbedo = value ? 1 : 0;
+                gpuSettings.TintOnTransmissiveRay = value ? 1 : 0;
                 ResetAccumulation();
             }
         }
@@ -105,7 +106,7 @@ namespace IDKEngine.Render
             public float LenseRadius;
             public int IsDebugBVHTraversal;
             public int IsTraceLights;
-            public int IsAlwaysTintWithAlbedo;
+            public int TintOnTransmissiveRay;
 
             public static GpuSettings Default = new GpuSettings()
             {
@@ -113,7 +114,7 @@ namespace IDKEngine.Render
                 LenseRadius = 0.01f,
                 IsDebugBVHTraversal = 0,
                 IsTraceLights = 0,
-                IsAlwaysTintWithAlbedo = 0
+                TintOnTransmissiveRay = 0
             };
         }
 
@@ -134,7 +135,13 @@ namespace IDKEngine.Render
             finalDrawProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/FinalDraw/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+
+            wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>();
+            wavefrontRayBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 30);
+
+            wavefrontPTBuffer = new BBG.Buffer();
+            wavefrontPTBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 31);
 
             SetSize(size);
 
@@ -176,6 +183,8 @@ namespace IDKEngine.Render
 
             BBG.Computing.Compute("Accumulate and output rays color", () =>
             {
+                BBG.Cmd.BindImageUnit(Result, 0);
+
                 BBG.Cmd.UseShaderProgram(finalDrawProgram);
                 BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit | BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
@@ -190,18 +199,11 @@ namespace IDKEngine.Render
             Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            Result.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
+            Result.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
             Result.Clear(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.Float, 0.0f);
 
-            if (wavefrontRayBuffer != null) wavefrontRayBuffer.Dispose();
-            wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>();
-            wavefrontRayBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, size.X * size.Y);
-            wavefrontRayBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 30);
-
-            if (wavefrontPTBuffer != null) wavefrontPTBuffer.Dispose();
-            wavefrontPTBuffer = new BBG.Buffer();
-            wavefrontPTBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
-            wavefrontPTBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 31);
+            BBG.Buffer.Recreate(ref wavefrontRayBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, size.X * size.Y);
+            BBG.Buffer.Recreate(ref wavefrontPTBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
             wavefrontPTBuffer.Clear(0, sizeof(GpuWavefrontPTHeader), 0.0f);
 
             ResetAccumulation();

@@ -8,7 +8,6 @@ namespace IDKEngine
         private static readonly ConcurrentQueue<Action> lazyActionsQueue = new ConcurrentQueue<Action>();
         private static readonly ConcurrentQueue<Action> hastyActionsQueue = new ConcurrentQueue<Action>();
 
-
         public static void AddToHastyQueue(Action action)
         {
             hastyActionsQueue.Enqueue(action);

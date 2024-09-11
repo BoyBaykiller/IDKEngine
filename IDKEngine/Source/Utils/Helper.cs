@@ -66,9 +66,9 @@ namespace IDKEngine.Utils
             return sizeof(T) * data.Length;
         }
 
-        public static unsafe int SizeInBytes<T>(this NativeMemoryView<T> data) where T : unmanaged
+        public static Span<T> GetSpan<T>(this Span<T> values, int start, int count)
         {
-            return sizeof(T) * data.Length;
+            return MemoryMarshal.CreateSpan(ref values[start], count);
         }
 
         public static T[] DeepClone<T>(this T[] array)
@@ -196,9 +196,8 @@ namespace IDKEngine.Utils
 
             byte* pixels = Memory.Malloc<byte>(texture.Width * texture.Height * nChannels);
             texture.Download(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
-
+            
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
-
             StbImage.FlipVerticallyOnSave = flipVertically;
             StbImage.WriteJpg(
                 new ReadOnlySpan<byte>(pixels, texture.Width * texture.Height * nChannels),

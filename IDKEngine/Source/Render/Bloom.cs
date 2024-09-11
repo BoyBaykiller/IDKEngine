@@ -50,7 +50,7 @@ namespace IDKEngine.Render
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "Bloom/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -144,13 +144,13 @@ namespace IDKEngine.Render
             downscaleTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             downscaleTexture.SetFilter(BBG.Sampler.MinFilter.LinearMipmapNearest, BBG.Sampler.MagFilter.Linear);
             downscaleTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            downscaleTexture.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float, levels);
+            downscaleTexture.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float, levels);
 
             if (upsampleTexture != null) upsampleTexture.Dispose();
             upsampleTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             upsampleTexture.SetFilter(BBG.Sampler.MinFilter.LinearMipmapNearest, BBG.Sampler.MagFilter.Linear);
             upsampleTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            upsampleTexture.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float, levels - 1);
+            upsampleTexture.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float, levels - 1);
         }
 
         public void Dispose()

@@ -26,7 +26,7 @@ namespace IDKEngine.Bvh
         {
             if (nodes.Length == 0) return;
 
-            Span<GpuTlasNode> initialChildNodes = MemoryMarshal.CreateSpan(ref nodes[nodes.Length - primitiveCount], primitiveCount);
+            Span<GpuTlasNode> initialChildNodes = nodes.GetSpan(nodes.Length - primitiveCount, primitiveCount);
 
             // Place initial tlasNodes at the end of array
             Box globalBounds = Box.Empty();
@@ -269,7 +269,7 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public static GpuTlasNode[] AllocateRequiresNodes(int leafNodesCount)
+        public static GpuTlasNode[] AllocateRequiredNodes(int leafNodesCount)
         {
             return new GpuTlasNode[Math.Max(2 * leafNodesCount - 1, 0)];
         }

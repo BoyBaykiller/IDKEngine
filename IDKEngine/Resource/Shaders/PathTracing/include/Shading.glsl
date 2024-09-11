@@ -3,15 +3,15 @@ AppInclude(include/Random.glsl)
 AppInclude(include/Transformations.glsl)
 AppInclude(PathTracing/include/Bsdf.glsl)
 
-#define RAY_TYPE_DIFFUSE    0
-#define RAY_TYPE_SPECULAR   1
-#define RAY_TYPE_REFRACTIVE 2
+#define ENUM_BSDF uint
+#define ENUM_BSDF_DIFFUSE      0u
+#define ENUM_BSDF_SPECULAR     1u
+#define ENUM_BSDF_TRANSMISSIVE 2u
 
 struct SampleMaterialResult
 {
     vec3 RayDirection;
-    uint RayType;
-    float RayTypeProbability;
+    ENUM_BSDF BsdfType;
 
     vec3 Bsdf;
     float Pdf;
@@ -21,50 +21,76 @@ struct SampleMaterialResult
 
 float SpecularBasedOnViewAngle(float specularChance, float cosTheta, float prevIor, float newIor)
 {
-    if (specularChance > 0.0) // adjust specular chance based on view angle
-    {
-        float f0 = BaseReflectivity(prevIor, newIor);
-        float f90 = 1.0;
-        
-        float newSpecularChance = mix(specularChance, f90, FresnelSchlick(cosTheta, f0, f90));
-        specularChance = newSpecularChance;
-    }
+    float f0 = BaseReflectivity(prevIor, newIor);
+    float f90 = 1.0;
+    
+    float newSpecularChance = mix(specularChance, f90, FresnelSchlick(f0, f90, cosTheta));
 
-    return specularChance;
+    return newSpecularChance;
 }
 
-SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevIor, bool fromInside)
+ENUM_BSDF SelectBsdf(Surface surface, out float bsdfSelectionPdf)
 {
-    surface.Roughness *= surface.Roughness; // just a convention to make roughness more perceptually
+    float specularChance = surface.Metallic;
+    float transmissionChance = surface.Transmission;
+    float diffuseChance = 1.0 - specularChance - transmissionChance;
+
+    float rnd = GetRandomFloat01();
+    if (specularChance > rnd)
+    {
+        bsdfSelectionPdf = specularChance;
+        return ENUM_BSDF_SPECULAR;
+    }
+    else if (specularChance + transmissionChance > rnd)
+    {
+        bsdfSelectionPdf = transmissionChance;
+        return ENUM_BSDF_TRANSMISSIVE;
+    }
+    else
+    {
+        bsdfSelectionPdf = diffuseChance;
+        return ENUM_BSDF_DIFFUSE;
+    }
+}
+
+SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevIor, bool fromInside, bool tintOnTransmissiveRay)
+{
+    surface.Roughness *= surface.Roughness; // just a convention to make roughness feel more linear perceptually
 
     float cosTheta = dot(-incomming, surface.Normal);
 
-    float diffuseChance = max(1.0 - surface.Metallic - surface.Transmission, 0.0);
+    float diffuseChance = 1.0 - surface.Metallic - surface.Transmission;
     surface.Metallic = SpecularBasedOnViewAngle(surface.Metallic, cosTheta, prevIor, surface.IOR);
-    surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // normalize again to (diff + spec + trans == 1.0)
+    surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // renormalize
 
     SampleMaterialResult result;
 
-    float rnd = GetRandomFloat01();
+    float bsdfSelectionPdf;
+    result.BsdfType = SelectBsdf(surface, bsdfSelectionPdf);
 
     float lambertianPdf;
     vec3 diffuseRayDir = SampleLambertian(surface.Normal, cosTheta, lambertianPdf);
-    if (surface.Metallic > rnd)
+
+    if (result.BsdfType == ENUM_BSDF_DIFFUSE)
+    {
+        result.RayDirection = diffuseRayDir;
+        result.NewIor = prevIor;
+
+        result.Bsdf = LambertianBrdf(surface.Albedo) * cosTheta;
+        result.Pdf = lambertianPdf;
+    }
+    else if (result.BsdfType == ENUM_BSDF_SPECULAR)
     {
         vec3 reflectionRayDir = reflect(incomming, surface.Normal);
         reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, surface.Roughness));
-        
         result.RayDirection = reflectionRayDir;
-        result.Bsdf = LambertianBrdf(surface.Albedo); // surface.Albedo
-        result.Pdf = lambertianPdf; // 1.0
 
-        result.RayDirection = reflectionRayDir;
-        result.RayTypeProbability = surface.Metallic;
-        result.RayType = RAY_TYPE_SPECULAR;
+        result.Bsdf = LambertianBrdf(surface.Albedo) * cosTheta; // surface.Albedo
+        result.Pdf = lambertianPdf; // 1.0
 
         result.NewIor = prevIor;
     }
-    else if (surface.Metallic + surface.Transmission > rnd)
+    else if (result.BsdfType == ENUM_BSDF_TRANSMISSIVE)
     {
         if (fromInside)
         {
@@ -83,37 +109,21 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
             refractionRayDir = reflect(incomming, surface.Normal);
             result.NewIor = prevIor;
         }
-        result.RayType = totalInternalReflection ? RAY_TYPE_SPECULAR : RAY_TYPE_REFRACTIVE;
         refractionRayDir = normalize(mix(refractionRayDir, !totalInternalReflection ? -diffuseRayDir : diffuseRayDir, surface.Roughness));
-        
         result.RayDirection = refractionRayDir;
-        result.RayTypeProbability = surface.Transmission;
 
-        result.Bsdf = LambertianBrdf(surface.Albedo);
-        result.Pdf = lambertianPdf;
+        if (tintOnTransmissiveRay)
+        {
+            result.Bsdf = LambertianBrdf(surface.Albedo) * cosTheta;
+            result.Pdf = lambertianPdf;
+        }
+        else
+        {
+            result.Bsdf = vec3(1.0);
+            result.Pdf = 1.0;
+        }
     }
-    else
-    {
-        result.RayDirection = diffuseRayDir;
-        result.RayTypeProbability = 1.0 - surface.Metallic - surface.Transmission;
-        result.RayType = RAY_TYPE_DIFFUSE;
-
-        result.NewIor = prevIor;
-
-        result.Bsdf = LambertianBrdf(surface.Albedo);
-        result.Pdf = lambertianPdf;
-    }
-    result.RayTypeProbability = max(result.RayTypeProbability, 0.0001);
-    result.Pdf = max(result.Pdf, 0.0001);
-
-    // result.Pdf = 1.0;
-    // result.Bsdf = surface.Albedo;
+    result.Pdf = max(result.Pdf * bsdfSelectionPdf, 0.0001);
 
     return result;
-}
-
-vec3 ApplyAbsorption(vec3 color, vec3 absorbance, float t)
-{
-    // Beer's law
-    return color * exp(-absorbance * t);
 }

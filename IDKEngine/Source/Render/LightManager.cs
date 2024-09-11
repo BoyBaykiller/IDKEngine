@@ -52,7 +52,7 @@ namespace IDKEngine.Render
         public SceneVsMovingSphereCollisionSettings SceneVsSphereCollisionSettings = new SceneVsMovingSphereCollisionSettings()
         {
             IsEnabled = true,
-            Collision = new Intersections.SceneVsMovingSphereSettings()
+            Settings = new Intersections.SceneVsMovingSphereSettings()
             {
                 TestSteps = 1,
                 RecursiveSteps = 8,
@@ -78,7 +78,7 @@ namespace IDKEngine.Render
                 BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "Light/fragment.glsl"));
 
             lightBufferObject = new BBG.TypedBuffer<GpuLight>();
-            lightBufferObject.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, lights.Length * sizeof(GpuLight) + sizeof(int));
+            lightBufferObject.Allocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, lights.Length * sizeof(GpuLight) + sizeof(int));
             lightBufferObject.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 1);
 
             const int SphereLatitudes = 12, SphereLongitudes = 12;
@@ -86,11 +86,11 @@ namespace IDKEngine.Render
 
             Span<ObjectFactory.Sphere.Vertex> vertices = ObjectFactory.Sphere.GenerateVertices(SphereRadius, SphereLatitudes, SphereLongitudes);
             vertexBuffer = new BBG.TypedBuffer<ObjectFactory.Sphere.Vertex>();
-            vertexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertices);
+            vertexBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertices);
 
             Span<uint> indices = ObjectFactory.Sphere.GenerateIndices(SphereLatitudes, SphereLongitudes);
             indexBuffer = new BBG.TypedBuffer<uint>();
-            indexBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, indices);
+            indexBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, indices);
 
             pointShadowManager = new PointShadowManager();
         }
@@ -241,7 +241,7 @@ namespace IDKEngine.Render
 
                     Sphere movingSphere = new Sphere(cpuLight.GpuLight.PrevPosition, cpuLight.GpuLight.Radius);
                     Vector3 prevSpherePos = movingSphere.Center;
-                    Intersections.SceneVsMovingSphereCollisionRoutine(modelManager, SceneVsSphereCollisionSettings.Collision, ref movingSphere, cpuLight.GpuLight.Position, (in Intersections.SceneHitInfo hitInfo) =>
+                    Intersections.SceneVsMovingSphereCollisionRoutine(modelManager, SceneVsSphereCollisionSettings.Settings, ref movingSphere, ref cpuLight.GpuLight.Position, (in Intersections.SceneHitInfo hitInfo) =>
                     {
                         Vector3 deltaStep = cpuLight.GpuLight.Position - prevSpherePos;
                         Vector3 reflected = Plane.Reflect(deltaStep, hitInfo.SlidingPlane);

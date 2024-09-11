@@ -12,8 +12,12 @@ out InOutData
 
 void main()
 {
-    mat4 viewNoTranslation = mat4(perFrameDataUBO.View[0], perFrameDataUBO.View[1], perFrameDataUBO.View[2], vec4(0.0, 0.0, 0.0, 1.0));
-    mat4 prevViewNoTranslation = mat4(perFrameDataUBO.PrevView[0], perFrameDataUBO.PrevView[1], perFrameDataUBO.PrevView[2], vec4(0.0, 0.0, 0.0, 1.0));
+    mat4 viewNoTranslation = perFrameDataUBO.View;
+    viewNoTranslation[3] = vec4(0.0, 0.0, 0.0, 1.0);
+
+    mat4 prevViewNoTranslation = perFrameDataUBO.PrevView;
+    prevViewNoTranslation[3] = vec4(0.0, 0.0, 0.0, 1.0);
+
     outData.TexCoord = CubeVertices[gl_VertexID];
 
     outData.ClipPos = (perFrameDataUBO.Projection * viewNoTranslation * vec4(outData.TexCoord, 1.0));

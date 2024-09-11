@@ -22,7 +22,7 @@ layout(std140, binding = 7) uniform SettingsUBO
     float LenseRadius;
     bool IsDebugBVHTraversal;
     bool IsTraceLights;
-    bool IsAlwaysTintWithAlbedo;
+    bool TintOnTransmissiveRay;
 } settingsUBO;
 
 vec3 TurboColormap(float x);
@@ -73,8 +73,8 @@ vec3 TurboColormap(float x)
     vec4 v4 = vec4( 1.0, x, x * x, x * x * x);
     vec2 v2 = v4.zw * v4.z;
     return vec3(
-      dot(v4, kRedVec4)   + dot(v2, kRedVec2),
-      dot(v4, kGreenVec4) + dot(v2, kGreenVec2),
-      dot(v4, kBlueVec4)  + dot(v2, kBlueVec2)
+        dot(v4, kRedVec4)   + dot(v2, kRedVec2),
+        dot(v4, kGreenVec4) + dot(v2, kGreenVec2),
+        dot(v4, kBlueVec4)  + dot(v2, kBlueVec2)
     );
 }

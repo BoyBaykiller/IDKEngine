@@ -4,7 +4,7 @@ namespace IDKEngine.GpuTypes
 {
     public record struct GpuMesh
     {
-        public int MaterialIndex;
+        public int MaterialId;
         public float NormalMapStrength;
         public float EmissiveBias;
         public float SpecularBias;

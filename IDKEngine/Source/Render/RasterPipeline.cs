@@ -209,11 +209,11 @@ namespace IDKEngine.Render
             mergeLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
 
             taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
-            taaDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            taaDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
             taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
 
             bindlessGBufferBuffer = new BBG.TypedBuffer<GpuBindlessGBuffer>();
-            bindlessGBufferBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            bindlessGBufferBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
             bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
 
             SSAO = new SSAO(renderSize, SSAO.GpuSettings.Default);
@@ -528,44 +528,44 @@ namespace IDKEngine.Render
             beforeTAATexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             beforeTAATexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             beforeTAATexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            beforeTAATexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+            beforeTAATexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
             DisposeBindlessGBufferTextures();
 
             AlbedoAlphaTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             AlbedoAlphaTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             AlbedoAlphaTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            AlbedoAlphaTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8B8A8Unorm);
+            AlbedoAlphaTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8B8A8Unorm);
             gpuBindlessGBuffer.AlbedoAlphaTexture = AlbedoAlphaTexture.GetTextureHandleARB();
 
             NormalTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             NormalTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             NormalTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            NormalTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8Snorm);
+            NormalTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8Unorm);
             gpuBindlessGBuffer.NormalTexture = NormalTexture.GetTextureHandleARB();
 
             MetallicRoughnessTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             MetallicRoughnessTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             MetallicRoughnessTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            MetallicRoughnessTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8Unorm);
+            MetallicRoughnessTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8Unorm);
             gpuBindlessGBuffer.MetallicRoughnessTexture = MetallicRoughnessTexture.GetTextureHandleARB();
 
             EmissiveTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             EmissiveTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             EmissiveTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            EmissiveTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R11G11B10Float);
+            EmissiveTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R11G11B10Float);
             gpuBindlessGBuffer.EmissiveTexture = EmissiveTexture.GetTextureHandleARB();
 
             VelocityTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             VelocityTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
             VelocityTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            VelocityTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R16G16Float);
+            VelocityTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R16G16Float);
             gpuBindlessGBuffer.VelocityTexture = VelocityTexture.GetTextureHandleARB();
 
             DepthTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             DepthTexture.SetFilter(BBG.Sampler.MinFilter.NearestMipmapNearest, BBG.Sampler.MagFilter.Nearest);
             DepthTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            DepthTexture.ImmutableAllocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.D32Float, BBG.Texture.GetMaxMipmapLevel(renderSize.X, renderSize.Y, 1));
+            DepthTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.D32Float, BBG.Texture.GetMaxMipmapLevel(renderSize.X, renderSize.Y, 1));
             gpuBindlessGBuffer.DepthTexture = DepthTexture.GetTextureHandleARB();
 
             bindlessGBufferBuffer.UploadElements(gpuBindlessGBuffer);

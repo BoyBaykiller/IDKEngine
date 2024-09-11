@@ -77,12 +77,9 @@ namespace BBOpenGL
                 }
             }
 
-            public unsafe void Upload(int location, in Vector3 vector3, int count = 1)
+            public unsafe void Upload(int location, Vector3 vector3, int count = 1)
             {
-                fixed (float* ptr = &vector3.X)
-                {
-                    GL.ProgramUniform3fv(ID, location, count, ptr);
-                }
+                GL.ProgramUniform3fv(ID, location, count, &vector3.X);
             }
 
             public unsafe void Upload(int location, float x, int count = 1)

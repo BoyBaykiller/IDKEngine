@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Threading;
-using System.Diagnostics;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -24,28 +23,7 @@ namespace IDKEngine
             // Deduced from the Nodes MeshInstance ranges
             public Range MeshRange;
 
-            public ModelLoader.Animation[] Animations;
-        }
-
-        public bool RunAnimations
-        {
-            get
-            {
-                return globalAnimationsTimer.IsRunning;
-            }
-
-            set
-            {
-                if (value)
-                {
-                    runSkinningShader = true;
-                    globalAnimationsTimer.Start();
-                }
-                else
-                {
-                    globalAnimationsTimer.Stop();
-                }
-            }
+            public ModelLoader.ModelAnimation[] Animations;
         }
 
         private record struct SkinningCmd
@@ -103,8 +81,9 @@ namespace IDKEngine
 
         private SkinningCmd[] skinningCmds;
 
-        private readonly Stopwatch globalAnimationsTimer = new Stopwatch();
         private bool runSkinningShader;
+        private float prevAnimationTime = float.MinValue;
+
         public ModelManager()
         {
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
@@ -150,7 +129,6 @@ namespace IDKEngine
             BVH = new BVH();
 
             skinningShaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "Skinning/compute.glsl"));
-            RunAnimations = true;
         }
 
         // TODO: Change to ReadOnlySpan in .NET 9
@@ -216,7 +194,7 @@ namespace IDKEngine
                 for (int j = Meshes.Length - gpuModel.Meshes.Length; j < Meshes.Length; j++)
                 {
                     ref GpuMesh newMesh = ref Meshes[j];
-                    newMesh.MaterialIndex += Materials.Length;
+                    newMesh.MaterialId += Materials.Length;
                     newMesh.MeshletsStart += meshlets.Length;
                 }
 
@@ -310,34 +288,37 @@ namespace IDKEngine
             BBG.Rendering.MultiDrawMeshletsCountNV(meshletTasksCmdsBuffer, meshletTasksCountBuffer, maxMeshlets, sizeof(BBG.DrawMeshTasksIndirectCommandNV));
         }
 
-        public void Update(out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved)
+        public void Update(float animationsTime, out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved)
         {
-            UpdateNodeAnimations(out anyAnimatedNodeMoved);
+            UpdateNodeAnimations(animationsTime, out anyAnimatedNodeMoved);
             UpdateNodeHierarchy();
             UpdateMeshInstanceBufferBatched(out anyMeshInstanceMoved);
 
-            ComputeSkinnedPositions();
+            ComputeSkinnedPositions(anyAnimatedNodeMoved);
 
-            for (int i = 0; i < CpuModels.Length; i++)
+            // Only need to update BLAS was animated, could use more granular per model bool here
+            if (anyAnimatedNodeMoved)
             {
-                ref readonly CpuModel model = ref CpuModels[i];
-                if (model.IsSkinned)
+                for (int i = 0; i < CpuModels.Length; i++)
                 {
-                    BVH.GpuBlasesRefit(model.MeshRange.Start, model.MeshRange.Count);
+                    ref readonly CpuModel model = ref CpuModels[i];
+                    if (model.IsSkinned)
+                    {
+                        BVH.GpuBlasesRefit(model.MeshRange.Start, model.MeshRange.Count);
+                    }
                 }
             }
 
-            BVH.TlasBuild();
+            // Only need to update TLAS if a BLAS was moved or animated
+            if (anyMeshInstanceMoved || anyAnimatedNodeMoved)
+            {
+                BVH.TlasBuild();
+            }
         }
 
-        public unsafe void ComputeSkinnedPositions()
+        public unsafe void ComputeSkinnedPositions(bool anyAnimatedNodeMoved)
         {
-            if (skinningCmds.Length == 0)
-            {
-                return;
-            }
-
-            if (RunAnimations)
+            if (anyAnimatedNodeMoved)
             {
                 int jointsProcessed = 0;
                 for (int i = 0; i < CpuModels.Length; i++)
@@ -396,7 +377,7 @@ namespace IDKEngine
 
                         tasks[taskCounter++] = Task.Run(() =>
                         {
-                            BLAS.Refit(BVH.GetBlas(blasDesc), BVH.GetBlasGeometry(blasDesc.GeometryDesc));
+                            BVH.CpuBlasRefit(blasDesc);
                         });
                     }
                 }
@@ -404,6 +385,11 @@ namespace IDKEngine
 
                 fenceCopiedSkinnedVerticesToHost.Value.Dispose();
                 fenceCopiedSkinnedVerticesToHost = null;
+            }
+
+            if (anyAnimatedNodeMoved)
+            {
+                runSkinningShader = true;
             }
 
             if (runSkinningShader)
@@ -431,7 +417,7 @@ namespace IDKEngine
 
                 fenceCopiedSkinnedVerticesToHost = new BBG.Fence();
 
-                if (!RunAnimations)
+                if (!anyAnimatedNodeMoved)
                 {
                     // Skinning shader must stop with one frame delay after Animations have been stoped so velocity becomes zero
                     runSkinningShader = false;
@@ -557,78 +543,79 @@ namespace IDKEngine
                 });
             }
         }
-        
-        private void UpdateNodeAnimations(out bool anyAnimatedNodeMoved)
+
+        private void UpdateNodeAnimations(float time, out bool anyAnimatedNodeMoved)
         {
             anyAnimatedNodeMoved = false;
-            if (!RunAnimations)
+            if (time == prevAnimationTime)
             {
                 return;
             }
+            prevAnimationTime = time;
 
-            float globalTime = (float)globalAnimationsTimer.Elapsed.TotalSeconds;
             for (int i = 0; i < CpuModels.Length; i++)
             {
                 ref readonly CpuModel cpuModel = ref CpuModels[i];
                 for (int j = 0; j < cpuModel.Animations.Length; j++)
                 {
-                    ref readonly ModelLoader.Animation animation = ref cpuModel.Animations[j];
-                    float animationTime = globalTime % animation.Duration;
+                    ref readonly ModelLoader.ModelAnimation modelAnimation = ref cpuModel.Animations[j];
+                    float animationTime = time % modelAnimation.Duration;
 
-                    for (int k = 0; k < animation.Samplers.Length; k++)
+                    for (int k = 0; k < modelAnimation.NodeAnimations.Length; k++)
                     {
-                        ref readonly ModelLoader.AnimationSampler sampler = ref animation.Samplers[k];
-                        if (!(animationTime >= sampler.Start && animationTime <= sampler.End))
+                        ref readonly ModelLoader.NodeAnimation nodeAnimation = ref modelAnimation.NodeAnimations[k];
+                        if (!(animationTime >= nodeAnimation.Start && animationTime <= nodeAnimation.End))
                         {
                             continue;
                         }
-                        anyAnimatedNodeMoved = true;
 
-                        int index = Algorithms.BinarySearchLowerBound(sampler.KeyFramesStart, animationTime, Comparer<float>.Default.Compare);
+                        int index = Algorithms.BinarySearchLowerBound(nodeAnimation.KeyFramesStart, animationTime, Comparer<float>.Default.Compare);
                         index = Math.Max(index, 1);
 
-                        float prevT = sampler.KeyFramesStart[index - 1];
-                        float nextT = sampler.KeyFramesStart[index];
+                        float prevT = nodeAnimation.KeyFramesStart[index - 1];
+                        float nextT = nodeAnimation.KeyFramesStart[index];
                         float alpha = 0.0f;
 
-                        if (sampler.Mode == ModelLoader.AnimationSampler.InterpolationMode.Step)
+                        if (nodeAnimation.Mode == ModelLoader.NodeAnimation.InterpolationMode.Step)
                         {
                             alpha = 0.0f;
                         }
-                        else if (sampler.Mode == ModelLoader.AnimationSampler.InterpolationMode.Linear)
+                        else if (nodeAnimation.Mode == ModelLoader.NodeAnimation.InterpolationMode.Linear)
                         {
                             alpha = MyMath.MapToZeroOne(animationTime, prevT, nextT);
                         }
 
-                        Transformation newTransformation = sampler.TargetNode.LocalTransform;
+                        Transformation newTransformation = nodeAnimation.TargetNode.LocalTransform;
 
-                        if (sampler.Type == ModelLoader.AnimationSampler.AnimationType.Scale ||
-                            sampler.Type == ModelLoader.AnimationSampler.AnimationType.Translation)
+                        if (nodeAnimation.Type == ModelLoader.NodeAnimation.AnimationType.Scale ||
+                            nodeAnimation.Type == ModelLoader.NodeAnimation.AnimationType.Translation)
                         {
-                            Span<Vector3> keyFrames = sampler.GetKeyFrameDataAsVec3();
+                            Span<Vector3> keyFrames = nodeAnimation.GetKeyFrameDataAsVec3();
                             ref readonly Vector3 prev = ref keyFrames[index - 1];
                             ref readonly Vector3 next = ref keyFrames[index];
 
                             Vector3 result = Vector3.Lerp(prev, next, alpha);
-                            if (sampler.Type == ModelLoader.AnimationSampler.AnimationType.Scale)
+                            if (nodeAnimation.Type == ModelLoader.NodeAnimation.AnimationType.Scale)
                             {
                                 newTransformation.Scale = result;
                             }
-                            if (sampler.Type == ModelLoader.AnimationSampler.AnimationType.Translation)
+                            if (nodeAnimation.Type == ModelLoader.NodeAnimation.AnimationType.Translation)
                             {
                                 newTransformation.Translation = result;
                             }
                         }
-                        else if (sampler.Type == ModelLoader.AnimationSampler.AnimationType.Rotation)
+                        else if (nodeAnimation.Type == ModelLoader.NodeAnimation.AnimationType.Rotation)
                         {
-                            Span<Quaternion> quaternions = sampler.GetKeyFrameDataAsQuaternion();
+                            Span<Quaternion> quaternions = nodeAnimation.GetKeyFrameDataAsQuaternion();
                             ref readonly Quaternion prev = ref quaternions[index - 1];
                             ref readonly Quaternion next = ref quaternions[index];
 
                             Quaternion result = Quaternion.Slerp(prev, next, alpha);
                             newTransformation.Rotation = result;
                         }
-                        sampler.TargetNode.LocalTransform = newTransformation;
+                        nodeAnimation.TargetNode.LocalTransform = newTransformation;
+
+                        anyAnimatedNodeMoved = true;
                     }
                 }
             }
@@ -709,10 +696,10 @@ namespace IDKEngine
                 }
             }
 
-            newCpuModel.Animations = new ModelLoader.Animation[model.Animations.Length];
+            newCpuModel.Animations = new ModelLoader.ModelAnimation[model.Animations.Length];
             for (int i = 0; i < newCpuModel.Animations.Length; i++)
             {
-                ref readonly ModelLoader.Animation oldAnimation = ref model.Animations[i];
+                ref readonly ModelLoader.ModelAnimation oldAnimation = ref model.Animations[i];
                 newCpuModel.Animations[i] = oldAnimation.DeepClone(newCpuModel.Nodes);
             }
 

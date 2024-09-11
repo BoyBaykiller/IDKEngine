@@ -13,7 +13,7 @@ out InOutData
     vec3 FragPos;
     vec2 TexCoord;
     vec3 Normal;
-    uint MaterialIndex;
+    uint MaterialId;
     float EmissiveBias;
 } outData;
 
@@ -40,7 +40,7 @@ void main()
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.TexCoord = vertex.TexCoord;
 
-    outData.MaterialIndex = mesh.MaterialIndex;
+    outData.MaterialId = mesh.MaterialId;
     outData.EmissiveBias = mesh.EmissiveBias;
 
     vec3 ndc = MapToZeroOne(outData.FragPos, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax) * 2.0 - 1.0;

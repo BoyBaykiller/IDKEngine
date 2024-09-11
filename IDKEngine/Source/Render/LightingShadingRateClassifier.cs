@@ -49,7 +49,7 @@ namespace IDKEngine.Render
             debugProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "ShadingRateClassification/debugCompute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -111,12 +111,12 @@ namespace IDKEngine.Render
             if (Result != null) Result.Dispose();
             Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
             Result.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
-            Result.ImmutableAllocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R8Uint);
+            Result.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R8Uint);
 
             if (debugTexture != null) debugTexture.Dispose();
             debugTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             debugTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
-            debugTexture.ImmutableAllocate(Result.Width, Result.Height, 1, BBG.Texture.InternalFormat.R32Float);
+            debugTexture.Allocate(Result.Width, Result.Height, 1, BBG.Texture.InternalFormat.R32Float);
         }
 
         public void Dispose()

@@ -27,7 +27,7 @@ namespace IDKEngine.Shapes
         [FieldOffset(0)] public Vector128<float> SIMDMin;
         [FieldOffset(16)] public Vector128<float> SIMDMax;
 
-        public Box(in Vector3 min, in Vector3 max)
+        public Box(Vector3 min, Vector3 max)
         {
             Min = min;
             Max = max;
@@ -38,13 +38,14 @@ namespace IDKEngine.Shapes
             SIMDMin = Vector128.Min(SIMDMin, point);
             SIMDMax = Vector128.Max(SIMDMax, point);
         }
+
         public void GrowToFit(in Box box)
         {
             SIMDMin = Vector128.Min(SIMDMin, box.SIMDMin);
             SIMDMax = Vector128.Max(SIMDMax, box.SIMDMax);
         }
 
-        public void GrowToFit(in Vector3 point)
+        public void GrowToFit(Vector3 point)
         {
             Vector128<float> p = Vector128.Create(point.X, point.Y, point.Z, 0.0f);
             GrowToFit(p);

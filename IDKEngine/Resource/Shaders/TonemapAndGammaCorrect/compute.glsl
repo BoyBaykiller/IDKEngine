@@ -49,8 +49,6 @@ void main()
 
 vec3 LinearToSrgb(vec3 linearRgb)
 {
-    // sRGB OETF, apply inverse of monitors transfer function
-
     bvec3 cutoff = lessThan(linearRgb, vec3(0.0031308));
     vec3 higher = vec3(1.055) * pow(linearRgb, vec3(1.0 / 2.4)) - vec3(0.055);
     vec3 lower = linearRgb * vec3(12.92);

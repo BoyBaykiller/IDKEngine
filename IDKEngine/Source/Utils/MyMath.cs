@@ -27,12 +27,12 @@ namespace IDKEngine.Utils
             return result;
         }
 
-        public static Vector3 Reflect(in Vector3 incident, in Vector3 normal)
+        public static Vector3 Reflect(Vector3 incident, Vector3 normal)
         {
             return incident - 2.0f * Vector3.Dot(normal, incident) * normal;
         }
 
-        public static Matrix3 GetTBN(in Vector3 tangent, in Vector3 normal)
+        public static Matrix3 GetTBN(Vector3 tangent, Vector3 normal)
         {
             Vector3 N = Vector3.Normalize(normal);
             Vector3 T = Vector3.Normalize(tangent);
@@ -106,7 +106,7 @@ namespace IDKEngine.Utils
             return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
         }
 
-        public static Vector3 MapRangeToAnOther(in Vector3 value, in Vector3 valueMin, in Vector3 valueMax, in Vector3 mapMin, in Vector3 mapMax)
+        public static Vector3 MapRangeToAnOther(Vector3 value, Vector3 valueMin, Vector3 valueMax, Vector3 mapMin, Vector3 mapMax)
         {
             Vector3 temp = (valueMax - valueMin);
             Vector3 result = (value - valueMin) / temp * (mapMax - mapMin) + mapMin;
@@ -118,7 +118,7 @@ namespace IDKEngine.Utils
             return result;
         }
 
-        public static Vector3 MapToZeroOne(in Vector3 value, in Vector3 rangeMin, in Vector3 rangeMax)
+        public static Vector3 MapToZeroOne(Vector3 value, Vector3 rangeMin, Vector3 rangeMax)
         {
             return MapRangeToAnOther(value, rangeMin, rangeMax, new Vector3(0.0f), new Vector3(1.0f));
         }
@@ -145,7 +145,7 @@ namespace IDKEngine.Utils
             return x;
         }
 
-        public static ulong GetMorton(in Vector3 normalizedV)
+        public static ulong GetMorton(Vector3 normalizedV)
         {
             const uint max = (1 << 21) - 1;
             uint x = Math.Clamp((uint)(normalizedV.X * max), 0u, max);

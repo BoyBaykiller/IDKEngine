@@ -20,7 +20,7 @@ namespace IDKEngine
             return WithScale(new Vector3(s));
         }
 
-        public Transformation WithScale(in Vector3 s)
+        public Transformation WithScale(Vector3 s)
         {
             Scale = s;
             return this;
@@ -31,7 +31,7 @@ namespace IDKEngine
             return WithTranslation(new Vector3(x, y, z));
         }
 
-        public Transformation WithTranslation(in Vector3 position)
+        public Transformation WithTranslation(Vector3 position)
         {
             Translation = position;
             return this;

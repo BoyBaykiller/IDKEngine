@@ -15,8 +15,6 @@ vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAt
 
 layout(std140, binding = 7) uniform SettingsUBO
 {
-    mat4 InvProjection;
-    mat4 InvViews[6];
     int ISteps;
     int JSteps;
     float LightIntensity;
@@ -30,7 +28,7 @@ void main()
     vec2 uv = (imgCoord.xy + 0.5) / imageSize(ImgResult);
     vec2 ndc = uv * 2.0 - 1.0;
     
-    vec3 toCubemap = GetWorldSpaceDirection(settingsUBO.InvProjection, settingsUBO.InvViews[imgCoord.z], ndc);
+    vec3 toCubemap = GetWorldSpaceDirection(ndc, imgCoord.z);
     vec3 lightPos = PolarToCartesian(settingsUBO.Azimuth, settingsUBO.Elevation);
 
     vec3 color = Atmosphere(
@@ -47,8 +45,6 @@ void main()
         0.758                           // Mie preferred scattering direction
     );
 
-    //color = pow(color, vec3(2.2));
-    //color = 1.0 - exp(-1.0 * color);
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
 }
 

@@ -56,11 +56,11 @@ float SmithGGXCorrelated(float NoV, float NoL, float roughness)
 }
 
 // GGX - F Term. Accounts for different reflectivity from different angles
-vec3 FresnelSchlick(float cosTheta, vec3 f0, vec3 f90)
+vec3 FresnelSchlick(vec3 f0, vec3 f90, float cosTheta)
 {
     return f0 + (f90 - f0) * pow(1.0 - cosTheta, 5.0);
 }
-float FresnelSchlick(float cosTheta, float f0, float f90)
+float FresnelSchlick(float f0, float f90, float cosTheta)
 {
     return f0 + (f90 - f0) * pow(1.0 - cosTheta, 5.0);
 }
@@ -71,23 +71,22 @@ vec3 GGXBrdf(Surface surface, vec3 V, vec3 L, float prevIor, out vec3 F)
     // L = outgoing vector (explicitly to a light with direct lighting)
     // H = halfway vector between V and L
 
+    surface.Roughness *= surface.Roughness; // just a convention to make roughness feel more linear perceptually
+
     vec3 f0 = BaseReflectivity(surface.Albedo, surface.Metallic, prevIor, surface.IOR);
     vec3 f90 = vec3(1.0);
 
     vec3 H = normalize(V + L);
-
     float NoV = abs(dot(surface.Normal, V));
     float NoL = clamp(dot(surface.Normal, L), 0.0, 1.0);
     float NoH = clamp(dot(surface.Normal, H), 0.0, 1.0);
     float LoH = clamp(dot(L, H), 0.0, 1.0);
 
-    surface.Roughness *= surface.Roughness; // just a convention to make roughness linear perceptually
-
     float D = DistributionGGX(NoH, surface.Roughness);
     float G = SmithGGXCorrelated(NoV, NoL, surface.Roughness);
-    F = FresnelSchlick(LoH, f0, f90);
+    F = FresnelSchlick(f0, f90, LoH);
 
-    vec3 specular = (F * G * D); // max((4.0 * NoL * NoV), 0.001)
+    vec3 specular = (D * G * F); // max((4.0 * NoL * NoV), 0.001)
 
     return specular;
 }

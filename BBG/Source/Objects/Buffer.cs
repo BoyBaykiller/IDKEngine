@@ -22,10 +22,14 @@ namespace BBOpenGL
 
             public enum MemLocation : uint
             {
-                // The buffer resides in DEVICE memory
+                /// <summary>
+                /// The buffer resides in DEVICE memory
+                /// </summary>
                 DeviceLocal = 0,
 
-                // The buffer resides in HOST memory
+                /// <summary>
+                /// The buffer resides in HOST memory
+                /// </summary>
                 HostLocal = BufferStorageMask.ClientStorageBit,
             }
 
@@ -79,7 +83,7 @@ namespace BBOpenGL
                 BlockIndex = index;
             }
 
-            public void ImmutableAllocate(MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
+            public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
             {
                 GL.NamedBufferStorage(ID, size, data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
                 Size = size;
@@ -157,7 +161,7 @@ namespace BBOpenGL
             public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
             {
                 Buffer newBuffer = new Buffer();
-                newBuffer.ImmutableAllocate(memLocation, memAccess, size, data);
+                newBuffer.Allocate(memLocation, memAccess, size, data);
                 if (buffer.BackingBlock != 0)
                 {
                     newBuffer.BindToBufferBackedBlock(buffer.BackingBlock, buffer.BlockIndex);
@@ -199,21 +203,21 @@ namespace BBOpenGL
 
             }
 
-            public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> data)
+            public void AllocateElements(MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> data)
             {
-                ImmutableAllocateElements(memLocation, memAccess, data.Length, MemoryMarshal.GetReference(data));
+                AllocateElements(memLocation, memAccess, data.Length, MemoryMarshal.GetReference(data));
             }
-            public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
+            public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
             {
                 fixed (void* ptr = &data)
                 {
-                    ImmutableAllocateElements(memLocation, memAccess, count, ptr);
+                    AllocateElements(memLocation, memAccess, count, ptr);
                 }
             }
-            public void ImmutableAllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, void* data = null)
+            public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, void* data = null)
             {
                 if (count == 0) return;
-                ImmutableAllocate(memLocation, memAccess, sizeof(T) * count, data);
+                Allocate(memLocation, memAccess, sizeof(T) * count, data);
             }
 
             public void UploadElements(ReadOnlySpan<T> data, nint startIndex = 0)

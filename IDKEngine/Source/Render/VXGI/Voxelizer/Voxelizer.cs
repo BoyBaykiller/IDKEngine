@@ -95,7 +95,7 @@ namespace IDKEngine.Render
             }
 
             voxelizerDataBuffer = new BBG.TypedBuffer<GpuVoxelizerData>();
-            voxelizerDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            voxelizerDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
             voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
 
             SetSize(width, height, depth);
@@ -252,7 +252,7 @@ namespace IDKEngine.Render
             ResultVoxels.SetFilter(BBG.Sampler.MinFilter.LinearMipmapLinear, BBG.Sampler.MagFilter.Linear);
             ResultVoxels.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
             ResultVoxels.SetAnisotropy(BBG.Sampler.Anisotropy.Samples16x);
-            ResultVoxels.ImmutableAllocate(width, height, depth, BBG.Texture.InternalFormat.R16G16B16A16Float, BBG.Texture.GetMaxMipmapLevel(width, height, depth));
+            ResultVoxels.Allocate(width, height, depth, BBG.Texture.InternalFormat.R16G16B16A16Float, BBG.Texture.GetMaxMipmapLevel(width, height, depth));
 
             if (!TAKE_ATOMIC_FP16_PATH)
             {
@@ -261,7 +261,7 @@ namespace IDKEngine.Render
                     if (intermediateResultsRbg[i] != null) intermediateResultsRbg[i].Dispose();
                     intermediateResultsRbg[i] = new BBG.Texture(BBG.Texture.Type.Texture3D);
                     intermediateResultsRbg[i].SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
-                    intermediateResultsRbg[i].ImmutableAllocate(width, height, depth, BBG.Texture.InternalFormat.R32Float);
+                    intermediateResultsRbg[i].Allocate(width, height, depth, BBG.Texture.InternalFormat.R32Float);
                 }
             }
         }

@@ -11,8 +11,8 @@ struct HitInfo
 {
     vec2 BaryXY; // z = 1.0 - bary.x - bary.y
     float T;
-    uint TriangleID;
-    uint InstanceID;
+    uint TriangleId;
+    uint InstanceId;
 };
 
 #ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
@@ -67,7 +67,7 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
                 if (RayTriangleIntersect(ray, p0, p1, p2, bary, hitT) && hitT < hitInfo.T)
                 {
                     hit = true;
-                    hitInfo.TriangleID = i;
+                    hitInfo.TriangleId = i;
                     hitInfo.BaryXY = bary.xy;
                     hitInfo.T = hitT;
                 }
@@ -140,7 +140,7 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
                 float hitT;
                 if (RayTriangleIntersect(ray, p0, p1, p2, bary, hitT) && hitT < hitInfo.T)
                 {
-                    hitInfo.TriangleID = i;
+                    hitInfo.TriangleId = i;
                     hitInfo.BaryXY = bary.xy;
                     hitInfo.T = hitT;
 
@@ -178,7 +178,7 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
 bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool traceLights, float maxDist)
 {
     hitInfo.T = maxDist;
-    hitInfo.TriangleID = ~0u;
+    hitInfo.TriangleId = ~0u;
     debugNodeCounter = 0;
 
     if (traceLights)
@@ -191,7 +191,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
             if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
             {
                 hitInfo.T = tMin < 0.0 ? tMax : tMin;
-                hitInfo.InstanceID = i;
+                hitInfo.InstanceId = i;
             }
         }
     }
@@ -214,11 +214,11 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         //     continue;
         // }
 
-        bool isLeaf = parent.IsLeafAndChildOrInstanceID >> 31 == 1;
-        uint childOrInstanceID = parent.IsLeafAndChildOrInstanceID & ((1u << 31) - 1);
+        bool isLeaf = parent.IsLeafAndChildOrInstanceId >> 31 == 1;
+        uint childOrInstanceId = parent.IsLeafAndChildOrInstanceId & ((1u << 31) - 1);
         if (isLeaf)
         {
-            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
+            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceId];
             GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshId];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
 
@@ -227,7 +227,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
 
             if (IntersectBlas(localRay, mesh.BlasRootNodeOffset, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
             {
-                hitInfo.InstanceID = childOrInstanceID;
+                hitInfo.InstanceId = childOrInstanceId;
             }
 
             if (stackPtr == 0) break;
@@ -236,7 +236,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         }
         
 
-        uint leftChild = childOrInstanceID;
+        uint leftChild = childOrInstanceId;
         uint rightChild = leftChild + 1;
         GpuTlasNode leftNode = tlasSSBO.Nodes[leftChild];
         GpuTlasNode rightNode = tlasSSBO.Nodes[rightChild];
@@ -275,7 +275,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
         Ray localRay = RayTransform(ray, invModelMatrix);
         if (IntersectBlas(localRay, mesh.BlasRootNodeOffset, cmd.FirstIndex / 3, hitInfo, debugNodeCounter))
         {
-            hitInfo.InstanceID = i;
+            hitInfo.InstanceId = i;
         }
     }
     #endif
@@ -292,7 +292,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 {
     hitInfo.T = maxDist;
-    hitInfo.TriangleID = ~0u;
+    hitInfo.TriangleId = ~0u;
 
     if (traceLights)
     {
@@ -304,7 +304,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
             if (RaySphereIntersect(ray, light.Position, light.Radius, tMin, tMax) && tMin < hitInfo.T)
             {
                 hitInfo.T = tMin < 0.0 ? tMax : tMin;
-                hitInfo.InstanceID = i;
+                hitInfo.InstanceId = i;
 
                 return true;
             }
@@ -330,11 +330,11 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         //     continue;
         // }
 
-        bool isLeaf = parent.IsLeafAndChildOrInstanceID >> 31 == 1;
-        uint childOrInstanceID = parent.IsLeafAndChildOrInstanceID & ((1u << 31) - 1);
+        bool isLeaf = parent.IsLeafAndChildOrInstanceId >> 31 == 1;
+        uint childOrInstanceId = parent.IsLeafAndChildOrInstanceId & ((1u << 31) - 1);
         if (isLeaf)
         {
-            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceID];
+            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[childOrInstanceId];
             GpuDrawElementsCmd cmd = drawElementsCmdSSBO.Commands[meshInstance.MeshId];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
 
@@ -343,7 +343,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 
             if (IntersectBlasAny(localRay, mesh.BlasRootNodeOffset, cmd.FirstIndex / 3, hitInfo))
             {
-                hitInfo.InstanceID = childOrInstanceID;
+                hitInfo.InstanceId = childOrInstanceId;
 
                 return true;
             }
@@ -354,7 +354,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         }
         
 
-        uint leftChild = childOrInstanceID;
+        uint leftChild = childOrInstanceId;
         uint rightChild = leftChild + 1;
         GpuTlasNode leftNode = tlasSSBO.Nodes[leftChild];
         GpuTlasNode rightNode = tlasSSBO.Nodes[rightChild];
@@ -393,7 +393,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         Ray localRay = RayTransform(ray, invModelMatrix);
         if (IntersectBlasAny(localRay, mesh.BlasRootNodeOffset, cmd.FirstIndex / 3, hitInfo))
         {
-            hitInfo.InstanceID = i;
+            hitInfo.InstanceId = i;
             return true;
         }
     }

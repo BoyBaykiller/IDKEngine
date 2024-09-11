@@ -85,7 +85,7 @@ struct GpuPointShadow
 
 struct GpuMesh
 {
-    int MaterialIndex;
+    int MaterialId;
     float NormalMapStrength;
     float EmissiveBias;
     float SpecularBias;
@@ -122,7 +122,7 @@ struct GpuBlasNode
 struct GpuTlasNode
 {
     vec3 Min;
-    uint IsLeafAndChildOrInstanceID;
+    uint IsLeafAndChildOrInstanceId;
     vec3 Max;
     float _pad0;
 };

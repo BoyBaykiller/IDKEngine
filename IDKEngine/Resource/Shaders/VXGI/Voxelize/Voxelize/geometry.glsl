@@ -16,7 +16,7 @@ layout(passthrough) in InOutData
     vec3 FragPos;
     vec2 TexCoord;
     vec3 Normal;
-    uint MaterialIndex;
+    uint MaterialId;
     float EmissiveBias;
 } inData[];
 

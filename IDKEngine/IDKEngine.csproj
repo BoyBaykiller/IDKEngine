@@ -7,9 +7,21 @@
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
     <StartupObject></StartupObject>
-    <!-- <PublishAOT>true</PublishAOT> -->
-    <!-- <OptimizationPreference>Speed</OptimizationPreference>
-    <IlcInstructionSet>native</IlcInstructionSet> -->
+    <PublishAOT>true</PublishAOT>
+
+    <!-- 
+    https://learn.microsoft.com/en-us/dotnet/core/runtime-config/compilation#quick-jit
+    QuickJIT has an overhead for code called first time(s). 
+    It doubles the time spent on building BLASes for Sponza+Helmet+Lucy on application load.
+    On the other hand it increase performance for parallel BLAS refitting.
+    The first-dispatch overhead of QuickJIT only exists when no precompiled code is given as a basis with the "ReadyToRun"-feature.
+    I don't think tiered compilation has any effect when NativeAOT is used since there is no JIT in that case.
+    -->
+    <TieredCompilation>true</TieredCompilation> <!-- True by default-->
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>  <!-- True by default-->
+
+    <!--<OptimizationPreference>Speed</OptimizationPreference>-->
+    <!--<IlcInstructionSet>native</IlcInstructionSet>--> 
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -42,7 +54,8 @@
     <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.11" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.11" />
     <PackageReference Include="ReFuel.StbImage" Version="2.0.1" />
-    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.1" />
+    <PackageReference Include="SharpGLTF.Core" Version="1.0.2" />
+    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.2" />
   </ItemGroup>
 
   <ItemGroup>

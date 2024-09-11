@@ -14,21 +14,23 @@ namespace IDKEngine.Render
             InternalAtmosphericScattering,
         }
 
-        public static string[] Paths;
-        public static BBG.Texture SkyBoxTexture => AtmosphericScatterer != null ? AtmosphericScatterer.Result : externalSkyBoxTexture;
+        public static string[] SkyBoxImagePaths;
+
+        public static BBG.Texture SkyBoxTexture => AtmosphericScatterer != null ? AtmosphericScatterer.Result : externalCubemapTexture;
         public static AtmosphericScatterer AtmosphericScatterer { get; private set; }
 
-
-        private static BBG.Texture externalSkyBoxTexture;
+        private static BBG.Texture externalCubemapTexture;
         public static BBG.TypedBuffer<BBG.Texture.BindlessHandle> skyBoxTextureBuffer;
-        public static unsafe void Initialize(SkyBoxMode skyBoxMode, string[] paths = null)
+        private static BBG.AbstractShaderProgram unprojectEquirectangularProgram;
+        public static unsafe void Initialize()
         {
             skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>();
             skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
-            skyBoxTextureBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            skyBoxTextureBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
-            Paths = paths;
-            SetSkyBoxMode(skyBoxMode);
+            unprojectEquirectangularProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "UnprojectEquirectangular/compute.glsl"));
+
+            SetSkyBoxMode(SkyBoxMode.InternalAtmosphericScattering);
         }
 
         private static SkyBoxMode _skyBoxMode;
@@ -36,20 +38,20 @@ namespace IDKEngine.Render
         {
             if (skyBoxMode == SkyBoxMode.ExternalAsset)
             {
-                externalSkyBoxTexture = new BBG.Texture(BBG.Texture.Type.Cubemap);
-                externalSkyBoxTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+                externalCubemapTexture = new BBG.Texture(BBG.Texture.Type.Cubemap);
+                externalCubemapTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
 
-                if (!LoadCubemap(externalSkyBoxTexture, BBG.Texture.InternalFormat.R8G8B8SRgba, Paths))
+                if (!LoadSkyBox(SkyBoxImagePaths))
                 {
                     skyBoxMode = SkyBoxMode.InternalAtmosphericScattering;
                 }
             }
             else
             {
-                if (externalSkyBoxTexture != null)
+                if (externalCubemapTexture != null)
                 {
-                    externalSkyBoxTexture.Dispose();
-                    externalSkyBoxTexture = null;
+                    externalCubemapTexture.Dispose();
+                    externalCubemapTexture = null;
                 }
             }
 
@@ -73,50 +75,108 @@ namespace IDKEngine.Render
             _skyBoxMode = skyBoxMode;
         }
 
-        private static unsafe bool LoadCubemap(BBG.Texture texture, BBG.Texture.InternalFormat format, string[] imagePaths)
+        public static SkyBoxMode GetSkyBoxMode()
+        {
+            return _skyBoxMode;
+        }
+
+        private static unsafe bool LoadSkyBox(string[] imagePaths)
         {
             if (imagePaths == null)
             {
-                Logger.Log(Logger.LogLevel.Error, $"Cubemap {nameof(imagePaths)} is null");
-                return false;
-            }
-            if (texture.TextureType != BBG.Texture.Type.Cubemap)
-            {
-                Logger.Log(Logger.LogLevel.Error, $"Texture must be of type {BBG.Texture.Type.Cubemap}");
-                return false;
-            }
-            if (imagePaths.Length != 6)
-            {
-                Logger.Log(Logger.LogLevel.Error, "Number of cubemap images must be equal to six");
+                Logger.Log(Logger.LogLevel.Error, $"SkyBox {nameof(imagePaths)} is null");
                 return false;
             }
             if (!imagePaths.All(p => File.Exists(p)))
             {
-                Logger.Log(Logger.LogLevel.Error, "At least one of the specified cubemap images is not found");
+                Logger.Log(Logger.LogLevel.Error, "At least one of the skybox images is not found");
+                return false;
+            }
+
+            bool success = false;
+            if (imagePaths.Length == 1)
+            {
+                success = LoadSkyBoxEquirectangular(imagePaths[0]);
+            }
+            if (imagePaths.Length == 6)
+            {
+                success = LoadSkyBoxImages(imagePaths);
+            }
+            if (success)
+            {
+                SkyBoxImagePaths = imagePaths;
+            }
+
+            return success;
+        }
+
+        private static unsafe bool LoadSkyBoxEquirectangular(string hrdPath)
+        {
+            using ImageLoader.ImageResult hdrImage = ImageLoader.Load(hrdPath, ImageLoader.ColorComponents.RGB);
+            if (hdrImage.RawPixels == null)
+            {
+                Logger.Log(Logger.LogLevel.Error, $"Hdr image could not be decoded");
+                return false;
+            }
+
+            externalCubemapTexture.Allocate(1536, 1536, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+            using BBG.Texture equirectangularTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+
+            BBG.Computing.Compute("Equirectangular to Cubemap", () =>
+            {
+                equirectangularTexture.Allocate(hdrImage.Header.Width, hdrImage.Header.Height, 1, externalCubemapTexture.Format);
+                equirectangularTexture.Upload2D(
+                    hdrImage.Header.Width, hdrImage.Header.Height,
+                    BBG.Texture.NumChannelsToPixelFormat(hdrImage.Header.Channels),
+                    BBG.Texture.PixelType.Float,
+                    hdrImage.RawPixels
+                );
+
+                BBG.Cmd.BindImageUnit(externalCubemapTexture, 0, 0, true);
+                BBG.Cmd.BindTextureUnit(equirectangularTexture, 0);
+                BBG.Cmd.UseShaderProgram(unprojectEquirectangularProgram);
+
+                BBG.Computing.Dispatch((externalCubemapTexture.Width + 8 - 1) / 8, (externalCubemapTexture.Width + 8 - 1) / 8, 6);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
+            });
+
+            return true;
+        }
+
+        private static unsafe bool LoadSkyBoxImages(string[] imagePaths)
+        {
+            if (imagePaths.Length != 6)
+            {
+                Logger.Log(Logger.LogLevel.Error, "Number of skybox images must be equal to six");
                 return false;
             }
 
             ImageLoader.ImageResult[] images = new ImageLoader.ImageResult[6];
             Parallel.For(0, images.Length, i =>
             {
-                ImageLoader.ImageResult imageResult = ImageLoader.Load(imagePaths[i], 3);
+                ImageLoader.ImageResult imageResult = ImageLoader.Load(imagePaths[i], ImageLoader.ColorComponents.RGB);
                 images[i] = imageResult;
             });
 
-            if (!images.All(i => i.Header.Width == i.Header.Height && i.Header.Width == images[0].Header.Width))
+            if (images.Any(it => it.RawPixels == null))
             {
-                Logger.Log(Logger.LogLevel.Error, "Cubemap images must be squares and each texture must be of the same size");
+                Logger.Log(Logger.LogLevel.Error, $"At least one of the skybox images could not be decoded");
+                return false;
+            }
+            if (!images.All(it => it.Header.Width == it.Header.Height && it.Header.Width == images[0].Header.Width))
+            {
+                Logger.Log(Logger.LogLevel.Error, "Skybox images must be squares and each texture must be of the same size");
                 return false;
             }
             int size = images[0].Header.Width;
 
-            texture.ImmutableAllocate(size, size, 1, format);
+            externalCubemapTexture.Allocate(size, size, 1, BBG.Texture.InternalFormat.R8G8B8SRgba);
             for (int i = 0; i < 6; i++)
             {
                 using ImageLoader.ImageResult imageResult = images[i];
-                texture.Upload3D(
+                externalCubemapTexture.Upload3D(
                     size, size, 1,
-                    BBG.Texture.NumChannelsToPixelFormat(imageResult.Channels),
+                    BBG.Texture.NumChannelsToPixelFormat(imageResult.Header.Channels),
                     BBG.Texture.PixelType.UByte,
                     imageResult.RawPixels,
                     0, 0, 0, i
@@ -126,15 +186,10 @@ namespace IDKEngine.Render
             return true;
         }
 
-        public static SkyBoxMode GetSkyBoxMode()
-        {
-            return _skyBoxMode;
-        }
-
         public static void Terminate()
         {
             if (AtmosphericScatterer != null) AtmosphericScatterer.Dispose();
-            if (externalSkyBoxTexture != null) externalSkyBoxTexture.Dispose();
+            if (externalCubemapTexture != null) externalCubemapTexture.Dispose();
             if (skyBoxTextureBuffer != null) skyBoxTextureBuffer.Dispose();
         }
     }

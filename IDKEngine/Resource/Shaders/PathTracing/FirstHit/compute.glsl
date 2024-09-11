@@ -29,7 +29,7 @@ layout(std140, binding = 7) uniform SettingsUBO
     float LenseRadius;
     bool IsDebugBVHTraversal;
     bool IsTraceLights;
-    bool IsAlwaysTintWithAlbedo;
+    bool TintOnTransmissiveRay;
 } settingsUBO;
 
 bool TraceRay(inout GpuWavefrontRay wavefrontRay);
@@ -104,10 +104,10 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
         Surface surface = GetDefaultSurface();
         vec3 vertexNormal;
-        bool hitLight = hitInfo.TriangleID == ~0u;
+        bool hitLight = hitInfo.TriangleId == ~0u;
         if (!hitLight)
         {
-            uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[hitInfo.TriangleID]);
+            uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId]);
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
             GpuVertex v2 = vertexSSBO.Vertices[indices.z];
@@ -117,12 +117,11 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), bary));
             vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), bary));
 
-            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceID];
+            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceId];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
-            GpuMaterial material = materialSSBO.Materials[mesh.MaterialIndex];
+            GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
 
             surface = GetSurface(material, interpTexCoord);
-            SurfaceApplyModificatons(surface, mesh);
 
             float alphaCutoff = surface.DoAlphaBlending ? GetRandomFloat01() : surface.AlphaCutoff;
             if (surface.Alpha < alphaCutoff)
@@ -139,10 +138,12 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface.Normal = normalize(mix(worldNormal, surface.Normal, mesh.NormalMapStrength));
 
             vertexNormal = worldNormal;
+
+            SurfaceApplyModificatons(surface, mesh);
         }
         else if (settingsUBO.IsTraceLights)
         {
-            GpuLight light = lightsUBO.Lights[hitInfo.InstanceID];
+            GpuLight light = lightsUBO.Lights[hitInfo.InstanceId];
             surface.Emissive = light.Color;
             surface.Albedo = light.Color;
             surface.Normal = (wavefrontRay.Origin - light.Position) / light.Radius;
@@ -161,7 +162,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface.Normal *= -1.0;
             cosTheta *= -1.0;
 
-            wavefrontRay.Throughput = ApplyAbsorption(wavefrontRay.Throughput, surface.Absorbance, hitInfo.T);
+            wavefrontRay.Throughput *= exp(-surface.Absorbance * hitInfo.T);
         }
         if (dot(-rayDir, vertexNormal) < 0.0)
         {
@@ -172,12 +173,8 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
         wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
 
-        SampleMaterialResult result = SampleMaterial(rayDir, surface, prevIor, fromInside);
-        if (result.RayType != RAY_TYPE_REFRACTIVE || settingsUBO.IsAlwaysTintWithAlbedo)
-        {
-            wavefrontRay.Throughput *= result.Bsdf / result.Pdf * cosTheta;
-        }
-        wavefrontRay.Throughput /= result.RayTypeProbability;
+        SampleMaterialResult result = SampleMaterial(rayDir, surface, prevIor, fromInside, settingsUBO.TintOnTransmissiveRay);
+        wavefrontRay.Throughput *= result.Bsdf / result.Pdf;
 
         bool terminateRay = RussianRouletteTerminateRay(wavefrontRay.Throughput);
         if (terminateRay)
@@ -185,7 +182,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             return false;
         }
 
-        if (result.RayType == RAY_TYPE_REFRACTIVE)
+        if (result.BsdfType == ENUM_BSDF_TRANSMISSIVE)
         {
             vertexNormal *= -1.0;   
         }

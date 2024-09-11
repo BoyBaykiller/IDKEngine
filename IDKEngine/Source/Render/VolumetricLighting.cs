@@ -54,7 +54,7 @@ namespace IDKEngine.Render
             upscaleProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VolumetricLight/Upscale/compute.glsl"));
 
             gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             _resolutionScale = resolutionScale;
             SetSize(size);
@@ -98,19 +98,19 @@ namespace IDKEngine.Render
             Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            Result.ImmutableAllocate(PresentationResolution.X, PresentationResolution.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+            Result.Allocate(PresentationResolution.X, PresentationResolution.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
             if (volumetricLightingTexture != null) volumetricLightingTexture.Dispose();
             volumetricLightingTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             volumetricLightingTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             volumetricLightingTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            volumetricLightingTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+            volumetricLightingTexture.Allocate(RenderResolution.X, RenderResolution.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
             if (depthTexture != null) depthTexture.Dispose();
             depthTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             depthTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
             depthTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            depthTexture.ImmutableAllocate(RenderResolution.X, RenderResolution.Y, 1, BBG.Texture.InternalFormat.R32Float);
+            depthTexture.Allocate(RenderResolution.X, RenderResolution.Y, 1, BBG.Texture.InternalFormat.R32Float);
         }
 
         public void Dispose()

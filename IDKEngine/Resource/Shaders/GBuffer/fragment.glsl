@@ -25,7 +25,7 @@ in InOutData
 void main()
 {
     GpuMesh mesh = meshSSBO.Meshes[inData.MeshId];
-    GpuMaterial material = materialSSBO.Materials[mesh.MaterialIndex];
+    GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
     
     Surface surface = GetSurface(material, inData.TexCoord, taaDataUBO.MipmapBias);
     SurfaceApplyModificatons(surface, mesh);

@@ -9,6 +9,7 @@ namespace IDKEngine
     {
         public enum ColorComponents : int
         {
+            Default,
             R,
             RA,
             RGB,
@@ -17,10 +18,13 @@ namespace IDKEngine
 
         public record struct ImageHeader
         {
+            public int SizeInBytes => Width * Height * Channels * ChannelSizeInBytes;
+            public ColorComponents ColorComponents => ChannelsToColorComponents(Channels);
+
             public int Width;
             public int Height;
             public int Channels;
-            public ColorComponents ColorComponents => ChannelsToColorComponents(Channels);
+            public int ChannelSizeInBytes;
 
             public void SetChannels(ColorComponents colorComponents)
             {
@@ -31,6 +35,7 @@ namespace IDKEngine
             {
                 int channels = colorComponents switch
                 {
+                    ColorComponents.Default => 0,
                     ColorComponents.R => 1,
                     ColorComponents.RA => 2,
                     ColorComponents.RGB => 3,
@@ -55,13 +60,10 @@ namespace IDKEngine
 
         public struct ImageResult : IDisposable
         {
-            public int SizeInBytes => Header.Width * Header.Height * Channels;
-
-            public Span<byte> Pixels => new Span<byte>(RawPixels, SizeInBytes);
+            public Span<byte> Pixels => new Span<byte>(RawPixels, Header.SizeInBytes);
 
             public ImageHeader Header;
-            public int Channels;
-            public byte* RawPixels;
+            public void* RawPixels;
 
             public void Dispose()
             {
@@ -73,30 +75,46 @@ namespace IDKEngine
             }
         }
 
-        public static ImageResult Load(string path, int desiredChannels = 0)
+        public static ImageResult Load(string path, ColorComponents colorComponents = ColorComponents.Default)
         {
             byte[] imageData = File.ReadAllBytes(path);
-            return Load(imageData, desiredChannels);
+            return Load(imageData, colorComponents);
         }
 
-        public static ImageResult Load(ReadOnlySpan<byte> imageData, int desiredChannels = 0)
+        public static ImageResult Load(ReadOnlySpan<byte> imageData, ColorComponents colorComponents = ColorComponents.Default)
         {
             ImageResult imageResult = new ImageResult();
             fixed (byte* ptr = imageData)
             {
-                imageResult.RawPixels = Stbi.load_from_memory(
-                    ptr,
-                    imageData.Length,
-                    &imageResult.Header.Width,
-                    &imageResult.Header.Height,
-                    &imageResult.Header.Channels,
-                    desiredChannels
-                );
+                int desiredChannels = ImageHeader.ColorComponentsToChannels(colorComponents);
+                imageResult.Header.ChannelSizeInBytes = GetImageChannelSize(ptr, imageData.Length);
 
-                imageResult.Channels = desiredChannels;
-                if (imageResult.Channels <= 0 || imageResult.Channels > 4)
+                if (Stbi.is_hdr_from_memory(ptr, imageData.Length) == 1)
                 {
-                    imageResult.Channels = imageResult.Header.Channels;
+                    imageResult.RawPixels = Stbi.loadf_from_memory(
+                        ptr,
+                        imageData.Length,
+                        &imageResult.Header.Width,
+                        &imageResult.Header.Height,
+                        &imageResult.Header.Channels,
+                        desiredChannels
+                    );
+                }
+                else
+                {
+                    imageResult.RawPixels = Stbi.load_from_memory(
+                        ptr,
+                        imageData.Length,
+                        &imageResult.Header.Width,
+                        &imageResult.Header.Height,
+                        &imageResult.Header.Channels,
+                        desiredChannels
+                    );
+                }
+
+                if (colorComponents != ColorComponents.Default)
+                {
+                    imageResult.Header.Channels = desiredChannels;
                 }
             }
 
@@ -116,6 +134,7 @@ namespace IDKEngine
             ImageHeader imageHeaderCopy = new ImageHeader();
 
             int success = Stbi.info_from_memory(data, size, &imageHeaderCopy.Width, &imageHeaderCopy.Height, &imageHeaderCopy.Channels);
+            imageHeaderCopy.ChannelSizeInBytes = GetImageChannelSize(data, size);
 
             imageHeader = imageHeaderCopy;
             return success == 1;
@@ -127,6 +146,18 @@ namespace IDKEngine
             string message = Marshal.PtrToStringAnsi((nint)ptr);
 
             return message;
+        }
+
+        private static int GetImageChannelSize(byte* data, int size)
+        {
+            if (Stbi.is_hdr_from_memory(data, size) == 1)
+            {
+                return sizeof(float);
+            }
+            else
+            {
+                return sizeof(byte);
+            }
         }
     }
 }

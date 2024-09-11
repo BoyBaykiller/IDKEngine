@@ -37,6 +37,7 @@ namespace BBOpenGL
                 R8G8Snorm = SizedInternalFormat.Rg8Snorm,
 
                 R16G16Float = SizedInternalFormat.Rg16f,
+                R32G32Float = SizedInternalFormat.Rg32f,
 
                 R11G11B10Float = SizedInternalFormat.R11fG11fB10f,
 
@@ -254,20 +255,24 @@ namespace BBOpenGL
                 GL.GenerateTextureMipmap(ID);
             }
 
-            public void ImmutableAllocate(int width, int height, int depth, InternalFormat format, int levels = 1)
+            public void Allocate(int width, int height, int depth, InternalFormat format, int levels = 1)
             {
                 switch (TextureType)
                 {
                     case Type.Texture2D:
                     case Type.Cubemap:
                         GL.TextureStorage2D(ID, levels, (SizedInternalFormat)format, width, height);
-                        Width = width; Height = height; Depth = 1;
+                        Width = width;
+                        Height = height;
+                        Depth = 1;
                         Levels = levels;
                         break;
 
                     case Type.Texture3D:
                         GL.TextureStorage3D(ID, levels, (SizedInternalFormat)format, width, height, depth);
-                        Width = width; Height = height; Depth = depth;
+                        Width = width;
+                        Height = height;
+                        Depth = depth;
                         Levels = levels;
                         break;
 

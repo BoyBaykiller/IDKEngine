@@ -21,6 +21,25 @@ namespace IDKEngine
             PathTracer
         }
 
+        public enum FrameRecorderState : int
+        {
+            None,
+            Recording,
+            Replaying,
+        }
+
+        public record struct RecordingSettings
+        {
+            public const string FRAME_STATES_INPUT_FILE = "frameRecordData.frd";
+            public const string FRAMES_OUTPUT_FOLDER = "RecordedFrames";
+
+            public int FPSGoal;
+            public int PathTracingSamplesGoal;
+            public bool IsOutputFrames;
+            public FrameRecorderState State;
+            public Stopwatch FrameTimer;
+        }
+
         public RenderMode CRenderMode
         {
             get
@@ -60,6 +79,8 @@ namespace IDKEngine
 
         public float RenderResolutionScale => (float)RenderResolution.Y / PresentationResolution.Y;
 
+        public ref readonly GpuPerFrameData PerFrameData => ref gpuPerFrameData;
+
         // Will take effect at the beginning of a frame
         public Vector2i? RequestPresentationResolution;
         public float? RequestRenderResolutionScale;
@@ -87,9 +108,7 @@ namespace IDKEngine
         public Camera Camera;
 
         public StateRecorder<FrameState> FrameStateRecorder;
-
-        private GpuPerFrameData gpuPerFrameData;
-        private BBG.TypedBuffer<GpuPerFrameData> gpuPerFrameDataBuffer;
+        public RecordingSettings RecorderVars;
 
         public int MeasuredFramesPerSecond { get; private set; }
 
@@ -102,15 +121,13 @@ namespace IDKEngine
             {
                 _timeEnabled = value;
                 LightManager.DoAdvanceSimulation = TimeEnabled;
-                ModelManager.RunAnimations = TimeEnabled;
-                ModelManager.BVH.RefitBlas = TimeEnabled;
             }
         }
 
         public SceneVsMovingSphereCollisionSettings SceneVsCamCollisionSettings = new SceneVsMovingSphereCollisionSettings()
         {
             IsEnabled = true,
-            Collision = new Intersections.SceneVsMovingSphereSettings()
+            Settings = new Intersections.SceneVsMovingSphereSettings()
             { 
                 TestSteps = 3,
                 RecursiveSteps = 12,
@@ -118,8 +135,14 @@ namespace IDKEngine
             }
         };
 
+        private GpuPerFrameData gpuPerFrameData;
+        private BBG.TypedBuffer<GpuPerFrameData> gpuPerFrameDataBuffer;
+
         private int fpsCounter;
         private readonly Stopwatch fpsTimer = Stopwatch.StartNew();
+
+        private float animationTime;
+
         public Application(int width, int height, string title)
             : base(width, height, title, 4, 6)
         {
@@ -128,6 +151,8 @@ namespace IDKEngine
         protected override void OnRender(float dT)
         {
             MainThreadQueue.Execute();
+            
+            HandleFrameRecorderLogic();
 
             Camera.ProjectionSize = RenderResolution;
             gpuPerFrameData.PrevView = gpuPerFrameData.View;
@@ -147,7 +172,7 @@ namespace IDKEngine
             gpuPerFrameDataBuffer.UploadElements(gpuPerFrameData);
 
             LightManager.Update(out bool anyLightMoved);
-            ModelManager.Update(out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved);
+            ModelManager.Update(animationTime, out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved);
 
             if (RequestPresentationResolution.HasValue || RequestRenderResolutionScale.HasValue)
             {
@@ -237,6 +262,7 @@ namespace IDKEngine
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderGui)
             {
+                gui.Update(this);
                 gui.Draw(this, dT);
             }
             else
@@ -259,8 +285,6 @@ namespace IDKEngine
 
         protected override void OnUpdate(float dT)
         {
-            gui.Update(this);
-
             if (KeyboardState[Keys.Escape] == Keyboard.InputState.Pressed)
             {
                 ShouldClose();
@@ -306,9 +330,10 @@ namespace IDKEngine
                     }
                 }
             }
-            if (!ImGuiNET.ImGui.GetIO().WantCaptureMouse)
+
+            if (RecorderVars.State != FrameRecorderState.Replaying)
             {
-                if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
+                if (!ImGuiNET.ImGui.GetIO().WantCaptureMouse)
                 {
                     if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                     {
@@ -334,10 +359,12 @@ namespace IDKEngine
                         }
                     }
                 }
-            }
 
-            if (gui.RecordingVars.FrameRecState != Gui.FrameRecorderState.Replaying)
-            {
+                if (TimeEnabled)
+                {
+                    animationTime += dT;
+                }
+
                 if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                 {
                     Camera.ProcessInputs(KeyboardState, MouseState);
@@ -351,7 +378,7 @@ namespace IDKEngine
             {
                 Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
                 Vector3 prevSpherePos = movingSphere.Center;
-                Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings.Collision, ref movingSphere, Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
+                Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings.Settings, ref movingSphere, ref Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
                 {
                     Vector3 deltaStep = Camera.Position - prevSpherePos;
                     Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
@@ -397,17 +424,19 @@ namespace IDKEngine
             }
 
             gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
-            gpuPerFrameDataBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            gpuPerFrameDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
             gpuPerFrameDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 0);
 
-            SkyBoxManager.Initialize(SkyBoxManager.SkyBoxMode.ExternalAsset, [
+            SkyBoxManager.Initialize();
+            SkyBoxManager.SkyBoxImagePaths = [
                 "Resource/Textures/EnvironmentMap/1.jpg",
                 "Resource/Textures/EnvironmentMap/2.jpg",
                 "Resource/Textures/EnvironmentMap/3.jpg",
                 "Resource/Textures/EnvironmentMap/4.jpg",
                 "Resource/Textures/EnvironmentMap/5.jpg",
                 "Resource/Textures/EnvironmentMap/6.jpg"
-            ]);
+            ];
+            SkyBoxManager.SetSkyBoxMode(SkyBoxManager.SkyBoxMode.ExternalAsset);
 
             ModelLoader.TextureLoaded += () =>
             {
@@ -437,12 +466,12 @@ namespace IDKEngine
                 ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).Matrix).Value;
                 lucy.GpuModel.Meshes[0].SpecularBias = -1.0f;
                 lucy.GpuModel.Meshes[0].TransmissionBias = 0.98f;
-                lucy.GpuModel.Meshes[0].IORBias = 0.174f;
+                lucy.GpuModel.Meshes[0].IORBias = -0.326f;
                 lucy.GpuModel.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.GpuModel.Meshes[0].RoughnessBias = -1.0f;
-
+                
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).Matrix).Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\\Users\\Julian\\Downloads\\Models\\glTF-Sample-Assets\\Models\\CesiumMan\\glTF\\CesiumMan.gltf", new Transformation().WithTranslation(5.0f, 0.0f, 0.0f).WithScale(2.0f).Matrix).Value;
+
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
@@ -466,10 +495,10 @@ namespace IDKEngine
             {
                 ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
                 ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\CpuModels\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
-                //ModelLoader.CpuModel d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\CpuModels\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
-                //ModelLoader.CpuModel e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\CpuModels\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a, b);
+                ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
+                //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
+                ModelManager.Add(a, b, c);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -482,6 +511,12 @@ namespace IDKEngine
             FrameStateRecorder = new StateRecorder<FrameState>();
             WindowVSync = true;
             TimeEnabled = true;
+
+            RecorderVars = new RecordingSettings();
+            RecorderVars.FPSGoal = 10000; // unlimited
+            RecorderVars.PathTracingSamplesGoal = 50;
+            RecorderVars.State = FrameRecorderState.None;
+            RecorderVars.FrameTimer = Stopwatch.StartNew();
 
             GC.Collect();
         }
@@ -589,9 +624,93 @@ namespace IDKEngine
             }
         }
 
-        public ref readonly GpuPerFrameData GetPerFrameData()
+        public void SetFrameState(in FrameState state)
         {
-            return ref gpuPerFrameData;
+            Camera.Position = state.CameraState.Position;
+            Camera.UpVector = state.CameraState.UpVector;
+            Camera.LookX = state.CameraState.LookX;
+            Camera.LookY = state.CameraState.LookY;
+            animationTime = state.AnimationTime;
+        }
+
+        private FrameState GetFrameState()
+        {
+            FrameState state = new FrameState();
+            state.CameraState.Position = Camera.Position;
+            state.CameraState.UpVector = Camera.UpVector;
+            state.CameraState.LookX = Camera.LookX;
+            state.CameraState.LookY = Camera.LookY;
+            state.AnimationTime = animationTime;
+
+            return state;
+        }
+
+        private void HandleFrameRecorderLogic()
+        {
+            if (RecorderVars.State == FrameRecorderState.Replaying)
+            {
+                if (CRenderMode == RenderMode.Rasterizer ||
+                    (CRenderMode == RenderMode.PathTracer && PathTracer.AccumulatedSamples >= RecorderVars.PathTracingSamplesGoal))
+                {
+                    if (RecorderVars.IsOutputFrames)
+                    {
+                        string path = $"{RecordingSettings.FRAMES_OUTPUT_FOLDER}/{FrameStateRecorder.ReplayStateIndex}";
+                        Directory.CreateDirectory(RecordingSettings.FRAMES_OUTPUT_FOLDER);
+                        Helper.TextureToDiskJpg(TonemapAndGamma.Result, path);
+                    }
+
+                    SetFrameState(FrameStateRecorder.Replay());
+
+                    // Stop replaying when we are at the first frame again
+                    if (FrameStateRecorder.ReplayStateIndex == 0)
+                    {
+                        RecorderVars.State = FrameRecorderState.None;
+                    }
+                }
+            }
+            else if (RecorderVars.State == FrameRecorderState.Recording)
+            {
+                if (RecorderVars.FrameTimer.Elapsed.TotalMilliseconds >= (1000.0f / RecorderVars.FPSGoal))
+                {
+                    FrameStateRecorder.Record(GetFrameState());
+                    RecorderVars.FrameTimer.Restart();
+                }
+            }
+
+            if (RecorderVars.State != FrameRecorderState.Replaying &&
+                KeyboardState[Keys.R] == Keyboard.InputState.Touched &&
+                KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
+            {
+                // Start/Stop recording
+                if (RecorderVars.State == FrameRecorderState.Recording)
+                {
+                    RecorderVars.State = FrameRecorderState.None;
+                }
+                else
+                {
+                    RecorderVars.State = FrameRecorderState.Recording;
+                    FrameStateRecorder.Clear();
+                }
+            }
+
+            if (RecorderVars.State != FrameRecorderState.Recording &&
+                KeyboardState[Keys.Space] == Keyboard.InputState.Touched &&
+                KeyboardState[Keys.LeftControl] == Keyboard.InputState.Pressed)
+            {
+                // Start/Stop replaying
+                if (RecorderVars.State == FrameRecorderState.Replaying)
+                {
+                    RecorderVars.State = FrameRecorderState.None;
+                }
+                else if (FrameStateRecorder.Count > 0)
+                {
+                    RecorderVars.State = FrameRecorderState.Replaying;
+                    MouseState.CursorMode = CursorModeValue.CursorNormal;
+
+                    // Replay first frame here to avoid edge cases
+                    SetFrameState(FrameStateRecorder.Replay());
+                }
+            }
         }
     }
 }

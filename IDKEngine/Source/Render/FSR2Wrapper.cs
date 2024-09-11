@@ -72,7 +72,7 @@ namespace IDKEngine.Render
             Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            Result.ImmutableAllocate(outputSize.X, outputSize.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+            Result.Allocate(outputSize.X, outputSize.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
             if (isFsr2Initialized)
             {

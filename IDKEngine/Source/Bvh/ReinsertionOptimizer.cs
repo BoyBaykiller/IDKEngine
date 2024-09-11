@@ -11,12 +11,12 @@ namespace IDKEngine.Bvh
     /// </summary>
     public ref struct ReinsertionOptimizer
     {
-        public record struct OptimizationSettings
+        public record struct Settings
         {
             public int Iterations = 3;
             public float CandidatesPercentage = 0.05f;
 
-            public OptimizationSettings()
+            public Settings()
             {
             }
         }
@@ -44,7 +44,7 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public static void Optimize(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles, in OptimizationSettings settings)
+        public static void Optimize(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles, in Settings settings)
         {
             if (nodes.Length <= 3)
             {
@@ -63,7 +63,7 @@ namespace IDKEngine.Bvh
             this.triangles = triangles;
         }
 
-        private void Optimize(in OptimizationSettings settings)
+        private void Optimize(in Settings settings)
         {
             Candidate[] candidatesMem = GetCandidatesMem();
             for (int i = 0; i < settings.Iterations; i++)
@@ -128,7 +128,7 @@ namespace IDKEngine.Bvh
             return new Candidate[nodes.Length - 1];
         }
 
-        private Span<Candidate> PopulateCandidates(Candidate[] candidates, float percentage)
+        private Span<Candidate> PopulateCandidates(Span<Candidate> candidates, float percentage)
         {
             int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
             if (count == 0) return Array.Empty<Candidate>();
@@ -141,9 +141,11 @@ namespace IDKEngine.Bvh
                 candidates[i - 1] = candidate;
             }
 
-            Algorithms.PartialSort<Candidate>(candidates, 0, candidates.Length, 0, count, MyComparer.GreaterThan);
+            // Custom partial sort faster for low node percentage
+            Algorithms.PartialSort(candidates, count, MyComparer.GreaterThan);
+            //MemoryExtensions.Sort<Candidate>(test, MyComparer.GreaterThan);
 
-            return new Span<Candidate>(candidates, 0, count);
+            return candidates.GetSpan(0, count);
         }
 
         private Reinsertion FindReinsertion(int nodeId)

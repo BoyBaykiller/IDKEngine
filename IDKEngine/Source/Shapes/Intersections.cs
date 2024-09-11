@@ -6,13 +6,33 @@ namespace IDKEngine.Shapes
 {
     public static class Intersections
     {
-        public static Vector3 ClosestPointOnLineSegment(in Vector3 a, in Vector3 b, in Vector3 point)
+        public record struct SceneVsMovingSphereSettings
+        {
+            public int TestSteps;
+            public int RecursiveSteps;
+            public float EpsilonNormalOffset;
+        }
+
+        public record struct SceneHitInfo
+        {
+            public Plane SlidingPlane;
+            public Vector3 TriNormal;
+            public Vector3 TriCollidingPoint;
+        }
+
+        private record struct ScalarProjection
+        {
+            public float MinScaler;
+            public float MaxScaler;
+        }
+
+        public static Vector3 ClosestPointOnLineSegment(Vector3 a, Vector3 b, Vector3 point)
         {
             Vector3 ab = b - a;
             float t = Vector3.Dot(point - a, ab) / Vector3.Dot(ab, ab);
             return a + Math.Clamp(t, 0.0f, 1.0f) * ab;
         }
-        public static Vector3 TriangleClosestPoint(in Triangle triangle, in Vector3 point)
+        public static Vector3 TriangleClosestPoint(in Triangle triangle, Vector3 point)
         {
             // Source: https://github.com/efryscok/OpenGL-Basic-Collision-Detection/blob/master/Project1_efryscok/TheMain.cpp#L276
 
@@ -90,7 +110,7 @@ namespace IDKEngine.Shapes
                 return penetrationDepth > 0.0f;
             }
         }
-        public static bool SphereVsBox(in Sphere sphere, in Vector3 c1, in Vector3 c2)
+        public static bool SphereVsBox(in Sphere sphere, Vector3 c1, Vector3 c2)
         {
             // Source: https://stackoverflow.com/a/4579069/12103839
 
@@ -123,7 +143,6 @@ namespace IDKEngine.Shapes
 
             return distSq < sphere.RadiusSquared;
         }
-
 
         public static bool BoxVsBox(in Box a, in Box b)
         {
@@ -371,7 +390,7 @@ namespace IDKEngine.Shapes
 
             return bary.X >= 0.0f && bary.Y >= 0.0f && bary.Z >= 0.0f && t > 0.0f;
         }
-        public static bool MovingSphereVsSphere(in Sphere sphereA, in Vector3 sphereAPrevPos, in Sphere sphereB, in Vector3 sphereBPrevPos, out float t1, out float t2, out float tScale)
+        public static bool MovingSphereVsSphere(in Sphere sphereA, Vector3 sphereAPrevPos, in Sphere sphereB, Vector3 sphereBPrevPos, out float t1, out float t2, out float tScale)
         {
             t1 = 0.0f;
             t2 = 0.0f;
@@ -394,12 +413,7 @@ namespace IDKEngine.Shapes
             return RayVsSphere(ray, new Sphere(sphereBPrevPos, combinedRadius), out t1, out t2);
         }
 
-        private record struct ScalarProjection
-        {
-            public float MinScaler;
-            public float MaxScaler;
-        }
-        private static ScalarProjection ScalarProjectVerticesOnToAxis(ReadOnlySpan<Vector3> vertices, in Vector3 axis)
+        private static ScalarProjection ScalarProjectVerticesOnToAxis(ReadOnlySpan<Vector3> vertices, Vector3 axis)
         {
             ScalarProjection projection = new ScalarProjection();
             projection.MinScaler = float.MaxValue;
@@ -416,7 +430,7 @@ namespace IDKEngine.Shapes
 
             return projection;
         }
-        private static bool ProjectionsIntersect(in ScalarProjection projA, in ScalarProjection projB)
+        private static bool ProjectionsIntersect(ScalarProjection projA, ScalarProjection projB)
         {
             if (
                 FloatInRange(projB.MinScaler, projA) ||
@@ -469,22 +483,8 @@ namespace IDKEngine.Shapes
             return true;
         }
 
-
-        public record struct SceneVsMovingSphereSettings
-        {
-            public int TestSteps;
-            public int RecursiveSteps;
-            public float EpsilonNormalOffset;
-        }
-        public record struct SceneHitInfo
-        {
-            public Plane SlidingPlane;
-            public Vector3 TriNormal;
-            public Vector3 TriCollidingPoint;
-        }
-
         public delegate void FuncIntersect(in SceneHitInfo hitInfo);
-        public static void SceneVsMovingSphereCollisionRoutine(ModelManager modelManager, in SceneVsMovingSphereSettings settings, ref Sphere movingSphere, in Vector3 sphereDestination, FuncIntersect intersectFunc)
+        public static void SceneVsMovingSphereCollisionRoutine(ModelManager modelManager, SceneVsMovingSphereSettings settings, ref Sphere movingSphere, ref readonly Vector3 sphereDestination, FuncIntersect intersectFunc)
         {
             for (int i = 0; i < settings.RecursiveSteps; i++)
             {
@@ -513,7 +513,7 @@ namespace IDKEngine.Shapes
         /// <param name="movingSphere">The previous position of the sphere and its radius</param>
         /// <param name="sceneHitInfo">Contains useful hit info data</param>
         /// <returns></returns>
-        private static bool SceneVsMovingSphere(ModelManager modelManager, int testSteps, in Vector3 sphereDestination, ref Sphere movingSphere, out SceneHitInfo sceneHitInfo)
+        private static bool SceneVsMovingSphere(ModelManager modelManager, int testSteps, Vector3 sphereDestination, ref Sphere movingSphere, out SceneHitInfo sceneHitInfo)
         {
             sceneHitInfo = new SceneHitInfo();
 

@@ -43,7 +43,7 @@ namespace IDKEngine.Utils
             public Node RootNode => Nodes[0];
             public Node[] Nodes;
 
-            public Animation[] Animations;
+            public ModelAnimation[] Animations;
             public GpuModel GpuModel;
 
             public int GetNumJoints()
@@ -89,12 +89,15 @@ namespace IDKEngine.Utils
 
                 set
                 {
-                    _localTransform = value;
-                    MarkDirty();
+                    if (_localTransform != value)
+                    {
+                        MarkDirty();
+                        _localTransform = value;
+                    }
                 }
             }
 
-            private Transformation _localTransform;
+            private Transformation _localTransform = new Transformation();
             public Matrix4 GlobalTransform { get; private set; } = Matrix4.Identity; // local * parent.Global
 
             public Node Parent;
@@ -105,7 +108,7 @@ namespace IDKEngine.Utils
             public Skin Skin;
             public Range MeshInstanceIds;
 
-            private bool isDirty;
+            private bool isDirty = true;
 
             public void UpdateGlobalTransform()
             {
@@ -160,7 +163,7 @@ namespace IDKEngine.Utils
                 MarkParentsDirty(this);
                 MarkChildrenDirty(this);
 
-                void MarkParentsDirty(Node node)
+                static void MarkParentsDirty(Node node)
                 {
                     if (!node.IsRoot && !node.Parent.isDirty)
                     {
@@ -169,7 +172,7 @@ namespace IDKEngine.Utils
                     }
                 }
 
-                void MarkChildrenDirty(Node parent)
+                static void MarkChildrenDirty(Node parent)
                 {
                     for (int i = 0; i < parent.Children.Length; i++)
                     {
@@ -212,7 +215,7 @@ namespace IDKEngine.Utils
                 }
             }
 
-            public static unsafe void HierarchyToArray(Node parent, Span<Node> nodes)
+            public static unsafe void HierarchyToArray(Node parent, ReadOnlySpan<Node> nodes)
             {
                 fixed (Node* ptrNodes = nodes)
                 {
@@ -261,26 +264,31 @@ namespace IDKEngine.Utils
             };
         }
 
-        public record struct Animation
+        public record struct ModelAnimation
         {
-            public float Duration;
-            public AnimationSampler[] Samplers;
+            public float Duration => End - Start;
 
-            public Animation DeepClone(ReadOnlySpan<Node> newTargetNodes)
+            public float Start; // Min of node animations start
+            public float End; // Max of node animations end
+            
+            public NodeAnimation[] NodeAnimations;
+
+            public ModelAnimation DeepClone(ReadOnlySpan<Node> newTargetNodes)
             {
-                Animation animation = new Animation();
-                animation.Duration = Duration;
-                animation.Samplers = new AnimationSampler[Samplers.Length];
-                for (int i = 0; i < animation.Samplers.Length; i++)
+                ModelAnimation animation = new ModelAnimation();
+                animation.Start = Start;
+                animation.End = End;
+                animation.NodeAnimations = new NodeAnimation[NodeAnimations.Length];
+                for (int i = 0; i < animation.NodeAnimations.Length; i++)
                 {
-                    animation.Samplers[i] = Samplers[i].DeepClone(newTargetNodes);
+                    animation.NodeAnimations[i] = NodeAnimations[i].DeepClone(newTargetNodes);
                 }
 
                 return animation;
             }
         }
 
-        public record struct AnimationSampler
+        public record struct NodeAnimation
         {
             public enum AnimationType : int
             {
@@ -294,7 +302,6 @@ namespace IDKEngine.Utils
                 Step = AnimationInterpolationMode.STEP,
                 Linear = AnimationInterpolationMode.LINEAR,
             }
-
 
             public float Start => KeyFramesStart[0];
             public float End => KeyFramesStart[KeyFramesStart.Length - 1];
@@ -326,9 +333,9 @@ namespace IDKEngine.Utils
                 return MemoryMarshal.Cast<byte, Quaternion>(RawKeyFramesData);
             }
 
-            public AnimationSampler DeepClone(ReadOnlySpan<Node> newNodes)
+            public NodeAnimation DeepClone(ReadOnlySpan<Node> newNodes)
             {
-                AnimationSampler sampler = new AnimationSampler();
+                NodeAnimation sampler = new NodeAnimation();
                 sampler.TargetNode = newNodes[TargetNode.ArrayIndex];
                 sampler.Type = Type;
                 sampler.Mode = Mode;
@@ -427,7 +434,7 @@ namespace IDKEngine.Utils
                 RoughnessFactor = 1.0f,
                 MetallicFactor = 1.0f,
                 Absorbance = new Vector3(0.0f),
-                IOR = 1.0f, // by spec 1.5 IOR would be correct
+                IOR = 1.5f
             };
         }
 
@@ -484,7 +491,7 @@ namespace IDKEngine.Utils
 
             // If regular Image is used
             public ImageLoader.ImageHeader ImageHeader;
-            public ImageLoader.ColorComponents ImageLoadChannels; // e.g for "Transmissive" we only load R instead of RGB
+            public ImageLoader.ColorComponents ImageLoadChannels; // e.g for "Transmissive" we can only load R instead of RGB
             public ReadOnlyMemory<byte> EncodedImageData;
         }
 
@@ -596,7 +603,7 @@ namespace IDKEngine.Utils
             List<byte> listMeshletsLocalIndices = new List<byte>();
             List<Vector4i> listJointIndices = new List<Vector4i>();
             List<Vector4> listJointWeights = new List<Vector4>();
-            
+
             Node myRoot = new Node();
             myRoot.Name = modelName;
             myRoot.LocalTransform = Transformation.FromMatrix(rootTransform);
@@ -619,7 +626,6 @@ namespace IDKEngine.Utils
                 }
             }
 
-            Dictionary<GltfNode, Node> gltfNodeToMyNode = new Dictionary<GltfNode, Node>(gltf.LogicalNodes.Count);
             while (nodeStack.Count > 0)
             {
                 (GltfNode gltfNode, Node myNode) = nodeStack.Pop();
@@ -627,8 +633,6 @@ namespace IDKEngine.Utils
                 myNode.ArrayIndex = gltfNode.LogicalIndex + 1;
                 myNode.LocalTransform = Transformation.FromMatrix(gltfNode.LocalMatrix.ToOpenTK());
                 myNode.UpdateGlobalTransform();
-
-                gltfNodeToMyNode[gltfNode] = myNode;
 
                 {
                     GltfNode[] gltfChildren = gltfNode.VisualChildren.ToArray();
@@ -670,9 +674,9 @@ namespace IDKEngine.Utils
                     {
                         ref GpuMeshlet myMeshlet = ref meshGeometry.Meshlets[j];
 
-                        // Adjust offsets in context of all meshlets
+                        // Adjust offsets in context of all meshlets (these overflow on very big models)
                         myMeshlet.VertexOffset += (uint)listMeshletsVertexIndices.Count;
-                        myMeshlet.IndicesOffset += (uint)listMeshletsLocalIndices.Count; // this overflows on very big models
+                        myMeshlet.IndicesOffset += (uint)listMeshletsLocalIndices.Count;
                     }
 
                     GpuMesh mesh = new GpuMesh();
@@ -689,7 +693,7 @@ namespace IDKEngine.Utils
                     {
                         bool hasNormalMap = listMaterials[gltfMeshPrimitive.Material.LogicalIndex].NormalTexture != FallbackTextures.White();
                         mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
-                        mesh.MaterialIndex = gltfMeshPrimitive.Material.LogicalIndex;
+                        mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
                     }
                     else
                     {
@@ -697,7 +701,7 @@ namespace IDKEngine.Utils
                         listMaterials.Add(defaultGpuMaterial);
 
                         mesh.NormalMapStrength = 0.0f;
-                        mesh.MaterialIndex = listMaterials.Count - 1;
+                        mesh.MaterialId = listMaterials.Count - 1;
                     }
 
                     GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
@@ -751,8 +755,9 @@ namespace IDKEngine.Utils
             Node[] myNodes = new Node[gltf.LogicalNodes.Count + 1];
             Node.HierarchyToArray(myRoot, myNodes);
 
-            LoadNodeSkins(gltf.LogicalNodes, gltfNodeToMyNode);
-            Animation[] animations = LoadAnimations(gltf, gltfNodeToMyNode);
+            ReadOnlySpan<Node> gltfNodeIdToMyNode = new ReadOnlySpan<Node>(myNodes, 1, myNodes.Length - 1);
+            LoadNodeSkins(gltf.LogicalNodes, gltfNodeIdToMyNode);
+            ModelAnimation[] animations = LoadAnimations(gltf, gltfNodeIdToMyNode);
 
             Model model = new Model();
             model.Nodes = myNodes;
@@ -833,12 +838,6 @@ namespace IDKEngine.Utils
 
             glSampler = new GLSampler(textureLoadData.SamplerState);
             glTexture = new GLTexture(GLTexture.Type.Texture2D);
-            if (textureType == GpuMaterial.TextureType.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
-            {
-                // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
-                // We move metallic from B into R channel, unless IDK_BC5_normal_metallicRoughness is used where this is already standard behaviour.
-                glTexture.SetSwizzleR(GLTexture.Swizzle.B);
-            }
 
             bool mipmapsRequired = GLSampler.IsMipmapFilter(glSampler.State.MinFilter);
             int levels = textureLoadData.IsKtx2Compressed ? textureLoadData.Ktx2Texture.Levels : GLTexture.GetMaxMipmapLevel(textureLoadData.Width, textureLoadData.Height, 1);
@@ -847,7 +846,13 @@ namespace IDKEngine.Utils
                 levels = 1;
             }
 
-            glTexture.ImmutableAllocate(textureLoadData.Width, textureLoadData.Height, 1, textureLoadData.InternalFormat, levels);
+            glTexture.Allocate(textureLoadData.Width, textureLoadData.Height, 1, textureLoadData.InternalFormat, levels);
+            if (textureType == GpuMaterial.TextureType.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
+            {
+                // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
+                // We move metallic from B into R channel, unless IDK_BC5_normal_metallicRoughness is used where this is already standard behaviour.
+                glTexture.SetSwizzleR(GLTexture.Swizzle.B);
+            }
 
             GLTexture glTextureCopy = glTexture;
             MainThreadQueue.AddToLazyQueue(() =>
@@ -892,7 +897,7 @@ namespace IDKEngine.Utils
                             int compressedImageSize = textureLoadData.Ktx2Texture.DataSize; // Compressed size after transcoding
 
                             BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                            stagingBuffer.ImmutableAllocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, compressedImageSize);
+                            stagingBuffer.Allocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, compressedImageSize);
 
                             Task.Run(() =>
                             {
@@ -917,30 +922,32 @@ namespace IDKEngine.Utils
                 }
                 else
                 {
-                    int imageSize = textureLoadData.ImageHeader.Width * textureLoadData.ImageHeader.Height * textureLoadData.ImageHeader.Channels;
                     BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                    stagingBuffer.ImmutableAllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, imageSize);
+                    stagingBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, textureLoadData.ImageHeader.SizeInBytes);
 
                     Task.Run(() =>
                     {
                         ReadOnlySpan<byte> imageData = textureLoadData.EncodedImageData.Span;
-                        using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, textureLoadData.ImageHeader.Channels);
-
+                        using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, textureLoadData.ImageHeader.ColorComponents);
                         if (imageResult.RawPixels == null)
                         {
                             Logger.Log(Logger.LogLevel.Error, $"Image could not be decoded");
                             MainThreadQueue.AddToLazyQueue(() => { stagingBuffer.Dispose(); });
                             return;
                         }
-                        Memory.Copy(imageResult.RawPixels, stagingBuffer.MappedMemory, imageSize);
+
+                        Memory.Copy(imageResult.RawPixels, stagingBuffer.MappedMemory, textureLoadData.ImageHeader.SizeInBytes);
 
                         MainThreadQueue.AddToLazyQueue(() =>
                         {
-                            glTextureCopy.Upload2D(stagingBuffer, textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height, GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels), GLTexture.PixelType.UByte, null);
-                            if (mipmapsRequired)
-                            {
-                                glTextureCopy.GenerateMipmap();
-                            }
+                            glTextureCopy.Upload2D(
+                                stagingBuffer,
+                                textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height,
+                                GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels),
+                                GLTexture.PixelType.UByte,
+                                null
+                            );
+                            glTextureCopy.GenerateMipmap();
                             stagingBuffer.Dispose();
 
                             TextureLoaded?.Invoke();
@@ -1116,7 +1123,7 @@ namespace IDKEngine.Utils
         {
             if (gpuInstancing.Count == 0)
             {
-                // If myNode does not define transformations using EXT_mesh_gpu_instancing we must use local transform
+                // If its not using EXT_mesh_gpu_instancing we must use local transform
                 return [localTransform];
             }
 
@@ -1348,7 +1355,7 @@ namespace IDKEngine.Utils
             return (gpuMeshlets, gpuMeshletsInfo);
         }
 
-        private static void LoadNodeSkins(IReadOnlyList<GltfNode> gltfNodes, Dictionary<GltfNode, Node> gltfNodeToMyNode)
+        private static void LoadNodeSkins(IReadOnlyList<GltfNode> gltfNodes, ReadOnlySpan<Node> gltfNodeIdToMyNode)
         {
             for (int i = 0; i < gltfNodes.Count; i++)
             {
@@ -1361,11 +1368,11 @@ namespace IDKEngine.Utils
                     {
                         (GltfNode gltfJoint, System.Numerics.Matrix4x4 inverseJointMatrix) = gltfNode.Skin.GetJoint(j);
 
-                        joints[j] = gltfNodeToMyNode[gltfJoint];
+                        joints[j] = gltfNodeIdToMyNode[gltfJoint.LogicalIndex];
                         inverseJointMatrices[j] = inverseJointMatrix.ToOpenTK();
                     }
 
-                    Node myNode = gltfNodeToMyNode[gltfNode];
+                    Node myNode = gltfNodeIdToMyNode[gltfNode.LogicalIndex];
                     myNode.Skin = new Skin();
                     myNode.Skin.Joints = joints;
                     myNode.Skin.InverseJointMatrices = inverseJointMatrices;
@@ -1373,31 +1380,32 @@ namespace IDKEngine.Utils
             }
         }
 
-        private static Animation[] LoadAnimations(ModelRoot gltf, Dictionary<GltfNode, Node> gltfNodeToMyNode)
+        private static ModelAnimation[] LoadAnimations(ModelRoot gltf, ReadOnlySpan<Node> gltfNodeIdToMyNode)
         {
             int animationCount = 0;
-            Animation[] animations = new Animation[gltf.LogicalAnimations.Count];
+            ModelAnimation[] animations = new ModelAnimation[gltf.LogicalAnimations.Count];
             for (int i = 0; i < gltf.LogicalAnimations.Count; i++)
             {
                 GltfAnimation gltfAnimation = gltf.LogicalAnimations[i];
+                ModelAnimation myAnimation = new ModelAnimation();
 
-                Animation myAnimation = new Animation();
-                myAnimation.Duration = gltfAnimation.Duration;
-
-                int samplerCount = 0;
-                myAnimation.Samplers = new AnimationSampler[gltfAnimation.Channels.Count];
+                int nodeAmimsCount = 0;
+                myAnimation.NodeAnimations = new NodeAnimation[gltfAnimation.Channels.Count];
                 for (int j = 0; j < gltfAnimation.Channels.Count; j++)
                 {
                     AnimationChannel animationChannel = gltfAnimation.Channels[j];
-                    if (TryGetAnimationSampler(animationChannel, gltfNodeToMyNode, out AnimationSampler sampler))
+                    if (TryGetNodeAnimation(animationChannel, gltfNodeIdToMyNode, out NodeAnimation sampler))
                     {
-                        myAnimation.Samplers[samplerCount++] = sampler;
+                        myAnimation.NodeAnimations[nodeAmimsCount++] = sampler;
                     }
                 }
 
-                if (samplerCount > 0)
+                if (nodeAmimsCount > 0)
                 {
-                    Array.Resize(ref myAnimation.Samplers, samplerCount);
+                    Array.Resize(ref myAnimation.NodeAnimations, nodeAmimsCount);
+
+                    myAnimation.Start = myAnimation.NodeAnimations.Select(it => it.Start).Min();
+                    myAnimation.End = myAnimation.NodeAnimations.Select(it => it.End).Max();
                     animations[animationCount++] = myAnimation;
                 }
             }
@@ -1406,25 +1414,24 @@ namespace IDKEngine.Utils
             return animations;
         }
 
-        private static unsafe bool TryGetAnimationSampler(AnimationChannel animationChannel, Dictionary<GltfNode, Node> gltfNodeToMyNode, out AnimationSampler animationSampler)
+        private static unsafe bool TryGetNodeAnimation(AnimationChannel animationChannel, ReadOnlySpan<Node> gltfNodeIdToMyNode, out NodeAnimation animation)
         {
-            animationSampler = new AnimationSampler();
-            animationSampler.TargetNode = gltfNodeToMyNode[animationChannel.TargetNode];
-            animationSampler.Type = (AnimationSampler.AnimationType)animationChannel.TargetNodePath;
-
+            animation = new NodeAnimation();
+            animation.TargetNode = gltfNodeIdToMyNode[animationChannel.TargetNode.LogicalIndex];
+            animation.Type = (NodeAnimation.AnimationType)animationChannel.TargetNodePath;
+            
             if (animationChannel.TargetNodePath == PropertyPath.scale ||
                 animationChannel.TargetNodePath == PropertyPath.translation)
             {
                 IAnimationSampler<System.Numerics.Vector3> gltfAnimationSampler = 
                     animationChannel.TargetNodePath == PropertyPath.scale ?
                     animationChannel.GetScaleSampler() :
-                    animationChannel.GetTranslationSampler()
-                ;
-                animationSampler.Mode = (AnimationSampler.InterpolationMode)gltfAnimationSampler.InterpolationMode;
+                    animationChannel.GetTranslationSampler();
+                animation.Mode = (NodeAnimation.InterpolationMode)gltfAnimationSampler.InterpolationMode;
 
                 ValueTuple<float, System.Numerics.Vector3>[] keys = null;
-                if (animationSampler.Mode == AnimationSampler.InterpolationMode.Step ||
-                    animationSampler.Mode == AnimationSampler.InterpolationMode.Linear)
+                if (animation.Mode == NodeAnimation.InterpolationMode.Step ||
+                    animation.Mode == NodeAnimation.InterpolationMode.Linear)
                 {
                     keys = gltfAnimationSampler.GetLinearKeys().ToArray();
                 }
@@ -1434,23 +1441,23 @@ namespace IDKEngine.Utils
                     return false;
                 }
 
-                animationSampler.KeyFramesStart = new float[keys.Length];
-                animationSampler.RawKeyFramesData = new byte[sizeof(Vector3) * keys.Length];
+                animation.KeyFramesStart = new float[keys.Length];
+                animation.RawKeyFramesData = new byte[sizeof(Vector3) * keys.Length];
                 for (int k = 0; k < keys.Length; k++)
                 {
                     (float time, System.Numerics.Vector3 value) = keys[k];
-                    animationSampler.KeyFramesStart[k] = time;
-                    animationSampler.GetKeyFrameDataAsVec3()[k] = value.ToOpenTK();
+                    animation.KeyFramesStart[k] = time;
+                    animation.GetKeyFrameDataAsVec3()[k] = value.ToOpenTK();
                 }
             }
             else if (animationChannel.TargetNodePath == PropertyPath.rotation)
             {
                 IAnimationSampler<System.Numerics.Quaternion> gltfAnimationSampler = animationChannel.GetRotationSampler();
-                animationSampler.Mode = (AnimationSampler.InterpolationMode)gltfAnimationSampler.InterpolationMode;
+                animation.Mode = (NodeAnimation.InterpolationMode)gltfAnimationSampler.InterpolationMode;
 
                 ValueTuple<float, System.Numerics.Quaternion>[] keys = null;
-                if (animationSampler.Mode == AnimationSampler.InterpolationMode.Step ||
-                    animationSampler.Mode == AnimationSampler.InterpolationMode.Linear)
+                if (animation.Mode == NodeAnimation.InterpolationMode.Step ||
+                    animation.Mode == NodeAnimation.InterpolationMode.Linear)
                 {
                     keys = gltfAnimationSampler.GetLinearKeys().ToArray();
                 }
@@ -1460,13 +1467,13 @@ namespace IDKEngine.Utils
                     return false;
                 }
 
-                animationSampler.KeyFramesStart = new float[keys.Length];
-                animationSampler.RawKeyFramesData = new byte[sizeof(Quaternion) * keys.Length];
+                animation.KeyFramesStart = new float[keys.Length];
+                animation.RawKeyFramesData = new byte[sizeof(Quaternion) * keys.Length];
                 for (int k = 0; k < keys.Length; k++)
                 {
                     (float time, System.Numerics.Quaternion value) = keys[k];
-                    animationSampler.KeyFramesStart[k] = time;
-                    animationSampler.GetKeyFrameDataAsQuaternion()[k] = value.ToOpenTK();
+                    animation.KeyFramesStart[k] = time;
+                    animation.GetKeyFrameDataAsQuaternion()[k] = value.ToOpenTK();
                 }
             }
             else
@@ -1492,7 +1499,6 @@ namespace IDKEngine.Utils
             }
             else if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.BLEND)
             {
-                // Blending only yet supported in Path Tracer
                 materialParams.DoAlphaBlending = true;
             }
 
@@ -1522,14 +1528,9 @@ namespace IDKEngine.Utils
             if (transmissionChannel.HasValue) // KHR_materials_transmission
             {
                 materialParams.TransmissionFactor = GetMaterialChannelParam<float>(transmissionChannel.Value, KnownProperty.TransmissionFactor);
-
-                // This is here because I only want to set IOR for transmissive objects,
-                // because for opaque objects default value of 1.5 looks bad
-                if (materialParams.TransmissionFactor > 0.001f)
-                {
-                    materialParams.IOR = gltfMaterial.IndexOfRefraction; // KHR_materials_ior
-                }
             }
+
+            materialParams.IOR = gltfMaterial.IndexOfRefraction; // KHR_materials_ior
 
             MaterialChannel? volumeAttenuationChannel = gltfMaterial.FindChannel(KnownChannel.VolumeAttenuation.ToString());
             if (volumeAttenuationChannel.HasValue) // KHR_materials_volume
@@ -1760,19 +1761,9 @@ namespace IDKEngine.Utils
         public static class GtlfpackWrapper
         {
             public const string CLI_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer
+            public static readonly string? CliPath = TryFindGltfpack();
 
-            private static bool? _isCliFoundCached;
-            public static bool IsCLIFoundCached
-            {
-                get
-                {
-                    if (!_isCliFoundCached.HasValue)
-                    {
-                        _isCliFoundCached = FindGltfpack();
-                    }
-                    return _isCliFoundCached.Value;
-                }
-            }
+            public static bool CliFound => CliPath != null;
 
             public record struct GltfpackSettings
             {
@@ -1790,7 +1781,7 @@ namespace IDKEngine.Utils
 
             public static Task Run(GltfpackSettings settings)
             {
-                if (!IsCLIFoundCached)
+                if (!CliFound)
                 {
                     Logger.Log(Logger.LogLevel.Error, $"Can't run {CLI_NAME}. Tool is not found");
                     return null;
@@ -1812,7 +1803,7 @@ namespace IDKEngine.Utils
 
                 ProcessStartInfo startInfo = new ProcessStartInfo()
                 {
-                    FileName = CLI_NAME,
+                    FileName = CliPath,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     Arguments = arguments,
@@ -1882,7 +1873,7 @@ namespace IDKEngine.Utils
                 return false;
             }
 
-            private static bool FindGltfpack()
+            private static string? TryFindGltfpack()
             {
                 List<string> pathsToSearch = [Directory.GetCurrentDirectory()];
                 {
@@ -1907,9 +1898,11 @@ namespace IDKEngine.Utils
                     string[] results = Directory.GetFiles(envPath, $"{CLI_NAME}.*");
                     if (results.Length > 0)
                     {
-                        return true;
+                        return results[0];
                     }
                 }
+
+                return null;
 
                 static bool TryGetEnvironmentVariable(string envVar, out string[] strings)
                 {
@@ -1918,8 +1911,6 @@ namespace IDKEngine.Utils
 
                     return data != null;
                 }
-
-                return false;
             }
         }
 
@@ -1936,7 +1927,7 @@ namespace IDKEngine.Utils
                 if (pureWhiteTexture == null)
                 {
                     pureWhiteTexture = new GLTexture(GLTexture.Type.Texture2D);
-                    pureWhiteTexture.ImmutableAllocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                    pureWhiteTexture.Allocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
                     pureWhiteTexture.Clear(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
                     pureWhiteTextureHandle = pureWhiteTexture.GetTextureHandleARB(new GLSampler(new GLSampler.SamplerState()));
                 }
@@ -1948,7 +1939,7 @@ namespace IDKEngine.Utils
                 if (purpleBlackTexture == null)
                 {
                     purpleBlackTexture = new GLTexture(GLTexture.Type.Texture2D);
-                    purpleBlackTexture.ImmutableAllocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                    purpleBlackTexture.Allocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
                     purpleBlackTexture.Upload2D(2, 2, GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4[]
                     {
                         // Source: https://en.wikipedia.org/wiki/File:Minecraft_missing_texture_block.svg

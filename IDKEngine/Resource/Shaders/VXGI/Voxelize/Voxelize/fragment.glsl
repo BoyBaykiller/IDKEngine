@@ -27,7 +27,7 @@ in InOutData
     vec3 FragPos;
     vec2 TexCoord;
     vec3 Normal;
-    flat uint MaterialIndex;
+    flat uint MaterialId;
     flat float EmissiveBias;
 } inData;
 
@@ -40,7 +40,7 @@ void main()
 {
     ivec3 voxelPos = WorlSpaceToVoxelImageSpace(inData.FragPos);
 
-    GpuMaterial material = materialSSBO.Materials[inData.MaterialIndex];
+    GpuMaterial material = materialSSBO.Materials[inData.MaterialId];
 
     Surface surface = GetSurface(material, inData.TexCoord);
     surface.Emissive = surface.Emissive + inData.EmissiveBias * surface.Albedo;

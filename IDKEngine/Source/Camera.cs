@@ -176,7 +176,7 @@ namespace IDKEngine
             return MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(FovY, ProjectionSize.X / (float)ProjectionSize.Y, NearPlane, FarPlane);
         }
 
-        public static Matrix4 GenerateViewMatrix(in Vector3 position, in Vector3 viewDir, in Vector3 upVector)
+        public static Matrix4 GenerateViewMatrix(Vector3 position, Vector3 viewDir, Vector3 upVector)
         {
             return Matrix4.LookAt(position, position + viewDir, upVector);
         }
