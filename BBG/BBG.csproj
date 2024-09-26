@@ -5,10 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>AnyCPU;x64</Platforms>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenTK.Graphics" Version="5.0.0-pre.11" />
+    <PackageReference Include="OpenTK.Graphics" Version="5.0.0-pre.12" />
   </ItemGroup>
 
   <ItemGroup>

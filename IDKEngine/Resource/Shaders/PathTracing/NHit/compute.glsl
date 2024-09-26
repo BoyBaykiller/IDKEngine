@@ -98,13 +98,12 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface = GetSurface(material, interpTexCoord);
             SurfaceApplyModificatons(surface, mesh);
 
-            float alphaCutoff = surface.DoAlphaBlending ? GetRandomFloat01() : surface.AlphaCutoff;
+            float alphaCutoff = SurfaceIsAlphaBlending(surface) ? GetRandomFloat01() : surface.AlphaCutoff;
             if (surface.Alpha < alphaCutoff)
             {
                 wavefrontRay.Origin += rayDir * 0.001;
                 return true;
             }
-            
 
             mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
             vec3 worldNormal = normalize(unitVecToWorld * interpNormal);

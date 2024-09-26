@@ -355,7 +355,6 @@ namespace IDKEngine.Bvh
 
             while (stackPtr > 0)
             {
-                // +1 because we skip root
                 treeDepth = Math.Max(stackPtr + 1, treeDepth);
 
                 int stackTop = stack[--stackPtr];

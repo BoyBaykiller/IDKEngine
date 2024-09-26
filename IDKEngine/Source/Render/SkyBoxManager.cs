@@ -113,7 +113,7 @@ namespace IDKEngine.Render
         private static unsafe bool LoadSkyBoxEquirectangular(string hrdPath)
         {
             using ImageLoader.ImageResult hdrImage = ImageLoader.Load(hrdPath, ImageLoader.ColorComponents.RGB);
-            if (hdrImage.RawPixels == null)
+            if (hdrImage.Memory == null)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Hdr image could not be decoded");
                 return false;
@@ -129,7 +129,7 @@ namespace IDKEngine.Render
                     hdrImage.Header.Width, hdrImage.Header.Height,
                     BBG.Texture.NumChannelsToPixelFormat(hdrImage.Header.Channels),
                     BBG.Texture.PixelType.Float,
-                    hdrImage.RawPixels
+                    hdrImage.Memory
                 );
 
                 BBG.Cmd.BindImageUnit(externalCubemapTexture, 0, 0, true);
@@ -158,7 +158,7 @@ namespace IDKEngine.Render
                 images[i] = imageResult;
             });
 
-            if (images.Any(it => it.RawPixels == null))
+            if (images.Any(it => it.Memory == null))
             {
                 Logger.Log(Logger.LogLevel.Error, $"At least one of the skybox images could not be decoded");
                 return false;
@@ -170,7 +170,7 @@ namespace IDKEngine.Render
             }
             int size = images[0].Header.Width;
 
-            externalCubemapTexture.Allocate(size, size, 1, BBG.Texture.InternalFormat.R8G8B8SRgba);
+            externalCubemapTexture.Allocate(size, size, 1, BBG.Texture.InternalFormat.R8G8B8A8SRgb);
             for (int i = 0; i < 6; i++)
             {
                 using ImageLoader.ImageResult imageResult = images[i];
@@ -178,7 +178,7 @@ namespace IDKEngine.Render
                     size, size, 1,
                     BBG.Texture.NumChannelsToPixelFormat(imageResult.Header.Channels),
                     BBG.Texture.PixelType.UByte,
-                    imageResult.RawPixels,
+                    imageResult.Memory,
                     0, 0, 0, i
                 );
             }

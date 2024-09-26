@@ -148,13 +148,13 @@ struct GpuMaterial
     vec3 EmissiveFactor;
     uint BaseColorFactor;
 
-    float TransmissionFactor;
-    float AlphaCutoff;
-    float RoughnessFactor;
-    float MetallicFactor;
-
     vec3 Absorbance;
     float IOR;
+
+    float TransmissionFactor;
+    float RoughnessFactor;
+    float MetallicFactor;
+    float AlphaCutoff;
 
     MATERIAL_SAMPLER_2D_TYPE BaseColor;
     MATERIAL_SAMPLER_2D_TYPE MetallicRoughness;
@@ -163,8 +163,7 @@ struct GpuMaterial
     MATERIAL_SAMPLER_2D_TYPE Emissive;
 
     MATERIAL_SAMPLER_2D_TYPE Transmission;
-    bool DoAlphaBlending;
-    uint _pad0;
+    uvec2 _pad0;
 };
 
 struct GpuVertex

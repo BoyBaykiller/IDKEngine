@@ -889,10 +889,10 @@ namespace IDKEngine.Render
 
                     if (modified)
                     {
-                        meshInstance.ModelMatrix = meshInstanceTransform.Matrix;
+                        meshInstance.ModelMatrix = meshInstanceTransform.GetMatrix();
 
                         resetPathTracer = true;
-                        app.ModelManager.UpdateMeshBuffer(SelectedEntity.EntityID, 1);
+                        app.ModelManager.UploadMeshBuffer(SelectedEntity.EntityID, 1);
                         app.ModelManager.SetMeshInstance(SelectedEntity.InstanceID, meshInstance);
                     }
                 }
@@ -1187,15 +1187,16 @@ namespace IDKEngine.Render
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray, out float t)
         {
             //Stopwatch sw = Stopwatch.StartNew();
-            //ref readonly GpuPerFrameData perFrameData = ref app.GetPerFrameData();
             //for (int y = 0; y < app.RenderResolution.Y; y++)
             //{
-            //    for (int x = 0; x < app.RenderResolution.X; x++)
+            //    int localY = y;
+            //    Parallel.For(0, app.RenderResolution.X, x =>
             //    {
-            //        OtkVec2 ndc = new OtkVec2(x, y) / app.PresentationResolution * 2.0f - new OtkVec2(1.0f);
-            //        Ray worldSpaceRay = Ray.GetWorldSpaceRay(perFrameData.CameraPos, perFrameData.InvProjection, perFrameData.InvView, ndc);
+            //        OtkVec2 ndc = new OtkVec2(x, localY) / app.PresentationResolution * 2.0f - new OtkVec2(1.0f);
+            //        Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.PerFrameData.CameraPos, app.PerFrameData.InvProjection, app.PerFrameData.InvView, ndc);
             //        app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
-            //    }
+
+            //    });
             //}
             //Console.WriteLine(sw.ElapsedMilliseconds);
 
@@ -1559,7 +1560,7 @@ namespace IDKEngine.Render
         {
             OtkVec3 modelPos = loadParams.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
             Transformation transformation = new Transformation().WithScale(loadParams.Scale).WithTranslation(modelPos);
-            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.Matrix, loadParams.ModelOptimizationSettings);
+            ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.GetMatrix(), loadParams.ModelOptimizationSettings);
             if (!newModel.HasValue)
             {
                 Logger.Log(Logger.LogLevel.Error, $"Failed loading model \"{modelPath}\"");

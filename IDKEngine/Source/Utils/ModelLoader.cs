@@ -38,6 +38,13 @@ namespace IDKEngine.Utils
             "IDK_BC5_normal_metallicRoughness"
         ];
 
+        public enum AlphaMode : int
+        {
+            Opaque = SharpGLTF.Schema2.AlphaMode.OPAQUE,
+            Mask = SharpGLTF.Schema2.AlphaMode.MASK,
+            Blend = SharpGLTF.Schema2.AlphaMode.BLEND,
+        }
+
         public record struct Model
         {
             public Node RootNode => Nodes[0];
@@ -101,7 +108,7 @@ namespace IDKEngine.Utils
             public Matrix4 GlobalTransform { get; private set; } = Matrix4.Identity; // local * parent.Global
 
             public Node Parent;
-            public Node[] Children = Array.Empty<Node>();
+            public Node[] Children = [];
             public string Name = string.Empty;
             public int ArrayIndex;
 
@@ -114,11 +121,11 @@ namespace IDKEngine.Utils
             {
                 if (IsRoot)
                 {
-                    GlobalTransform = LocalTransform.Matrix;
+                    GlobalTransform = LocalTransform.GetMatrix();
                 }
                 else
                 {
-                    GlobalTransform = LocalTransform.Matrix * Parent.GlobalTransform;
+                    GlobalTransform = LocalTransform.GetMatrix() * Parent.GlobalTransform;
                 }
             }
 
@@ -367,7 +374,7 @@ namespace IDKEngine.Utils
 
         private record struct MaterialDesc
         {
-            public static readonly int TEXTURE_COUNT = Enum.GetValues<TextureType>().Length;
+            public const int TEXTURE_COUNT = (int)TextureType.Count;
 
             public enum TextureType : int
             {
@@ -376,6 +383,7 @@ namespace IDKEngine.Utils
                 Normal,
                 Emissive,
                 Transmission,
+                Count,
             }
 
             public ref SampledImage this[TextureType textureType]
@@ -384,46 +392,42 @@ namespace IDKEngine.Utils
                 {
                     switch (textureType)
                     {
-                        case TextureType.BaseColor: return ref Unsafe.AsRef(ref BaseColorTexture);
-                        case TextureType.MetallicRoughness: return ref Unsafe.AsRef(ref MetallicRoughnessTexture);
-                        case TextureType.Normal: return ref Unsafe.AsRef(ref NormalTexture);
-                        case TextureType.Emissive: return ref Unsafe.AsRef(ref EmissiveTexture);
-                        case TextureType.Transmission: return ref Unsafe.AsRef(ref TransmissionTexture);
+                        case TextureType.BaseColor: return ref Unsafe.AsRef(ref SampledImages[0]);
+                        case TextureType.MetallicRoughness: return ref Unsafe.AsRef(ref SampledImages[1]);
+                        case TextureType.Normal: return ref Unsafe.AsRef(ref SampledImages[2]);
+                        case TextureType.Emissive: return ref Unsafe.AsRef(ref SampledImages[3]);
+                        case TextureType.Transmission: return ref Unsafe.AsRef(ref SampledImages[4]);
                         default: throw new NotSupportedException($"Unsupported {nameof(TextureType)} {textureType}");
                     }
                 }
             }
 
             public MaterialParams MaterialParams;
-
-            public SampledImage BaseColorTexture;
-            public SampledImage MetallicRoughnessTexture;
-            public SampledImage NormalTexture;
-            public SampledImage EmissiveTexture;
-            public SampledImage TransmissionTexture;
+            public SampledImageArray SampledImages;
 
             public static readonly MaterialDesc Default = new MaterialDesc()
             {
-                BaseColorTexture = { },
-                MetallicRoughnessTexture = { },
-                NormalTexture = { },
-                EmissiveTexture = { },
-                TransmissionTexture = { },
                 MaterialParams = MaterialParams.Default,
             };
+
+            [InlineArray(TEXTURE_COUNT)]
+            public struct SampledImageArray
+            {
+                public SampledImage _sampledImage;
+            }
         }
 
         private record struct MaterialParams
         {
-            public Vector3 EmissiveFactor;
             public Vector4 BaseColorFactor;
+            public Vector3 EmissiveFactor;
             public float TransmissionFactor;
             public float AlphaCutoff;
             public float RoughnessFactor;
             public float MetallicFactor;
             public Vector3 Absorbance;
             public float IOR;
-            public bool DoAlphaBlending;
+            public AlphaMode AlphaMode;
 
             public static readonly MaterialParams Default = new MaterialParams()
             {
@@ -434,7 +438,8 @@ namespace IDKEngine.Utils
                 RoughnessFactor = 1.0f,
                 MetallicFactor = 1.0f,
                 Absorbance = new Vector3(0.0f),
-                IOR = 1.5f
+                IOR = 1.5f,
+                AlphaMode = AlphaMode.Opaque,
             };
         }
 
@@ -546,6 +551,7 @@ namespace IDKEngine.Utils
             }
 
             ModelRoot gltf = ModelRoot.Load(path, new ReadSettings() { Validation = SharpGLTF.Validation.ValidationMode.Skip });
+
             string fileName = Path.GetFileName(path);
             foreach (string ext in gltf.ExtensionsUsed)
             {
@@ -604,10 +610,12 @@ namespace IDKEngine.Utils
             List<Vector4i> listJointIndices = new List<Vector4i>();
             List<Vector4> listJointWeights = new List<Vector4>();
 
+            int nodeCounter = 0;
+
             Node myRoot = new Node();
             myRoot.Name = modelName;
             myRoot.LocalTransform = Transformation.FromMatrix(rootTransform);
-            myRoot.ArrayIndex = 0;
+            myRoot.ArrayIndex = nodeCounter++;
             myRoot.UpdateGlobalTransform();
 
             Stack<ValueTuple<GltfNode, Node>> nodeStack = new Stack<ValueTuple<GltfNode, Node>>();
@@ -625,14 +633,17 @@ namespace IDKEngine.Utils
                     nodeStack.Push((gltfNode, myNode));
                 }
             }
-
+            
+            Dictionary<GltfNode, Node> gltfNodeToMyNode = new Dictionary<GltfNode, Node>(gltf.LogicalNodes.Count);
             while (nodeStack.Count > 0)
             {
                 (GltfNode gltfNode, Node myNode) = nodeStack.Pop();
 
-                myNode.ArrayIndex = gltfNode.LogicalIndex + 1;
+                myNode.ArrayIndex = nodeCounter++;
                 myNode.LocalTransform = Transformation.FromMatrix(gltfNode.LocalMatrix.ToOpenTK());
                 myNode.UpdateGlobalTransform();
+
+                gltfNodeToMyNode[gltfNode] = myNode;
 
                 {
                     GltfNode[] gltfChildren = gltfNode.VisualChildren.ToArray();
@@ -655,8 +666,8 @@ namespace IDKEngine.Utils
                 {
                     continue;
                 }
-
-                Matrix4[] nodeTransformations = GetNodeInstances(gltfNode.UseGpuInstancing(), myNode.LocalTransform.Matrix);
+                
+                Matrix4[] nodeTransformations = GetNodeInstances(gltfNode.UseGpuInstancing(), myNode.LocalTransform.GetMatrix());
 
                 Range meshInstanceIdsRange = new Range();
                 meshInstanceIdsRange.Start = listMeshInstances.Count;
@@ -755,9 +766,8 @@ namespace IDKEngine.Utils
             Node[] myNodes = new Node[gltf.LogicalNodes.Count + 1];
             Node.HierarchyToArray(myRoot, myNodes);
 
-            ReadOnlySpan<Node> gltfNodeIdToMyNode = new ReadOnlySpan<Node>(myNodes, 1, myNodes.Length - 1);
-            LoadNodeSkins(gltf.LogicalNodes, gltfNodeIdToMyNode);
-            ModelAnimation[] animations = LoadAnimations(gltf, gltfNodeIdToMyNode);
+            LoadNodeSkins(gltf.LogicalNodes, gltfNodeToMyNode);
+            ModelAnimation[] animations = LoadAnimations(gltf, gltfNodeToMyNode);
 
             Model model = new Model();
             model.Nodes = myNodes;
@@ -786,7 +796,16 @@ namespace IDKEngine.Utils
                 gpuMaterial.MetallicFactor = materialParams.MetallicFactor;
                 gpuMaterial.Absorbance = materialParams.Absorbance;
                 gpuMaterial.IOR = materialParams.IOR;
-                gpuMaterial.DoAlphaBlending = materialParams.DoAlphaBlending;
+
+                if (materialParams.AlphaMode == AlphaMode.Opaque)
+                {
+                    gpuMaterial.AlphaCutoff = 0.0f;
+                }
+                else if (materialParams.AlphaMode == AlphaMode.Blend)
+                {
+                    // special value interpreted as do blending
+                    gpuMaterial.AlphaCutoff = 2.0f;
+                }
 
                 for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
                 {
@@ -901,7 +920,7 @@ namespace IDKEngine.Utils
 
                             Task.Run(() =>
                             {
-                                Memory.Copy(textureLoadData.Ktx2Texture.Data, stagingBuffer.MappedMemory, compressedImageSize);
+                                Memory.Copy(textureLoadData.Ktx2Texture.Data, stagingBuffer.Memory, compressedImageSize);
 
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
@@ -929,14 +948,14 @@ namespace IDKEngine.Utils
                     {
                         ReadOnlySpan<byte> imageData = textureLoadData.EncodedImageData.Span;
                         using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, textureLoadData.ImageHeader.ColorComponents);
-                        if (imageResult.RawPixels == null)
+                        if (imageResult.Memory == null)
                         {
                             Logger.Log(Logger.LogLevel.Error, $"Image could not be decoded");
                             MainThreadQueue.AddToLazyQueue(() => { stagingBuffer.Dispose(); });
                             return;
                         }
 
-                        Memory.Copy(imageResult.RawPixels, stagingBuffer.MappedMemory, textureLoadData.ImageHeader.SizeInBytes);
+                        Memory.Copy(imageResult.Memory, stagingBuffer.Memory, textureLoadData.ImageHeader.SizeInBytes);
 
                         MainThreadQueue.AddToLazyQueue(() =>
                         {
@@ -975,10 +994,10 @@ namespace IDKEngine.Utils
 
                 textureLoadData.InternalFormat = textureType switch
                 {
-                    GpuMaterial.TextureType.BaseColor => GLTexture.InternalFormat.R8G8B8A8Srgb,
+                    GpuMaterial.TextureType.BaseColor => GLTexture.InternalFormat.R8G8B8A8SRgb,
                     GpuMaterial.TextureType.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float,
                     GpuMaterial.TextureType.Normal => GLTexture.InternalFormat.R8G8Unorm,
-                    GpuMaterial.TextureType.Emissive => GLTexture.InternalFormat.R8G8B8A8Srgb,
+                    GpuMaterial.TextureType.Emissive => GLTexture.InternalFormat.R8G8B8A8SRgb,
                     GpuMaterial.TextureType.Transmission => GLTexture.InternalFormat.R8Unorm,
                     _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
                 };
@@ -1043,7 +1062,7 @@ namespace IDKEngine.Utils
                 MaterialDesc materialDesc = MaterialDesc.Default;
                 materialDesc.MaterialParams = GetMaterialParams(gltfMaterial);
 
-                for (int j = 0; j < MaterialDesc.TEXTURE_COUNT; j++)
+                for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
                 {
                     MaterialDesc.TextureType textureType = MaterialDesc.TextureType.BaseColor + j;
                     SampledImage sampledImage = GetSampledImage(gltfMaterial, textureType);
@@ -1180,7 +1199,8 @@ namespace IDKEngine.Utils
                     }
                 }
             }
-            //int deduplicatedCount = totalMeshPrimitives - uniqueMeshPrimitivesCount;
+            //int deduplicatedCount = maxMeshPrimitives - uniqueMeshPrimitivesCount;
+
             while (uniqueMeshPrimitivesCount < tasks.Length)
             {
                 tasks[uniqueMeshPrimitivesCount++] = Task.CompletedTask;
@@ -1219,8 +1239,8 @@ namespace IDKEngine.Utils
             VertexData vertexData = new VertexData();
             vertexData.Vertices = new GpuVertex[positonAccessor.Count];
             vertexData.Positons = new Vector3[positonAccessor.Count];
-            vertexData.JointIndices = Array.Empty<Vector4i>();
-            vertexData.JointWeights = Array.Empty<Vector4>();
+            vertexData.JointIndices = [];
+            vertexData.JointWeights = [];
 
             IterateAccessor(positonAccessor, (in Vector3 pos, int i) =>
             {
@@ -1355,7 +1375,7 @@ namespace IDKEngine.Utils
             return (gpuMeshlets, gpuMeshletsInfo);
         }
 
-        private static void LoadNodeSkins(IReadOnlyList<GltfNode> gltfNodes, ReadOnlySpan<Node> gltfNodeIdToMyNode)
+        private static void LoadNodeSkins(IReadOnlyList<GltfNode> gltfNodes, Dictionary<GltfNode, Node> gltfNodeToMyNode)
         {
             for (int i = 0; i < gltfNodes.Count; i++)
             {
@@ -1368,11 +1388,11 @@ namespace IDKEngine.Utils
                     {
                         (GltfNode gltfJoint, System.Numerics.Matrix4x4 inverseJointMatrix) = gltfNode.Skin.GetJoint(j);
 
-                        joints[j] = gltfNodeIdToMyNode[gltfJoint.LogicalIndex];
+                        joints[j] = gltfNodeToMyNode[gltfJoint];
                         inverseJointMatrices[j] = inverseJointMatrix.ToOpenTK();
                     }
 
-                    Node myNode = gltfNodeIdToMyNode[gltfNode.LogicalIndex];
+                    Node myNode = gltfNodeToMyNode[gltfNode];
                     myNode.Skin = new Skin();
                     myNode.Skin.Joints = joints;
                     myNode.Skin.InverseJointMatrices = inverseJointMatrices;
@@ -1380,7 +1400,7 @@ namespace IDKEngine.Utils
             }
         }
 
-        private static ModelAnimation[] LoadAnimations(ModelRoot gltf, ReadOnlySpan<Node> gltfNodeIdToMyNode)
+        private static ModelAnimation[] LoadAnimations(ModelRoot gltf, Dictionary<GltfNode, Node> gltfNodeToMyNode)
         {
             int animationCount = 0;
             ModelAnimation[] animations = new ModelAnimation[gltf.LogicalAnimations.Count];
@@ -1394,7 +1414,7 @@ namespace IDKEngine.Utils
                 for (int j = 0; j < gltfAnimation.Channels.Count; j++)
                 {
                     AnimationChannel animationChannel = gltfAnimation.Channels[j];
-                    if (TryGetNodeAnimation(animationChannel, gltfNodeIdToMyNode, out NodeAnimation sampler))
+                    if (TryGetNodeAnimation(animationChannel, gltfNodeToMyNode, out NodeAnimation sampler))
                     {
                         myAnimation.NodeAnimations[nodeAmimsCount++] = sampler;
                     }
@@ -1414,10 +1434,10 @@ namespace IDKEngine.Utils
             return animations;
         }
 
-        private static unsafe bool TryGetNodeAnimation(AnimationChannel animationChannel, ReadOnlySpan<Node> gltfNodeIdToMyNode, out NodeAnimation animation)
+        private static unsafe bool TryGetNodeAnimation(AnimationChannel animationChannel, Dictionary<GltfNode, Node> gltfNodeToMyNode, out NodeAnimation animation)
         {
             animation = new NodeAnimation();
-            animation.TargetNode = gltfNodeIdToMyNode[animationChannel.TargetNode.LogicalIndex];
+            animation.TargetNode = gltfNodeToMyNode[animationChannel.TargetNode];
             animation.Type = (NodeAnimation.AnimationType)animationChannel.TargetNodePath;
             
             if (animationChannel.TargetNodePath == PropertyPath.scale ||
@@ -1469,11 +1489,11 @@ namespace IDKEngine.Utils
 
                 animation.KeyFramesStart = new float[keys.Length];
                 animation.RawKeyFramesData = new byte[sizeof(Quaternion) * keys.Length];
-                for (int k = 0; k < keys.Length; k++)
+                for (int i = 0; i < keys.Length; i++)
                 {
-                    (float time, System.Numerics.Quaternion value) = keys[k];
-                    animation.KeyFramesStart[k] = time;
-                    animation.GetKeyFrameDataAsQuaternion()[k] = value.ToOpenTK();
+                    (float time, System.Numerics.Quaternion value) = keys[i];
+                    animation.KeyFramesStart[i] = time;
+                    animation.GetKeyFrameDataAsQuaternion()[i] = value.ToOpenTK();
                 }
             }
             else
@@ -1489,18 +1509,8 @@ namespace IDKEngine.Utils
         {
             MaterialParams materialParams = MaterialParams.Default;
 
-            if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.OPAQUE)
-            {
-                materialParams.AlphaCutoff = -1.0f;
-            }
-            else if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.MASK)
-            {
-                materialParams.AlphaCutoff = gltfMaterial.AlphaCutoff;
-            }
-            else if (gltfMaterial.Alpha == SharpGLTF.Schema2.AlphaMode.BLEND)
-            {
-                materialParams.DoAlphaBlending = true;
-            }
+            materialParams.AlphaCutoff = gltfMaterial.AlphaCutoff;
+            materialParams.AlphaMode = (AlphaMode)gltfMaterial.Alpha;
 
             MaterialChannel? baseColorChannel = gltfMaterial.FindChannel(KnownChannel.BaseColor.ToString());
             if (baseColorChannel.HasValue)

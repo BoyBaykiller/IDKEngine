@@ -1,33 +1,50 @@
 ﻿[*.{cs,vb}]
 
-# IDE0302: Simplify collection initialization
-dotnet_style_prefer_collection_expression = false
+######################
+## Warning messages ##
+######################
 
 # CS8632: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-dotnet_diagnostic.CS8632.severity = silent
+dotnet_diagnostic.CS8632.severity = none
 
 # Because in development you are likely to temporarily disable code. 
 # CS0162: Unreachable code detected
-dotnet_diagnostic.CS0162.severity = silent
+dotnet_diagnostic.CS0162.severity = none
 
 # Because structs that are shared with GPU require fields to be present even when not used on CPU 
 # CS0649: Field 'field' is never assigned to, and will always have its default value 'value'
-dotnet_diagnostic.CS0649.severity = silent
+dotnet_diagnostic.CS0649.severity = none
 
 # Because structs that are shared with GPU require fields to be present even when not used on CPU 
 # CS0169: The field 'field' is never used
-dotnet_diagnostic.CS0169.severity = silent
+dotnet_diagnostic.CS0169.severity = none
+
+# Because callers should be aware when they pass a reference to a `ref readonl` parameters
+# CS9192: Argument should be passed with 'ref' or 'in' keyword
+dotnet_diagnostic.CS9192.severity = error
+
+# Because I want `ref readonly` parameters to only accept r-values. Just like `ref`. After all thats its intention
+# CS9193: Argument should be a variable because it is passed to a 'ref readonly' parameter
+dotnet_diagnostic.CS9193.severity = error
+
+########################
+## Code quality rules ##
+########################
 
 # Because it decreases chances of forgeting to call Dispose
 # CA2213: Disposable fields should be disposed
 dotnet_diagnostic.CA2213.severity = warning
+
+######################
+## Code style rules ##
+######################
+
+# Because I dont include the Source folder in namespaces
+# IDE0130: Namespace does not match folder structure
+dotnet_style_namespace_match_folder = false
 
 # IDE0090: Use 'new(...)'
 csharp_style_implicit_object_creation_when_type_is_apparent = false
 
 # IDE0017: Simplify object initialization
 dotnet_style_object_initializer = false
-
-# Because we dont include the Source folder in namespace
-# IDE0130: Namespace does not match folder structure
-dotnet_style_namespace_match_folder = false

@@ -213,8 +213,7 @@ namespace IDKEngine.Render
             BBG.Cmd.BindTextureUnit(ResultVoxels, 0);
             BBG.Cmd.UseShaderProgram(mipmapProgram);
 
-            int levels = BBG.Texture.GetMaxMipmapLevel(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth);
-            for (int i = 1; i < levels; i++)
+            for (int i = 1; i < ResultVoxels.Levels; i++)
             {
                 BBG.Computing.Compute($"Downsample Voxel texture to level {i}", () =>
                 {

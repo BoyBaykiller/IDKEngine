@@ -37,13 +37,13 @@ namespace IDKEngine.GpuTypes
         public Vector3 EmissiveFactor;
         public uint BaseColorFactor;
 
-        public float TransmissionFactor;
-        public float AlphaCutoff;
-        public float RoughnessFactor;
-        public float MetallicFactor;
-
         public Vector3 Absorbance;
         public float IOR;
+
+        public float TransmissionFactor;
+        public float RoughnessFactor;
+        public float MetallicFactor;
+        public float AlphaCutoff;
 
         public BBG.Texture.BindlessHandle BaseColorTexture;
         public BBG.Texture.BindlessHandle MetallicRoughnessTexture;
@@ -52,7 +52,7 @@ namespace IDKEngine.GpuTypes
         public BBG.Texture.BindlessHandle EmissiveTexture;
 
         public BBG.Texture.BindlessHandle TransmissionTexture;
-        public bool DoAlphaBlending;
-        private readonly uint _pad0;
+        private readonly float _pad0;
+        private readonly float _pad1;
     }
 }

@@ -178,7 +178,7 @@ namespace IDKEngine.Utils
             readData = new T[fileStream.Length / sizeof(T)];
 
             Span<byte> byteData = MemoryMarshal.AsBytes<T>(readData);
-            fileStream.Read(byteData);
+            fileStream.ReadExactly(byteData);
 
             return true;
         }

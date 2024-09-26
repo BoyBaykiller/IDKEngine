@@ -17,9 +17,15 @@ namespace BBOpenGL
 
             private readonly GLSync glFence;
 
-            public Fence()
+            public static Fence InsertIntoCommandStream()
             {
-                glFence = GL.FenceSync(SyncCondition.SyncGpuCommandsComplete, SyncBehaviorFlags.None);
+                Fence fence = new Fence(GL.FenceSync(SyncCondition.SyncGpuCommandsComplete, SyncBehaviorFlags.None));
+                return fence;
+            }
+
+            public Fence(GLSync glSync)
+            {
+                glFence = glSync;
             }
 
             public bool TryWait(ulong timeout = 1_000_000_000) // 1s in nanoseconds

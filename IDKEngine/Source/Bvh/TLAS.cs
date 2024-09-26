@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
@@ -18,7 +17,6 @@ namespace IDKEngine.Bvh
             }
         }
 
-        // TODO: Investigate if .NET 9 allows ref struct in ValueTuple
         public delegate void FuncGetBlas(int instanceId, out BLAS.BuildResult blas, out Matrix4 worldTransform);
         public delegate void FuncGetBlasAndGeometry(int instanceId, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
@@ -280,6 +278,10 @@ namespace IDKEngine.Bvh
             int bestNodeIndex = -1;
 
             ref readonly GpuTlasNode node = ref nodes[nodeIndex];
+
+            // Doing the conversion here cuts 15ms with searchRadius=15!?
+            Box nodeBox = Conversions.ToBox(node);
+
             for (int i = start; i < end; i++)
             {
                 if (i == nodeIndex)
@@ -289,9 +291,8 @@ namespace IDKEngine.Bvh
 
                 ref readonly GpuTlasNode otherNode = ref nodes[i];
 
-                Box fittingBox = Conversions.ToBox(node);
-                fittingBox.GrowToFit(otherNode.Min);
-                fittingBox.GrowToFit(otherNode.Max);
+                Box fittingBox = nodeBox;
+                fittingBox.GrowToFit(otherNode);
 
                 float area = fittingBox.HalfArea();
                 if (area < smallestArea)

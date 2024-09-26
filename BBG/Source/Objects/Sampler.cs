@@ -95,7 +95,7 @@ namespace BBOpenGL
 
             public void Dispose()
             {
-                GL.DeleteSampler(ID);
+                GL.DeleteSamplers(1, in ID);
             }
 
             public static bool IsMipmapFilter(MinFilter minFilter)

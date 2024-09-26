@@ -295,7 +295,7 @@ namespace IDKEngine.Render
                     ref readonly GpuMesh mesh = ref modelManager.Meshes[i];
                     modelManager.DrawCommands[i].InstanceCount = mesh.InstanceCount;
                 }
-                modelManager.UpdateDrawCommandBuffer(0, modelManager.DrawCommands.Length);
+                modelManager.UploadDrawCommandBuffer(0, modelManager.DrawCommands.Length);
 
                 Voxelizer.Render(modelManager);
             }

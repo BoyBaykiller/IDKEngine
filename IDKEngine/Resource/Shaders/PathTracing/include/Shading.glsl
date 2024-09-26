@@ -85,8 +85,8 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
         reflectionRayDir = normalize(mix(reflectionRayDir, diffuseRayDir, surface.Roughness));
         result.RayDirection = reflectionRayDir;
 
-        result.Bsdf = LambertianBrdf(surface.Albedo) * cosTheta; // surface.Albedo
-        result.Pdf = lambertianPdf; // 1.0
+        result.Bsdf = surface.Albedo;
+        result.Pdf = 1.0;
 
         result.NewIor = prevIor;
     }
@@ -94,7 +94,7 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
     {
         if (fromInside)
         {
-            // we don't actually know wheter the next mesh we hit has ior 1.0
+            // We don't actually know wheter the next mesh we hit has ior 1.0
             result.NewIor = 1.0;
         }
         else
@@ -114,14 +114,13 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
 
         if (tintOnTransmissiveRay)
         {
-            result.Bsdf = LambertianBrdf(surface.Albedo) * cosTheta;
-            result.Pdf = lambertianPdf;
+            result.Bsdf = surface.Albedo;
         }
         else
         {
             result.Bsdf = vec3(1.0);
-            result.Pdf = 1.0;
         }
+        result.Pdf = 1.0;
     }
     result.Pdf = max(result.Pdf * bsdfSelectionPdf, 0.0001);
 

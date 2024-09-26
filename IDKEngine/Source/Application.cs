@@ -234,35 +234,49 @@ namespace IDKEngine
                 TonemapAndGamma.Settings.IsAgXTonemaping = !PathTracer.IsDebugBVHTraversal;
                 TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
-
+            
             if (gui.SelectedEntity.EntityType != Gui.EntityType.None)
             {
-                Box boundingBox = new Box();
                 if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
                 {
                     GpuBlasNode node = ModelManager.BVH.GetBlas(gui.SelectedEntity.EntityID).Root;
-                    boundingBox.Min = node.Min;
-                    boundingBox.Max = node.Max;
 
-                    boundingBox.Transform(ModelManager.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
+                    Box box = new Box();
+                    box.Min = node.Min;
+                    box.Max = node.Max;
+
+                    box.Transform(ModelManager.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
+                    BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
                 }
-
-                if (gui.SelectedEntity.EntityType == Gui.EntityType.Light)
+                else if (gui.SelectedEntity.EntityType == Gui.EntityType.Light)
                 {
                     LightManager.TryGetLight(gui.SelectedEntity.EntityID, out CpuLight cpuLight);
                     ref GpuLight light = ref cpuLight.GpuLight;
 
-                    boundingBox.Min = light.Position - new Vector3(light.Radius);
-                    boundingBox.Max = light.Position + new Vector3(light.Radius);
+                    Box box = new Box();
+                    box.Min = light.Position - new Vector3(light.Radius);
+                    box.Max = light.Position + new Vector3(light.Radius);
+                    BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
                 }
+                else if (gui.SelectedEntity.EntityType == Gui.EntityType.Node)
+                {
+                    ModelLoader.Node.Traverse(gui.SelectedEntity.Node, (node) =>
+                    {
+                        Range meshInstanceIds = node.MeshInstanceIds;
+                        for (int i = meshInstanceIds.Start; i < meshInstanceIds.End; i++)
+                        {
+                            ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[i];
 
-                BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, boundingBox);
+                            Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(meshInstance.MeshId).Root);
+                            BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
+                        }
+                    });
+                }
             }
 
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderGui)
             {
-                gui.Update(this);
                 gui.Draw(this, dT);
             }
             else
@@ -285,6 +299,8 @@ namespace IDKEngine
 
         protected override void OnUpdate(float dT)
         {
+            gui.Update(this);
+
             if (KeyboardState[Keys.Escape] == Keyboard.InputState.Pressed)
             {
                 ShouldClose();
@@ -449,7 +465,7 @@ namespace IDKEngine
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), 360.0f - 165.4f, 90.0f - 7.4f);
             if (true)
             {
-                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Resource/Models/SponzaCompressed/Sponza.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).Matrix).Value;
+                ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Resource/Models/SponzaCompressed/Sponza.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).GetMatrix()).Value;
                 sponza.GpuModel.Meshes[63].EmissiveBias = 10.0f;
                 sponza.GpuModel.Meshes[70].EmissiveBias = 20.0f;
                 sponza.GpuModel.Meshes[3].EmissiveBias = 12.0f;
@@ -463,16 +479,17 @@ namespace IDKEngine
                 //sponza.GpuModel.Meshes[46].RoughnessBias = -0.436f; // -0.665
                 //sponza.GpuModel.Meshes[46].NormalMapStrength = 0.0f;
 
-                ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).Matrix).Value;
+                ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).GetMatrix()).Value;
                 lucy.GpuModel.Meshes[0].SpecularBias = -1.0f;
                 lucy.GpuModel.Meshes[0].TransmissionBias = 0.98f;
                 lucy.GpuModel.Meshes[0].IORBias = -0.326f;
                 lucy.GpuModel.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.GpuModel.Meshes[0].RoughnessBias = -1.0f;
-                
-                ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).Matrix).Value;
+
+                ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
 
@@ -494,11 +511,11 @@ namespace IDKEngine
             else
             {
                 ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
-                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-                ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+                //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
                 //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
                 //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a, b, c);
+                ModelManager.Add(a);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 

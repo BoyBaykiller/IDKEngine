@@ -9,8 +9,6 @@ namespace IDKEngine
         public Quaternion Rotation = Quaternion.Identity;
         public Vector3 Scale = new Vector3(1.0f);
 
-        public Matrix4 Matrix => Matrix4.CreateScale(Scale) * Matrix4.CreateFromQuaternion(Rotation) * Matrix4.CreateTranslation(Translation);
-
         public Transformation()
         {
         }
@@ -48,7 +46,15 @@ namespace IDKEngine
             return this;
         }
 
-       public static Transformation FromMatrix(in Matrix4 mat)
+        public Matrix4 GetMatrix()
+        {
+            Matrix4 matrix = Matrix4.CreateScale(Scale) * Matrix4.CreateFromQuaternion(Rotation);
+            matrix.Row3.Xyz = Translation;
+
+            return matrix;
+        }
+
+        public static Transformation FromMatrix(in Matrix4 mat)
         {
             Transformation transformation;
             transformation.Scale = mat.ExtractScale();

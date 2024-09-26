@@ -160,7 +160,7 @@ namespace IDKEngine.ThirdParty
                 0.0f,
                 -1.0f,
                 1.0f);
-            GL.ProgramUniformMatrix4f(glShaderProgram, glProjectionUniformLocation, 1, false, mvp);
+            GL.ProgramUniformMatrix4f(glShaderProgram, glProjectionUniformLocation, 1, false, ref mvp);
 
             GL.Enable(EnableCap.Blend);
             GL.Enable(EnableCap.ScissorTest);
@@ -292,15 +292,15 @@ namespace IDKEngine.ThirdParty
 
         public void Dispose()
         {
-            GL.DeleteVertexArray(glVertexArray);
-            GL.DeleteBuffer(glVertexBuffer);
-            GL.DeleteBuffer(glIndexBuffer);
+            GL.DeleteVertexArrays(1, ref glVertexArray);
+            GL.DeleteBuffers(1, ref glVertexBuffer);
+            GL.DeleteBuffers(1, ref glIndexBuffer);
 
-            GL.DeleteTexture(glFontTexture);
+            GL.DeleteTextures(1, ref glFontTexture);
             GL.DeleteProgram(glShaderProgram);
         }
 
-        private int CreateProgram(string vertexSource, string fragmentSource)
+        private static int CreateProgram(string vertexSource, string fragmentSource)
         {
             int program = GL.CreateProgram();
             int vertex = CompileShader(ShaderType.VertexShader, vertexSource);
@@ -326,7 +326,7 @@ namespace IDKEngine.ThirdParty
             return program;
         }
 
-        private int CompileShader(ShaderType type, string source)
+        private static int CompileShader(ShaderType type, string source)
         {
             int shader = GL.CreateShader(type);
             GL.ShaderSource(shader, source);

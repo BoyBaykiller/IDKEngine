@@ -60,17 +60,17 @@ namespace IDKEngine
 
         public struct ImageResult : IDisposable
         {
-            public Span<byte> Pixels => new Span<byte>(RawPixels, Header.SizeInBytes);
+            public Span<byte> Pixels => new Span<byte>(Memory, Header.SizeInBytes);
 
             public ImageHeader Header;
-            public void* RawPixels;
+            public void* Memory;
 
             public void Dispose()
             {
-                if (RawPixels != null)
+                if (Memory != null)
                 {
-                    Stbi.image_free(RawPixels);
-                    RawPixels = null;
+                    Stbi.image_free(Memory);
+                    Memory = null;
                 }
             }
         }
@@ -91,7 +91,7 @@ namespace IDKEngine
 
                 if (Stbi.is_hdr_from_memory(ptr, imageData.Length) == 1)
                 {
-                    imageResult.RawPixels = Stbi.loadf_from_memory(
+                    imageResult.Memory = Stbi.loadf_from_memory(
                         ptr,
                         imageData.Length,
                         &imageResult.Header.Width,
@@ -102,7 +102,7 @@ namespace IDKEngine
                 }
                 else
                 {
-                    imageResult.RawPixels = Stbi.load_from_memory(
+                    imageResult.Memory = Stbi.load_from_memory(
                         ptr,
                         imageData.Length,
                         &imageResult.Header.Width,

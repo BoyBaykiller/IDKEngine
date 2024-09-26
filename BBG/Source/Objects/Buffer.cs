@@ -66,7 +66,7 @@ namespace BBOpenGL
 
             public readonly int ID;
             public nint Size { get; private set; }
-            public void* MappedMemory { get; private set; }
+            public void* Memory { get; private set; }
 
             public BufferBackedBlockTarget BackingBlock { get; private set; }
             public int BlockIndex { get; private set; }
@@ -88,15 +88,15 @@ namespace BBOpenGL
                 GL.NamedBufferStorage(ID, size, data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
                 Size = size;
 
-                MappedMemory = null;
+                Memory = null;
 
                 if (memAccess == MemAccess.MappedCoherent)
                 {
-                    MappedMemory = GL.MapNamedBufferRange(ID, 0, size,(MapBufferAccessMask)memAccess);
+                    Memory = GL.MapNamedBufferRange(ID, 0, size,(MapBufferAccessMask)memAccess);
                 }
                 if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedIncoherentWriteOnlyReBAR)
                 {
-                    MappedMemory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
+                    Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
                 }
             }
 
@@ -151,11 +151,11 @@ namespace BBOpenGL
 
             public void Dispose()
             {
-                if (MappedMemory != null)
+                if (Memory != null)
                 {
                     GL.UnmapNamedBuffer(ID);
                 }
-                GL.DeleteBuffer(ID);
+                GL.DeleteBuffers(1, in ID);
             }
 
             public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
@@ -194,7 +194,7 @@ namespace BBOpenGL
 
         public unsafe class TypedBuffer<T> : Buffer where T : unmanaged
         {
-            public new T* MappedMemory => (T*)base.MappedMemory;
+            public new T* Memory => (T*)base.Memory;
             public int NumElements => (int)(Size / sizeof(T));
 
             public TypedBuffer()

@@ -16,13 +16,13 @@ namespace BBOpenGL
                 Link(others);
             }
             public ShaderProgram(Shader first, params Shader[] others)
-                : this(others.Concat([first]).ToArray())
+                : this([.. others, first])
             {
             }
 
             public void Link(Shader first, params Shader[] others)
             {
-                Shader[] shaders = others.Concat([first]).ToArray();
+                Shader[] shaders = [.. others, first];
                 Link(shaders);
             }
 
@@ -71,15 +71,23 @@ namespace BBOpenGL
 
             public unsafe void Upload(int location, in Matrix4 Matrix4, int count = 1, bool transpose = false)
             {
-                fixed (float* ptr = &Matrix4.Row0.X)
+                fixed (Matrix4* ptr = &Matrix4)
                 {
-                    GL.ProgramUniformMatrix4fv(ID, location, count, transpose, ptr);
+                    GL.ProgramUniformMatrix4fv(ID, location, count, transpose, (float*)ptr);
                 }
             }
 
             public unsafe void Upload(int location, Vector3 vector3, int count = 1)
             {
                 GL.ProgramUniform3fv(ID, location, count, &vector3.X);
+            }
+
+            public unsafe void Upload(int location, in Vector4 vector4, int count = 1)
+            {
+                fixed (Vector4* ptr = &vector4)
+                {
+                    GL.ProgramUniform4fv(ID, location, count, (float*)ptr);
+                }
             }
 
             public unsafe void Upload(int location, float x, int count = 1)
@@ -134,7 +142,7 @@ namespace BBOpenGL
             }
 
             public AbstractShaderProgram(AbstractShader first, params AbstractShader[] others)
-                : this(others.Concat([first]).ToArray())
+                : this([.. others, first])
             {
             }
 

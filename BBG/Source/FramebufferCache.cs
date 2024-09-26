@@ -53,7 +53,7 @@ namespace BBOpenGL
                 public int GLResource;
             }
 
-            private static FramebufferRessorce[] framebuffers = Array.Empty<FramebufferRessorce>();
+            private static FramebufferRessorce[] framebuffers = [];
 
             public static int GetFramebuffer(in FramebufferDesc framebufferDesc)
             {
@@ -67,7 +67,7 @@ namespace BBOpenGL
                 }
 
                 FramebufferRessorce newFramebuffer = CreateFramebuffer(framebufferDesc);
-                framebuffers = framebuffers.Concat([newFramebuffer]).ToArray();
+                framebuffers = [.. framebuffers, newFramebuffer];
 
                 return newFramebuffer.GLResource;
             }
@@ -85,8 +85,8 @@ namespace BBOpenGL
                         ref readonly Attachment attachment = ref framebuffer.FramebufferDesc.Attachments[j];
                         if (attachment.Texture == texture)
                         {
-                            GL.DeleteFramebuffer(framebuffer.GLResource);
-                            
+                            GL.DeleteFramebuffers(1, in framebuffer.GLResource);
+
                             if (aliveFbos > 0)
                             {
                                 // move deleted framebuffer to end of array
@@ -130,7 +130,7 @@ namespace BBOpenGL
                         numColorAttachments++;
                     }
                 }
-                GL.NamedFramebufferDrawBuffers(newFramebuffer.GLResource, numColorAttachments, drawBuffers[0]);
+                GL.NamedFramebufferDrawBuffers(newFramebuffer.GLResource, numColorAttachments, ref drawBuffers[0]);
 
                 return newFramebuffer;
             }

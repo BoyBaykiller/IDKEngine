@@ -130,16 +130,17 @@ namespace BBOpenGL
                     int versionStatementLineCount = CountLines(result, afterVersionStatement);
                     result = result.Insert(afterVersionStatement,
                         $"""
-                        #extension GL_ARB_bindless_texture : require
-                        #extension GL_EXT_shader_image_load_formatted : require
                         #if {(GLSL_EXTENSION_NAME_LINE_SOURCEFILE != null ? 1 : 0)}
-                            #extension {GLSL_EXTENSION_NAME_LINE_SOURCEFILE} : enable
+                        #extension {GLSL_EXTENSION_NAME_LINE_SOURCEFILE} : enable
                         #endif
 
                         // Keep in sync between shader and client code!
                         #define {ShaderStageShaderInsertion(shaderStage)} 1
                         #define {VendorToShaderInsertion(GetDeviceInfo().Vendor)} 1
                         #line {versionStatementLineCount + 1}
+
+                        #extension GL_ARB_bindless_texture : require
+                        #extension GL_EXT_shader_image_load_formatted : require
 
                         """
                     );
@@ -239,7 +240,7 @@ namespace BBOpenGL
                 private static StringBuilder RemoveUnusedShaderStorageBlocks(string text)
                 {
                     StringBuilder result = new StringBuilder(text.Length);
-                    Regex searchDeclaration = new Regex(@"layout\s*\([^)]*\)\s*(?:\b\w+\b\s*)*buffer\b[\s\S]*?}\s*(\w+)\s*;");
+                    Regex searchDeclaration = new Regex(@"layout\s*\([^)]*\)\s*(?:\b\w+\b\s*)*buffer\b[\s\S]*?}\s*(\w+)\s*;\s*");
                     int numReferencedDeclarations = 0;
 
                     int currentIndex = 0;

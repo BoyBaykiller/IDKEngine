@@ -14,22 +14,22 @@ vec3 GetWorldSpaceDirection(vec2 ndc, int face)
     switch (face)
     {
         case 0:
-            return normalize(vec3(1.0, ndc.y, -ndc.x));
+            return normalize(vec3(-1.0, -ndc.y, ndc.x));
 
         case 1:
-            return normalize(vec3(-1.0, ndc.y, ndc.x));
+            return normalize(vec3(1.0, -ndc.y, -ndc.x));
         
         case 2:
-		    return normalize(vec3(ndc.x, -1.0, ndc.y));
+		    return normalize(vec3(-ndc.x, 1.0, -ndc.y));
 
         case 3:
-		    return normalize(vec3(ndc.x, 1.0, -ndc.y));
+		    return normalize(vec3(-ndc.x, -1.0, ndc.y));
 
         case 4:
-		    return normalize(vec3(ndc, 1.0));
+		    return normalize(vec3(-ndc, -1.0));
 
         case 5:
-            return normalize(vec3(-ndc.x, ndc.y, -1.0));
+            return normalize(vec3(ndc.x, -ndc.y, 1.0));
 
         default:
             return vec3(0.0);

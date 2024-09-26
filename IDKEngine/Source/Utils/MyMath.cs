@@ -152,9 +152,9 @@ namespace IDKEngine.Utils
             uint y = Math.Clamp((uint)(normalizedV.Y * max), 0u, max);
             uint z = Math.Clamp((uint)(normalizedV.Z * max), 0u, max);
 
-            ulong answer = 0;
-            answer |= SplitBy3(x) | SplitBy3(y) << 1 | SplitBy3(z) << 2;
-            return answer;
+            ulong result = 0;
+            result |= SplitBy3(x) | SplitBy3(y) << 1 | SplitBy3(z) << 2;
+            return result;
         }
 
         public static float DegreesToRadians(float degrees)

@@ -6,8 +6,8 @@
     <Platforms>AnyCPU;x64</Platforms>
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
-    <StartupObject></StartupObject>
-    <PublishAOT>true</PublishAOT>
+    <Nullable>disable</Nullable>
+    <!--<PublishAOT>true</PublishAOT>-->
 
     <!-- 
     https://learn.microsoft.com/en-us/dotnet/core/runtime-config/compilation#quick-jit
@@ -18,10 +18,10 @@
     I don't think tiered compilation has any effect when NativeAOT is used since there is no JIT in that case.
     -->
     <TieredCompilation>true</TieredCompilation> <!-- True by default-->
-    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>  <!-- True by default-->
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit> <!-- True by default-->
 
-    <!--<OptimizationPreference>Speed</OptimizationPreference>-->
-    <!--<IlcInstructionSet>native</IlcInstructionSet>--> 
+    <!--<OptimizationPreference>Speed</OptimizationPreference>
+    <IlcInstructionSet>native</IlcInstructionSet>-->
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -51,8 +51,8 @@
     <PackageReference Include="Ktx2.NET" Version="1.0.3" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.5" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
-    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.11" />
-    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.11" />
+    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.12" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.12" />
     <PackageReference Include="ReFuel.StbImage" Version="2.0.1" />
     <PackageReference Include="SharpGLTF.Core" Version="1.0.2" />
     <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.2" />

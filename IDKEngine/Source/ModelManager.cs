@@ -18,47 +18,50 @@ namespace IDKEngine
         {
             public ModelLoader.Node Root => Nodes[0];
             public ModelLoader.Node[] Nodes;
-            public bool IsSkinned;
-
-            // Deduced from the Nodes MeshInstance ranges
-            public Range MeshRange;
 
             public ModelLoader.ModelAnimation[] Animations;
         }
 
         private record struct SkinningCmd
         {
-            public int InputVertexOffset;
-            public int CpuModelId;
+            /// <summary>
+            /// The node with a skin (containing meshes)
+            /// </summary>
+            public ModelLoader.Node SkinnedNode;
+
+            /// <summary>
+            /// The offset into the buffer containing animated vertices for the first mesh from <see cref="SkinnedNode"/>
+            /// </summary>
+            public int VertexOffset;
         }
 
-        public CpuModel[] CpuModels = Array.Empty<CpuModel>();
+        public CpuModel[] CpuModels = [];
         public BVH BVH;
 
-        public BBG.DrawElementsIndirectCommand[] DrawCommands = Array.Empty<BBG.DrawElementsIndirectCommand>();
+        public BBG.DrawElementsIndirectCommand[] DrawCommands = [];
         private BBG.TypedBuffer<BBG.DrawElementsIndirectCommand> drawCommandBuffer;
 
-        public GpuMesh[] Meshes = Array.Empty<GpuMesh>();
+        public GpuMesh[] Meshes = [];
         private BBG.TypedBuffer<GpuMesh> meshesBuffer;
 
         public ReadOnlyArray<GpuMeshInstance> MeshInstances => new ReadOnlyArray<GpuMeshInstance>(meshInstances);
-        private GpuMeshInstance[] meshInstances = Array.Empty<GpuMeshInstance>();
+        private GpuMeshInstance[] meshInstances = [];
         private BBG.TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
         private BitArray meshInstancesDirty;
 
-        public GpuMaterial[] Materials = Array.Empty<GpuMaterial>();
+        public GpuMaterial[] Materials = [];
         private BBG.TypedBuffer<GpuMaterial> materialsBuffer;
 
-        public GpuVertex[] Vertices = Array.Empty<GpuVertex>();
+        public GpuVertex[] Vertices = [];
         private BBG.TypedBuffer<GpuVertex> vertexBuffer;
 
-        public Vector3[] VertexPositions = Array.Empty<Vector3>();
+        public Vector3[] VertexPositions = [];
         private BBG.TypedBuffer<Vector3> vertexPositionsBuffer;
 
-        public uint[] VertexIndices = Array.Empty<uint>();
+        public uint[] VertexIndices = [];
         private BBG.TypedBuffer<uint> vertexIndicesBuffer;
 
-        public Matrix3x4[] JointMatrices = Array.Empty<Matrix3x4>();
+        public Matrix3x4[] JointMatrices = [];
         private BBG.TypedBuffer<Matrix3x4> jointMatricesBuffer;
 
         private BBG.TypedBuffer<Vector3> prevVertexPositionsBuffer;
@@ -155,6 +158,8 @@ namespace IDKEngine
                 ref readonly ModelLoader.GpuModel gpuModel = ref model.GpuModel;
                 CpuModel myModel = ConvertToCpuModel(model);
 
+                Helper.ArrayAdd(ref unskinnedVertices, GetUnskinnedVertices(model));
+
                 // The following data needs to be readjusted when deleting models as it has offsets backed in
 
                 Helper.ArrayAdd(ref jointIndices, gpuModel.JointIndices);
@@ -163,7 +168,6 @@ namespace IDKEngine
                     jointIndices[j] += new Vector4i(JointMatrices.Length);
                 }
 
-                myModel.MeshRange = meshInstances.Length + GetNodesMeshRange(myModel.Nodes, gpuModel.MeshInstances);
                 for (int j = 0; j < myModel.Nodes.Length; j++)
                 {
                     ModelLoader.Node node = myModel.Nodes[j];
@@ -215,11 +219,6 @@ namespace IDKEngine
                 Helper.ArrayAdd(ref meshletsPrimitiveIndices, gpuModel.MeshletsLocalIndices);
                 Helper.ArrayAdd(ref jointWeights, gpuModel.JointWeights);
                 Array.Resize(ref JointMatrices, JointMatrices.Length + model.GetNumJoints());
-                
-                if (myModel.IsSkinned)
-                {
-                    Helper.ArrayAdd(ref unskinnedVertices, GetUnskinnedVertices(gpuModel.VertexPositions, gpuModel.Vertices));
-                }
             }
 
             {
@@ -244,7 +243,7 @@ namespace IDKEngine
                     Meshes[i].BlasRootNodeOffset = BVH.BlasesDesc[i].RootNodeOffset;
                 }
             }
-            
+
             skinningCmds = GetSkinningCommands();
             meshInstancesDirty = new BitArray(meshInstances.Length, true);
 
@@ -296,16 +295,14 @@ namespace IDKEngine
 
             ComputeSkinnedPositions(anyAnimatedNodeMoved);
 
-            // Only need to update BLAS was animated, could use more granular per model bool here
+            // Only need to update BLAS when node was animated, could use more granular check
             if (anyAnimatedNodeMoved)
             {
-                for (int i = 0; i < CpuModels.Length; i++)
+                for (int i = 0; i < skinningCmds.Length; i++)
                 {
-                    ref readonly CpuModel model = ref CpuModels[i];
-                    if (model.IsSkinned)
-                    {
-                        BVH.GpuBlasesRefit(model.MeshRange.Start, model.MeshRange.Count);
-                    }
+                    ref readonly SkinningCmd cmd = ref skinningCmds[i];
+                    Range meshRange = GetNodeMeshRange(cmd.SkinnedNode);
+                    BVH.GpuBlasesRefit(meshRange.Start, meshRange.Count);
                 }
             }
 
@@ -321,27 +318,15 @@ namespace IDKEngine
             if (anyAnimatedNodeMoved)
             {
                 int jointsProcessed = 0;
-                for (int i = 0; i < CpuModels.Length; i++)
+                for (int i = 0; i < skinningCmds.Length; i++)
                 {
-                    ref readonly CpuModel cpuModel = ref CpuModels[i];
-                    if (!cpuModel.IsSkinned)
-                    {
-                        continue;
-                    }
+                    ref readonly SkinningCmd skinningCmd = ref skinningCmds[i];
+                    ref readonly ModelLoader.Skin skin = ref skinningCmd.SkinnedNode.Skin;
 
-                    for (int j = 0; j < cpuModel.Nodes.Length; j++)
+                    Matrix4 inverseNodeTransform = Matrix4.Invert(skinningCmd.SkinnedNode.GlobalTransform);
+                    for (int j = 0; j < skin.Joints.Length; j++)
                     {
-                        ModelLoader.Node node = cpuModel.Nodes[j];
-                        if (node.HasSkin)
-                        {
-                            Matrix4 inverseNodeTransform = Matrix4.Invert(node.GlobalTransform);
-
-                            ref readonly ModelLoader.Skin skin = ref node.Skin;
-                            for (int k = 0; k < skin.Joints.Length; k++)
-                            {
-                                JointMatrices[jointsProcessed++] = MyMath.Matrix4x4ToTranposed3x4(skin.InverseJointMatrices[k] * skin.Joints[k].GlobalTransform * inverseNodeTransform);
-                            }
-                        }
+                        JointMatrices[jointsProcessed++] = MyMath.Matrix4x4ToTranposed3x4(skin.InverseJointMatrices[j] * skin.Joints[j].GlobalTransform * inverseNodeTransform);
                     }
                 }
                 jointMatricesBuffer.UploadElements(JointMatrices);
@@ -356,27 +341,33 @@ namespace IDKEngine
                 ThreadPool.SetMinThreads(threadPoolThreads, 1);
                 ThreadPool.SetMaxThreads(threadPoolThreads, 1);
 
-                Task[] tasks = new Task[skinningCmds.Sum(it => CpuModels[it.CpuModelId].MeshRange.Count)];
+                Task[] tasks = new Task[skinningCmds.Sum(it => GetNodeMeshRange(it.SkinnedNode).Count)];
                 int taskCounter = 0;
                 for (int i = 0; i < skinningCmds.Length; i++)
                 {
-                    SkinningCmd cmd = skinningCmds[i];
+                    SkinningCmd skinningCmd = skinningCmds[i];
+                    Range meshRange = GetNodeMeshRange(skinningCmd.SkinnedNode);
 
-                    Range meshRange = CpuModels[cmd.CpuModelId].MeshRange;
-                    int vertexCount = GetMeshesVertexCount(meshRange.Start, meshRange.Count);
-                    int outputVertexOffset = DrawCommands[meshRange.Start].BaseVertex;
-
-                    fixed (Vector3* dest = VertexPositions)
-                    {
-                        Memory.CopyElements(skinnedVertexPositionsHostBuffer.MappedMemory + cmd.InputVertexOffset, dest + outputVertexOffset, vertexCount);
-                    }
-
+                    int firstBaseVertex = DrawCommands[meshRange.Start].BaseVertex;
                     for (int j = meshRange.Start; j < meshRange.End; j++)
                     {
                         BVH.BlasDesc blasDesc = BVH.BlasesDesc[j];
 
+                        int baseVertex = DrawCommands[j].BaseVertex;
+                        int vertexCount = GetMeshesVertexCount(j);
+                        int localSkinningVertexOffset = baseVertex - firstBaseVertex;
+
                         tasks[taskCounter++] = Task.Run(() =>
                         {
+                            fixed (Vector3* ptrAllVertexPositions = VertexPositions)
+                            {
+                                Memory.CopyElements(
+                                    src: &skinnedVertexPositionsHostBuffer.Memory[skinningCmd.VertexOffset + localSkinningVertexOffset],
+                                    dest: &ptrAllVertexPositions[baseVertex],
+                                    numElements: vertexCount
+                                );
+                            }
+
                             BVH.CpuBlasRefit(blasDesc);
                         });
                     }
@@ -396,26 +387,27 @@ namespace IDKEngine
             {
                 for (int i = 0; i < skinningCmds.Length; i++)
                 {
-                    SkinningCmd cmd = skinningCmds[i];
+                    SkinningCmd skinningCmd = skinningCmds[i];
+                    Range meshRange = GetNodeMeshRange(skinningCmd.SkinnedNode);
 
-                    Range meshRange = CpuModels[cmd.CpuModelId].MeshRange;
-                    int vertexCount = GetMeshesVertexCount(meshRange.Start, meshRange.Count);
                     int outputVertexOffset = DrawCommands[meshRange.Start].BaseVertex;
+                    int vertexCount = GetMeshesVertexCount(meshRange.Start, meshRange.Count);
 
                     BBG.Computing.Compute("Compute Skinned vertices", () =>
                     {
-                        skinningShaderProgram.Upload(0, (uint)cmd.InputVertexOffset);
+                        skinningShaderProgram.Upload(0, (uint)skinningCmd.VertexOffset);
                         skinningShaderProgram.Upload(1, (uint)outputVertexOffset);
                         skinningShaderProgram.Upload(2, (uint)vertexCount);
 
                         BBG.Cmd.UseShaderProgram(skinningShaderProgram);
                         BBG.Computing.Dispatch((vertexCount + 64 - 1) / 64, 1, 1);
                     });
-                    vertexPositionsBuffer.CopyElementsTo(skinnedVertexPositionsHostBuffer, outputVertexOffset, cmd.InputVertexOffset, vertexCount);
+                    vertexPositionsBuffer.CopyElementsTo(skinnedVertexPositionsHostBuffer, outputVertexOffset, skinningCmd.VertexOffset, vertexCount);
                 }
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit);
 
-                fenceCopiedSkinnedVerticesToHost = new BBG.Fence();
+                // When signaled all skinned vertices have been computed and copied into the host buffer
+                fenceCopiedSkinnedVerticesToHost = BBG.Fence.InsertIntoCommandStream();
 
                 if (!anyAnimatedNodeMoved)
                 {
@@ -431,32 +423,6 @@ namespace IDKEngine
             meshInstancesDirty[index] = true;
         }
 
-        public void UpdateVertexPositionBuffer(int start, int count)
-        {
-            vertexPositionsBuffer.UploadElements(start, count, VertexPositions[start]);
-        }
-
-        public void UpdateMeshBuffer(int start, int count)
-        {
-            if (count == 0) return;
-            meshesBuffer.UploadElements(start, count, Meshes[start]);
-        }
-
-        public void UpdateDrawCommandBuffer(int start, int count)
-        {
-            if (count == 0) return;
-            drawCommandBuffer.UploadElements(start, count, DrawCommands[start]);
-        }
-
-        public void UpdateMeshInstanceBuffer(int start, int count)
-        {
-            meshInstanceBuffer.UploadElements(start, count, meshInstances[start]);
-            for (int i = 0; i < count; i++)
-            {
-                meshInstancesDirty[start + i] = false;
-            }
-        }
-
         public void ResetInstanceCounts(int count = 0)
         {
             // for vertex rendering path
@@ -464,7 +430,7 @@ namespace IDKEngine
             {
                 DrawCommands[i].InstanceCount = count;
             }
-            UpdateDrawCommandBuffer(0, DrawCommands.Length);
+            UploadDrawCommandBuffer(0, DrawCommands.Length);
             for (int i = 0; i < DrawCommands.Length; i++)
             {
                 ref readonly GpuMesh mesh = ref Meshes[i];
@@ -477,9 +443,38 @@ namespace IDKEngine
 
         public int GetMeshesVertexCount(int startMesh, int count = 1)
         {
-            int baseVertex = DrawCommands[startMesh].BaseVertex;
-            int nextBaseVertex = startMesh + count == DrawCommands.Length ? VertexPositions.Length : DrawCommands[startMesh + count].BaseVertex;
-            return nextBaseVertex - baseVertex;
+            return GetMeshesVertexCount(DrawCommands, VertexPositions, startMesh, count);
+        }
+
+        public void UploadVertexPositionBuffer(int start, int count)
+        {
+            vertexPositionsBuffer.UploadElements(start, count, VertexPositions[start]);
+        }
+
+        public void UploadMeshBuffer(int start, int count)
+        {
+            if (count == 0) return;
+            meshesBuffer.UploadElements(start, count, Meshes[start]);
+        }
+
+        public void UploadDrawCommandBuffer(int start, int count)
+        {
+            if (count == 0) return;
+            drawCommandBuffer.UploadElements(start, count, DrawCommands[start]);
+        }
+
+        public void UploadMeshInstanceBuffer(int start, int count)
+        {
+            meshInstanceBuffer.UploadElements(start, count, meshInstances[start]);
+            for (int i = 0; i < count; i++)
+            {
+                meshInstancesDirty[start + i] = false;
+            }
+        }
+
+        public Range GetNodeMeshRange(ModelLoader.Node node)
+        {
+            return GetNodeMeshRange(node, meshInstances);
         }
 
         private void UpdateMeshInstanceBufferBatched(out bool anyMeshInstanceMoved)
@@ -497,7 +492,7 @@ namespace IDKEngine
                     int batchStart = i;
                     int batchEnd = Math.Min(MyMath.NextMultiple(i, batchedUploadSize), end);
 
-                    UpdateMeshInstanceBuffer(batchStart, batchEnd - batchStart);
+                    UploadMeshInstanceBuffer(batchStart, batchEnd - batchStart);
                     for (int j = batchStart; j < batchEnd; j++)
                     {
                         if (meshInstances[j].DidMove())
@@ -536,7 +531,7 @@ namespace IDKEngine
                             Transformation transformDiff = Transformation.FromMatrix(meshInstance.ModelMatrix) - nodeTransformBefore;
                             Transformation adjustedTransform = nodeTransformAfter + transformDiff;
 
-                            meshInstance.ModelMatrix = adjustedTransform.Matrix;
+                            meshInstance.ModelMatrix = adjustedTransform.GetMatrix();
                             SetMeshInstance(j, meshInstance);
                         }
                     }
@@ -623,31 +618,43 @@ namespace IDKEngine
 
         private SkinningCmd[] GetSkinningCommands()
         {
-            int totalSkinningCmds = CpuModels.Sum(model => model.IsSkinned ? 1 : 0);
-
-            SkinningCmd[] skinningCmds = new SkinningCmd[totalSkinningCmds];
-
-            int cmdsCount = 0;
-            int unskinnedVerticesCount = 0;
-
+            int totalSkinningCmds = 0;
             for (int i = 0; i < CpuModels.Length; i++)
             {
                 ref readonly CpuModel cpuModel = ref CpuModels[i];
-                if (!cpuModel.IsSkinned)
+                for (int j = 0; j < cpuModel.Nodes.Length; j++)
                 {
-                    continue;
+                    ModelLoader.Node node = cpuModel.Nodes[j];
+                    if (node.HasSkin)
+                    {
+                        totalSkinningCmds++;
+                    }
                 }
-
-                SkinningCmd skinningCmd = new SkinningCmd();
-                skinningCmd.InputVertexOffset = unskinnedVerticesCount;
-                skinningCmd.CpuModelId = i;
-
-                skinningCmds[cmdsCount++] = skinningCmd;
-
-                int vertexCount = GetMeshesVertexCount(cpuModel.MeshRange.Start, cpuModel.MeshRange.Count);
-                unskinnedVerticesCount += vertexCount;
             }
-            Array.Resize(ref skinningCmds, cmdsCount);
+
+            SkinningCmd[] skinningCmds = new SkinningCmd[totalSkinningCmds];
+            int cmdsCount = 0;
+            int unskinnedVerticesCount = 0;
+            for (int i = 0; i < CpuModels.Length; i++)
+            {
+                ref readonly CpuModel model = ref CpuModels[i];
+                for (int j = 0; j < model.Nodes.Length; j++)
+                {
+                    ModelLoader.Node node = model.Nodes[j];
+                    if (node.HasSkin)
+                    {
+                        SkinningCmd skinningCmd = new SkinningCmd();
+                        skinningCmd.VertexOffset = unskinnedVerticesCount;
+                        skinningCmd.SkinnedNode = node;
+
+                        skinningCmds[cmdsCount++] = skinningCmd;
+                        Range meshRange = GetNodeMeshRange(node, meshInstances);
+
+                        int vertexCount = GetMeshesVertexCount(meshRange.Start, meshRange.Count);
+                        unskinnedVerticesCount += vertexCount;
+                    }
+                }
+            }
 
             return skinningCmds;
         }
@@ -687,15 +694,6 @@ namespace IDKEngine
             newCpuModel.Nodes = new ModelLoader.Node[model.Nodes.Length];
             model.RootNode.DeepClone(newCpuModel.Nodes, model.Nodes);
 
-            for (int i = 0; i < newCpuModel.Nodes.Length; i++)
-            {
-                if (newCpuModel.Nodes[i].HasSkin)
-                {
-                    newCpuModel.IsSkinned = true;
-                    break;
-                }
-            }
-
             newCpuModel.Animations = new ModelLoader.ModelAnimation[model.Animations.Length];
             for (int i = 0; i < newCpuModel.Animations.Length; i++)
             {
@@ -706,43 +704,69 @@ namespace IDKEngine
             return newCpuModel;
         }
 
-        private static GpuUnskinnedVertex[] GetUnskinnedVertices(ReadOnlySpan<Vector3> vertexPositions, ReadOnlySpan<GpuVertex> vertices)
+        private static GpuUnskinnedVertex[] GetUnskinnedVertices(in ModelLoader.Model model)
         {
-            GpuUnskinnedVertex[] unskinnedVertices = new GpuUnskinnedVertex[vertexPositions.Length];
-
-            for (int i = 0; i < unskinnedVertices.Length; i++)
+            int totalUnskinnedVertices = 0;
+            for (int i = 0; i < model.Nodes.Length; i++)
             {
-                ref readonly GpuVertex vertex = ref vertices[i];
-                ref readonly Vector3 vertexPos = ref vertexPositions[i];
+                ModelLoader.Node node = model.Nodes[i];
+                if (node.HasSkin)
+                {
+                    Range meshRange = GetNodeMeshRange(node, model.GpuModel.MeshInstances);
+                    int vertexCount = GetMeshesVertexCount(model.GpuModel.DrawCommands, model.GpuModel.VertexPositions, meshRange.Start, meshRange.Count);
+                    totalUnskinnedVertices += vertexCount;
+                }
+            }
+            
+            GpuUnskinnedVertex[] unskinnedVertices = new GpuUnskinnedVertex[totalUnskinnedVertices];
+            int unskinnedVerticesCount = 0;
+            for (int i = 0; i < model.Nodes.Length; i++)
+            {
+                ModelLoader.Node node = model.Nodes[i];
+                if (node.HasSkin)
+                {
+                    Range meshRange = GetNodeMeshRange(node, model.GpuModel.MeshInstances);
+                    int startVertex = model.GpuModel.DrawCommands[node.MeshInstanceIds.Start].BaseVertex;
+                    int vertexCount = GetMeshesVertexCount(model.GpuModel.DrawCommands, model.GpuModel.VertexPositions, meshRange.Start, meshRange.Count);
 
-                GpuUnskinnedVertex unskinnedVertex = new GpuUnskinnedVertex();
-                unskinnedVertex.Position = vertexPos;
-                unskinnedVertex.Tangent = vertex.Tangent;
-                unskinnedVertex.Normal = vertex.Normal;
+                    ReadOnlySpan<Vector3> vertexPositions = new ReadOnlySpan<Vector3>(model.GpuModel.VertexPositions, startVertex, vertexCount);
+                    ReadOnlySpan<GpuVertex> vertices = new ReadOnlySpan<GpuVertex>(model.GpuModel.Vertices, startVertex, vertexCount);
+                    
+                    for (int j = 0; j < vertexPositions.Length; j++)
+                    {
+                        ref readonly GpuVertex vertex = ref vertices[j];
+                        ref readonly Vector3 vertexPos = ref vertexPositions[j];
 
-                unskinnedVertices[i] = unskinnedVertex;
+                        GpuUnskinnedVertex unskinnedVertex = new GpuUnskinnedVertex();
+                        unskinnedVertex.Position = vertexPos;
+                        unskinnedVertex.Tangent = vertex.Tangent;
+                        unskinnedVertex.Normal = vertex.Normal;
+
+                        unskinnedVertices[unskinnedVerticesCount++] = unskinnedVertex;
+                    }
+                }
             }
 
             return unskinnedVertices;
         }
 
-        private static Range GetNodesMeshRange(ReadOnlySpan<ModelLoader.Node> nodes, ReadOnlySpan<GpuMeshInstance> meshInstances)
+        private static Range GetNodeMeshRange(ModelLoader.Node node, ReadOnlySpan<GpuMeshInstance> meshInstances)
         {
-            int min = int.MaxValue;
-            int max = int.MinValue;
-            for (int i = 0; i < nodes.Length; i++)
+            if (!node.HasMeshInstances)
             {
-                ModelLoader.Node node = nodes[i];
-                if (node.HasMeshInstances)
-                {
-                    ref readonly GpuMeshInstance first = ref meshInstances[node.MeshInstanceIds.Start];
-                    ref readonly GpuMeshInstance last = ref meshInstances[node.MeshInstanceIds.End - 1];
-                    min = Math.Min(min, first.MeshId);
-                    max = Math.Max(max, last.MeshId);
-                }
+                return new Range(0, 0);
             }
 
-            return new Range(min, (max - min) + 1);
+            ref readonly GpuMeshInstance first = ref meshInstances[node.MeshInstanceIds.Start];
+            ref readonly GpuMeshInstance last = ref meshInstances[node.MeshInstanceIds.End - 1];
+            return new Range(first.MeshId, (last.MeshId - first.MeshId) + 1);
+        }
+
+        private static int GetMeshesVertexCount(ReadOnlySpan<BBG.DrawElementsIndirectCommand> drawCmds, ReadOnlySpan<Vector3> vertexPositions, int startMesh, int count = 1)
+        {
+            int baseVertex = drawCmds[startMesh].BaseVertex;
+            int nextBaseVertex = startMesh + count == drawCmds.Length ? vertexPositions.Length : drawCmds[startMesh + count].BaseVertex;
+            return nextBaseVertex - baseVertex;
         }
     }
 }

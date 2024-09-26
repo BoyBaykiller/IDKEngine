@@ -43,9 +43,8 @@ namespace BBOpenGL
 
                 R8G8B8A8Unorm = SizedInternalFormat.Rgba8,
                 R8G8B8A8Snorm = SizedInternalFormat.Rgba8Snorm,
-                R8G8B8A8Srgb = SizedInternalFormat.Srgb8Alpha8,
+                R8G8B8A8SRgb = SizedInternalFormat.Srgb8Alpha8,
 
-                R8G8B8SRgba = SizedInternalFormat.Srgb8,
                 R16G16B16A16Float = SizedInternalFormat.Rgba16f,
                 R32G32B32A32Float = SizedInternalFormat.Rgba32f,
 
@@ -349,7 +348,7 @@ namespace BBOpenGL
                 }
                 bindlessImageHandles = null;
 
-                GL.DeleteTexture(ID);
+                GL.DeleteTextures(1, in ID);
             }
 
             public static int GetMaxMipmapLevel(int width, int height, int depth)

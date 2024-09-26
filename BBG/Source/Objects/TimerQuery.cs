@@ -7,7 +7,7 @@ namespace BBOpenGL
         public class TimerQuery : IDisposable
         {
             public float MeasuredMilliseconds { get; private set; }
-            public int ID;
+            public readonly int ID;
             public TimerQuery()
             {
                 GL.CreateQueries(QueryTarget.TimeElapsed, 1, ref ID);
@@ -36,7 +36,7 @@ namespace BBOpenGL
 
             public void Dispose()
             {
-                GL.DeleteQuery(ID);
+                GL.DeleteQueries(1, in ID);
             }
         }
     }

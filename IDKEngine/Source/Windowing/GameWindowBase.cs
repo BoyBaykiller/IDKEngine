@@ -160,7 +160,7 @@ namespace IDKEngine.Windowing
             {
                 // Make window black (calling SwapBuffers here irritates diagnostic tools like renderdoc)
                 Vector4 clearColor = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
-                OpenTK.Graphics.OpenGL.GL.ClearNamedFramebufferf(0, OpenTK.Graphics.OpenGL.Buffer.Color, 0, clearColor.X);
+                OpenTK.Graphics.OpenGL.GL.ClearNamedFramebufferf(0, OpenTK.Graphics.OpenGL.Buffer.Color, 0, ref clearColor.X);
                 GLFW.SwapBuffers(window);
             }
         }

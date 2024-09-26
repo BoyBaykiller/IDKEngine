@@ -44,13 +44,14 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public static void Optimize(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles, in Settings settings)
+        public static void Optimize(ref BLAS.BuildResult blas, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles, in Settings settings)
         {
-            if (nodes.Length <= 3)
+            if (blas.Nodes.Length <= 3)
             {
                 return;
             }
-            new ReinsertionOptimizer(nodes, parentIds, triangles).Optimize(settings);
+            new ReinsertionOptimizer(blas.Nodes, parentIds, triangles).Optimize(settings);
+            blas.MaxTreeDepth = BLAS.ComputeTreeDepth(blas);
         }
 
         private readonly Span<GpuBlasNode> nodes;
@@ -131,7 +132,7 @@ namespace IDKEngine.Bvh
         private Span<Candidate> PopulateCandidates(Span<Candidate> candidates, float percentage)
         {
             int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
-            if (count == 0) return Array.Empty<Candidate>();
+            if (count == 0) return [];
 
             for (int i = 1; i < candidates.Length + 1; i++)
             {

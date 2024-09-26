@@ -17,8 +17,7 @@ struct Surface
     float Transmission;
     float IOR;
     
-    float AlphaCutoff; // Only used if DoAlphaBlending=false
-    bool DoAlphaBlending;
+    float AlphaCutoff;
 };
 
 Surface GetDefaultSurface()
@@ -35,10 +34,9 @@ Surface GetDefaultSurface()
     surface.Metallic = 0.0;
     surface.Roughness = 0.0;
     surface.Transmission = 0.0;
-    surface.IOR = 1.0;
+    surface.IOR = 1.5;
 
     surface.AlphaCutoff = 0.5;
-    surface.DoAlphaBlending = false;
     
     return surface;
 }
@@ -68,7 +66,6 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv, float baseColorLodBias)
     surface.Transmission = texture(gpuMaterial.Transmission, uv).r * gpuMaterial.TransmissionFactor;
     surface.IOR = gpuMaterial.IOR;
 
-    surface.DoAlphaBlending = gpuMaterial.DoAlphaBlending;
     surface.AlphaCutoff = gpuMaterial.AlphaCutoff;
 
     return surface;
@@ -89,4 +86,9 @@ void SurfaceApplyModificatons(inout Surface surface, GpuMesh mesh)
     surface.Roughness = clamp(surface.Roughness + mesh.RoughnessBias, 0.0, 1.0);
     surface.Transmission = clamp(surface.Transmission + mesh.TransmissionBias, 0.0, 1.0);
     surface.IOR = max(surface.IOR + mesh.IORBias, 1.0);
+}
+
+bool SurfaceIsAlphaBlending(Surface surface)
+{
+    return surface.AlphaCutoff == 2.0; 
 }

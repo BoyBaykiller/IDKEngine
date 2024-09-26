@@ -30,7 +30,9 @@ void main()
     Surface surface = GetSurface(material, inData.TexCoord, taaDataUBO.MipmapBias);
     SurfaceApplyModificatons(surface, mesh);
 
-    if (surface.Alpha < material.AlphaCutoff)
+    // We dont support alpha blending yet
+    float alphaCutoff = SurfaceIsAlphaBlending(surface) ? 0.0 : surface.AlphaCutoff;
+    if (surface.Alpha < alphaCutoff)
     {
         discard;
     }

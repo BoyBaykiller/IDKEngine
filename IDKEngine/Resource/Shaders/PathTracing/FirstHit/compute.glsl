@@ -122,8 +122,9 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
 
             surface = GetSurface(material, interpTexCoord);
+            SurfaceApplyModificatons(surface, mesh);
 
-            float alphaCutoff = surface.DoAlphaBlending ? GetRandomFloat01() : surface.AlphaCutoff;
+            float alphaCutoff = SurfaceIsAlphaBlending(surface) ? GetRandomFloat01() : surface.AlphaCutoff;
             if (surface.Alpha < alphaCutoff)
             {
                 wavefrontRay.Origin += rayDir * 0.001;
@@ -138,8 +139,6 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface.Normal = normalize(mix(worldNormal, surface.Normal, mesh.NormalMapStrength));
 
             vertexNormal = worldNormal;
-
-            SurfaceApplyModificatons(surface, mesh);
         }
         else if (settingsUBO.IsTraceLights)
         {

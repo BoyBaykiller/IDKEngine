@@ -1,7 +1,7 @@
-﻿using IDKEngine.Shapes;
-using IDKEngine.Bvh;
+﻿using IDKEngine.Bvh;
+using IDKEngine.GpuTypes;
 
-namespace IDKEngine.GpuTypes
+namespace IDKEngine.Shapes
 {
     public static class Conversions
     {

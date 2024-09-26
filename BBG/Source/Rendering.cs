@@ -244,7 +244,7 @@ namespace BBOpenGL
 
             public record struct GraphicsPipelineState
             {
-                public Capability[] EnabledCapabilities = Array.Empty<Capability>();
+                public Capability[] EnabledCapabilities = [];
 
                 public DepthFunction DepthFunction = DepthFunction.Less;
                 public TriangleFace CullFace = TriangleFace.Back;
@@ -310,7 +310,7 @@ namespace BBOpenGL
 
                             case AttachmentLoadOp.DontCare:
                                 FramebufferAttachment framebufferAttachment = FramebufferAttachment.ColorAttachment0 + (uint)i;
-                                GL.InvalidateNamedFramebufferData(fbo, 1, framebufferAttachment);
+                                GL.InvalidateNamedFramebufferData(fbo, 1, ref framebufferAttachment);
                                 break;
                         }
 
@@ -347,7 +347,8 @@ namespace BBOpenGL
 
                         case AttachmentLoadOp.DontCare:
                             FramebufferAttachment attachment = FormatTypeToFboAttachment(formatType);
-                            GL.InvalidateNamedFramebufferData(fbo, 1, attachment);
+                            GL.InvalidateNamedFramebufferData(fbo, 1, ref attachment);
+
                             break;
                     }
 
@@ -367,7 +368,7 @@ namespace BBOpenGL
             {
                 Debugging.PushDebugGroup(renderPassName);
 
-                GL.DeleteFramebuffer(fboNoAttachmentsGLHandle);
+                GL.DeleteFramebuffers(1, ref fboNoAttachmentsGLHandle);
                 GL.CreateFramebuffers(1, ref fboNoAttachmentsGLHandle);
 
                 GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
@@ -394,7 +395,7 @@ namespace BBOpenGL
 
             public static void SetVertexInputAssembly(in VertexInputAssembly vertexInputAssembly)
             {
-                GL.DeleteVertexArray(vaoGLHandle);
+                GL.DeleteVertexArrays(1, ref vaoGLHandle);
                 GL.CreateVertexArrays(1, ref vaoGLHandle);
 
                 GL.VertexArrayElementBuffer(vaoGLHandle, vertexInputAssembly.IndexBuffer.ID);
@@ -483,7 +484,7 @@ namespace BBOpenGL
                     }
                 }
 
-                GL.ViewportArray(0, viewports.Length, data[0].X);
+                GL.ViewportArray(0, viewports.Length, ref data[0].X);
             }
 
             public static Capability CapIf(bool val, Capability cap)
