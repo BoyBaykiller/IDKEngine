@@ -22,7 +22,6 @@ layout(std140, binding = 7) uniform SettingsUBO
     float LenseRadius;
     bool IsDebugBVHTraversal;
     bool IsTraceLights;
-    bool TintOnTransmissiveRay;
 } settingsUBO;
 
 vec3 TurboColormap(float x);

@@ -17,9 +17,11 @@ namespace IDKEngine
         public record struct CpuModel
         {
             public ModelLoader.Node Root => Nodes[0];
-            public ModelLoader.Node[] Nodes;
+            public string Name => Root.Name;
 
+            public ModelLoader.Node[] Nodes;
             public ModelLoader.ModelAnimation[] Animations;
+            public BitArray EnabledAnimations;
         }
 
         private record struct SkinningCmd
@@ -72,7 +74,7 @@ namespace IDKEngine
         private BBG.TypedBuffer<uint> meshletsVertexIndicesBuffer;
         private BBG.TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
         private BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV> meshletTasksCmdsBuffer;
-        private BBG.TypedBuffer<int> meshletTasksCountBuffer;
+        private readonly BBG.TypedBuffer<int> meshletTasksCountBuffer;
 
         private BBG.TypedBuffer<Vector4i> jointIndicesBuffer;
         private BBG.TypedBuffer<Vector4> jointWeightsBuffer;
@@ -87,7 +89,7 @@ namespace IDKEngine
         private bool runSkinningShader;
         private float prevAnimationTime = float.MinValue;
 
-        public ModelManager()
+        public unsafe ModelManager()
         {
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
             meshesBuffer = new BBG.TypedBuffer<GpuMesh>();
@@ -128,6 +130,8 @@ namespace IDKEngine
             jointMatricesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 15);
             unskinnedVerticesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 16);
             prevVertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 17);
+
+            meshletTasksCountBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             BVH = new BVH();
 
@@ -265,7 +269,6 @@ namespace IDKEngine
             BBG.Buffer.Recreate(ref unskinnedVerticesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, unskinnedVertices);
             BBG.Buffer.Recreate(ref visibleMeshInstancesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
             BBG.Buffer.Recreate(ref meshletTasksCmdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
-            BBG.Buffer.Recreate(ref meshletTasksCountBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
             BBG.Buffer.Recreate(ref prevVertexPositionsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, VertexPositions);
         }
 
@@ -287,16 +290,15 @@ namespace IDKEngine
             BBG.Rendering.MultiDrawMeshletsCountNV(meshletTasksCmdsBuffer, meshletTasksCountBuffer, maxMeshlets, sizeof(BBG.DrawMeshTasksIndirectCommandNV));
         }
 
-        public void Update(float animationsTime, out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved)
+        public void Update(float animationsTime, out bool anyNodeMoved, out bool anyMeshInstanceMoved)
         {
-            UpdateNodeAnimations(animationsTime, out anyAnimatedNodeMoved);
-            UpdateNodeHierarchy();
+            UpdateNodeAnimations(animationsTime);
+            UpdateNodeHierarchy(out anyNodeMoved);
             UpdateMeshInstanceBufferBatched(out anyMeshInstanceMoved);
-
-            ComputeSkinnedPositions(anyAnimatedNodeMoved);
+            ComputeSkinnedPositions(anyNodeMoved);
 
             // Only need to update BLAS when node was animated, could use more granular check
-            if (anyAnimatedNodeMoved)
+            if (anyNodeMoved)
             {
                 for (int i = 0; i < skinningCmds.Length; i++)
                 {
@@ -307,7 +309,7 @@ namespace IDKEngine
             }
 
             // Only need to update TLAS if a BLAS was moved or animated
-            if (anyMeshInstanceMoved || anyAnimatedNodeMoved)
+            if (anyMeshInstanceMoved || anyNodeMoved)
             {
                 BVH.TlasBuild();
             }
@@ -457,6 +459,12 @@ namespace IDKEngine
             meshesBuffer.UploadElements(start, count, Meshes[start]);
         }
 
+        public void UploadMaterialBuffer(int start, int count)
+        {
+            if (count == 0) return;
+            materialsBuffer.UploadElements(start, count, Materials[start]);
+        }
+
         public void UploadDrawCommandBuffer(int start, int count)
         {
             if (count == 0) return;
@@ -512,13 +520,16 @@ namespace IDKEngine
             }
         }
 
-        private void UpdateNodeHierarchy()
+        private void UpdateNodeHierarchy(out bool anyNodeMoved)
         {
+            bool anyNodeMovedCopy = false;
             for (int i = 0; i < CpuModels.Length; i++)
             {
                 ref readonly CpuModel cpuModel = ref CpuModels[i];
                 ModelLoader.Node.TraverseUpdate(cpuModel.Root, (ModelLoader.Node node) =>
                 {
+                    anyNodeMovedCopy = true;
+
                     Transformation nodeTransformBefore = Transformation.FromMatrix(node.GlobalTransform);
                     node.UpdateGlobalTransform();
 
@@ -537,11 +548,12 @@ namespace IDKEngine
                     }
                 });
             }
+
+            anyNodeMoved = anyNodeMovedCopy;
         }
 
-        private void UpdateNodeAnimations(float time, out bool anyAnimatedNodeMoved)
+        private void UpdateNodeAnimations(float time)
         {
-            anyAnimatedNodeMoved = false;
             if (time == prevAnimationTime)
             {
                 return;
@@ -553,6 +565,11 @@ namespace IDKEngine
                 ref readonly CpuModel cpuModel = ref CpuModels[i];
                 for (int j = 0; j < cpuModel.Animations.Length; j++)
                 {
+                    if (!cpuModel.EnabledAnimations[j])
+                    {
+                        continue;
+                    }
+
                     ref readonly ModelLoader.ModelAnimation modelAnimation = ref cpuModel.Animations[j];
                     float animationTime = time % modelAnimation.Duration;
 
@@ -608,9 +625,8 @@ namespace IDKEngine
                             Quaternion result = Quaternion.Slerp(prev, next, alpha);
                             newTransformation.Rotation = result;
                         }
-                        nodeAnimation.TargetNode.LocalTransform = newTransformation;
 
-                        anyAnimatedNodeMoved = true;
+                        nodeAnimation.TargetNode.LocalTransform = newTransformation;
                     }
                 }
             }
@@ -700,6 +716,8 @@ namespace IDKEngine
                 ref readonly ModelLoader.ModelAnimation oldAnimation = ref model.Animations[i];
                 newCpuModel.Animations[i] = oldAnimation.DeepClone(newCpuModel.Nodes);
             }
+
+            newCpuModel.EnabledAnimations = new BitArray(newCpuModel.Animations.Length, true);
 
             return newCpuModel;
         }

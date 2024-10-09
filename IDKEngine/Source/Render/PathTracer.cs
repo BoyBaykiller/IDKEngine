@@ -88,17 +88,6 @@ namespace IDKEngine.Render
                 ResetAccumulation();
             }
         }
-        
-        public bool TintOnTransmissiveRay
-        {
-            get => gpuSettings.TintOnTransmissiveRay == 1;
-
-            set
-            {
-                gpuSettings.TintOnTransmissiveRay = value ? 1 : 0;
-                ResetAccumulation();
-            }
-        }
 
         public record struct GpuSettings
         {
@@ -106,7 +95,6 @@ namespace IDKEngine.Render
             public float LenseRadius;
             public int IsDebugBVHTraversal;
             public int IsTraceLights;
-            public int TintOnTransmissiveRay;
 
             public static GpuSettings Default = new GpuSettings()
             {
@@ -114,7 +102,6 @@ namespace IDKEngine.Render
                 LenseRadius = 0.01f,
                 IsDebugBVHTraversal = 0,
                 IsTraceLights = 0,
-                TintOnTransmissiveRay = 0
             };
         }
 

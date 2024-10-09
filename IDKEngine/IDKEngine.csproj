@@ -18,7 +18,7 @@
     I don't think tiered compilation has any effect when NativeAOT is used since there is no JIT in that case.
     -->
     <TieredCompilation>true</TieredCompilation> <!-- True by default-->
-    <TieredCompilationQuickJit>true</TieredCompilationQuickJit> <!-- True by default-->
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
 
     <!--<OptimizationPreference>Speed</OptimizationPreference>
     <IlcInstructionSet>native</IlcInstructionSet>-->

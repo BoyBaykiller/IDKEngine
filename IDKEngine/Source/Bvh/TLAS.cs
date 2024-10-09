@@ -236,7 +236,7 @@ namespace IDKEngine.Bvh
                         hitInfo.TriangleIndices = leafNodeTriangle;
                         hitInfo.InstanceID = instanceID;
 
-                        intersectFunc(hitInfo);
+                        return intersectFunc(hitInfo);
                     });
 
                     if (stackPtr == 0) break;

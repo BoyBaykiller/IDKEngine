@@ -169,7 +169,7 @@ namespace IDKEngine.Windowing
         {
             OnStart();
 
-            float maxDt = 1.0f / 30.0f;
+            float maxDt = 1.0f / 5.0f;
             float frameTime = maxDt; // always run update on first iteration
 
             while (!GLFW.WindowShouldClose(window))

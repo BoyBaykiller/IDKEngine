@@ -53,7 +53,7 @@ ENUM_BSDF SelectBsdf(Surface surface, out float bsdfSelectionPdf)
     }
 }
 
-SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevIor, bool fromInside, bool tintOnTransmissiveRay)
+SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevIor, bool fromInside)
 {
     surface.Roughness *= surface.Roughness; // just a convention to make roughness feel more linear perceptually
 
@@ -102,17 +102,29 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
             result.NewIor = surface.IOR;
         }
 
-        vec3 refractionRayDir = refract(incomming, surface.Normal, prevIor / result.NewIor);
-        bool totalInternalReflection = refractionRayDir == vec3(0.0);
-        if (totalInternalReflection)
+        vec3 refractionRayDir;
+        bool totalInternalReflection;
+        if (surface.IsThinWalled)
         {
-            refractionRayDir = reflect(incomming, surface.Normal);
-            result.NewIor = prevIor;
+            refractionRayDir = incomming;
+            totalInternalReflection = false;
+            result.NewIor = 1.0;
         }
+        else
+        {
+            refractionRayDir = refract(incomming, surface.Normal, prevIor / result.NewIor);
+            totalInternalReflection = refractionRayDir == vec3(0.0);
+            if (totalInternalReflection)
+            {
+                refractionRayDir = reflect(incomming, surface.Normal);
+                result.NewIor = prevIor;
+            }
+        }
+        
         refractionRayDir = normalize(mix(refractionRayDir, !totalInternalReflection ? -diffuseRayDir : diffuseRayDir, surface.Roughness));
         result.RayDirection = refractionRayDir;
 
-        if (tintOnTransmissiveRay)
+        if (surface.TintOnTransmissive)
         {
             result.Bsdf = surface.Albedo;
         }

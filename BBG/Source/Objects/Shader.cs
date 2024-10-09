@@ -44,14 +44,14 @@ namespace BBOpenGL
                 GL.GetShaderInfoLog(ID, out string shaderInfoLog);
                 if (shaderInfoLog != string.Empty)
                 {
-                    bool compiled = GetCompileStatus();
+                    bool compiled = IsCompiledSuccessfully();
                     Logger.LogLevel level = compiled ? Logger.LogLevel.Info : Logger.LogLevel.Error;
 
                     Logger.Log(level, $"Shader \"{Name}\" log:\n{shaderInfoLog}");
                 }
             }
 
-            public bool GetCompileStatus()
+            public bool IsCompiledSuccessfully()
             {
                 GL.GetShaderi(ID, ShaderParameterName.CompileStatus, out int success);
                 return success == 1;
@@ -83,7 +83,7 @@ namespace BBOpenGL
             private AbstractShader(ShaderStage shaderStage, string source, string localShaderPath, bool debugSaveAndRunRGA = false)
                 : base(shaderStage, Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath), localShaderPath)
             {
-                if (debugSaveAndRunRGA && GetCompileStatus())
+                if (debugSaveAndRunRGA && IsCompiledSuccessfully())
                 {
                     // This is only relevant for development.
                     // Runs Radeon GPU Analyzer on the shader code and writes the results + preprocessed code to disk
@@ -339,7 +339,7 @@ namespace BBOpenGL
                         """;
 
                     Shader shader = new Shader(ShaderStage.Fragment, shaderString, "Check for (#line \"filename\") support");
-                    if (shader.GetCompileStatus())
+                    if (shader.IsCompiledSuccessfully())
                     {
                         return true;
                     }
@@ -383,6 +383,12 @@ namespace BBOpenGL
 
                     return $"APP_VENDOR_{insertion}";
                 }
+            }
+
+            public static AbstractShader Recompile(AbstractShader existingShader)
+            {
+                AbstractShader newShader = FromFile(existingShader.ShaderStage, existingShader.LocalShaderPath, existingShader.DebugSaveAndRunRGA);
+                return newShader;
             }
 
             /// <summary>

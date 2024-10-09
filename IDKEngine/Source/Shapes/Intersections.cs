@@ -544,11 +544,11 @@ namespace IDKEngine.Shapes
                     bool intersects = SphereVsTriangle(movingSphereCopy, worldSpaceTri, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth);
                     if (!intersects || distance >= bestTriDistance)
                     {
-                        return;
+                        return false;
                     }
                     if (distance == 0.0f) // handle edge case
                     {
-                        return;
+                        return false;
                     }
 
                     triCollisionDetected = true;
@@ -568,6 +568,9 @@ namespace IDKEngine.Shapes
                     thisSceneHitInfo.TriCollidingPoint = closestPointOnTri;
                     bestTriDistance = distance;
                     bestPenetrationDepth = penetrationDepth;
+
+                    // Continue searching for collisions even if we already found one
+                    return false;
                 });
 
                 if (triCollisionDetected)

@@ -14,7 +14,7 @@ in InOutData
 
 void main()
 {
-    OutFragColor = textureLod(skyBoxUBO.Albedo, inData.TexCoord, 0.0);
+    OutFragColor = texture(skyBoxUBO.Albedo, inData.TexCoord);
 
     vec2 thisNdc = inData.ClipPos.xy / inData.ClipPos.w;
     vec2 historyNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;

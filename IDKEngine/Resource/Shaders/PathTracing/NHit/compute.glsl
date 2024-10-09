@@ -25,7 +25,6 @@ layout(std140, binding = 7) uniform SettingsUBO
     float LenseRadius;
     bool IsDebugBVHTraversal;
     bool IsTraceLights;
-    bool TintOnTransmissiveRay;
 } settingsUBO;
 
 bool TraceRay(inout GpuWavefrontRay wavefrontRay);
@@ -77,7 +76,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         wavefrontRay.Origin += rayDir * hitInfo.T;
 
         Surface surface = GetDefaultSurface();
-        vec3 vertexNormal;
+        vec3 geometricNormal;
         bool hitLight = hitInfo.TriangleId == ~0u;
         if (!hitLight)
         {
@@ -112,7 +111,11 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface.Normal = tbn * surface.Normal;
             surface.Normal = normalize(mix(worldNormal, surface.Normal, mesh.NormalMapStrength));
 
-            vertexNormal = worldNormal;
+            vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
+            vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);
+            vec3 p2 = Unpack(vertexPositionsSSBO.Positions[indices.z]);
+            geometricNormal = GetTriangleNormal(p0, p1, p2);
+            geometricNormal = normalize(unitVecToWorld * geometricNormal);
         }
         else if (settingsUBO.IsTraceLights)
         {
@@ -120,28 +123,27 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface.Emissive = light.Color;
             surface.Albedo = light.Color;
             surface.Normal = (wavefrontRay.Origin - light.Position) / light.Radius;
-            vertexNormal = surface.Normal;
+            geometricNormal = surface.Normal;
         }
 
         float cosTheta = dot(-rayDir, surface.Normal);
-        bool fromInside = cosTheta < 0.0;
-
-        if (fromInside)
+        if (cosTheta < 0.0)
         {
             surface.Normal *= -1.0;
             cosTheta *= -1.0;
+        }
+        cosTheta = min(cosTheta, 1.0);
 
+        bool fromInside = dot(-rayDir, geometricNormal) < 0.0;
+        if (fromInside)
+        {
+            geometricNormal *= -1.0;
             wavefrontRay.Throughput *= exp(-surface.Absorbance * hitInfo.T);
         }
-        if (dot(-rayDir, vertexNormal) < 0.0)
-        {
-            vertexNormal *= -1.0;
-        }
-        cosTheta = clamp(cosTheta, 0.0, 1.0);
 
         wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
 
-        SampleMaterialResult result = SampleMaterial(rayDir, surface, wavefrontRay.PreviousIOROrDebugNodeCounter, fromInside, settingsUBO.TintOnTransmissiveRay);
+        SampleMaterialResult result = SampleMaterial(rayDir, surface, wavefrontRay.PreviousIOROrDebugNodeCounter, fromInside);
         wavefrontRay.Throughput *= result.Bsdf / result.Pdf;
 
         bool terminateRay = RussianRouletteTerminateRay(wavefrontRay.Throughput);
@@ -152,9 +154,9 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
         if (result.BsdfType == ENUM_BSDF_TRANSMISSIVE)
         {
-            vertexNormal *= -1.0;
+            geometricNormal *= -1.0;   
         }
-        wavefrontRay.Origin += vertexNormal * 0.001;
+        wavefrontRay.Origin += geometricNormal * 0.001;
         wavefrontRay.PreviousIOROrDebugNodeCounter = result.NewIor;
 
         vec2 packedDir = EncodeUnitVec(result.RayDirection);

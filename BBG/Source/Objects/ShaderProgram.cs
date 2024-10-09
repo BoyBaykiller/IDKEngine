@@ -15,20 +15,10 @@ namespace BBOpenGL
                 ID = GL.CreateProgram();
                 Link(others);
             }
-            public ShaderProgram(Shader first, params Shader[] others)
-                : this([.. others, first])
-            {
-            }
-
-            public void Link(Shader first, params Shader[] others)
-            {
-                Shader[] shaders = [.. others, first];
-                Link(shaders);
-            }
 
             public void Link(Shader[] shaders)
             {
-                if (shaders.Length == 0)
+                if (shaders.Any(it => !it.IsCompiledSuccessfully()))
                 {
                     return;
                 }
@@ -36,10 +26,7 @@ namespace BBOpenGL
                 for (int i = 0; i < shaders.Length; i++)
                 {
                     Shader shader = shaders[i];
-                    if (shader.GetCompileStatus())
-                    {
-                        GL.AttachShader(ID, shaders[i].ID);
-                    }
+                    GL.AttachShader(ID, shaders[i].ID);
                 }
 
                 GL.LinkProgram(ID);
@@ -56,7 +43,7 @@ namespace BBOpenGL
                 for (int i = 0; i < shaders.Length; i++)
                 {
                     Shader shader = shaders[i];
-                    if (shader.GetCompileStatus())
+                    if (shader.IsCompiledSuccessfully())
                     {
                         GL.DetachShader(ID, shaders[i].ID);
                     }
@@ -146,31 +133,41 @@ namespace BBOpenGL
             {
             }
 
-            public void Link(AbstractShader[] shaders)
+            public void Recompile()
             {
-                DisposeShaders();
-                Shaders = shaders;
-
-                base.Link(shaders);
-            }
-
-            private void DisposeShaders()
-            {
-                if (Shaders != null)
+                AbstractShader[] newShaders = new AbstractShader[Shaders.Length];
+                for (int i = 0; i < newShaders.Length; i++)
                 {
-                    for (int i = 0; i < Shaders.Length; i++)
-                    {
-                        Shaders[i].Dispose();
-                    }
+                    newShaders[i] = AbstractShader.Recompile(Shaders[i]);
                 }
+
+                if (newShaders.Any(it => !it.IsCompiledSuccessfully()))
+                {
+                    DisposeShaders(newShaders);
+                    return;
+                }
+
+                DisposeShaders(Shaders);
+                Shaders = newShaders;
+
+                Link(Shaders);
             }
+
 
             public new void Dispose()
             {
-                DisposeShaders();
+                DisposeShaders(Shaders);
                 globalInstances.Remove(this);
 
                 base.Dispose();
+            }
+
+            private static void DisposeShaders(AbstractShader[] shaders)
+            {
+                for (int i = 0; i < shaders.Length; i++)
+                {
+                    shaders[i].Dispose();
+                }
             }
 
             /// <summary>
@@ -222,7 +219,7 @@ namespace BBOpenGL
 
                     if (programIncludesAppInsertionKey)
                     {
-                        Recompile(shaderProgram);
+                        shaderProgram.Recompile();
 
                         recompiledShadersNames += $"[{string.Join(", ", shaderProgram.Shaders.Select(shader => $"{shader.Name}"))}]";
                     }
@@ -243,23 +240,12 @@ namespace BBOpenGL
                 for (int i = 0; i < globalInstances.Count; i++)
                 {
                     AbstractShaderProgram shaderProgram = globalInstances[i];
-                    Recompile(shaderProgram);
+                    shaderProgram.Recompile();
                 }
                 sw.Stop();
 
                 int numShaders = globalInstances.Sum(it => it.Shaders.Length);
                 Logger.Log(Logger.LogLevel.Info, $"Parsed and recompiled {numShaders} shaders in {sw.ElapsedMilliseconds} milliseconds");
-            }
-
-            public static void Recompile(AbstractShaderProgram shaderProgram)
-            {
-                AbstractShader[] recompiledShaders = new AbstractShader[shaderProgram.Shaders.Length];
-                for (int i = 0; i < recompiledShaders.Length; i++)
-                {
-                    AbstractShader existingShader = shaderProgram.Shaders[i];
-                    recompiledShaders[i] = AbstractShader.FromFile(existingShader.ShaderStage, existingShader.LocalShaderPath, existingShader.DebugSaveAndRunRGA);
-                }
-                shaderProgram.Link(recompiledShaders);
             }
         }
     }

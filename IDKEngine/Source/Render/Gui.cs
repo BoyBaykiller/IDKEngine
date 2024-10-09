@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using OpenTK.Mathematics;
@@ -348,7 +347,11 @@ namespace IDKEngine.Render
                     $"You probably want this together with {nameof(app.ModelManager.BVH.RebuildTlas)}"
                 );
                 ImGui.SameLine();
-                ImGui.Checkbox("RebuildTlas", ref app.ModelManager.BVH.RebuildTlas);
+                tempBool = app.ModelManager.BVH.RebuildTlas;
+                if (ImGui.Checkbox("RebuildTlas", ref tempBool))
+                {
+                    app.ModelManager.BVH.RebuildTlas = tempBool;
+                }
 
                 ImGui.SliderFloat("Exposure", ref app.TonemapAndGamma.Settings.Exposure, 0.0f, 8.0f);
                 ImGui.SliderFloat("Saturation", ref app.TonemapAndGamma.Settings.Saturation, 0.0f, 1.5f);
@@ -362,28 +365,26 @@ namespace IDKEngine.Render
                     }
                 }
 
+                if (ImGui.BeginCombo("Render Mode", app.CRenderMode.ToString()))
                 {
-                    if (ImGui.BeginCombo("Render Mode", app.CRenderMode.ToString()))
+                    Application.RenderMode[] renderModes = Enum.GetValues<Application.RenderMode>();
+                    for (int i = 0; i < renderModes.Length; i++)
                     {
-                        Application.RenderMode[] renderModes = Enum.GetValues<Application.RenderMode>();
-                        for (int i = 0; i < renderModes.Length; i++)
+                        bool isSelected = app.CRenderMode == renderModes[i];
+                        string enumName = renderModes[i].ToString();
+                        if (ImGui.Selectable(enumName, isSelected))
                         {
-                            bool isSelected = app.CRenderMode == renderModes[i];
-                            string enumName = renderModes[i].ToString();
-                            if (ImGui.Selectable(enumName, isSelected))
-                            {
-                                app.RequestRenderMode = (Application.RenderMode)i;
-                            }
-
-                            if (isSelected)
-                            {
-                                ImGui.SetItemDefaultFocus();
-                            }
+                            app.RequestRenderMode = (Application.RenderMode)i;
                         }
-                        ImGui.EndCombo();
+
+                        if (isSelected)
+                        {
+                            ImGui.SetItemDefaultFocus();
+                        }
                     }
-                    ImGui.Separator();
+                    ImGui.EndCombo();
                 }
+                ImGui.Separator();
 
                 if (app.CRenderMode == Application.RenderMode.Rasterizer)
                 {
@@ -715,16 +716,6 @@ namespace IDKEngine.Render
                             app.PathTracer.IsTraceLights = tempBool;
                         }
 
-                        tempBool = app.PathTracer.TintOnTransmissiveRay;
-                        if (ImGui.Checkbox("TintOnTransmissiveRay", ref tempBool))
-                        {
-                            app.PathTracer.TintOnTransmissiveRay = tempBool;
-                        }
-                        ToolTipForItemAboveHovered(
-                                "This is required for gltF models to work correctly,\n" +
-                                "however it's not what Path Tracers typically do, so disabled by default"
-                            );
-
                         if (!app.PathTracer.IsDebugBVHTraversal)
                         {
                             tempInt = app.PathTracer.RayDepth;
@@ -821,9 +812,12 @@ namespace IDKEngine.Render
                     bool modified = false;
                     ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[SelectedEntity.EntityID];
                     ref GpuMesh mesh = ref app.ModelManager.Meshes[SelectedEntity.EntityID];
+                    ref GpuMaterial material = ref app.ModelManager.Materials[mesh.MaterialId];
                     GpuMeshInstance meshInstance = app.ModelManager.MeshInstances[SelectedEntity.InstanceID];
 
                     Transformation meshInstanceTransform = Transformation.FromMatrix(meshInstance.ModelMatrix);
+
+                    ImGui.SeparatorText("Mesh Instance");
 
                     tempVec3 = meshInstanceTransform.Translation.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
@@ -847,6 +841,8 @@ namespace IDKEngine.Render
                     }
 
                     ImGui.Separator();
+
+                    ImGui.SeparatorText("Mesh Material");
 
                     if (ImGui.SliderFloat("NormalMapStrength", ref mesh.NormalMapStrength, 0.0f, 4.0f))
                     {
@@ -872,7 +868,7 @@ namespace IDKEngine.Render
                     {
                         modified = true;
                     }
-
+                    
                     tempVec3 = mesh.AbsorbanceBias.ToNumerics();
                     if (ImGui.DragFloat3("AbsorbanceBias", ref tempVec3, 0.01f))
                     {
@@ -880,12 +876,15 @@ namespace IDKEngine.Render
                         mesh.AbsorbanceBias = tempVec3.ToOpenTK();
                     }
 
-                    ImGui.Text($"MeshId: {SelectedEntity.EntityID}");
-                    ImGui.SameLine();
-                    ImGui.Text($"MaterialID: {mesh.MaterialId}");
-                    ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance}");
-                    ImGui.SameLine();
-                    ImGui.Text($"Triangle Count: {cmd.IndexCount / 3}");
+                    if (ImGui.Checkbox("TintOnTransmissive", ref mesh.TintOnTransmissive))
+                    {
+                        modified = true;
+                    }
+
+                    ImGui.SeparatorText("Mesh Info");
+
+                    ImGui.Text($"MeshId: {SelectedEntity.EntityID} | MaterialID: {mesh.MaterialId}");
+                    ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance} | Triangle Count: {cmd.IndexCount / 3}");
 
                     if (modified)
                     {
@@ -990,6 +989,8 @@ namespace IDKEngine.Render
                     Transformation meshInstanceTransform = SelectedEntity.Node.LocalTransform;
                     bool modified = false;
 
+                    ImGui.SeparatorText("Node Transform");
+
                     tempVec3 = meshInstanceTransform.Translation.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
                     {
@@ -1017,10 +1018,37 @@ namespace IDKEngine.Render
                         resetPathTracer = true;
                     }
 
-                    ImGui.Text($"Node: {SelectedEntity.Node.Name}");
-                    ImGui.SameLine();
-                    ImGui.Text($"NodeId: {SelectedEntity.Node.ArrayIndex}");
-                    ImGui.Text($"HasSkin: {SelectedEntity.Node.HasSkin}");
+                    for (int i = 0; i < app.ModelManager.CpuModels.Length; i++)
+                    {
+                        ref ModelManager.CpuModel model = ref app.ModelManager.CpuModels[i];
+                        
+                        if (app.ModelManager.CpuModels[i].Root == SelectedEntity.Node && model.Animations.Length > 0)
+                        {
+                            ImGui.SeparatorText("Model Animations");
+                            ImGui.SetNextWindowSizeConstraints(new SysVec2(0.0f, 0.0f), new SysVec2(float.MaxValue, ImGui.GetTextLineHeightWithSpacing() * 6.0f));
+                            if (ImGui.BeginChild("Model Animations", new SysVec2(0.0f), ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY))
+                            {
+                                for (int j = 0; j < model.Animations.Length; j++)
+                                {
+                                    ref readonly ModelLoader.ModelAnimation animation = ref model.Animations[j];
+
+                                    bool enabled = model.EnabledAnimations[j];
+                                    if (ImGui.Checkbox(animation.Name, ref enabled))
+                                    {
+                                        model.EnabledAnimations[j] = enabled;
+                                    }
+                                }
+                            }
+                            ImGui.EndChild();
+
+                            break;
+                        }
+                    }
+
+                    ImGui.SeparatorText("Node Info");
+
+                    ImGui.Text($"Name: {SelectedEntity.Node.Name} | ArrayIndex: {SelectedEntity.Node.ArrayIndex}");
+                    ImGui.Text($"HasSkin: {SelectedEntity.Node.HasSkin} | HasMeshInstances: {SelectedEntity.Node.HasMeshInstances}");
                 }
                 else
                 {
@@ -1036,19 +1064,31 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Scene Graph"))
             {
+                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new SysVec2(0.0f));
+                ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new SysVec2(0.0f));
+                ImGui.BeginTable("Scene Graph", 1, ImGuiTableFlags.RowBg | ImGuiTableFlags.NoBordersInBody);
+                ImGui.PopStyleVar(2);
+
                 for (int i = 0; i < app.ModelManager.CpuModels.Length; i++)
                 {
                     ref readonly ModelManager.CpuModel cpuModel = ref app.ModelManager.CpuModels[i];
-                    RenderNodesGraph(cpuModel.Root);
 
+                    RenderNodesGraph(cpuModel.Root);
+                    
                     void RenderNodesGraph(ModelLoader.Node node)
                     {
                         ImGui.PushID(node.GetHashCode());
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
 
                         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
                         if (node.IsLeaf && node.MeshInstanceIds.Count == 0)
                         {
                             flags |= ImGuiTreeNodeFlags.Leaf;
+                        }
+                        if (SelectedEntity.EntityType == EntityType.Node && SelectedEntity.Node == node)
+                        {
+                            flags |= ImGuiTreeNodeFlags.Selected;
                         }
 
                         bool nodeOpen = ImGui.TreeNodeEx(node.Name, flags);
@@ -1065,7 +1105,12 @@ namespace IDKEngine.Render
                             }
                             for (int i = node.MeshInstanceIds.Start; i < node.MeshInstanceIds.End; i++)
                             {
-                                if (ImGui.TreeNodeEx($"MeshInstance_{i}", ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf))
+                                flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
+                                if (SelectedEntity.EntityType == EntityType.Mesh && SelectedEntity.EntityID == i)
+                                {
+                                    flags |= ImGuiTreeNodeFlags.Selected;
+                                }
+                                if (ImGui.TreeNodeEx($"MeshInstance_{i}", flags))
                                 {
                                     ImGui.TreePop();
                                 }
@@ -1081,11 +1126,21 @@ namespace IDKEngine.Render
                     }
                 }
 
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn();
                 if (ImGui.TreeNodeEx("Lights"))
                 {
                     for (int i = 0; i < app.LightManager.Count; i++)
                     {
-                        if (ImGui.TreeNodeEx($"Light_{i}", ImGuiTreeNodeFlags.Leaf))
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
+
+                        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
+                        if (SelectedEntity.EntityType == EntityType.Light && SelectedEntity.EntityID == i)
+                        {
+                            flags |= ImGuiTreeNodeFlags.Selected;
+                        }
+                        if (ImGui.TreeNodeEx($"Light_{i}", flags))
                         {
                             ImGui.TreePop();
                         }
@@ -1093,10 +1148,11 @@ namespace IDKEngine.Render
                         {
                             SelectedEntity = new SelectedEntityInfo(EntityType.Light, i, 0);
                         }
-
                     }
                     ImGui.TreePop();
                 }
+
+                ImGui.EndTable();
             }
             ImGui.End();
 
@@ -1114,7 +1170,7 @@ namespace IDKEngine.Render
                 SysVec2 tileBar = ImGui.GetCursorPos();
                 viewportHeaderSize = ImGui.GetWindowPos() + tileBar;
 
-                ImGui.Image((nint)app.TonemapAndGamma.Result.ID, content.ToNumerics(), new SysVec2(0.0f, 1.0f), new SysVec2(1.0f, 0.0f));
+                ImGui.Image(app.TonemapAndGamma.Result.ID, content.ToNumerics(), new SysVec2(0.0f, 1.0f), new SysVec2(1.0f, 0.0f));
             }
             ImGui.PopStyleVar();
             ImGui.End();
@@ -1261,7 +1317,7 @@ namespace IDKEngine.Render
             ImGui.SetCursorPos(new SysVec2((size - textWidth).X * 0.5f, ImGui.GetCursorPos().Y));
             ImGui.Text(text);
         }
-        
+
         private static bool CheckBoxEnabled(string name, ref bool value, bool enabled)
         {
             if (!enabled) 

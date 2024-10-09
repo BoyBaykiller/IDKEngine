@@ -18,6 +18,8 @@ struct Surface
     float IOR;
     
     float AlphaCutoff;
+    bool IsThinWalled;
+    bool TintOnTransmissive;
 };
 
 Surface GetDefaultSurface()
@@ -37,6 +39,9 @@ Surface GetDefaultSurface()
     surface.IOR = 1.5;
 
     surface.AlphaCutoff = 0.5;
+
+    surface.IsThinWalled = false;
+    surface.TintOnTransmissive = true;
     
     return surface;
 }
@@ -67,6 +72,7 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv, float baseColorLodBias)
     surface.IOR = gpuMaterial.IOR;
 
     surface.AlphaCutoff = gpuMaterial.AlphaCutoff;
+    surface.IsThinWalled = gpuMaterial.IsThinWalled;
 
     return surface;
 }
@@ -86,6 +92,8 @@ void SurfaceApplyModificatons(inout Surface surface, GpuMesh mesh)
     surface.Roughness = clamp(surface.Roughness + mesh.RoughnessBias, 0.0, 1.0);
     surface.Transmission = clamp(surface.Transmission + mesh.TransmissionBias, 0.0, 1.0);
     surface.IOR = max(surface.IOR + mesh.IORBias, 1.0);
+
+    surface.TintOnTransmissive = mesh.TintOnTransmissive;
 }
 
 bool SurfaceIsAlphaBlending(Surface surface)

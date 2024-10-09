@@ -92,16 +92,31 @@ namespace IDKEngine.Bvh
         }
 
         public bool CpuUseTlas;
-        public bool RebuildTlas;
+
+        private bool _rebuildTlas;
+        public bool RebuildTlas
+        {
+            get => _rebuildTlas;
+
+            set
+            {
+                _rebuildTlas = value;
+
+                if (RebuildTlas)
+                {
+                    TlasBuild();
+                }
+            }
+        }
 
         public GpuTlasNode[] TlasNodes = [];
         public GpuBlasNode[] BlasNodes = [];
         public BLAS.IndicesTriplet[] BlasTriangles = [];
         public BlasDesc[] BlasesDesc = [];
 
-        private Vector3[] vertexPositions;
-        private uint[] vertexIndices;
-        private GpuMeshInstance[] meshInstances;
+        private Vector3[] vertexPositions = [];
+        private uint[] vertexIndices = [];
+        private GpuMeshInstance[] meshInstances = [];
 
         private BBG.TypedBuffer<GpuBlasNode> blasNodesBuffer;
         private BBG.TypedBuffer<BLAS.IndicesTriplet> blasTriangleIndicesBuffer;
@@ -173,7 +188,7 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public delegate void FuncIntersectLeafNode(in BoxHitInfo hitInfo);
+        public delegate bool FuncIntersectLeafNode(in BoxHitInfo hitInfo);
         public void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
         {
             if (CpuUseTlas)
@@ -189,7 +204,6 @@ namespace IDKEngine.Bvh
 
                     Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
 
-                    int copyMeshIndex = meshInstance.MeshId;
                     BLAS.Intersect(
                         GetBlas(blasDesc),
                         GetBlasGeometry(blasDesc.GeometryDesc),
@@ -199,7 +213,7 @@ namespace IDKEngine.Bvh
                         hitInfo.TriangleIndices = hitTriangle;
                         hitInfo.InstanceID = i;
 
-                        intersectFunc(hitInfo);
+                        return intersectFunc(hitInfo);
                     });
                 }
             }
@@ -273,26 +287,28 @@ namespace IDKEngine.Bvh
                 }
 
                 GpuBlasNode[] nodes = BLAS.AllocateUpperBoundNodes(geometry.TriangleCount);
-                BLAS.BuildResult blasBuildResult = new BLAS.BuildResult(nodes);
+                BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
 
-                int nodesUsed = BLAS.Build(ref blasBuildResult, geometry, buildSettings);
+                int nodesUsed = BLAS.Build(ref blas, geometry, buildSettings);
                 blasDesc.NodeCount = nodesUsed;
-                blasDesc.UnpaddedNodesCount = blasBuildResult.UnpaddedNodesCount;
+                blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;
 
                 // Resize array and update the Span because array got mutated
                 Array.Resize(ref nodes, blasDesc.NodeCount);
-                blasBuildResult.Nodes = nodes;
+                blas.Nodes = nodes;
 
-                int[] parentIds = BLAS.GetParentIndices(blasBuildResult);
-                ReinsertionOptimizer.Optimize(ref blasBuildResult, parentIds, geometry.Triangles, optimizationSettings);
+                int[] parentIds = BLAS.GetParentIndices(blas);
+                ReinsertionOptimizer.Optimize(ref blas, parentIds, geometry.Triangles, optimizationSettings);
 
-                blasDesc.MaxTreeDepth = blasBuildResult.MaxTreeDepth;
+                blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
 
-                int[] leafIds = BLAS.GetLeafIndices(blasBuildResult);
+                int[] leafIds = BLAS.GetLeafIndices(blas);
                 blasDesc.LeafIndicesCount = leafIds.Length;
 
                 BlasBuildPhaseData blasData = new BlasBuildPhaseData();
                 blasData.Nodes = nodes;
+
+                // TODO: Add concept of refitable BLAS and only store parent and leaf ids for those
                 blasData.ParentIds = parentIds;
                 blasData.LeafIds = leafIds;
                 newBlasesData[i] = blasData;
@@ -394,12 +410,12 @@ namespace IDKEngine.Bvh
 
         public BLAS.BuildResult GetBlas(in BlasDesc blasDesc)
         {
-            BLAS.BuildResult blasBuildResult = new BLAS.BuildResult();
-            blasBuildResult.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
-            blasBuildResult.MaxTreeDepth = blasDesc.MaxTreeDepth;
-            blasBuildResult.UnpaddedNodesCount = blasDesc.UnpaddedNodesCount;
+            BLAS.BuildResult blas = new BLAS.BuildResult();
+            blas.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
+            blas.MaxTreeDepth = blasDesc.MaxTreeDepth;
+            blas.UnpaddedNodesCount = blasDesc.UnpaddedNodesCount;
 
-            return blasBuildResult;
+            return blas;
         }
         
         public BLAS.Geometry GetBlasGeometry(in GeometryDesc geometryDesc)

@@ -374,7 +374,7 @@ namespace BBOpenGL
                 GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
                 GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultHeight, fboParameters.Height);
 
-                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                GL.BindFramebuffer(FramebufferTarget.Framebuffer, fboNoAttachmentsGLHandle);
                 SetGraphicsPipelineState(pipelineState);
 
                 inferredViewportSize = new Vector2i(fboParameters.Width, fboParameters.Height);

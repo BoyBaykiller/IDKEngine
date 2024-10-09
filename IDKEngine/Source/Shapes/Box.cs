@@ -38,6 +38,7 @@ namespace IDKEngine.Shapes
 
         public void GrowToFit(in Vector128<float> point)
         {
+            // TODO: Switch to Vector128.MaxNative/MinNative
             SIMDMin = Sse.Min(SIMDMin, point);
             SIMDMax = Sse.Max(SIMDMax, point);
         }

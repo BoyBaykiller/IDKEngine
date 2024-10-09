@@ -234,7 +234,7 @@ namespace IDKEngine
                 TonemapAndGamma.Settings.IsAgXTonemaping = !PathTracer.IsDebugBVHTraversal;
                 TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
-            
+
             if (gui.SelectedEntity.EntityType != Gui.EntityType.None)
             {
                 if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
@@ -390,7 +390,7 @@ namespace IDKEngine
                 LightManager.Update(dT, ModelManager);
             }
 
-            if (SceneVsCamCollisionSettings.IsEnabled)
+            if (SceneVsCamCollisionSettings.IsEnabled && MouseState[MouseButton.Button1 + 4] == Keyboard.InputState.Released)
             {
                 Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
                 Vector3 prevSpherePos = movingSphere.Center;
@@ -404,6 +404,11 @@ namespace IDKEngine
 
                     prevSpherePos = movingSphere.Center;
                 });
+            }
+
+            if (MouseState[MouseButton.Button1 + 3] == Keyboard.InputState.Touched)
+            {
+                Camera.IsGravity = !Camera.IsGravity;
             }
 
             Camera.SetPrevToCurrentPosition();
@@ -485,11 +490,13 @@ namespace IDKEngine
                 lucy.GpuModel.Meshes[0].IORBias = -0.326f;
                 lucy.GpuModel.Meshes[0].AbsorbanceBias = new Vector3(0.81f, 0.18f, 0.0f);
                 lucy.GpuModel.Meshes[0].RoughnessBias = -1.0f;
+                lucy.GpuModel.Meshes[0].TintOnTransmissive = false;
+                lucy.GpuModel.Materials[0].IsThinWalled = false;
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf").Value;
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\untitled.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
 
@@ -530,7 +537,7 @@ namespace IDKEngine
             TimeEnabled = true;
 
             RecorderVars = new RecordingSettings();
-            RecorderVars.FPSGoal = 10000; // unlimited
+            RecorderVars.FPSGoal = 30; // unlimited
             RecorderVars.PathTracingSamplesGoal = 50;
             RecorderVars.State = FrameRecorderState.None;
             RecorderVars.FrameTimer = Stopwatch.StartNew();

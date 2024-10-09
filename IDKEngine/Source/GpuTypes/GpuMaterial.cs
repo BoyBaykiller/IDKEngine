@@ -5,7 +5,7 @@ using BBOpenGL;
 
 namespace IDKEngine.GpuTypes
 {
-    public record struct GpuMaterial
+    public unsafe struct GpuMaterial
     {
         public static readonly int TEXTURE_COUNT = Enum.GetValues<TextureType>().Length;
 
@@ -52,7 +52,8 @@ namespace IDKEngine.GpuTypes
         public BBG.Texture.BindlessHandle EmissiveTexture;
 
         public BBG.Texture.BindlessHandle TransmissionTexture;
+        public bool IsThinWalled;
+        private fixed bool _pad[3];
         private readonly float _pad0;
-        private readonly float _pad1;
     }
 }

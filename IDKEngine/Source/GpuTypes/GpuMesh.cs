@@ -2,7 +2,7 @@
 
 namespace IDKEngine.GpuTypes
 {
-    public record struct GpuMesh
+    public unsafe struct GpuMesh
     {
         public int MaterialId;
         public float NormalMapStrength;
@@ -19,6 +19,12 @@ namespace IDKEngine.GpuTypes
 
         public int InstanceCount;
         public int BlasRootNodeOffset;
-        public Vector2 _pad0;
+        public bool TintOnTransmissive = true;
+        private fixed bool _pad[3];
+        private readonly float _pad0;
+
+        public GpuMesh()
+        {
+        }
     }
 }

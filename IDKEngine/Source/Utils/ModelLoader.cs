@@ -116,6 +116,7 @@ namespace IDKEngine.Utils
             public Range MeshInstanceIds;
 
             private bool isDirty = true;
+            private bool isAscendantOfDirty = false;
 
             public void UpdateGlobalTransform()
             {
@@ -168,25 +169,13 @@ namespace IDKEngine.Utils
             {
                 isDirty = true;
                 MarkParentsDirty(this);
-                MarkChildrenDirty(this);
 
                 static void MarkParentsDirty(Node node)
                 {
-                    if (!node.IsRoot && !node.Parent.isDirty)
+                    if (!node.IsRoot && !node.Parent.isAscendantOfDirty)
                     {
-                        node.Parent.isDirty = true;
+                        node.Parent.isAscendantOfDirty = true;
                         MarkParentsDirty(node.Parent);
-                    }
-                }
-
-                static void MarkChildrenDirty(Node parent)
-                {
-                    for (int i = 0; i < parent.Children.Length; i++)
-                    {
-                        Node child = parent.Children[i];
-                        child.isDirty = true;
-
-                        MarkChildrenDirty(child);
                     }
                 }
             }
@@ -199,18 +188,29 @@ namespace IDKEngine.Utils
             /// <param name="updateParent"></param>
             public static void TraverseUpdate(Node parent, Action<Node> updateParent)
             {
-                if (!parent.isDirty)
+                if (!parent.isDirty && !parent.isAscendantOfDirty)
                 {
                     return;
                 }
 
-                updateParent(parent);
-                parent.isDirty = false;
+                if (parent.isDirty)
+                {
+                    updateParent(parent);
+                }
 
                 for (int i = 0; i < parent.Children.Length; i++)
                 {
-                    TraverseUpdate(parent.Children[i], updateParent);
+                    Node child = parent.Children[i];
+                    if (parent.isDirty)
+                    {
+                        child.isDirty = true; // if parent is dirty children automatically are too
+                    }
+
+                    TraverseUpdate(child, updateParent);
                 }
+
+                parent.isDirty = false;
+                parent.isAscendantOfDirty = false;
             }
 
             public static void Traverse(Node node, Action<Node> funcOnNode)
@@ -277,18 +277,21 @@ namespace IDKEngine.Utils
 
             public float Start; // Min of node animations start
             public float End; // Max of node animations end
-            
+
+            public string Name;
+
             public NodeAnimation[] NodeAnimations;
 
-            public ModelAnimation DeepClone(ReadOnlySpan<Node> newTargetNodes)
+            public ModelAnimation DeepClone(ReadOnlySpan<Node> newNodes)
             {
                 ModelAnimation animation = new ModelAnimation();
                 animation.Start = Start;
                 animation.End = End;
+                animation.Name = new string(Name);
                 animation.NodeAnimations = new NodeAnimation[NodeAnimations.Length];
                 for (int i = 0; i < animation.NodeAnimations.Length; i++)
                 {
-                    animation.NodeAnimations[i] = NodeAnimations[i].DeepClone(newTargetNodes);
+                    animation.NodeAnimations[i] = NodeAnimations[i].DeepClone(newNodes);
                 }
 
                 return animation;
@@ -419,15 +422,18 @@ namespace IDKEngine.Utils
 
         private record struct MaterialParams
         {
+            public bool IsThinWalled => ThicknessFactor == 0.0f;
+
             public Vector4 BaseColorFactor;
+            public float RoughnessFactor;
+            public float MetallicFactor;
             public Vector3 EmissiveFactor;
             public float TransmissionFactor;
             public float AlphaCutoff;
-            public float RoughnessFactor;
-            public float MetallicFactor;
             public Vector3 Absorbance;
             public float IOR;
             public AlphaMode AlphaMode;
+            public float ThicknessFactor;
 
             public static readonly MaterialParams Default = new MaterialParams()
             {
@@ -440,6 +446,7 @@ namespace IDKEngine.Utils
                 Absorbance = new Vector3(0.0f),
                 IOR = 1.5f,
                 AlphaMode = AlphaMode.Opaque,
+                ThicknessFactor = 0.0f,
             };
         }
 
@@ -633,7 +640,8 @@ namespace IDKEngine.Utils
                     nodeStack.Push((gltfNode, myNode));
                 }
             }
-            
+
+            int jointsCount = 0;
             Dictionary<GltfNode, Node> gltfNodeToMyNode = new Dictionary<GltfNode, Node>(gltf.LogicalNodes.Count);
             while (nodeStack.Count > 0)
             {
@@ -667,7 +675,7 @@ namespace IDKEngine.Utils
                     continue;
                 }
                 
-                Matrix4[] nodeTransformations = GetNodeInstances(gltfNode.UseGpuInstancing(), myNode.LocalTransform.GetMatrix());
+                Matrix4[] nodeTransformations = GetNodeTransformations(gltfNode);
 
                 Range meshInstanceIdsRange = new Range();
                 meshInstanceIdsRange.Start = listMeshInstances.Count;
@@ -679,15 +687,6 @@ namespace IDKEngine.Utils
                     {
                         // MeshPrimitive was not loaded for some reason
                         continue;
-                    }
-
-                    for (int j = 0; j < meshGeometry.Meshlets.Length; j++)
-                    {
-                        ref GpuMeshlet myMeshlet = ref meshGeometry.Meshlets[j];
-
-                        // Adjust offsets in context of all meshlets (these overflow on very big models)
-                        myMeshlet.VertexOffset += (uint)listMeshletsVertexIndices.Count;
-                        myMeshlet.IndicesOffset += (uint)listMeshletsLocalIndices.Count;
                     }
 
                     GpuMesh mesh = new GpuMesh();
@@ -742,8 +741,28 @@ namespace IDKEngine.Utils
                     listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshGeometry.MeshletData.LocalIndices, 0, meshGeometry.MeshletData.LocalIndicesLength));
                     listJointIndices.AddRange(meshGeometry.VertexData.JointIndices);
                     listJointWeights.AddRange(meshGeometry.VertexData.JointWeights);
+
+                    int prevCount = listJointIndices.Count - meshGeometry.VertexData.JointIndices.Length;
+                    for (int j = prevCount; j < listJointIndices.Count; j++)
+                    {
+                        listJointIndices[j] += new Vector4i(jointsCount);
+                    }
+
+                    prevCount = listMeshlets.Count - meshGeometry.Meshlets.Length;
+                    for (int j = prevCount; j < listMeshlets.Count; j++)
+                    {
+                        GpuMeshlet myMeshlet = listMeshlets[j];
+
+                        // These overflow on big models
+                        myMeshlet.VertexOffset += (uint)(listMeshletsVertexIndices.Count - meshGeometry.MeshletData.VertexIndicesLength);
+                        myMeshlet.IndicesOffset += (uint)(listMeshletsLocalIndices.Count - meshGeometry.MeshletData.LocalIndicesLength);
+
+                        listMeshlets[j] = myMeshlet;
+                    }
                 }
-                
+
+                jointsCount += gltfNode.Skin != null ? gltfNode.Skin.JointsCount : 0;
+
                 meshInstanceIdsRange.End = listMeshInstances.Count;
                 myNode.MeshInstanceIds = meshInstanceIdsRange;
             }
@@ -796,6 +815,7 @@ namespace IDKEngine.Utils
                 gpuMaterial.MetallicFactor = materialParams.MetallicFactor;
                 gpuMaterial.Absorbance = materialParams.Absorbance;
                 gpuMaterial.IOR = materialParams.IOR;
+                gpuMaterial.IsThinWalled = materialParams.IsThinWalled;
 
                 if (materialParams.AlphaMode == AlphaMode.Opaque)
                 {
@@ -1138,18 +1158,19 @@ namespace IDKEngine.Utils
             return state;
         }
 
-        private static Matrix4[] GetNodeInstances(MeshGpuInstancing gpuInstancing, in Matrix4 localTransform)
+        private static Matrix4[] GetNodeTransformations(GltfNode node)
         {
-            if (gpuInstancing.Count == 0)
+            MeshGpuInstancing meshGpuInstancing = node.UseGpuInstancing();
+            if (meshGpuInstancing.Count == 0)
             {
                 // If its not using EXT_mesh_gpu_instancing we must use local transform
-                return [localTransform];
+                return [node.LocalMatrix.ToOpenTK()];
             }
 
-            Matrix4[] nodeInstances = new Matrix4[gpuInstancing.Count];
+            Matrix4[] nodeInstances = new Matrix4[meshGpuInstancing.Count];
             for (int i = 0; i < nodeInstances.Length; i++)
             {
-                nodeInstances[i] = gpuInstancing.GetLocalMatrix(i).ToOpenTK();
+                nodeInstances[i] = meshGpuInstancing.GetLocalMatrix(i).ToOpenTK();
             }
 
             return nodeInstances;
@@ -1407,7 +1428,9 @@ namespace IDKEngine.Utils
             for (int i = 0; i < gltf.LogicalAnimations.Count; i++)
             {
                 GltfAnimation gltfAnimation = gltf.LogicalAnimations[i];
+                
                 ModelAnimation myAnimation = new ModelAnimation();
+                myAnimation.Name = gltfAnimation.Name ?? $"Animation_{i}";
 
                 int nodeAmimsCount = 0;
                 myAnimation.NodeAnimations = new NodeAnimation[gltfAnimation.Channels.Count];
@@ -1557,6 +1580,13 @@ namespace IDKEngine.Utils
                 float z = -MathF.Log(gltfAttenuationColor.Z) / gltfAttenuationDistance;
                 Vector3 absorbance = new Vector3(x, y, z);
                 materialParams.Absorbance = absorbance;
+            }
+
+            MaterialChannel? volumeThicknesssChannel = gltfMaterial.FindChannel(KnownChannel.VolumeThickness.ToString());
+            if (volumeThicknesssChannel.HasValue) // KHR_materials_volume
+            {
+                float thicknessFactor = GetMaterialChannelParam<float>(volumeThicknesssChannel.Value, KnownProperty.ThicknessFactor);
+                materialParams.ThicknessFactor = thicknessFactor;
             }
 
             return materialParams;

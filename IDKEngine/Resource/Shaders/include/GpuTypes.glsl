@@ -97,7 +97,8 @@ struct GpuMesh
     uint MeshletCount;
     uint InstanceCount;
     uint BlasRootNodeOffset;
-    vec2 _pad0;
+    bool TintOnTransmissive;
+    float _pad0;
 };
 
 struct GpuMeshInstance
@@ -106,9 +107,7 @@ struct GpuMeshInstance
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
     uint MeshId;
-    uint _pad0;
-    uint _pad1;
-    uint _pad2;
+    uint _pad0, _pad1, _pad2;
 };
 
 struct GpuBlasNode
@@ -163,7 +162,8 @@ struct GpuMaterial
     MATERIAL_SAMPLER_2D_TYPE Emissive;
 
     MATERIAL_SAMPLER_2D_TYPE Transmission;
-    uvec2 _pad0;
+    bool IsThinWalled;
+    float _pad0;
 };
 
 struct GpuVertex
