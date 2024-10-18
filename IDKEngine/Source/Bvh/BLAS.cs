@@ -506,7 +506,7 @@ namespace IDKEngine.Bvh
                     float probHitRightChild = rightSplit.TriangleBounds.HalfArea() / areaParent;
 
                     // Estimates cost of hitting parentNode if it was split at the evaluated split position
-                    // The full "Surface Area Heuristic" is recurisve, but in practice we assume
+                    // The full "Surface Area Heuristic" is recursive, but in practice we assume
                     // the resulting child nodes are leafs
                     float surfaceAreaHeuristic = CostInternalNode(
                         probHitLeftChild,

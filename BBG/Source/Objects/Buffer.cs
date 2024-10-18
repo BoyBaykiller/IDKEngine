@@ -83,7 +83,17 @@ namespace BBOpenGL
                 BlockIndex = index;
             }
 
-            public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
+            public void InvalidateData()
+            {
+                GL.InvalidateBufferData(ID);
+            }
+
+            public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size)
+            {
+                Allocate(memLocation, memAccess, size, null);
+            }
+
+            public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size, void* data)
             {
                 GL.NamedBufferStorage(ID, size, data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
                 Size = size;
@@ -158,6 +168,11 @@ namespace BBOpenGL
                 GL.DeleteBuffers(1, in ID);
             }
 
+            public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size)
+            {
+                Recreate(ref buffer, memLocation, memAccess, size, null);
+            }
+
             public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
             {
                 Buffer newBuffer = new Buffer();
@@ -184,7 +199,12 @@ namespace BBOpenGL
                 }
             }
 
-            public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, nint count, void* data = null) where T : unmanaged
+            public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, nint count) where T : unmanaged
+            {
+                Recreate(ref buffer, memLocation, memAccess, count, null);
+            }
+
+            public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, nint count, void* data) where T : unmanaged
             {
                 if (count == 0) return;
                 ref Buffer baseBuffer = ref Unsafe.As<TypedBuffer<T>, Buffer>(ref buffer);
@@ -207,6 +227,7 @@ namespace BBOpenGL
             {
                 AllocateElements(memLocation, memAccess, data.Length, MemoryMarshal.GetReference(data));
             }
+
             public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
             {
                 fixed (void* ptr = &data)
@@ -214,7 +235,13 @@ namespace BBOpenGL
                     AllocateElements(memLocation, memAccess, count, ptr);
                 }
             }
-            public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, void* data = null)
+
+            public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count)
+            {
+                AllocateElements(memLocation, memAccess, count, null);
+            }
+
+            public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, void* data)
             {
                 if (count == 0) return;
                 Allocate(memLocation, memAccess, sizeof(T) * count, data);
@@ -224,10 +251,12 @@ namespace BBOpenGL
             {
                 UploadElements(startIndex, data.Length, MemoryMarshal.GetReference(data));
             }
+
             public void UploadElements(in T data, nint startIndex = 0)
             {
                 UploadElements(startIndex, 1, data);
             }
+
             public void UploadElements(nint startIndex, nint count, in T data)
             {
                 if (count == 0) return;
@@ -242,10 +271,12 @@ namespace BBOpenGL
                 values = new T[NumElements];
                 DownloadElements(values, 0);
             }
+
             public void DownloadElements(Span<T> data, nint startIndex = 0)
             {
                 DownloadElements(startIndex, data.Length, ref MemoryMarshal.GetReference(data));
             }
+
             public void DownloadElements(nint startIndex, nint count, ref T data)
             {
                 fixed (void* ptr = &data)

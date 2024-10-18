@@ -22,7 +22,7 @@ namespace IDKEngine.Render
         private static BBG.Texture externalCubemapTexture;
         public static BBG.TypedBuffer<BBG.Texture.BindlessHandle> skyBoxTextureBuffer;
         private static BBG.AbstractShaderProgram unprojectEquirectangularProgram;
-        public static unsafe void Initialize()
+        public static void Initialize()
         {
             skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>();
             skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
@@ -57,7 +57,7 @@ namespace IDKEngine.Render
 
             if (skyBoxMode == SkyBoxMode.InternalAtmosphericScattering)
             {
-                AtmosphericScatterer = new AtmosphericScatterer(128, AtmosphericScatterer.GpuSettings.Default);
+                AtmosphericScatterer = new AtmosphericScatterer(128, new AtmosphericScatterer.GpuSettings());
                 AtmosphericScatterer.Compute();
             }
             else

@@ -7,33 +7,24 @@ namespace IDKEngine.Render
     {
         public record struct GpuSettings
         {
-            public int ISteps;
-            public int JSteps;
-            public float LightIntensity;
-            public float Azimuth;
-            public float Elevation;
+            public int ISteps = 40;
+            public int JSteps = 8;
+            public float LightIntensity = 15.0f;
+            public float Azimuth = 0.0f;
+            public float Elevation = 0.0f;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                ISteps = 40,
-                JSteps = 8,
-                LightIntensity = 15.0f,
-                Azimuth = 0.0f,
-                Elevation = 0.0f,
-            };
+            }
         }
 
         public GpuSettings Settings;
 
         public BBG.Texture Result;
         private readonly BBG.AbstractShaderProgram shaderProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public unsafe AtmosphericScatterer(int size, in GpuSettings settings)
+        public AtmosphericScatterer(int size, in GpuSettings settings)
         {
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "AtmosphericScattering/compute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             Settings = settings;
 
@@ -46,8 +37,7 @@ namespace IDKEngine.Render
             {
                 Settings.LightIntensity = MathF.Max(Settings.LightIntensity, 0.0f);
 
-                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-                gpuSettingsBuffer.UploadElements(Settings);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0, 0, true);
                 BBG.Cmd.UseShaderProgram(shaderProgram);
@@ -67,7 +57,6 @@ namespace IDKEngine.Render
 
         public void Dispose()
         {
-            gpuSettingsBuffer.Dispose();
             shaderProgram.Dispose();
             Result.Dispose();
         }

@@ -10,18 +10,21 @@ layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerHistoryColor;
 layout(binding = 1) uniform sampler2D SamplerCurrentColor;
 
+layout(std140, binding = 7) uniform SettingsUBO
+{
+    bool IsNaiveTaa;
+    float PreferAliasingOverBlur;
+} settingsUBO;
+
 void GetResolveData(ivec2 imgCoord, out vec4 currentColor, out vec2 neighborhoodBestUv, out vec4 neighborhoodMin, out vec4 neighborhoodMax);
 vec4 SampleTextureCatmullRom(sampler2D src, vec2 uv);
-
-uniform bool IsNaiveTaa;
-uniform float PreferAliasingOverBlur;
 
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    if (IsNaiveTaa)
+    if (settingsUBO.IsNaiveTaa)
     {
         vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg;
         vec2 historyUV = uv - velocity;
@@ -55,7 +58,7 @@ void main()
 
     vec2 localPixelPos = fract(historyUV * textureSize(SamplerHistoryColor, 0));
     float pixelCenterDistance = abs(0.5 - localPixelPos.x) + abs(0.5 - localPixelPos.y);
-    blend = mix(blend, 1.0, pixelCenterDistance * PreferAliasingOverBlur);
+    blend = mix(blend, 1.0, pixelCenterDistance * settingsUBO.PreferAliasingOverBlur);
     
     vec4 color = mix(historyColor, currentColor, blend);
     imageStore(ImgResult, imgCoord, color);

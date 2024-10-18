@@ -272,14 +272,14 @@ GL.NamedBufferStorage(stagingBuffer, imageSize, IntPtr.Zero, flags);
 
 // 2. Upload pixels into buffer
 void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
-NativeMemory.Copy(imageData, bufferMemory, imageSize);
+NativeMemory.Copy(decodedImage, bufferMemory, imageSize);
 
 // 3. Transfer pixels from buffer into texture
 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, stagingBuffer);
-GL.TextureSubImage2D(___, IntPtr.Zero);
+GL.TextureSubImage2D(___, null);
 GL.DeleteBuffer(stagingBuffer);
 ```
-The `NativeMemory.Copy` together with image decoding will be done on a different thread. Notice how the pixels argument in `TextureSubImage2D` is null. That is because a Pixel Unpack Buffer is bound which is used as the data source. So the argument actually gets interpreted as an offset. By the way, don't worry about the CPU->Buffer->Texture method of uploading adding overhead compared to CPU->Texture. It's what the driver does anyway and it's the default method in Vulkan/DX12.
+Decoding the image and copying the pixels into the buffer will be done on a different thread. Notice how the pixels argument in `TextureSubImage2D` is null. That is because a Pixel Unpack Buffer is bound which is used as the data source. So the argument actually gets interpreted as an offset. By the way, don't worry about the CPU->Buffer->Texture method of uploading adding overhead compared to CPU->Texture. It's what the driver does anyway and it's the default method in Vulkan/DX12.
 
 We need a way to signal to the main thread that it should start step 3 after a worker thread completed step 2.
 This can be implemented with a Queue.
@@ -306,7 +306,7 @@ public static class MainThreadQueue
 C# has `ConcurrentQueue`, which is also thread-safe, so perfect for this use case.
 `Execute()` is called every frame on the main thread. When a worker thread wants something done on the main thread it enqueues the Action and shortly afterwards it will be dequeued and executed. I decided to dequeue only a single Action at a time as I prefer the work to be distributed across multiple frames.
 
-With that done, the final texture loading algorithm is just a few lines:
+With that done, the final texture loading algorithm is just a couple lines:
 ```cs
 int imageSize = imageWidth * imageHeight * imageChannels;
 
@@ -328,9 +328,9 @@ Task.Run(() =>
     });
 });
 ```
-The algorithm requires knowing the image extends and channels before it is decoded in order to compute the size. If you are using stbi, the `stbi_info` family of functions can give you that information.
+The algorithm requires knowing the image extends and channels before it is decoded in order to compute the number of bytes to allocate for the buffer. If you are using stbi, the `stbi_info` family of functions can give you that information.
 The code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that loading only really starts as soon as the render loop is entered and `MainThreadQueue.Execute()` gets called.
-Creating a thread for every image might introduce lag so I am calling `Task.Run()` which uses a thread pool. The numer of thread pool threads can be set with `ThreadPool.Set{Min/Max}Threads()`. 
+Creating a thread for every image might introduce lag so I am calling `Task.Run()` which uses a thread pool.
 
 Finally, a nice way to demonstrate that things are working is to have a random thread sleep inside the worker threads, causing textures to slowly load in at different times.
 

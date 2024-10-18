@@ -4,7 +4,7 @@ namespace BBOpenGL
 {
     public static partial class BBG
     {
-        public static class Cmd
+        public static unsafe class Cmd
         {
             [Flags]
             public enum MemoryBarrierMask : uint
@@ -66,6 +66,14 @@ namespace BBOpenGL
             public static void UnbindTextureUnit(int unit)
             {
                 GL.BindTextureUnit((uint)unit, 0);
+            }
+
+            public static void SetUniforms<T>(in T uniforms) where T : unmanaged
+            {
+                globalUniformBuffer.InvalidateData();
+
+                globalUniformBuffer.UploadData(0, sizeof(T), uniforms);
+                globalUniformBuffer.BindToBufferBackedBlock(Buffer.BufferBackedBlockTarget.Uniform, 7);
             }
         }
     }

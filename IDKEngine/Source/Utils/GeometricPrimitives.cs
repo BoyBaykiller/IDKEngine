@@ -4,7 +4,7 @@ using OpenTK.Mathematics;
 
 namespace IDKEngine.Utils
 {
-    public static class ObjectFactory
+    public static class GeometricPrimitives
     {
         public static class Sphere
         {

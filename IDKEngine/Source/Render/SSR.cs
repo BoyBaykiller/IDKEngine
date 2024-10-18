@@ -8,16 +8,13 @@ namespace IDKEngine.Render
     {
         public record struct GpuSettings
         {
-            public int SampleCount;
-            public int BinarySearchCount;
-            public float MaxDist;
+            public int SampleCount = 30;
+            public int BinarySearchCount = 8;
+            public float MaxDist = 50.0f;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                SampleCount = 30,
-                BinarySearchCount = 8,
-                MaxDist = 50.0f
-            };
+            }
         }
 
         public GpuSettings Settings;
@@ -25,13 +22,9 @@ namespace IDKEngine.Render
 
         public BBG.Texture Result;
         private readonly BBG.AbstractShaderProgram shaderProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public unsafe SSR(Vector2i size, in GpuSettings settings)
+        public SSR(Vector2i size, in GpuSettings settings)
         {
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "SSR/compute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -42,8 +35,7 @@ namespace IDKEngine.Render
         {
             BBG.Computing.Compute("Compute SSR", () =>
             {
-                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-                gpuSettingsBuffer.UploadElements(Settings);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.BindTextureUnit(colorTexture, 0);
@@ -67,7 +59,6 @@ namespace IDKEngine.Render
         {
             Result.Dispose();
             shaderProgram.Dispose();
-            gpuSettingsBuffer.Dispose();
         }
     }
 }

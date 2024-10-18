@@ -6,8 +6,17 @@ namespace IDKEngine.Render
 {
     class TAAResolve : IDisposable
     {
-        public bool IsNaiveTaa;
-        public float PreferAliasingOverBlur;
+        public record struct GpuSettings
+        {
+            public bool IsNaiveTaa;
+            public float PreferAliasingOverBlur = 0.25f;
+
+            public GpuSettings()
+            {
+            }
+        }
+
+        public GpuSettings Settings;
 
         public BBG.Texture Result => (frame % 2 == 0) ? taaPing : taaPong;
         public BBG.Texture PrevResult => (frame % 2 == 0) ? taaPong : taaPing;
@@ -16,13 +25,12 @@ namespace IDKEngine.Render
         private BBG.Texture taaPong;
         private readonly BBG.AbstractShaderProgram taaResolveProgram;
         private int frame;
-        public TAAResolve(Vector2i size, float preferAliasingOverBlurAmount = 0.25f)
+        public TAAResolve(Vector2i size, in GpuSettings settings)
         {
             taaResolveProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "TAAResolve/compute.glsl"));
 
             SetSize(size);
-
-            PreferAliasingOverBlur = preferAliasingOverBlurAmount;
+            Settings = settings;
         }
 
         public void Compute(BBG.Texture color)
@@ -31,8 +39,7 @@ namespace IDKEngine.Render
 
             BBG.Computing.Compute("Temporal Anti Aliasing", () =>
             {
-                taaResolveProgram.Upload("PreferAliasingOverBlur", PreferAliasingOverBlur);
-                taaResolveProgram.Upload("IsNaiveTaa", IsNaiveTaa);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.BindTextureUnit(PrevResult, 0);

@@ -8,35 +8,25 @@ namespace IDKEngine.Render
     {
         public record struct GpuSettings
         {
-            public float Exposure;
-            public float Saturation;
-            public float Linear;
-            public float Peak;
-            public float Compression;
-            public bool IsAgXTonemaping;
+            public float Exposure = 0.45f;
+            public float Saturation = 1.06f;
+            public float Linear = 0.18f;
+            public float Peak = 1.0f;
+            public float Compression = 0.1f;
+            public bool IsAgXTonemaping = true;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                Exposure = 0.45f,
-                Saturation = 1.06f,
-                Linear = 0.18f,
-                Peak = 1.0f,
-                Compression = 0.10f,
-                IsAgXTonemaping = true,
-            };
+            }
         }
 
         public GpuSettings Settings;
 
         public BBG.Texture Result;
         private readonly BBG.AbstractShaderProgram tonemapAndGammaCorrecterProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public unsafe TonemapAndGammaCorrect(Vector2i size, in GpuSettings settings)
+        public TonemapAndGammaCorrect(Vector2i size, in GpuSettings settings)
         {
             tonemapAndGammaCorrecterProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "TonemapAndGammaCorrect/compute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -47,8 +37,7 @@ namespace IDKEngine.Render
         {
             BBG.Computing.Compute("Merge Textures and do Tonemapping + Gamma Correction", () =>
             {
-                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-                gpuSettingsBuffer.UploadElements(Settings);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.BindTextureUnit(texture0, 0, texture0 != null);
@@ -74,7 +63,6 @@ namespace IDKEngine.Render
         {
             Result.Dispose();
             tonemapAndGammaCorrecterProgram.Dispose();
-            gpuSettingsBuffer.Dispose();
         }
     }
 }

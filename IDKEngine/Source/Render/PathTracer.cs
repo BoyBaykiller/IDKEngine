@@ -37,11 +37,11 @@ namespace IDKEngine.Render
 
         public bool IsDebugBVHTraversal
         {
-            get => gpuSettings.IsDebugBVHTraversal == 1;
+            get => settings.IsDebugBVHTraversal == 1;
 
             set
             {
-                gpuSettings.IsDebugBVHTraversal = value ? 1 : 0;
+                settings.IsDebugBVHTraversal = value ? 1 : 0;
 
                 if (value)
                 {
@@ -58,60 +58,55 @@ namespace IDKEngine.Render
 
         public bool IsTraceLights
         {
-            get => gpuSettings.IsTraceLights == 1;
+            get => settings.IsTraceLights == 1;
 
             set
             {
-                gpuSettings.IsTraceLights = value ? 1 : 0;
+                settings.IsTraceLights = value ? 1 : 0;
                 ResetAccumulation();
             }
         }
 
         public float FocalLength
         {
-            get => gpuSettings.FocalLength;
+            get => settings.FocalLength;
 
             set
             {
-                gpuSettings.FocalLength = value;
+                settings.FocalLength = value;
                 ResetAccumulation();
             }
         }
 
         public float LenseRadius
         {
-            get => gpuSettings.LenseRadius;
+            get => settings.LenseRadius;
 
             set
             {
-                gpuSettings.LenseRadius = value;
+                settings.LenseRadius = value;
                 ResetAccumulation();
             }
         }
 
         public record struct GpuSettings
         {
-            public float FocalLength;
-            public float LenseRadius;
+            public float FocalLength = 8.0f;
+            public float LenseRadius = 0.01f;
             public int IsDebugBVHTraversal;
             public int IsTraceLights;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                FocalLength = 8.0f,
-                LenseRadius = 0.01f,
-                IsDebugBVHTraversal = 0,
-                IsTraceLights = 0,
-            };
+            }
         }
 
-        private GpuSettings gpuSettings;
+        private GpuSettings settings;
 
         public BBG.Texture Result;
         private readonly BBG.AbstractShaderProgram firstHitProgram;
         private readonly BBG.AbstractShaderProgram nHitProgram;
         private readonly BBG.AbstractShaderProgram finalDrawProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
         private BBG.TypedBuffer<GpuWavefrontRay> wavefrontRayBuffer;
         private BBG.Buffer wavefrontPTBuffer;
         public unsafe PathTracer(Vector2i size, in GpuSettings settings)
@@ -121,9 +116,6 @@ namespace IDKEngine.Render
             nHitProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/NHit/compute.glsl"));
             finalDrawProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/FinalDraw/compute.glsl"));
 
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-
             wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>();
             wavefrontRayBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 30);
 
@@ -132,15 +124,14 @@ namespace IDKEngine.Render
 
             SetSize(size);
 
-            gpuSettings = settings;
+            this.settings = settings;
 
             RayDepth = 7;
         }
 
         public void Compute()
         {
-            gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-            gpuSettingsBuffer.UploadElements(gpuSettings);
+            BBG.Cmd.SetUniforms(settings);
 
             BBG.Computing.Compute($"PathTrace Primary Rays", () =>
             {
@@ -203,7 +194,7 @@ namespace IDKEngine.Render
 
         public ref readonly GpuSettings GetGpuSettings()
         {
-            return ref gpuSettings;
+            return ref settings;
         }
 
         public void Dispose()
@@ -213,8 +204,6 @@ namespace IDKEngine.Render
             firstHitProgram.Dispose();
             nHitProgram.Dispose();
             finalDrawProgram.Dispose();
-
-            gpuSettingsBuffer.Dispose();
 
             wavefrontRayBuffer.Dispose();
             wavefrontPTBuffer.Dispose();

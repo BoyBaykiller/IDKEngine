@@ -7,7 +7,7 @@ namespace BBOpenGL
 {
     public static partial class BBG
     {
-        public class ShaderProgram : IDisposable
+        public unsafe class ShaderProgram : IDisposable
         {
             public readonly int ID;
             public ShaderProgram(Shader[] others)
@@ -56,7 +56,7 @@ namespace BBOpenGL
                 return success == 1;
             }
 
-            public unsafe void Upload(int location, in Matrix4 Matrix4, int count = 1, bool transpose = false)
+            public void Upload(int location, in Matrix4 Matrix4, int count = 1, bool transpose = false)
             {
                 fixed (Matrix4* ptr = &Matrix4)
                 {
@@ -64,12 +64,12 @@ namespace BBOpenGL
                 }
             }
 
-            public unsafe void Upload(int location, Vector3 vector3, int count = 1)
+            public void Upload(int location, Vector3 vector3, int count = 1)
             {
                 GL.ProgramUniform3fv(ID, location, count, &vector3.X);
             }
 
-            public unsafe void Upload(int location, in Vector4 vector4, int count = 1)
+            public void Upload(int location, in Vector4 vector4, int count = 1)
             {
                 fixed (Vector4* ptr = &vector4)
                 {
@@ -77,25 +77,25 @@ namespace BBOpenGL
                 }
             }
 
-            public unsafe void Upload(int location, float x, int count = 1)
+            public void Upload(int location, float x, int count = 1)
             {
                 GL.ProgramUniform1fv(ID, location, count, &x);
             }
-            public unsafe void Upload(string name, float x, int count = 1)
+            public void Upload(string name, float x, int count = 1)
             {
                 GL.ProgramUniform1fv(ID, GetUniformLocation(name), count, &x);
             }
 
-            public unsafe void Upload(int location, int x, int count = 1)
+            public void Upload(int location, int x, int count = 1)
             {
                 GL.ProgramUniform1iv(ID, location, count, &x);
             }
-            public unsafe void Upload(string name, int x, int count = 1)
+            public void Upload(string name, int x, int count = 1)
             {
                 GL.ProgramUniform1iv(ID, GetUniformLocation(name), count, &x);
             }
 
-            public unsafe void Upload(int location, uint x, int count = 1)
+            public void Upload(int location, uint x, int count = 1)
             {
                 GL.ProgramUniform1uiv(ID, location, count, &x);
             }

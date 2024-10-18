@@ -573,7 +573,7 @@ namespace IDKEngine.Render
 
                         if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.TAA)
                         {
-                            ImGui.Checkbox("IsNaiveTaa", ref app.RasterizerPipeline.TaaResolve.IsNaiveTaa);
+                            ImGui.Checkbox("IsNaiveTaa", ref app.RasterizerPipeline.TaaResolve.Settings.IsNaiveTaa);
                             ToolTipForItemAboveHovered(
                                 "This is not a feature. It's mostly for fun and you can see the output of a naive TAA resolve pass.\n" +
                                 "In static scenes this always converges to the correct result whereas with artifact mitigation valid samples might be rejected."
@@ -581,9 +581,9 @@ namespace IDKEngine.Render
 
                             ImGui.SliderInt("Samples##SamplesTAA", ref app.RasterizerPipeline.TAASamples, 1, 36);
 
-                            if (!app.RasterizerPipeline.TaaResolve.IsNaiveTaa)
+                            if (!app.RasterizerPipeline.TaaResolve.Settings.IsNaiveTaa)
                             {
-                                ImGui.SliderFloat("PreferAliasingOverBlur", ref app.RasterizerPipeline.TaaResolve.PreferAliasingOverBlur, 0.0f, 1.0f);
+                                ImGui.SliderFloat("PreferAliasingOverBlur", ref app.RasterizerPipeline.TaaResolve.Settings.PreferAliasingOverBlur, 0.0f, 1.0f);
                             }
                         }
 

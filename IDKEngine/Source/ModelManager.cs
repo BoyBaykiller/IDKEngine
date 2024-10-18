@@ -89,7 +89,7 @@ namespace IDKEngine
         private bool runSkinningShader;
         private float prevAnimationTime = float.MinValue;
 
-        public unsafe ModelManager()
+        public ModelManager()
         {
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
             meshesBuffer = new BBG.TypedBuffer<GpuMesh>();
@@ -139,7 +139,7 @@ namespace IDKEngine
         }
 
         // TODO: Change to ReadOnlySpan in .NET 9
-        public unsafe void Add(params ModelLoader.Model?[] models)
+        public void Add(params ModelLoader.Model?[] models)
         {
             // This data is not stored on the CPU so retrieve it
             meshletBuffer.DownloadElements(out GpuMeshlet[] meshlets);

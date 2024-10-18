@@ -390,7 +390,7 @@ namespace IDKEngine
                 LightManager.Update(dT, ModelManager);
             }
 
-            if (SceneVsCamCollisionSettings.IsEnabled && MouseState[MouseButton.Button1 + 4] == Keyboard.InputState.Released)
+            if (SceneVsCamCollisionSettings.IsEnabled)
             {
                 Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
                 Vector3 prevSpherePos = movingSphere.Center;
@@ -406,15 +406,10 @@ namespace IDKEngine
                 });
             }
 
-            if (MouseState[MouseButton.Button1 + 3] == Keyboard.InputState.Touched)
-            {
-                Camera.IsGravity = !Camera.IsGravity;
-            }
-
             Camera.SetPrevToCurrentPosition();
         }
 
-        protected override unsafe void OnStart()
+        protected override void OnStart()
         {
             BBG.Initialize(Helper.GLDebugCallback);
 
@@ -443,7 +438,7 @@ namespace IDKEngine
                     "If the extension is indeed not supported shader compilation will throw errors"
                 );
             }
-
+            
             gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
             gpuPerFrameDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
             gpuPerFrameDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 0);
@@ -496,7 +491,7 @@ namespace IDKEngine
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\untitled.glb").Value;
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", new Transformation().WithScale(4.0f).GetMatrix()).Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
 
@@ -624,7 +619,7 @@ namespace IDKEngine
                 TimeEnabled = false;
 
                 PathTracer?.Dispose();
-                PathTracer = new PathTracer(renderRes, PathTracer == null ? PathTracer.GpuSettings.Default : PathTracer.GetGpuSettings());
+                PathTracer = new PathTracer(renderRes, PathTracer == null ? new PathTracer.GpuSettings() : PathTracer.GetGpuSettings());
             }
             else
             {
@@ -638,13 +633,13 @@ namespace IDKEngine
                 BoxRenderer = new BoxRenderer();
 
                 if (TonemapAndGamma != null) TonemapAndGamma.Dispose();
-                TonemapAndGamma = new TonemapAndGammaCorrect(presentRes, TonemapAndGamma == null ? TonemapAndGammaCorrect.GpuSettings.Default : TonemapAndGamma.Settings);
+                TonemapAndGamma = new TonemapAndGammaCorrect(presentRes, TonemapAndGamma == null ? new TonemapAndGammaCorrect.GpuSettings() : TonemapAndGamma.Settings);
 
                 if (Bloom != null) Bloom.Dispose();
-                Bloom = new Bloom(presentRes, Bloom == null ? Bloom.GpuSettings.Default : Bloom.Settings);
+                Bloom = new Bloom(presentRes, Bloom == null ? new Bloom.GpuSettings() : Bloom.Settings);
 
                 if (VolumetricLight != null) VolumetricLight.Dispose();
-                VolumetricLight = new VolumetricLighting(presentRes, VolumetricLight == null ? VolumetricLighting.GpuSettings.Default : VolumetricLight.Settings);
+                VolumetricLight = new VolumetricLighting(presentRes, VolumetricLight == null ? new VolumetricLighting.GpuSettings() : VolumetricLight.Settings);
             }
         }
 

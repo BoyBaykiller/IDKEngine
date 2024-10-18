@@ -14,14 +14,12 @@ namespace IDKEngine.Render
 
         public record struct GpuSettings
         {
-            public float Threshold;
-            public float MaxColor;
+            public float Threshold = 1.0f;
+            public float MaxColor = 2.8f;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                Threshold = 1.0f,
-                MaxColor = 2.8f
-            };
+            }
         }
 
         private int _minusLods;
@@ -44,13 +42,9 @@ namespace IDKEngine.Render
         private BBG.Texture downscaleTexture;
         private BBG.Texture upsampleTexture;
         private readonly BBG.AbstractShaderProgram shaderProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public unsafe Bloom(Vector2i size, in GpuSettings settings, int minusLods = 3)
+        public Bloom(Vector2i size, in GpuSettings settings, int minusLods = 3)
         {
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "Bloom/compute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -60,8 +54,7 @@ namespace IDKEngine.Render
 
         public void Compute(BBG.Texture src)
         {
-            gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-            gpuSettingsBuffer.UploadElements(Settings);
+            BBG.Cmd.SetUniforms(Settings);
 
             BBG.Cmd.UseShaderProgram(shaderProgram);
             int currentWriteLod = 0;
@@ -158,7 +151,6 @@ namespace IDKEngine.Render
             downscaleTexture.Dispose();
             upsampleTexture.Dispose();
             shaderProgram.Dispose();
-            gpuSettingsBuffer.Dispose();
         }
     }
 }

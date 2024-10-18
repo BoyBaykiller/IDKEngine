@@ -87,22 +87,22 @@ vec3 CosineSampleHemisphere(vec3 normal)
     return CosineSampleHemisphere(normal, GetRandomFloat01(), GetRandomFloat01());
 }
 
-vec2 SampleDisk(float rnd0, float rnd1)
+vec2 SampleDisk()
 {
     vec2 point;
     float dist;
+    float lastRnd = GetRandomFloat01();
     do
     {
-        point = vec2(rnd0, rnd1) * 2.0 - 1.0;
+        float thisRnd = GetRandomFloat01();
+        
+        point = vec2(lastRnd, thisRnd);
         dist = dot(point, point);
+
+        lastRnd = thisRnd;
     } while (dist > 1.0);
 
-    return point;
-}
-
-vec2 SampleDisk()
-{
-    return SampleDisk(GetRandomFloat01(), GetRandomFloat01());
+    return point * 2.0 - 1.0;
 }
 
 float CosineSampleHemispherePdf(float cosTheta)

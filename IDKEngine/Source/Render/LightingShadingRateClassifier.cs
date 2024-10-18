@@ -23,16 +23,13 @@ namespace IDKEngine.Render
 
         public record struct GpuSettings
         {
-            public DebugMode DebugValue;
-            public float SpeedFactor;
-            public float LumVarianceFactor;
+            public DebugMode DebugValue = DebugMode.None;
+            public float SpeedFactor = 0.2f;
+            public float LumVarianceFactor = 0.04f;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                DebugValue = DebugMode.None,
-                SpeedFactor = 0.2f,
-                LumVarianceFactor = 0.04f,
-            };
+            }
         }
 
         public GpuSettings Settings;
@@ -42,14 +39,10 @@ namespace IDKEngine.Render
         private BBG.Texture debugTexture;
         private readonly BBG.AbstractShaderProgram shaderProgram;
         private readonly BBG.AbstractShaderProgram debugProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public unsafe LightingShadingRateClassifier(Vector2i size, in GpuSettings settings)
+        public LightingShadingRateClassifier(Vector2i size, in GpuSettings settings)
         {
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "ShadingRateClassification/compute.glsl"));
             debugProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "ShadingRateClassification/debugCompute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -68,8 +61,7 @@ namespace IDKEngine.Render
         {
             BBG.Computing.Compute("Generate Shading Rate Image", () =>
             {
-                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-                gpuSettingsBuffer.UploadElements(Settings);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.BindImageUnit(debugTexture, 1);
@@ -90,8 +82,7 @@ namespace IDKEngine.Render
 
             BBG.Computing.Compute("Debug render shading rate attributes", () =>
             {
-                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-                gpuSettingsBuffer.UploadElements(Settings);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(dest, 0);
                 BBG.Cmd.BindTextureUnit(dest, 0);
@@ -125,7 +116,6 @@ namespace IDKEngine.Render
             debugTexture.Dispose();
             shaderProgram.Dispose();
             debugProgram.Dispose();
-            gpuSettingsBuffer.Dispose();
         }
 
         public BBG.Rendering.VariableRateShadingNV GetRenderData()

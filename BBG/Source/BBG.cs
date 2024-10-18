@@ -112,6 +112,7 @@ namespace BBOpenGL
         }
 
         private static ContextInfo contextInfo;
+        private static Buffer globalUniformBuffer;
 
         public static void Initialize(Debugging.FuncOpenGLDebugCallback openglDebugCallback = null)
         {
@@ -130,15 +131,18 @@ namespace BBOpenGL
             GL.Disable(EnableCap.Multisample);
             GL.Disable(EnableCap.Dither);
 
-            // set default graphics pipeline state
-            Rendering.SetGraphicsPipelineState(new Rendering.GraphicsPipelineState());
-
             // ideally should be paramaters in pixel pack/unpack functions
             GL.PixelStorei(PixelStoreParameter.PackAlignment, 1);
             GL.PixelStorei(PixelStoreParameter.UnpackAlignment, 1);
 
+            // set default graphics pipeline state
+            Rendering.SetGraphicsPipelineState(new Rendering.GraphicsPipelineState());
+
+            globalUniformBuffer = new Buffer();
+            globalUniformBuffer.Allocate(Buffer.MemLocation.DeviceLocal, Buffer.MemAccess.AutoSync, 1 << 12);
+
             contextInfo.APIName = GL.GetString(StringName.Version);
-            contextInfo.GLVersion = Convert.ToDouble($"{GL.GetInteger(GetPName.MajorVersion)}.{GL.GetInteger(GetPName.MinorVersion)}");
+            contextInfo.GLVersion = Convert.ToInt32($"{GL.GetInteger(GetPName.MajorVersion)}{GL.GetInteger(GetPName.MinorVersion)}") / 10.0;
 
             ref DeviceInfo deviceInfo = ref contextInfo.DeviceInfo;
             deviceInfo.Name = GL.GetString(StringName.Renderer);

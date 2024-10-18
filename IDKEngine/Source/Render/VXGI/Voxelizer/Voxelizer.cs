@@ -55,7 +55,6 @@ namespace IDKEngine.Render
             }
         }
 
-
         public BBG.Texture ResultVoxels;
         private readonly BBG.Texture[] intermediateResultsRbg; // only used if no support for GL_NV_shader_atomic_fp16_vector
         private readonly BBG.AbstractShaderProgram mergeIntermediatesProgram; // only used if no support for GL_NV_shader_atomic_fp16_vector
@@ -66,7 +65,7 @@ namespace IDKEngine.Render
         public readonly BBG.TypedBuffer<GpuVoxelizerData> voxelizerDataBuffer;
         private GpuVoxelizerData gpuVoxelizerData;
 
-        public unsafe Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
+        public Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
         {
             BBG.AbstractShaderProgram.SetShaderInsertionValue(nameof(TAKE_ATOMIC_FP16_PATH), TAKE_ATOMIC_FP16_PATH);
             BBG.AbstractShaderProgram.SetShaderInsertionValue(nameof(TAKE_FAST_GEOMETRY_SHADER_PATH), TAKE_FAST_GEOMETRY_SHADER_PATH);

@@ -8,20 +8,15 @@ namespace IDKEngine.Render
     {
         public record struct GpuSettings
         {
-            public Vector3 Absorbance;
-            public int SampleCount;
-            public float Scattering;
-            public float MaxDist;
-            public float Strength;
+            public Vector3 Absorbance = new Vector3(0.025f);
+            public int SampleCount = 5;
+            public float Scattering = 0.758f;
+            public float MaxDist = 50.0f;
+            public float Strength = 0.1f;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                Absorbance = new Vector3(0.025f),
-                SampleCount = 5,
-                Scattering = 0.758f,
-                MaxDist = 50.0f,
-                Strength = 0.1f
-            };
+            }
         }
 
         public Vector2i RenderResolution { get; private set; }
@@ -47,14 +42,10 @@ namespace IDKEngine.Render
 
         private readonly BBG.AbstractShaderProgram volumetricLightingProgram;
         private readonly BBG.AbstractShaderProgram upscaleProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
         public unsafe VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
         {
             volumetricLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VolumetricLight/compute.glsl"));
             upscaleProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VolumetricLight/Upscale/compute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             _resolutionScale = resolutionScale;
             SetSize(size);
@@ -64,11 +55,11 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-            gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-            gpuSettingsBuffer.UploadElements(Settings);
 
             BBG.Computing.Compute("Compute Volumetric Lighting", () =>
             {
+                BBG.Cmd.SetUniforms(Settings);
+
                 BBG.Cmd.BindImageUnit(volumetricLightingTexture, 0);
                 BBG.Cmd.BindImageUnit(depthTexture, 1);
                 BBG.Cmd.UseShaderProgram(volumetricLightingProgram);
@@ -121,8 +112,6 @@ namespace IDKEngine.Render
 
             volumetricLightingProgram.Dispose();
             upscaleProgram.Dispose();
-
-            gpuSettingsBuffer.Dispose();
         }
     }
 }

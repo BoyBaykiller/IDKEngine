@@ -3,9 +3,9 @@
 #define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH) - 1, 1) // -1 because we skip root
 #define MAX_TLAS_TREE_DEPTH max(24, 1)
 
+AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/IntersectionRoutines.glsl)
-AppInclude(include/StaticUniformBuffers.glsl)
 
 struct HitInfo
 {

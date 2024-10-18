@@ -8,35 +8,25 @@ namespace IDKEngine.Render
     {
         public record struct GpuSettings
         {
-            public int MaxSamples;
-            public float StepMultiplier;
-            public float GIBoost;
-            public float GISkyBoxBoost;
-            public float NormalRayOffset;
-            public bool IsTemporalAccumulation;
+            public int MaxSamples = 4;
+            public float StepMultiplier = 0.16f;
+            public float GIBoost = 1.3f;
+            public float GISkyBoxBoost = 1.0f / 1.3f;
+            public float NormalRayOffset = 1.0f;
+            public bool IsTemporalAccumulation = true;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                NormalRayOffset = 1.0f,
-                MaxSamples = 4,
-                GIBoost = 1.3f,
-                GISkyBoxBoost = 1.0f / 1.3f,
-                StepMultiplier = 0.16f,
-                IsTemporalAccumulation = true
-            };
+            }
         }
 
         public GpuSettings Settings;
 
         public BBG.Texture Result;
         private readonly BBG.AbstractShaderProgram shaderProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public unsafe ConeTracer(Vector2i size, in GpuSettings settings)
+        public ConeTracer(Vector2i size, in GpuSettings settings)
         {
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/ConeTracing/compute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -47,8 +37,7 @@ namespace IDKEngine.Render
         {
             BBG.Computing.Compute("Cone Trace voxel texture", () =>
             {
-                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-                gpuSettingsBuffer.UploadElements(Settings);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.BindTextureUnit(voxelsAlbedo, 0);
@@ -71,7 +60,6 @@ namespace IDKEngine.Render
         {
             Result.Dispose();
             shaderProgram.Dispose();
-            gpuSettingsBuffer.Dispose();
         }
     }
 }

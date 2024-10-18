@@ -65,7 +65,7 @@ namespace IDKEngine.Render
         private readonly CpuLight[] lights;
 
         private readonly BBG.TypedBuffer<GpuLight> lightBufferObject;
-        private readonly BBG.TypedBuffer<ObjectFactory.Sphere.Vertex> vertexBuffer;
+        private readonly BBG.TypedBuffer<GeometricPrimitives.Sphere.Vertex> vertexBuffer;
         private readonly BBG.TypedBuffer<uint> indexBuffer;
         private readonly BBG.AbstractShaderProgram shaderProgram;
         private readonly PointShadowManager pointShadowManager;
@@ -84,11 +84,11 @@ namespace IDKEngine.Render
             const int SphereLatitudes = 12, SphereLongitudes = 12;
             const float SphereRadius = 1.0f;
 
-            Span<ObjectFactory.Sphere.Vertex> vertices = ObjectFactory.Sphere.GenerateVertices(SphereRadius, SphereLatitudes, SphereLongitudes);
-            vertexBuffer = new BBG.TypedBuffer<ObjectFactory.Sphere.Vertex>();
+            Span<GeometricPrimitives.Sphere.Vertex> vertices = GeometricPrimitives.Sphere.GenerateVertices(SphereRadius, SphereLatitudes, SphereLongitudes);
+            vertexBuffer = new BBG.TypedBuffer<GeometricPrimitives.Sphere.Vertex>();
             vertexBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertices);
 
-            Span<uint> indices = ObjectFactory.Sphere.GenerateIndices(SphereLatitudes, SphereLongitudes);
+            Span<uint> indices = GeometricPrimitives.Sphere.GenerateIndices(SphereLatitudes, SphereLongitudes);
             indexBuffer = new BBG.TypedBuffer<uint>();
             indexBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, indices);
 
@@ -103,12 +103,12 @@ namespace IDKEngine.Render
                 IndexBuffer = indexBuffer,
                 VertexDescription = new BBG.Rendering.VertexDescription()
                 {
-                    VertexBuffers = [new BBG.Rendering.VertexBuffer() { Buffer = vertexBuffer, VertexSize = sizeof(ObjectFactory.Sphere.Vertex) } ],
+                    VertexBuffers = [new BBG.Rendering.VertexBuffer() { Buffer = vertexBuffer, VertexSize = sizeof(GeometricPrimitives.Sphere.Vertex) } ],
                     VertexAttributes = [
                         new BBG.Rendering.VertexAttribute()
                         {
                             BufferIndex = 0,
-                            RelativeOffset = Marshal.OffsetOf<ObjectFactory.Sphere.Vertex>(nameof(ObjectFactory.Sphere.Vertex.Position)),
+                            RelativeOffset = Marshal.OffsetOf<GeometricPrimitives.Sphere.Vertex>(nameof(GeometricPrimitives.Sphere.Vertex.Position)),
                             Type = BBG.Rendering.VertexAttributeType.Float,
                             NumComponents = 3,
                         },

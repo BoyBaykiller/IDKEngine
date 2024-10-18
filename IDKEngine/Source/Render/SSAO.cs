@@ -8,29 +8,22 @@ namespace IDKEngine.Render
     {
         public record struct GpuSettings
         {
-            public int SampleCount;
-            public float Radius;
-            public float Strength;
+            public int SampleCount = 10;
+            public float Radius = 0.2f;
+            public float Strength = 1.3f;
 
-            public static GpuSettings Default = new GpuSettings()
+            public GpuSettings()
             {
-                SampleCount = 10,
-                Radius = 0.2f,
-                Strength = 1.3f
-            };
+            }
         }
 
         public GpuSettings Settings;
 
         public BBG.Texture Result;
         private readonly BBG.AbstractShaderProgram shaderProgram;
-        private readonly BBG.TypedBuffer<GpuSettings> gpuSettingsBuffer;
-        public unsafe SSAO(Vector2i size, in GpuSettings settings)
+        public SSAO(Vector2i size, in GpuSettings settings)
         {
             shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "SSAO/compute.glsl"));
-
-            gpuSettingsBuffer = new BBG.TypedBuffer<GpuSettings>();
-            gpuSettingsBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             SetSize(size);
 
@@ -41,8 +34,7 @@ namespace IDKEngine.Render
         {
             BBG.Computing.Compute("Compute SSAO", () =>
             {
-                gpuSettingsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-                gpuSettingsBuffer.UploadElements(Settings);
+                BBG.Cmd.SetUniforms(Settings);
 
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.UseShaderProgram(shaderProgram);
@@ -64,7 +56,6 @@ namespace IDKEngine.Render
         {
             Result.Dispose();
             shaderProgram.Dispose();
-            gpuSettingsBuffer.Dispose();
         }
     }
 }

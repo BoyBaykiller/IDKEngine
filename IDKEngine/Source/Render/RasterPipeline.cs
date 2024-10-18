@@ -41,7 +41,7 @@ namespace IDKEngine.Render
                 if (TAAMode == TemporalAntiAliasingMode.TAA)
                 {
                     TaaResolve?.Dispose();
-                    TaaResolve = new TAAResolve(PresentationResolution);
+                    TaaResolve = new TAAResolve(PresentationResolution, new TAAResolve.GpuSettings());
                 }
                 else
                 {
@@ -187,7 +187,7 @@ namespace IDKEngine.Render
         private GpuBindlessGBuffer gpuBindlessGBuffer;
 
         private int frameIndex;
-        public unsafe RasterPipeline(Vector2i renderSize, Vector2i presentationSize)
+        public RasterPipeline(Vector2i renderSize, Vector2i presentationSize)
         {
             TakeMeshShaderPath = false;
             IsHiZCulling = false;
@@ -216,11 +216,11 @@ namespace IDKEngine.Render
             bindlessGBufferBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
             bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
 
-            SSAO = new SSAO(renderSize, SSAO.GpuSettings.Default);
-            SSR = new SSR(renderSize, SSR.GpuSettings.Default);
-            LightingVRS = new LightingShadingRateClassifier(renderSize, LightingShadingRateClassifier.GpuSettings.Default);
+            SSAO = new SSAO(renderSize, new SSAO.GpuSettings());
+            SSR = new SSR(renderSize, new SSR.GpuSettings());
+            LightingVRS = new LightingShadingRateClassifier(renderSize, new LightingShadingRateClassifier.GpuSettings());
             Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
-            ConeTracer = new ConeTracer(renderSize, ConeTracer.GpuSettings.Default);
+            ConeTracer = new ConeTracer(renderSize, new ConeTracer.GpuSettings());
 
             IsWireframe = false;
             IsSSAO = true;
