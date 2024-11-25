@@ -93,8 +93,6 @@ namespace IDKEngine.Render
         public BBG.Texture ShadowMap;
         public BBG.Texture RayTracedShadowMap;
 
-        private BBG.Sampler nearestSampler;
-        private BBG.Sampler shadowSampler;
         private GpuPointShadow gpuPointShadow;
 
         private static bool isLazyInitialized;
@@ -184,12 +182,12 @@ namespace IDKEngine.Render
 
         private void UpdateViewMatrices()
         {
-            gpuPointShadow.PosX = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-            gpuPointShadow.NegX = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-            gpuPointShadow.PosY = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
-            gpuPointShadow.NegY = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
-            gpuPointShadow.PosZ = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
-            gpuPointShadow.NegZ = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow[GpuPointShadow.RenderMatrix.PosX] = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow[GpuPointShadow.RenderMatrix.NegX] = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(-1.0f, 0.0f, 0.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow[GpuPointShadow.RenderMatrix.PosY] = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f)) * projection;
+            gpuPointShadow[GpuPointShadow.RenderMatrix.NegY] = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, -1.0f, 0.0f), new Vector3(0.0f, 0.0f, -1.0f)) * projection;
+            gpuPointShadow[GpuPointShadow.RenderMatrix.PosZ] = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
+            gpuPointShadow[GpuPointShadow.RenderMatrix.NegZ] = Camera.GenerateViewMatrix(gpuPointShadow.Position, new Vector3(0.0f, 0.0f, -1.0f), new Vector3(0.0f, -1.0f, 0.0f)) * projection;
         }
 
         public ref readonly GpuPointShadow GetGpuPointShadow()
@@ -204,11 +202,9 @@ namespace IDKEngine.Render
 
         public void SetSizeShadowMap(int size)
         {
-            if (shadowSampler != null) { shadowSampler.Dispose(); }
-            if (nearestSampler != null) { nearestSampler.Dispose(); }
             if (ShadowMap != null) { ShadowMap.Dispose(); }
 
-            shadowSampler = new BBG.Sampler(new BBG.Sampler.SamplerState()
+            using BBG.Sampler shadowSampler = new BBG.Sampler(new BBG.Sampler.SamplerState()
             {
                 MinFilter = BBG.Sampler.MinFilter.Linear,
                 MagFilter = BBG.Sampler.MagFilter.Linear,
@@ -217,7 +213,7 @@ namespace IDKEngine.Render
                 CompareFunc = BBG.Sampler.CompareFunc.Less,
             });
 
-            nearestSampler = new BBG.Sampler(new BBG.Sampler.SamplerState()
+            using BBG.Sampler nearestSampler = new BBG.Sampler(new BBG.Sampler.SamplerState()
             {
                 MinFilter = BBG.Sampler.MinFilter.Nearest,
                 MagFilter = BBG.Sampler.MagFilter.Nearest,
@@ -248,9 +244,6 @@ namespace IDKEngine.Render
         public void Dispose()
         {
             RayTracedShadowMap.Dispose();
-
-            shadowSampler.Dispose();
-            nearestSampler.Dispose();
             ShadowMap.Dispose();
         }
     }

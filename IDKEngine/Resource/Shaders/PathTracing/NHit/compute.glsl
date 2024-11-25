@@ -126,6 +126,13 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             geometricNormal = surface.Normal;
         }
 
+        bool fromInside = dot(-rayDir, geometricNormal) < 0.0;
+        if (fromInside)
+        {
+            geometricNormal *= -1.0;
+            wavefrontRay.Throughput *= exp(-surface.Absorbance * hitInfo.T);
+        }
+
         float cosTheta = dot(-rayDir, surface.Normal);
         if (cosTheta < 0.0)
         {
@@ -133,13 +140,6 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             cosTheta *= -1.0;
         }
         cosTheta = min(cosTheta, 1.0);
-
-        bool fromInside = dot(-rayDir, geometricNormal) < 0.0;
-        if (fromInside)
-        {
-            geometricNormal *= -1.0;
-            wavefrontRay.Throughput *= exp(-surface.Absorbance * hitInfo.T);
-        }
 
         wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
 

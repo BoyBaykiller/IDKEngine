@@ -59,9 +59,12 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
 
     float cosTheta = dot(-incomming, surface.Normal);
 
-    float diffuseChance = 1.0 - surface.Metallic - surface.Transmission;
-    surface.Metallic = SpecularBasedOnViewAngle(surface.Metallic, cosTheta, prevIor, surface.IOR);
-    surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // renormalize
+    {
+        // Fresnel
+        float diffuseChance = 1.0 - surface.Metallic - surface.Transmission;
+        surface.Metallic = SpecularBasedOnViewAngle(surface.Metallic, cosTheta, prevIor, surface.IOR);
+        surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // renormalize
+    }
 
     SampleMaterialResult result;
 

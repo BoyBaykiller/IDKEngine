@@ -115,7 +115,6 @@ vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPo
     
     float distSq = dot(surfaceToLight, surfaceToLight);
     float attenuation = GetAttenuationFactor(distSq, light.Radius);
-
     
     const float prevIor = 1.0;
     vec3 fresnelTerm;
@@ -130,7 +129,6 @@ vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPo
 
 float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample)
 {
-    // TODO: Use overall better sampling method
     // Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
     const vec3 ShadowSampleOffsets[] =
     {

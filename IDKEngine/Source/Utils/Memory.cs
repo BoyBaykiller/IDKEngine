@@ -1,5 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace IDKEngine.Utils
 {
@@ -25,7 +24,7 @@ namespace IDKEngine.Utils
             NativeMemory.Fill(ptr, (nuint)byteCount, value);
         }
 
-        public static void CopyElements<T>(in T src, ref T dest, nint numElements) where T : unmanaged
+        public static void CopyElements<T>(ref readonly T src, ref T dest, nint numElements) where T : unmanaged
         {
             fixed (T* srcPtr = &src, destPtr = &dest)
             {

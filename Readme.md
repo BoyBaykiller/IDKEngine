@@ -182,7 +182,7 @@ Performance comparison on 11 million triangles [Intel Sponza](https://www.intel.
 
 The rendering thrice method is simpler to implement and faster. Still it's far from optimal. For example swizzling the vertices in a compute shader and then rendering only once, basically emulating the geometry shader, would likely be more performant.
 
-### 2.3 Optimizations (using NV-extensions)
+### 3.0 Optimizations (using NV-extensions)
 
 There are certain extensions we can use to improve the voxelization process. These are only supported on NVIDIA GPUs starting from the Maxwell architecture (GTX-900 series).
 

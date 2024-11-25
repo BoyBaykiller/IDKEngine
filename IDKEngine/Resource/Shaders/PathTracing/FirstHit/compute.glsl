@@ -110,7 +110,6 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
             GpuVertex v2 = vertexSSBO.Vertices[indices.z];
-
             vec3 bary = vec3(hitInfo.BaryXY.xy, 1.0 - hitInfo.BaryXY.x - hitInfo.BaryXY.y);
             vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, bary);
             vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), bary));
@@ -152,24 +151,25 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             geometricNormal = surface.Normal;
         }
 
+        // This is the first hit shader so we determine previous IOR here
         float prevIor = 1.0;
-        float cosTheta = dot(-rayDir, surface.Normal);
-        if (cosTheta < 0.0)
-        {
-            // This is the first hit shader which means we determine previous IOR here
-            prevIor = surface.IOR;
-            
-            surface.Normal *= -1.0;
-            cosTheta *= -1.0;
-        }
-        cosTheta = min(cosTheta, 1.0);
 
         bool fromInside = dot(-rayDir, geometricNormal) < 0.0;
         if (fromInside)
         {
+            prevIor = surface.IOR;
+
             geometricNormal *= -1.0;
             wavefrontRay.Throughput *= exp(-surface.Absorbance * hitInfo.T);
         }
+
+        float cosTheta = dot(-rayDir, surface.Normal);
+        if (cosTheta < 0.0)
+        {
+            surface.Normal *= -1.0;
+            cosTheta *= -1.0;
+        }
+        cosTheta = min(cosTheta, 1.0);
 
         wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
 

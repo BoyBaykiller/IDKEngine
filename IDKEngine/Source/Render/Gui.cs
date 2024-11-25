@@ -23,56 +23,38 @@ namespace IDKEngine.Render
 {
     partial class Gui : IDisposable
     {
-        public enum EntityType : int
+        public abstract record SelectedEntityInfo
         {
-            None,
-            Mesh,
-            Light,
-            Node,
-        }
-
-        public readonly record struct SelectedEntityInfo
-        {
-            public readonly EntityType EntityType = EntityType.None;
-
-            // Only used when EntityType != Node
-            public readonly int EntityID;
-            public readonly int InstanceID;
-
-            // Only used when EntityType == Node
-            public readonly ModelLoader.Node? Node; 
-
-            public static readonly SelectedEntityInfo None = new SelectedEntityInfo();
-
-            public SelectedEntityInfo(EntityType entityType, int entityId, int instanceID)
-            {
-                EntityType = entityType;
-                EntityID = entityId;
-                InstanceID = instanceID;
-            }
-
-            public SelectedEntityInfo(ModelLoader.Node node)
-            {
-                EntityType = EntityType.Node;
-                Node = node;
-            }
+            public record MeshInstance(int MeshInstanceId) : SelectedEntityInfo;
+            public record Light(int LightId) : SelectedEntityInfo;
+            public record Node(ModelLoader.Node Node_) : SelectedEntityInfo;
+            public record Material(int MaterialId) : SelectedEntityInfo;
+            public record Animation(int ModelId, int AnimationId) : SelectedEntityInfo;
         }
 
         public SelectedEntityInfo SelectedEntity;
 
         private readonly ImGuiBackend guiBackend;
+        private readonly Queue<IDisposable> frameDeletionQueue;
         private SysVec2 viewportHeaderSize;
         private float clickedEntityDistance;
         public Gui(Vector2i windowSize)
         {
-            guiBackend = new ImGuiBackend(windowSize);
+            guiBackend = new ImGuiBackend(windowSize, "Resource/imgui.ini");
+            frameDeletionQueue = new Queue<IDisposable>();
         }
 
         public void Draw(Application app, float dT)
         {
             guiBackend.BeginFrame(app, dT);
+
             DrawMyGui(app);
+
             guiBackend.EndFrame();
+            while (frameDeletionQueue.TryDequeue(out IDisposable disposable))
+            {
+                disposable.Dispose();
+            }
         }
 
         private unsafe void DrawMyGui(Application app)
@@ -112,7 +94,7 @@ namespace IDKEngine.Render
                                 pointShadow.Dispose();
                             }
 
-                            SelectedEntity = new SelectedEntityInfo(EntityType.Light, newLightIndex, 0);
+                            SelectedEntity = new SelectedEntityInfo.Light(newLightIndex);
                             resetPathTracer = true;
                         }
                     }
@@ -807,13 +789,14 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Entity Properties"))
             {
-                if (SelectedEntity.EntityType == EntityType.Mesh)
+                if (SelectedEntity is SelectedEntityInfo.MeshInstance meshInstanceInfo)
                 {
                     bool modified = false;
-                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[SelectedEntity.EntityID];
-                    ref GpuMesh mesh = ref app.ModelManager.Meshes[SelectedEntity.EntityID];
-                    ref GpuMaterial material = ref app.ModelManager.Materials[mesh.MaterialId];
-                    GpuMeshInstance meshInstance = app.ModelManager.MeshInstances[SelectedEntity.InstanceID];
+
+                    GpuMeshInstance meshInstance = app.ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId];
+                    ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[meshInstance.MeshId];
+                    ref GpuMesh mesh = ref app.ModelManager.Meshes[meshInstance.MeshId];
+                    ref GpuMaterial material = ref app.ModelManager.GpuMaterials[mesh.MaterialId];
 
                     Transformation meshInstanceTransform = Transformation.FromMatrix(meshInstance.ModelMatrix);
 
@@ -883,29 +866,36 @@ namespace IDKEngine.Render
 
                     ImGui.SeparatorText("Mesh Info");
 
-                    ImGui.Text($"MeshId: {SelectedEntity.EntityID} | MaterialID: {mesh.MaterialId}");
-                    ImGui.Text($"InstanceID: {SelectedEntity.InstanceID - cmd.BaseInstance} | Triangle Count: {cmd.IndexCount / 3}");
+                    ImGui.Text($"MeshId: {meshInstance.MeshId} | MaterialId: {mesh.MaterialId}");
+                    ImGui.Text($"InstanceId: {meshInstanceInfo.MeshInstanceId - cmd.BaseInstance} | Triangle Count: {cmd.IndexCount / 3}");
 
                     if (modified)
                     {
                         meshInstance.ModelMatrix = meshInstanceTransform.GetMatrix();
 
                         resetPathTracer = true;
-                        app.ModelManager.UploadMeshBuffer(SelectedEntity.EntityID, 1);
-                        app.ModelManager.SetMeshInstance(SelectedEntity.InstanceID, meshInstance);
+                        app.ModelManager.UploadMeshBuffer(meshInstance.MeshId, 1);
+                        app.ModelManager.SetMeshInstance(meshInstanceInfo.MeshInstanceId, meshInstance);
+                    }
+
+                    if (ImGui.Button("Delete"))
+                    {
+                        app.ModelManager.RemoveMeshInstances(new Range(meshInstanceInfo.MeshInstanceId, 1));
+                        SelectedEntity = null;
+                        resetPathTracer = true;
                     }
                 }
-                else if (SelectedEntity.EntityType == EntityType.Light)
+                else if (SelectedEntity is SelectedEntityInfo.Light lightInfo)
                 {
                     bool modified = false;
 
-                    app.LightManager.TryGetLight(SelectedEntity.EntityID, out CpuLight cpuLight);
+                    app.LightManager.TryGetLight(lightInfo.LightId, out CpuLight cpuLight);
                     ref GpuLight gpuLight = ref cpuLight.GpuLight;
 
                     if (ImGui.Button("Delete"))
                     {
-                        app.LightManager.DeleteLight(SelectedEntity.EntityID);
-                        SelectedEntity = SelectedEntityInfo.None;
+                        app.LightManager.DeleteLight(lightInfo.LightId);
+                        SelectedEntity = null;
                         resetPathTracer = true;
                     }
                     else
@@ -946,7 +936,7 @@ namespace IDKEngine.Render
                         {
                             if (ImGui.Button("Delete PointShadow"))
                             {
-                                app.LightManager.DeletePointShadowOfLight(SelectedEntity.EntityID);
+                                app.LightManager.DeletePointShadowOfLight(lightInfo.LightId);
                             }
                         }
                         else
@@ -954,7 +944,7 @@ namespace IDKEngine.Render
                             if (ImGui.Button("Create PointShadow"))
                             {
                                 CpuPointShadow newPointShadow = new CpuPointShadow(256, app.RenderResolution, new OtkVec2(gpuLight.Radius, 60.0f));
-                                if (!app.LightManager.CreatePointShadowForLight(newPointShadow, SelectedEntity.EntityID))
+                                if (!app.LightManager.CreatePointShadowForLight(newPointShadow, lightInfo.LightId))
                                 {
                                     newPointShadow.Dispose();
                                 }
@@ -982,11 +972,13 @@ namespace IDKEngine.Render
                         }
                     }
 
-                    ImGui.Text($"LightID: {SelectedEntity.EntityID}");
+                    ImGui.Text($"LightID: {lightInfo.LightId}");
                 }
-                else if (SelectedEntity.EntityType == EntityType.Node)
+                else if (SelectedEntity is SelectedEntityInfo.Node nodeInfo)
                 {
-                    Transformation meshInstanceTransform = SelectedEntity.Node.LocalTransform;
+                    ModelLoader.Node node = nodeInfo.Node_;
+
+                    Transformation meshInstanceTransform = node.LocalTransform;
                     bool modified = false;
 
                     ImGui.SeparatorText("Node Transform");
@@ -1014,48 +1006,68 @@ namespace IDKEngine.Render
 
                     if (modified)
                     {
-                        SelectedEntity.Node.LocalTransform = meshInstanceTransform;
+                        node.LocalTransform = meshInstanceTransform;
                         resetPathTracer = true;
                     }
 
-                    for (int i = 0; i < app.ModelManager.CpuModels.Length; i++)
+                    if (ImGui.Button("Delete"))
                     {
-                        ref ModelManager.CpuModel model = ref app.ModelManager.CpuModels[i];
-                        
-                        if (app.ModelManager.CpuModels[i].Root == SelectedEntity.Node && model.Animations.Length > 0)
+                        Range meshRange = app.ModelManager.GetNodeMeshRangeRecursive(node);
+                        if (meshRange.Count > 0)
                         {
-                            ImGui.SeparatorText("Model Animations");
-                            ImGui.SetNextWindowSizeConstraints(new SysVec2(0.0f, 0.0f), new SysVec2(float.MaxValue, ImGui.GetTextLineHeightWithSpacing() * 6.0f));
-                            if (ImGui.BeginChild("Model Animations", new SysVec2(0.0f), ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY))
-                            {
-                                for (int j = 0; j < model.Animations.Length; j++)
-                                {
-                                    ref readonly ModelLoader.ModelAnimation animation = ref model.Animations[j];
-
-                                    bool enabled = model.EnabledAnimations[j];
-                                    if (ImGui.Checkbox(animation.Name, ref enabled))
-                                    {
-                                        model.EnabledAnimations[j] = enabled;
-                                    }
-                                }
-                            }
-                            ImGui.EndChild();
-
-                            break;
+                            app.ModelManager.RemoveMesh(new Range(meshRange.Start, meshRange.Count));
+                            SelectedEntity = null;
+                            resetPathTracer = true;
                         }
                     }
 
                     ImGui.SeparatorText("Node Info");
 
-                    ImGui.Text($"Name: {SelectedEntity.Node.Name} | ArrayIndex: {SelectedEntity.Node.ArrayIndex}");
-                    ImGui.Text($"HasSkin: {SelectedEntity.Node.HasSkin} | HasMeshInstances: {SelectedEntity.Node.HasMeshInstances}");
+                    ImGui.Text($"Name: {node.Name} | ArrayIndex: {node.ArrayIndex}");
+                    ImGui.Text($"HasSkin: {node.HasSkin} | HasMeshInstances: {node.HasMeshInstances}");
+                }
+                else if (SelectedEntity is SelectedEntityInfo.Material materialInfo)
+                {
+                    ref readonly ModelLoader.CpuMaterial cpuMaterial = ref app.ModelManager.CpuMaterials[materialInfo.MaterialId];
+
+                    for (int i = 0; i < ModelLoader.CpuMaterial.TEXTURE_COUNT; i++)
+                    {
+                        ModelLoader.TextureType textureType = (ModelLoader.TextureType)i;
+                        if (cpuMaterial.HasFallbackPixels(textureType))
+                        {
+                            continue;
+                        }
+
+                        (BBG.Texture texture, BBG.Sampler sampler) = cpuMaterial[textureType];
+                        BBG.TextureView textureView = new BBG.TextureView(texture, sampler.State);
+
+                        SysVec2 content = ImGui.GetContentRegionAvail();
+                        ImGui.SeparatorText($"{textureType} ({texture.Width}x{texture.Height}, {texture.Format})");
+                        ImGui.Image(textureView.ID, new SysVec2(content.X), new SysVec2(0.0f, 0.0f), new SysVec2(1.0f, 1.0f));
+
+                        frameDeletionQueue.Enqueue(textureView);
+                    }
+                }
+                else if (SelectedEntity is SelectedEntityInfo.Animation animationInfo)
+                {
+                    ref readonly ModelManager.CpuModel model = ref app.ModelManager.CpuModels[animationInfo.ModelId];
+                    ref readonly ModelLoader.ModelAnimation animation = ref model.Animations[animationInfo.AnimationId];
+
+                    bool enabled = model.EnabledAnimations[animationInfo.AnimationId];
+                    if (ImGui.Checkbox("Apply", ref enabled))
+                    {
+                        model.EnabledAnimations[animationInfo.AnimationId] = enabled;
+                    }
+
+                    ImGui.Text($"Start - End: {animation.Start} - {animation.End}sec");
+                    ImGui.Text($"Node Animatons: {animation.NodeAnimations.Length}");
                 }
                 else
                 {
                     BothAxisCenteredText("SELECT AN ENTITY TO VIEW DETAILS");
                 }
 
-                if (SelectedEntity.EntityType == EntityType.Mesh || SelectedEntity.EntityType == EntityType.Light)
+                if (SelectedEntity is SelectedEntityInfo.MeshInstance || SelectedEntity is SelectedEntityInfo.Light)
                 {
                     ImGui.Text($"Distance {MathF.Round(clickedEntityDistance, 3)}");
                 }
@@ -1073,8 +1085,70 @@ namespace IDKEngine.Render
                 {
                     ref readonly ModelManager.CpuModel cpuModel = ref app.ModelManager.CpuModels[i];
 
-                    RenderNodesGraph(cpuModel.Root);
-                    
+                    ImGui.PushID(cpuModel.GetHashCode());
+                    ImGui.TableNextRow();
+                    ImGui.TableNextColumn();
+                    if (ImGui.TreeNodeEx(cpuModel.Name))
+                    {
+                        RenderNodesGraph(cpuModel.Root);
+
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
+                        if (ImGui.TreeNodeEx("Materials"))
+                        {
+                            Range materialRange = app.ModelManager.GetNodeMaterialRange(cpuModel.Root);
+                            for (int j = materialRange.Start; j < materialRange.End; j++)
+                            {
+                                ref readonly ModelLoader.CpuMaterial cpuMaterial = ref app.ModelManager.CpuMaterials[j];
+
+                                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
+                                if (SelectedEntity is SelectedEntityInfo.Material materialInfo && materialInfo.MaterialId == j)
+                                {
+                                    flags |= ImGuiTreeNodeFlags.Selected;
+                                }
+                                if (ImGui.TreeNodeEx($"Material_{j}", flags))
+                                {
+                                    ImGui.TreePop();
+                                }
+                                if (ImGui.IsItemClicked())
+                                {
+                                    SelectedEntity = new SelectedEntityInfo.Material(j);
+                                }
+                            }
+
+                            ImGui.TreePop();
+                        }
+
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
+                        if (ImGui.TreeNodeEx("Animations"))
+                        {
+                            for (int j = 0; j < cpuModel.Animations.Length; j++)
+                            {
+                                ref readonly ModelLoader.ModelAnimation animation = ref cpuModel.Animations[j];
+                                
+                                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
+                                if (SelectedEntity is SelectedEntityInfo.Animation animationInfo && animationInfo.AnimationId == j)
+                                {
+                                    flags |= ImGuiTreeNodeFlags.Selected;
+                                }
+                                if (ImGui.TreeNodeEx(animation.Name, flags))
+                                {
+                                    ImGui.TreePop();
+                                }
+                                if (ImGui.IsItemClicked())
+                                {
+                                    SelectedEntity = new SelectedEntityInfo.Animation(i, j);
+                                }
+                            }
+                            ImGui.TreePop();
+                        }
+
+                        ImGui.TreePop();
+                    }
+
+                    ImGui.PopID();
+
                     void RenderNodesGraph(ModelLoader.Node node)
                     {
                         ImGui.PushID(node.GetHashCode());
@@ -1082,11 +1156,12 @@ namespace IDKEngine.Render
                         ImGui.TableNextColumn();
 
                         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
-                        if (node.IsLeaf && node.MeshInstanceIds.Count == 0)
+                        if (node.IsLeaf && node.MeshInstanceRange.Count == 0)
                         {
                             flags |= ImGuiTreeNodeFlags.Leaf;
                         }
-                        if (SelectedEntity.EntityType == EntityType.Node && SelectedEntity.Node == node)
+
+                        if (SelectedEntity is SelectedEntityInfo.Node nodeInfo && nodeInfo.Node_ == node)
                         {
                             flags |= ImGuiTreeNodeFlags.Selected;
                         }
@@ -1094,7 +1169,7 @@ namespace IDKEngine.Render
                         bool nodeOpen = ImGui.TreeNodeEx(node.Name, flags);
                         if (ImGui.IsItemClicked())
                         {
-                            SelectedEntity = new SelectedEntityInfo(node);
+                            SelectedEntity = new SelectedEntityInfo.Node(node);
                         }
 
                         if (nodeOpen)
@@ -1103,10 +1178,10 @@ namespace IDKEngine.Render
                             {
                                 RenderNodesGraph(node.Children[i]);
                             }
-                            for (int i = node.MeshInstanceIds.Start; i < node.MeshInstanceIds.End; i++)
+                            for (int i = node.MeshInstanceRange.Start; i < node.MeshInstanceRange.End; i++)
                             {
                                 flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
-                                if (SelectedEntity.EntityType == EntityType.Mesh && SelectedEntity.EntityID == i)
+                                if (SelectedEntity is SelectedEntityInfo.MeshInstance meshInstanceInfo && meshInstanceInfo.MeshInstanceId == i)
                                 {
                                     flags |= ImGuiTreeNodeFlags.Selected;
                                 }
@@ -1116,7 +1191,7 @@ namespace IDKEngine.Render
                                 }
                                 if (ImGui.IsItemClicked())
                                 {
-                                    SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, app.ModelManager.MeshInstances[i].MeshId, i);
+                                    SelectedEntity = new SelectedEntityInfo.MeshInstance(i);
                                 }
                             }
                             ImGui.TreePop();
@@ -1136,7 +1211,7 @@ namespace IDKEngine.Render
                         ImGui.TableNextColumn();
 
                         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
-                        if (SelectedEntity.EntityType == EntityType.Light && SelectedEntity.EntityID == i)
+                        if (SelectedEntity is SelectedEntityInfo.Light lightInfo && lightInfo.LightId == i)
                         {
                             flags |= ImGuiTreeNodeFlags.Selected;
                         }
@@ -1146,7 +1221,7 @@ namespace IDKEngine.Render
                         }
                         if (ImGui.IsItemClicked())
                         {
-                            SelectedEntity = new SelectedEntityInfo(EntityType.Light, i, 0);
+                            SelectedEntity = new SelectedEntityInfo.Light(i);
                         }
                     }
                     ImGui.TreePop();
@@ -1215,7 +1290,7 @@ namespace IDKEngine.Render
                     bool entityWasAlreadySelected = hitEntity == SelectedEntity;
                     if (entityWasAlreadySelected)
                     {
-                        SelectedEntity = SelectedEntityInfo.None;
+                        SelectedEntity = null;
                     }
                     else
                     {
@@ -1265,7 +1340,7 @@ namespace IDKEngine.Render
                 hitLight = false;
             }
 
-            SelectedEntityInfo hitEntity = SelectedEntityInfo.None;
+            SelectedEntityInfo hitEntity = null;
             if (!hitMesh && !hitLight)
             {
                 return hitEntity;
@@ -1283,12 +1358,12 @@ namespace IDKEngine.Render
             if (meshHitInfo.T < lightHitInfo.T)
             {
                 t = meshHitInfo.T;
-                hitEntity = new SelectedEntityInfo(EntityType.Mesh, app.ModelManager.MeshInstances[meshHitInfo.InstanceID].MeshId, meshHitInfo.InstanceID);
+                hitEntity = new SelectedEntityInfo.MeshInstance(meshHitInfo.InstanceID);
             }
             else
             {
                 t = lightHitInfo.T;
-                hitEntity = new SelectedEntityInfo(EntityType.Light, lightHitInfo.LightID, 0);
+                hitEntity = new SelectedEntityInfo.Light(lightHitInfo.LightID);
             }
 
             return hitEntity;
@@ -1627,7 +1702,6 @@ namespace IDKEngine.Render
 
             int newMeshIndex = app.ModelManager.Meshes.Length - 1;
             ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[newMeshIndex];
-            SelectedEntity = new SelectedEntityInfo(EntityType.Mesh, newMeshIndex, (int)cmd.BaseInstance);
 
             return true;
         }

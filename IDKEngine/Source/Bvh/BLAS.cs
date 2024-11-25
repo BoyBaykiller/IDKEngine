@@ -62,15 +62,6 @@ namespace IDKEngine.Bvh
 
                 return new Triangle() { Position0 = p0, Position1 = p1, Position2 = p2 };
             }
-
-            public static Triangle GetTriangle(in IndicesTriplet triangles, ReadOnlySpan<Vector3> vertexPositions)
-            {
-                ref readonly Vector3 p0 = ref vertexPositions[triangles.X];
-                ref readonly Vector3 p1 = ref vertexPositions[triangles.Y];
-                ref readonly Vector3 p2 = ref vertexPositions[triangles.Z];
-
-                return new Triangle() { Position0 = p0, Position1 = p1, Position2 = p2 };
-            }
         }
 
         public record struct IndicesTriplet

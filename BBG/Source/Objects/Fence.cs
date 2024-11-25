@@ -35,10 +35,9 @@ namespace BBOpenGL
 
             public bool TryWait(out Status status, ulong timeout = 1_000_000_000) // 1s in nanoseconds
             {
-                SyncStatus syncStatus = GL.ClientWaitSync(glFence, SyncObjectMask.SyncFlushCommandsBit, timeout);
-                status = (Status)syncStatus;
-
-                if (syncStatus == SyncStatus.TimeoutExpired || syncStatus == SyncStatus.WaitFailed)
+                status = (Status)GL.ClientWaitSync(glFence, SyncObjectMask.SyncFlushCommandsBit, timeout);
+                
+                if (status == Status.TimeoutExpired || status == Status.WaitFailed)
                 {
                     return false;
                 }

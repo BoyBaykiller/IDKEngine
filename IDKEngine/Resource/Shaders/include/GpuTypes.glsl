@@ -1,3 +1,21 @@
+struct PackedVec4
+{
+    float x, y, z, w;
+};
+vec4 Unpack(PackedVec4 floats)
+{
+    return vec4(floats.x, floats.y, floats.z, floats.w);
+}
+
+struct PackedUVec4
+{
+    uint x, y, z, w;
+};
+uvec4 Unpack(PackedUVec4 uints)
+{
+    return uvec4(uints.x, uints.y, uints.z, uints.w);
+}
+
 struct PackedVec3
 {
     float x, y, z;
@@ -60,7 +78,7 @@ struct GpuLight
     float Radius;
     
     vec3 Color;
-    int PointShadowIndex;
+    int PointShadowIndex; // -1 for no shadow
     
     vec3 PrevPosition;
     float _pad0;
@@ -201,6 +219,9 @@ struct GpuMeshletInfo
 
 struct UnskinnedVertex
 {
+    PackedUVec4 JointIndices;
+    PackedVec4 JointWeights;
+
     PackedVec3 Position;
     uint Tangent;
     uint Normal;

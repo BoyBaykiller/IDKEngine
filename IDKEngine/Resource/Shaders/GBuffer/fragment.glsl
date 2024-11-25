@@ -31,7 +31,7 @@ void main()
     SurfaceApplyModificatons(surface, mesh);
 
     // We dont support alpha blending yet
-    float alphaCutoff = SurfaceIsAlphaBlending(surface) ? 0.0 : surface.AlphaCutoff;
+    float alphaCutoff = SurfaceIsAlphaBlending(surface) ? 0.5 : surface.AlphaCutoff;
     if (surface.Alpha < alphaCutoff)
     {
         discard;

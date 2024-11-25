@@ -6,6 +6,9 @@ namespace BBOpenGL
     {
         public static unsafe class Cmd
         {
+            // Application specific
+            public const int SET_UNIFORMS_UBO_BLOCK_BINDING = 7;
+
             [Flags]
             public enum MemoryBarrierMask : uint
             {
@@ -73,7 +76,7 @@ namespace BBOpenGL
                 globalUniformBuffer.InvalidateData();
 
                 globalUniformBuffer.UploadData(0, sizeof(T), uniforms);
-                globalUniformBuffer.BindToBufferBackedBlock(Buffer.BufferBackedBlockTarget.Uniform, 7);
+                globalUniformBuffer.BindToBufferBackedBlock(Buffer.BufferBackedBlockTarget.Uniform, SET_UNIFORMS_UBO_BLOCK_BINDING);
             }
         }
     }

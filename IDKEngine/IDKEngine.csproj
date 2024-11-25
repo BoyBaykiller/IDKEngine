@@ -2,12 +2,12 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Platforms>AnyCPU;x64</Platforms>
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
     <Nullable>disable</Nullable>
-    <!--<PublishAOT>true</PublishAOT>-->
+    <PublishAOT>true</PublishAOT>
 
     <!-- 
     https://learn.microsoft.com/en-us/dotnet/core/runtime-config/compilation#quick-jit
@@ -18,10 +18,10 @@
     I don't think tiered compilation has any effect when NativeAOT is used since there is no JIT in that case.
     -->
     <TieredCompilation>true</TieredCompilation> <!-- True by default-->
-    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit> <!-- True by default-->
 
-    <!--<OptimizationPreference>Speed</OptimizationPreference>
-    <IlcInstructionSet>native</IlcInstructionSet>-->
+    <!--<OptimizationPreference>Size</OptimizationPreference>-->
+    <!--<IlcInstructionSet>native</IlcInstructionSet>-->
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -49,14 +49,15 @@
     <PackageReference Include="FFX_FSR2" Version="1.0.2" />
     <PackageReference Include="ImGui.NET" Version="1.90.8.1" />
     <PackageReference Include="Ktx2.NET" Version="1.0.3" />
-    <PackageReference Include="Meshoptimizer.NET" Version="1.0.5" />
+    <PackageReference Include="Meshoptimizer.NET" Version="1.0.6" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
-    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.12" />
-    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.12" />
-    <PackageReference Include="ReFuel.StbImage" Version="2.0.1" />
-    <PackageReference Include="SharpGLTF.Core" Version="1.0.2" />
-    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.2" />
+    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.13" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.13" />
+    <PackageReference Include="ReFuel.StbImage" Version="2.1.0" />
+    <PackageReference Include="SharpGLTF.Core" Version="1.0.3" />
+    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.3" />
   </ItemGroup>
+
 
   <ItemGroup>
     <ProjectReference Include="..\BBG\BBG.csproj" />

@@ -71,27 +71,17 @@ layout(std430, binding = 12) restrict readonly buffer MeshletLocalIndicesSSBO
 } meshletLocalIndicesSSBO;
 #endif
 
-layout(std430, binding = 13) restrict readonly buffer JointIndicesSSBO
-{
-    uvec4 Indices[];
-} jointIndicesSSBO;
-
-layout(std430, binding = 14) restrict readonly buffer JointWeightsSSBO
-{
-    vec4 Weights[];
-} jointWeightsSSBO;
-
-layout(std430, binding = 15, row_major) restrict readonly buffer JointMatricesSSBO
+layout(std430, binding = 13, row_major) restrict readonly buffer JointMatricesSSBO
 {
     mat4x3 Matrices[];
 } jointMatricesSSBO;
 
-layout(std430, binding = 16) restrict buffer UnskinnedVertexSSBO
+layout(std430, binding = 14) restrict buffer UnskinnedVertexSSBO
 {
     UnskinnedVertex Vertices[];
 } unskinnedVertexSSBO;
 
-layout(std430, binding = 17) restrict buffer PrevVertexPositionSSBO
+layout(std430, binding = 15) restrict buffer PrevVertexPositionSSBO
 {
     PackedVec3 Positions[];
 } prevVertexPositionSSBO;

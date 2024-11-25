@@ -138,7 +138,7 @@ namespace IDKEngine.Bvh
                 }
 
                 // Copy from temp into final array
-                Memory.CopyElements(tempNodes[newBegin], ref nodes[newBegin], activeRangeEnd - newBegin);
+                Memory.CopyElements(ref tempNodes[newBegin], ref nodes[newBegin], activeRangeEnd - newBegin);
 
                 // For every merged pair, 2 tlasNodes become inactive and 1 new one gets active
                 activeRangeCount -= mergedNodesCount / 2;

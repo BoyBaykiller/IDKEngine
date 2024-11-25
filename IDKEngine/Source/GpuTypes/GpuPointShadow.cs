@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using BBOpenGL;
 
@@ -7,6 +6,8 @@ namespace IDKEngine.GpuTypes
 {
     record struct GpuPointShadow
     {
+        public const int FACE_COUNT = (int)RenderMatrix.Count;
+
         public enum RenderMatrix : int
         {
             PosX,
@@ -15,33 +16,15 @@ namespace IDKEngine.GpuTypes
             NegY,
             PosZ,
             NegZ,
+            Count,
         }
-        public ref Matrix4 this[RenderMatrix matrix]
-        {
-            get
-            {
-                switch (matrix)
-                {
-                    case RenderMatrix.PosX: return ref Unsafe.AsRef(ref PosX);
-                    case RenderMatrix.NegX: return ref Unsafe.AsRef(ref NegX);
-                    case RenderMatrix.PosY: return ref Unsafe.AsRef(ref PosY);
-                    case RenderMatrix.NegY: return ref Unsafe.AsRef(ref NegY);
-                    case RenderMatrix.PosZ: return ref Unsafe.AsRef(ref PosZ);
-                    case RenderMatrix.NegZ: return ref Unsafe.AsRef(ref NegZ);
-                    default: throw new NotSupportedException($"Unsupported {nameof(RenderMatrix)} {matrix}");
-                }
-            }
-        }
+
+        public ref Matrix4 this[RenderMatrix matrix] => ref Unsafe.AsRef(ref Matrices[(int)matrix]);
 
         public BBG.Texture.BindlessHandle Texture;
         public BBG.Texture.BindlessHandle ShadowTexture;
 
-        public Matrix4 PosX;
-        public Matrix4 NegX;
-        public Matrix4 PosY;
-        public Matrix4 NegY;
-        public Matrix4 PosZ;
-        public Matrix4 NegZ;
+        public MatrixArray Matrices;
 
         public Vector3 Position;
         public float NearPlane;
@@ -49,5 +32,11 @@ namespace IDKEngine.GpuTypes
         public BBG.Texture.BindlessHandle RayTracedShadowTexture;
         public float FarPlane;
         public int LightIndex;
+
+        [InlineArray(FACE_COUNT)]
+        public struct MatrixArray
+        {
+            public Matrix4 _matrix;
+        }
     }
 }

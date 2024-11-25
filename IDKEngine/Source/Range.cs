@@ -1,4 +1,6 @@
-﻿namespace IDKEngine
+﻿using System;
+
+namespace IDKEngine
 {
     public record struct Range
     {
@@ -24,9 +26,24 @@
             Count = count;
         }
 
-        public static Range operator +(int num, Range range)
+        public bool Contains(int index)
         {
-            return new Range(range.Start + num, range.Count);
+            return index >= Start && index < End;
+        }
+
+        public bool Overlaps(Range range, out Range overlap)
+        {
+            overlap = new Range();
+            overlap.Start = Math.Max(Start, range.Start);
+            overlap.End = Math.Min(End, range.End);
+            return overlap.Count > 0;
+        }
+
+        public bool Overlaps(Range range, out int overlap)
+        {
+            bool overlaps = Overlaps(range, out Range overlappingRange);
+            overlap = overlappingRange.Count;
+            return overlaps;
         }
     }
 }

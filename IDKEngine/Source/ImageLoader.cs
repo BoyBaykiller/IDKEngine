@@ -54,7 +54,8 @@ namespace IDKEngine
                     3 => ColorComponents.RGB,
                     4 => ColorComponents.RGBA,
                     _ => throw new NotSupportedException($"Can not convert {nameof(channels)} = {channels} to {nameof(colorComponents)}"),
-                };return colorComponents;
+                };
+                return colorComponents;
             }
         }
 
@@ -62,12 +63,14 @@ namespace IDKEngine
         {
             public Span<byte> Pixels => new Span<byte>(Memory, Header.SizeInBytes);
 
+            public bool IsLoadedSuccesfully => Memory != null;
+
             public ImageHeader Header;
             public void* Memory;
 
             public void Dispose()
             {
-                if (Memory != null)
+                if (IsLoadedSuccesfully)
                 {
                     Stbi.image_free(Memory);
                     Memory = null;

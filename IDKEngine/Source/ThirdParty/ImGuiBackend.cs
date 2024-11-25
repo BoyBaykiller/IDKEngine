@@ -31,7 +31,7 @@ namespace IDKEngine.ThirdParty
         private Vector2 scaleFactor = Vector2.One;
 
         private readonly List<uint> pressedKeysBuf = new List<uint>();
-        public ImGuiBackend(Vector2i windowSize)
+        public ImGuiBackend(Vector2i windowSize, string iniFilename)
         {
             this.windowSize = windowSize;
 
@@ -39,6 +39,8 @@ namespace IDKEngine.ThirdParty
             
             ImGuiIOPtr io = ImGui.GetIO();
             io.Fonts.AddFontDefault();
+
+            io.NativePtr->IniFilename = (byte*)Marshal.StringToHGlobalAnsi(iniFilename);
 
             io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
             io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;

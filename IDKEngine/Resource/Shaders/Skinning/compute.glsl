@@ -8,7 +8,8 @@ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 layout(location = 0) uniform uint InputVertexOffset;
 layout(location = 1) uniform uint OutputVertexOffset;
-layout(location = 2) uniform uint VertexCount;
+layout(location = 2) uniform uint JointMatricesOffset;
+layout(location = 3) uniform uint VertexCount;
 
 void main()
 {
@@ -22,13 +23,13 @@ void main()
 
     UnskinnedVertex unskinnedVertex = unskinnedVertexSSBO.Vertices[inIndex];
 
-    uvec4 jointIndices = jointIndicesSSBO.Indices[inIndex];
-    vec4 jointWeights = jointWeightsSSBO.Weights[inIndex];
+    uvec4 jointIndices = Unpack(unskinnedVertex.JointIndices);
+    vec4 jointWeights = Unpack(unskinnedVertex.JointWeights);
     mat4x3 skinMatrix =
-        jointWeights.x * jointMatricesSSBO.Matrices[jointIndices.x] +
-        jointWeights.y * jointMatricesSSBO.Matrices[jointIndices.y] +
-        jointWeights.z * jointMatricesSSBO.Matrices[jointIndices.z] +
-        jointWeights.w * jointMatricesSSBO.Matrices[jointIndices.w];
+        jointWeights.x * jointMatricesSSBO.Matrices[JointMatricesOffset + jointIndices.x] +
+        jointWeights.y * jointMatricesSSBO.Matrices[JointMatricesOffset + jointIndices.y] +
+        jointWeights.z * jointMatricesSSBO.Matrices[JointMatricesOffset + jointIndices.z] +
+        jointWeights.w * jointMatricesSSBO.Matrices[JointMatricesOffset + jointIndices.w];
     
     vec3 position = Unpack(unskinnedVertex.Position);
     vec3 normal = DecompressSR11G11B10(unskinnedVertex.Normal);

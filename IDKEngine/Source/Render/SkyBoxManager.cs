@@ -113,9 +113,9 @@ namespace IDKEngine.Render
         private static unsafe bool LoadSkyBoxEquirectangular(string hrdPath)
         {
             using ImageLoader.ImageResult hdrImage = ImageLoader.Load(hrdPath, ImageLoader.ColorComponents.RGB);
-            if (hdrImage.Memory == null)
+            if (!hdrImage.IsLoadedSuccesfully)
             {
-                Logger.Log(Logger.LogLevel.Error, $"Hdr image could not be decoded");
+                Logger.Log(Logger.LogLevel.Error, $"Hdr image could not be loaded");
                 return false;
             }
 
@@ -158,9 +158,9 @@ namespace IDKEngine.Render
                 images[i] = imageResult;
             });
 
-            if (images.Any(it => it.Memory == null))
+            if (images.Any(it => !it.IsLoadedSuccesfully))
             {
-                Logger.Log(Logger.LogLevel.Error, $"At least one of the skybox images could not be decoded");
+                Logger.Log(Logger.LogLevel.Error, $"At least one of the skybox images could not be loaded");
                 return false;
             }
             if (!images.All(it => it.Header.Width == it.Header.Height && it.Header.Width == images[0].Header.Width))

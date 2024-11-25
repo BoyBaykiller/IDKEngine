@@ -26,7 +26,7 @@ using GltfAnimation = SharpGLTF.Schema2.Animation;
 
 namespace IDKEngine.Utils
 {
-    public static class ModelLoader
+    public static unsafe class ModelLoader
     {
         public static readonly string[] SupportedExtensions = [
             "KHR_materials_emissive_strength",
@@ -37,6 +37,16 @@ namespace IDKEngine.Utils
             "KHR_texture_basisu",
             "IDK_BC5_normal_metallicRoughness"
         ];
+
+        public enum TextureType : int
+        {
+            BaseColor,
+            MetallicRoughness,
+            Normal,
+            Emissive,
+            Transmission,
+            Count,
+        }
 
         public enum AlphaMode : int
         {
@@ -51,12 +61,8 @@ namespace IDKEngine.Utils
             public Node[] Nodes;
 
             public ModelAnimation[] Animations;
+            public CpuMaterial[] Materials;
             public GpuModel GpuModel;
-
-            public int GetNumJoints()
-            {
-                return Nodes.Sum(node => node.HasSkin ? node.Skin.Joints.Length : 0);
-            }
         }
 
         public record struct GpuModel
@@ -87,7 +93,7 @@ namespace IDKEngine.Utils
             public bool IsRoot => Parent == null;
             public bool IsLeaf => Children.Length == 0;
 
-            public bool HasMeshInstances => MeshInstanceIds.Count > 0;
+            public bool HasMeshInstances => MeshInstanceRange.Count > 0;
             public bool HasSkin => Skin.Joints != null;
 
             public Transformation LocalTransform
@@ -113,7 +119,7 @@ namespace IDKEngine.Utils
             public int ArrayIndex;
 
             public Skin Skin;
-            public Range MeshInstanceIds;
+            public Range MeshInstanceRange;
 
             private bool isDirty = true;
             private bool isAscendantOfDirty = false;
@@ -150,7 +156,7 @@ namespace IDKEngine.Utils
                     newNode.ArrayIndex = source.ArrayIndex;
                     newNode.LocalTransform = source.LocalTransform;
                     newNode.GlobalTransform = source.GlobalTransform;
-                    newNode.MeshInstanceIds = source.MeshInstanceIds;
+                    newNode.MeshInstanceRange = source.MeshInstanceRange;
                     newNode.Skin = source.Skin;
                     newNode.isDirty = source.isDirty;
 
@@ -182,11 +188,11 @@ namespace IDKEngine.Utils
 
             /// <summary>
             /// Traverses into all dirty parents and marks them as no longer dirty. The caller is expected to call
-            /// <see cref="UpdateGlobalTransform"/> inside <paramref name="updateParent"/>
+            /// <see cref="UpdateGlobalTransform"/> inside <paramref name="updateFunc"/>
             /// </summary>
             /// <param name="parent"></param>
-            /// <param name="updateParent"></param>
-            public static void TraverseUpdate(Node parent, Action<Node> updateParent)
+            /// <param name="updateFunc"></param>
+            public static void TraverseUpdate(Node parent, Action<Node> updateFunc)
             {
                 if (!parent.isDirty && !parent.isAscendantOfDirty)
                 {
@@ -195,7 +201,7 @@ namespace IDKEngine.Utils
 
                 if (parent.isDirty)
                 {
-                    updateParent(parent);
+                    updateFunc(parent);
                 }
 
                 for (int i = 0; i < parent.Children.Length; i++)
@@ -206,7 +212,7 @@ namespace IDKEngine.Utils
                         child.isDirty = true; // if parent is dirty children automatically are too
                     }
 
-                    TraverseUpdate(child, updateParent);
+                    TraverseUpdate(child, updateFunc);
                 }
 
                 parent.isDirty = false;
@@ -222,7 +228,7 @@ namespace IDKEngine.Utils
                 }
             }
 
-            public static unsafe void HierarchyToArray(Node parent, ReadOnlySpan<Node> nodes)
+            public static void HierarchyToArray(Node parent, ReadOnlySpan<Node> nodes)
             {
                 fixed (Node* ptrNodes = nodes)
                 {
@@ -375,79 +381,88 @@ namespace IDKEngine.Utils
             }
         }
 
-        private record struct MaterialDesc
+        public record struct CpuMaterial
         {
             public const int TEXTURE_COUNT = (int)TextureType.Count;
 
-            public enum TextureType : int
+            public ref SampledTexture this[TextureType textureType] => ref Unsafe.AsRef(ref SampledTextures[(int)textureType]);
+
+            public int HasFallbackPixelsBits;
+
+            public SampledTextureArray SampledTextures;
+
+            public bool HasFallbackPixels(TextureType type)
             {
-                BaseColor,
-                MetallicRoughness,
-                Normal,
-                Emissive,
-                Transmission,
-                Count,
+                return (HasFallbackPixelsBits & (1 << (int)type)) != 0;
             }
-
-            public ref SampledImage this[TextureType textureType]
-            {
-                get
-                {
-                    switch (textureType)
-                    {
-                        case TextureType.BaseColor: return ref Unsafe.AsRef(ref SampledImages[0]);
-                        case TextureType.MetallicRoughness: return ref Unsafe.AsRef(ref SampledImages[1]);
-                        case TextureType.Normal: return ref Unsafe.AsRef(ref SampledImages[2]);
-                        case TextureType.Emissive: return ref Unsafe.AsRef(ref SampledImages[3]);
-                        case TextureType.Transmission: return ref Unsafe.AsRef(ref SampledImages[4]);
-                        default: throw new NotSupportedException($"Unsupported {nameof(TextureType)} {textureType}");
-                    }
-                }
-            }
-
-            public MaterialParams MaterialParams;
-            public SampledImageArray SampledImages;
-
-            public static readonly MaterialDesc Default = new MaterialDesc()
-            {
-                MaterialParams = MaterialParams.Default,
-            };
 
             [InlineArray(TEXTURE_COUNT)]
+            public struct SampledTextureArray
+            {
+                public SampledTexture _sampledTexture;
+            }
+        }
+
+        public record struct SampledTexture : IDisposable
+        {
+            public GLTexture Texture;
+            public GLSampler Sampler;
+
+            public void Deconstruct(out GLTexture texture, out GLSampler sampler)
+            {
+                texture = Texture;
+                sampler = Sampler;
+            }
+
+            public void Dispose()
+            {
+                Sampler.Dispose();
+                Texture.Dispose();
+            }
+        }
+
+        private record struct BindlessSampledTexture
+        {
+            public SampledTexture SampledTexture;
+            public GLTexture.BindlessHandle BindlessHandle;
+        }
+
+        public record struct MaterialParams
+        {
+            public bool IsThinWalled => ThicknessFactor == 0.0f;
+
+            public Vector4 BaseColorFactor = new Vector4(1.0f);
+            public float RoughnessFactor = 1.0f;
+            public float MetallicFactor = 1.0f;
+            public Vector3 EmissiveFactor = new Vector3(0.0f);
+            public float TransmissionFactor = 0.0f;
+            public float AlphaCutoff = 0.5f;
+            public Vector3 Absorbance = new Vector3(0.0f);
+            public float IOR = 1.5f;
+            public AlphaMode AlphaMode = AlphaMode.Opaque;
+            public float ThicknessFactor = 0.0f;
+
+            public MaterialParams()
+            {
+            }
+        }
+
+        private record struct MaterialDesc
+        {
+            public ref SampledImage this[TextureType textureType] => ref Unsafe.AsRef(ref SampledImages[(int)textureType]);
+
+            public MaterialParams MaterialParams = new MaterialParams();
+            public SampledImageArray SampledImages;
+
+            public MaterialDesc()
+            {
+            }
+
+            [InlineArray((int)TextureType.Count)]
             public struct SampledImageArray
             {
                 public SampledImage _sampledImage;
             }
-        }
-
-        private record struct MaterialParams
-        {
-            public bool IsThinWalled => ThicknessFactor == 0.0f;
-
-            public Vector4 BaseColorFactor;
-            public float RoughnessFactor;
-            public float MetallicFactor;
-            public Vector3 EmissiveFactor;
-            public float TransmissionFactor;
-            public float AlphaCutoff;
-            public Vector3 Absorbance;
-            public float IOR;
-            public AlphaMode AlphaMode;
-            public float ThicknessFactor;
-
-            public static readonly MaterialParams Default = new MaterialParams()
-            {
-                EmissiveFactor = new Vector3(0.0f),
-                BaseColorFactor = new Vector4(1.0f),
-                TransmissionFactor = 0.0f,
-                AlphaCutoff = 0.5f,
-                RoughnessFactor = 1.0f,
-                MetallicFactor = 1.0f,
-                Absorbance = new Vector3(0.0f),
-                IOR = 1.5f,
-                AlphaMode = AlphaMode.Opaque,
-                ThicknessFactor = 0.0f,
-            };
         }
 
         private record struct SampledImage
@@ -527,12 +542,12 @@ namespace IDKEngine.Utils
             }
         }
 
-        private unsafe struct USVec4
+        private struct USVec4
         {
             public fixed ushort Data[4];
         }
 
-        private unsafe struct BVec4
+        private struct BVec4
         {
             public fixed byte Data[4];
         }
@@ -602,8 +617,8 @@ namespace IDKEngine.Utils
 
         private static Model GltfToEngineFormat(ModelRoot gltf, in Matrix4 rootTransform, OptimizationSettings optimizationSettings, bool useExtBc5NormalMetallicRoughness, string modelName)
         {
+            (CpuMaterial[] cpuMaterials, GpuMaterial[] gpuMaterials) = LoadMaterials(GetMaterialDescFromGltf(gltf.LogicalMaterials), useExtBc5NormalMetallicRoughness);
             Dictionary<MeshPrimitiveDesc, MeshGeometry> meshPrimitivesGeometry = LoadMeshPrimitivesGeometry(gltf, optimizationSettings);
-            List<GpuMaterial> listMaterials = new List<GpuMaterial>(LoadGpuMaterials(GetMaterialDescFromGltf(gltf.LogicalMaterials), useExtBc5NormalMetallicRoughness));
             List<GpuMesh> listMeshes = new List<GpuMesh>();
             List<GpuMeshInstance> listMeshInstances = new List<GpuMeshInstance>();
             List<BBG.DrawElementsIndirectCommand> listDrawCommands = new List<BBG.DrawElementsIndirectCommand>();
@@ -674,7 +689,7 @@ namespace IDKEngine.Utils
                 {
                     continue;
                 }
-                
+
                 Matrix4[] nodeTransformations = GetNodeTransformations(gltfNode);
 
                 Range meshInstanceIdsRange = new Range();
@@ -695,29 +710,38 @@ namespace IDKEngine.Utils
                     mesh.SpecularBias = 0.0f;
                     mesh.RoughnessBias = 0.0f;
                     mesh.TransmissionBias = 0.0f;
-                    mesh.MeshletsStart = listMeshlets.Count;
+                    mesh.MeshletsOffset = listMeshlets.Count;
                     mesh.MeshletCount = meshGeometry.Meshlets.Length;
                     mesh.IORBias = 0.0f;
                     mesh.AbsorbanceBias = new Vector3(0.0f);
-                    if (gltfMeshPrimitive.Material != null)
+                    if (gltfMeshPrimitive.Material == null)
                     {
-                        bool hasNormalMap = listMaterials[gltfMeshPrimitive.Material.LogicalIndex].NormalTexture != FallbackTextures.White();
-                        mesh.NormalMapStrength = hasNormalMap ? 1.0f : 0.0f;
-                        mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
+                        // load some default material if mesh primitive doesn't have one
+                        (CpuMaterial[] cpuMaterial, GpuMaterial[] gpuMaterial) = LoadMaterials([new MaterialDesc()]);
+                        Helper.ArrayAdd(ref cpuMaterials, cpuMaterial[0]);
+                        Helper.ArrayAdd(ref gpuMaterials, gpuMaterial[0]);
+
+                        mesh.NormalMapStrength = 0.0f;
+                        mesh.MaterialId = gpuMaterial.Length - 1;
                     }
                     else
                     {
-                        GpuMaterial defaultGpuMaterial = LoadGpuMaterials([MaterialDesc.Default])[0];
-                        listMaterials.Add(defaultGpuMaterial);
-
-                        mesh.NormalMapStrength = 0.0f;
-                        mesh.MaterialId = listMaterials.Count - 1;
+                        bool normalMapProvided = !cpuMaterials[gltfMeshPrimitive.Material.LogicalIndex].HasFallbackPixels(TextureType.Normal);
+                        mesh.NormalMapStrength = normalMapProvided ? 1.0f : 0.0f;
+                        mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
                     }
 
                     GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
                     for (int j = 0; j < meshInstances.Length; j++)
                     {
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
+
+                        // fix for small_city.glb which has a couple malformed transformations
+                        if (nodeTransformations[j].Row1 == new Vector4(0.0f))
+                        {
+                            nodeTransformations[j].Row1 = Vector4.UnitY;
+                        }
+
                         meshInstance.ModelMatrix = nodeTransformations[j] * myNode.Parent.GlobalTransform;
                         meshInstance.MeshId = listMeshes.Count;
                     }
@@ -727,7 +751,7 @@ namespace IDKEngine.Utils
                     drawCmd.InstanceCount = meshInstances.Length;
                     drawCmd.FirstIndex = listIndices.Count;
                     drawCmd.BaseVertex = listVertices.Count;
-                    drawCmd.BaseInstance = (uint)listMeshInstances.Count;
+                    drawCmd.BaseInstance = listMeshInstances.Count;
 
                     listVertices.AddRange(meshGeometry.VertexData.Vertices);
                     listVertexPositions.AddRange(meshGeometry.VertexData.Positons);
@@ -742,13 +766,7 @@ namespace IDKEngine.Utils
                     listJointIndices.AddRange(meshGeometry.VertexData.JointIndices);
                     listJointWeights.AddRange(meshGeometry.VertexData.JointWeights);
 
-                    int prevCount = listJointIndices.Count - meshGeometry.VertexData.JointIndices.Length;
-                    for (int j = prevCount; j < listJointIndices.Count; j++)
-                    {
-                        listJointIndices[j] += new Vector4i(jointsCount);
-                    }
-
-                    prevCount = listMeshlets.Count - meshGeometry.Meshlets.Length;
+                    int prevCount = listMeshlets.Count - meshGeometry.Meshlets.Length;
                     for (int j = prevCount; j < listMeshlets.Count; j++)
                     {
                         GpuMeshlet myMeshlet = listMeshlets[j];
@@ -764,13 +782,13 @@ namespace IDKEngine.Utils
                 jointsCount += gltfNode.Skin != null ? gltfNode.Skin.JointsCount : 0;
 
                 meshInstanceIdsRange.End = listMeshInstances.Count;
-                myNode.MeshInstanceIds = meshInstanceIdsRange;
+                myNode.MeshInstanceRange = meshInstanceIdsRange;
             }
 
             GpuModel gpuModel = new GpuModel();
             gpuModel.Meshes = listMeshes.ToArray();
             gpuModel.MeshInstances = listMeshInstances.ToArray();
-            gpuModel.Materials = listMaterials.ToArray();
+            gpuModel.Materials = gpuMaterials;
             gpuModel.DrawCommands = listDrawCommands.ToArray();
             gpuModel.Vertices = listVertices.ToArray();
             gpuModel.VertexPositions = listVertexPositions.ToArray();
@@ -792,21 +810,23 @@ namespace IDKEngine.Utils
             model.Nodes = myNodes;
             model.GpuModel = gpuModel;
             model.Animations = animations;
+            model.Materials = cpuMaterials;
 
             return model;
         }
 
-        private static GpuMaterial[] LoadGpuMaterials(ReadOnlySpan<MaterialDesc> materialsLoadData, bool useExtBc5NormalMetallicRoughness = false)
+        private static ValueTuple<CpuMaterial[], GpuMaterial[]> LoadMaterials(ReadOnlySpan<MaterialDesc> materialsLoadData, bool useExtBc5NormalMetallicRoughness = false)
         {
-            Dictionary<SampledImage, GLTexture.BindlessHandle> uniqueBindlessHandles = new Dictionary<SampledImage, GLTexture.BindlessHandle>();
+            Dictionary<SampledImage, BindlessSampledTexture> uniqueBindlessTextures = new Dictionary<SampledImage, BindlessSampledTexture>();
 
+            CpuMaterial[] cpuMaterials = new CpuMaterial[materialsLoadData.Length];
             GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
-            for (int i = 0; i < gpuMaterials.Length; i++)
+            for (int i = 0; i < cpuMaterials.Length; i++)
             {
                 ref readonly MaterialDesc materialDesc = ref materialsLoadData[i];
-                ref GpuMaterial gpuMaterial = ref gpuMaterials[i];
+                ref readonly MaterialParams materialParams = ref materialDesc.MaterialParams;
 
-                MaterialParams materialParams = materialDesc.MaterialParams;
+                GpuMaterial gpuMaterial = new GpuMaterial();
                 gpuMaterial.EmissiveFactor = materialParams.EmissiveFactor;
                 gpuMaterial.BaseColorFactor = Compression.CompressUR8G8B8A8(materialParams.BaseColorFactor);
                 gpuMaterial.TransmissionFactor = materialParams.TransmissionFactor;
@@ -827,73 +847,84 @@ namespace IDKEngine.Utils
                     gpuMaterial.AlphaCutoff = 2.0f;
                 }
 
-                for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
+                CpuMaterial cpuMaterial = new CpuMaterial();
+                for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
                 {
-                    GpuMaterial.TextureType textureType = (GpuMaterial.TextureType)j;
-                    SampledImage sampledImage = materialDesc[(MaterialDesc.TextureType)textureType];
+                    TextureType textureType = (TextureType)j;
+                    SampledImage sampledImage = materialDesc[textureType];
 
+                    int hasFallbackPixels = 0;
+                    BindlessSampledTexture bindlessTexture;
                     if (!sampledImage.HasImage)
                     {
                         // By having a pure white fallback we can keep the sampling logic
                         // in shaders the same and still comply to glTF spec
-                        gpuMaterial[textureType] = FallbackTextures.White();
-                        continue;
+                        bindlessTexture = FallbackTextures.GetWhite();
+                        hasFallbackPixels = 1;
                     }
-
-                    if (!uniqueBindlessHandles.TryGetValue(sampledImage, out GLTexture.BindlessHandle bindlessHandle))
+                    else if (!uniqueBindlessTextures.TryGetValue(sampledImage, out bindlessTexture))
                     {
-                        if (StartAsyncLoadGLTexture(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler))
+                        if (StartAsyncLoadGLTexture(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out bindlessTexture))
                         {
-                            bindlessHandle = glTexture.GetTextureHandleARB(glSampler);
-                            uniqueBindlessHandles[sampledImage] = bindlessHandle;
+                            uniqueBindlessTextures[sampledImage] = bindlessTexture;
                         }
                         else
                         {
-                            if (textureType == GpuMaterial.TextureType.BaseColor)
+                            if (textureType == TextureType.BaseColor)
                             {
-                                bindlessHandle = FallbackTextures.PurpleBlack();
+                                bindlessTexture = FallbackTextures.GetPurpleBlack();
                             }
                             else
                             {
-                                bindlessHandle = FallbackTextures.White();
+                                bindlessTexture = FallbackTextures.GetWhite();
                             }
+                            hasFallbackPixels = 1;
                         }
                     }
-                    gpuMaterial[textureType] = bindlessHandle;
+
+                    cpuMaterial.HasFallbackPixelsBits |= hasFallbackPixels << j;
+                    cpuMaterial[textureType] = bindlessTexture.SampledTexture;
+                    gpuMaterial[(GpuMaterial.TextureType)textureType] = bindlessTexture.BindlessHandle;
                 }
+
+                cpuMaterials[i] = cpuMaterial;
+                gpuMaterials[i] = gpuMaterial;
             }
 
-            return gpuMaterials;
+            return (cpuMaterials, gpuMaterials);
         }
 
-        private static unsafe bool StartAsyncLoadGLTexture(SampledImage sampledImage, GpuMaterial.TextureType textureType, bool useExtBc5NormalMetallicRoughness, out GLTexture glTexture, out GLSampler glSampler)
+        private static bool StartAsyncLoadGLTexture(SampledImage sampledImage, TextureType textureType, bool useExtBc5NormalMetallicRoughness, out BindlessSampledTexture bindlessTexture)
         {
+            bindlessTexture = new BindlessSampledTexture();
             if (!TryGetGLTextureLoadData(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out GLTextureLoadData textureLoadData))
             {
-                glTexture = null;
-                glSampler = null;
                 return false;
             }
 
-            glSampler = new GLSampler(textureLoadData.SamplerState);
-            glTexture = new GLTexture(GLTexture.Type.Texture2D);
+            GLTexture texture = new GLTexture(GLTexture.Type.Texture2D);
+            GLSampler sampler = new GLSampler(textureLoadData.SamplerState);
 
-            bool mipmapsRequired = GLSampler.IsMipmapFilter(glSampler.State.MinFilter);
+            bool mipmapsRequired = GLSampler.IsMipmapFilter(sampler.State.MinFilter);
             int levels = textureLoadData.IsKtx2Compressed ? textureLoadData.Ktx2Texture.Levels : GLTexture.GetMaxMipmapLevel(textureLoadData.Width, textureLoadData.Height, 1);
             if (!mipmapsRequired)
             {
                 levels = 1;
             }
 
-            glTexture.Allocate(textureLoadData.Width, textureLoadData.Height, 1, textureLoadData.InternalFormat, levels);
-            if (textureType == GpuMaterial.TextureType.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
+            texture.Allocate(textureLoadData.Width, textureLoadData.Height, 1, textureLoadData.InternalFormat, levels);
+            if (textureType == TextureType.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
             {
                 // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
                 // We move metallic from B into R channel, unless IDK_BC5_normal_metallicRoughness is used where this is already standard behaviour.
-                glTexture.SetSwizzleR(GLTexture.Swizzle.B);
+                texture.SetSwizzleR(GLTexture.Swizzle.B);
             }
 
-            GLTexture glTextureCopy = glTexture;
+            bindlessTexture.SampledTexture.Texture = texture;
+            bindlessTexture.SampledTexture.Sampler = sampler;
+            bindlessTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
+
+            GLTexture glTextureCopy = texture;
             MainThreadQueue.AddToLazyQueue(() =>
             {
                 /* For compressed textures:
@@ -944,16 +975,20 @@ namespace IDKEngine.Utils
 
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
-                                    for (int level = 0; level < glTextureCopy.Levels; level++)
+                                    // We don't own the texture so make sure it didn't get deleted
+                                    if (!glTextureCopy.IsDeleted())
                                     {
-                                        Vector3i size = GLTexture.GetMipmapLevelSize(textureLoadData.Ktx2Texture.BaseWidth, textureLoadData.Ktx2Texture.BaseHeight, textureLoadData.Ktx2Texture.BaseDepth, level);
-                                        textureLoadData.Ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
-                                        glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
+                                        for (int level = 0; level < glTextureCopy.Levels; level++)
+                                        {
+                                            Vector3i size = GLTexture.GetMipmapLevelSize(textureLoadData.Ktx2Texture.BaseWidth, textureLoadData.Ktx2Texture.BaseHeight, textureLoadData.Ktx2Texture.BaseDepth, level);
+                                            textureLoadData.Ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
+                                            glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
+                                        }
+
+                                        TextureLoaded?.Invoke();
                                     }
                                     stagingBuffer.Dispose();
                                     textureLoadData.Ktx2Texture.Dispose();
-
-                                    TextureLoaded?.Invoke();
                                 });
                             });
                         });
@@ -968,9 +1003,9 @@ namespace IDKEngine.Utils
                     {
                         ReadOnlySpan<byte> imageData = textureLoadData.EncodedImageData.Span;
                         using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, textureLoadData.ImageHeader.ColorComponents);
-                        if (imageResult.Memory == null)
+                        if (!imageResult.IsLoadedSuccesfully)
                         {
-                            Logger.Log(Logger.LogLevel.Error, $"Image could not be decoded");
+                            Logger.Log(Logger.LogLevel.Error, $"Image could not be loaded");
                             MainThreadQueue.AddToLazyQueue(() => { stagingBuffer.Dispose(); });
                             return;
                         }
@@ -979,17 +1014,22 @@ namespace IDKEngine.Utils
 
                         MainThreadQueue.AddToLazyQueue(() =>
                         {
-                            glTextureCopy.Upload2D(
-                                stagingBuffer,
-                                textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height,
-                                GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels),
-                                GLTexture.PixelType.UByte,
-                                null
-                            );
-                            glTextureCopy.GenerateMipmap();
-                            stagingBuffer.Dispose();
+                            // We don't own the texture so make sure it didn't get deleted
+                            if (!glTextureCopy.IsDeleted())
+                            {
+                                glTextureCopy.Upload2D(
+                                    stagingBuffer,
+                                    textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height,
+                                    GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels),
+                                    GLTexture.PixelType.UByte,
+                                    null
+                                );
+                                glTextureCopy.GenerateMipmap();
 
-                            TextureLoaded?.Invoke();
+                                TextureLoaded?.Invoke();
+                            }
+
+                            stagingBuffer.Dispose();
                         });
                     });
                 }
@@ -998,7 +1038,7 @@ namespace IDKEngine.Utils
             return true;
         }
 
-        private static bool TryGetGLTextureLoadData(SampledImage sampledImage, GpuMaterial.TextureType textureType, bool useExtBc5NormalMetallicRoughness, out GLTextureLoadData textureLoadData)
+        private static bool TryGetGLTextureLoadData(SampledImage sampledImage, TextureType textureType, bool useExtBc5NormalMetallicRoughness, out GLTextureLoadData textureLoadData)
         {
             Image gltfImage = sampledImage.GltfImage;
             textureLoadData = new GLTextureLoadData();
@@ -1014,20 +1054,20 @@ namespace IDKEngine.Utils
 
                 textureLoadData.InternalFormat = textureType switch
                 {
-                    GpuMaterial.TextureType.BaseColor => GLTexture.InternalFormat.R8G8B8A8SRgb,
-                    GpuMaterial.TextureType.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float,
-                    GpuMaterial.TextureType.Normal => GLTexture.InternalFormat.R8G8Unorm,
-                    GpuMaterial.TextureType.Emissive => GLTexture.InternalFormat.R8G8B8A8SRgb,
-                    GpuMaterial.TextureType.Transmission => GLTexture.InternalFormat.R8Unorm,
+                    TextureType.BaseColor => GLTexture.InternalFormat.R8G8B8A8SRgb,
+                    TextureType.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float,
+                    TextureType.Normal => GLTexture.InternalFormat.R8G8Unorm,
+                    TextureType.Emissive => GLTexture.InternalFormat.R8G8B8A8SRgb,
+                    TextureType.Transmission => GLTexture.InternalFormat.R8Unorm,
                     _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
                 };
                 textureLoadData.ImageLoadChannels = textureType switch
                 {
-                    GpuMaterial.TextureType.BaseColor => textureLoadData.ImageHeader.ColorComponents,
-                    GpuMaterial.TextureType.MetallicRoughness => ImageLoader.ColorComponents.RGB, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels :(
-                    GpuMaterial.TextureType.Normal => ImageLoader.ColorComponents.RGB,
-                    GpuMaterial.TextureType.Emissive => ImageLoader.ColorComponents.RGB,
-                    GpuMaterial.TextureType.Transmission => ImageLoader.ColorComponents.R,
+                    TextureType.BaseColor => textureLoadData.ImageHeader.ColorComponents,
+                    TextureType.MetallicRoughness => ImageLoader.ColorComponents.RGB, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels :(
+                    TextureType.Normal => ImageLoader.ColorComponents.RGB,
+                    TextureType.Emissive => ImageLoader.ColorComponents.RGB,
+                    TextureType.Transmission => ImageLoader.ColorComponents.R,
                     _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
                 };
             }
@@ -1050,14 +1090,14 @@ namespace IDKEngine.Utils
 
                 textureLoadData.InternalFormat = textureType switch
                 {
-                    GpuMaterial.TextureType.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
+                    TextureType.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
 
                     // BC5 support added with gltfpack fork (https://github.com/BoyBaykiller/meshoptimizer) implementing IDK_BC5_normal_metallicRoughness
-                    GpuMaterial.TextureType.MetallicRoughness => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
-                    GpuMaterial.TextureType.Normal => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
+                    TextureType.MetallicRoughness => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
+                    TextureType.Normal => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
 
-                    GpuMaterial.TextureType.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
-                    GpuMaterial.TextureType.Transmission => GLTexture.InternalFormat.BC4RUnorm,
+                    TextureType.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
+                    TextureType.Transmission => GLTexture.InternalFormat.BC4RUnorm,
                     _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
                 };
             }
@@ -1079,33 +1119,33 @@ namespace IDKEngine.Utils
             {
                 Material gltfMaterial = gltfMaterials[i];
 
-                MaterialDesc materialDesc = MaterialDesc.Default;
+                MaterialDesc materialDesc = new MaterialDesc();
                 materialDesc.MaterialParams = GetMaterialParams(gltfMaterial);
 
-                for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
+                for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
                 {
-                    MaterialDesc.TextureType textureType = MaterialDesc.TextureType.BaseColor + j;
+                    TextureType textureType = TextureType.BaseColor + j;
                     SampledImage sampledImage = GetSampledImage(gltfMaterial, textureType);
 
                     materialDesc[textureType] = sampledImage;
                 }
 
                 materialsDesc[i] = materialDesc;
-                //materialsDesc[i] = MaterialDesc.Default;
+                //materialsDesc[i] = new MaterialDesc();
             }
 
             return materialsDesc;
         }
 
-        private static SampledImage GetSampledImage(Material material, MaterialDesc.TextureType textureType)
+        private static SampledImage GetSampledImage(Material material, TextureType textureType)
         {
             KnownChannel channel = textureType switch
             {
-                MaterialDesc.TextureType.BaseColor => KnownChannel.BaseColor,
-                MaterialDesc.TextureType.MetallicRoughness => KnownChannel.MetallicRoughness,
-                MaterialDesc.TextureType.Normal => KnownChannel.Normal,
-                MaterialDesc.TextureType.Emissive => KnownChannel.Emissive,
-                MaterialDesc.TextureType.Transmission => KnownChannel.Transmission,
+                TextureType.BaseColor => KnownChannel.BaseColor,
+                TextureType.MetallicRoughness => KnownChannel.MetallicRoughness,
+                TextureType.Normal => KnownChannel.Normal,
+                TextureType.Emissive => KnownChannel.Emissive,
+                TextureType.Transmission => KnownChannel.Transmission,
                 _ => throw new NotSupportedException($"Can not convert {nameof(textureType)} = {textureType} to {nameof(channel)}"),
             };
 
@@ -1253,7 +1293,7 @@ namespace IDKEngine.Utils
             return meshDesc;
         }
 
-        private static unsafe ValueTuple<VertexData, uint[]> LoadVertexAndIndices(IReadOnlyList<Accessor> accessors, in MeshPrimitiveDesc meshDesc)
+        private static ValueTuple<VertexData, uint[]> LoadVertexAndIndices(IReadOnlyList<Accessor> accessors, in MeshPrimitiveDesc meshDesc)
         {
             Accessor positonAccessor = accessors[meshDesc.PositionAccessor];
 
@@ -1428,7 +1468,7 @@ namespace IDKEngine.Utils
             for (int i = 0; i < gltf.LogicalAnimations.Count; i++)
             {
                 GltfAnimation gltfAnimation = gltf.LogicalAnimations[i];
-                
+
                 ModelAnimation myAnimation = new ModelAnimation();
                 myAnimation.Name = gltfAnimation.Name ?? $"Animation_{i}";
 
@@ -1457,16 +1497,16 @@ namespace IDKEngine.Utils
             return animations;
         }
 
-        private static unsafe bool TryGetNodeAnimation(AnimationChannel animationChannel, Dictionary<GltfNode, Node> gltfNodeToMyNode, out NodeAnimation animation)
+        private static bool TryGetNodeAnimation(AnimationChannel animationChannel, Dictionary<GltfNode, Node> gltfNodeToMyNode, out NodeAnimation animation)
         {
             animation = new NodeAnimation();
             animation.TargetNode = gltfNodeToMyNode[animationChannel.TargetNode];
             animation.Type = (NodeAnimation.AnimationType)animationChannel.TargetNodePath;
-            
+
             if (animationChannel.TargetNodePath == PropertyPath.scale ||
                 animationChannel.TargetNodePath == PropertyPath.translation)
             {
-                IAnimationSampler<System.Numerics.Vector3> gltfAnimationSampler = 
+                IAnimationSampler<System.Numerics.Vector3> gltfAnimationSampler =
                     animationChannel.TargetNodePath == PropertyPath.scale ?
                     animationChannel.GetScaleSampler() :
                     animationChannel.GetTranslationSampler();
@@ -1530,7 +1570,7 @@ namespace IDKEngine.Utils
 
         private static MaterialParams GetMaterialParams(Material gltfMaterial)
         {
-            MaterialParams materialParams = MaterialParams.Default;
+            MaterialParams materialParams = new MaterialParams();
 
             materialParams.AlphaCutoff = gltfMaterial.AlphaCutoff;
             materialParams.AlphaMode = (AlphaMode)gltfMaterial.Alpha;
@@ -1657,7 +1697,7 @@ namespace IDKEngine.Utils
             return num;
         }
 
-        private static unsafe void OptimizeMesh(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices, OptimizationSettings optimizationSettings)
+        private static void OptimizeMesh(ref GpuVertex[] meshVertices, ref Vector3[] meshVertexPositions, Span<uint> meshIndices, OptimizationSettings optimizationSettings)
         {
             if (optimizationSettings.VertexRemapOptimization)
             {
@@ -1697,7 +1737,7 @@ namespace IDKEngine.Utils
             }
         }
 
-        private static unsafe MeshletData GenerateMeshlets(ReadOnlySpan<Vector3> meshVertexPositions, ReadOnlySpan<uint> meshIndices)
+        private static MeshletData GenerateMeshlets(ReadOnlySpan<Vector3> meshVertexPositions, ReadOnlySpan<uint> meshIndices)
         {
             const float CONE_WEIGHT = 0.0f;
 
@@ -1759,7 +1799,7 @@ namespace IDKEngine.Utils
         }
 
         private delegate void FuncAccessorItem<T>(in T item, int index);
-        private static unsafe void IterateAccessor<T>(Accessor accessor, FuncAccessorItem<T> funcItem) where T : unmanaged
+        private static void IterateAccessor<T>(Accessor accessor, FuncAccessorItem<T> funcItem) where T : unmanaged
         {
             if (accessor.IsSparse)
             {
@@ -1788,12 +1828,12 @@ namespace IDKEngine.Utils
             }
         }
 
-        private static unsafe Vector4 DecodeNormalizedIntsToFloats(in BVec4 bVec4)
+        private static Vector4 DecodeNormalizedIntsToFloats(in BVec4 bVec4)
         {
             return new Vector4(bVec4.Data[0] / 255.0f, bVec4.Data[1] / 255.0f, bVec4.Data[2] / 255.0f, bVec4.Data[3] / 255.0f);
         }
 
-        private static unsafe Vector4 DecodeNormalizedIntsToFloats(in USVec4 usvec4)
+        private static Vector4 DecodeNormalizedIntsToFloats(in USVec4 usvec4)
         {
             return new Vector4(usvec4.Data[0] / 65535.0f, usvec4.Data[1] / 65535.0f, usvec4.Data[2] / 65535.0f, usvec4.Data[3] / 65535.0f);
         }
@@ -1956,31 +1996,54 @@ namespace IDKEngine.Utils
 
         private static class FallbackTextures
         {
-            private static GLTexture pureWhiteTexture;
-            private static GLTexture.BindlessHandle pureWhiteTextureHandle;
+            // We cache textures because many bindless textures have a performance overhead on AMD drivers
+            // https://gist.github.com/BoyBaykiller/40d21d5b28391fb40d3f3bc348375ce8
+            // We check if user deleted them in which case we recreate (we are not owning)
 
-            private static GLTexture purpleBlackTexture;
-            private static GLTexture.BindlessHandle purpleBlackTextureHandle;
+            private static BindlessSampledTexture cachedWhiteTexture = new BindlessSampledTexture();
+            private static BindlessSampledTexture cachedPurpleBackTexture = new BindlessSampledTexture();
 
-            public static GLTexture.BindlessHandle White()
+            public static BindlessSampledTexture GetWhite()
             {
-                if (pureWhiteTexture == null)
+                ref GLTexture texture = ref cachedWhiteTexture.SampledTexture.Texture;
+                ref GLSampler sampler = ref cachedWhiteTexture.SampledTexture.Sampler;
+
+                if (sampler == null || sampler.IsDeleted())
                 {
-                    pureWhiteTexture = new GLTexture(GLTexture.Type.Texture2D);
-                    pureWhiteTexture.Allocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-                    pureWhiteTexture.Clear(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
-                    pureWhiteTextureHandle = pureWhiteTexture.GetTextureHandleARB(new GLSampler(new GLSampler.SamplerState()));
+                    sampler = new GLSampler(new GLSampler.SamplerState());
                 }
-                return pureWhiteTextureHandle;
+
+                if (texture == null || texture.IsDeleted())
+                {
+                    texture = new GLTexture(GLTexture.Type.Texture2D);
+                    texture.Allocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                    texture.Clear(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
+
+                    cachedWhiteTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
+                }
+
+                return cachedWhiteTexture;
             }
 
-            public static GLTexture.BindlessHandle PurpleBlack()
+            public static BindlessSampledTexture GetPurpleBlack()
             {
-                if (purpleBlackTexture == null)
+                ref GLTexture texture = ref cachedPurpleBackTexture.SampledTexture.Texture;
+                ref GLSampler sampler = ref cachedPurpleBackTexture.SampledTexture.Sampler;
+
+                if (sampler == null || sampler.IsDeleted())
                 {
-                    purpleBlackTexture = new GLTexture(GLTexture.Type.Texture2D);
-                    purpleBlackTexture.Allocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-                    purpleBlackTexture.Upload2D(2, 2, GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4[]
+                    sampler = new GLSampler(new GLSampler.SamplerState()
+                    {
+                        WrapModeS = GLSampler.WrapMode.Repeat,
+                        WrapModeT = GLSampler.WrapMode.Repeat,
+                    });
+                }
+
+                if (texture == null || texture.IsDeleted())
+                {
+                    texture = new GLTexture(GLTexture.Type.Texture2D);
+                    texture.Allocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                    texture.Upload2D(2, 2, GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4[]
                     {
                         // Source: https://en.wikipedia.org/wiki/File:Minecraft_missing_texture_block.svg
                         new Vector4(251.0f / 255.0f, 62.0f / 255.0f, 249.0f / 255.0f, 1.0f), // Purple
@@ -1989,14 +2052,10 @@ namespace IDKEngine.Utils
                         new Vector4(251.0f / 255.0f, 62.0f / 255.0f, 249.0f / 255.0f, 1.0f), // Purple
                     }[0]);
 
-                    purpleBlackTextureHandle = purpleBlackTexture.GetTextureHandleARB(new GLSampler(new GLSampler.SamplerState()
-                    {
-                        WrapModeS = GLSampler.WrapMode.Repeat,
-                        WrapModeT = GLSampler.WrapMode.Repeat
-                    }));
+                    cachedPurpleBackTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
                 }
 
-                return purpleBlackTextureHandle;
+                return cachedPurpleBackTexture;
             }
         }
     }

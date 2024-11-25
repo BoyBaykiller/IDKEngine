@@ -12,7 +12,7 @@ namespace IDKEngine.GpuTypes
         public float RoughnessBias;
         public float TransmissionBias;
         public float IORBias;
-        public int MeshletsStart;
+        public int MeshletsOffset;
 
         public Vector3 AbsorbanceBias;
         public int MeshletCount;

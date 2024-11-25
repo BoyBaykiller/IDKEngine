@@ -1,7 +1,5 @@
 ﻿using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 using System.Runtime.InteropServices;
-using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using IDKEngine.Bvh;
 using IDKEngine.GpuTypes;
@@ -38,15 +36,14 @@ namespace IDKEngine.Shapes
 
         public void GrowToFit(in Vector128<float> point)
         {
-            // TODO: Switch to Vector128.MaxNative/MinNative
-            SIMDMin = Sse.Min(SIMDMin, point);
-            SIMDMax = Sse.Max(SIMDMax, point);
+            SIMDMin = Vector128.MinNative(SIMDMin, point);
+            SIMDMax = Vector128.MaxNative(SIMDMax, point);
         }
 
         public void GrowToFit(in Box box)
         {
-            SIMDMin = Sse.Min(SIMDMin, box.SIMDMin);
-            SIMDMax = Sse.Max(SIMDMax, box.SIMDMax);
+            SIMDMin = Vector128.MinNative(SIMDMin, box.SIMDMin);
+            SIMDMax = Vector128.MaxNative(SIMDMax, box.SIMDMax);
         }
 
         public void GrowToFit(in GpuTlasNode node)
@@ -56,8 +53,8 @@ namespace IDKEngine.Shapes
             Vector128<float> p0 = Vector128.Create(node.Min.X, node.Min.Y, node.Min.Z, 0.0f);
             Vector128<float> p1 = Vector128.Create(node.Max.X, node.Max.Y, node.Max.Z, 0.0f);
             
-            SIMDMin = Sse.Min(SIMDMin, p0);
-            SIMDMax = Sse.Max(SIMDMax, p1);
+            SIMDMin = Vector128.MinNative(SIMDMin, p0);
+            SIMDMax = Vector128.MaxNative(SIMDMax, p1);
         }
 
         public void GrowToFit(Vector3 point)

@@ -5,7 +5,7 @@ using IDKEngine;
 
 namespace Program
 {
-    class Program
+    class EntryPoint
     {
         private static void Main()
         {

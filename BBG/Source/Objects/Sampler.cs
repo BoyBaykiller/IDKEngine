@@ -67,12 +67,15 @@ namespace BBOpenGL
 
             public ref readonly SamplerState State => ref samplerState;
 
+            public int ID { get; private set; }
             private SamplerState samplerState;
-            public readonly int ID;
 
             public Sampler(in SamplerState state)
             {
-                GL.CreateSamplers(1, ref ID);
+                int id = 0;
+                GL.CreateSamplers(1, ref id);
+
+                ID = id;
                 SetState(state);
             }
 
@@ -93,9 +96,20 @@ namespace BBOpenGL
                 samplerState = state;
             }
 
+            public bool IsDeleted()
+            {
+                return ID == 0;
+            }
+
             public void Dispose()
             {
-                GL.DeleteSamplers(1, in ID);
+                if (IsDeleted())
+                {
+                    return;
+                }
+
+                GL.DeleteSampler(ID);
+                ID = 0;
             }
 
             public static bool IsMipmapFilter(MinFilter minFilter)

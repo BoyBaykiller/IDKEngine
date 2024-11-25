@@ -37,7 +37,7 @@ namespace BBOpenGL
             {
                 /// <summary>
                 /// The buffer must be written or read to by using the mapped memory pointer or read by using the Download functions.
-                /// Writes by the HOST only become visible to the DEVICE after a call to glFlushMappedBufferRange.
+                /// Writes by the HOST only become visible to the DEVICE after a call to glMemoryBarrier(CLIENT_MAPPED_BUFFER_BARRIER_BIT) and glFlushMappedBufferRange.
                 /// Writes by the DEVICE only become visible to the HOST after a call to glMemoryBarrier(CLIENT_MAPPED_BUFFER_BARRIER_BIT) followed by a wait for glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)
                 /// Note: AMD driver places this in HOST memory!
                 /// </summary>
@@ -64,7 +64,7 @@ namespace BBOpenGL
                 AutoSync = BufferStorageMask.DynamicStorageBit,
             }
 
-            public readonly int ID;
+            public int ID { get; private set; }
             public nint Size { get; private set; }
             public void* Memory { get; private set; }
 
@@ -73,7 +73,10 @@ namespace BBOpenGL
 
             public Buffer()
             {
-                GL.CreateBuffers(1, ref ID);
+                int id = 0;
+                GL.CreateBuffers(1, ref id);
+
+                ID = id;
             }
 
             public void BindToBufferBackedBlock(BufferBackedBlockTarget target, int index)
@@ -95,24 +98,50 @@ namespace BBOpenGL
 
             public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size, void* data)
             {
-                GL.NamedBufferStorage(ID, size, data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
                 Size = size;
-
                 Memory = null;
 
-                if (memAccess == MemAccess.MappedCoherent)
+                if (Size == 0)
                 {
-                    Memory = GL.MapNamedBufferRange(ID, 0, size,(MapBufferAccessMask)memAccess);
+                    Dispose();
                 }
-                if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedIncoherentWriteOnlyReBAR)
+                else
                 {
-                    Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
-                }
-            }
+                    // On AMD drivers uploading a lot of data to a GPU-side buffer the classical way takes a lot of time.
+                    // Staging buffer approach is much faster (800ms vs 30ms, 101MB).
+                    // We only do this when the buffer is not mapped, otherwise a glFinish/fence is required to have the new content be immediately visible.
+                    const bool USE_FAST_UPLOAD_PATH_AMD = true;
 
-            public void UploadData(nint offset, nint size, void* data)
-            {
-                GL.NamedBufferSubData(ID, offset, size, data);
+                    bool fastUploadPathCandidate =
+                        memLocation == MemLocation.DeviceLocal && 
+                        memAccess != MemAccess.MappedCoherent &&
+                        memAccess != MemAccess.MappedIncoherent && 
+                        memAccess != MemAccess.MappedIncoherentWriteOnlyReBAR &&
+                        data != null;
+
+                    if (!USE_FAST_UPLOAD_PATH_AMD)
+                    {
+                        fastUploadPathCandidate = false;
+                    }
+
+                    GL.NamedBufferStorage(ID, size, fastUploadPathCandidate ? null : data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
+                    if (fastUploadPathCandidate)
+                    {
+                        using Buffer stagingBuffer = new Buffer();
+                        stagingBuffer.Allocate(MemLocation.HostLocal, MemAccess.AutoSync, size, data);
+
+                        stagingBuffer.CopyTo(this, 0, 0, stagingBuffer.Size);
+                    }
+
+                    if (memAccess == MemAccess.MappedCoherent)
+                    {
+                        Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
+                    }
+                    if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedIncoherentWriteOnlyReBAR)
+                    {
+                        Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
+                    }
+                }
             }
 
             public void UploadData<T>(nint offset, nint size, in T data) where T : unmanaged
@@ -123,13 +152,21 @@ namespace BBOpenGL
                 }
             }
 
+            public void UploadData(nint offset, nint size, void* data)
+            {
+                if (size == 0) return;
+                GL.NamedBufferSubData(ID, offset, size, data);
+            }
+
             public void DownloadData(nint offset, nint size, void* data)
             {
+                if (size == 0) return;
                 GL.GetNamedBufferSubData(ID, offset, size, data);
             }
 
             public void CopyTo(Buffer buffer, nint readOffset, nint writeOffset, nint size)
             {
+                if (size == 0) return;
                 GL.CopyNamedBufferSubData(ID, buffer.ID, readOffset, writeOffset, size);
             }
 
@@ -151,21 +188,35 @@ namespace BBOpenGL
             
             public void Clear(Texture.InternalFormat internalFormat, Texture.PixelFormat pixelFormat, Texture.PixelType pixelType, nint offset, nint size, void* data)
             {
+                if (size == 0) return;
                 GL.ClearNamedBufferSubData(ID, (SizedInternalFormat)internalFormat, offset, size, (PixelFormat)pixelFormat, (PixelType)pixelType, data);
             }
 
             public void FlushMemory(nint offset, nint size)
             {
+                if (size == 0) return;
                 GL.FlushMappedNamedBufferRange(ID, offset, size);
+            }
+
+            public bool IsDeleted()
+            {
+                return ID == 0;
             }
 
             public void Dispose()
             {
+                if (IsDeleted())
+                {
+                    return;
+                }
+
                 if (Memory != null)
                 {
                     GL.UnmapNamedBuffer(ID);
                 }
-                GL.DeleteBuffers(1, in ID);
+
+                GL.DeleteBuffer(ID);
+                ID = 0;
             }
 
             public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size)
@@ -175,13 +226,15 @@ namespace BBOpenGL
 
             public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
             {
+                buffer.Dispose();
+
                 Buffer newBuffer = new Buffer();
-                newBuffer.Allocate(memLocation, memAccess, size, data);
+                newBuffer.Allocate(memLocation, memAccess, size, data);   
+
                 if (buffer.BackingBlock != 0)
                 {
                     newBuffer.BindToBufferBackedBlock(buffer.BackingBlock, buffer.BlockIndex);
                 }
-                buffer.Dispose();
 
                 buffer = newBuffer;
             }
@@ -206,7 +259,6 @@ namespace BBOpenGL
 
             public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, nint count, void* data) where T : unmanaged
             {
-                if (count == 0) return;
                 ref Buffer baseBuffer = ref Unsafe.As<TypedBuffer<T>, Buffer>(ref buffer);
                 Recreate(ref baseBuffer, memLocation, memAccess, sizeof(T) * count, data);
             }
@@ -243,7 +295,6 @@ namespace BBOpenGL
 
             public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, void* data)
             {
-                if (count == 0) return;
                 Allocate(memLocation, memAccess, sizeof(T) * count, data);
             }
 
@@ -259,7 +310,6 @@ namespace BBOpenGL
 
             public void UploadElements(nint startIndex, nint count, in T data)
             {
-                if (count == 0) return;
                 fixed (void* ptr = &data)
                 {
                     UploadData(startIndex * sizeof(T), count * sizeof(T), ptr);

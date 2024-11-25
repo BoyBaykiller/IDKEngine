@@ -109,7 +109,7 @@ namespace IDKEngine.Render
         private readonly BBG.AbstractShaderProgram finalDrawProgram;
         private BBG.TypedBuffer<GpuWavefrontRay> wavefrontRayBuffer;
         private BBG.Buffer wavefrontPTBuffer;
-        public unsafe PathTracer(Vector2i size, in GpuSettings settings)
+        public PathTracer(Vector2i size, in GpuSettings settings)
         {
             firstHitProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/FirstHit/compute.glsl"));
 

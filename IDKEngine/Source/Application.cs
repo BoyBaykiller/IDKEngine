@@ -33,11 +33,15 @@ namespace IDKEngine
             public const string FRAME_STATES_INPUT_FILE = "frameRecordData.frd";
             public const string FRAMES_OUTPUT_FOLDER = "RecordedFrames";
 
-            public int FPSGoal;
-            public int PathTracingSamplesGoal;
-            public bool IsOutputFrames;
-            public FrameRecorderState State;
-            public Stopwatch FrameTimer;
+            public int FPSGoal = 30;
+            public int PathTracingSamplesGoal = 50;
+            public bool IsOutputFrames = false;
+            public FrameRecorderState State = FrameRecorderState.None;
+            public Stopwatch FrameTimer = new Stopwatch();
+
+            public RecordingSettings()
+            {
+            }
         }
 
         public RenderMode CRenderMode
@@ -108,7 +112,7 @@ namespace IDKEngine
         public Camera Camera;
 
         public StateRecorder<FrameState> FrameStateRecorder;
-        public RecordingSettings RecorderVars;
+        public RecordingSettings RecorderVars = new RecordingSettings();
 
         public int MeasuredFramesPerSecond { get; private set; }
 
@@ -235,43 +239,42 @@ namespace IDKEngine
                 TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
 
-            if (gui.SelectedEntity.EntityType != Gui.EntityType.None)
+
+            if (gui.SelectedEntity is Gui.SelectedEntityInfo.MeshInstance meshInstanceInfo)
             {
-                if (gui.SelectedEntity.EntityType == Gui.EntityType.Mesh)
-                {
-                    GpuBlasNode node = ModelManager.BVH.GetBlas(gui.SelectedEntity.EntityID).Root;
+                ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId]; 
+                GpuBlasNode node = ModelManager.BVH.GetBlas(meshInstance.MeshId).Root;
 
-                    Box box = new Box();
-                    box.Min = node.Min;
-                    box.Max = node.Max;
+                Box box = new Box();
+                box.Min = node.Min;
+                box.Max = node.Max;
 
-                    box.Transform(ModelManager.MeshInstances[gui.SelectedEntity.InstanceID].ModelMatrix);
-                    BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
-                }
-                else if (gui.SelectedEntity.EntityType == Gui.EntityType.Light)
-                {
-                    LightManager.TryGetLight(gui.SelectedEntity.EntityID, out CpuLight cpuLight);
-                    ref GpuLight light = ref cpuLight.GpuLight;
+                box.Transform(meshInstance.ModelMatrix);
+                BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
+            }
+            else if (gui.SelectedEntity is Gui.SelectedEntityInfo.Light lightInfo)
+            {
+                LightManager.TryGetLight(lightInfo.LightId, out CpuLight cpuLight);
+                ref GpuLight light = ref cpuLight.GpuLight;
 
-                    Box box = new Box();
-                    box.Min = light.Position - new Vector3(light.Radius);
-                    box.Max = light.Position + new Vector3(light.Radius);
-                    BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
-                }
-                else if (gui.SelectedEntity.EntityType == Gui.EntityType.Node)
+                Box box = new Box();
+                box.Min = light.Position - new Vector3(light.Radius);
+                box.Max = light.Position + new Vector3(light.Radius);
+                BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
+            }
+            else if (gui.SelectedEntity is Gui.SelectedEntityInfo.Node nodeInfo)
+            {
+                ModelLoader.Node.Traverse(nodeInfo.Node_, (node) =>
                 {
-                    ModelLoader.Node.Traverse(gui.SelectedEntity.Node, (node) =>
+                    Range meshInstanceIds = node.MeshInstanceRange;
+                    for (int i = meshInstanceIds.Start; i < meshInstanceIds.End; i++)
                     {
-                        Range meshInstanceIds = node.MeshInstanceIds;
-                        for (int i = meshInstanceIds.Start; i < meshInstanceIds.End; i++)
-                        {
-                            ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[i];
+                        ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[i];
 
-                            Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(meshInstance.MeshId).Root);
-                            BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
-                        }
-                    });
-                }
+                        Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(meshInstance.MeshId).Root);
+                        BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
+                    }
+                });
             }
 
             BBG.Rendering.SetViewport(WindowFramebufferSize);
@@ -462,7 +465,9 @@ namespace IDKEngine
             ModelManager = new ModelManager();
             LightManager = new LightManager();
 
+            gui = new Gui(WindowFramebufferSize);
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), 360.0f - 165.4f, 90.0f - 7.4f);
+            
             if (true)
             {
                 ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Resource/Models/SponzaCompressed/Sponza.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).GetMatrix()).Value;
@@ -491,7 +496,6 @@ namespace IDKEngine
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", new Transformation().WithScale(4.0f).GetMatrix()).Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
 
@@ -503,21 +507,21 @@ namespace IDKEngine
 
                 for (int i = 0; i < 3; i++)
                 {
-                    if (LightManager.TryGetLight(i, out CpuLight light))
-                    {
-                        CpuPointShadow pointShadow = new CpuPointShadow(512, WindowFramebufferSize, new Vector2(light.GpuLight.Radius, 60.0f));
-                        LightManager.CreatePointShadowForLight(pointShadow, i);
-                    }
+                   if (LightManager.TryGetLight(i, out CpuLight light))
+                   {
+                       CpuPointShadow pointShadow = new CpuPointShadow(512, WindowFramebufferSize, new Vector2(light.GpuLight.Radius, 60.0f));
+                       LightManager.CreatePointShadowForLight(pointShadow, i);
+                   }
                 }
             }
             else
             {
                 ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
-                //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+                ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
                 //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
                 //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
                 //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a);
+                ModelManager.Add(a, b);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -525,17 +529,10 @@ namespace IDKEngine
                 //LightManager.CreatePointShadowForLight(new CpuPointShadow(512, WindowFramebufferSize, new Vector2(0.1f, 60.0f)), 0);
             }
 
-            gui = new Gui(WindowFramebufferSize);
             MouseState.CursorMode = CursorModeValue.CursorNormal;
             FrameStateRecorder = new StateRecorder<FrameState>();
             WindowVSync = true;
             TimeEnabled = true;
-
-            RecorderVars = new RecordingSettings();
-            RecorderVars.FPSGoal = 30; // unlimited
-            RecorderVars.PathTracingSamplesGoal = 50;
-            RecorderVars.State = FrameRecorderState.None;
-            RecorderVars.FrameTimer = Stopwatch.StartNew();
 
             GC.Collect();
         }
@@ -544,7 +541,7 @@ namespace IDKEngine
         {
             gui.SetSize(WindowFramebufferSize);
 
-            // If GUI is used it will handle resizing
+            // If GUI is used it will handle render resizing
             if (!RenderGui)
             {
                 RequestPresentationResolution = WindowFramebufferSize;
@@ -709,6 +706,7 @@ namespace IDKEngine
                 {
                     RecorderVars.State = FrameRecorderState.Recording;
                     FrameStateRecorder.Clear();
+                    RecorderVars.FrameTimer.Restart();
                 }
             }
 

@@ -54,14 +54,17 @@ namespace IDKEngine.Utils
             }
         }
 
-        // TODO: In .NET 9 rid of all SizeInBytes overloads in favour of ReadOnlySpan<T>, as it can be implciliy converted in extensions
-
         public static unsafe int SizeInBytes<T>(this T[] data) where T : unmanaged
         {
             return sizeof(T) * data.Length;
         }
 
         public static unsafe int SizeInBytes<T>(this ReadOnlyArray<T> data) where T : unmanaged
+        {
+            return sizeof(T) * data.Length;
+        }
+
+        public static unsafe int SizeInBytes<T>(this NativeMemoryView<T> data) where T : unmanaged
         {
             return sizeof(T) * data.Length;
         }
@@ -78,6 +81,13 @@ namespace IDKEngine.Utils
             return newArr;
         }
 
+        public static void ArrayAdd<T>(ref T[] array, T toAdd)
+        {
+            int prevLength = array.Length;
+            Array.Resize(ref array, prevLength + 1);
+            array[array.Length - 1] = toAdd;
+        }
+
         public static void ArrayAdd<T>(ref T[] array, ReadOnlySpan<T> toAdd)
         {
             int prevLength = array.Length;
@@ -85,7 +95,7 @@ namespace IDKEngine.Utils
             toAdd.CopyTo(new Span<T>(array, prevLength, toAdd.Length));
         }
 
-        public static void ArrayRemoveRange<T>(ref T[] array, int start, int count)
+        public static void ArrayRemove<T>(ref T[] array, int start, int count)
         {
             int end = start + count;
             Array.Copy(array, end, array, start, array.Length - end);

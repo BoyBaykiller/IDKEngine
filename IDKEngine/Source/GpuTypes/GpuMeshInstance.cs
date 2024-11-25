@@ -54,7 +54,7 @@ namespace IDKEngine.GpuTypes
 
         public void SetPrevToCurrentMatrix()
         {
-            prevModelMatrix3x4 = ModelMatrix3x4;
+            prevModelMatrix3x4 = modelMatrix3x4;
         }
     }
 }

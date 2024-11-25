@@ -93,7 +93,7 @@ namespace BBOpenGL
             public int InstanceCount;
             public int FirstIndex;
             public int BaseVertex;
-            public uint BaseInstance;
+            public int BaseInstance;
         }
 
         public record struct DrawArraysIndirectCommand
@@ -101,7 +101,7 @@ namespace BBOpenGL
             public int Count;
             public int InstanceCount;
             public int First;
-            public uint BaseInstance;
+            public int BaseInstance;
         }
 
         public record struct DispatchIndirectCommand

@@ -253,13 +253,13 @@ namespace IDKEngine.Bvh
 
                 if (leftChild.IsLeaf)
                 {
-                    Memory.CopyElements(triangles[leftChild.TriStartOrChild], ref newTriIndices[triCounter], leftChild.TriCount);
+                    Memory.CopyElements(ref triangles[leftChild.TriStartOrChild], ref newTriIndices[triCounter], leftChild.TriCount);
                     leftChild.TriStartOrChild = triCounter;
                     triCounter += leftChild.TriCount;
                 }
                 if (rightChild.IsLeaf)
                 {
-                    Memory.CopyElements(triangles[rightChild.TriStartOrChild], ref newTriIndices[triCounter], rightChild.TriCount);
+                    Memory.CopyElements(ref triangles[rightChild.TriStartOrChild], ref newTriIndices[triCounter], rightChild.TriCount);
                     rightChild.TriStartOrChild = triCounter;
                     triCounter += rightChild.TriCount;
                 }
@@ -308,7 +308,7 @@ namespace IDKEngine.Bvh
             UpdateChildParentIds(nodes, parentIds, outLeftChildId);
             UpdateChildParentIds(nodes, parentIds, outRightChildId);
 
-            void UpdateChildParentIds(Span<GpuBlasNode> nodes, Span<int> parentIds, int parentNodeId)
+            static void UpdateChildParentIds(Span<GpuBlasNode> nodes, Span<int> parentIds, int parentNodeId)
             {
                 ref readonly GpuBlasNode parent = ref nodes[parentNodeId];
                 if (!parent.IsLeaf)

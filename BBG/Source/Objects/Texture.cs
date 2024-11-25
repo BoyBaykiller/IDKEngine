@@ -112,7 +112,7 @@ namespace BBOpenGL
                 public ulong GLHandle;
             }
 
-            public readonly int ID;
+            public int ID { get; private set; }
             public readonly Type TextureType;
             public InternalFormat Format { get; private set; }
             public int Width { get; private set; }
@@ -125,7 +125,10 @@ namespace BBOpenGL
 
             public Texture(Type textureType)
             {
-                GL.CreateTextures((TextureTarget)textureType, 1, ref ID);
+                int id = 0;
+                GL.CreateTextures((TextureTarget)textureType, 1, ref id);
+
+                ID = id;
                 TextureType = textureType;
             }
 
@@ -326,8 +329,18 @@ namespace BBOpenGL
                 return bindlessHandle;
             }
 
+            public bool IsDeleted()
+            {
+                return ID == 0;
+            }
+
             public void Dispose()
             {
+                if (IsDeleted())
+                {
+                    return;
+                }
+
                 FramebufferCache.DeleteFramebuffersWithTexture(this);
 
                 for (int i = 0; i < bindlessTextureHandles.Count; i++)
@@ -348,7 +361,8 @@ namespace BBOpenGL
                 }
                 bindlessImageHandles = null;
 
-                GL.DeleteTextures(1, in ID);
+                GL.DeleteTexture(ID);
+                ID = 0;
             }
 
             public static int GetMaxMipmapLevel(int width, int height, int depth)
