@@ -69,11 +69,6 @@ namespace IDKEngine.Utils
             return sizeof(T) * data.Length;
         }
 
-        public static Span<T> GetSpan<T>(this Span<T> values, int start, int count)
-        {
-            return MemoryMarshal.CreateSpan(ref values[start], count);
-        }
-
         public static T[] DeepClone<T>(this T[] array)
         {
             T[] newArr = new T[array.Length];
@@ -111,6 +106,19 @@ namespace IDKEngine.Utils
             }
 
             return sum;
+        }
+
+        public static void FillIncreasing(Span<int> array, int startValue = 0)
+        {
+            FillIncreasing(array, 0, array.Length, startValue);
+        }
+
+        public static void FillIncreasing(Span<int> array, int start, int count, int startValue = 0)
+        {
+            for (int i = start; i < start + count; i++)
+            {
+                array[i] = startValue + i;
+            }
         }
 
         public static void FillIncreasing(Span<uint> array, uint startValue = 0u)

@@ -156,7 +156,7 @@ namespace IDKEngine.Windowing
 
             GLFW.MakeContextCurrent(window);
             OpenTK.Graphics.GLLoader.LoadBindings(this);
-
+            
             {
                 // Make window black (calling SwapBuffers here irritates diagnostic tools like renderdoc)
                 Vector4 clearColor = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);

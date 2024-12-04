@@ -18,10 +18,12 @@
     I don't think tiered compilation has any effect when NativeAOT is used since there is no JIT in that case.
     -->
     <TieredCompilation>true</TieredCompilation> <!-- True by default-->
-    <TieredCompilationQuickJit>true</TieredCompilationQuickJit> <!-- True by default-->
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit> <!-- True by default-->
 
-    <!--<OptimizationPreference>Size</OptimizationPreference>-->
+    <!--<OptimizationPreference>Speed</OptimizationPreference>-->
     <!--<IlcInstructionSet>native</IlcInstructionSet>-->
+    <!--<IlcDisableReflection>true</IlcDisableReflection>-->
+
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

@@ -48,8 +48,8 @@ Notes:
 # Path Traced Render Samples
 
 ![Path Traced Lumberyard Bistro](Screenshots/Showcase/PTBistro.png?raw=true)
+![Path Traced Intel Sponza](Screenshots/Showcase/PTIntelSponza.png?raw=true)
 ![Path Traced Temple](Screenshots/Showcase/PTTemple.png?raw=true)
-![Path Traced Chess Board](Screenshots/Showcase/PTChessBoard.png?raw=true)
 
 ## Voxel Global Illumination
 
@@ -317,8 +317,8 @@ void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
 
 Task.Run(() =>
 {
-    ImageResult imageResult = ImageResult.FromStream(...);
-    NativeMemory.Copy(imageResult.Data, bufferMemory, imageSize);
+    byte* imageData = LoadImage(...);
+    NativeMemory.Copy(imageData, bufferMemory, imageSize);
 
     MainThreadQueue.AddToLazyQueue(() =>
     {

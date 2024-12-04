@@ -73,7 +73,7 @@ namespace IDKEngine.Utils
 
         public static int Partition<T>(Span<T> arr, int start, int end, Predicate<T> func)
         {
-            Span<T> values = arr.GetSpan(start, end - start);
+            Span<T> values = arr.Slice(start, end - start);
             return Partition(values, func) + start;
         }
 
@@ -107,6 +107,46 @@ namespace IDKEngine.Utils
             }
 
             return start;
+        }
+
+        /// <summary>
+        /// Reorders the elements in the range [first, last) in such a way that all elements for which the predicate returns true
+        /// precede the elements for which predicate p returns false. Relative order of the elements is preserved.
+        /// Equivalent to std::stable_partition
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="arr"></param>
+        /// <param name="func"></param>
+        public static void StablePartition<T>(Span<T> arr, Predicate<T> func)
+        {
+            T[] leftTemp = new T[arr.Length];
+            T[] rightTemp = new T[arr.Length];
+
+            int leftCounter = 0;
+            int rightCounter = 0;
+
+            for (int i = 0; i < arr.Length; i++)
+            {
+                ref T value = ref arr[i];
+                if (func(value))
+                {
+                    leftTemp[leftCounter++] = value;
+                }
+                else
+                {
+                    rightTemp[rightCounter++] = value;
+                }
+            }
+
+            for (int i = 0; i < leftCounter; i++)
+            {
+                arr[i] = leftTemp[i];
+            }
+
+            for (int i = 0; i < rightCounter; i++)
+            {
+                arr[leftCounter + i] = rightTemp[i];
+            }
         }
 
         public static void Swap<T>(ref T a, ref T b)

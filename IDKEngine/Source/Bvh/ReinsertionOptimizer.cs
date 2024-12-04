@@ -7,7 +7,8 @@ using IDKEngine.GpuTypes;
 namespace IDKEngine.Bvh
 {
     /// <summary>
-    /// Implementation of https://meistdan.github.io/publications/prbvh/paper.pdf
+    /// Implementation of "Parallel Reinsertion for Bounding Volume Hierarchy Optimization"
+    /// https://meistdan.github.io/publications/prbvh/paper.pdf
     /// </summary>
     public ref struct ReinsertionOptimizer
     {
@@ -50,6 +51,7 @@ namespace IDKEngine.Bvh
             {
                 return;
             }
+
             new ReinsertionOptimizer(blas.Nodes, parentIds, triangles).Optimize(settings);
             blas.MaxTreeDepth = BLAS.ComputeTreeDepth(blas);
         }
@@ -57,6 +59,7 @@ namespace IDKEngine.Bvh
         private readonly Span<GpuBlasNode> nodes;
         private readonly Span<int> parentIds;
         private readonly Span<BLAS.IndicesTriplet> triangles;
+        
         private ReinsertionOptimizer(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles)
         {
             this.nodes = nodes;
@@ -146,7 +149,7 @@ namespace IDKEngine.Bvh
             Algorithms.PartialSort(candidates, count, MyComparer.GreaterThan);
             //MemoryExtensions.Sort<Candidate>(test, MyComparer.GreaterThan);
 
-            return candidates.GetSpan(0, count);
+            return candidates.Slice(0, count);
         }
 
         private Reinsertion FindReinsertion(int nodeId)

@@ -467,7 +467,7 @@ namespace IDKEngine
 
             gui = new Gui(WindowFramebufferSize);
             Camera = new Camera(WindowFramebufferSize, new Vector3(7.63f, 2.71f, 0.8f), 360.0f - 165.4f, 90.0f - 7.4f);
-            
+
             if (true)
             {
                 ModelLoader.Model sponza = ModelLoader.LoadGltfFromFile("Resource/Models/SponzaCompressed/Sponza.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).GetMatrix()).Value;
@@ -498,7 +498,7 @@ namespace IDKEngine
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
-
+                
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
@@ -518,10 +518,10 @@ namespace IDKEngine
             {
                 ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
                 ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-                //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+                ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
                 //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
                 //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a, b);
+                ModelManager.Add(a, b, c);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 

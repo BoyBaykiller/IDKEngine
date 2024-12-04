@@ -98,7 +98,6 @@ namespace IDKEngine.Shapes
             return area;
         }
         
-
         public void Transform(in Matrix4 matrix)
         {
             this = Transformed(this, matrix);

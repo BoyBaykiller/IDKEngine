@@ -24,7 +24,7 @@ namespace IDKEngine.Bvh
         {
             if (nodes.Length == 0) return;
 
-            Span<GpuTlasNode> initialChildNodes = nodes.GetSpan(nodes.Length - primitiveCount, primitiveCount);
+            Span<GpuTlasNode> initialChildNodes = nodes.Slice(nodes.Length - primitiveCount, primitiveCount);
 
             // Place initial tlasNodes at the end of array
             Box globalBounds = Box.Empty();

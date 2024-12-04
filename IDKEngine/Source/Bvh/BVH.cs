@@ -320,7 +320,7 @@ namespace IDKEngine.Bvh
             BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
             ReinsertionOptimizer.Settings optimizationSettings = new ReinsertionOptimizer.Settings();
             BlasBuildPhaseData[] newBlasesData = new BlasBuildPhaseData[count];
-
+            
             Stopwatch swBuilding = Stopwatch.StartNew();
             Parallel.For(0, count, i =>
             //for (int i = 0; i < count; i++)
@@ -364,7 +364,7 @@ namespace IDKEngine.Bvh
             });
             swBuilding.Stop();
 
-            Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms(Build) {swBuilding.ElapsedMilliseconds}ms");
+            Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms");
 
             if (true)
             {

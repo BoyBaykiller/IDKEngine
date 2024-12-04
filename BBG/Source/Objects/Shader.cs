@@ -294,7 +294,7 @@ namespace BBOpenGL
                         return source.Length;
                     }
                 }
-                
+
                 private static int CountLines(string searchString, int count, int startIndex = 0)
                 {
                     int lineCount = 0;
