@@ -37,39 +37,39 @@ namespace IDKEngine.Shapes
             // Source: https://github.com/efryscok/OpenGL-Basic-Collision-Detection/blob/master/Project1_efryscok/TheMain.cpp#L276
 
             // Check if P in vertex region outside A
-            Vector3 ab = triangle.P1 - triangle.P0;
-            Vector3 ac = triangle.P2 - triangle.P0;
-            Vector3 ap = point - triangle.P0;
+            Vector3 ab = triangle.Position1 - triangle.Position0;
+            Vector3 ac = triangle.Position2 - triangle.Position0;
+            Vector3 ap = point - triangle.Position0;
             float d1 = Vector3.Dot(ab, ap);        // Vector3.Dot( ab, ap );
             float d2 = Vector3.Dot(ac, ap);
-            if (d1 <= 0.0f && d2 <= 0.0f) return triangle.P0; // barycentric coordinates (1,0,0)
+            if (d1 <= 0.0f && d2 <= 0.0f) return triangle.Position0; // barycentric coordinates (1,0,0)
 
             // Check if P in vertex region outside B
-            Vector3 bp = point - triangle.P1;
+            Vector3 bp = point - triangle.Position1;
             float d3 = Vector3.Dot(ab, bp);
             float d4 = Vector3.Dot(ac, bp);
-            if (d3 >= 0.0f && d4 <= d3) return triangle.P1; // barycentric coordinates (0,1,0)
+            if (d3 >= 0.0f && d4 <= d3) return triangle.Position1; // barycentric coordinates (0,1,0)
 
             // Check if P in edge region of AB, if so return projection of P onto AB
             float vc = d1 * d4 - d3 * d2;
             if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
             {
                 float v = d1 / (d1 - d3);
-                return triangle.P0 + v * ab; // barycentric coordinates (1-v,v,0)
+                return triangle.Position0 + v * ab; // barycentric coordinates (1-v,v,0)
             }
 
             // Check if P in vertex region outside C
-            Vector3 cp = point - triangle.P2;
+            Vector3 cp = point - triangle.Position2;
             float d5 = Vector3.Dot(ab, cp);
             float d6 = Vector3.Dot(ac, cp);
-            if (d6 >= 0.0f && d5 <= d6) return triangle.P2; // barycentric coordinates (0,0,1)
+            if (d6 >= 0.0f && d5 <= d6) return triangle.Position2; // barycentric coordinates (0,0,1)
 
             // Check if P in edge region of AC, if so return projection of P onto AC
             float vb = d5 * d2 - d1 * d6;
             if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
             {
                 float w = d2 / (d2 - d6);
-                return triangle.P0 + w * ac; // barycentric coordinates (1-w,0,w)
+                return triangle.Position0 + w * ac; // barycentric coordinates (1-w,0,w)
             }
 
             // Check if P in edge region of BC, if so return projection of P onto BC
@@ -77,7 +77,7 @@ namespace IDKEngine.Shapes
             if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
             {
                 float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-                return triangle.P1 + w * (triangle.P2 - triangle.P1); // barycentric coordinates (0,1-w,w)
+                return triangle.Position1 + w * (triangle.Position2 - triangle.Position1); // barycentric coordinates (0,1-w,w)
             }
 
             // P inside face region. Compute Q through its barycentric coordinates (u,v,w)
@@ -86,7 +86,7 @@ namespace IDKEngine.Shapes
                 float v = vb * denom;
                 float w = vc * denom;
 
-                return triangle.P0 + ab * v + ac * w; // = u*a + v*b + w*c, u = va * denom = 1.0f - v - w
+                return triangle.Position0 + ab * v + ac * w; // = u*a + v*b + w*c, u = va * denom = 1.0f - v - w
             }
         }
 
@@ -159,9 +159,9 @@ namespace IDKEngine.Shapes
             // Source: "Real-Time Collision Detection" by Christer Ericson, page 169
 
             // Translate triangle as conceptually moving Box to origin
-            var v0 = (triangle.P0 - box.Center());
-            var v1 = (triangle.P1 - box.Center());
-            var v2 = (triangle.P2 - box.Center());
+            var v0 = (triangle.Position0 - box.Center());
+            var v1 = (triangle.Position1 - box.Center());
+            var v2 = (triangle.Position2 - box.Center());
 
             // Compute edge vectors for triangle
             var f0 = (v1 - v0);
@@ -375,9 +375,9 @@ namespace IDKEngine.Shapes
         {
             // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 
-            Vector3 v1v0 = triangle.P1 - triangle.P0;
-            Vector3 v2v0 = triangle.P2 - triangle.P0;
-            Vector3 rov0 = ray.Origin - triangle.P0;
+            Vector3 v1v0 = triangle.Position1 - triangle.Position0;
+            Vector3 v2v0 = triangle.Position2 - triangle.Position0;
+            Vector3 rov0 = ray.Origin - triangle.Position0;
             Vector3 normal = Vector3.Cross(v1v0, v2v0);
             Vector3 q = Vector3.Cross(rov0, ray.Direction);
 

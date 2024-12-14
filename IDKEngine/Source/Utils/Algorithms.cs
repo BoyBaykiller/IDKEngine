@@ -40,13 +40,13 @@ namespace IDKEngine.Utils
             return lo;
         }
 
-        public static void PartialSort<T>(Span<T> values, int sortEnd, Comparison<T> comparison)
+        public static void PartialSort<T>(Span<T> values, int sortEnd, Comparison<T> comparison, Action<int, int> onSwap = null)
         {
-            PartialSort(values, 0, values.Length, sortEnd, comparison);
+            PartialSort(values, 0, values.Length, sortEnd, comparison, onSwap);
         }
 
         /// <summary>
-        /// Rearranges elements such that the range [start, end) contains the sorted (sortEnd − first) smallest elements in the range [start, end).
+        /// Rearranges elements such that the range [start, end) contains the sorted (end − start) smallest elements in the range [start, end).
         /// The order of equal elements is not guaranteed to be preserved. The order of the remaining elements in the range [middle, last) is unspecified.
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -55,30 +55,40 @@ namespace IDKEngine.Utils
         /// <param name="end"></param>
         /// <param name="sortEnd"></param>
         /// <param name="comparison"></param>
-        public static void PartialSort<T>(Span<T> values, int start, int end, int sortEnd, Comparison<T> comparison)
+        private static void PartialSort<T>(Span<T> values, int start, int end, int sortEnd, Comparison<T> comparison, Action<int, int> onSwap = null)
         {
-            T pivot = values[(start + end) / 2]; // Consider randomizing
-            int middle1 = Partition(values, start, end, (in T it) => comparison(it, pivot) < 0);
-            int middle2 = Partition(values, middle1, end, (in T it) => !(comparison(pivot, it) < 0));
+            // Swap randomly selected pivot with start
+            SwapNotifyUser(values, RNG.RandomInt(start, end - 1), start, onSwap);
+            T pivot = values[start];
 
-            if ((middle1 - start) >= 2)
+            int middle = Partition(values, start, end, (in T it) => comparison(it, pivot) < 0, onSwap);
+
+            // The pivot is now located at the end by the partitioning step
+            // We swap it into middle. It will divide the next two recursive sorts and gets excluded from both
+            // That way we avoid avoid all values ending up in one partition causing endless loop
+            SwapNotifyUser(values, middle, end - 1, onSwap);
+
+            int lSortEnd = middle;
+            int rSortStart = middle + 1;
+
+            if ((lSortEnd - start) > 1)
             {
-                PartialSort(values, start, middle1, sortEnd, comparison);
+                PartialSort(values, start, lSortEnd, sortEnd, comparison, onSwap);
             }
-            if ((end - middle2) >= 2 && middle2 < sortEnd)
+            if ((end - rSortStart) > 1 && rSortStart < sortEnd)
             {
-                PartialSort(values, middle2, end, sortEnd, comparison);
+                PartialSort(values, rSortStart, end, sortEnd, comparison, onSwap);
             }
         }
 
-        public static int Partition<T>(Span<T> arr, int start, int end, Predicate<T> func)
+        public static int Partition<T>(Span<T> arr, int start, int end, Predicate<T> func, Action<int, int> onSwap = null)
         {
-            Span<T> values = arr.Slice(start, end - start);
-            return Partition(values, func) + start;
+            arr = arr.Slice(start, end - start);
+            return Partition(arr, func, onSwap) + start;
         }
 
         /// <summary>
-        /// Reorders the elements in the range [start, end) in such a way that all elements for which the predicate returns true
+        /// Reorders the elements in such a way that all elements for which the predicate returns true
         /// precede all elements for which the predicate returns false. Relative order of the elements is not preserved.
         /// Equivalent to std::partition
         /// </summary>
@@ -88,7 +98,7 @@ namespace IDKEngine.Utils
         /// <param name="end"></param>
         /// <param name="func"></param>
         /// <returns>Index to the first element of the second group.</returns>
-        public static int Partition<T>(Span<T> arr, Predicate<T> func)
+        public static int Partition<T>(Span<T> arr, Predicate<T> func, Action<int, int> onSwap = null)
         {
             int start = 0;
             int end = arr.Length;
@@ -102,7 +112,7 @@ namespace IDKEngine.Utils
                 }
                 else
                 {
-                    Swap(ref value, ref arr[--end]);
+                    SwapNotifyUser(arr, start, --end, onSwap);
                 }
             }
 
@@ -110,48 +120,54 @@ namespace IDKEngine.Utils
         }
 
         /// <summary>
-        /// Reorders the elements in the range [first, last) in such a way that all elements for which the predicate returns true
+        /// Reorders the elements in such a way that all elements for which the predicate returns true
         /// precede the elements for which predicate p returns false. Relative order of the elements is preserved.
         /// Equivalent to std::stable_partition
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="arr"></param>
+        /// <param name="temp"></param>
         /// <param name="func"></param>
-        public static void StablePartition<T>(Span<T> arr, Predicate<T> func)
+        public static int StablePartition<T>(Span<T> arr, Span<T> temp, Predicate<T> func)
         {
-            T[] leftTemp = new T[arr.Length];
-            T[] rightTemp = new T[arr.Length];
-
-            int leftCounter = 0;
-            int rightCounter = 0;
+            int leftHead = 0;
+            int rightHead = arr.Length;
 
             for (int i = 0; i < arr.Length; i++)
             {
                 ref T value = ref arr[i];
                 if (func(value))
                 {
-                    leftTemp[leftCounter++] = value;
+                    temp[leftHead++] = value;
                 }
                 else
                 {
-                    rightTemp[rightCounter++] = value;
+                    temp[--rightHead] = value;
                 }
             }
 
-            for (int i = 0; i < leftCounter; i++)
+            temp.Slice(0, leftHead).CopyTo(arr);
+            
+            for (int i = arr.Length - 1; i >= leftHead; i--)
             {
-                arr[i] = leftTemp[i];
+                int offsetFromLeft = arr.Length - 1 - i;
+                arr[leftHead + offsetFromLeft] = temp[i];
             }
 
-            for (int i = 0; i < rightCounter; i++)
-            {
-                arr[leftCounter + i] = rightTemp[i];
-            }
+            return leftHead;
         }
 
         public static void Swap<T>(ref T a, ref T b)
         {
-            (a, b) = (b, a);
+            T temp = a;
+            a = b;
+            b = temp;
+        }
+
+        private static void SwapNotifyUser<T>(Span<T> values, int idA, int idB, Action<int, int> onSwap = null)
+        {
+            Swap(ref values[idA], ref values[idB]);
+            onSwap?.Invoke(idA, idB);
         }
     }
 }

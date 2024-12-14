@@ -147,7 +147,7 @@ namespace IDKEngine.Render
 
                 if (TAKE_FAST_GEOMETRY_SHADER_PATH)
                 {
-                    Span<BBG.Rendering.Viewport> viewport = [
+                    Span<BBG.Rendering.Viewport> viewports = [
                         new BBG.Rendering.Viewport() {
                             Size = new Vector2(ResultVoxels.Width, ResultVoxels.Height),
                         },
@@ -160,7 +160,7 @@ namespace IDKEngine.Render
                             ViewportSwizzle = new BBG.Rendering.ViewportSwizzleNV() { X = BBG.Rendering.ViewportSwizzleAxisNV.PositiveZ, Z = BBG.Rendering.ViewportSwizzleAxisNV.PositiveX },
                         }
                     ];
-                    BBG.Rendering.SetViewports(viewport);
+                    BBG.Rendering.SetViewports(viewports);
                 }
 
                 BBG.Cmd.BindImageUnit(ResultVoxels, 0, 0, true);

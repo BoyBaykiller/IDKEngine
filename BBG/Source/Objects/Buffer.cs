@@ -110,7 +110,7 @@ namespace BBOpenGL
                     // On AMD drivers uploading a lot of data to a GPU-side buffer the classical way takes a lot of time.
                     // Staging buffer approach is much faster (800ms vs 30ms, 101MB).
                     // We only do this when the buffer is not mapped, otherwise a glFinish/fence is required to have the new content be immediately visible.
-                    const bool USE_FAST_UPLOAD_PATH_AMD = true;
+                    bool useFastUploadPathAMD = GetGpuVendor() == GpuVendor.AMD;
 
                     bool fastUploadPathCandidate =
                         memLocation == MemLocation.DeviceLocal && 
@@ -119,7 +119,7 @@ namespace BBOpenGL
                         memAccess != MemAccess.MappedIncoherentWriteOnlyReBAR &&
                         data != null;
 
-                    if (!USE_FAST_UPLOAD_PATH_AMD)
+                    if (!useFastUploadPathAMD)
                     {
                         fastUploadPathCandidate = false;
                     }

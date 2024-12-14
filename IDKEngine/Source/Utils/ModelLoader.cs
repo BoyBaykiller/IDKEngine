@@ -399,7 +399,7 @@ namespace IDKEngine.Utils
             [InlineArray(TEXTURE_COUNT)]
             public struct SampledTextureArray
             {
-                public SampledTexture _sampledTexture;
+                public SampledTexture _element;
             }
         }
 
@@ -461,7 +461,7 @@ namespace IDKEngine.Utils
             [InlineArray((int)TextureType.Count)]
             public struct SampledImageArray
             {
-                public SampledImage _sampledImage;
+                public SampledImage _element;
             }
         }
 
@@ -915,8 +915,8 @@ namespace IDKEngine.Utils
             texture.Allocate(textureLoadData.Width, textureLoadData.Height, 1, textureLoadData.InternalFormat, levels);
             if (textureType == TextureType.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
             {
-                // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel"
-                // We move metallic from B into R channel, unless IDK_BC5_normal_metallicRoughness is used where this is already standard behaviour.
+                // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel".
+                // We move metallic from B into R channel, unless IDK_BC5_normal_metallicRoughness is used where this is already standard behaviour
                 texture.SetSwizzleR(GLTexture.Swizzle.B);
             }
 

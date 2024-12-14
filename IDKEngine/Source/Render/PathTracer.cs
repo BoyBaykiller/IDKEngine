@@ -143,7 +143,7 @@ namespace IDKEngine.Render
 
             for (int i = 1; i < RayDepth; i++)
             {
-                BBG.Computing.Compute($"PathTrace Ray bounce {i}", () =>
+                BBG.Computing.Compute("PathTrace Ray bounce {i}", () =>
                 {
                     int pingPongIndex = i % 2;
 

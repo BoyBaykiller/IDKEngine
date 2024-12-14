@@ -323,7 +323,7 @@ namespace IDKEngine
             Helper.ArrayRemove(ref DrawCommands, rmMeshRange.Start, rmMeshRange.Count);
             
             SortedSet<int> freeListMaterials = new SortedSet<int>();
-            for (int meshId = rmMeshRange.End - 1; meshId >= rmMeshRange.Start; meshId--)
+            for (int meshId = rmMeshRange.Start; meshId < rmMeshRange.End; meshId++)
             {
                 ref readonly GpuMesh rmMesh = ref Meshes[meshId];
 
@@ -340,28 +340,31 @@ namespace IDKEngine
                 GpuMaterial rmGpuMaterial = GpuMaterials[rmMaterialId];
                 ModelLoader.CpuMaterial rmCpuMaterial = CpuMaterials[rmMaterialId];
 
-                Helper.ArrayRemove(ref GpuMaterials, rmMaterialId, 1);
-                Helper.ArrayRemove(ref CpuMaterials, rmMaterialId, 1);
-
-                for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
+                for (int i = 0; i < GpuMaterial.TEXTURE_COUNT; i++)
                 {
-                    GpuMaterial.TextureType textureType = (GpuMaterial.TextureType)j;
+                    GpuMaterial.TextureType textureType = (GpuMaterial.TextureType)i;
 
                     BBG.Texture.BindlessHandle handle = rmGpuMaterial[textureType];
                     if (!IsTextureHandleReferenced(handle, GpuMaterials, freeListMaterials))
                     {
-                        rmCpuMaterial.SampledTextures[j].Dispose();
+                        rmCpuMaterial.SampledTextures[i].Dispose();
                     }
                 }
-
-                for (int j = 0; j < Meshes.Length; j++)
+                
+                for (int i = 0; i < Meshes.Length; i++)
                 {
-                    ref GpuMesh mesh = ref Meshes[j];
+                    ref GpuMesh mesh = ref Meshes[i];
                     if (mesh.MaterialId > rmMaterialId)
                     {
                         mesh.MaterialId--;
                     }
                 }
+            }
+            
+            foreach (int rmMaterialId in freeListMaterials.Reverse())
+            {
+                Helper.ArrayRemove(ref GpuMaterials, rmMaterialId, 1);
+                Helper.ArrayRemove(ref CpuMaterials, rmMaterialId, 1);
             }
 
             UpdateBuffers(vertexPositions, meshlets, meshletsInfo, meshletsVertexIndices, meshletsPrimitiveIndices, unskinnedVertices);
@@ -847,7 +850,7 @@ namespace IDKEngine
                             continue;
                         }
 
-                        int index = Algorithms.BinarySearchLowerBound(nodeAnimation.KeyFramesStart, animationTime, Comparer<float>.Default.Compare);
+                        int index = Algorithms.BinarySearchLowerBound(nodeAnimation.KeyFramesStart, animationTime, MyComparer.LessThan);
                         index = Math.Max(index, 1);
 
                         float prevT = nodeAnimation.KeyFramesStart[index - 1];

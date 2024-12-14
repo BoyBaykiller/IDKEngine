@@ -36,7 +36,7 @@ namespace IDKEngine.GpuTypes
         [InlineArray(FACE_COUNT)]
         public struct MatrixArray
         {
-            public Matrix4 _matrix;
+            public Matrix4 _element;
         }
     }
 }

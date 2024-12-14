@@ -347,7 +347,10 @@ namespace IDKEngine.Bvh
                 blas.Nodes = nodes;
 
                 int[] parentIds = BLAS.GetParentIndices(blas);
-                ReinsertionOptimizer.Optimize(ref blas, parentIds, geometry.Triangles, optimizationSettings);
+
+                // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net-performance
+                // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
+                //ReinsertionOptimizer.Optimize(ref blas, parentIds, geometry.Triangles, optimizationSettings);
 
                 blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
 

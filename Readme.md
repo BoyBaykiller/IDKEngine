@@ -131,8 +131,8 @@ Now, running the voxelization as described so far gives me this. There are two o
 ### 2.1 Fixing flickering
 
 Flickering happens because the world space position for different fragment shader invocations can get mapped to the same voxel, and the invocation that writes to the image at last is random. One decent solution is to store the `max()` of the already stored and the new voxel color. There are several ways to implement this in a thread-safe manner: Fragment Shader Interlock, CAS-Loop, Atomic Operations.
-Fragment Shader Interlock is only available on NVIDIA & Intel. CAS-Loop is what I've seen the most but it's unstable and slow.
-So I decided to go with `imageAtomicMax`.
+Fragment Shader Interlock is not in OpenGL Core and generally slower (certainly on AMD). CAS-Loop is what I've seen the most but it's unstable and slow.
+So I decided to go with Atomic Operations, `imageAtomicMax` in particular.
 
 ```glsl
 layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxels;

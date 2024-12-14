@@ -144,7 +144,7 @@ namespace BBOpenGL
             [InlineArray(MAX_FRAMEBUFFER_ATTACHMENTS)]
             public struct AttachmentArray
             {
-                private Attachment _framebufferAttachment;
+                private Attachment _element;
             }
         }
     }

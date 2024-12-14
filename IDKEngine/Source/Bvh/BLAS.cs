@@ -1,5 +1,4 @@
-﻿#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type. Workarround to C# Lambda-Functions skill issue
-using System;
+﻿using System;
 using System.Collections;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
@@ -20,7 +19,7 @@ namespace IDKEngine.Bvh
         {
             public int MinLeafTriangleCount = 1;
             public int MaxLeafTriangleCount = 8;
-            public float TriangleIntersectCost = 1.1f;
+            public float TriangleCost = 1.1f;
             public float TraversalCost = 1.0f;
 
             public BuildSettings()
@@ -84,19 +83,12 @@ namespace IDKEngine.Bvh
             public float T;
         }
 
-        public record struct Triangle
-        {
-            public Vector3 Position0;
-            public Vector3 Position1;
-            public Vector3 Position2;
-        }
-
         private record struct BuildData
         {
-            public BitArray Marks;
-            public Box[] Boxes;
             public float[] RightCostsAccum;
-            public SortedAxisTris SortedAxisTris;
+            public BitArray TriMarks;
+            public Box[] TriBounds;
+            public TriAxesSorted TrisAxesSorted;
         }
 
         public static int Build(ref BuildResult blas, in Geometry geometry, in BuildSettings settings)
@@ -166,7 +158,7 @@ namespace IDKEngine.Bvh
             IndicesTriplet[] triangles = new IndicesTriplet[geometry.TriangleCount];
             for (int i = 0; i < geometry.TriangleCount; i++)
             {
-                triangles[i] = geometry.Triangles[buildData.SortedAxisTris[0][i]];
+                triangles[i] = geometry.Triangles[buildData.TrisAxesSorted[0][i]];
             }
             triangles.CopyTo(geometry.Triangles);
 
@@ -202,7 +194,7 @@ namespace IDKEngine.Bvh
                         ref readonly IndicesTriplet indicesTriplet = ref geometry.Triangles[i];
                         Triangle triangle = geometry.GetTriangle(indicesTriplet);
 
-                        if (Intersections.RayVsTriangle(ray, Conversions.ToTriangle(triangle), out Vector3 bary, out float t) && t < hitInfo.T)
+                        if (Intersections.RayVsTriangle(ray, triangle, out Vector3 bary, out float t) && t < hitInfo.T)
                         {
                             hitInfo.TriangleIndices = indicesTriplet;
                             hitInfo.Bary = bary;
@@ -332,7 +324,7 @@ namespace IDKEngine.Bvh
         {
             if (parentNode.IsLeaf)
             {
-                return CostLeafNode(parentNode.TriCount, settings.TriangleIntersectCost);
+                return CostLeafNode(parentNode.TriCount, settings.TriangleCost);
             }
 
             ref readonly GpuBlasNode leftChild = ref nodes[parentNode.TriStartOrChild];
@@ -421,7 +413,7 @@ namespace IDKEngine.Bvh
         {
             return nodeId % 2 == 1;
         }
-        
+
         public static int GetSiblingId(int nodeId)
         {
             return IsLeftSibling(nodeId) ? nodeId + 1 : nodeId - 1;
@@ -449,7 +441,7 @@ namespace IDKEngine.Bvh
             int triPivot = 0;
             int splitAxis = 0;
 
-            float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleIntersectCost);
+            float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleCost);
             float splitCost = notSplitCost;
 
             for (int axis = 0; axis < 3; axis++)
@@ -458,13 +450,13 @@ namespace IDKEngine.Bvh
                 int firstRightTri = triStart;
                 for (int i = triEnd - 1; i > triStart; i--)
                 {
-                    rightBoxAccum.GrowToFit(buildData.Boxes[buildData.SortedAxisTris[axis][i]]);
+                    rightBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
 
                     int triCount = triEnd - i;
                     float areaParent = parentNode.HalfArea();
                     float probHitRightChild = rightBoxAccum.HalfArea() / areaParent;
-                    float rightCost = probHitRightChild * CostLeafNode(triCount, settings.TriangleIntersectCost);
-                   
+                    float rightCost = probHitRightChild * CostLeafNode(triCount, settings.TriangleCost);
+
                     buildData.RightCostsAccum[i] = rightCost;
 
                     if (rightCost >= splitCost)
@@ -478,11 +470,11 @@ namespace IDKEngine.Bvh
                 Box leftBoxAccum = Box.Empty();
                 for (int i = triStart; i < firstRightTri; i++)
                 {
-                    leftBoxAccum.GrowToFit(buildData.Boxes[buildData.SortedAxisTris[axis][i]]);
+                    leftBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
                 }
                 for (int i = firstRightTri; i < triEnd - 1; i++)
                 {
-                    leftBoxAccum.GrowToFit(buildData.Boxes[buildData.SortedAxisTris[axis][i]]);
+                    leftBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
 
                     // Implementation of "Surface Area Heuristic" described in "Spatial Splits in Bounding Volume Hierarchies"
                     // https://www.nvidia.in/docs/IO/77714/sbvh.pdf 2.1 BVH Construction
@@ -490,14 +482,14 @@ namespace IDKEngine.Bvh
                     float areaParent = parentNode.HalfArea();
                     float probHitLeftChild = leftBoxAccum.HalfArea() / areaParent;
 
-                    float leftCost = probHitLeftChild * CostLeafNode(triCount, settings.TriangleIntersectCost);
+                    float leftCost = probHitLeftChild * CostLeafNode(triCount, settings.TriangleCost);
                     float rightCost = buildData.RightCostsAccum[i + 1];
 
-                    // Estimates cost of hitting parentNode if it was split at the evaluated split position
-                    // The full "Surface Area Heuristic" is recursive, but in practice we assume
-                    // the resulting child nodes are leafs
+                    // Estimates cost of hitting parentNode if it was split at the evaluated split position.
+                    // The full "Surface Area Heuristic" is recursive, but in practice assume
+                    // the resulting child nodes are leafs. This the greedy SAH approach
                     float surfaceAreaHeuristic = CostInternalNode(leftCost, rightCost, settings.TraversalCost);
-                    
+
                     if (surfaceAreaHeuristic < splitCost)
                     {
                         triPivot = i + 1;
@@ -515,7 +507,7 @@ namespace IDKEngine.Bvh
             {
                 if (parentNode.TriCount > settings.MaxLeafTriangleCount)
                 {
-                    // Simply split the triangles equally in this case
+                    // Simply split the triangles equally in this case.
                     // Having a maximum triangle count regardless of what SAH says can be benefical in some scenes
 
                     Vector3 size = parentNode.Max - parentNode.Min;
@@ -531,18 +523,22 @@ namespace IDKEngine.Bvh
                 }
             }
 
-            // The other two axes which are not the splitAxis need to have the same triangles in each subset (left child and right child)
-            // This is done by marking all triangles depending on which side of the pivot they are on
-            // Then the triangles are stably-partitioned into the correct subset using the markers
+            // We found a split axis where the triangles are partitioned into a left and right set.
+            // Now, the other two axes also need to have the same triangles in their sets respectively.
+            // To do that we mark every triangle on the left side of the split axis.
+            // Then the other two axes have their triangles partioned such that all marked triangles precede the others.
+            // The partitioning is stable so the triangles stay sorted otherwise which is crucial
+
             for (int i = triStart; i < triPivot; i++)
             {
-                buildData.Marks[buildData.SortedAxisTris[splitAxis][i]] = true;
+                buildData.TriMarks[buildData.TrisAxesSorted[splitAxis][i]] = true;
             }
             for (int i = triPivot; i < triEnd; i++)
             {
-                buildData.Marks[buildData.SortedAxisTris[splitAxis][i]] = false;
+                buildData.TriMarks[buildData.TrisAxesSorted[splitAxis][i]] = false;
             }
 
+            int[] partitionAux = new int[triEnd - triStart];
             for (int axis = 0; axis < 3; axis++)
             {
                 if (axis == splitAxis)
@@ -550,9 +546,9 @@ namespace IDKEngine.Bvh
                     continue;
                 }
 
-                Algorithms.StablePartition(buildData.SortedAxisTris[axis].AsSpan(triStart, triEnd - triStart), (in int value) =>
+                Algorithms.StablePartition(buildData.TrisAxesSorted[axis].AsSpan(triStart, triEnd - triStart), partitionAux, (in int triId) =>
                 {
-                    return buildData.Marks[value];
+                    return buildData.TriMarks[triId];
                 });
             }
 
@@ -575,7 +571,7 @@ namespace IDKEngine.Bvh
             Box box = Box.Empty();
             for (int i = start; i < start + count; i++)
             {
-                box.GrowToFit(buildData.Boxes[buildData.SortedAxisTris[0][i]]);
+                box.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[0][i]]);
             }
             return box;
         }
@@ -583,32 +579,41 @@ namespace IDKEngine.Bvh
         private static BuildData GetBuildData(in Geometry geometry)
         {
             BuildData buildData = new BuildData();
-            buildData.Marks = new BitArray(geometry.TriangleCount, false);
-            buildData.Boxes = new Box[geometry.TriangleCount];
+            buildData.TriMarks = new BitArray(geometry.TriangleCount, false);
+            buildData.TriBounds = new Box[geometry.TriangleCount];
             buildData.RightCostsAccum = new float[geometry.TriangleCount];
-            buildData.SortedAxisTris = new SortedAxisTris();
+            buildData.TrisAxesSorted = new TriAxesSorted();
 
-            Vector3[] centroids = new Vector3[geometry.TriangleCount];
-            for (int i = 0; i < centroids.Length; i++)
+            TriCentroids triCentroids = new TriCentroids();
+
+            for (int axis = 0; axis < 3; axis++)
+            {
+                triCentroids[axis] = new float[geometry.TriangleCount];
+                buildData.TrisAxesSorted[axis] = new int[geometry.TriangleCount];
+            }
+
+            for (int i = 0; i < geometry.TriangleCount; i++)
             {
                 Triangle tri = geometry.GetTriangle(i);
-                centroids[i] = (tri.Position0 + tri.Position1 + tri.Position2) / 3.0f;
 
-                Box box = Box.Empty();
-                box.GrowToFit(tri);
-                buildData.Boxes[i] = box;
+                Vector3 centroid = tri.Centroid;
+                triCentroids[0][i] = centroid.X;
+                triCentroids[1][i] = centroid.Y;
+                triCentroids[2][i] = centroid.Z;
+
+                buildData.TriBounds[i] = Box.From(tri);
             }
 
             for (int axis = 0; axis < 3; axis++)
             {
-                Span<int> tris = buildData.SortedAxisTris[axis] = new int[geometry.TriangleCount];
+                Span<int> tris = buildData.TrisAxesSorted[axis];
 
                 Helper.FillIncreasing(tris);
 
                 tris.Sort((int a, int b) =>
                 {
-                    float centroidA = centroids[a][axis];
-                    float centroidB = centroids[b][axis];
+                    float centroidA = triCentroids[axis][a];
+                    float centroidB = triCentroids[axis][b];
 
                     if (centroidA > centroidB) return 1;
                     if (centroidA == centroidB) return 0;
@@ -635,9 +640,15 @@ namespace IDKEngine.Bvh
         }
 
         [InlineArray(3)]
-        private struct SortedAxisTris
+        private struct TriAxesSorted
         {
-            private int[] _sortedAxisTris;
+            private int[] _element;
+        }
+
+        [InlineArray(3)]
+        private struct TriCentroids
+        {
+            private float[] _element;
         }
     }
 }

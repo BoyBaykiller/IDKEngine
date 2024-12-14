@@ -1,7 +1,6 @@
 ﻿using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
-using IDKEngine.Bvh;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Shapes
@@ -63,7 +62,7 @@ namespace IDKEngine.Shapes
             GrowToFit(p);
         }
 
-        public void GrowToFit(in BLAS.Triangle tri)
+        public void GrowToFit(in Triangle tri)
         {
             GrowToFit(tri.Position0);
             GrowToFit(tri.Position1);
@@ -97,7 +96,7 @@ namespace IDKEngine.Shapes
             float area = (size.X + size.Y) * size.Z + size.X * size.Y;
             return area;
         }
-        
+
         public void Transform(in Matrix4 matrix)
         {
             this = Transformed(this, matrix);
@@ -128,6 +127,15 @@ namespace IDKEngine.Shapes
         public static Box Empty()
         {
             return new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+        }
+
+        public static Box From(Triangle triangle)
+        {
+            Box box = new Box(triangle.Position0, triangle.Position0);
+            box.GrowToFit(triangle.Position1);
+            box.GrowToFit(triangle.Position2);
+
+            return box;
         }
     }
 }

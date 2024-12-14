@@ -29,19 +29,17 @@ namespace IDKEngine.Bvh
             public float AreaDecrease;
         }
 
-        private record struct Candidate : MyComparer.IComparisons<Candidate>
+        private record struct Candidates
         {
-            public int NodeId;
-            public float Cost;
+            public int Length => NodeIds.Length;
 
-            public static bool operator >(in Candidate lhs, in Candidate rhs)
-            {
-                return lhs.Cost > rhs.Cost;
-            }
+            public int[] NodeIds;
+            public float[] Costs;
 
-            public static bool operator <(in Candidate lhs, in Candidate rhs)
+            public Candidates(int num)
             {
-                return lhs.Cost < rhs.Cost;
+                NodeIds = new int[num];
+                Costs = new float[num];
             }
         }
 
@@ -69,15 +67,14 @@ namespace IDKEngine.Bvh
 
         private void Optimize(in Settings settings)
         {
-            Candidate[] candidatesMem = GetCandidatesMem();
+            Candidates candidatesMem = GetCandidatesMem();
             for (int i = 0; i < settings.Iterations; i++)
             {
-                Span<Candidate> candidates = PopulateCandidates(candidatesMem, settings.CandidatesPercentage);
+                Span<int> nodeIds = GetCandidates(candidatesMem, settings.CandidatesPercentage);
 
-                for (int j = 0; j < candidates.Length; j++)
+                for (int j = 0; j < nodeIds.Length; j++)
                 {
-                    ref readonly Candidate candidate = ref candidates[j];
-                    Reinsertion reinsertion = FindReinsertion(candidate.NodeId);
+                    Reinsertion reinsertion = FindReinsertion(nodeIds[j]);
 
                     if (reinsertion.AreaDecrease > 0.0f)
                     {
@@ -127,29 +124,29 @@ namespace IDKEngine.Bvh
             BLAS.RefitFromNode(outId, nodes, parentIds); // Refit new parent of 'in'   
         }
 
-        private Candidate[] GetCandidatesMem()
+        private Candidates GetCandidatesMem()
         {
-            return new Candidate[nodes.Length - 1];
+            return new Candidates(nodes.Length - 1);
         }
 
-        private Span<Candidate> PopulateCandidates(Span<Candidate> candidates, float percentage)
+        private Span<int> GetCandidates(Candidates candidates, float percentage)
         {
             int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
             if (count == 0) return [];
 
             for (int i = 1; i < candidates.Length + 1; i++)
             {
-                Candidate candidate = new Candidate();
-                candidate.Cost = nodes[i].HalfArea();
-                candidate.NodeId = i;
-                candidates[i - 1] = candidate;
+                candidates.Costs[i - 1] = nodes[i].HalfArea();
+                candidates.NodeIds[i - 1] = i;
             }
 
-            // Custom partial sort faster for low node percentage
-            Algorithms.PartialSort(candidates, count, MyComparer.GreaterThan);
-            //MemoryExtensions.Sort<Candidate>(test, MyComparer.GreaterThan);
+            Algorithms.PartialSort<float>(candidates.Costs, count, MyComparer.GreaterThan, (int a, int b) =>
+            {
+                Algorithms.Swap(ref candidates.NodeIds[a], ref candidates.NodeIds[b]);
+            });
+            //MemoryExtensions.Sort<float, int>(candidates.Costs, candidates.NodeIds, MyComparer.GreaterThan);
 
-            return candidates.Slice(0, count);
+            return candidates.NodeIds.AsSpan(0, count);
         }
 
         private Reinsertion FindReinsertion(int nodeId)

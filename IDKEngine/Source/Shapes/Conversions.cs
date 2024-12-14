@@ -19,10 +19,5 @@ namespace IDKEngine.Shapes
         {
             return new Box(node.Min, node.Max);
         }
-
-        public static Triangle ToTriangle(in BLAS.Triangle triangle)
-        {
-            return new Triangle(triangle.Position0, triangle.Position1, triangle.Position2);
-        }
     }
 }
