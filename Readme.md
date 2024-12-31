@@ -723,7 +723,7 @@ void main() {
     Box box = mesh.AABB;
         
     Frustum frustum = GetFrustum(ProjView * mesh.ModelMatrix);
-    bool isMeshInFrustum = FrustumBoxIntersect(frustum, node.Min, node.Max);
+    bool isMeshInFrustum = FrustumBoxIntersect(frustum, box.Min, box.Max);
 
     drawCommandSSBO.DrawCommands[meshIndex].InstanceCount = isMeshInFrustum ? 1 : 0;
 }
