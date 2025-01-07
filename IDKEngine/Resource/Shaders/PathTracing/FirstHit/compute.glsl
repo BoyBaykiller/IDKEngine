@@ -9,7 +9,7 @@
 AppInclude(include/Ray.glsl)
 AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
@@ -23,7 +23,7 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y, local_size_z = 
 
 layout(binding = 0) restrict readonly writeonly uniform image2D ImgResult;
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     float FocalLength;
     float LenseRadius;

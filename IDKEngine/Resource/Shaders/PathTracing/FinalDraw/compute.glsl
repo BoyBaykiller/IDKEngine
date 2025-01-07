@@ -16,7 +16,7 @@ struct HitInfo
     uint InstanceID;
 };
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     float FocalLength;
     float LenseRadius;

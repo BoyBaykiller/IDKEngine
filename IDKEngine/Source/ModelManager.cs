@@ -334,7 +334,7 @@ namespace IDKEngine
                 }
             }
             Helper.ArrayRemove(ref Meshes, rmMeshRange.Start, rmMeshRange.Count);
-
+            
             foreach (int rmMaterialId in freeListMaterials.Reverse())
             {
                 GpuMaterial rmGpuMaterial = GpuMaterials[rmMaterialId];
@@ -602,7 +602,7 @@ namespace IDKEngine
                         skinningShaderProgram.Upload(3, (uint)vertexCount);
 
                         BBG.Cmd.UseShaderProgram(skinningShaderProgram);
-                        BBG.Computing.Dispatch((vertexCount + 64 - 1) / 64, 1, 1);
+                        BBG.Computing.Dispatch(MyMath.DivUp(vertexCount, 64), 1, 1);
                     });
                     vertexPositionsBuffer.CopyElementsTo(vertexPositionsHostBuffer, outputVertexOffset, outputVertexOffset, vertexCount);
                 }

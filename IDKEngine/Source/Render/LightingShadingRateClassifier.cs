@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using BBOpenGL;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Render
 {
@@ -68,7 +69,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(shaded, 0);
                 BBG.Cmd.UseShaderProgram(shaderProgram);
 
-                BBG.Computing.Dispatch((shaded.Width + TILE_SIZE - 1) / TILE_SIZE, (shaded.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(shaded.Width, TILE_SIZE), MyMath.DivUp(shaded.Height, TILE_SIZE), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
         }
@@ -89,7 +90,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(Settings.DebugValue == DebugMode.ShadingRate ? Result : debugTexture, 1);
 
                 BBG.Cmd.UseShaderProgram(debugProgram);
-                BBG.Computing.Dispatch((dest.Width + TILE_SIZE - 1) / TILE_SIZE, (dest.Height + TILE_SIZE - 1) / TILE_SIZE, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(dest.Width, TILE_SIZE), MyMath.DivUp(dest.Height, TILE_SIZE), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
         }

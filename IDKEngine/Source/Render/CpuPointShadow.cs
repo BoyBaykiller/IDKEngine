@@ -149,7 +149,7 @@ namespace IDKEngine.Render
                 cullingProgram.Upload(2, visibleFaces);
 
                 BBG.Cmd.UseShaderProgram(cullingProgram);
-                BBG.Computing.Dispatch((modelManager.MeshInstances.Length + 64 - 1) / 64, 1, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
 

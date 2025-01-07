@@ -10,7 +10,7 @@ layout(binding = 0) uniform sampler2D SamplerSrc;
 layout(binding = 1) uniform usampler2D SamplerDebugShadingRate;
 layout(binding = 1) uniform sampler2D SamplerDebugOtherData; // speed, luminance, or coefficient of variation of luminance 
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     ENUM_DEBUG_MODE DebugMode;
     float SpeedFactor;

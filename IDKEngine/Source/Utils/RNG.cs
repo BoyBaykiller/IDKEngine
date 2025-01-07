@@ -5,6 +5,8 @@ namespace IDKEngine.Utils
 {
     public static class RNG
     {
+
+        private static readonly Random rng = new Random();
         public static Vector3 RandomVec3()
         {
             return RandomVec3(0.0f, 1.0f);
@@ -26,12 +28,12 @@ namespace IDKEngine.Utils
 
         public static float RandomFloat01()
         {
-            return Random.Shared.NextSingle();
+            return rng.NextSingle();
         }
 
         public static int RandomInt(int min, int max)
         {
-            return Random.Shared.Next(min, max);
+            return rng.Next(min, max);
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using BBLogger;
 using BBOpenGL;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Render
 {
@@ -20,12 +21,12 @@ namespace IDKEngine.Render
         public static AtmosphericScatterer AtmosphericScatterer { get; private set; }
 
         private static BBG.Texture externalCubemapTexture;
-        public static BBG.TypedBuffer<BBG.Texture.BindlessHandle> skyBoxTextureBuffer;
+        private static BBG.TypedBuffer<BBG.Texture.BindlessHandle> skyBoxTextureBuffer;
         private static BBG.AbstractShaderProgram unprojectEquirectangularProgram;
         public static void Initialize()
         {
             skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>();
-            skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
+            FSR2WorkaroundRebindUBO();
             skyBoxTextureBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
             unprojectEquirectangularProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "UnprojectEquirectangular/compute.glsl"));
@@ -78,6 +79,11 @@ namespace IDKEngine.Render
         public static SkyBoxMode GetSkyBoxMode()
         {
             return _skyBoxMode;
+        }
+
+        public static void FSR2WorkaroundRebindUBO()
+        {
+            skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
         }
 
         private static unsafe bool LoadSkyBox(string[] imagePaths)
@@ -136,7 +142,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(equirectangularTexture, 0);
                 BBG.Cmd.UseShaderProgram(unprojectEquirectangularProgram);
 
-                BBG.Computing.Dispatch((externalCubemapTexture.Width + 8 - 1) / 8, (externalCubemapTexture.Width + 8 - 1) / 8, 6);
+                BBG.Computing.Dispatch(MyMath.DivUp(externalCubemapTexture.Width, 8), MyMath.DivUp(externalCubemapTexture.Height, 8), 6);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
 

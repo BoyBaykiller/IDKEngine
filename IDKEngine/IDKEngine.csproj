@@ -21,7 +21,7 @@
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit> <!-- True by default-->
 
     <!--<OptimizationPreference>Speed</OptimizationPreference>-->
-    <!--<IlcInstructionSet>native</IlcInstructionSet>-->
+    <!--<IlcInstructionSet>avx2</IlcInstructionSet>-->
     <!--<IlcDisableReflection>true</IlcDisableReflection>-->
 
   </PropertyGroup>

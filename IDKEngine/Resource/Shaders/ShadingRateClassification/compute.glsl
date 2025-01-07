@@ -10,7 +10,7 @@ layout(binding = 0) restrict writeonly uniform uimage2D ImgResult;
 layout(binding = 1) restrict writeonly uniform image2D ImgDebug;
 layout(binding = 0) uniform sampler2D SamplerShaded;
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     ENUM_DEBUG_MODE DebugMode;
     float SpeedFactor;

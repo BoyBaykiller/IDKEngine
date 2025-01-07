@@ -4,24 +4,26 @@ AppInclude(include/GpuTypes.glsl)
 #define GPU_MAX_UBO_POINT_SHADOW_COUNT 128
 #define GPU_MAX_UBO_LIGHT_COUNT 256
 
-layout(std140, binding = 0) uniform PerFrameDataUBO
+// binding 0 reserved for temporary UBOs
+
+layout(std140, binding = 1) uniform PerFrameDataUBO
 {
     GpuPerFrameData perFrameDataUBO;
 };
 
-layout(std140, binding = 1) uniform LightsUBO
+layout(std140, binding = 2) uniform LightsUBO
 {
     GpuLight Lights[GPU_MAX_UBO_LIGHT_COUNT];
     int Count;
 } lightsUBO;
 
-layout(std140, binding = 2) uniform ShadowsUBO
+layout(std140, binding = 3) uniform ShadowsUBO
 {
     GpuPointShadow PointShadows[GPU_MAX_UBO_POINT_SHADOW_COUNT];
     int Count;
 } shadowsUBO;
 
-layout(std140, binding = 3) uniform TaaDataUBO
+layout(std140, binding = 4) uniform TaaDataUBO
 {
     vec2 Jitter;
     int SampleCount;
@@ -29,12 +31,12 @@ layout(std140, binding = 3) uniform TaaDataUBO
     int TemporalAntiAliasingMode;
 } taaDataUBO;
 
-layout(std140, binding = 4) uniform SkyBoxUBO
+layout(std140, binding = 5) uniform SkyBoxUBO
 {
     samplerCube Albedo;
 } skyBoxUBO;
 
-layout(std140, binding = 5) uniform VoxelizerDataUBO
+layout(std140, binding = 6) uniform VoxelizerDataUBO
 {
     vec3 GridMin;
     float _pad0;
@@ -42,7 +44,7 @@ layout(std140, binding = 5) uniform VoxelizerDataUBO
     float _pad1;
 } voxelizerDataUBO;
 
-layout(std140, binding = 6) uniform GBufferDataUBO
+layout(std140, binding = 7) uniform GBufferDataUBO
 {
     sampler2D AlbedoAlpha;
     sampler2D Normal;

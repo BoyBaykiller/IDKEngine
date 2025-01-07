@@ -4,7 +4,7 @@ AppInclude(include/Surface.glsl)
 AppInclude(include/Sampling.glsl)
 AppInclude(include/TraceCone.glsl)
 AppInclude(include/Compression.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -12,7 +12,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler3D SamplerVoxels;
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     int MaxSamples;
     float StepMultiplier;

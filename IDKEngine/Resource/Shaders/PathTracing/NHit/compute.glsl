@@ -9,7 +9,7 @@
 AppInclude(include/Ray.glsl)
 AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
@@ -19,7 +19,7 @@ AppInclude(include/BVHIntersect.glsl)
 
 layout(local_size_x = N_HIT_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     float FocalLength;
     float LenseRadius;

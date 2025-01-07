@@ -10,7 +10,7 @@
 
 AppInclude(include/Constants.glsl)
 AppInclude(include/Compression.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 

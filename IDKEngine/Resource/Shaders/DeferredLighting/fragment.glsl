@@ -4,7 +4,7 @@ AppInclude(include/StaticStorageBuffers.glsl)
 
 AppInclude(include/Pbr.glsl)
 AppInclude(include/Compression.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(location = 0) out vec4 OutFragColor;

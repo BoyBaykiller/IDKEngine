@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using BBOpenGL;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Render
 {
@@ -71,11 +72,10 @@ namespace IDKEngine.Render
                     BBG.Cmd.BindImageUnit(downscaleTexture, 0);
                 
                     Vector3i mipLevelSize = BBG.Texture.GetMipmapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, currentWriteLod);
-                    BBG.Computing.Dispatch((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
+                    BBG.Computing.Dispatch(MyMath.DivUp(mipLevelSize.X, 8), MyMath.DivUp(mipLevelSize.Y, 8), 1);
                     BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
                     currentWriteLod++;
                 });
-
 
                 BBG.Cmd.BindTextureUnit(downscaleTexture, 0);
                 for (; currentWriteLod < downscaleTexture.Levels; currentWriteLod++)
@@ -86,7 +86,7 @@ namespace IDKEngine.Render
                         BBG.Cmd.BindImageUnit(downscaleTexture, 0, currentWriteLod);
 
                         Vector3i mipLevelSize = BBG.Texture.GetMipmapLevelSize(downscaleTexture.Width, downscaleTexture.Height, 1, currentWriteLod);
-                        BBG.Computing.Dispatch((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
+                        BBG.Computing.Dispatch(MyMath.DivUp(mipLevelSize.X, 8), MyMath.DivUp(mipLevelSize.Y, 8), 1);
                         BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
                     });
                 }
@@ -104,7 +104,7 @@ namespace IDKEngine.Render
                     BBG.Cmd.BindImageUnit(upsampleTexture, 0, currentWriteLod);
 
                     Vector3i mipLevelSize = BBG.Texture.GetMipmapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, currentWriteLod);
-                    BBG.Computing.Dispatch((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
+                    BBG.Computing.Dispatch(MyMath.DivUp(mipLevelSize.X, 8), MyMath.DivUp(mipLevelSize.Y, 8), 1);
                     BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
 
                     currentWriteLod--;
@@ -119,7 +119,7 @@ namespace IDKEngine.Render
                         BBG.Cmd.BindImageUnit(upsampleTexture, 0, currentWriteLod);
 
                         Vector3i mipLevelSize = BBG.Texture.GetMipmapLevelSize(upsampleTexture.Width, upsampleTexture.Height, 1, currentWriteLod);
-                        BBG.Computing.Dispatch((mipLevelSize.X + 8 - 1) / 8, (mipLevelSize.Y + 8 - 1) / 8, 1);
+                        BBG.Computing.Dispatch(MyMath.DivUp(mipLevelSize.X, 8), MyMath.DivUp(mipLevelSize.Y, 8), 1);
                         BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
                     });
                 }

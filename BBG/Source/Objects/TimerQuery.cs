@@ -6,7 +6,7 @@ namespace BBOpenGL
     {
         public class TimerQuery : IDisposable
         {
-            public float MeasuredMilliseconds { get; private set; }
+            public float ElapsedMilliseconds { get; private set; }
             public readonly int ID;
             public TimerQuery()
             {
@@ -31,7 +31,7 @@ namespace BBOpenGL
                 GL.EndQuery(QueryTarget.TimeElapsed);
 
                 GL.GetQueryObjecti64(ID, QueryObjectParameterName.QueryResult, out long resultNanoSec);
-                MeasuredMilliseconds = resultNanoSec / 1000000.0f;
+                ElapsedMilliseconds = resultNanoSec / 1000000.0f;
             }
 
             public void Dispose()

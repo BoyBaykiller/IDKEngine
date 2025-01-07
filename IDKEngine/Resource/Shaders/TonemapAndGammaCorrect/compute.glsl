@@ -7,7 +7,7 @@ layout(binding = 0) uniform sampler2D Sampler0;
 layout(binding = 1) uniform sampler2D Sampler1;
 layout(binding = 2) uniform sampler2D Sampler2;
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     float Exposure;
     float Saturation;

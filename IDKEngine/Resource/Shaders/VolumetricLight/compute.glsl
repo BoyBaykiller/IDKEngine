@@ -2,7 +2,7 @@
 
 AppInclude(include/Pbr.glsl)
 AppInclude(include/Random.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 
@@ -11,7 +11,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 1) restrict writeonly uniform image2D ImgResultDepth;
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     vec3 Absorbance;
     int SampleCount;

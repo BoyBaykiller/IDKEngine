@@ -240,14 +240,14 @@ namespace BBOpenGL
                 GL.GetTextureImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, pixels);
             }
 
-            public void Clear<T>(PixelFormat pixelFormat, PixelType pixelType, in T value, int level = 0) where T : unmanaged
+            public void Fill<T>(PixelFormat pixelFormat, PixelType pixelType, in T value, int level = 0) where T : unmanaged
             {
                 fixed (void* ptr = &value)
                 {
-                    Clear(pixelFormat, pixelType, ptr, level);
+                    Fill(pixelFormat, pixelType, ptr, level);
                 }
             }
-            public void Clear(PixelFormat pixelFormat, PixelType pixelType, void* data, int level = 0)
+            public void Fill(PixelFormat pixelFormat, PixelType pixelType, void* data, int level = 0)
             {
                 GL.ClearTexImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, data);
             }

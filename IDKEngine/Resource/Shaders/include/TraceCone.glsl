@@ -1,6 +1,6 @@
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/Ray.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 
 vec4 TraceCone(sampler3D samplerVoxels, Ray ray, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
 {

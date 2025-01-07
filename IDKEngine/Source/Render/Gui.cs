@@ -401,8 +401,9 @@ namespace IDKEngine.Render
                         ImGui.Checkbox("IsVXGI", ref app.RasterizerPipeline.IsVXGI);
                         if (app.RasterizerPipeline.IsVXGI)
                         {
-                            ToolTipForItemAboveHovered("Controls wether the scene is re-voxelized every frame");
                             ImGui.Checkbox("GridReVoxelize", ref app.RasterizerPipeline.GridReVoxelize);
+                            ToolTipForItemAboveHovered("Controls wether the scene is re-voxelized every frame");
+
                             ImGui.Checkbox("GridFollowCamera", ref app.RasterizerPipeline.GridFollowCamera);
 
                             ImGui.Checkbox("IsConfigureGrid", ref app.RasterizerPipeline.IsConfigureGridMode);
@@ -1273,7 +1274,7 @@ namespace IDKEngine.Render
             if (app.MouseState.CursorMode == CursorModeValue.CursorNormal && app.MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
             {
                 OtkVec2 clickedPixel = app.MouseState.Position;
-                if (app.RenderGui)
+                if (app.RenderImGui)
                 {
                     clickedPixel -= viewportHeaderSize.ToOpenTK();
                 }

@@ -17,10 +17,10 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public delegate void FuncGetBlas(int instanceId, out BLAS.BuildResult blas, out Matrix4 worldTransform);
+        public delegate Box FuncGetPrimitive(int primId);
         public delegate void FuncGetBlasAndGeometry(int instanceId, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
-        public static void Build(Span<GpuTlasNode> nodes, FuncGetBlas funcGetBlas, int primitiveCount, BuildSettings buildSettings)
+        public static void Build(Span<GpuTlasNode> nodes, FuncGetPrimitive funcGetLeaf, int primitiveCount, BuildSettings buildSettings)
         {
             if (nodes.Length == 0) return;
 
@@ -30,10 +30,7 @@ namespace IDKEngine.Bvh
             Box globalBounds = Box.Empty();
             for (int i = 0; i < initialChildNodes.Length; i++)
             {
-                funcGetBlas(i, out BLAS.BuildResult blas, out Matrix4 worldTransform);
-
-                Box localBounds = Conversions.ToBox(blas.Root);
-                Box worldSpaceBounds = Box.Transformed(localBounds, worldTransform);
+                Box worldSpaceBounds = funcGetLeaf(i);
                 globalBounds.GrowToFit(worldSpaceBounds);
 
                 GpuTlasNode newNode = new GpuTlasNode();
@@ -49,10 +46,10 @@ namespace IDKEngine.Bvh
             MemoryExtensions.Sort(initialChildNodes, (GpuTlasNode a, GpuTlasNode b) =>
             {
                 Vector3 mappedA = MyMath.MapToZeroOne((a.Max + a.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
-                ulong mortonCodeA = MyMath.GetMorton(mappedA);
+                uint mortonCodeA = MyMath.GetMorton(mappedA);
 
                 Vector3 mappedB = MyMath.MapToZeroOne((b.Max + b.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
-                ulong mortonCodeB = MyMath.GetMorton(mappedB);
+                uint mortonCodeB = MyMath.GetMorton(mappedB);
 
                 if (mortonCodeA > mortonCodeB) return 1;
                 if (mortonCodeA == mortonCodeB) return 0;

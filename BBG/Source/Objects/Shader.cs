@@ -97,8 +97,8 @@ namespace BBOpenGL
 
             public static class Preprocessor
             {
-                public static readonly bool SUPPORTS_LINE_SOURCEFILE = GetGLSLLineSourcefileSupport(out GLSL_EXTENSION_NAME_LINE_SOURCEFILE);
-                private static readonly string? GLSL_EXTENSION_NAME_LINE_SOURCEFILE; // The required GLSL-extension that enables #line "filename" or null if none
+                public static readonly bool SUPPORTS_LINE_DIRECTIVE_SOURCEFILE = GetGLSLLineSourcefileSupport(out EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE);
+                private static readonly string? EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE; // The required GLSL-extension that enables #line "filename" or null if none
 
                 public enum Keyword : int
                 {
@@ -130,8 +130,8 @@ namespace BBOpenGL
                     int versionStatementLineCount = CountLines(result, afterVersionStatement);
                     result = result.Insert(afterVersionStatement,
                         $"""
-                        #if {(GLSL_EXTENSION_NAME_LINE_SOURCEFILE != null ? 1 : 0)}
-                        #extension {GLSL_EXTENSION_NAME_LINE_SOURCEFILE} : enable
+                        #if {(EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE != null ? 1 : 0)}
+                        #extension {EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE} : enable
                         #endif
 
                         // Keep in sync between shader and client code!
@@ -191,34 +191,33 @@ namespace BBOpenGL
                                     if (pathsAlreadyIncluded.Contains(path))
                                     {
                                         includedText = $"// Omitted including \"{path}\" as it's already part of this file";
+                                        result.AppendLine(includedText);
                                     }
                                     else
                                     {
                                         includedText = File.ReadAllText(path);
                                         pathsAlreadyIncluded.Add(path);
+
+                                        string lineDirective = "#line 1";
+                                        if (SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)
+                                        {
+                                            lineDirective += $" \"{path}\"";
+                                        }
+                                        lineDirective += $" // Including \"{path}\"";
+                                        result.AppendLine(lineDirective);
+
+                                        result.Append(RecursiveResolveKeywords(includedText, path));
+                                        result.Append('\n');
+
+                                        string origionalLine = $"#line {CountLines(source, currentIndex) + 1}";
+                                        string safeSourceName = name ?? "No source name given";
+                                        if (SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)
+                                        {
+                                            origionalLine += $" \"{safeSourceName}\"";
+                                        }
+                                        origionalLine += $" // Included \"{path}\"";
+                                        result.AppendLine(origionalLine);
                                     }
-
-                                    int lineCount = CountLines(source, currentIndex);
-
-                                    string newLine = "#line 1";
-                                    if (SUPPORTS_LINE_SOURCEFILE)
-                                    {
-                                        newLine += $" \"{path}\"";
-                                    }
-                                    newLine += $" // Including \"{path}\"";
-                                    result.AppendLine(newLine);
-
-                                    result.Append(RecursiveResolveKeywords(includedText, path));
-                                    result.Append('\n');
-
-                                    string origionalLine = $"#line {lineCount + 1}";
-                                    string safeSourceName = name ?? "No source name given";
-                                    if (SUPPORTS_LINE_SOURCEFILE)
-                                    {
-                                        origionalLine += $" \"{safeSourceName}\"";
-                                    }
-                                    origionalLine += $" // Included \"{path}\"";
-                                    result.AppendLine(origionalLine);
                                 }
                             }
 
@@ -251,7 +250,7 @@ namespace BBOpenGL
                         {
                             Group shaderStorageBlock = match.Groups[0];
                             Group instanceName = match.Groups[1];
-
+                            
                             bool instanceNameReferenced = new Regex($@"\b{instanceName.Value}\.").Match(text, currentIndex).Success;
                             int end = shaderStorageBlock.Index;
                             if (instanceNameReferenced)
@@ -268,6 +267,15 @@ namespace BBOpenGL
                             result.Append(text, currentIndex, text.Length - currentIndex);
                             break;
                         }
+                    }
+
+                    if (numReferencedDeclarations >= 16)
+                    {
+                        Logger.Log(Logger.LogLevel.Warn, """
+                            The number of shader storage blocks referenced by the shader exceeds the limit
+                            in current NVIDIA drivers: https://forums.developer.nvidia.com/t/increase-maximum-allowed-shader-storage-blocks/293755/1
+                            This shader will fail to compile on NVIDIA GPUs!
+                            """);
                     }
 
                     return result;

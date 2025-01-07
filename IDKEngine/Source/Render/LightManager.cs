@@ -79,7 +79,7 @@ namespace IDKEngine.Render
 
             lightBufferObject = new BBG.TypedBuffer<GpuLight>();
             lightBufferObject.Allocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, lights.Length * sizeof(GpuLight) + sizeof(int));
-            lightBufferObject.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 1);
+            lightBufferObject.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 2);
 
             const int SphereLatitudes = 12, SphereLongitudes = 12;
             const float SphereRadius = 1.0f;
@@ -312,6 +312,11 @@ namespace IDKEngine.Render
                     }
                 }
             }
+        }
+
+        public void FSR2WorkaroundRebindUBO()
+        {
+            pointShadowManager.FSR2WorkaroundRebindUBO();
         }
 
         private static void CollisionResponse(CpuLight light, CpuLight otherLight, float intersectionTime)

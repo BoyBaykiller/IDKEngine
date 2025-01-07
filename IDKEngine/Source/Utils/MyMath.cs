@@ -5,6 +5,16 @@ namespace IDKEngine.Utils
 {
     public static class MyMath
     {
+        public static int DivUp(int numerator, int divisor)
+        {
+            return (numerator + divisor - 1) / divisor;
+        }
+
+        public static uint DivUp(uint numerator, uint divisor)
+        {
+            return (numerator + divisor - 1) / divisor;
+        }
+
         public static Vector2 GetHalton2D(int index, int baseA, int baseB)
         {
             float x = GetHalton(index + 1, baseA);
@@ -133,28 +143,53 @@ namespace IDKEngine.Utils
             return ((num / multiple) + 1) * multiple;
         }
 
-        /// Source: https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/#For-loop_based_method
-        private static ulong SplitBy3(uint a)
+        public static int NextPowerOfTwo(int v)
         {
-            ulong x = a & 0x1fffff; // we only look at the first 21 bits
-            x = (x | x << 32) & 0x1f00000000ffff; // shift left 32 bits, OR with self, and 00011111000000000000000000000000000000001111111111111111
-            x = (x | x << 16) & 0x1f0000ff0000ff; // shift left 32 bits, OR with self, and 00011111000000000000000011111111000000000000000011111111
-            x = (x | x << 8) & 0x100f00f00f00f00f; // shift left 32 bits, OR with self, and 0001000000001111000000001111000000001111000000001111000000000000
-            x = (x | x << 4) & 0x10c30c30c30c30c3; // shift left 32 bits, OR with self, and 0001000011000011000011000011000011000011000011000011000100000000
-            x = (x | x << 2) & 0x1249249249249249;
-            return x;
+            v--;
+            v |= v >> 1;
+            v |= v >> 2;
+            v |= v >> 4;
+            v |= v >> 8;
+            v |= v >> 16;
+            v++;
+
+            return v;
         }
 
-        public static ulong GetMorton(Vector3 normalizedV)
-        {
-            const uint max = (1 << 21) - 1;
-            uint x = Math.Clamp((uint)(normalizedV.X * max), 0u, max);
-            uint y = Math.Clamp((uint)(normalizedV.Y * max), 0u, max);
-            uint z = Math.Clamp((uint)(normalizedV.Z * max), 0u, max);
+        /// Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
 
-            ulong result = 0;
-            result |= SplitBy3(x) | SplitBy3(y) << 1 | SplitBy3(z) << 2;
-            return result;
+        // Expands a 10-bit integer into 30 bits
+        // by inserting 2 zeros after each bit.
+        private static unsafe uint ExpandBits(uint v)
+        {
+            unchecked
+            {
+                v = (v * 0x00010001u) & 0xFF0000FFu;
+                v = (v * 0x00000101u) & 0x0F00F00Fu;
+                v = (v * 0x00000011u) & 0xC30C30C3u;
+                v = (v * 0x00000005u) & 0x49249249u;
+
+                return v;
+            }
+        }
+
+        // Calculates a 30-bit Morton code for the
+        // given 3D point located within the unit cube [0,1].
+        public static uint GetMorton(Vector3 normalizedV)
+        {
+            unchecked
+            {
+                uint x = Math.Clamp((uint)(normalizedV.X * 1024.0f), 0, 1023);
+                uint y = Math.Clamp((uint)(normalizedV.Y * 1024.0f), 0, 1023);
+                uint z = Math.Clamp((uint)(normalizedV.Z * 1024.0f), 0, 1023);
+
+                uint xx = ExpandBits(x);
+                uint yy = ExpandBits(y);
+                uint zz = ExpandBits(z);
+                uint result = xx * 4 + yy * 2 + zz;
+
+                return result;
+            }
         }
 
         public static float DegreesToRadians(float degrees)

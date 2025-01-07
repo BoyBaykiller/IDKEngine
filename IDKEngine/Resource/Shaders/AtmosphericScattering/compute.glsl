@@ -4,7 +4,7 @@
 #version 460 core
 
 AppInclude(include/Constants.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -13,7 +13,7 @@ layout(binding = 0) restrict writeonly uniform imageCube ImgResult;
 vec2 Rsi(vec3 r0, vec3 rd, float sr);
 vec3 Atmosphere(vec3 r, vec3 r0, vec3 pSun, float iSun, float rPlanet, float rAtmos, vec3 kRlh, float kMie, float shRlh, float shMie, float g);
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     int ISteps;
     int JSteps;

@@ -304,11 +304,15 @@ namespace IDKEngine.Bvh
                 TLAS.Build(TlasNodes, GetPrimitive, meshInstances.Length, new TLAS.BuildSettings());
                 BBG.Buffer.Recreate(ref tlasBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, TlasNodes);
 
-                void GetPrimitive(int primId, out BLAS.BuildResult blas, out Matrix4 worldTransform)
+                Box GetPrimitive(int primId)
                 {
                     ref readonly GpuMeshInstance meshInstance = ref meshInstances[primId];
-                    blas = GetBlas(BlasesDesc[meshInstance.MeshId]);
-                    worldTransform = meshInstance.ModelMatrix;
+
+                    BLAS.BuildResult blas = GetBlas(BlasesDesc[meshInstance.MeshId]);
+                    Box localBounds = Conversions.ToBox(blas.Root);
+                    Box worldSpaceBounds = Box.Transformed(localBounds, meshInstance.ModelMatrix);
+
+                    return worldSpaceBounds;
                 }
             }
         }
@@ -428,7 +432,7 @@ namespace IDKEngine.Bvh
             {
                 BlasDesc blasDesc = BlasesDesc[i];
 
-                blasRefitLockBuffer.Clear(0, blasRefitLockBuffer.Size, 0);
+                blasRefitLockBuffer.Fill(0, blasRefitLockBuffer.Size, 0);
                 BBG.Computing.Compute("Refit BLAS", () =>
                 {
                     refitBlasProgram.Upload(0, (uint)blasDesc.RootNodeOffset);
@@ -437,7 +441,7 @@ namespace IDKEngine.Bvh
                     refitBlasProgram.Upload(3, (uint)blasDesc.LeafIndicesCount);
 
                     BBG.Cmd.UseShaderProgram(refitBlasProgram);
-                    BBG.Computing.Dispatch((blasDesc.LeafIndicesCount + 64 - 1) / 64, 1, 1);
+                    BBG.Computing.Dispatch(MyMath.DivUp(blasDesc.LeafIndicesCount, 64), 1, 1);
                 });
             }
 

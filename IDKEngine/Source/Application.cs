@@ -104,7 +104,7 @@ namespace IDKEngine
         private Gui gui;
         public bool IsBloom = true;
         public bool IsVolumetricLighting = true;
-        public bool RenderGui = true;
+        public bool RenderImGui = true;
 
         // All models and all lights and Camera (the types of different entities)
         public ModelManager ModelManager;
@@ -278,7 +278,7 @@ namespace IDKEngine
             }
 
             BBG.Rendering.SetViewport(WindowFramebufferSize);
-            if (RenderGui)
+            if (RenderImGui)
             {
                 gui.Draw(this, dT);
             }
@@ -309,7 +309,7 @@ namespace IDKEngine
                 ShouldClose();
             }
 
-            if (!ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
+            if (!RenderImGui || !ImGuiNET.ImGui.GetIO().WantCaptureKeyboard)
             {
                 if (KeyboardState[Keys.V] == Keyboard.InputState.Touched)
                 {
@@ -317,8 +317,8 @@ namespace IDKEngine
                 }
                 if (KeyboardState[Keys.G] == Keyboard.InputState.Touched)
                 {
-                    RenderGui = !RenderGui;
-                    if (!RenderGui)
+                    RenderImGui = !RenderImGui;
+                    if (!RenderImGui)
                     {
                         RequestPresentationResolution = WindowFramebufferSize;
                     }
@@ -352,7 +352,7 @@ namespace IDKEngine
 
             if (RecorderVars.State != FrameRecorderState.Replaying)
             {
-                if (!ImGuiNET.ImGui.GetIO().WantCaptureMouse)
+                if (!RenderImGui || !ImGuiNET.ImGui.GetIO().WantCaptureMouse)
                 {
                     if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
                     {
@@ -403,7 +403,7 @@ namespace IDKEngine
                     Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
                     Camera.Position = movingSphere.Center + slidedDeltaStep;
 
-                    Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane); 
+                    Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane);
 
                     prevSpherePos = movingSphere.Center;
                 });
@@ -412,7 +412,7 @@ namespace IDKEngine
             Camera.SetPrevToCurrentPosition();
         }
 
-        protected override void OnStart()
+        protected override unsafe void OnStart()
         {
             BBG.Initialize(Helper.GLDebugCallback);
 
@@ -420,7 +420,7 @@ namespace IDKEngine
 
             Logger.Log(Logger.LogLevel.Info, $"API: {glContextInfo.APIName}");
             Logger.Log(Logger.LogLevel.Info, $"GPU: {glContextInfo.DeviceInfo.Name}");
-            Logger.Log(Logger.LogLevel.Info, $"{nameof(BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_SOURCEFILE)} = {BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_SOURCEFILE}");
+            Logger.Log(Logger.LogLevel.Info, $"{nameof(BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)} = {BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_DIRECTIVE_SOURCEFILE}");
 
             if (glContextInfo.GLVersion < 4.6)
             {
@@ -444,7 +444,7 @@ namespace IDKEngine
             
             gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
             gpuPerFrameDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-            gpuPerFrameDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 0);
+            gpuPerFrameDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 1);
 
             SkyBoxManager.Initialize();
             SkyBoxManager.SkyBoxImagePaths = [
@@ -497,6 +497,7 @@ namespace IDKEngine
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
+                //ModelLoader.Model plane = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
                 
@@ -508,11 +509,11 @@ namespace IDKEngine
 
                 for (int i = 0; i < 3; i++)
                 {
-                   if (LightManager.TryGetLight(i, out CpuLight light))
-                   {
-                       CpuPointShadow pointShadow = new CpuPointShadow(512, WindowFramebufferSize, new Vector2(light.GpuLight.Radius, 60.0f));
-                       LightManager.CreatePointShadowForLight(pointShadow, i);
-                   }
+                    if (LightManager.TryGetLight(i, out CpuLight light))
+                    {
+                        CpuPointShadow pointShadow = new CpuPointShadow(512, WindowFramebufferSize, new Vector2(light.GpuLight.Radius, 60.0f));
+                        LightManager.CreatePointShadowForLight(pointShadow, i);
+                    }
                 }
             }
             else
@@ -542,11 +543,14 @@ namespace IDKEngine
         {
             gui.SetSize(WindowFramebufferSize);
 
-            // If GUI is used it will handle render resizing
-            if (!RenderGui)
+            // If GUI is used it calculates and sets the new (viewport-)resolution
+            // If GUI is not used the new resolution is simply window size, that case is handled here
+            if (!RenderImGui)
             {
                 RequestPresentationResolution = WindowFramebufferSize;
             }
+
+            OnRender(gpuPerFrameData.DeltaRenderTime);
         }
 
         protected override void OnKeyPress(uint key)

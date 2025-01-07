@@ -268,7 +268,7 @@ Here's an example:
 // 1. Allocate buffer to store pixels
 var flags = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapWriteBit;
 GL.CreateBuffers(1, out int stagingBuffer);
-GL.NamedBufferStorage(stagingBuffer, imageSize, IntPtr.Zero, flags);
+GL.NamedBufferStorage(stagingBuffer, imageSize, null, flags);
 
 // 2. Upload pixels into buffer
 void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
@@ -312,7 +312,7 @@ int imageSize = imageWidth * imageHeight * imageChannels;
 
 var flags = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapWriteBit;
 GL.CreateBuffers(1, out int stagingBuffer);
-GL.NamedBufferStorage(stagingBuffer, imageSize, IntPtr.Zero, flags);
+GL.NamedBufferStorage(stagingBuffer, imageSize, null, flags);
 void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
 
 Task.Run(() =>
@@ -323,7 +323,7 @@ Task.Run(() =>
     MainThreadQueue.AddToLazyQueue(() =>
     {
         GL.BindBuffer(BufferTarget.PixelUnpackBuffer, stagingBuffer);
-        texture.Upload2D(imageWidth, imageHeight, PixelFormat, PixelType, IntPtr.Zero);
+        texture.Upload2D(imageWidth, imageHeight, PixelFormat, PixelType, null);
         GL.DeleteBuffer(stagingBuffer);
     });
 });
@@ -594,7 +594,7 @@ public void Draw()
     GL.BindVertexArray(vao); // contains merged vertex and indices array + vertex format
     GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer); // contains DrawCommand[Meshes.Length]
 
-    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
+    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, null, Meshes.Length, 0);
 }
 ```
 While this renders all geometry just fine, you might be wondering how to access the entirety of materials to compute proper shading. After all scenes like Sponza come with a lot of textures and the usual method of manually declaring `sampler2D` in glsl quickly becomes insufficient as we can't do state changes between draw calls anymore (which is good) to swap out materials. This is where Bindless Textures comes in.
@@ -690,7 +690,7 @@ void Render()
     GL.BindVertexArray(vao);
     GL.UseProgram(drawingProgram);
     GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer);
-    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, IntPtr.Zero, Meshes.Length, 0);
+    GL.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedInt, null, Meshes.Length, 0);
 }
 ```
 A compute shader is dispatched to do the culling and adjust the content of `drawCommandBuffer` accordingly.

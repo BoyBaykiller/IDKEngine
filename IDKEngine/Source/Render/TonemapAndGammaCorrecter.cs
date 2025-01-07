@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using BBOpenGL;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Render
 {
@@ -45,7 +46,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(texture2, 2, texture2 != null);
                 BBG.Cmd.UseShaderProgram(tonemapAndGammaCorrecterProgram);
 
-                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
         }

@@ -141,3 +141,36 @@ vec3 PolarToCartesian(float azimuth, float elevation)
 {
     return PolarToCartesian(azimuth, elevation, 1.0);
 }
+
+uint NextPowerOfTwo(uint num)
+{
+    return 2u << findMSB(max(1u, num) - 1u);
+} 
+
+/// Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
+
+uint ExpandBits(uint v)
+{
+    v = (v * 0x00010001u) & 0xFF0000FFu;
+    v = (v * 0x00000101u) & 0x0F00F00Fu;
+    v = (v * 0x00000011u) & 0xC30C30C3u;
+    v = (v * 0x00000005u) & 0x49249249u;
+
+    return v;
+}
+
+// Calculates a 30-bit Morton code for the
+// given 3D point located within the unit cube [0,1].
+uint GetMorton(vec3 normalizedV)
+{
+    uint x = clamp(uint(normalizedV.x * 1024.0f), 0u, 1023u);
+    uint y = clamp(uint(normalizedV.y * 1024.0f), 0u, 1023u);
+    uint z = clamp(uint(normalizedV.z * 1024.0f), 0u, 1023u);
+
+    uint xx = ExpandBits(x);
+    uint yy = ExpandBits(y);
+    uint zz = ExpandBits(z);
+    uint result = xx * 4 + yy * 2 + zz;
+
+    return result;
+}

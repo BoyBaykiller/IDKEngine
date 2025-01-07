@@ -2,6 +2,7 @@
 using OpenTK.Mathematics;
 using BBLogger;
 using BBOpenGL;
+using IDKEngine.Utils;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -33,7 +34,12 @@ namespace IDKEngine.Render
 
             pointShadowsBuffer = new BBG.TypedBuffer<GpuPointShadow>();
             pointShadowsBuffer.Allocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
-            pointShadowsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 2);
+            FSR2WorkaroundRebindUBO();
+        }
+
+        public void FSR2WorkaroundRebindUBO()
+        {
+            pointShadowsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
         }
 
         public void RenderShadowMaps(ModelManager modelManager, Camera camera)
@@ -72,7 +78,7 @@ namespace IDKEngine.Render
                 rayTracedShadowsProgram.Upload(0, samples);
 
                 BBG.Cmd.UseShaderProgram(rayTracedShadowsProgram);
-                BBG.Computing.Dispatch((commonSize.X + 8 - 1) / 8, (commonSize.Y + 8 - 1) / 8, Count);
+                BBG.Computing.Dispatch(MyMath.DivUp(commonSize.X, 8), MyMath.DivUp(commonSize.Y, 8), Count);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit);
             });
         }

@@ -7,7 +7,7 @@ namespace BBOpenGL
         public static unsafe class Cmd
         {
             // Application specific
-            public const int SET_UNIFORMS_UBO_BLOCK_BINDING = 7;
+            public const int SET_UNIFORMS_UBO_BLOCK_BINDING = 0;
 
             [Flags]
             public enum MemoryBarrierMask : uint

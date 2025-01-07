@@ -1,5 +1,5 @@
 AppInclude(include/Random.glsl)
-AppInclude(include/Transformations.glsl)
+AppInclude(include/Math.glsl)
 
 vec3 SampleCone(vec3 normal, float phi, float sinTheta, float cosTheta)
 {

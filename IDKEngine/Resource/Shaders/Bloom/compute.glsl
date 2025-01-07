@@ -10,7 +10,7 @@ layout(binding = 0) restrict writeonly uniform image2D ImgResult;
 layout(binding = 0) uniform sampler2D SamplerDownsample;
 layout(binding = 1) uniform sampler2D SamplerUpsample;
 
-layout(std140, binding = 7) uniform SettingsUBO
+layout(std140, binding = 0) uniform SettingsUBO
 {
     float Threshold;
     float MaxColor;

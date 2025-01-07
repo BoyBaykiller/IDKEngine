@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using BBOpenGL;
+using IDKEngine.Utils;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -11,7 +12,7 @@ namespace IDKEngine.Render
         public Vector2i RenderResolution => new Vector2i(Result.Width, Result.Height);
 
         private int cachedRayDepth;
-        
+
         public int _rayDepth;
         public int RayDepth
         {
@@ -133,17 +134,17 @@ namespace IDKEngine.Render
         {
             BBG.Cmd.SetUniforms(settings);
 
-            BBG.Computing.Compute($"PathTrace Primary Rays", () =>
+            BBG.Computing.Compute("PathTrace Primary Rays", () =>
             {
                 BBG.Cmd.BindImageUnit(Result, 0);
                 BBG.Cmd.UseShaderProgram(firstHitProgram);
-                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
 
             for (int i = 1; i < RayDepth; i++)
             {
-                BBG.Computing.Compute("PathTrace Ray bounce {i}", () =>
+                BBG.Computing.Compute($"PathTrace Ray bounce {i}", () =>
                 {
                     int pingPongIndex = i % 2;
 
@@ -164,10 +165,9 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindImageUnit(Result, 0);
 
                 BBG.Cmd.UseShaderProgram(finalDrawProgram);
-                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Height + 8 - 1) / 8, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit | BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
-
             AccumulatedSamples++;
         }
 
@@ -178,11 +178,14 @@ namespace IDKEngine.Render
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
             Result.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
-            Result.Clear(BBG.Texture.PixelFormat.R, BBG.Texture.PixelType.Float, 0.0f);
+            Result.Fill(BBG.Texture.PixelFormat.RGBA, BBG.Texture.PixelType.Float, new Vector4(0.0f));
 
             BBG.Buffer.Recreate(ref wavefrontRayBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, size.X * size.Y);
             BBG.Buffer.Recreate(ref wavefrontPTBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
-            wavefrontPTBuffer.Clear(0, sizeof(GpuWavefrontPTHeader), 0.0f);
+            wavefrontPTBuffer.UploadData(0, sizeof(GpuWavefrontPTHeader), new GpuWavefrontPTHeader()
+            {
+                DispatchCommand = new BBG.DispatchIndirectCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 }
+            });
 
             ResetAccumulation();
         }

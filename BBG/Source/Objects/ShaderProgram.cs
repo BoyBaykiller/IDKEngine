@@ -56,9 +56,9 @@ namespace BBOpenGL
                 return success == 1;
             }
 
-            public void Upload(int location, in Matrix4 Matrix4, int count = 1, bool transpose = false)
+            public void Upload(int location, in Matrix4 matrix4, int count = 1, bool transpose = false)
             {
-                fixed (Matrix4* ptr = &Matrix4)
+                fixed (Matrix4* ptr = &matrix4)
                 {
                     GL.ProgramUniformMatrix4fv(ID, location, count, transpose, (float*)ptr);
                 }
@@ -228,7 +228,7 @@ namespace BBOpenGL
                 if (recompiledShadersNames != string.Empty)
                 {
                     Logger.Log(Logger.LogLevel.Info,
-                           $"{nameof(AbstractShader.Preprocessor.Keyword.AppInclude)} \"{key}\" was assigned new value \"{value}\", " +
+                           $"{nameof(AbstractShader.Preprocessor.Keyword.AppInsert)} \"{key}\" was assigned new value \"{value}\", " +
                            $"causing shader recompilation for {recompiledShadersNames}"
                        );
                 }

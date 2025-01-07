@@ -52,10 +52,8 @@ namespace BBOpenGL
 
                 /// <summary>
                 /// Same as <see cref="MappedIncoherent"/> except that it's write-only AND leverages ReBAR/SAM on AMD drivers. <br/>
-                /// https://gist.github.com/BoyBaykiller/6334c26912e6d2cf0da5c7a76d341a41 <br/>
-                /// <![CDATA[https://vanguard.amd.com/project/feedback/view.html?cap=00de81e7400a4f968b2b7c7ed88e35b8&f={662A7A4D-8782-46AA-BB66-31734E56D968}&uf={01316738-8958-4B49-8CFE-1B68A831626C}]]>
                 /// </summary>
-                MappedIncoherentWriteOnlyReBAR = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapWriteBit,
+                MappedCoherentWriteOnlyReBAR = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapCoherentBit | BufferStorageMask.MapWriteBit,
 
                 /// <summary>
                 /// The buffer must be written or read by to using the Upload/Download functions.
@@ -116,7 +114,7 @@ namespace BBOpenGL
                         memLocation == MemLocation.DeviceLocal && 
                         memAccess != MemAccess.MappedCoherent &&
                         memAccess != MemAccess.MappedIncoherent && 
-                        memAccess != MemAccess.MappedIncoherentWriteOnlyReBAR &&
+                        memAccess != MemAccess.MappedCoherentWriteOnlyReBAR &&
                         data != null;
 
                     if (!useFastUploadPathAMD)
@@ -137,7 +135,7 @@ namespace BBOpenGL
                     {
                         Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
                     }
-                    if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedIncoherentWriteOnlyReBAR)
+                    if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
                     {
                         Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
                     }
@@ -170,23 +168,23 @@ namespace BBOpenGL
                 GL.CopyNamedBufferSubData(ID, buffer.ID, readOffset, writeOffset, size);
             }
 
-            public void Clear(nint offset, nint size, in uint data)
+            public void Fill(nint offset, nint size, in uint data)
             {
                 fixed (void* ptr = &data)
                 {
-                    Clear(Texture.InternalFormat.R32Uint, Texture.PixelFormat.RInteger, Texture.PixelType.Int, offset, size, ptr);
+                    Fill(Texture.InternalFormat.R32Uint, Texture.PixelFormat.RInteger, Texture.PixelType.Int, offset, size, ptr);
                 }
             }
             
-            public void Clear(nint offset, nint size, in float data)
+            public void Fill(nint offset, nint size, in float data)
             {
                 fixed (void* ptr = &data)
                 {
-                    Clear(Texture.InternalFormat.R32Float, Texture.PixelFormat.R, Texture.PixelType.Float, offset, size, ptr);
+                    Fill(Texture.InternalFormat.R32Float, Texture.PixelFormat.R, Texture.PixelType.Float, offset, size, ptr);
                 }
             }
             
-            public void Clear(Texture.InternalFormat internalFormat, Texture.PixelFormat pixelFormat, Texture.PixelType pixelType, nint offset, nint size, void* data)
+            public void Fill(Texture.InternalFormat internalFormat, Texture.PixelFormat pixelFormat, Texture.PixelType pixelType, nint offset, nint size, void* data)
             {
                 if (size == 0) return;
                 GL.ClearNamedBufferSubData(ID, (SizedInternalFormat)internalFormat, offset, size, (PixelFormat)pixelFormat, (PixelType)pixelType, data);

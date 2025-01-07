@@ -1,6 +1,7 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using BBOpenGL;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Render
 {
@@ -55,7 +56,6 @@ namespace IDKEngine.Render
 
         public void Compute()
         {
-
             BBG.Computing.Compute("Compute Volumetric Lighting", () =>
             {
                 BBG.Cmd.SetUniforms(Settings);
@@ -64,7 +64,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindImageUnit(depthTexture, 1);
                 BBG.Cmd.UseShaderProgram(volumetricLightingProgram);
 
-                BBG.Computing.Dispatch((volumetricLightingTexture.Width + 8 - 1) / 8, (volumetricLightingTexture.Height + 8 - 1) / 8, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(volumetricLightingTexture.Width, 8), MyMath.DivUp(volumetricLightingTexture.Height, 8), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
 
@@ -75,7 +75,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(depthTexture, 1);
                 BBG.Cmd.UseShaderProgram(upscaleProgram);
 
-                BBG.Computing.Dispatch((PresentationResolution.X + 8 - 1) / 8, (PresentationResolution.Y + 8 - 1) / 8, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(PresentationResolution.X, 8), MyMath.DivUp(PresentationResolution.Y, 8), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
         }

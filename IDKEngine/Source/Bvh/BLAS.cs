@@ -447,8 +447,8 @@ namespace IDKEngine.Bvh
             for (int axis = 0; axis < 3; axis++)
             {
                 Box rightBoxAccum = Box.Empty();
-                int firstRightTri = triStart;
-                for (int i = triEnd - 1; i > triStart; i--)
+                int firstRightTri = triStart + 1;
+                for (int i = triEnd - 1; i >= firstRightTri; i--)
                 {
                     rightBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
 
@@ -462,23 +462,24 @@ namespace IDKEngine.Bvh
                     if (rightCost >= splitCost)
                     {
                         // Don't need to consider split positions beyond this point as cost is already greater and will only get more
-                        firstRightTri = i;
+                        firstRightTri = i + 1;
                         break;
                     }
                 }
 
                 Box leftBoxAccum = Box.Empty();
-                for (int i = triStart; i < firstRightTri; i++)
+                for (int i = triStart; i < firstRightTri - 1; i++)
                 {
                     leftBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
                 }
-                for (int i = firstRightTri; i < triEnd - 1; i++)
+                for (int i = firstRightTri - 1; i < triEnd - 1; i++)
                 {
                     leftBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
 
                     // Implementation of "Surface Area Heuristic" described in "Spatial Splits in Bounding Volume Hierarchies"
                     // https://www.nvidia.in/docs/IO/77714/sbvh.pdf 2.1 BVH Construction
-                    int triCount = (i + 1) - triStart;
+                    int triIndex = i + 1;
+                    int triCount = triIndex - triStart;
                     float areaParent = parentNode.HalfArea();
                     float probHitLeftChild = leftBoxAccum.HalfArea() / areaParent;
 
@@ -486,13 +487,13 @@ namespace IDKEngine.Bvh
                     float rightCost = buildData.RightCostsAccum[i + 1];
 
                     // Estimates cost of hitting parentNode if it was split at the evaluated split position.
-                    // The full "Surface Area Heuristic" is recursive, but in practice assume
+                    // The full "Surface Area Heuristic" is recursive, but in practice we assume
                     // the resulting child nodes are leafs. This the greedy SAH approach
                     float surfaceAreaHeuristic = CostInternalNode(leftCost, rightCost, settings.TraversalCost);
 
                     if (surfaceAreaHeuristic < splitCost)
                     {
-                        triPivot = i + 1;
+                        triPivot = triIndex;
                         splitAxis = axis;
                         splitCost = surfaceAreaHeuristic;
                     }

@@ -210,11 +210,11 @@ namespace IDKEngine.Render
 
             taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
             taaDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-            taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
+            taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
 
             bindlessGBufferBuffer = new BBG.TypedBuffer<GpuBindlessGBuffer>();
             bindlessGBufferBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-            bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
+            bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
 
             SSAO = new SSAO(renderSize, new SSAO.GpuSettings());
             SSR = new SSR(renderSize, new SSR.GpuSettings());
@@ -340,7 +340,7 @@ namespace IDKEngine.Render
                 modelManager.ResetInstanceCounts();
 
                 BBG.Cmd.UseShaderProgram(cullingProgram);
-                BBG.Computing.Dispatch((modelManager.MeshInstances.Length + 64 - 1) / 64, 1, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
 
@@ -491,7 +491,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindTextureUnit(SSR.Result, 1, IsSSR);
                 BBG.Cmd.UseShaderProgram(mergeLightingProgram);
 
-                BBG.Computing.Dispatch((RenderResolution.X + 8 - 1) / 8, (RenderResolution.Y + 8 - 1) / 8, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(RenderResolution.X, 8), MyMath.DivUp(RenderResolution.Y, 8), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
 
@@ -504,10 +504,10 @@ namespace IDKEngine.Render
                 FSR2Wrapper.Run(beforeTAATexture, DepthTexture, VelocityTexture, camera, gpuTaaData.Jitter, dT * 1000.0f);
 
                 // This is a hack to fix global UBO bindings modified by FSR2
-                taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
-                SkyBoxManager.skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
-                Voxelizer.voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
-                bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
+                lightManager.FSR2WorkaroundRebindUBO(); // binding 3
+                taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
+                SkyBoxManager.FSR2WorkaroundRebindUBO(); // binding 5
+                Voxelizer.voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
             }
         }
 

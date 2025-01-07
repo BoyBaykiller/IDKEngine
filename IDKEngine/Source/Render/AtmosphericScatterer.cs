@@ -1,5 +1,6 @@
 ﻿using System;
 using BBOpenGL;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Render
 {
@@ -42,7 +43,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindImageUnit(Result, 0, 0, true);
                 BBG.Cmd.UseShaderProgram(shaderProgram);
 
-                BBG.Computing.Dispatch((Result.Width + 8 - 1) / 8, (Result.Width + 8 - 1) / 8, 6);
+                BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Width, 8), 6);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
         }

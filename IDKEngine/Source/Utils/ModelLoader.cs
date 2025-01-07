@@ -2017,7 +2017,7 @@ namespace IDKEngine.Utils
                 {
                     texture = new GLTexture(GLTexture.Type.Texture2D);
                     texture.Allocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-                    texture.Clear(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
+                    texture.Fill(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
 
                     cachedWhiteTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
                 }

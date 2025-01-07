@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using OpenTK.Mathematics;
 using BBLogger;
 using BBOpenGL;
+using IDKEngine.Utils;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render
@@ -95,7 +96,7 @@ namespace IDKEngine.Render
 
             voxelizerDataBuffer = new BBG.TypedBuffer<GpuVoxelizerData>();
             voxelizerDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-            voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
+            voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
 
             SetSize(width, height, depth);
 
@@ -126,7 +127,7 @@ namespace IDKEngine.Render
                 }
 
                 BBG.Cmd.UseShaderProgram(clearTexturesProgram);
-                BBG.Computing.Dispatch((ResultVoxels.Width + 4 - 1) / 4, (ResultVoxels.Height + 4 - 1) / 4, (ResultVoxels.Depth + 4 - 1) / 4);
+                BBG.Computing.Dispatch(MyMath.DivUp(ResultVoxels.Width, 4), MyMath.DivUp(ResultVoxels.Height, 4), MyMath.DivUp(ResultVoxels.Depth, 4));
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit);
             });
         }
@@ -201,7 +202,7 @@ namespace IDKEngine.Render
                     BBG.Cmd.BindTextureUnit(intermediateResultsRbg[2], 2);
                     BBG.Cmd.UseShaderProgram(mergeIntermediatesProgram);
 
-                    BBG.Computing.Dispatch((ResultVoxels.Width + 4 - 1) / 4, (ResultVoxels.Height + 4 - 1) / 4, (ResultVoxels.Depth + 4 - 1) / 4);
+                    BBG.Computing.Dispatch(MyMath.DivUp(ResultVoxels.Width, 4), MyMath.DivUp(ResultVoxels.Height, 4), MyMath.DivUp(ResultVoxels.Depth, 4));
                     BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit | BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
                 });
             }
@@ -221,7 +222,7 @@ namespace IDKEngine.Render
                     Vector3i size = BBG.Texture.GetMipmapLevelSize(ResultVoxels.Width, ResultVoxels.Height, ResultVoxels.Depth, i);
 
                     BBG.Cmd.BindImageUnit(ResultVoxels, 0, i, true);
-                    BBG.Computing.Dispatch((size.X + 4 - 1) / 4, (size.Y + 4 - 1) / 4, (size.Z + 4 - 1) / 4);
+                    BBG.Computing.Dispatch(MyMath.DivUp(size.X, 4), MyMath.DivUp(size.Y, 4), MyMath.DivUp(size.Z, 4));
                     BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit | BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
                 });
             }
@@ -237,7 +238,8 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindImageUnit(debugResult, 0);
                 BBG.Cmd.BindTextureUnit(ResultVoxels, 0);
                 BBG.Cmd.UseShaderProgram(visualizeDebugProgram);
-                BBG.Computing.Dispatch((debugResult.Width + 8 - 1) / 8, (debugResult.Height + 8 - 1) / 8, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(debugResult.Width, 8), MyMath.DivUp(debugResult.Height, 8), 1);
+
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
 
