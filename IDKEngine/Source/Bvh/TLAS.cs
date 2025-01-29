@@ -52,8 +52,8 @@ namespace IDKEngine.Bvh
                 uint mortonCodeB = MyMath.GetMorton(mappedB);
 
                 if (mortonCodeA > mortonCodeB) return 1;
-                if (mortonCodeA == mortonCodeB) return 0;
-                return -1;
+                if (mortonCodeA < mortonCodeB) return -1;
+                return 0;
             });
 
             int activeRangeCount = primitiveCount;

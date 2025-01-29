@@ -245,10 +245,7 @@ namespace IDKEngine
                 ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId]; 
                 GpuBlasNode node = ModelManager.BVH.GetBlas(meshInstance.MeshId).Root;
 
-                Box box = new Box();
-                box.Min = node.Min;
-                box.Max = node.Max;
-
+                Box box = new Box(node.Min, node.Max);
                 box.Transform(meshInstance.ModelMatrix);
                 BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
             }
@@ -257,9 +254,7 @@ namespace IDKEngine
                 LightManager.TryGetLight(lightInfo.LightId, out CpuLight cpuLight);
                 ref GpuLight light = ref cpuLight.GpuLight;
 
-                Box box = new Box();
-                box.Min = light.Position - new Vector3(light.Radius);
-                box.Max = light.Position + new Vector3(light.Radius);
+                Box box = new Box(light.Position - new Vector3(light.Radius), light.Position + new Vector3(light.Radius));
                 BoxRenderer.Render(TonemapAndGamma.Result, gpuPerFrameData.ProjView, box);
             }
             else if (gui.SelectedEntity is Gui.SelectedEntityInfo.Node nodeInfo)
@@ -483,7 +478,7 @@ namespace IDKEngine
                 //sponza.GpuModel.Meshes[46].SpecularBias = 1.0f;
                 //sponza.GpuModel.Meshes[46].RoughnessBias = -0.436f; // -0.665
                 //sponza.GpuModel.Meshes[46].NormalMapStrength = 0.0f;
-
+                
                 ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).GetMatrix()).Value;
                 lucy.GpuModel.Meshes[0].SpecularBias = -1.0f;
                 lucy.GpuModel.Meshes[0].TransmissionBias = 0.98f;
@@ -497,6 +492,7 @@ namespace IDKEngine
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
+                //ModelLoader.Model cb = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
                 //ModelLoader.Model plane = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);

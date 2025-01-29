@@ -46,8 +46,9 @@ namespace IDKEngine
             return this;
         }
 
-        public Matrix4 GetMatrix()
+        public readonly Matrix4 GetMatrix()
         {
+            // Same as S * R * T
             Matrix4 matrix = Matrix4.CreateScale(Scale) * Matrix4.CreateFromQuaternion(Rotation);
             matrix.Row3.Xyz = Translation;
 

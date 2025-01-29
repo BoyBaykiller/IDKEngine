@@ -9,7 +9,7 @@ namespace IDKEngine
 
         public int End
         {
-            get
+            readonly get
             {
                 return Start + Count;
             }
@@ -26,12 +26,12 @@ namespace IDKEngine
             Count = count;
         }
 
-        public bool Contains(int index)
+        public readonly bool Contains(int index)
         {
             return index >= Start && index < End;
         }
 
-        public bool Overlaps(Range range, out Range overlap)
+        public readonly bool Overlaps(Range range, out Range overlap)
         {
             overlap = new Range();
             overlap.Start = Math.Max(Start, range.Start);
@@ -39,7 +39,7 @@ namespace IDKEngine
             return overlap.Count > 0;
         }
 
-        public bool Overlaps(Range range, out int overlap)
+        public readonly bool Overlaps(Range range, out int overlap)
         {
             bool overlaps = Overlaps(range, out Range overlappingRange);
             overlap = overlappingRange.Count;

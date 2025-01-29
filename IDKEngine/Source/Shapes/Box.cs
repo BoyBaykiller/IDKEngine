@@ -1,5 +1,6 @@
 ﻿using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using IDKEngine.GpuTypes;
 
@@ -8,7 +9,7 @@ namespace IDKEngine.Shapes
     [StructLayout(LayoutKind.Explicit)]
     public record struct Box
     {
-        public Vector3 this[int index]
+        public readonly Vector3 this[int index]
         {
             get
             {
@@ -24,8 +25,8 @@ namespace IDKEngine.Shapes
         [FieldOffset(0)] public Vector3 Min;
         [FieldOffset(16)] public Vector3 Max;
 
-        [FieldOffset(0)] public Vector128<float> SIMDMin;
-        [FieldOffset(16)] public Vector128<float> SIMDMax;
+        [FieldOffset(0)] public Vector128<float> SimdMin;
+        [FieldOffset(16)] public Vector128<float> SimdMax;
 
         public Box(Vector3 min, Vector3 max)
         {
@@ -35,14 +36,14 @@ namespace IDKEngine.Shapes
 
         public void GrowToFit(in Vector128<float> point)
         {
-            SIMDMin = Vector128.MinNative(SIMDMin, point);
-            SIMDMax = Vector128.MaxNative(SIMDMax, point);
+            SimdMin = Vector128.MinNative(SimdMin, point);
+            SimdMax = Vector128.MaxNative(SimdMax, point);
         }
 
         public void GrowToFit(in Box box)
         {
-            SIMDMin = Vector128.MinNative(SIMDMin, box.SIMDMin);
-            SIMDMax = Vector128.MaxNative(SIMDMax, box.SIMDMax);
+            SimdMin = Vector128.MinNative(SimdMin, box.SimdMin);
+            SimdMax = Vector128.MaxNative(SimdMax, box.SimdMax);
         }
 
         public void GrowToFit(in GpuTlasNode node)
@@ -52,8 +53,8 @@ namespace IDKEngine.Shapes
             Vector128<float> p0 = Vector128.Create(node.Min.X, node.Min.Y, node.Min.Z, 0.0f);
             Vector128<float> p1 = Vector128.Create(node.Max.X, node.Max.Y, node.Max.Z, 0.0f);
             
-            SIMDMin = Vector128.MinNative(SIMDMin, p0);
-            SIMDMax = Vector128.MaxNative(SIMDMax, p1);
+            SimdMin = Vector128.MinNative(SimdMin, p0);
+            SimdMax = Vector128.MaxNative(SimdMax, p1);
         }
 
         public void GrowToFit(Vector3 point)
@@ -69,28 +70,28 @@ namespace IDKEngine.Shapes
             GrowToFit(tri.Position2);
         }
 
-        public Vector3 Center()
+        public readonly Vector3 Center()
         {
             return (Max + Min) * 0.5f;
         }
 
-        public Vector3 Size()
+        public readonly Vector3 Size()
         {
             return Max - Min;
         }
 
-        public Vector3 HalfSize()
+        public readonly Vector3 HalfSize()
         {
             return Size() * 0.5f;
         }
 
-        public float Volume()
+        public readonly float Volume()
         {
             Vector3 size = Size();
             return size.X * size.Y * size.Z;
         }
 
-        public float HalfArea()
+        public readonly float HalfArea()
         {
             Vector3 size = Size();
             float area = (size.X + size.Y) * size.Z + size.X * size.Y;
@@ -124,12 +125,17 @@ namespace IDKEngine.Shapes
             return extends;
         }
 
+        // Does not get inlined even though it's small and tends be a size decreasing inline
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Box Empty()
         {
-            return new Box(new Vector3(float.MaxValue), new Vector3(float.MinValue));
+            Box box = new Box();
+            box.SimdMin = Vector128.Create<float>(float.MaxValue);
+            box.SimdMax = Vector128.Create<float>(float.MinValue);
+            return box;
         }
 
-        public static Box From(Triangle triangle)
+        public static Box From(in Triangle triangle)
         {
             Box box = new Box(triangle.Position0, triangle.Position0);
             box.GrowToFit(triangle.Position1);

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 
 namespace IDKEngine.Utils
 {
@@ -40,9 +41,9 @@ namespace IDKEngine.Utils
             return lo;
         }
 
-        public static void PartialSort<T>(Span<T> values, int sortEnd, Comparison<T> comparison, Action<int, int> onSwap = null)
+        public static void PartialSort<T>(Span<T> values, int sortEnd, Random rng, Comparison<T> comparison, Action<int, int> onSwap = null)
         {
-            PartialSort(values, 0, values.Length, sortEnd, comparison, onSwap);
+            PartialSort(values, 0, values.Length, sortEnd, rng, comparison, onSwap);
         }
 
         /// <summary>
@@ -55,10 +56,10 @@ namespace IDKEngine.Utils
         /// <param name="end"></param>
         /// <param name="sortEnd"></param>
         /// <param name="comparison"></param>
-        private static void PartialSort<T>(Span<T> values, int start, int end, int sortEnd, Comparison<T> comparison, Action<int, int> onSwap = null)
+        private static void PartialSort<T>(Span<T> values, int start, int end, int sortEnd, Random rng, Comparison<T> comparison, Action<int, int> onSwap = null)
         {
             // Swap randomly selected pivot with start
-            SwapNotifyUser(values, RNG.RandomInt(start, end - 1), start, onSwap);
+            SwapNotifyUser(values, rng.Next(start, end - 1), start, onSwap);
             T pivot = values[start];
 
             int middle = Partition(values, start, end, (in T it) => comparison(it, pivot) < 0, onSwap);
@@ -73,11 +74,11 @@ namespace IDKEngine.Utils
 
             if ((lSortEnd - start) > 1)
             {
-                PartialSort(values, start, lSortEnd, sortEnd, comparison, onSwap);
+                PartialSort(values, start, lSortEnd, sortEnd, rng, comparison, onSwap);
             }
             if ((end - rSortStart) > 1 && rSortStart < sortEnd)
             {
-                PartialSort(values, rSortStart, end, sortEnd, comparison, onSwap);
+                PartialSort(values, rSortStart, end, sortEnd, rng, comparison, onSwap);
             }
         }
 
@@ -120,41 +121,35 @@ namespace IDKEngine.Utils
         }
 
         /// <summary>
-        /// Reorders the elements in such a way that all elements for which the predicate returns true
-        /// precede the elements for which predicate p returns false. Relative order of the elements is preserved.
+        /// Reorders the integers in such a way that all elements for which bitArray[arr[i]] is true
+        /// precede the integers for which it is false. Relative order of the elements is preserved.
         /// Equivalent to std::stable_partition
         /// </summary>
-        /// <typeparam name="T"></typeparam>
         /// <param name="arr"></param>
-        /// <param name="temp"></param>
-        /// <param name="func"></param>
-        public static int StablePartition<T>(Span<T> arr, Span<T> temp, Predicate<T> func)
+        /// <param name="auxiliary"></param>
+        /// <param name="bitArray"></param>
+        /// <returns></returns>
+        public static int StablePartition(Span<int> arr, Span<int> auxiliary, BitArray bitArray)
         {
-            int leftHead = 0;
-            int rightHead = arr.Length;
+            int lCounter = 0;
+            int rCounter = 0;
 
             for (int i = 0; i < arr.Length; i++)
             {
-                ref T value = ref arr[i];
-                if (func(value))
+                int id = arr[i];
+                if (bitArray[id])
                 {
-                    temp[leftHead++] = value;
+                    arr[lCounter++] = id;
                 }
                 else
                 {
-                    temp[--rightHead] = value;
+                    auxiliary[rCounter++] = id;
                 }
             }
 
-            temp.Slice(0, leftHead).CopyTo(arr);
-            
-            for (int i = arr.Length - 1; i >= leftHead; i--)
-            {
-                int offsetFromLeft = arr.Length - 1 - i;
-                arr[leftHead + offsetFromLeft] = temp[i];
-            }
+            Memory.CopyElements(ref auxiliary[0], ref arr[lCounter], arr.Length - lCounter);
 
-            return leftHead;
+            return lCounter;
         }
 
         public static void Swap<T>(ref T a, ref T b)
@@ -168,6 +163,11 @@ namespace IDKEngine.Utils
         {
             Swap(ref values[idA], ref values[idB]);
             onSwap?.Invoke(idA, idB);
+        }
+
+        public static void SetBit(ref int value, int n, bool x)
+        {
+            value = (value & ~(1 << n)) | (Convert.ToInt32(x) << n);
         }
     }
 }

@@ -20,7 +20,6 @@ namespace IDKEngine.Bvh
             public int MinLeafTriangleCount = 1;
             public int MaxLeafTriangleCount = 8;
             public float TriangleCost = 1.1f;
-            public float TraversalCost = 1.0f;
 
             public BuildSettings()
             {
@@ -43,7 +42,7 @@ namespace IDKEngine.Bvh
 
         public ref struct Geometry
         {
-            public int TriangleCount => Triangles.Length;
+            public readonly int TriangleCount => Triangles.Length;
 
             public Span<Vector3> VertexPositions;
             public Span<IndicesTriplet> Triangles;
@@ -54,18 +53,18 @@ namespace IDKEngine.Bvh
                 Triangles = triangles;
             }
 
-            public Triangle GetTriangle(int index)
+            public readonly Triangle GetTriangle(int index)
             {
                 return GetTriangle(Triangles[index]);
             }
 
-            public Triangle GetTriangle(in IndicesTriplet triangles)
+            public readonly Triangle GetTriangle(in IndicesTriplet triangles)
             {
                 ref readonly Vector3 p0 = ref VertexPositions[triangles.X];
                 ref readonly Vector3 p1 = ref VertexPositions[triangles.Y];
                 ref readonly Vector3 p2 = ref VertexPositions[triangles.Z];
 
-                return new Triangle() { Position0 = p0, Position1 = p1, Position2 = p2 };
+                return new Triangle(p0, p1, p2);
             }
         }
 
@@ -109,15 +108,15 @@ namespace IDKEngine.Bvh
             {
                 ref GpuBlasNode parentNode = ref blas.Nodes[stack[--stackPtr]];
 
-                if (TrySplit(parentNode, buildData, settings) is int partitonPivot)
+                if (TrySplit(parentNode, buildData, settings) is int partitionPivot)
                 {
                     GpuBlasNode newLeftNode = new GpuBlasNode();
                     newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
-                    newLeftNode.TriCount = partitonPivot - newLeftNode.TriStartOrChild;
+                    newLeftNode.TriCount = partitionPivot - newLeftNode.TriStartOrChild;
                     newLeftNode.SetBounds(ComputeBoundingBox(newLeftNode.TriStartOrChild, newLeftNode.TriCount, buildData));
 
                     GpuBlasNode newRightNode = new GpuBlasNode();
-                    newRightNode.TriStartOrChild = partitonPivot;
+                    newRightNode.TriStartOrChild = partitionPivot;
                     newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
                     newRightNode.SetBounds(ComputeBoundingBox(newRightNode.TriStartOrChild, newRightNode.TriCount, buildData));
 
@@ -155,6 +154,7 @@ namespace IDKEngine.Bvh
 
             blas.MaxTreeDepth = ComputeTreeDepth(blas);
 
+            // Remove the indirection of TrisAxesSorted -> Triangles introduced by this builder
             IndicesTriplet[] triangles = new IndicesTriplet[geometry.TriangleCount];
             for (int i = 0; i < geometry.TriangleCount; i++)
             {
@@ -334,7 +334,7 @@ namespace IDKEngine.Bvh
             float probHitLeftChild = leftChild.HalfArea() / areaParent;
             float probHitRightChild = rightChild.HalfArea() / areaParent;
 
-            float cost = CostInternalNode(probHitLeftChild, probHitRightChild, ComputeGlobalCost(leftChild, nodes, settings), ComputeGlobalCost(rightChild, nodes, settings), settings.TraversalCost);
+            float cost = CostInternalNode(probHitLeftChild, probHitRightChild, ComputeGlobalCost(leftChild, nodes, settings), ComputeGlobalCost(rightChild, nodes, settings));
 
             if (areaParent == 0.0f)
             {
@@ -424,9 +424,9 @@ namespace IDKEngine.Bvh
             return IsLeftSibling(nodeId) ? nodeId : nodeId - 1;
         }
 
-        public static GpuBlasNode[] AllocateUpperBoundNodes(int triangleCount)
+        public static int GetUpperBoundNodes(int triangleCount)
         {
-            return new GpuBlasNode[Math.Max(2 * triangleCount - 1, 3)];
+            return Math.Max(2 * triangleCount - 1, 3);
         }
 
         private static int? TrySplit(in GpuBlasNode parentNode, BuildData buildData, in BuildSettings settings)
@@ -438,12 +438,11 @@ namespace IDKEngine.Bvh
 
             int triStart = parentNode.TriStartOrChild;
             int triEnd = triStart + parentNode.TriCount;
+            float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleCost);
+
             int triPivot = 0;
             int splitAxis = 0;
-
-            float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleCost);
             float splitCost = notSplitCost;
-
             for (int axis = 0; axis < 3; axis++)
             {
                 Box rightBoxAccum = Box.Empty();
@@ -489,7 +488,7 @@ namespace IDKEngine.Bvh
                     // Estimates cost of hitting parentNode if it was split at the evaluated split position.
                     // The full "Surface Area Heuristic" is recursive, but in practice we assume
                     // the resulting child nodes are leafs. This the greedy SAH approach
-                    float surfaceAreaHeuristic = CostInternalNode(leftCost, rightCost, settings.TraversalCost);
+                    float surfaceAreaHeuristic = CostInternalNode(leftCost, rightCost);
 
                     if (surfaceAreaHeuristic < splitCost)
                     {
@@ -527,7 +526,7 @@ namespace IDKEngine.Bvh
             // We found a split axis where the triangles are partitioned into a left and right set.
             // Now, the other two axes also need to have the same triangles in their sets respectively.
             // To do that we mark every triangle on the left side of the split axis.
-            // Then the other two axes have their triangles partioned such that all marked triangles precede the others.
+            // Then the other two axes have their triangles partitioned such that all marked triangles precede the others.
             // The partitioning is stable so the triangles stay sorted otherwise which is crucial
 
             for (int i = triStart; i < triPivot; i++)
@@ -547,10 +546,7 @@ namespace IDKEngine.Bvh
                     continue;
                 }
 
-                Algorithms.StablePartition(buildData.TrisAxesSorted[axis].AsSpan(triStart, triEnd - triStart), partitionAux, (in int triId) =>
-                {
-                    return buildData.TriMarks[triId];
-                });
+                Algorithms.StablePartition(buildData.TrisAxesSorted[axis].AsSpan(triStart, triEnd - triStart), partitionAux, buildData.TriMarks);
             }
 
             return triPivot;
@@ -625,13 +621,15 @@ namespace IDKEngine.Bvh
             return buildData;
         }
 
-        private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild, float traversalCost)
+        private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild)
         {
+            const float traversalCost = 1.0f;
             return traversalCost + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
         }
 
-        private static float CostInternalNode(float costLeft, float costRight, float traversalCost)
+        private static float CostInternalNode(float costLeft, float costRight)
         {
+            const float traversalCost = 1.0f;
             return traversalCost + costLeft + costRight;
         }
 

@@ -49,6 +49,10 @@
 
   <ItemGroup>
     <PackageReference Include="FFX_FSR2" Version="1.0.2" />
+    <PackageReference Include="hamarb123.Analyzers" Version="1.2.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="ImGui.NET" Version="1.90.8.1" />
     <PackageReference Include="Ktx2.NET" Version="1.0.3" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.6" />

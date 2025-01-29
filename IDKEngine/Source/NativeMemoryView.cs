@@ -15,7 +15,7 @@ namespace IDKEngine
             Length = length;
         }
 
-        public ref T this[int index]
+        public readonly ref T this[int index]
         {
             get
             {
@@ -24,7 +24,7 @@ namespace IDKEngine
             }
         }
 
-        public Span<T> AsSpan(int offset, int length)
+        public readonly Span<T> AsSpan(int offset, int length)
         {
             return new Span<T>(Ptr + offset, length);
         }

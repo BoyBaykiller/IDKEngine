@@ -4,7 +4,7 @@ namespace IDKEngine.Shapes
 {
     public record struct Triangle
     {
-        public Vector3 Normal
+        public readonly Vector3 Normal
         {
             get
             {
@@ -16,7 +16,7 @@ namespace IDKEngine.Shapes
             }
         }
 
-        public Vector3 Centroid => (Position0 + Position1 + Position2) / 3.0f;
+        public readonly Vector3 Centroid => (Position0 + Position1 + Position2) / 3.0f;
 
         public Vector3 Position0;
         public Vector3 Position1;
@@ -35,7 +35,6 @@ namespace IDKEngine.Shapes
             Position1 = (new Vector4(Position1, 1.0f) * model).Xyz;
             Position2 = (new Vector4(Position2, 1.0f) * model).Xyz;
         }
-
 
         public static Triangle Transformed(Triangle triangle, in Matrix4 model)
         {

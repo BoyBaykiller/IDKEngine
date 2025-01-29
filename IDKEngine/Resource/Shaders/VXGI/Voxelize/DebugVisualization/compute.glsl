@@ -13,7 +13,6 @@ layout(binding = 0) uniform sampler3D SamplerVoxels;
 layout(location = 0) uniform float StepMultiplier;
 layout(location = 1) uniform float ConeAngle;
 
-
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);

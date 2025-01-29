@@ -16,8 +16,8 @@ namespace IDKEngine
     {
         public record struct CpuModel
         {
-            public ModelLoader.Node Root => Nodes[0];
-            public string Name => Root.Name;
+            public readonly ModelLoader.Node Root => Nodes[0];
+            public readonly string Name => Root.Name;
 
             public ModelLoader.Node[] Nodes;
             public ModelLoader.ModelAnimation[] Animations;
@@ -342,9 +342,8 @@ namespace IDKEngine
 
                 for (int i = 0; i < GpuMaterial.TEXTURE_COUNT; i++)
                 {
-                    GpuMaterial.TextureType textureType = (GpuMaterial.TextureType)i;
+                    BBG.Texture.BindlessHandle handle = rmGpuMaterial[(GpuMaterial.TextureType)i];
 
-                    BBG.Texture.BindlessHandle handle = rmGpuMaterial[textureType];
                     if (!IsTextureHandleReferenced(handle, GpuMaterials, freeListMaterials))
                     {
                         rmCpuMaterial.SampledTextures[i].Dispose();
@@ -901,7 +900,13 @@ namespace IDKEngine
             }
         }
 
-        private void UpdateBuffers(Vector3[] vertexPositions, GpuMeshlet[] meshlets, GpuMeshletInfo[] meshletsInfo, uint[] meshletsVertexIndices, byte[] meshletsPrimitiveIndices, GpuUnskinnedVertex[] unskinnedVertices)
+        private void UpdateBuffers(
+            ReadOnlySpan<Vector3> vertexPositions,
+            ReadOnlySpan<GpuMeshlet> meshlets,
+            ReadOnlySpan<GpuMeshletInfo> meshletsInfo,
+            ReadOnlySpan<uint> meshletsVertexIndices,
+            ReadOnlySpan<byte> meshletsPrimitiveIndices,
+            ReadOnlySpan<GpuUnskinnedVertex> unskinnedVertices)
         {
             BBG.Buffer.Recreate(ref drawCommandBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, DrawCommands);
             BBG.Buffer.Recreate(ref meshesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, Meshes);
@@ -1051,7 +1056,7 @@ namespace IDKEngine
             return false;
         }
 
-        private static bool IsTextureHandleReferenced(BBG.Texture.BindlessHandle bindlessHandle, ReadOnlySpan<GpuMaterial> materials, SortedSet<int> ignoreMaterials)
+        private static bool IsTextureHandleReferenced(BBG.Texture.BindlessHandle bindlessHandle, Span<GpuMaterial> materials, SortedSet<int> ignoreMaterials)
         {
             for (int i = 0; i < materials.Length; i++)
             {
@@ -1060,7 +1065,7 @@ namespace IDKEngine
                     continue;
                 }
 
-                ref readonly GpuMaterial material = ref materials[i];
+                ref GpuMaterial material = ref materials[i];
 
                 for (int j = 0; j < GpuMaterial.TEXTURE_COUNT; j++)
                 {

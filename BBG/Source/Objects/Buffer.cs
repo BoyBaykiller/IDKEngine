@@ -237,7 +237,7 @@ namespace BBOpenGL
                 buffer = newBuffer;
             }
 
-            public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, Span<T> newValues) where T : unmanaged
+            public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> newValues) where T : unmanaged
             {
                 Recreate(ref buffer, memLocation, memAccess, newValues.Length, MemoryMarshal.GetReference(newValues));
             }

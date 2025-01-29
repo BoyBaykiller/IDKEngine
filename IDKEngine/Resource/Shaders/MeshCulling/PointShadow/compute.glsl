@@ -26,10 +26,10 @@ void main()
     }
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
-    uint meshID = meshInstance.MeshId;
+    uint meshId = meshInstance.MeshId;
     
-    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
-    GpuBlasNode node = blasNodeSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeOffset];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
+    GpuBlasNode node = blasNodeSSBO.Nodes[meshSSBO.Meshes[meshId].BlasRootNodeOffset];
 
     for (int i = 0; i < NumVisibleFaces; i++)
     {
@@ -41,24 +41,24 @@ void main()
         Frustum frustum = GetFrustum(projView * modelMatrix);
         bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
 
-        uint faceAndMeshInstanceID = (faceID << 29) | meshInstanceID; // 3bits | 29bits
+        uint faceAndMeshInstanceId = (faceID << 29) | meshInstanceID; // 3bits | 29bits
 
         if (isVisible)
         {
         #if TAKE_MESH_SHADER_PATH_SHADOW
 
-            uint meshletTaskID = atomicAdd(meshletTasksCountSSBO.Count, 1u);
-            visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskID] = faceAndMeshInstanceID;
+            uint meshletTaskId = atomicAdd(meshletTasksCountSSBO.Count, 1u);
+            visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskId] = faceAndMeshInstanceId;
             
             const uint taskShaderWorkGroupSize = 32;
-            uint meshletCount = meshSSBO.Meshes[meshID].MeshletCount;
+            uint meshletCount = meshSSBO.Meshes[meshId].MeshletCount;
             uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
-            meshletTaskCmdSSBO.Commands[meshletTaskID].Count = meshletsWorkGroupCount;
+            meshletTaskCmdSSBO.Commands[meshletTaskId].Count = meshletsWorkGroupCount;
 
         #else
 
-            uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshID].InstanceCount, 1u);
-            visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance * 6 + index] = faceAndMeshInstanceID;
+            uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshId].InstanceCount, 1u);
+            visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance * 6 + index] = faceAndMeshInstanceId;
 
         #endif
         }

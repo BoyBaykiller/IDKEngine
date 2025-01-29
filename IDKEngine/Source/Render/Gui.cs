@@ -1034,12 +1034,12 @@ namespace IDKEngine.Render
                     for (int i = 0; i < ModelLoader.CpuMaterial.TEXTURE_COUNT; i++)
                     {
                         ModelLoader.TextureType textureType = (ModelLoader.TextureType)i;
-                        if (cpuMaterial.HasFallbackPixels(textureType))
+                        if (cpuMaterial.GetHasFallbackPixels(textureType))
                         {
                             continue;
                         }
 
-                        (BBG.Texture texture, BBG.Sampler sampler) = cpuMaterial[textureType];
+                        (BBG.Texture texture, BBG.Sampler sampler) = cpuMaterial.SampledTextures[i];
                         BBG.TextureView textureView = new BBG.TextureView(texture, sampler.State);
 
                         SysVec2 content = ImGui.GetContentRegionAvail();
@@ -1441,7 +1441,7 @@ namespace IDKEngine.Render
                     LoadParams = new LoadParams();
                 }
 
-                public string GetPopupModalName()
+                public readonly string GetPopupModalName()
                 {
                     return $"Loading {Path.GetFileName(CompressGltfSettings.InputPath)}###{IMGUI_ID_POPUP_MODAL}";
                 }
@@ -1475,7 +1475,7 @@ namespace IDKEngine.Render
                 return queuedLoadingTasks.TryDequeue(out CurrentGuiDialogLoadingTask);
             }
 
-            public void AddLoadingTask(string modelPath)
+            public readonly void AddLoadingTask(string modelPath)
             {
                 queuedLoadingTasks.Enqueue(new LoadingTask(modelPath));
             }

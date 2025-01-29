@@ -136,40 +136,40 @@ namespace IDKEngine.Utils
 
         public static Vector4 ToOpenTK(this System.Numerics.Vector4 vector4)
         {
-            return Unsafe.As<System.Numerics.Vector4, Vector4>(ref vector4);
+            return Unsafe.BitCast<System.Numerics.Vector4, Vector4>(vector4);
         }
 
         public static System.Numerics.Vector3 ToNumerics(this Vector3 vector3)
         {
-            return Unsafe.As<Vector3, System.Numerics.Vector3>(ref vector3);
+            return Unsafe.BitCast<Vector3, System.Numerics.Vector3>(vector3);
         }
         public static Vector3 ToOpenTK(this System.Numerics.Vector3 vector3)
         {
-            return Unsafe.As<System.Numerics.Vector3, Vector3>(ref vector3);
+            return Unsafe.BitCast<System.Numerics.Vector3, Vector3>(vector3);
         }
 
         public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
         {
-            return Unsafe.As<Vector2, System.Numerics.Vector2>(ref vector2);
+            return Unsafe.BitCast<Vector2, System.Numerics.Vector2>(vector2);
         }
         public static Vector2 ToOpenTK(this System.Numerics.Vector2 vector2)
         {
-            return Unsafe.As<System.Numerics.Vector2, Vector2>(ref vector2);
+            return Unsafe.BitCast<System.Numerics.Vector2, Vector2>(vector2);
         }
 
         public static Matrix4 ToOpenTK(this System.Numerics.Matrix4x4 Matrix4)
         {
-            return Unsafe.As<System.Numerics.Matrix4x4, Matrix4>(ref Matrix4);
+            return Unsafe.BitCast<System.Numerics.Matrix4x4, Matrix4>(Matrix4);
         }
 
         public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 Matrix4)
         {
-            return Unsafe.As<Matrix4, System.Numerics.Matrix4x4>(ref Matrix4);
+            return Unsafe.BitCast<Matrix4, System.Numerics.Matrix4x4>(Matrix4);
         }
 
         public static Quaternion ToOpenTK(this System.Numerics.Quaternion quaternion)
         {
-            return Unsafe.As<System.Numerics.Quaternion, Quaternion>(ref quaternion);
+            return Unsafe.BitCast<System.Numerics.Quaternion, Quaternion>(quaternion);
         }
 
         public static string ToOnOff(this bool val)
@@ -177,9 +177,9 @@ namespace IDKEngine.Utils
             return val ? "On" : "Off";
         }
 
-        public static unsafe bool TryReadFromFile<T>(string path, out T[] readData) where T : unmanaged
+        public static unsafe bool TryReadFromFile<T>(string path, out T[] dest) where T : unmanaged
         {
-            readData = null;
+            dest = null;
 
             using FileStream fileStream = File.OpenRead(path);
             if (fileStream.Length % sizeof(T) != 0)
@@ -193,9 +193,9 @@ namespace IDKEngine.Utils
                 return false;
             }
 
-            readData = new T[fileStream.Length / sizeof(T)];
+            dest = new T[fileStream.Length / sizeof(T)];
 
-            Span<byte> byteData = MemoryMarshal.AsBytes<T>(readData);
+            Span<byte> byteData = MemoryMarshal.AsBytes<T>(dest);
             fileStream.ReadExactly(byteData);
 
             return true;

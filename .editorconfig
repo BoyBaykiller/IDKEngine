@@ -23,7 +23,7 @@ dotnet_diagnostic.CS0169.severity = none
 # CS9192: Argument should be passed with 'ref' or 'in' keyword
 dotnet_diagnostic.CS9192.severity = error
 
-# Because I want `ref readonly` parameters to only accept r-values. Just like `ref`. After all thats its intention
+# Because I want `ref readonly` parameters to only accept l-values. Just like `ref`. After all thats its intention
 # CS9193: Argument should be a variable because it is passed to a 'ref readonly' parameter
 dotnet_diagnostic.CS9193.severity = error
 
@@ -48,3 +48,7 @@ csharp_style_implicit_object_creation_when_type_is_apparent = false
 
 # IDE0017: Simplify object initialization
 dotnet_style_object_initializer = false
+
+# Because calling non readonly methods on ref readonly structs causes hidden defensive copy
+# IDE0251: Make member 'readonly'
+dotnet_diagnostic.IDE0251.severity = error

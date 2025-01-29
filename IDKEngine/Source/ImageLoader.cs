@@ -18,8 +18,8 @@ namespace IDKEngine
 
         public record struct ImageHeader
         {
-            public int SizeInBytes => Width * Height * Channels * ChannelSizeInBytes;
-            public ColorComponents ColorComponents => ChannelsToColorComponents(Channels);
+            public readonly int SizeInBytes => Width * Height * Channels * ChannelSizeInBytes;
+            public readonly ColorComponents ColorComponents => ChannelsToColorComponents(Channels);
 
             public int Width;
             public int Height;
@@ -61,9 +61,9 @@ namespace IDKEngine
 
         public struct ImageResult : IDisposable
         {
-            public Span<byte> Pixels => new Span<byte>(Memory, Header.SizeInBytes);
+            public readonly Span<byte> Pixels => new Span<byte>(Memory, Header.SizeInBytes);
 
-            public bool IsLoadedSuccesfully => Memory != null;
+            public readonly bool IsLoadedSuccesfully => Memory != null;
 
             public ImageHeader Header;
             public void* Memory;

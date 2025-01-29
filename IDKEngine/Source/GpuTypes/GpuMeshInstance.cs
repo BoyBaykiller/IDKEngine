@@ -15,7 +15,7 @@ namespace IDKEngine.GpuTypes
 
         public Matrix4 ModelMatrix
         {
-            get => MyMath.Matrix3x4ToTransposed4x4(ModelMatrix3x4);
+            readonly get => MyMath.Matrix3x4ToTransposed4x4(ModelMatrix3x4);
 
             set
             {
@@ -23,13 +23,13 @@ namespace IDKEngine.GpuTypes
             }
         }
         
-        public Matrix4 InvModelMatrix => MyMath.Matrix3x4ToTransposed4x4(invModelMatrix3x4);
+        public readonly Matrix4 InvModelMatrix => MyMath.Matrix3x4ToTransposed4x4(invModelMatrix3x4);
         
-        public Matrix4 PrevModelMatrix => MyMath.Matrix3x4ToTransposed4x4(prevModelMatrix3x4);
+        public readonly Matrix4 PrevModelMatrix => MyMath.Matrix3x4ToTransposed4x4(prevModelMatrix3x4);
 
         public Matrix3x4 ModelMatrix3x4
         {
-            get => modelMatrix3x4;
+            readonly get => modelMatrix3x4;
 
             private set
             {
@@ -47,7 +47,7 @@ namespace IDKEngine.GpuTypes
         private readonly float _pad1;
         private readonly float _pad2;
 
-        public bool DidMove()
+        public readonly bool DidMove()
         {
             return prevModelMatrix3x4 != modelMatrix3x4;
         }

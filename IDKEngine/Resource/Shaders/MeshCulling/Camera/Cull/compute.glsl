@@ -24,9 +24,9 @@ void main()
     }
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
-    uint meshID = meshInstance.MeshId;
+    uint meshId = meshInstance.MeshId;
 
-    GpuBlasNode node = blasNodeSSBO.Nodes[meshSSBO.Meshes[meshID].BlasRootNodeOffset];
+    GpuBlasNode node = blasNodeSSBO.Nodes[meshSSBO.Meshes[meshId].BlasRootNodeOffset];
     
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
@@ -55,19 +55,19 @@ void main()
     {
     #if TAKE_MESH_SHADER_PATH_CAMERA
 
-        uint meshletTaskID = atomicAdd(meshletTasksCountSSBO.Count, 1u);
-        visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskID] = meshInstanceID;
+        uint meshletTaskId = atomicAdd(meshletTasksCountSSBO.Count, 1u);
+        visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskId] = meshInstanceID;
         
         const uint taskShaderWorkGroupSize = 32;
-        uint meshletCount = meshSSBO.Meshes[meshID].MeshletCount;
+        uint meshletCount = meshSSBO.Meshes[meshId].MeshletCount;
         uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
-        meshletTaskCmdSSBO.Commands[meshletTaskID].Count = meshletsWorkGroupCount;
+        meshletTaskCmdSSBO.Commands[meshletTaskId].Count = meshletsWorkGroupCount;
 
     #else
 
-        GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
+        GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
 
-        uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshID].InstanceCount, 1u);
+        uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshId].InstanceCount, 1u);
         visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceID;
 
     #endif

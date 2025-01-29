@@ -13,12 +13,12 @@ namespace IDKEngine.Shapes
             Direction = direction;
         }
 
-        public Vector3 At(float t)
+        public readonly Vector3 At(float t)
         {
             return Origin + Direction * t;
         }
 
-        public Ray Transformed(in Matrix4 invModel)
+        public readonly Ray Transformed(in Matrix4 invModel)
         {
             Ray ray = new Ray();
             ray.Origin = (new Vector4(Origin, 1.0f) * invModel).Xyz;

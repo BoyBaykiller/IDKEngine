@@ -31,7 +31,7 @@ namespace IDKEngine.Bvh
 
         private record struct Candidates
         {
-            public int Length => NodeIds.Length;
+            public readonly int Length => NodeIds.Length;
 
             public int[] NodeIds;
             public float[] Costs;
@@ -65,7 +65,7 @@ namespace IDKEngine.Bvh
             this.triangles = triangles;
         }
 
-        private void Optimize(in Settings settings)
+        private readonly void Optimize(in Settings settings)
         {
             Candidates candidatesMem = GetCandidatesMem();
             for (int i = 0; i < settings.Iterations; i++)
@@ -86,7 +86,7 @@ namespace IDKEngine.Bvh
             RestoreTreeQualities();
         }
 
-        private void ReinsertNode(int inId, int outId)
+        private readonly void ReinsertNode(int inId, int outId)
         {
             // See Figure.2 https://meistdan.github.io/publications/prbvh/paper.pdf
 
@@ -124,12 +124,12 @@ namespace IDKEngine.Bvh
             BLAS.RefitFromNode(outId, nodes, parentIds); // Refit new parent of 'in'   
         }
 
-        private Candidates GetCandidatesMem()
+        private readonly Candidates GetCandidatesMem()
         {
             return new Candidates(nodes.Length - 1);
         }
 
-        private Span<int> GetCandidates(Candidates candidates, float percentage)
+        private readonly Span<int> GetCandidates(Candidates candidates, float percentage)
         {
             int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
             if (count == 0) return [];
@@ -140,7 +140,8 @@ namespace IDKEngine.Bvh
                 candidates.NodeIds[i - 1] = i;
             }
 
-            Algorithms.PartialSort<float>(candidates.Costs, count, MyComparer.GreaterThan, (int a, int b) =>
+            Random rng = new Random(42);
+            Algorithms.PartialSort<float>(candidates.Costs, count, rng, MyComparer.GreaterThan, (int a, int b) =>
             {
                 Algorithms.Swap(ref candidates.NodeIds[a], ref candidates.NodeIds[b]);
             });
@@ -149,7 +150,7 @@ namespace IDKEngine.Bvh
             return candidates.NodeIds.AsSpan(0, count);
         }
 
-        private Reinsertion FindReinsertion(int nodeId)
+        private readonly Reinsertion FindReinsertion(int nodeId)
         {
             // Source: https://github.com/madmann91/bvh/blob/3490634ae822e5081e41f09498fcce03bc1419e3/src/bvh/v2/reinsertion_optimizer.h#L107
 
@@ -224,7 +225,7 @@ namespace IDKEngine.Bvh
         /// Makes sure the root always always points to index 1 as its left child and
         /// that primitives of two leafs always form a continuous range in memory.
         /// </summary>
-        private void RestoreTreeQualities()
+        private readonly void RestoreTreeQualities()
         {
             // Always make node 0 point to 1, as this is expected by traversal
             // Always make node 1 point to 3, as this is good memory access
@@ -278,7 +279,7 @@ namespace IDKEngine.Bvh
             newTriIndices.CopyTo(triangles);
         }
 
-        private void SwapChildrenInMem(int inParent, int outParent)
+        private readonly void SwapChildrenInMem(int inParent, int outParent)
         {
             int inLeftChildId = nodes[inParent].TriStartOrChild;
             int inRightChildId = nodes[inParent].TriStartOrChild + 1;

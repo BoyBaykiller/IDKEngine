@@ -106,6 +106,12 @@ namespace IDKEngine.Utils
             }
         }
 
+        public static float HalfArea(Vector3 extends)
+        {
+            float area = (extends.X + extends.Y) * extends.Z + extends.X * extends.Y;
+            return area;
+        }
+
         public static bool AlmostEqual(float a, float b, float epsilon)
         {
             return MathF.Abs(a - b) < epsilon;

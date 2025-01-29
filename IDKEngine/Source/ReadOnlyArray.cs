@@ -4,7 +4,7 @@ namespace IDKEngine
 {
     public record struct ReadOnlyArray<T>
     {
-        public int Length => array.Length;
+        public readonly int Length => array.Length;
 
         private readonly T[] array;
 
@@ -13,7 +13,7 @@ namespace IDKEngine
             this.array = array;
         }
 
-        public ref readonly T this[int index]
+        public readonly ref readonly T this[int index]
         {
             get => ref array[index];
         }

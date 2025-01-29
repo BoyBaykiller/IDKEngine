@@ -57,7 +57,7 @@ namespace IDKEngine.Utils
 
         public record struct Model
         {
-            public Node RootNode => Nodes[0];
+            public readonly Node RootNode => Nodes[0];
             public Node[] Nodes;
 
             public ModelAnimation[] Animations;
@@ -279,7 +279,7 @@ namespace IDKEngine.Utils
 
         public record struct ModelAnimation
         {
-            public float Duration => End - Start;
+            public readonly float Duration => End - Start;
 
             public float Start; // Min of node animations start
             public float End; // Max of node animations end
@@ -288,7 +288,7 @@ namespace IDKEngine.Utils
 
             public NodeAnimation[] NodeAnimations;
 
-            public ModelAnimation DeepClone(ReadOnlySpan<Node> newNodes)
+            public readonly ModelAnimation DeepClone(ReadOnlySpan<Node> newNodes)
             {
                 ModelAnimation animation = new ModelAnimation();
                 animation.Start = Start;
@@ -319,9 +319,9 @@ namespace IDKEngine.Utils
                 Linear = AnimationInterpolationMode.LINEAR,
             }
 
-            public float Start => KeyFramesStart[0];
-            public float End => KeyFramesStart[KeyFramesStart.Length - 1];
-            public float Duration => End - Start;
+            public readonly float Start => KeyFramesStart[0];
+            public readonly float End => KeyFramesStart[KeyFramesStart.Length - 1];
+            public readonly float Duration => End - Start;
 
             public Node TargetNode;
             public AnimationType Type;
@@ -329,7 +329,7 @@ namespace IDKEngine.Utils
             public float[] KeyFramesStart;  // time in seconds from the beginning of the animation when the Keyframe at at that index should be used
             public byte[] RawKeyFramesData; // interpreted differently based on PropertyPath
 
-            public Span<Vector3> GetKeyFrameDataAsVec3()
+            public readonly Span<Vector3> GetKeyFrameDataAsVec3()
             {
                 if (Type != AnimationType.Translation && Type != AnimationType.Scale)
                 {
@@ -339,7 +339,7 @@ namespace IDKEngine.Utils
                 return MemoryMarshal.Cast<byte, Vector3>(RawKeyFramesData);
             }
 
-            public Span<Quaternion> GetKeyFrameDataAsQuaternion()
+            public readonly Span<Quaternion> GetKeyFrameDataAsQuaternion()
             {
                 if (Type != AnimationType.Rotation)
                 {
@@ -349,7 +349,7 @@ namespace IDKEngine.Utils
                 return MemoryMarshal.Cast<byte, Quaternion>(RawKeyFramesData);
             }
 
-            public NodeAnimation DeepClone(ReadOnlySpan<Node> newNodes)
+            public readonly NodeAnimation DeepClone(ReadOnlySpan<Node> newNodes)
             {
                 NodeAnimation sampler = new NodeAnimation();
                 sampler.TargetNode = newNodes[TargetNode.ArrayIndex];
@@ -367,7 +367,7 @@ namespace IDKEngine.Utils
             public Node[] Joints;
             public Matrix4[] InverseJointMatrices;
 
-            public Skin DeepClone(ReadOnlySpan<Node> newNodes)
+            public readonly Skin DeepClone(ReadOnlySpan<Node> newNodes)
             {
                 Skin skin = new Skin();
                 skin.Joints = new Node[Joints.Length];
@@ -385,15 +385,18 @@ namespace IDKEngine.Utils
         {
             public const int TEXTURE_COUNT = (int)TextureType.Count;
 
-            public ref SampledTexture this[TextureType textureType] => ref Unsafe.AsRef(ref SampledTextures[(int)textureType]);
-
             public int HasFallbackPixelsBits;
 
             public SampledTextureArray SampledTextures;
 
-            public bool HasFallbackPixels(TextureType type)
+            public readonly bool GetHasFallbackPixels(TextureType type)
             {
                 return (HasFallbackPixelsBits & (1 << (int)type)) != 0;
+            }
+
+            public void SetHasFallbackPixels(TextureType type, bool value)
+            {
+                Algorithms.SetBit(ref HasFallbackPixelsBits, (int)type, value);
             }
 
             [InlineArray(TEXTURE_COUNT)]
@@ -408,13 +411,13 @@ namespace IDKEngine.Utils
             public GLTexture Texture;
             public GLSampler Sampler;
 
-            public void Deconstruct(out GLTexture texture, out GLSampler sampler)
+            public readonly void Deconstruct(out GLTexture texture, out GLSampler sampler)
             {
                 texture = Texture;
                 sampler = Sampler;
             }
 
-            public void Dispose()
+            public readonly void Dispose()
             {
                 Sampler.Dispose();
                 Texture.Dispose();
@@ -429,7 +432,7 @@ namespace IDKEngine.Utils
 
         public record struct MaterialParams
         {
-            public bool IsThinWalled => ThicknessFactor == 0.0f;
+            public readonly bool IsThinWalled => ThicknessFactor == 0.0f;
 
             public Vector4 BaseColorFactor = new Vector4(1.0f);
             public float RoughnessFactor = 1.0f;
@@ -449,8 +452,6 @@ namespace IDKEngine.Utils
 
         private record struct MaterialDesc
         {
-            public ref SampledImage this[TextureType textureType] => ref Unsafe.AsRef(ref SampledImages[(int)textureType]);
-
             public MaterialParams MaterialParams = new MaterialParams();
             public SampledImageArray SampledImages;
 
@@ -467,7 +468,7 @@ namespace IDKEngine.Utils
 
         private record struct SampledImage
         {
-            public bool HasImage => GltfImage != null;
+            public readonly bool HasImage => GltfImage != null;
 
             public Image GltfImage;
             public GLSampler.SamplerState SamplerState;
@@ -506,9 +507,9 @@ namespace IDKEngine.Utils
 
         private record struct GLTextureLoadData
         {
-            public bool IsKtx2Compressed => Ktx2Texture != null;
-            public int Width => IsKtx2Compressed ? Ktx2Texture.BaseWidth : ImageHeader.Width;
-            public int Height => IsKtx2Compressed ? Ktx2Texture.BaseHeight : ImageHeader.Height;
+            public readonly bool IsKtx2Compressed => Ktx2Texture != null;
+            public readonly int Width => IsKtx2Compressed ? Ktx2Texture.BaseWidth : ImageHeader.Width;
+            public readonly int Height => IsKtx2Compressed ? Ktx2Texture.BaseHeight : ImageHeader.Height;
 
             public GLTexture.InternalFormat InternalFormat;
             public GLSampler.SamplerState SamplerState;
@@ -524,11 +525,11 @@ namespace IDKEngine.Utils
 
         private record struct MeshPrimitiveDesc
         {
-            public bool HasNormalAccessor => NormalAccessor != -1;
-            public bool HasTexCoordAccessor => TexCoordAccessor != -1;
-            public bool HasJointsAccessor => JointsAccessor != -1;
-            public bool HasWeightsAccessor => WeightsAccessor != -1;
-            public bool HasIndexAccessor => IndexAccessor != -1;
+            public readonly bool HasNormalAccessor => NormalAccessor != -1;
+            public readonly bool HasTexCoordAccessor => TexCoordAccessor != -1;
+            public readonly bool HasJointsAccessor => JointsAccessor != -1;
+            public readonly bool HasWeightsAccessor => WeightsAccessor != -1;
+            public readonly bool HasIndexAccessor => IndexAccessor != -1;
 
             public int PositionAccessor;
             public int NormalAccessor = -1;
@@ -726,7 +727,7 @@ namespace IDKEngine.Utils
                     }
                     else
                     {
-                        bool normalMapProvided = !cpuMaterials[gltfMeshPrimitive.Material.LogicalIndex].HasFallbackPixels(TextureType.Normal);
+                        bool normalMapProvided = !cpuMaterials[gltfMeshPrimitive.Material.LogicalIndex].GetHasFallbackPixels(TextureType.Normal);
                         mesh.NormalMapStrength = normalMapProvided ? 1.0f : 0.0f;
                         mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
                     }
@@ -851,16 +852,16 @@ namespace IDKEngine.Utils
                 for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
                 {
                     TextureType textureType = (TextureType)j;
-                    SampledImage sampledImage = materialDesc[textureType];
+                    SampledImage sampledImage = materialDesc.SampledImages[j];
 
-                    int hasFallbackPixels = 0;
+                    bool hasFallbackPixels = false;
                     BindlessSampledTexture bindlessTexture;
                     if (!sampledImage.HasImage)
                     {
                         // By having a pure white fallback we can keep the sampling logic
                         // in shaders the same and still comply to glTF spec
                         bindlessTexture = FallbackTextures.GetWhite();
-                        hasFallbackPixels = 1;
+                        hasFallbackPixels = true;
                     }
                     else if (!uniqueBindlessTextures.TryGetValue(sampledImage, out bindlessTexture))
                     {
@@ -878,12 +879,13 @@ namespace IDKEngine.Utils
                             {
                                 bindlessTexture = FallbackTextures.GetWhite();
                             }
-                            hasFallbackPixels = 1;
+                            hasFallbackPixels = true;
                         }
                     }
 
-                    cpuMaterial.HasFallbackPixelsBits |= hasFallbackPixels << j;
-                    cpuMaterial[textureType] = bindlessTexture.SampledTexture;
+                    cpuMaterial.SetHasFallbackPixels(textureType, hasFallbackPixels);
+
+                    cpuMaterial.SampledTextures[j] = bindlessTexture.SampledTexture;
                     gpuMaterial[(GpuMaterial.TextureType)textureType] = bindlessTexture.BindlessHandle;
                 }
 
@@ -1127,7 +1129,7 @@ namespace IDKEngine.Utils
                     TextureType textureType = TextureType.BaseColor + j;
                     SampledImage sampledImage = GetSampledImage(gltfMaterial, textureType);
 
-                    materialDesc[textureType] = sampledImage;
+                    materialDesc.SampledImages[j] = sampledImage;
                 }
 
                 materialsDesc[i] = materialDesc;

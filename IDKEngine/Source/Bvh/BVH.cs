@@ -69,23 +69,17 @@ namespace IDKEngine.Bvh
             public int MaxTreeDepth;
             public int UnpaddedNodesCount;
 
-            public int NodesEnd => RootNodeOffset + NodeCount;
-            public int LeafIndicesEnd => LeafIndicesOffset + LeafIndicesCount;
+            public readonly int NodesEnd => RootNodeOffset + NodeCount;
+            public readonly int LeafIndicesEnd => LeafIndicesOffset + LeafIndicesCount;
         }
 
         private record struct BlasBuildPhaseData
         {
-            public ref GpuBlasNode Root => ref Nodes[0];
+            public readonly ref GpuBlasNode Root => ref Nodes[0];
 
             public GpuBlasNode[] Nodes;
             public int[] ParentIds;
             public int[] LeafIds;
-        }
-
-        private record struct BlasRefittedBounds
-        {
-            public Vector3 Min;
-            public Vector3 Max;
         }
 
         public record struct GeometryDesc
@@ -339,7 +333,7 @@ namespace IDKEngine.Bvh
                     geometry.Triangles[j].Z = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 2]);
                 }
 
-                GpuBlasNode[] nodes = BLAS.AllocateUpperBoundNodes(geometry.TriangleCount);
+                GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(geometry.TriangleCount)];
                 BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
 
                 int nodesUsed = BLAS.Build(ref blas, geometry, buildSettings);
@@ -354,7 +348,7 @@ namespace IDKEngine.Bvh
 
                 // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net-performance
                 // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
-                //ReinsertionOptimizer.Optimize(ref blas, parentIds, geometry.Triangles, optimizationSettings);
+                // ReinsertionOptimizer.Optimize(ref blas, parentIds, geometry.Triangles, optimizationSettings);
 
                 blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
 

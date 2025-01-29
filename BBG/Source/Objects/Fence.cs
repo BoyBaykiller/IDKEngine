@@ -28,12 +28,12 @@ namespace BBOpenGL
                 glFence = glSync;
             }
 
-            public bool TryWait(ulong timeout = 1_000_000_000) // 1s in nanoseconds
+            public readonly bool TryWait(ulong timeout = 1_000_000_000) // 1s in nanoseconds
             {
                 return TryWait(out Status _, timeout);
             }
 
-            public bool TryWait(out Status status, ulong timeout = 1_000_000_000) // 1s in nanoseconds
+            public readonly bool TryWait(out Status status, ulong timeout = 1_000_000_000) // 1s in nanoseconds
             {
                 status = (Status)GL.ClientWaitSync(glFence, SyncObjectMask.SyncFlushCommandsBit, timeout);
                 
@@ -44,7 +44,7 @@ namespace BBOpenGL
                 return true;
             }
 
-            public void Dispose()
+            public readonly void Dispose()
             {
                 GL.DeleteSync(glFence);
             }

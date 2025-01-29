@@ -20,7 +20,7 @@ namespace IDKEngine.GpuTypes
 
         public bool IsLeaf
         {
-            get => isLeafAndChildOrInstanceID >> 31 == 1;
+            readonly get => isLeafAndChildOrInstanceID >> 31 == 1;
 
             set
             {
@@ -31,7 +31,7 @@ namespace IDKEngine.GpuTypes
         
         public uint ChildOrInstanceID
         {
-            get
+            readonly get
             {
                 const uint mask = (1u << 31) - 1;
                 return isLeafAndChildOrInstanceID & mask;

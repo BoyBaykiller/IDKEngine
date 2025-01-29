@@ -4,7 +4,7 @@ namespace IDKEngine.Shapes
 {
     public record struct Sphere
     {
-        public float RadiusSquared => Radius * Radius;
+        public readonly float RadiusSquared => Radius * Radius;
 
         public Vector3 Center;
         public float Radius;

@@ -10,7 +10,7 @@ namespace IDKEngine.GpuTypes
         public Vector3 Max;
         public int TriCount;
 
-        public bool IsLeaf => TriCount > 0;
+        public readonly bool IsLeaf => TriCount > 0;
 
         public void SetBounds(in Box box)
         {
@@ -18,7 +18,7 @@ namespace IDKEngine.GpuTypes
             Max = box.Max;
         }
 
-        public float HalfArea()
+        public readonly float HalfArea()
         {
             Vector3 size = Max - Min;
             float area = (size.X + size.Y) * size.Z + size.X * size.Y;
