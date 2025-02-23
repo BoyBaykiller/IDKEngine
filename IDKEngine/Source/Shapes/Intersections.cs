@@ -387,9 +387,9 @@ namespace IDKEngine.Shapes
             bary.X = 1.0f - bary.Y - bary.Z;
 
             t = Vector3.Dot(-normal, rov0) / x;
-
             return bary.X >= 0.0f && bary.Y >= 0.0f && bary.Z >= 0.0f && t > 0.0f;
         }
+
         public static bool MovingSphereVsSphere(in Sphere sphereA, Vector3 sphereAPrevPos, in Sphere sphereB, Vector3 sphereBPrevPos, out float t1, out float t2, out float tScale)
         {
             t1 = 0.0f;

@@ -255,9 +255,9 @@ With this method you can have your textures gradually load in at run-time withou
 
 ![Asynchronus Textures Loading](Screenshots/Articles/TextureLoad.gif)
 
-The technique works like this:
+For every image the technique does:
 
-0. Get image extends & channels (main thread)
+0. Calculate decoded size from dimensions and number of channels (main thread)
 1. Allocate "staging buffer" to store pixels (main thread)
 2. Decode image and copy the pixels into staging buffer (worker thread)
 3. Transfer pixels from staging buffer into texture (main thread)

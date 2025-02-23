@@ -407,6 +407,7 @@ namespace IDKEngine
             Camera.SetPrevToCurrentPosition();
         }
 
+
         protected override unsafe void OnStart()
         {
             BBG.Initialize(Helper.GLDebugCallback);
@@ -478,7 +479,7 @@ namespace IDKEngine
                 //sponza.GpuModel.Meshes[46].SpecularBias = 1.0f;
                 //sponza.GpuModel.Meshes[46].RoughnessBias = -0.436f; // -0.665
                 //sponza.GpuModel.Meshes[46].NormalMapStrength = 0.0f;
-                
+
                 ModelLoader.Model lucy = ModelLoader.LoadGltfFromFile("Resource/Models/LucyCompressed/Lucy.gltf", new Transformation().WithScale(0.8f).WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-1.68f, 2.3f, 0.0f).GetMatrix()).Value;
                 lucy.GpuModel.Meshes[0].SpecularBias = -1.0f;
                 lucy.GpuModel.Meshes[0].TransmissionBias = 0.98f;
@@ -496,7 +497,7 @@ namespace IDKEngine
                 //ModelLoader.Model plane = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
 
                 ModelManager.Add(sponza, lucy, helmet);
-                
+
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
@@ -519,7 +520,7 @@ namespace IDKEngine
                 //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
                 //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
                 //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-                ModelManager.Add(a);
+                ModelManager.Add(a, b);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -554,7 +555,7 @@ namespace IDKEngine
             gui.PressChar(key);
         }
 
-        protected override void OnFilesDrop(string[] paths)
+        protected override void OnFilesDrop(ReadOnlySpan<string> paths)
         {
             for (int i = 0; i < paths.Length; i++)
             {

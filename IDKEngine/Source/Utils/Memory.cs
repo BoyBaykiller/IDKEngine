@@ -4,12 +4,12 @@ namespace IDKEngine.Utils
 {
     public static unsafe class Memory
     {
-        public static T* Malloc<T>(nint count = 1) where T : unmanaged
+        public static T* Alloc<T>(nint count = 1) where T : unmanaged
         {
             return (T*)NativeMemory.Alloc((nuint)(sizeof(T) * count));
         }
 
-        public static T* Malloc<T>(int count = 1) where T : unmanaged
+        public static T* Alloc<T>(int count = 1) where T : unmanaged
         {
             return (T*)NativeMemory.Alloc((nuint)(sizeof(T) * count));
         }

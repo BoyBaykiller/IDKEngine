@@ -354,7 +354,7 @@ namespace BBOpenGL
                     else
                     {
                         Logger.Log(Logger.LogLevel.Warn, """
-                            If you see this message (#line \"filename\") is not supported and errors in
+                            #line \"filename\" is not supported and errors in
                             included GLSL shader code will not have the correct filename. The line will still be correct.
                             """);
 

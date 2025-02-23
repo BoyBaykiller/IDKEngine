@@ -104,7 +104,7 @@ void main()
     }
 
     OutFragColor = vec4((directLighting + indirectLight) + emissive, 1.0);
-    // OutFragColor = vec4(normal * 0.5 + 0.5, 1.0);
+    // OutFragColor = vec4(alpha);
 }
 
 vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion)

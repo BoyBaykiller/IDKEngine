@@ -26,6 +26,7 @@ namespace Program
                 }
                 catch (Exception ex)
                 {
+                    Logger.Log(Logger.LogLevel.Fatal, ex.StackTrace);
                     Logger.Log(Logger.LogLevel.Fatal, ex.Message);
                 }
             }

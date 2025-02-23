@@ -1316,21 +1316,27 @@ namespace IDKEngine.Render
             guiBackend.Dispose();
         }
 
+        //private static void Test(Application app)
+        //{
+        //    System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+        //    OtkVec2 res = app.RenderResolution;
+        //    for (int y = 0; y < res.Y; y++)
+        //    {
+        //        int localY = y;
+        //        Parallel.For(0, app.RenderResolution.X, x =>
+        //        //for (int x = 0; x < res.X; x++)
+        //        {
+        //            OtkVec2 ndc = new OtkVec2(x, localY) / res * 2.0f - new OtkVec2(1.0f);
+        //            Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.PerFrameData.CameraPos, app.PerFrameData.InvProjection, app.PerFrameData.InvView, ndc);
+        //            app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
+        //        });
+        //    }
+        //    Console.WriteLine(sw.ElapsedMilliseconds);
+        //}
+
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray, out float t)
         {
-            //Stopwatch sw = Stopwatch.StartNew();
-            //for (int y = 0; y < app.RenderResolution.Y; y++)
-            //{
-            //    int localY = y;
-            //    Parallel.For(0, app.RenderResolution.X, x =>
-            //    {
-            //        OtkVec2 ndc = new OtkVec2(x, localY) / app.PresentationResolution * 2.0f - new OtkVec2(1.0f);
-            //        Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.PerFrameData.CameraPos, app.PerFrameData.InvProjection, app.PerFrameData.InvView, ndc);
-            //        app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
-
-            //    });
-            //}
-            //Console.WriteLine(sw.ElapsedMilliseconds);
+            //Test(app);
 
             t = float.MaxValue;
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);

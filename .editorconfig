@@ -27,6 +27,10 @@ dotnet_diagnostic.CS9192.severity = error
 # CS9193: Argument should be a variable because it is passed to a 'ref readonly' parameter
 dotnet_diagnostic.CS9193.severity = error
 
+# I'd rather not do this but C# makes me in order to achieve good performance. For example when sorting.
+# CS8500: This takes the address of, gets the size of, or declares a pointer to a managed type
+dotnet_diagnostic.CS8500.severity = none
+
 ########################
 ## Code quality rules ##
 ########################

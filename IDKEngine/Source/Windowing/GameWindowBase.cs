@@ -215,7 +215,7 @@ namespace IDKEngine.Windowing
         protected abstract void OnStart();
         protected abstract void OnWindowResize();
         protected abstract void OnKeyPress(uint key);
-        protected abstract void OnFilesDrop(string[] paths);
+        protected abstract void OnFilesDrop(ReadOnlySpan<string> paths);
 
 
         private readonly GLFWCallbacks.FramebufferSizeCallback framebufferSizeFuncPtr;
@@ -251,7 +251,7 @@ namespace IDKEngine.Windowing
         private readonly GLFWCallbacks.DropCallback windowDropCallback;
         private void WindowDropCallback(Window* window, int count, byte** paths)
         {
-            string[] strings = new string[count];
+            Span<string> strings = new string[count];
             for (int i = 0; i < count; i++)
             {
                 strings[i] = Marshal.PtrToStringAnsi((nint)paths[i]);

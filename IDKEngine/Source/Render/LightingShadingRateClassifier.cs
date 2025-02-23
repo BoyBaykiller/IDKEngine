@@ -111,14 +111,6 @@ namespace IDKEngine.Render
             debugTexture.Allocate(Result.Width, Result.Height, 1, BBG.Texture.InternalFormat.R32Float);
         }
 
-        public void Dispose()
-        {
-            Result.Dispose();
-            debugTexture.Dispose();
-            shaderProgram.Dispose();
-            debugProgram.Dispose();
-        }
-
         public BBG.Rendering.VariableRateShadingNV GetRenderData()
         {
             return new BBG.Rendering.VariableRateShadingNV()
@@ -126,6 +118,14 @@ namespace IDKEngine.Render
                 ShadingRateImage = Result,
                 ShadingRatePalette = ShadingRatePalette,
             };
+        }
+
+        public void Dispose()
+        {
+            Result.Dispose();
+            debugTexture.Dispose();
+            shaderProgram.Dispose();
+            debugProgram.Dispose();
         }
     }
 }

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections;
+using System.Runtime.Intrinsics;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
@@ -13,7 +15,7 @@ namespace IDKEngine.Bvh
     /// Implementation of "Sweep SAH" in "Bonsai: Rapid Bounding Volume Hierarchy Generation using Mini Trees"
     /// https://jcgt.org/published/0004/03/02/paper-lowres.pdf
     /// </summary>
-    public static class BLAS
+    public static unsafe class BLAS
     {
         public record struct BuildSettings
         {
@@ -58,11 +60,11 @@ namespace IDKEngine.Bvh
                 return GetTriangle(Triangles[index]);
             }
 
-            public readonly Triangle GetTriangle(in IndicesTriplet triangles)
+            public readonly Triangle GetTriangle(in IndicesTriplet indices)
             {
-                ref readonly Vector3 p0 = ref VertexPositions[triangles.X];
-                ref readonly Vector3 p1 = ref VertexPositions[triangles.Y];
-                ref readonly Vector3 p2 = ref VertexPositions[triangles.Z];
+                ref readonly Vector3 p0 = ref VertexPositions[indices.X];
+                ref readonly Vector3 p1 = ref VertexPositions[indices.Y];
+                ref readonly Vector3 p2 = ref VertexPositions[indices.Z];
 
                 return new Triangle(p0, p1, p2);
             }
@@ -119,6 +121,13 @@ namespace IDKEngine.Bvh
                     newRightNode.TriStartOrChild = partitionPivot;
                     newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
                     newRightNode.SetBounds(ComputeBoundingBox(newRightNode.TriStartOrChild, newRightNode.TriCount, buildData));
+
+                    //Vector3 ext = Box.GetOverlappingExtends(Conversions.ToBox(newRightNode), Conversions.ToBox(newLeftNode));
+                    //float area = MyMath.HalfArea(ext);
+                    //if (area < 0.0f)
+                    //{
+                    //    Console.WriteLine(area);
+                    //}
 
                     int leftNodeId = nodesUsed + 0;
                     int rightNodeId = nodesUsed + 1;
@@ -429,7 +438,7 @@ namespace IDKEngine.Bvh
             return Math.Max(2 * triangleCount - 1, 3);
         }
 
-        private static int? TrySplit(in GpuBlasNode parentNode, BuildData buildData, in BuildSettings settings)
+        private static int? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, in BuildSettings settings)
         {
             if (parentNode.TriCount <= settings.MinLeafTriangleCount)
             {
@@ -438,6 +447,8 @@ namespace IDKEngine.Bvh
 
             int triStart = parentNode.TriStartOrChild;
             int triEnd = triStart + parentNode.TriCount;
+            float parentArea = parentNode.HalfArea();
+
             float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleCost);
 
             int triPivot = 0;
@@ -452,8 +463,7 @@ namespace IDKEngine.Bvh
                     rightBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
 
                     int triCount = triEnd - i;
-                    float areaParent = parentNode.HalfArea();
-                    float probHitRightChild = rightBoxAccum.HalfArea() / areaParent;
+                    float probHitRightChild = rightBoxAccum.HalfArea() / parentArea;
                     float rightCost = probHitRightChild * CostLeafNode(triCount, settings.TriangleCost);
 
                     buildData.RightCostsAccum[i] = rightCost;
@@ -479,8 +489,7 @@ namespace IDKEngine.Bvh
                     // https://www.nvidia.in/docs/IO/77714/sbvh.pdf 2.1 BVH Construction
                     int triIndex = i + 1;
                     int triCount = triIndex - triStart;
-                    float areaParent = parentNode.HalfArea();
-                    float probHitLeftChild = leftBoxAccum.HalfArea() / areaParent;
+                    float probHitLeftChild = leftBoxAccum.HalfArea() / parentArea;
 
                     float leftCost = probHitLeftChild * CostLeafNode(triCount, settings.TriangleCost);
                     float rightCost = buildData.RightCostsAccum[i + 1];
@@ -538,16 +547,9 @@ namespace IDKEngine.Bvh
                 buildData.TriMarks[buildData.TrisAxesSorted[splitAxis][i]] = false;
             }
 
-            int[] partitionAux = new int[triEnd - triStart];
-            for (int axis = 0; axis < 3; axis++)
-            {
-                if (axis == splitAxis)
-                {
-                    continue;
-                }
-
-                Algorithms.StablePartition(buildData.TrisAxesSorted[axis].AsSpan(triStart, triEnd - triStart), partitionAux, buildData.TriMarks);
-            }
+            int[] partitionAux = new int[triEnd - triPivot];
+            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 1) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
+            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 2) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
 
             return triPivot;
         }
@@ -604,18 +606,12 @@ namespace IDKEngine.Bvh
             for (int axis = 0; axis < 3; axis++)
             {
                 Span<int> tris = buildData.TrisAxesSorted[axis];
-
                 Helper.FillIncreasing(tris);
 
-                tris.Sort((int a, int b) =>
-                {
-                    float centroidA = triCentroids[axis][a];
-                    float centroidB = triCentroids[axis][b];
+                Span<float> triCentroidsForAxis = triCentroids[axis];
+                SortingInt.PtrTriCentroidsForAxis = &triCentroidsForAxis;
 
-                    if (centroidA > centroidB) return 1;
-                    if (centroidA == centroidB) return 0;
-                    return -1;
-                });
+                MemoryMarshal.Cast<int, SortingInt>(tris).Sort();
             }
 
             return buildData;
@@ -636,6 +632,27 @@ namespace IDKEngine.Bvh
         private static float CostLeafNode(int numTriangles, float triangleCost)
         {
             return numTriangles * triangleCost;
+        }
+
+        /// <summary>
+        /// Needed to avoid virtual function call with Delegate or IComparer<T> and enable inlining
+        /// </summary>
+        private struct SortingInt : IComparable<SortingInt>
+        {
+            private readonly int index;
+
+            [ThreadStatic]
+            public static Span<float>* PtrTriCentroidsForAxis;
+
+            public readonly int CompareTo(SortingInt other)
+            {
+                float centroidA = (*PtrTriCentroidsForAxis)[index];
+                float centroidB = (*PtrTriCentroidsForAxis)[other.index];
+
+                if (centroidA > centroidB) return 1;
+                if (centroidA < centroidB) return -1;
+                return 0;
+            }
         }
 
         [InlineArray(3)]

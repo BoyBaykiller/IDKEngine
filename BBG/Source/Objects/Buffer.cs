@@ -51,7 +51,11 @@ namespace BBOpenGL
                 MappedCoherent = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapCoherentBit | BufferStorageMask.MapReadBit | BufferStorageMask.MapWriteBit,
 
                 /// <summary>
-                /// Same as <see cref="MappedIncoherent"/> except that it's write-only AND leverages ReBAR/SAM on AMD drivers. <br/>
+                /// Same as <see cref="MappedIncoherent"/> except that it's write-only AND leverages ReBAR/SAM on AMD (and NVIDIA?) drivers. <br/>
+                /// Read buffers are placed in HOST mem by AMD (and NVIIDA?) drivers because:
+                /// 1. "there is a massive CPU performance penalty, on the level of 2 to 3 orders of magnitude if you issue a CPU instruction to read from DEVICE_LOCAL"
+                /// 2. "there exists poorly programmed OGL apps who call MapBuffer and similar with flags thats do not properly indicate the app is going to read that memory via CPU"
+                /// 3. "out of caution for these apps we default to HOST memory"
                 /// </summary>
                 MappedCoherentWriteOnlyReBAR = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapCoherentBit | BufferStorageMask.MapWriteBit,
 

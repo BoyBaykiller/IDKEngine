@@ -1,12 +1,11 @@
 ﻿using System.Runtime.Intrinsics;
-using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
+using IDKEngine.Utils;
 using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Shapes
 {
-    [StructLayout(LayoutKind.Explicit)]
     public record struct Box
     {
         public readonly Vector3 this[int index]
@@ -17,21 +16,20 @@ namespace IDKEngine.Shapes
                 bool isMaxX = (index & 1) != 0;
                 bool isMaxY = (index & 2) != 0;
                 bool isMaxZ = (index & 4) != 0;
-                return new Vector3(isMaxX ? Max.X : Min.X, isMaxY ? Max.Y : Min.Y, isMaxZ ? Max.Z : Min.Z);
+                return new Vector3(isMaxX ? SimdMax[0] : SimdMin[0], isMaxY ? SimdMax[1] : SimdMin[1], isMaxZ ? SimdMax[2] : SimdMin[2]);
             }
         }
 
+        public readonly Vector3 Min => SimdMin.ToOpenTK();
+        public readonly Vector3 Max => SimdMax.ToOpenTK();
 
-        [FieldOffset(0)] public Vector3 Min;
-        [FieldOffset(16)] public Vector3 Max;
-
-        [FieldOffset(0)] public Vector128<float> SimdMin;
-        [FieldOffset(16)] public Vector128<float> SimdMax;
+        public Vector128<float> SimdMin;
+        public Vector128<float> SimdMax;
 
         public Box(Vector3 min, Vector3 max)
         {
-            Min = min;
-            Max = max;
+            SimdMin = Vector128.Create(min.X, min.Y, min.Z, 0.0f);
+            SimdMax = Vector128.Create(max.X, max.Y, max.Z, 0.0f);
         }
 
         public void GrowToFit(in Vector128<float> point)
@@ -72,12 +70,19 @@ namespace IDKEngine.Shapes
 
         public readonly Vector3 Center()
         {
-            return (Max + Min) * 0.5f;
+            return ((SimdMax + SimdMin) * 0.5f).ToOpenTK();
         }
 
         public readonly Vector3 Size()
         {
-            return Max - Min;
+            return SimdSize().ToOpenTK();
+        }
+
+        public readonly Vector128<float> SimdSize()
+        {
+            // Unfortunately Simd.ToOpenTK() adds overhead because return value is stored on stack, see if this is fixed in NET10
+
+            return SimdMax - SimdMin;
         }
 
         public readonly Vector3 HalfSize()
@@ -90,11 +95,13 @@ namespace IDKEngine.Shapes
             Vector3 size = Size();
             return size.X * size.Y * size.Z;
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)] // It's small and called in hot loop
         public readonly float HalfArea()
         {
-            Vector3 size = Size();
-            float area = (size.X + size.Y) * size.Z + size.X * size.Y;
+            Vector128<float> size = SimdSize();
+            float area = (size[0] + size[1]) * size[2] + size[0] * size[1];
+
             return area;
         }
 
@@ -114,19 +121,8 @@ namespace IDKEngine.Shapes
             return newBox;
         }
 
-        public static Vector3 GetOverlappingExtends(in Box a, in Box b)
-        {
-            Box boundingBox = a;
-            boundingBox.GrowToFit(b);
-
-            Vector3 addedSize = a.Size() + b.Size();
-            Vector3 extends = addedSize - boundingBox.Size();
-
-            return extends;
-        }
-
-        // Does not get inlined even though it's small and tends be a size decreasing inline
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)] // It's small and tends be a size decreasing inline
         public static Box Empty()
         {
             Box box = new Box();

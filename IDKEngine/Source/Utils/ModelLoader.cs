@@ -1,5 +1,4 @@
-﻿#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type. Workarround to C# Lambda-Functions skill issue
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -228,16 +227,13 @@ namespace IDKEngine.Utils
                 }
             }
 
-            public static void HierarchyToArray(Node parent, ReadOnlySpan<Node> nodes)
+            public static void HierarchyToArray(Node parent, Span<Node> nodes)
             {
-                fixed (Node* ptrNodes = nodes)
+                Span<Node>* ptrNodes = &nodes;
+                Traverse(parent, (node) =>
                 {
-                    Node* copyPtrNodes = ptrNodes;
-                    Traverse(parent, (node) =>
-                    {
-                        copyPtrNodes[node.ArrayIndex] = node;
-                    });
-                }
+                    (*ptrNodes)[node.ArrayIndex] = node;
+                });
             }
         }
 

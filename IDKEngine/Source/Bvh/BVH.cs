@@ -333,10 +333,26 @@ namespace IDKEngine.Bvh
                     geometry.Triangles[j].Z = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 2]);
                 }
 
+                //System.IO.File.WriteAllBytes("vertices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.VertexPositions));
+                //System.IO.File.WriteAllBytes("indices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.Triangles));
+
                 GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(geometry.TriangleCount)];
                 BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
 
+                //float avg = 0.0f;
+                //for (int j = 0; j < 10; j++)
+                //{
+                //    swBuilding = Stopwatch.StartNew();
+                //    BLAS.Build(ref blas, geometry, buildSettings);
+                //    if (j >= 3)
+                //    {
+                //        avg += swBuilding.ElapsedMilliseconds;
+                //    }
+                //}
+                //Console.WriteLine($"Avg = {avg / 7.0f}");
+
                 int nodesUsed = BLAS.Build(ref blas, geometry, buildSettings);
+
                 blasDesc.NodeCount = nodesUsed;
                 blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;
 

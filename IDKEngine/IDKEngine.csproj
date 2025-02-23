@@ -7,7 +7,6 @@
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
     <Nullable>disable</Nullable>
-    <PublishAOT>true</PublishAOT>
 
     <!-- 
     https://learn.microsoft.com/en-us/dotnet/core/runtime-config/compilation#quick-jit
@@ -15,13 +14,19 @@
     It doubles the time spent on building BLASes for Sponza+Helmet+Lucy on application load.
     On the other hand it increase performance for parallel BLAS refitting.
     The first-dispatch overhead of QuickJIT only exists when no precompiled code is given as a basis with the "ReadyToRun"-feature.
-    I don't think tiered compilation has any effect when NativeAOT is used since there is no JIT in that case.
+    Tiered compilation has no effect when NativeAOT is used since all code is precompiled.
     -->
     <TieredCompilation>true</TieredCompilation> <!-- True by default-->
-    <TieredCompilationQuickJit>false</TieredCompilationQuickJit> <!-- True by default-->
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit><!-- True by default-->
+    <TieredCompilationQuickJitForLoops>false</TieredCompilationQuickJitForLoops> <!-- False by default-->
 
-    <!--<OptimizationPreference>Speed</OptimizationPreference>-->
-    <!--<IlcInstructionSet>avx2</IlcInstructionSet>-->
+    <!--<PublishAOT>true</PublishAOT>-->
+    <OptimizationPreference>Speed</OptimizationPreference> 
+    <IlcInstructionSet>avx2</IlcInstructionSet> 
+
+    <!--<StackTraceSupport>false</StackTraceSupport>-->
+    <!--<InvariantGlobalization>true</InvariantGlobalization>-->
+    <!--<UseSystemResourceKeys>true</UseSystemResourceKeys>-->
     <!--<IlcDisableReflection>true</IlcDisableReflection>-->
 
   </PropertyGroup>

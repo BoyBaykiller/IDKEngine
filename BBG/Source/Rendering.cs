@@ -16,7 +16,7 @@ namespace BBOpenGL
                 // https://interactive.arm.com/story/the-arm-manga-guide-to-the-mali-gpu/
 
                 /// <summary>
-                /// This is a no-op. On tiler GPUs it makes the driver do a full screen copy from image memory to tile memory which is bad.
+                /// On tiler GPUs it makes the driver do a full screen copy from image memory to tile memory which is bad.
                 /// On Desktop GPUs this does nothing.
                 /// </summary>
                 Load,

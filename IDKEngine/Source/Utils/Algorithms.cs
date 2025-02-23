@@ -1,11 +1,127 @@
 ﻿using System;
 using System.Collections;
+using System.Diagnostics;
+using System.Runtime.Intrinsics.X86;
+using System.Runtime.CompilerServices;
 
 namespace IDKEngine.Utils
 {
     public static class Algorithms
     {
         public delegate bool Predicate<T>(in T v);
+
+        public static uint FloatToKey(float value)
+        {
+            // Integer comparisons between numbers returned from this function behave
+            // as if the origional float values where compared.
+            // Simple reinterpretation works only for [0, ...], but this also handles negatives
+
+            //return Unsafe.BitCast<float, uint>(value);
+
+            unchecked
+            {
+                // 1. Always flip the sign bit.
+                // 2. If the sign bit was set, flip the other bits too.
+                // Note: We do right shift on an int, meaning arithmetic shift
+
+                uint f = Unsafe.BitCast<float, uint>(value);
+                uint mask = (uint)((int)f >> 31 | (1 << 31));
+
+                return f ^ mask;
+            }
+        }
+
+        public static unsafe void RadixSort<T>(Span<T> input, Span<T> output, Func<T, uint> getKey)
+        {
+            Debug.Assert(input.Length == output.Length);
+
+            // http://stereopsis.com/radix.html
+
+            const int radixSize = 11;
+            const int binSize = 1 << radixSize;
+            const int mask = binSize - 1;
+            const int passes = 3;
+
+            // We don't use Span<int> here because:
+            // 1. Even though it could, the JIT currently does not elide all bound checks: https://github.com/dotnet/runtime/issues/112725
+            // 2. Constant offsets are not baked into address calculation: https://discord.com/channels/143867839282020352/312132327348240384/1342254292995801100
+            // 3. Local functions can't capture Span<T>: https://discord.com/channels/143867839282020352/312132327348240384/1336514607493283881
+            int* prefixSum = stackalloc int[binSize * passes];
+            
+            // Compute histogram for all passes
+            for (int i = 0; i < input.Length; i++)
+            {
+                Sse.Prefetch0(Unsafe.AsPointer(ref input[i]));
+
+                uint key = getKey(input[i]);
+
+                int radix0 = (int)(key >> 0 * radixSize & mask);
+                int radix1 = (int)(key >> 1 * radixSize & mask);
+                int radix2 = (int)(key >> 2 * radixSize & mask);
+
+                prefixSum[radix0 + 0u * binSize]++;
+                prefixSum[radix1 + 1u * binSize]++;
+                prefixSum[radix2 + 2u * binSize]++;
+            }
+
+            // Compute prefix sum for all passes
+            {
+                int sum0 = 0, sum1 = 0, sum2 = 0;
+                for (int i = 0; i < binSize; i++)
+                {
+                    int temp0 = prefixSum[i + 0u * binSize];
+                    int temp1 = prefixSum[i + 1u * binSize];
+                    int temp2 = prefixSum[i + 2u * binSize];
+
+                    prefixSum[i + 0u * binSize] = sum0;
+                    prefixSum[i + 1u * binSize] = sum1;
+                    prefixSum[i + 2u * binSize] = sum2;
+
+                    sum0 += temp0;
+                    sum1 += temp1;
+                    sum2 += temp2;
+                }
+            }
+
+            // Sort from LSB to MSB in radix-sized steps
+            for (int i = 0; i < 3; i++)
+            {
+                int j = 0;
+                for (; j < input.Length - 3; j += 4)
+                {
+                    T t0 = input[j + 0];
+                    T t1 = input[j + 1];
+                    T t2 = input[j + 2];
+                    T t3 = input[j + 3];
+
+                    uint key0 = getKey(t0);
+                    uint key1 = getKey(t1);
+                    uint key2 = getKey(t2);
+                    uint key3 = getKey(t3);
+
+                    output[GetOffset(key0, i)] = t0;
+                    output[GetOffset(key1, i)] = t1;
+                    output[GetOffset(key2, i)] = t2;
+                    output[GetOffset(key3, i)] = t3;
+                }
+                for (; (uint)j < (uint)input.Length; j++)
+                {
+                    T t0 = input[j];
+                    uint key0 = getKey(t0);
+                    output[GetOffset(key0, i)] = t0;
+                }
+
+                Swap(ref input, ref output);
+            }
+
+            int GetOffset(uint key, int pass)
+            {
+                uint radix = (key >> (pass * radixSize)) & mask;
+                int offset = prefixSum[radix + pass * binSize]++;
+
+                return offset;
+            }
+        }
 
         /// <summary>
         /// Searches for the first element in the array which is not ordered before value. Runs in O(log N).
@@ -85,7 +201,7 @@ namespace IDKEngine.Utils
         public static int Partition<T>(Span<T> arr, int start, int end, Predicate<T> func, Action<int, int> onSwap = null)
         {
             arr = arr.Slice(start, end - start);
-            return Partition(arr, func, onSwap) + start;
+            return start + Partition(arr, func, onSwap);
         }
 
         /// <summary>
@@ -120,26 +236,33 @@ namespace IDKEngine.Utils
             return start;
         }
 
+        public static int StablePartition(Span<int> source, int start, int end, Span<int> auxiliary, BitArray bitArray)
+        {
+            source = source.Slice(start, end - start);
+            return start + StablePartition(source, auxiliary, bitArray);
+        }
+
         /// <summary>
-        /// Reorders the integers in such a way that all elements for which bitArray[arr[i]] is true
-        /// precede the integers for which it is false. Relative order of the elements is preserved.
+        /// Reorders the integers in such a way that all elements for which bitArray[arr[i]]==flag
+        /// precede the integers for which it is not. Relative order of the elements is preserved.
+        /// Auxiliary must be able to hold as many elements as bitArray has false entries
         /// Equivalent to std::stable_partition
         /// </summary>
-        /// <param name="arr"></param>
+        /// <param name="source"></param>
         /// <param name="auxiliary"></param>
         /// <param name="bitArray"></param>
         /// <returns></returns>
-        public static int StablePartition(Span<int> arr, Span<int> auxiliary, BitArray bitArray)
+        public static int StablePartition(Span<int> source, Span<int> auxiliary, BitArray bitArray)
         {
             int lCounter = 0;
             int rCounter = 0;
 
-            for (int i = 0; i < arr.Length; i++)
+            for (int i = 0; i < source.Length; i++)
             {
-                int id = arr[i];
+                int id = source[i];
                 if (bitArray[id])
                 {
-                    arr[lCounter++] = id;
+                    source[lCounter++] = id;
                 }
                 else
                 {
@@ -147,12 +270,12 @@ namespace IDKEngine.Utils
                 }
             }
 
-            Memory.CopyElements(ref auxiliary[0], ref arr[lCounter], arr.Length - lCounter);
+            Memory.CopyElements(ref auxiliary[0], ref source[lCounter], rCounter);
 
             return lCounter;
         }
 
-        public static void Swap<T>(ref T a, ref T b)
+        public static void Swap<T>(ref T a, ref T b) where T : allows ref struct
         {
             T temp = a;
             a = b;

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
@@ -147,6 +148,10 @@ namespace IDKEngine.Utils
         {
             return Unsafe.BitCast<System.Numerics.Vector3, Vector3>(vector3);
         }
+        public static Vector3 ToOpenTK(this Vector128<float> vector128)
+        {
+            return vector128.AsVector3().ToOpenTK();
+        }
 
         public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
         {
@@ -212,7 +217,7 @@ namespace IDKEngine.Utils
         {
             int nChannels = 3;
 
-            byte* pixels = Memory.Malloc<byte>(texture.Width * texture.Height * nChannels);
+            byte* pixels = Memory.Alloc<byte>(texture.Width * texture.Height * nChannels);
             texture.Download(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
             
             using FileStream fileStream = File.OpenWrite($"{path}.jpg");
