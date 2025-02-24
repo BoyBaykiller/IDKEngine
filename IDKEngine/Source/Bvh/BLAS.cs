@@ -603,15 +603,17 @@ namespace IDKEngine.Bvh
                 buildData.TriBounds[i] = Box.From(tri);
             }
 
+            int[] auxRadixSort = new int[geometry.TriangleCount];
             for (int axis = 0; axis < 3; axis++)
             {
-                Span<int> tris = buildData.TrisAxesSorted[axis];
-                Helper.FillIncreasing(tris);
+                Span<int> input = auxRadixSort;
+                Span<int> output = buildData.TrisAxesSorted[axis];
 
-                Span<float> triCentroidsForAxis = triCentroids[axis];
-                SortingInt.PtrTriCentroidsForAxis = &triCentroidsForAxis;
-
-                MemoryMarshal.Cast<int, SortingInt>(tris).Sort();
+                Helper.FillIncreasing(input);
+                Algorithms.RadixSort(input, output, (int value) =>
+                {
+                    return Algorithms.FloatToKey(triCentroids[axis][value]);
+                });
             }
 
             return buildData;
@@ -632,27 +634,6 @@ namespace IDKEngine.Bvh
         private static float CostLeafNode(int numTriangles, float triangleCost)
         {
             return numTriangles * triangleCost;
-        }
-
-        /// <summary>
-        /// Needed to avoid virtual function call with Delegate or IComparer<T> and enable inlining
-        /// </summary>
-        private struct SortingInt : IComparable<SortingInt>
-        {
-            private readonly int index;
-
-            [ThreadStatic]
-            public static Span<float>* PtrTriCentroidsForAxis;
-
-            public readonly int CompareTo(SortingInt other)
-            {
-                float centroidA = (*PtrTriCentroidsForAxis)[index];
-                float centroidB = (*PtrTriCentroidsForAxis)[other.index];
-
-                if (centroidA > centroidB) return 1;
-                if (centroidA < centroidB) return -1;
-                return 0;
-            }
         }
 
         [InlineArray(3)]

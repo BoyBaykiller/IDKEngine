@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Diagnostics;
-using System.Runtime.Intrinsics.X86;
 using System.Runtime.CompilerServices;
 
 namespace IDKEngine.Utils
@@ -13,7 +12,7 @@ namespace IDKEngine.Utils
         public static uint FloatToKey(float value)
         {
             // Integer comparisons between numbers returned from this function behave
-            // as if the origional float values where compared.
+            // as if the original float values where compared.
             // Simple reinterpretation works only for [0, ...], but this also handles negatives
 
             //return Unsafe.BitCast<float, uint>(value);
@@ -33,9 +32,9 @@ namespace IDKEngine.Utils
 
         public static unsafe void RadixSort<T>(Span<T> input, Span<T> output, Func<T, uint> getKey)
         {
-            Debug.Assert(input.Length == output.Length);
-
             // http://stereopsis.com/radix.html
+
+            Debug.Assert(input.Length == output.Length);
 
             const int radixSize = 11;
             const int binSize = 1 << radixSize;
@@ -51,17 +50,11 @@ namespace IDKEngine.Utils
             // Compute histogram for all passes
             for (int i = 0; i < input.Length; i++)
             {
-                Sse.Prefetch0(Unsafe.AsPointer(ref input[i]));
-
                 uint key = getKey(input[i]);
 
-                int radix0 = (int)(key >> 0 * radixSize & mask);
-                int radix1 = (int)(key >> 1 * radixSize & mask);
-                int radix2 = (int)(key >> 2 * radixSize & mask);
-
-                prefixSum[radix0 + 0u * binSize]++;
-                prefixSum[radix1 + 1u * binSize]++;
-                prefixSum[radix2 + 2u * binSize]++;
+                GetPrefixSumRef(key, 0)++;
+                GetPrefixSumRef(key, 1)++;
+                GetPrefixSumRef(key, 2)++;
             }
 
             // Compute prefix sum for all passes
@@ -84,7 +77,7 @@ namespace IDKEngine.Utils
             }
 
             // Sort from LSB to MSB in radix-sized steps
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < passes; i++)
             {
                 int j = 0;
                 for (; j < input.Length - 3; j += 4)
@@ -99,27 +92,27 @@ namespace IDKEngine.Utils
                     uint key2 = getKey(t2);
                     uint key3 = getKey(t3);
 
-                    output[GetOffset(key0, i)] = t0;
-                    output[GetOffset(key1, i)] = t1;
-                    output[GetOffset(key2, i)] = t2;
-                    output[GetOffset(key3, i)] = t3;
+                    output[GetPrefixSumRef(key0, i)++] = t0;
+                    output[GetPrefixSumRef(key1, i)++] = t1;
+                    output[GetPrefixSumRef(key2, i)++] = t2;
+                    output[GetPrefixSumRef(key3, i)++] = t3;
                 }
                 for (; (uint)j < (uint)input.Length; j++)
                 {
                     T t0 = input[j];
                     uint key0 = getKey(t0);
-                    output[GetOffset(key0, i)] = t0;
+                    output[GetPrefixSumRef(key0, i)++] = t0;
                 }
 
                 Swap(ref input, ref output);
             }
 
-            int GetOffset(uint key, int pass)
+            ref int GetPrefixSumRef(uint key, int pass)
             {
                 uint radix = (key >> (pass * radixSize)) & mask;
-                int offset = prefixSum[radix + pass * binSize]++;
+                ref int offset = ref prefixSum[radix + pass * binSize];
 
-                return offset;
+                return ref offset;
             }
         }
 

@@ -24,6 +24,15 @@ namespace IDKEngine
             }
         }
 
+        public readonly ref T this[long index]
+        {
+            get
+            {
+                Debug.Assert(index >= 0 && index < Length);
+                return ref Unsafe.AsRef<T>(Ptr + index);
+            }
+        }
+
         public readonly Span<T> AsSpan(int offset, int length)
         {
             return new Span<T>(Ptr + offset, length);

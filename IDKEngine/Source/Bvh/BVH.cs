@@ -339,16 +339,16 @@ namespace IDKEngine.Bvh
                 GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(geometry.TriangleCount)];
                 BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
 
-                //float avg = 0.0f;
-                //for (int j = 0; j < 10; j++)
-                //{
-                //    swBuilding = Stopwatch.StartNew();
-                //    BLAS.Build(ref blas, geometry, buildSettings);
-                //    if (j >= 3)
-                //    {
-                //        avg += swBuilding.ElapsedMilliseconds;
-                //    }
-                //}
+                // float avg = 0.0f;
+                // for (int j = 0; j < 10; j++)
+                // {
+                //     Stopwatch debug = Stopwatch.StartNew();
+                //     BLAS.Build(ref blas, geometry, buildSettings);
+                //     if (j >= 3)
+                //     {
+                //         avg += debug.ElapsedMilliseconds;
+                //     }
+                // }
                 //Console.WriteLine($"Avg = {avg / 7.0f}");
 
                 int nodesUsed = BLAS.Build(ref blas, geometry, buildSettings);
