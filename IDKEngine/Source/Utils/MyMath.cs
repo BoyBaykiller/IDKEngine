@@ -106,9 +106,13 @@ namespace IDKEngine.Utils
             }
         }
 
-        public static float HalfArea(Vector3 extends)
+        public static float HalfArea(float sizeX, float sizeY, float sizeZ)
         {
-            float area = (extends.X + extends.Y) * extends.Z + extends.X * extends.Y;
+            float x = sizeX + sizeY;
+            float y = sizeZ;
+            float z = sizeX * sizeY;
+            float area = float.MultiplyAddEstimate(x, y, z);
+
             return area;
         }
 

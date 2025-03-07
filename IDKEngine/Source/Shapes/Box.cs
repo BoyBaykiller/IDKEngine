@@ -100,7 +100,7 @@ namespace IDKEngine.Shapes
         public readonly float HalfArea()
         {
             Vector128<float> size = SimdSize();
-            float area = (size[0] + size[1]) * size[2] + size[0] * size[1];
+            float area = MyMath.HalfArea(size[0], size[1], size[2]);
 
             return area;
         }

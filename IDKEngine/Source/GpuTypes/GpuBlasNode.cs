@@ -1,4 +1,5 @@
 ﻿using OpenTK.Mathematics;
+using IDKEngine.Utils;
 using IDKEngine.Shapes;
 
 namespace IDKEngine.GpuTypes
@@ -21,7 +22,8 @@ namespace IDKEngine.GpuTypes
         public readonly float HalfArea()
         {
             Vector3 size = Max - Min;
-            float area = (size.X + size.Y) * size.Z + size.X * size.Y;
+            float area = MyMath.HalfArea(size.X, size.Y, size.Z);
+
             return area;
         }
     }

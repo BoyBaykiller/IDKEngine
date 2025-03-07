@@ -177,6 +177,7 @@ namespace IDKEngine
 
             LightManager.Update(out bool anyLightMoved);
             ModelManager.Update(animationTime, out bool anyAnimatedNodeMoved, out bool anyMeshInstanceMoved);
+            //ModelManager.BVH.BlasesBuild(0, ModelManager.BVH.BlasesDesc.Length);
 
             if (RequestPresentationResolution.HasValue || RequestRenderResolutionScale.HasValue)
             {
@@ -406,7 +407,6 @@ namespace IDKEngine
 
             Camera.SetPrevToCurrentPosition();
         }
-
 
         protected override unsafe void OnStart()
         {

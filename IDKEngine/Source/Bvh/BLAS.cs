@@ -454,19 +454,30 @@ namespace IDKEngine.Bvh
             int triPivot = 0;
             int splitAxis = 0;
             float splitCost = notSplitCost;
+
+            // Unfortunately we have to manually load the fields for best perf
+            // as the JIT otherwise repeatedly loads them in the loop
+            // https://github.com/dotnet/runtime/issues/113107
+            Span<float> rightCostsAccum = buildData.RightCostsAccum;
+            Span<Box> triBounds = buildData.TriBounds;
+            BitArray triMarks = buildData.TriMarks;
+
             for (int axis = 0; axis < 3; axis++)
             {
                 Box rightBoxAccum = Box.Empty();
                 int firstRightTri = triStart + 1;
+
+                Span<int> trisAxesSorted = buildData.TrisAxesSorted[axis];
+
                 for (int i = triEnd - 1; i >= firstRightTri; i--)
                 {
-                    rightBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
+                    rightBoxAccum.GrowToFit(triBounds[trisAxesSorted[i]]);
 
                     int triCount = triEnd - i;
                     float probHitRightChild = rightBoxAccum.HalfArea() / parentArea;
                     float rightCost = probHitRightChild * CostLeafNode(triCount, settings.TriangleCost);
 
-                    buildData.RightCostsAccum[i] = rightCost;
+                    rightCostsAccum[i] = rightCost;
 
                     if (rightCost >= splitCost)
                     {
@@ -479,11 +490,11 @@ namespace IDKEngine.Bvh
                 Box leftBoxAccum = Box.Empty();
                 for (int i = triStart; i < firstRightTri - 1; i++)
                 {
-                    leftBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
+                    leftBoxAccum.GrowToFit(triBounds[trisAxesSorted[i]]);
                 }
                 for (int i = firstRightTri - 1; i < triEnd - 1; i++)
                 {
-                    leftBoxAccum.GrowToFit(buildData.TriBounds[buildData.TrisAxesSorted[axis][i]]);
+                    leftBoxAccum.GrowToFit(triBounds[trisAxesSorted[i]]);
 
                     // Implementation of "Surface Area Heuristic" described in "Spatial Splits in Bounding Volume Hierarchies"
                     // https://www.nvidia.in/docs/IO/77714/sbvh.pdf 2.1 BVH Construction
@@ -492,7 +503,7 @@ namespace IDKEngine.Bvh
                     float probHitLeftChild = leftBoxAccum.HalfArea() / parentArea;
 
                     float leftCost = probHitLeftChild * CostLeafNode(triCount, settings.TriangleCost);
-                    float rightCost = buildData.RightCostsAccum[i + 1];
+                    float rightCost = rightCostsAccum[i + 1];
 
                     // Estimates cost of hitting parentNode if it was split at the evaluated split position.
                     // The full "Surface Area Heuristic" is recursive, but in practice we assume
@@ -538,16 +549,19 @@ namespace IDKEngine.Bvh
             // Then the other two axes have their triangles partitioned such that all marked triangles precede the others.
             // The partitioning is stable so the triangles stay sorted otherwise which is crucial
 
+            Span<int> trisAxesSortedSplitAxis = buildData.TrisAxesSorted[splitAxis];
             for (int i = triStart; i < triPivot; i++)
             {
-                buildData.TriMarks[buildData.TrisAxesSorted[splitAxis][i]] = true;
+                triMarks[trisAxesSortedSplitAxis[i]] = true;
             }
             for (int i = triPivot; i < triEnd; i++)
             {
-                buildData.TriMarks[buildData.TrisAxesSorted[splitAxis][i]] = false;
+                triMarks[trisAxesSortedSplitAxis[i]] = false;
             }
 
-            int[] partitionAux = new int[triEnd - triPivot];
+
+            Span<int> partitionAux = Helper.Reinterpret<float, int>(rightCostsAccum, triEnd - triPivot);
+
             Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 1) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
             Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 2) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
 
@@ -603,10 +617,9 @@ namespace IDKEngine.Bvh
                 buildData.TriBounds[i] = Box.From(tri);
             }
 
-            int[] auxRadixSort = new int[geometry.TriangleCount];
             for (int axis = 0; axis < 3; axis++)
             {
-                Span<int> input = auxRadixSort;
+                Span<int> input = Helper.Reinterpret<float, int>(buildData.RightCostsAccum, geometry.TriangleCount);
                 Span<int> output = buildData.TrisAxesSorted[axis];
 
                 Helper.FillIncreasing(input);

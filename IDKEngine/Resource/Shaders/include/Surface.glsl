@@ -98,5 +98,8 @@ void SurfaceApplyModificatons(inout Surface surface, GpuMesh mesh)
 
 bool SurfaceIsAlphaBlending(Surface surface)
 {
-    return surface.AlphaCutoff == 2.0; 
+    // Keep in sync between shader and client code!
+    const float valueMeaniningBlendMode = 2.0;
+    
+    return surface.AlphaCutoff == valueMeaniningBlendMode; 
 }

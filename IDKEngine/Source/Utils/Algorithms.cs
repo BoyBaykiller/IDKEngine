@@ -83,18 +83,19 @@ namespace IDKEngine.Utils
                 for (; j < input.Length - 3; j += 4)
                 {
                     T t0 = input[j + 0];
-                    T t1 = input[j + 1];
-                    T t2 = input[j + 2];
-                    T t3 = input[j + 3];
-
                     uint key0 = getKey(t0);
-                    uint key1 = getKey(t1);
-                    uint key2 = getKey(t2);
-                    uint key3 = getKey(t3);
-
                     output[GetPrefixSumRef(key0, i)++] = t0;
+
+                    T t1 = input[j + 1];
+                    uint key1 = getKey(t1);
                     output[GetPrefixSumRef(key1, i)++] = t1;
+
+                    T t2 = input[j + 2];
+                    uint key2 = getKey(t2);
                     output[GetPrefixSumRef(key2, i)++] = t2;
+
+                    T t3 = input[j + 3];
+                    uint key3 = getKey(t3);
                     output[GetPrefixSumRef(key3, i)++] = t3;
                 }
                 for (; (uint)j < (uint)input.Length; j++)

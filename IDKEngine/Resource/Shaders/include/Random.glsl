@@ -10,7 +10,6 @@ void InitializeRandomSeed(uint value)
 
 uint GetPCGHash(inout uint seed)
 {
-    // Faster and much more random than Wang Hash
     // Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
 
     seed = seed * 747796405u + 2891336453u;

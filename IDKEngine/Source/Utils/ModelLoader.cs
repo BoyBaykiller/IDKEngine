@@ -840,8 +840,10 @@ namespace IDKEngine.Utils
                 }
                 else if (materialParams.AlphaMode == AlphaMode.Blend)
                 {
-                    // special value interpreted as do blending
-                    gpuMaterial.AlphaCutoff = 2.0f;
+                    // Keep in sync between shader and client code!
+                    const float valueMeaniningBlendMode = 2.0f;
+
+                    gpuMaterial.AlphaCutoff = valueMeaniningBlendMode;
                 }
 
                 CpuMaterial cpuMaterial = new CpuMaterial();

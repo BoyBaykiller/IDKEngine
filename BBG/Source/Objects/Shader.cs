@@ -30,7 +30,7 @@ namespace BBOpenGL
             public readonly int ID;
             public readonly ShaderStage ShaderStage;
             public readonly string Name;
-            public Shader(ShaderStage stage, string source, string name = null)
+            public Shader(ShaderStage stage, string shaderSource, string name = null)
             {
                 ShaderStage = stage;
 
@@ -38,7 +38,7 @@ namespace BBOpenGL
 
                 Name = name ?? stage.ToString();
 
-                GL.ShaderSource(ID, source);
+                GL.ShaderSource(ID, shaderSource);
                 GL.CompileShader(ID);
 
                 GL.GetShaderInfoLog(ID, out string shaderInfoLog);
@@ -74,8 +74,8 @@ namespace BBOpenGL
 
             public static AbstractShader FromFile(ShaderStage shaderStage, string localShaderPath, bool debugSaveAndRunRGA = false)
             {
-                string source = File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath));
-                AbstractShader result = new AbstractShader(shaderStage, source, localShaderPath, debugSaveAndRunRGA);
+                string unprocessedSource = File.ReadAllText(Path.Combine(SHADER_PATH, localShaderPath));
+                AbstractShader result = new AbstractShader(shaderStage, unprocessedSource, localShaderPath, debugSaveAndRunRGA);
 
                 return result;
             }
@@ -83,16 +83,70 @@ namespace BBOpenGL
             private AbstractShader(ShaderStage shaderStage, string source, string localShaderPath, bool debugSaveAndRunRGA = false)
                 : base(shaderStage, Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath), localShaderPath)
             {
-                if (debugSaveAndRunRGA && IsCompiledSuccessfully())
+                if (debugSaveAndRunRGA)
                 {
                     // This is only relevant for development.
-                    // Runs Radeon GPU Analyzer on the shader code and writes the results + preprocessed code to disk
-                    string outPath = Path.Combine(SHADER_PATH, "bin", localShaderPath);
+                    // Runs Radeon GPU Analyzer on the processed shader code and writes the results and code to disk
+
+                    string shaderCodePath = Path.Combine(SHADER_PATH, "bin", localShaderPath);
                     string shaderCode = Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath);
-                    __DebugSaveAndRunRGA(shaderStage, shaderCode, outPath);
+                    File.WriteAllText(shaderCodePath, shaderCode);
+
+                    if (IsCompiledSuccessfully())
+                    {
+                        __DebugSaveAndRunRGA(shaderStage, shaderCodePath);
+                    }
                 }
+
                 LocalShaderPath = localShaderPath;
                 DebugSaveAndRunRGA = debugSaveAndRunRGA;
+            }
+
+            public static AbstractShader Recompile(AbstractShader existingShader)
+            {
+                AbstractShader newShader = FromFile(existingShader.ShaderStage, existingShader.LocalShaderPath, existingShader.DebugSaveAndRunRGA);
+                return newShader;
+            }
+
+            /// <summary>
+            /// This is only meant to be used in development. It invokes the "rga" tool for shader analysis
+            /// </summary>
+            private static void __DebugSaveAndRunRGA(ShaderStage shaderStage, string shaderCodePath)
+            {
+                const string SHADER_ANALYZER_TOOL_NAME = "rga"; // https://github.com/GPUOpen-Tools/radeon_gpu_analyzer
+
+                string rgaShaderStage = shaderStage switch
+                {
+                    ShaderStage.Vertex => "--vert",
+                    ShaderStage.Geometry => "--geom",
+                    ShaderStage.Fragment => "--frag",
+                    ShaderStage.Compute => "--comp",
+                    _ => throw new NotSupportedException($"Can not convert {nameof(shaderStage)} = {shaderStage} to {nameof(rgaShaderStage)}"),
+                };
+
+                string outDir = Path.GetDirectoryName(shaderCodePath);
+                Directory.CreateDirectory(outDir);
+
+                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {shaderCodePath} " +
+                                   $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
+                                   $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
+                
+                System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo()
+                {
+                    FileName = SHADER_ANALYZER_TOOL_NAME,
+                    Arguments = arguments,
+                };
+
+                try
+                {
+                    System.Diagnostics.Process? proc = System.Diagnostics.Process.Start(startInfo);
+
+                    proc.Start();
+                }
+                catch (Exception)
+                {
+                    Logger.Log(Logger.LogLevel.Error, $"Failed to create process. Be sure to provide a {SHADER_ANALYZER_TOOL_NAME} binary (https://github.com/GPUOpen-Tools/radeon_gpu_analyzer) in working dir or PATH");
+                }
             }
 
             public static class Preprocessor
@@ -135,12 +189,12 @@ namespace BBOpenGL
                         #endif
 
                         // Keep in sync between shader and client code!
-                        #define {ShaderStageShaderInsertion(shaderStage)} 1
-                        #define {VendorToShaderInsertion(GetDeviceInfo().Vendor)} 1
-                        #line {versionStatementLineCount + 1}
+                        #define {GetShaderStageInsertion(shaderStage)} 1
+                        #define {GetVendorInsertion(GetDeviceInfo().Vendor)} 1
 
                         #extension GL_ARB_bindless_texture : require
                         #extension GL_EXT_shader_image_load_formatted : require
+                        #line {versionStatementLineCount + 1}
 
                         """
                     );
@@ -250,7 +304,7 @@ namespace BBOpenGL
                         {
                             Group shaderStorageBlock = match.Groups[0];
                             Group instanceName = match.Groups[1];
-                            
+
                             bool instanceNameReferenced = new Regex($@"\b{instanceName.Value}\.").Match(text, currentIndex).Success;
                             int end = shaderStorageBlock.Index;
                             if (instanceNameReferenced)
@@ -362,7 +416,7 @@ namespace BBOpenGL
                     }
                 }
 
-                private static string ShaderStageShaderInsertion(ShaderStage shaderStage)
+                private static string GetShaderStageInsertion(ShaderStage shaderStage)
                 {
                     string insertion = shaderStage switch
                     {
@@ -378,7 +432,7 @@ namespace BBOpenGL
                     return $"APP_SHADER_STAGE_{insertion}";
                 }
 
-                private static string VendorToShaderInsertion(GpuVendor gpuVendor)
+                private static string GetVendorInsertion(GpuVendor gpuVendor)
                 {
                     string insertion = gpuVendor switch
                     {
@@ -390,55 +444,6 @@ namespace BBOpenGL
                     };
 
                     return $"APP_VENDOR_{insertion}";
-                }
-            }
-
-            public static AbstractShader Recompile(AbstractShader existingShader)
-            {
-                AbstractShader newShader = FromFile(existingShader.ShaderStage, existingShader.LocalShaderPath, existingShader.DebugSaveAndRunRGA);
-                return newShader;
-            }
-
-            /// <summary>
-            /// This is only meant to be used in development. It invokes the "rga" tool for shader analysis
-            /// </summary>
-            private static void __DebugSaveAndRunRGA(ShaderStage shaderStage, string shaderCode, string outPath)
-            {
-                const string SHADER_ANALYZER_TOOL_NAME = "rga"; // https://github.com/GPUOpen-Tools/radeon_gpu_analyzer
-
-                string rgaShaderStage = shaderStage switch
-                {
-                    ShaderStage.Vertex => "--vert",
-                    ShaderStage.Geometry => "--geom",
-                    ShaderStage.Fragment => "--frag",
-                    ShaderStage.Compute => "--comp",
-                    _ => throw new NotSupportedException($"Can not convert {nameof(shaderStage)} = {shaderStage} to {nameof(rgaShaderStage)}"),
-                };
-
-                string outDir = Path.GetDirectoryName(outPath);
-                Directory.CreateDirectory(outDir);
-
-                File.WriteAllText(outPath, shaderCode);
-
-                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {outPath} " +
-                                   $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
-                                   $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
-                
-                System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo()
-                {
-                    FileName = SHADER_ANALYZER_TOOL_NAME,
-                    Arguments = arguments,
-                };
-
-                try
-                {
-                    System.Diagnostics.Process? proc = System.Diagnostics.Process.Start(startInfo);
-
-                    proc.Start();
-                }
-                catch (Exception)
-                {
-                    Logger.Log(Logger.LogLevel.Error, $"Failed to create process. Be sure to provide a {SHADER_ANALYZER_TOOL_NAME} binary (https://github.com/GPUOpen-Tools/radeon_gpu_analyzer) in working dir or PATH");
                 }
             }
         }

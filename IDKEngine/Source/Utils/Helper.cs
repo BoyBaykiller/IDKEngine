@@ -135,6 +135,20 @@ namespace IDKEngine.Utils
             }
         }
 
+        public static unsafe Span<TTo> Reinterpret<TFrom, TTo>(Span<TFrom> source, int length)
+            where TFrom : unmanaged
+            where TTo : unmanaged
+        {
+            int sourceLeft = sizeof(TFrom) * source.Length;
+            int askedFor = sizeof(TTo) * length;
+            if (askedFor > sourceLeft)
+            {
+                throw new ArgumentException($"Out of bounds ");
+            }
+
+            return MemoryMarshal.Cast<TFrom, TTo>(source).Slice(0, length);
+        }
+
         public static Vector4 ToOpenTK(this System.Numerics.Vector4 vector4)
         {
             return Unsafe.BitCast<System.Numerics.Vector4, Vector4>(vector4);

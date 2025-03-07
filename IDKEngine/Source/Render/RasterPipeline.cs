@@ -362,6 +362,11 @@ namespace IDKEngine.Render
                 FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
             }, () =>
             {
+                // TODO: As soon as we properly integrated blending make this part of BBG (ogl abstraction)
+                OpenTK.Graphics.OpenGL.GL.Enablei(OpenTK.Graphics.OpenGL.EnableCap.Blend, 0);
+                OpenTK.Graphics.OpenGL.GL.BlendEquationi(0, OpenTK.Graphics.OpenGL.BlendEquationMode.FuncAdd);
+                OpenTK.Graphics.OpenGL.GL.BlendFunci(0, OpenTK.Graphics.OpenGL.BlendingFactor.SrcAlpha, OpenTK.Graphics.OpenGL.BlendingFactor.OneMinusSrcAlpha);
+                
                 BBG.Cmd.UseShaderProgram(gBufferProgram);
 
                 BBG.Rendering.InferViewportSize();
@@ -373,6 +378,8 @@ namespace IDKEngine.Render
                 {
                     modelManager.Draw();
                 }
+
+                OpenTK.Graphics.OpenGL.GL.Disablei(OpenTK.Graphics.OpenGL.EnableCap.Blend, 0);
             });
 
             // The AMD driver fails to detect a write-read dependency between G-Buffer and some of the

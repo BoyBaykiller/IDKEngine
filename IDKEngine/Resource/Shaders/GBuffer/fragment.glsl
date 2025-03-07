@@ -30,11 +30,19 @@ void main()
     Surface surface = GetSurface(material, inData.TexCoord, taaDataUBO.MipmapBias);
     SurfaceApplyModificatons(surface, mesh);
 
-    // We dont support alpha blending yet
-    float alphaCutoff = SurfaceIsAlphaBlending(surface) ? 0.5 : surface.AlphaCutoff;
-    if (surface.Alpha < alphaCutoff)
+    if (!SurfaceIsAlphaBlending(surface))
     {
-        discard;
+        if (surface.Alpha < surface.AlphaCutoff)
+        {
+            discard;
+        }
+
+        // TODO: We currently render blend and non blend-materials in one pass with blending enabled.
+        // To make non blend-materials appear opaque we manually set their alpha to 1.0 here.
+        // In the future we want to render, in order: 
+        // 1. Non blend-materials with blending disabled (no longer need to manually set alpha to 1.0 then)
+        // 2. Blend-materials
+        surface.Alpha = 1.0;
     }
     
     vec3 interpTangent = normalize(inData.Tangent);

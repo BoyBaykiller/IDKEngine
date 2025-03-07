@@ -20,10 +20,10 @@
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit><!-- True by default-->
     <TieredCompilationQuickJitForLoops>false</TieredCompilationQuickJitForLoops> <!-- False by default-->
 
-    <!--<PublishAOT>true</PublishAOT>-->
+    <PublishAOT>true</PublishAOT>
     <OptimizationPreference>Speed</OptimizationPreference> 
-    <IlcInstructionSet>avx2</IlcInstructionSet> 
-
+    <IlcInstructionSet>avx2</IlcInstructionSet>
+    
     <!--<StackTraceSupport>false</StackTraceSupport>-->
     <!--<InvariantGlobalization>true</InvariantGlobalization>-->
     <!--<UseSystemResourceKeys>true</UseSystemResourceKeys>-->
