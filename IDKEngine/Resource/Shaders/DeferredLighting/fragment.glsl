@@ -1,20 +1,15 @@
 #version 460 core
 
-AppInclude(include/StaticStorageBuffers.glsl)
-
-AppInclude(include/Pbr.glsl)
-AppInclude(include/Compression.glsl)
 AppInclude(include/Math.glsl)
+AppInclude(include/Compression.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
+AppInclude(include/StaticStorageBuffers.glsl)
+AppInclude(DeferredLighting/include/Impl.glsl)
 
 layout(location = 0) out vec4 OutFragColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
-
-vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion);
-float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample);
-float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos);
 
 #define SHADOW_MODE_NONE 0
 #define SHADOW_MODE_PCF_SHADOW_MAP 1
@@ -52,13 +47,14 @@ void main()
     float specular = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
     float roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
     vec3 emissive = texelFetch(gBufferDataUBO.Emissive, imgCoord, 0).rgb;
-    float ambientOcclusion = 1.0 - texelFetch(SamplerAO, imgCoord, 0).r;
+    float ambientOcclusion = texelFetch(SamplerAO, imgCoord, 0).r;
 
     Surface surface = GetDefaultSurface();
     surface.Albedo = albedo;
     surface.Normal = normal;
     surface.Metallic = specular;
     surface.Roughness = roughness;
+    surface.Emissive = emissive;
     surface.IOR = 1.0;
 
     vec3 directLighting = vec3(0.0);
@@ -78,7 +74,7 @@ void main()
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
                 vec3 lightToSample = unjitteredFragPos - light.Position;
-                shadow = 1.0 - Visibility(pointShadow, normal, lightToSample);
+                shadow = 1.0 - Visibility(pointShadow, surface.Normal, lightToSample);
             }
             else if (ShadowMode == SHADOW_MODE_RAY_TRACED)
             {
@@ -95,70 +91,14 @@ void main()
     vec3 indirectLight;
     if (IsVXGI)
     {
-        indirectLight = texelFetch(SamplerIndirectLighting, imgCoord, 0).rgb * albedo;
+        indirectLight = texelFetch(SamplerIndirectLighting, imgCoord, 0).rgb * surface.Albedo;
     }
     else
     {
         const vec3 ambient = vec3(0.015);
-        indirectLight = ambient * albedo;
+        indirectLight = ambient * surface.Albedo;
     }
 
-    OutFragColor = vec4((directLighting + indirectLight) + emissive, 1.0);
+    OutFragColor = vec4((directLighting + indirectLight) + surface.Emissive, 1.0);
     // OutFragColor = vec4(alpha);
-}
-
-vec3 EvaluateLighting(GpuLight light, Surface surface, vec3 fragPos, vec3 viewPos, float ambientOcclusion)
-{
-    vec3 surfaceToLight = light.Position - fragPos;
-    vec3 dirSurfaceToCam = normalize(viewPos - fragPos);
-    vec3 dirSurfaceToLight = normalize(surfaceToLight);
-    
-    float distSq = dot(surfaceToLight, surfaceToLight);
-    float attenuation = GetAttenuationFactor(distSq, light.Radius);
-    
-    const float prevIor = 1.0;
-    vec3 fresnelTerm;
-    vec3 specularBrdf = GGXBrdf(surface, dirSurfaceToCam, dirSurfaceToLight, prevIor, fresnelTerm);
-    vec3 diffuseBrdf = surface.Albedo * ambientOcclusion;
-    
-    vec3 combinedBrdf = specularBrdf + diffuseBrdf * (vec3(1.0) - fresnelTerm) * (1.0 - surface.Metallic); 
-
-    float cosTheta = clamp(dot(surface.Normal, dirSurfaceToLight), 0.0, 1.0);
-    return combinedBrdf * attenuation * cosTheta * light.Color;
-}
-
-float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample)
-{
-    // Source: https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
-    const vec3 ShadowSampleOffsets[] =
-    {
-        vec3( 0.0,  0.0,  0.0 ),
-        vec3( 1.0,  1.0,  1.0 ), vec3(  1.0, -1.0,  1.0 ), vec3( -1.0, -1.0,  1.0 ), vec3( -1.0,  1.0,  1.0 ), 
-        vec3( 1.0,  1.0, -1.0 ), vec3(  1.0, -1.0, -1.0 ), vec3( -1.0, -1.0, -1.0 ), vec3( -1.0,  1.0, -1.0 ),
-        vec3( 1.0,  1.0,  0.0 ), vec3(  1.0, -1.0,  0.0 ), vec3( -1.0, -1.0,  0.0 ), vec3( -1.0,  1.0,  0.0 ),
-        vec3( 1.0,  0.0,  1.0 ), vec3( -1.0,  0.0,  1.0 ), vec3(  1.0,  0.0, -1.0 ), vec3( -1.0,  0.0, -1.0 ),
-        vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
-    };
-    
-    const float bias = 0.018;
-    const float sampleDiskRadius = 0.04;
-
-    float visibilityFactor = 0.0;
-    for (int i = 0; i < ShadowSampleOffsets.length(); i++)
-    {
-        vec3 samplePos = (lightToSample + ShadowSampleOffsets[i] * sampleDiskRadius);
-        float depth = GetLightSpaceDepth(pointShadow, samplePos * (1.0 - bias));
-        visibilityFactor += texture(pointShadow.PcfShadowTexture, vec4(samplePos, depth));
-    }
-    visibilityFactor /= ShadowSampleOffsets.length();
-
-    return visibilityFactor;
-}
-
-float GetLightSpaceDepth(GpuPointShadow pointShadow, vec3 lightSpaceSamplePos)
-{
-    float dist = max(abs(lightSpaceSamplePos.x), max(abs(lightSpaceSamplePos.y), abs(lightSpaceSamplePos.z)));
-    float depth = GetLogarithmicDepth(pointShadow.NearPlane, pointShadow.FarPlane, dist);
-
-    return depth;
 }

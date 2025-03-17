@@ -26,7 +26,7 @@ void main()
     GpuPointShadow pointShadow = shadowsUBO.PointShadows[gl_GlobalInvocationID.z];
 
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
-    if (depth == 0.0 || any(greaterThanEqual(imgCoord, imageSize(image2D(pointShadow.RayTracedShadowMapImage)))))
+    if (depth == 1.0 || any(greaterThanEqual(imgCoord, imageSize(image2D(pointShadow.RayTracedShadowMapImage)))))
     {
         return;
     }

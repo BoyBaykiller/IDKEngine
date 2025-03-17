@@ -27,7 +27,7 @@ namespace IDKEngine.Render
         private readonly BBG.AbstractShaderProgram shaderProgram;
         public ConeTracer(Vector2i size, in GpuSettings settings)
         {
-            shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/ConeTracing/compute.glsl"));
+            shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/ConeTraceGI/compute.glsl"));
 
             SetSize(size);
 
@@ -36,7 +36,7 @@ namespace IDKEngine.Render
 
         public void Compute(BBG.Texture voxelsAlbedo)
         {
-            BBG.Computing.Compute("Cone Trace voxel texture", () =>
+            BBG.Computing.Compute("Cone Trace GI", () =>
             {
                 BBG.Cmd.SetUniforms(Settings);
 

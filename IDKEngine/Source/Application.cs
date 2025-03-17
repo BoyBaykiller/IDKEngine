@@ -408,10 +408,10 @@ namespace IDKEngine
             Camera.SetPrevToCurrentPosition();
         }
 
-        protected override unsafe void OnStart()
+        protected override void OnStart()
         {
             BBG.Initialize(Helper.GLDebugCallback);
-
+            
             ref readonly BBG.ContextInfo glContextInfo = ref BBG.GetContextInfo();
 
             Logger.Log(Logger.LogLevel.Info, $"API: {glContextInfo.APIName}");
@@ -494,8 +494,12 @@ namespace IDKEngine
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
                 //ModelLoader.Model cb = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
-                //ModelLoader.Model plane = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
+                //ModelLoader.Model ast = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
+                //ModelLoader.Model alpha = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\AlphaBlendModeTest\glTF-Binary\AlphaBlendModeTest.glb", new Transformation().WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-3.0f, 0.0f, 0.0f).GetMatrix()).Value;
+                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\window\scene.gltf", new Transformation().WithTranslation(-7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
+                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\window\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(MathF.PI / 2.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
 
+                //lucy.GpuModel.Materials[0].AlphaCutoff = 2.0f;
                 ModelManager.Add(sponza, lucy, helmet);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);

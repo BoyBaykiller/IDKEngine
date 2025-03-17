@@ -53,7 +53,6 @@ namespace BBOpenGL
                 None = 0,
                 DepthTest = EnableCap.DepthTest,
                 CullFace = EnableCap.CullFace,
-                Blend = EnableCap.Blend,
 
                 /// <summary>
                 /// Requires GL_NV_conservative_raster
@@ -104,6 +103,17 @@ namespace BBOpenGL
                 Always = OpenTK.Graphics.OpenGL.DepthFunction.Always,
             }
 
+            public enum BlendOp : uint
+            {
+                Add = BlendEquationMode.FuncAdd,
+            }
+
+            public enum BlendFactor : uint
+            {
+                SrcAlpha = BlendingFactor.SrcAlpha,
+                OneMinusSrcAlpha = BlendingFactor.OneMinusSrcAlpha,
+            }
+
             /// <summary>
             /// Requires GL_NV_shading_rate_image
             /// </summary>
@@ -141,13 +151,13 @@ namespace BBOpenGL
             }
 
             /// <summary>
-            /// Similar to <see cref="ColorAttachment"/> but less verbose - allows for simpler API
+            /// Similar to <see cref="ColorAttachment"/> but less verbose
             /// </summary>
             public record struct ColorAttachments
             {
                 public Texture[] Textures;
                 public AttachmentLoadOp AttachmentLoadOp;
-                public Vector4 ClearColor;
+                public Vector4 ClearColor; // Currently assumes floating point texture format
             }
 
             public record struct ColorAttachment
@@ -155,7 +165,12 @@ namespace BBOpenGL
                 public Texture Texture;
                 public AttachmentLoadOp AttachmentLoadOp;
                 public int Level;
-                public Vector4 ClearColor;
+                public Vector4 ClearColor; // Currently assumes floating point texture format
+                public BlendState BlendState = new BlendState();
+
+                public ColorAttachment()
+                {
+                }
             }
 
             public record struct DepthStencilAttachment
@@ -177,7 +192,19 @@ namespace BBOpenGL
                 public int Height;
             }
 
-            public record struct VertexInputAssembly
+            public record struct BlendState
+            {
+                public bool Enabled = false;
+                public BlendOp BlendOp = BlendOp.Add;
+                public BlendFactor SrcFactor = BlendFactor.SrcAlpha;
+                public BlendFactor DstFactor = BlendFactor.OneMinusSrcAlpha;
+
+                public BlendState()
+                {
+                }
+            }
+
+            public record struct VertexInputDesc
             {
                 public Buffer IndexBuffer;
                 public VertexDescription? VertexDescription;
@@ -246,6 +273,7 @@ namespace BBOpenGL
             {
                 public Capability[] EnabledCapabilities = [];
 
+                public bool EnableDepthWrites = true;
                 public DepthFunction DepthFunction = DepthFunction.Less;
                 public TriangleFace CullFace = TriangleFace.Back;
                 public DepthConvention DepthConvention = DepthConvention.ZeroToOne;
@@ -275,6 +303,7 @@ namespace BBOpenGL
                         verboseRTs.ColorAttachments[i].Texture = colorAttachments.Textures[i];
                         verboseRTs.ColorAttachments[i].AttachmentLoadOp = colorAttachments.AttachmentLoadOp;
                         verboseRTs.ColorAttachments[i].ClearColor = colorAttachments.ClearColor;
+                        verboseRTs.ColorAttachments[i].BlendState = new BlendState();
                     }
                 }
                 verboseRTs.DepthStencilAttachment = renderAttachments.DepthStencilAttachment;
@@ -316,6 +345,14 @@ namespace BBOpenGL
 
                         Vector3i textureSize = Texture.GetMipmapLevelSize(colorAttachment.Texture.Width, colorAttachment.Texture.Height, 1, colorAttachment.Level);
                         inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
+
+                        ref readonly BlendState blendState = ref colorAttachment.BlendState;
+                        if (blendState.Enabled)
+                        {
+                            GL.Enablei(EnableCap.Blend, (uint)i);
+                            GL.BlendEquationi((uint)i, (BlendEquationMode)blendState.BlendOp);
+                            GL.BlendFunci((uint)i, (BlendingFactor)blendState.SrcFactor, (BlendingFactor)blendState.DstFactor);
+                        }
                     }
                 }
 
@@ -358,8 +395,11 @@ namespace BBOpenGL
 
                 GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
                 SetGraphicsPipelineState(pipelineState);
-
+                
                 funcRender();
+
+                UnsetGraphicsPipelineState(pipelineState);
+                GL.Disable(EnableCap.Blend);
 
                 Debugging.PopDebugGroup();
             }
@@ -393,7 +433,7 @@ namespace BBOpenGL
                 GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
             }
 
-            public static void SetVertexInputAssembly(in VertexInputAssembly vertexInputAssembly)
+            public static void SetVertexInputAssembly(in VertexInputDesc vertexInputAssembly)
             {
                 GL.DeleteVertexArrays(1, ref vaoGLHandle);
                 GL.CreateVertexArrays(1, ref vaoGLHandle);
@@ -494,26 +534,7 @@ namespace BBOpenGL
 
             internal static void SetGraphicsPipelineState(in GraphicsPipelineState pipelineState)
             {
-                Capability[] capabilities = Enum.GetValues<Capability>();
                 ref readonly ExtensionSupport extensionSupport = ref GetDeviceInfo().ExtensionSupport;
-                for (int i = 0; i < capabilities.Length; i++)
-                {
-                    Capability capability = capabilities[i];
-                    if (capability == Capability.None)
-                    {
-                        continue;
-                    }
-                    if (capability == Capability.ConservativeRasterizationNV && !extensionSupport.ConservativeRaster)
-                    {
-                        continue;
-                    }
-                    if (capability == Capability.VariableRateShadingNV && !extensionSupport.VariableRateShading)
-                    {
-                        continue;
-                    }
-
-                    GL.Disable((EnableCap)capability);
-                }
 
                 for (int i = 0; i < pipelineState.EnabledCapabilities.Length; i++)
                 {
@@ -526,6 +547,7 @@ namespace BBOpenGL
                     GL.Enable((EnableCap)capability);
                 }
 
+                GL.DepthMask(pipelineState.EnableDepthWrites);
                 GL.ClipControl(ClipControlOrigin.LowerLeft, (ClipControlDepth)pipelineState.DepthConvention);
                 GL.PolygonMode(OpenTK.Graphics.OpenGL.TriangleFace.FrontAndBack, (PolygonMode)pipelineState.FillMode);
                 GL.DepthFunc((OpenTK.Graphics.OpenGL.DepthFunction)pipelineState.DepthFunction);
@@ -541,6 +563,23 @@ namespace BBOpenGL
                     GL.NV.BindShadingRateImageNV(variableRateShading.ShadingRateImage.ID);
                     GL.NV.ShadingRateImageBarrierNV(true);
                 }
+            }
+
+            private static void UnsetGraphicsPipelineState(in GraphicsPipelineState pipelineState)
+            {
+                ref readonly ExtensionSupport extensionSupport = ref GetDeviceInfo().ExtensionSupport;
+                for (int i = 0; i < pipelineState.EnabledCapabilities.Length; i++)
+                {
+                    Capability capability = pipelineState.EnabledCapabilities[i];
+                    if (capability == Capability.None)
+                    {
+                        continue;
+                    }
+
+                    GL.Disable((EnableCap)capability);
+                }
+
+                // No need to set other state as we overwrite it anyway
             }
 
             private static FramebufferCache.FramebufferDesc RenderAttachmentsToFramebufferDesc(in RenderAttachmentsVerbose renderAttachments)

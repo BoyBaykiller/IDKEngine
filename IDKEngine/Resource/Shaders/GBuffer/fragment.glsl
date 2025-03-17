@@ -1,7 +1,6 @@
 #version 460 core
 
 AppInclude(include/Surface.glsl)
-
 AppInclude(include/Compression.glsl)
 AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
@@ -30,19 +29,9 @@ void main()
     Surface surface = GetSurface(material, inData.TexCoord, taaDataUBO.MipmapBias);
     SurfaceApplyModificatons(surface, mesh);
 
-    if (!SurfaceIsAlphaBlending(surface))
+    if (surface.Alpha < surface.AlphaCutoff)
     {
-        if (surface.Alpha < surface.AlphaCutoff)
-        {
-            discard;
-        }
-
-        // TODO: We currently render blend and non blend-materials in one pass with blending enabled.
-        // To make non blend-materials appear opaque we manually set their alpha to 1.0 here.
-        // In the future we want to render, in order: 
-        // 1. Non blend-materials with blending disabled (no longer need to manually set alpha to 1.0 then)
-        // 2. Blend-materials
-        surface.Alpha = 1.0;
+        discard;
     }
     
     vec3 interpTangent = normalize(inData.Tangent);
@@ -51,7 +40,7 @@ void main()
     surface.Normal = tbn * surface.Normal;
     surface.Normal = normalize(mix(interpNormal, surface.Normal, mesh.NormalMapStrength));
 
-    OutAlbedoAlpha = vec4(surface.Albedo, surface.Alpha);
+    OutAlbedoAlpha = vec4(surface.Albedo, 1.0);
     OutNormal = EncodeUnitVec(surface.Normal);
     OutMetallicRoughness = vec2(surface.Metallic, surface.Roughness);
     OutEmissive = surface.Emissive;

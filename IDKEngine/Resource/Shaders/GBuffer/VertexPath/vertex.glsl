@@ -20,8 +20,8 @@ void main()
     vec3 vertexPosition = Unpack(vertexPositionsSSBO.Positions[gl_VertexID]);
     vec3 prevVertexPosition = Unpack(prevVertexPositionSSBO.Positions[gl_VertexID]);
     
-    uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_InstanceID + gl_BaseInstance];
-    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    uint meshInstanceId = visibleMeshInstanceIdSSBO.Ids[gl_BaseInstance + gl_InstanceID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     
     vec3 normal = DecompressSR11G11B10(vertex.Normal);
     vec3 tangent = DecompressSR11G11B10(vertex.Tangent);

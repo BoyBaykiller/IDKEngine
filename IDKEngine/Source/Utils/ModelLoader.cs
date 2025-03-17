@@ -382,10 +382,10 @@ namespace IDKEngine.Utils
             public const int TEXTURE_COUNT = (int)TextureType.Count;
 
             public int HasFallbackPixelsBits;
-
             public SampledTextureArray SampledTextures;
+            public string Name;
 
-            public readonly bool GetHasFallbackPixels(TextureType type)
+            public readonly bool HasFallbackPixels(TextureType type)
             {
                 return (HasFallbackPixelsBits & (1 << (int)type)) != 0;
             }
@@ -450,6 +450,7 @@ namespace IDKEngine.Utils
         {
             public MaterialParams MaterialParams = new MaterialParams();
             public SampledImageArray SampledImages;
+            public string Name;
 
             public MaterialDesc()
             {
@@ -645,7 +646,7 @@ namespace IDKEngine.Utils
                 {
                     GltfNode gltfNode = gltfChildren[i];
 
-                    Node myNode = myRoot.Children[i] = new Node();
+                    Node myNode = (myRoot.Children[i] = new Node());
                     myNode.Parent = myRoot;
                     myNode.Name = gltfNode.Name ?? $"RootNode_{i}";
 
@@ -723,7 +724,7 @@ namespace IDKEngine.Utils
                     }
                     else
                     {
-                        bool normalMapProvided = !cpuMaterials[gltfMeshPrimitive.Material.LogicalIndex].GetHasFallbackPixels(TextureType.Normal);
+                        bool normalMapProvided = !cpuMaterials[gltfMeshPrimitive.Material.LogicalIndex].HasFallbackPixels(TextureType.Normal);
                         mesh.NormalMapStrength = normalMapProvided ? 1.0f : 0.0f;
                         mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
                     }
@@ -734,10 +735,10 @@ namespace IDKEngine.Utils
                         ref GpuMeshInstance meshInstance = ref meshInstances[j];
 
                         // fix for small_city.glb which has a couple malformed transformations
-                        if (nodeTransformations[j].Row1 == new Vector4(0.0f))
-                        {
-                            nodeTransformations[j].Row1 = Vector4.UnitY;
-                        }
+                        //if (nodeTransformations[j].Row1 == new Vector4(0.0f))
+                        //{
+                        //    nodeTransformations[j].Row1 = Vector4.UnitY;
+                        //}
 
                         meshInstance.ModelMatrix = nodeTransformations[j] * myNode.Parent.GlobalTransform;
                         meshInstance.MeshId = listMeshes.Count;
@@ -847,6 +848,8 @@ namespace IDKEngine.Utils
                 }
 
                 CpuMaterial cpuMaterial = new CpuMaterial();
+                cpuMaterial.Name = materialDesc.Name;
+
                 for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
                 {
                     TextureType textureType = (TextureType)j;
@@ -924,7 +927,6 @@ namespace IDKEngine.Utils
             bindlessTexture.SampledTexture.Sampler = sampler;
             bindlessTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
 
-            GLTexture glTextureCopy = texture;
             MainThreadQueue.AddToLazyQueue(() =>
             {
                 /* For compressed textures:
@@ -955,7 +957,7 @@ namespace IDKEngine.Utils
                         if (textureLoadData.Ktx2Texture.NeedsTranscoding)
                         {
                             //int supercompressedImageSize = ktx2Texture.DataSize; // Supercompressed size before transcoding
-                            Ktx2.ErrorCode errCode = textureLoadData.Ktx2Texture.Transcode(GLFormatToKtxFormat(glTextureCopy.Format), Ktx2.TranscodeFlagBits.HighQuality);
+                            Ktx2.ErrorCode errCode = textureLoadData.Ktx2Texture.Transcode(GLFormatToKtxFormat(texture.Format), Ktx2.TranscodeFlagBits.HighQuality);
                             if (errCode != Ktx2.ErrorCode.Success)
                             {
                                 Logger.Log(Logger.LogLevel.Error, $"Failed to transcode KTX texture. {nameof(textureLoadData.Ktx2Texture.Transcode)} returned {errCode}");
@@ -976,13 +978,13 @@ namespace IDKEngine.Utils
                                 MainThreadQueue.AddToLazyQueue(() =>
                                 {
                                     // We don't own the texture so make sure it didn't get deleted
-                                    if (!glTextureCopy.IsDeleted())
+                                    if (!texture.IsDeleted())
                                     {
-                                        for (int level = 0; level < glTextureCopy.Levels; level++)
+                                        for (int level = 0; level < texture.Levels; level++)
                                         {
                                             Vector3i size = GLTexture.GetMipmapLevelSize(textureLoadData.Ktx2Texture.BaseWidth, textureLoadData.Ktx2Texture.BaseHeight, textureLoadData.Ktx2Texture.BaseDepth, level);
                                             textureLoadData.Ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
-                                            glTextureCopy.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
+                                            texture.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
                                         }
 
                                         TextureLoaded?.Invoke();
@@ -1006,7 +1008,7 @@ namespace IDKEngine.Utils
                         if (!imageResult.IsLoadedSuccesfully)
                         {
                             Logger.Log(Logger.LogLevel.Error, $"Image could not be loaded");
-                            MainThreadQueue.AddToLazyQueue(() => { stagingBuffer.Dispose(); });
+                            MainThreadQueue.AddToLazyQueue(stagingBuffer.Dispose);
                             return;
                         }
 
@@ -1015,16 +1017,16 @@ namespace IDKEngine.Utils
                         MainThreadQueue.AddToLazyQueue(() =>
                         {
                             // We don't own the texture so make sure it didn't get deleted
-                            if (!glTextureCopy.IsDeleted())
+                            if (!texture.IsDeleted())
                             {
-                                glTextureCopy.Upload2D(
+                                texture.Upload2D(
                                     stagingBuffer,
                                     textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height,
                                     GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels),
                                     GLTexture.PixelType.UByte,
                                     null
                                 );
-                                glTextureCopy.GenerateMipmap();
+                                texture.GenerateMipmap();
 
                                 TextureLoaded?.Invoke();
                             }
@@ -1118,9 +1120,9 @@ namespace IDKEngine.Utils
             for (int i = 0; i < gltfMaterials.Count; i++)
             {
                 Material gltfMaterial = gltfMaterials[i];
-
                 MaterialDesc materialDesc = new MaterialDesc();
                 materialDesc.MaterialParams = GetMaterialParams(gltfMaterial);
+                materialDesc.Name = gltfMaterial.Name;
 
                 for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
                 {
@@ -1238,6 +1240,8 @@ namespace IDKEngine.Utils
                         continue;
                     }
 
+                    // TryAdd instead of Contains will prevent entering multiple times 
+                    // before the task has actually written a Value
                     if (uniqueMeshPrimitives.TryAdd(meshDesc, new MeshGeometry()))
                     {
                         tasks[uniqueMeshPrimitivesCount++] = Task.Run(() =>
@@ -1260,7 +1264,7 @@ namespace IDKEngine.Utils
                     }
                 }
             }
-            //int deduplicatedCount = maxMeshPrimitives - uniqueMeshPrimitivesCount;
+            int deduplicatedCount = maxMeshPrimitives - uniqueMeshPrimitivesCount;
 
             while (uniqueMeshPrimitivesCount < tasks.Length)
             {
@@ -1268,7 +1272,6 @@ namespace IDKEngine.Utils
             }
 
             Task.WaitAll(tasks);
-            uniqueMeshPrimitives.TrimExcess();
 
             return uniqueMeshPrimitives;
         }

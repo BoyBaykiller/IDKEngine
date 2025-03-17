@@ -381,7 +381,7 @@ namespace IDKEngine.Render
                         CpuPointShadow.TakeMeshShaderPath = tempBool;
                     }
                     ToolTipForItemAboveHovered(
-                        "If your GPU supports them this will significantly improve performance assuming a proper vertex load is given (not old sponza)."
+                        "If your GPU supports them this can significantly improve performance depending on the scene (not old sponza)."
                     );
 
                     ImGui.SameLine();
@@ -865,6 +865,8 @@ namespace IDKEngine.Render
                         modified = true;
                     }
 
+                    ImGui.Text($"IsTransparent (AlphaBlend): {material.IsTransparent()}");
+
                     ImGui.SeparatorText("Mesh Info");
 
                     ImGui.Text($"MeshId: {meshInstance.MeshId} | MaterialId: {mesh.MaterialId}");
@@ -1034,7 +1036,7 @@ namespace IDKEngine.Render
                     for (int i = 0; i < ModelLoader.CpuMaterial.TEXTURE_COUNT; i++)
                     {
                         ModelLoader.TextureType textureType = (ModelLoader.TextureType)i;
-                        if (cpuMaterial.GetHasFallbackPixels(textureType))
+                        if (cpuMaterial.HasFallbackPixels(textureType))
                         {
                             continue;
                         }
@@ -1101,13 +1103,15 @@ namespace IDKEngine.Render
                             for (int j = materialRange.Start; j < materialRange.End; j++)
                             {
                                 ref readonly ModelLoader.CpuMaterial cpuMaterial = ref app.ModelManager.CpuMaterials[j];
-
+                                
                                 ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
                                 if (SelectedEntity is SelectedEntityInfo.Material materialInfo && materialInfo.MaterialId == j)
                                 {
                                     flags |= ImGuiTreeNodeFlags.Selected;
                                 }
-                                if (ImGui.TreeNodeEx($"Material_{j}", flags))
+
+                                string materialName = cpuMaterial.Name != string.Empty ? cpuMaterial.Name : $"Material_{j}";
+                                if (ImGui.TreeNodeEx(materialName, flags))
                                 {
                                     ImGui.TreePop();
                                 }

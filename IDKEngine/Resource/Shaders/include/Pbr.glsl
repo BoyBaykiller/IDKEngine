@@ -39,7 +39,7 @@ vec3 BaseReflectivity(vec3 albedo, float metallic, float n1, float n2)
 float DistributionGGX(float NoH, float roughness)
 {
     // Force visible specular highlight for perfect mirror
-    roughness = max(roughness, 0.001);
+    roughness = max(roughness, 0.005);
 
     float a = NoH * roughness;
     float k = roughness / (1.0 - NoH * NoH + a * a);

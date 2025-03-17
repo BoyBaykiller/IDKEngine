@@ -122,7 +122,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface = GetSurface(material, interpTexCoord);
             SurfaceApplyModificatons(surface, mesh);
 
-            float alphaCutoff = SurfaceIsAlphaBlending(surface) ? GetRandomFloat01() : surface.AlphaCutoff;
+            float alphaCutoff = SurfaceIsTransparent(surface) ? GetRandomFloat01() : surface.AlphaCutoff;
             if (surface.Alpha < alphaCutoff)
             {
                 wavefrontRay.Origin += rayDir * 0.001;

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using BBOpenGL;
 using IDKEngine.Bvh;
@@ -43,44 +44,38 @@ namespace IDKEngine
         public BVH BVH;
 
         public BBG.DrawElementsIndirectCommand[] DrawCommands = [];
-        private BBG.TypedBuffer<BBG.DrawElementsIndirectCommand> drawCommandBuffer;
-
-        public GpuMesh[] Meshes = [];
-        private BBG.TypedBuffer<GpuMesh> meshesBuffer;
-
         public ReadOnlyArray<GpuMeshInstance> MeshInstances => new ReadOnlyArray<GpuMeshInstance>(meshInstances);
-        private GpuMeshInstance[] meshInstances = [];
-        private BBG.TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
-        private BitArray meshInstancesDirty;
-
         public ModelLoader.CpuMaterial[] CpuMaterials = [];
         public GpuMaterial[] GpuMaterials = [];
-        private BBG.TypedBuffer<GpuMaterial> materialsBuffer;
-
+        public GpuMesh[] Meshes = [];
         public GpuVertex[] Vertices = [];
-        private BBG.TypedBuffer<GpuVertex> vertexBuffer;
-
         public NativeMemoryView<Vector3> VertexPositions;
+        public uint[] VertexIndices = [];
+        public Matrix3x4[] JointMatrices = [];
+        public BBG.TypedBuffer<uint> OpaqueMeshInstanceIdBuffer;
+        public BBG.TypedBuffer<uint> TransparentMeshInstanceIdBuffer;
+
+        private GpuMeshInstance[] meshInstances = [];
+        private BitArray meshInstancesDirty;
+
+        private BBG.TypedBuffer<BBG.DrawElementsIndirectCommand> drawCommandBuffer;
+        private BBG.TypedBuffer<GpuMesh> meshesBuffer;
+        private BBG.TypedBuffer<GpuMeshInstance> meshInstanceBuffer;
+        private BBG.TypedBuffer<GpuMaterial> materialsBuffer;
+        private BBG.TypedBuffer<GpuVertex> vertexBuffer;
         private BBG.TypedBuffer<Vector3> vertexPositionsBuffer;
         private BBG.TypedBuffer<Vector3> vertexPositionsHostBuffer;
-
-        public uint[] VertexIndices = [];
+        private BBG.TypedBuffer<GpuUnskinnedVertex> unskinnedVerticesBuffer;
         private BBG.TypedBuffer<uint> vertexIndicesBuffer;
-
-        public Matrix3x4[] JointMatrices = [];
         private BBG.TypedBuffer<Matrix3x4> jointMatricesBuffer;
-
         private BBG.TypedBuffer<Vector3> prevVertexPositionsBuffer;
-        private BBG.TypedBuffer<uint> visibleMeshInstancesBuffer;
-
+        private BBG.TypedBuffer<uint> visibleMeshInstanceIdSSBO;
         private BBG.TypedBuffer<GpuMeshlet> meshletBuffer;
         private BBG.TypedBuffer<GpuMeshletInfo> meshletInfoBuffer;
         private BBG.TypedBuffer<uint> meshletsVertexIndicesBuffer;
         private BBG.TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
         private BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV> meshletTasksCmdsBuffer;
-        private readonly BBG.TypedBuffer<int> meshletTasksCountBuffer;
-
-        private BBG.TypedBuffer<GpuUnskinnedVertex> unskinnedVerticesBuffer;
+        private readonly BBG.TypedBuffer<uint> meshletTasksCountBuffer;
 
         private readonly BBG.AbstractShaderProgram skinningShaderProgram;
         private BBG.Fence? fenceCopiedSkinnedVerticesToHost;
@@ -95,13 +90,13 @@ namespace IDKEngine
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
             meshesBuffer = new BBG.TypedBuffer<GpuMesh>();
             meshInstanceBuffer = new BBG.TypedBuffer<GpuMeshInstance>();
-            visibleMeshInstancesBuffer = new BBG.TypedBuffer<uint>();
+            visibleMeshInstanceIdSSBO = new BBG.TypedBuffer<uint>();
             materialsBuffer = new BBG.TypedBuffer<GpuMaterial>();
             vertexBuffer = new BBG.TypedBuffer<GpuVertex>();
             vertexPositionsBuffer = new BBG.TypedBuffer<Vector3>();
             vertexIndicesBuffer = new BBG.TypedBuffer<uint>();
             meshletTasksCmdsBuffer = new BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV>();
-            meshletTasksCountBuffer = new BBG.TypedBuffer<int>();
+            meshletTasksCountBuffer = new BBG.TypedBuffer<uint>();
             meshletBuffer = new BBG.TypedBuffer<GpuMeshlet>();
             meshletInfoBuffer = new BBG.TypedBuffer<GpuMeshletInfo>();
             meshletsVertexIndicesBuffer = new BBG.TypedBuffer<uint>();
@@ -110,23 +105,25 @@ namespace IDKEngine
             unskinnedVerticesBuffer = new BBG.TypedBuffer<GpuUnskinnedVertex>();
             vertexPositionsHostBuffer = new BBG.TypedBuffer<Vector3>();
             prevVertexPositionsBuffer = new BBG.TypedBuffer<Vector3>();
+            OpaqueMeshInstanceIdBuffer = new BBG.TypedBuffer<uint>();
+            TransparentMeshInstanceIdBuffer = new BBG.TypedBuffer<uint>();
 
-            drawCommandBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 0);
-            meshesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 1);
-            meshInstanceBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 2);
-            visibleMeshInstancesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 3);
-            materialsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 4);
-            vertexBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 5);
-            vertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 6);
-            meshletTasksCmdsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 7);
-            meshletTasksCountBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 8);
-            meshletBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 9);
-            meshletInfoBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 10);
-            meshletsVertexIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 11);
-            meshletsPrimitiveIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 12);
-            jointMatricesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 13);
-            unskinnedVerticesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 14);
-            prevVertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 15);
+            drawCommandBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 1);
+            meshesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 2);
+            meshInstanceBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 3);
+            visibleMeshInstanceIdSSBO.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 4);
+            materialsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 5);
+            vertexBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 6);
+            vertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 7);
+            meshletTasksCmdsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 8);
+            meshletTasksCountBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 9);
+            meshletBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 10);
+            meshletInfoBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 11);
+            meshletsVertexIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 12);
+            meshletsPrimitiveIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 13);
+            jointMatricesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 14);
+            unskinnedVerticesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 15);
+            prevVertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 16);
 
             meshletTasksCountBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
@@ -237,6 +234,7 @@ namespace IDKEngine
             }
             UploadMeshBuffer(0, Meshes.Length);
 
+            UpdateOpqauesAndTransparents();
             meshInstancesDirty = new BitArray(meshInstances.Length, true);
         }
 
@@ -376,6 +374,7 @@ namespace IDKEngine
             }
             UploadMeshBuffer(0, Meshes.Length);
 
+            UpdateOpqauesAndTransparents();
             meshInstancesDirty = new BitArray(meshInstances.Length, true);
             fenceCopiedSkinnedVerticesToHost?.Dispose();
             fenceCopiedSkinnedVerticesToHost = null;
@@ -421,68 +420,42 @@ namespace IDKEngine
                     }
                 }
             }
-
             UpdateBuffers();
 
             BVH.SetSourceInstances(meshInstances);
 
             meshInstancesDirty = new BitArray(meshInstances.Length, true);
+            UpdateOpqauesAndTransparents();
         }
 
-        private void RemoveMeshInstancesImpl(Range rmInstanceRange)
+        public void UpdateOpqauesAndTransparents()
         {
-            Range meshRange = GetInstancesMeshRange(rmInstanceRange);
-
-            for (int i = 0; i < CpuModels.Length; i++)
+            List<uint> opaqueMeshInstanceIds = new List<uint>();
+            List<uint> transparentMeshInstanceIds = new List<uint>();
+            for (uint i = 0; i < meshInstances.Length; i++)
             {
-                ref readonly CpuModel model = ref CpuModels[i];
+                ref readonly GpuMeshInstance meshInstance = ref meshInstances[i];
+                ref readonly GpuMesh mesh = ref Meshes[meshInstance.MeshId];
 
-                for (int j = 0; j < model.Nodes.Length; j++)
+                //transparentMeshInstanceIds.Add(i);
+                //continue;
+
+                if (GpuMaterials[mesh.MaterialId].IsTransparent())
                 {
-                    ModelLoader.Node node = model.Nodes[j];
-
-                    if (!node.HasMeshInstances)
-                    {
-                        continue;
-                    }
-
-                    if (node.MeshInstanceRange.End <= rmInstanceRange.Start)
-                    {
-                        // mesh instances to be removed are after this nodes mesh instances
-                    }
-                    else if (node.MeshInstanceRange.Start >= rmInstanceRange.End)
-                    {
-                        // mesh instances to be removed are before this nodes mesh instances
-                        node.MeshInstanceRange.Start -= rmInstanceRange.Count;
-                    }
-                    else if (node.MeshInstanceRange.Overlaps(rmInstanceRange, out int overlap))
-                    {
-                        // mesh instances to be removed overlap with this nodes mesh instances
-                        node.MeshInstanceRange.Count -= overlap;
-                    }
+                    transparentMeshInstanceIds.Add(i);
+                }
+                else
+                {
+                    opaqueMeshInstanceIds.Add(i);
                 }
             }
-
-            for (int i = rmInstanceRange.Start; i < rmInstanceRange.End; i++)
-            {
-                int meshId = meshInstances[i].MeshId;
-
-                DrawCommands[meshId].InstanceCount--;
-                Meshes[meshId].InstanceCount--;
-            }
-
-            for (int i = meshRange.End; i < DrawCommands.Length; i++)
-            {
-                ref BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[i];
-                cmd.BaseInstance -= rmInstanceRange.Count;
-            }
-
-            Helper.ArrayRemove(ref meshInstances, rmInstanceRange.Start, rmInstanceRange.Count);
+            BBG.Buffer.Recreate(ref OpaqueMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, CollectionsMarshal.AsSpan(opaqueMeshInstanceIds));
+            BBG.Buffer.Recreate(ref TransparentMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, CollectionsMarshal.AsSpan(transparentMeshInstanceIds));
         }
 
         public void Draw()
         {
-            BBG.Rendering.SetVertexInputAssembly(new BBG.Rendering.VertexInputAssembly()
+            BBG.Rendering.SetVertexInputAssembly(new BBG.Rendering.VertexInputDesc()
             {
                 IndexBuffer = vertexIndicesBuffer,
             });
@@ -639,7 +612,7 @@ namespace IDKEngine
             }
 
             // for mesh-shader rendering path
-            meshletTasksCountBuffer.UploadElements(count);
+            meshletTasksCountBuffer.UploadElements((uint)count);
         }
 
         public int GetMeshesVertexCount(int startMesh, int count = 1)
@@ -668,6 +641,58 @@ namespace IDKEngine
             range.End = DrawCommands[meshes.End - 1].FirstIndex + DrawCommands[meshes.End - 1].IndexCount;
 
             return range;
+        }
+
+        public Range GetInstancesMeshRange(Range instanceRange)
+        {
+            return GetInstancesMeshRange(instanceRange, meshInstances);
+        }
+
+        public Range GetNodeMaterialRange(ModelLoader.Node node)
+        {
+            Range meshRange = GetNodeMeshRangeRecursive(node);
+            if (meshRange.Count == 0)
+            {
+                return new Range(0, 0);
+            }
+
+            int min = int.MaxValue;
+            int max = 0;
+            for (int i = meshRange.Start; i < meshRange.End; i++)
+            {
+                min = Math.Min(min, Meshes[i].MaterialId);
+                max = Math.Max(max, Meshes[i].MaterialId);
+            }
+
+            return new Range(min, max - min + 1);
+        }
+
+        public Range GetNodeMeshRange(ModelLoader.Node node)
+        {
+            return GetNodeMeshRange(node, meshInstances);
+        }
+
+        public Range GetNodeMeshRangeRecursive(ModelLoader.Node node)
+        {
+            int min = int.MaxValue;
+            int max = -1;
+            ModelLoader.Node.Traverse(node, (node) =>
+            {
+                if (node.HasMeshInstances)
+                {
+                    Range meshRange = GetNodeMeshRange(node);
+
+                    min = Math.Min(min, meshRange.Start);
+                    max = Math.Max(max, meshRange.End);
+                }
+            });
+
+            if (max == -1)
+            {
+                return new Range(0, 0);
+            }
+
+            return new Range(min, max - min);
         }
 
         public void UploadVertexPositionBuffer(int start, int count)
@@ -702,55 +727,55 @@ namespace IDKEngine
             }
         }
 
-        public Range GetInstancesMeshRange(Range instanceRange)
+        private void RemoveMeshInstancesImpl(Range rmInstanceRange)
         {
-            Range range = new Range();
-            range.Start = meshInstances[instanceRange.Start].MeshId;
-            range.End = meshInstances[instanceRange.End - 1].MeshId + 1;
+            Range meshRange = GetInstancesMeshRange(rmInstanceRange);
 
-            return range;
-        }
-
-        public Range GetNodeMaterialRange(ModelLoader.Node node)
-        {
-            Range meshRange = GetNodeMeshRangeRecursive(node);
-            int min = int.MaxValue;
-            int max = 0;
-            for (int i = meshRange.Start; i < meshRange.End; i++)
+            for (int i = 0; i < CpuModels.Length; i++)
             {
-                min = Math.Min(min, Meshes[i].MaterialId);
-                max = Math.Max(max, Meshes[i].MaterialId);
-            }
+                ref readonly CpuModel model = ref CpuModels[i];
 
-            return new Range(min, max - min + 1);
-        }
-
-        public Range GetNodeMeshRange(ModelLoader.Node node)
-        {
-            return GetNodeMeshRange(node, meshInstances);
-        }
-
-        public Range GetNodeMeshRangeRecursive(ModelLoader.Node node)
-        {
-            int min = int.MaxValue;
-            int max = -1;
-            ModelLoader.Node.Traverse(node, (node) =>
-            {
-                if (node.HasMeshInstances)
+                for (int j = 0; j < model.Nodes.Length; j++)
                 {
-                    Range meshRange = GetNodeMeshRange(node);
+                    ModelLoader.Node node = model.Nodes[j];
 
-                    min = Math.Min(min, meshRange.Start);
-                    max = Math.Max(max, meshRange.End);
+                    if (!node.HasMeshInstances)
+                    {
+                        continue;
+                    }
+
+                    if (node.MeshInstanceRange.End <= rmInstanceRange.Start)
+                    {
+                        // mesh instances to be removed are after this nodes mesh instances
+                    }
+                    else if (node.MeshInstanceRange.Start >= rmInstanceRange.End)
+                    {
+                        // mesh instances to be removed are before this nodes mesh instances
+                        node.MeshInstanceRange.Start -= rmInstanceRange.Count;
+                    }
+                    else if (node.MeshInstanceRange.Overlaps(rmInstanceRange, out int overlap))
+                    {
+                        // mesh instances to be removed overlap with this nodes mesh instances
+                        node.MeshInstanceRange.Count -= overlap;
+                    }
                 }
-            });
-
-            if (max == -1)
-            {
-                return new Range(-1, 0);
             }
 
-            return new Range(min, max - min);
+            for (int i = rmInstanceRange.Start; i < rmInstanceRange.End; i++)
+            {
+                int meshId = meshInstances[i].MeshId;
+
+                DrawCommands[meshId].InstanceCount--;
+                Meshes[meshId].InstanceCount--;
+            }
+
+            for (int i = meshRange.End; i < DrawCommands.Length; i++)
+            {
+                ref BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[i];
+                cmd.BaseInstance -= rmInstanceRange.Count;
+            }
+
+            Helper.ArrayRemove(ref meshInstances, rmInstanceRange.Start, rmInstanceRange.Count);
         }
 
         private void UpdateMeshInstanceBufferBatched(out bool anyMeshInstanceMoved)
@@ -923,7 +948,7 @@ namespace IDKEngine
             BBG.Buffer.Recreate(ref meshletsPrimitiveIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsPrimitiveIndices);
             BBG.Buffer.Recreate(ref jointMatricesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, JointMatrices);
             BBG.Buffer.Recreate(ref unskinnedVerticesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, unskinnedVertices);
-            BBG.Buffer.Recreate(ref visibleMeshInstancesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
+            BBG.Buffer.Recreate(ref visibleMeshInstanceIdSSBO, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
             BBG.Buffer.Recreate(ref meshletTasksCmdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
             BBG.Buffer.Recreate(ref prevVertexPositionsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertexPositions);
         }
@@ -938,7 +963,7 @@ namespace IDKEngine
             VertexPositions = new NativeMemoryView<Vector3>(vertexPositionsHostBuffer.Memory, vertexPositionsHostBuffer.NumElements);
             BBG.Buffer.Recreate(ref vertexIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, VertexIndices);
             BBG.Buffer.Recreate(ref jointMatricesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, JointMatrices);
-            BBG.Buffer.Recreate(ref visibleMeshInstancesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
+            BBG.Buffer.Recreate(ref visibleMeshInstanceIdSSBO, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
             BBG.Buffer.Recreate(ref meshletTasksCmdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
         }
 
@@ -979,7 +1004,7 @@ namespace IDKEngine
             drawCommandBuffer.Dispose();
             meshesBuffer.Dispose();
             meshInstanceBuffer.Dispose();
-            visibleMeshInstancesBuffer.Dispose();
+            visibleMeshInstanceIdSSBO.Dispose();
             materialsBuffer.Dispose();
             vertexBuffer.Dispose();
             vertexIndicesBuffer.Dispose();
@@ -998,6 +1023,9 @@ namespace IDKEngine
             BVH.Dispose();
 
             skinningShaderProgram.Dispose();
+
+            OpaqueMeshInstanceIdBuffer.Dispose();
+            TransparentMeshInstanceIdBuffer.Dispose();
         }
 
         private static GpuUnskinnedVertex[] LoadUnskinnedVertices(in ModelLoader.Model model)
@@ -1106,9 +1134,19 @@ namespace IDKEngine
                 throw new ArgumentException($"Node has no mesh instances");
             }
 
-            ref readonly GpuMeshInstance first = ref meshInstances[node.MeshInstanceRange.Start];
-            ref readonly GpuMeshInstance last = ref meshInstances[node.MeshInstanceRange.End - 1];
-            return new Range(first.MeshId, (last.MeshId - first.MeshId) + 1);
+            Range meshRange = GetInstancesMeshRange(node.MeshInstanceRange, meshInstances);
+            return meshRange;
+        }
+
+        public static Range GetInstancesMeshRange(Range instanceRange, ReadOnlySpan<GpuMeshInstance> meshInstances)
+        {
+            // Assumes that for mesh instances GpuMeshInstance[i + 1].MeshIndex >= GpuMeshInstance[i].MeshIndex
+
+            Range range = new Range();
+            range.Start = meshInstances[instanceRange.Start].MeshId;
+            range.End = meshInstances[instanceRange.End - 1].MeshId + 1;
+
+            return range;
         }
 
         private static int GetMeshesVertexCount(ReadOnlySpan<BBG.DrawElementsIndirectCommand> drawCmds, ReadOnlySpan<Vector3> vertexPositions, int startMesh, int count = 1)

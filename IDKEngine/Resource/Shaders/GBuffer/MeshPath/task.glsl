@@ -19,18 +19,18 @@ layout(local_size_x = MESHLETS_PER_WORKGROUP) in;
 taskNV out InOutData
 {
     uint MeshId;
-    uint InstanceID;
+    uint InstanceId;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
 } outData;
 
 void main()
 {
-    uint meshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_DrawID];
-    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    uint meshInstanceId = visibleMeshInstanceIdSSBO.Ids[gl_DrawID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
 
-    uint meshID = meshInstance.MeshId;
-    GpuMesh mesh = meshSSBO.Meshes[meshID];
+    uint meshId = meshInstance.MeshId;
+    GpuMesh mesh = meshSSBO.Meshes[meshId];
 
     if (gl_GlobalInvocationID.x >= mesh.MeshletCount)
     {
@@ -41,7 +41,7 @@ void main()
     uint workgroupFirstMeshlet = mesh.MeshletsStart + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
     uint workgroupThisMeshlet = workgroupFirstMeshlet + localMeshlet;
 
-    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
     GpuMeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
 
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
@@ -94,8 +94,8 @@ void main()
 
     if (gl_LocalInvocationIndex == 0)
     {
-        outData.MeshId = meshID;
-        outData.InstanceID = meshInstanceID;
+        outData.MeshId = meshId;
+        outData.InstanceId = meshInstanceId;
         outData.MeshletsStart = workgroupFirstMeshlet;
         
         uint survivingCount = subgroupBallotBitCount(visibleMeshletsBitmask);

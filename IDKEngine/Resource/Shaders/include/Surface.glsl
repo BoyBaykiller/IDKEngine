@@ -96,7 +96,7 @@ void SurfaceApplyModificatons(inout Surface surface, GpuMesh mesh)
     surface.TintOnTransmissive = mesh.TintOnTransmissive;
 }
 
-bool SurfaceIsAlphaBlending(Surface surface)
+bool SurfaceIsTransparent(Surface surface)
 {
     // Keep in sync between shader and client code!
     const float valueMeaniningBlendMode = 2.0;

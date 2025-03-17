@@ -174,3 +174,8 @@ uint GetMorton(vec3 normalizedV)
 
     return result;
 }
+
+int CeilLog2Int(int x)
+{
+    return int(ceil(log2(float(x))));
+}

@@ -27,7 +27,7 @@ void main()
     vec3 vertexPosition = Unpack(vertexPositionsSSBO.Positions[gl_VertexID]);
 
     GpuMesh mesh = meshSSBO.Meshes[gl_DrawID];
-    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_InstanceID + gl_BaseInstance];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_BaseInstance + gl_InstanceID];
 
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);

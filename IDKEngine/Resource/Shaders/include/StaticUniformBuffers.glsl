@@ -4,7 +4,7 @@ AppInclude(include/GpuTypes.glsl)
 #define GPU_MAX_UBO_POINT_SHADOW_COUNT 128
 #define GPU_MAX_UBO_LIGHT_COUNT 256
 
-// binding 0 reserved for temporary UBOs
+// Binding 0 is reserved for temporary UBOs
 
 layout(std140, binding = 1) uniform PerFrameDataUBO
 {

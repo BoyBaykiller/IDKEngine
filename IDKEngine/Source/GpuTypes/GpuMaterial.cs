@@ -55,5 +55,13 @@ namespace IDKEngine.GpuTypes
         public bool IsThinWalled;
         private fixed bool _pad[3];
         private readonly float _pad0;
+
+        public readonly bool IsTransparent()
+        {
+            // Keep in sync between shader and client code!
+            const float valueMeaniningBlendMode = 2.0f;
+
+            return AlphaCutoff == valueMeaniningBlendMode;
+        }
     }
 }

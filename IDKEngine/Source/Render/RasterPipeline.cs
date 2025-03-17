@@ -78,6 +78,7 @@ namespace IDKEngine.Render
                 }
 
                 if (gBufferProgram != null) gBufferProgram.Dispose();
+                if (forwardTransparentProgram != null) forwardTransparentProgram.Dispose();
                 BBG.AbstractShaderProgram.SetShaderInsertionValue("TAKE_MESH_SHADER_PATH_CAMERA", TakeMeshShaderPath);
 
                 if (TakeMeshShaderPath)
@@ -86,12 +87,21 @@ namespace IDKEngine.Render
                        BBG.AbstractShader.FromFile(BBG.ShaderStage.TaskNV, "GBuffer/MeshPath/task.glsl"),
                        BBG.AbstractShader.FromFile(BBG.ShaderStage.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
+
+                    forwardTransparentProgram = new BBG.AbstractShaderProgram(
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.TaskNV, "GBuffer/MeshPath/task.glsl"),
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "ForwardTransparent/fragment.glsl"));
                 }
                 else
                 {
                     gBufferProgram = new BBG.AbstractShaderProgram(
                         BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "GBuffer/VertexPath/vertex.glsl"),
                         BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
+
+                    forwardTransparentProgram = new BBG.AbstractShaderProgram(
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "GBuffer/VertexPath/vertex.glsl"),
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "ForwardTransparent/fragment.glsl"));
                 }
             }
         }
@@ -141,7 +151,7 @@ namespace IDKEngine.Render
         public TAAResolve? TaaResolve;
         public FSR2Wrapper? FSR2Wrapper;
 
-        // Which FX is turned on
+        // Which FX are turned on
         public bool IsWireframe;
         public bool IsSSAO;
         public bool IsSSR;
@@ -172,6 +182,7 @@ namespace IDKEngine.Render
         public BBG.Texture DepthTexture;
 
         private BBG.AbstractShaderProgram gBufferProgram;
+        private BBG.AbstractShaderProgram forwardTransparentProgram;
         private readonly BBG.AbstractShaderProgram deferredLightingProgram;
         private readonly BBG.AbstractShaderProgram skyBoxProgram;
         private readonly BBG.AbstractShaderProgram mergeLightingProgram;
@@ -248,22 +259,28 @@ namespace IDKEngine.Render
                 gpuTaaData.MipmapBias = 0.0f;
                 gpuTaaData.Jitter = new Vector2(0.0f);
                 gpuTaaData.TemporalAntiAliasingMode = TAAMode;
+
                 if (TAAMode == TemporalAntiAliasingMode.TAA)
                 {
                     gpuTaaData.MipmapBias = TAAResolve.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + TAAAdditionalMipBias;
                     gpuTaaData.SampleCount = TAASamples;
                 }
+
                 if (TAAMode == TemporalAntiAliasingMode.FSR2)
                 {
                     gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + TAAAdditionalMipBias;
                     gpuTaaData.SampleCount = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
                 }
+
                 if (TAAMode == TemporalAntiAliasingMode.TAA || 
                     TAAMode == TemporalAntiAliasingMode.FSR2)
                 {
                     Vector2 jitter = MyMath.GetHalton2D(frameIndex++ % gpuTaaData.SampleCount, 2, 3);
-                    gpuTaaData.Jitter = (jitter * 2.0f - new Vector2(1.0f)) / RenderResolution;
+                    jitter = jitter * 2.0f - new Vector2(1.0f);
+
+                    gpuTaaData.Jitter = jitter / RenderResolution;
                 }
+
                 if (!TAAEnableMipBias)
                 {
                     gpuTaaData.MipmapBias = 0.0f;
@@ -335,16 +352,17 @@ namespace IDKEngine.Render
                 }
             }
 
-            BBG.Computing.Compute("Main view Frustum and Occlusion Culling", () =>
+            BBG.Computing.Compute("Main view culling for opaques", () =>
             {
                 modelManager.ResetInstanceCounts();
+                modelManager.OpaqueMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 0);
 
                 BBG.Cmd.UseShaderProgram(cullingProgram);
-                BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
+                BBG.Computing.Dispatch(MyMath.DivUp(modelManager.OpaqueMeshInstanceIdBuffer.NumElements, 64), 1, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
 
-            BBG.Rendering.Render("Fill G-Buffer", new BBG.Rendering.RenderAttachments()
+            BBG.Rendering.Render("Fill G-Buffer with opaques", new BBG.Rendering.RenderAttachments()
             {
                 ColorAttachments = new BBG.Rendering.ColorAttachments()
                 {
@@ -358,15 +376,13 @@ namespace IDKEngine.Render
                 }
             }, new BBG.Rendering.GraphicsPipelineState()
             {
-                EnabledCapabilities = [BBG.Rendering.Capability.DepthTest, BBG.Rendering.CapIf(!IsWireframe, BBG.Rendering.Capability.CullFace)],
+                EnabledCapabilities = [
+                    BBG.Rendering.Capability.DepthTest,
+                    BBG.Rendering.CapIf(!IsWireframe, BBG.Rendering.Capability.CullFace)
+                ],
                 FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
             }, () =>
             {
-                // TODO: As soon as we properly integrated blending make this part of BBG (ogl abstraction)
-                OpenTK.Graphics.OpenGL.GL.Enablei(OpenTK.Graphics.OpenGL.EnableCap.Blend, 0);
-                OpenTK.Graphics.OpenGL.GL.BlendEquationi(0, OpenTK.Graphics.OpenGL.BlendEquationMode.FuncAdd);
-                OpenTK.Graphics.OpenGL.GL.BlendFunci(0, OpenTK.Graphics.OpenGL.BlendingFactor.SrcAlpha, OpenTK.Graphics.OpenGL.BlendingFactor.OneMinusSrcAlpha);
-                
                 BBG.Cmd.UseShaderProgram(gBufferProgram);
 
                 BBG.Rendering.InferViewportSize();
@@ -378,8 +394,6 @@ namespace IDKEngine.Render
                 {
                     modelManager.Draw();
                 }
-
-                OpenTK.Graphics.OpenGL.GL.Disablei(OpenTK.Graphics.OpenGL.EnableCap.Blend, 0);
             });
 
             // The AMD driver fails to detect a write-read dependency between G-Buffer and some of the
@@ -444,7 +458,8 @@ namespace IDKEngine.Render
             }, new BBG.Rendering.GraphicsPipelineState()
             {
                 EnabledCapabilities = [
-                    BBG.Rendering.Capability.DepthTest, BBG.Rendering.Capability.CullFace,
+                    BBG.Rendering.Capability.DepthTest,
+                    BBG.Rendering.Capability.CullFace,
                     BBG.Rendering.CapIf(IsVariableRateShading, BBG.Rendering.Capability.VariableRateShadingNV)
                 ],
                 VariableRateShading = LightingVRS.GetRenderData(),
@@ -479,6 +494,65 @@ namespace IDKEngine.Render
             {
                 BBG.Cmd.UseShaderProgram(skyBoxProgram);
                 BBG.Rendering.DrawNonIndexed(BBG.Rendering.Topology.Quads, 0, 24);
+            });
+
+            BBG.Computing.Compute("Main view culling for transparents", () =>
+            {
+                modelManager.ResetInstanceCounts();
+                modelManager.TransparentMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 0);
+
+                BBG.Cmd.UseShaderProgram(cullingProgram);
+                BBG.Computing.Dispatch(MyMath.DivUp(modelManager.TransparentMeshInstanceIdBuffer.NumElements, 64), 1, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+            });
+
+            BBG.Rendering.Render("Render transparents", new BBG.Rendering.RenderAttachmentsVerbose()
+            {
+                ColorAttachments = [new BBG.Rendering.ColorAttachment()
+                {
+                    Texture = beforeTAATexture,
+                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
+                    BlendState = new BBG.Rendering.BlendState()
+                    {
+                        Enabled = true,
+                        BlendOp = BBG.Rendering.BlendOp.Add,
+                        SrcFactor = BBG.Rendering.BlendFactor.SrcAlpha,
+                        DstFactor = BBG.Rendering.BlendFactor.OneMinusSrcAlpha,
+                    }
+                }],
+                DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
+                {
+                    Texture = DepthTexture,
+                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
+                }
+            }, new BBG.Rendering.GraphicsPipelineState()
+            {
+                EnabledCapabilities = [
+                    BBG.Rendering.Capability.DepthTest,
+                    BBG.Rendering.CapIf(!IsWireframe, BBG.Rendering.Capability.CullFace)
+                ],
+                EnableDepthWrites = false,
+                FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
+                DepthFunction = BBG.Rendering.DepthFunction.Less,
+                VariableRateShading = LightingVRS.GetRenderData(),
+            },
+            () =>
+            {
+                forwardTransparentProgram.Upload("IsVXGI", IsVXGI);
+
+                BBG.Cmd.SetUniforms(ConeTracer.Settings);
+                BBG.Cmd.BindTextureUnit(Voxelizer.ResultVoxels, 0);
+                BBG.Cmd.UseShaderProgram(forwardTransparentProgram);
+
+                BBG.Rendering.InferViewportSize();
+                if (TakeMeshShaderPath)
+                {
+                    modelManager.MeshShaderDrawNV();
+                }
+                else
+                {
+                    modelManager.Draw();
+                }
             });
 
             if (IsVariableRateShading || LightingVRS.Settings.DebugValue != LightingShadingRateClassifier.DebugMode.None)
@@ -606,6 +680,7 @@ namespace IDKEngine.Render
 
             DisposeBindlessGBufferTextures();
 
+            forwardTransparentProgram.Dispose();
             gBufferProgram.Dispose();
             deferredLightingProgram.Dispose();
             skyBoxProgram.Dispose();

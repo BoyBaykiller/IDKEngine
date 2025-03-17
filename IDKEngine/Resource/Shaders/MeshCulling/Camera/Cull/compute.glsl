@@ -15,15 +15,21 @@ AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
+layout(std430, binding = 0) restrict buffer InCullingMeshInstanceIdSSBO
+{
+    uint Ids[];
+} inCullingMeshInstanceIdSSBO;
+
 void main()
 {
-    uint meshInstanceID = gl_GlobalInvocationID.x;
-    if (meshInstanceID >= meshInstanceSSBO.MeshInstances.length())
+    if (gl_GlobalInvocationID.x >= inCullingMeshInstanceIdSSBO.Ids.length())
     {
         return;
     }
 
-    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    uint meshInstanceId = inCullingMeshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
+
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     uint meshId = meshInstance.MeshId;
 
     GpuBlasNode node = blasNodeSSBO.Nodes[meshSSBO.Meshes[meshId].BlasRootNodeOffset];
@@ -56,7 +62,7 @@ void main()
     #if TAKE_MESH_SHADER_PATH_CAMERA
 
         uint meshletTaskId = atomicAdd(meshletTasksCountSSBO.Count, 1u);
-        visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskId] = meshInstanceID;
+        visibleMeshInstanceIdSSBO.Ids[meshletTaskId] = meshInstanceId;
         
         const uint taskShaderWorkGroupSize = 32;
         uint meshletCount = meshSSBO.Meshes[meshId].MeshletCount;
@@ -68,7 +74,7 @@ void main()
         GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
 
         uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshId].InstanceCount, 1u);
-        visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance + index] = meshInstanceID;
+        visibleMeshInstanceIdSSBO.Ids[drawCmd.BaseInstance + index] = meshInstanceId;
 
     #endif
 

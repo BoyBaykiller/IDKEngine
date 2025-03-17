@@ -8,14 +8,6 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict uniform image2D ImgResult;
 
-struct HitInfo
-{
-    vec3 Bary;
-    float T;
-    uvec3 VertexIndices;
-    uint InstanceID;
-};
-
 layout(std140, binding = 0) uniform SettingsUBO
 {
     float FocalLength;

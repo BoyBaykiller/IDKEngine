@@ -19,13 +19,13 @@ layout(location = 2) uniform uint VisibleFaces;
 
 void main()
 {
-    uint meshInstanceID = gl_GlobalInvocationID.x;
-    if (meshInstanceID >= meshInstanceSSBO.MeshInstances.length())
+    uint meshInstanceId = gl_GlobalInvocationID.x;
+    if (meshInstanceId >= meshInstanceSSBO.MeshInstances.length())
     {
         return;
     }
 
-    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     uint meshId = meshInstance.MeshId;
     
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
@@ -33,22 +33,22 @@ void main()
 
     for (int i = 0; i < NumVisibleFaces; i++)
     {
-        uint faceID = (VisibleFaces >> (i * 3)) & ((1u << 3) - 1);
+        uint faceId = (VisibleFaces >> (i * 3)) & ((1u << 3) - 1);
 
-        mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceID];
+        mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceId];
         mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
 
         Frustum frustum = GetFrustum(projView * modelMatrix);
         bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
 
-        uint faceAndMeshInstanceId = (faceID << 29) | meshInstanceID; // 3bits | 29bits
+        uint faceAndMeshInstanceId = (faceId << 29) | meshInstanceId; // 3bits | 29bits
 
         if (isVisible)
         {
         #if TAKE_MESH_SHADER_PATH_SHADOW
 
             uint meshletTaskId = atomicAdd(meshletTasksCountSSBO.Count, 1u);
-            visibleMeshInstanceSSBO.MeshInstanceIDs[meshletTaskId] = faceAndMeshInstanceId;
+            visibleMeshInstanceIdSSBO.Ids[meshletTaskId] = faceAndMeshInstanceId;
             
             const uint taskShaderWorkGroupSize = 32;
             uint meshletCount = meshSSBO.Meshes[meshId].MeshletCount;
@@ -58,7 +58,7 @@ void main()
         #else
 
             uint index = atomicAdd(drawElementsCmdSSBO.Commands[meshId].InstanceCount, 1u);
-            visibleMeshInstanceSSBO.MeshInstanceIDs[drawCmd.BaseInstance * 6 + index] = faceAndMeshInstanceId;
+            visibleMeshInstanceIdSSBO.Ids[drawCmd.BaseInstance * 6 + index] = faceAndMeshInstanceId;
 
         #endif
         }

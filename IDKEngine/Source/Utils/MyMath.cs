@@ -121,12 +121,12 @@ namespace IDKEngine.Utils
             return MathF.Abs(a - b) < epsilon;
         }
 
-        public static float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMin, float mapMax)
+        public static float Remap(float value, float valueMin, float valueMax, float mapMin, float mapMax)
         {
             return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
         }
 
-        public static Vector3 MapRangeToAnOther(Vector3 value, Vector3 valueMin, Vector3 valueMax, Vector3 mapMin, Vector3 mapMax)
+        public static Vector3 Remap(Vector3 value, Vector3 valueMin, Vector3 valueMax, Vector3 mapMin, Vector3 mapMax)
         {
             Vector3 temp = (valueMax - valueMin);
             Vector3 result = (value - valueMin) / temp * (mapMax - mapMin) + mapMin;
@@ -140,12 +140,12 @@ namespace IDKEngine.Utils
 
         public static Vector3 MapToZeroOne(Vector3 value, Vector3 rangeMin, Vector3 rangeMax)
         {
-            return MapRangeToAnOther(value, rangeMin, rangeMax, new Vector3(0.0f), new Vector3(1.0f));
+            return Remap(value, rangeMin, rangeMax, new Vector3(0.0f), new Vector3(1.0f));
         }
 
         public static float MapToZeroOne(float value, float rangeMin, float rangeMax)
         {
-            return MapRangeToAnOther(value, rangeMin, rangeMax, 0.0f, 1.0f);
+            return Remap(value, rangeMin, rangeMax, 0.0f, 1.0f);
         }
 
         public static int NextMultiple(int num, int multiple)

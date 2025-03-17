@@ -17,8 +17,8 @@ layout(local_size_x = MESHLETS_PER_WORKGROUP) in;
 taskNV out InOutData
 {
     uint MeshId;
-    uint InstanceID;
-    uint8_t FaceID;
+    uint InstanceId;
+    uint8_t FaceId;
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
 } outData;
@@ -27,14 +27,14 @@ layout(location = 0) uniform int ShadowIndex;
 
 void main()
 {
-    uint faceAndMeshInstanceID = visibleMeshInstanceSSBO.MeshInstanceIDs[gl_DrawID];
-    uint8_t faceID = uint8_t(faceAndMeshInstanceID >> 29);
-    uint meshInstanceID = faceAndMeshInstanceID & ((1u << 29) - 1);
+    uint faceAndMeshInstanceId = visibleMeshInstanceIdSSBO.Ids[gl_DrawID];
+    uint8_t faceId = uint8_t(faceAndMeshInstanceId >> 29);
+    uint meshInstanceId = faceAndMeshInstanceId & ((1u << 29) - 1);
 
-    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceID];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
 
-    uint meshID = meshInstance.MeshId;
-    GpuMesh mesh = meshSSBO.Meshes[meshID];
+    uint meshId = meshInstance.MeshId;
+    GpuMesh mesh = meshSSBO.Meshes[meshId];
 
     if (gl_GlobalInvocationID.x >= mesh.MeshletCount)
     {
@@ -45,11 +45,11 @@ void main()
     uint workgroupFirstMeshlet = mesh.MeshletsStart + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
     uint workgroupThisMeshlet = workgroupFirstMeshlet + localMeshlet;
 
-    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshID];
+    GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
     GpuMeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
     
-    mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceID];
-    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceID].ModelMatrix);
+    mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceId];
+    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceId].ModelMatrix);
 
     Frustum frustum = GetFrustum(projView * modelMatrix);
     bool isVisible = FrustumBoxIntersect(frustum, Box(meshletInfo.Min, meshletInfo.Max));
@@ -63,9 +63,9 @@ void main()
 
     if (gl_LocalInvocationIndex == 0)
     {
-        outData.MeshId = meshID;
-        outData.InstanceID = meshInstanceID;
-        outData.FaceID = faceID;
+        outData.MeshId = meshId;
+        outData.InstanceId = meshInstanceId;
+        outData.FaceId = faceId;
         outData.MeshletsStart = workgroupFirstMeshlet;
         
         uint survivingCount = subgroupBallotBitCount(visibleMeshletsBitmask);

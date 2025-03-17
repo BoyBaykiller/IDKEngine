@@ -26,10 +26,10 @@ vec4 TraceCone(sampler3D samplerVoxels, Ray ray, vec3 normal, float coneAngle, f
         {
             break;
         }
+
+        // Voxel color already premultiplied with alpha
         vec4 newSample = textureLod(samplerVoxels, sampleUVW, sampleLod);
 
-        // glBlendEquation(mode: GL_FUNC_ADD)
-        // glBlendFunc(sfactor: GL_ONE_MINUS_DST_ALPHA, dfactor: 1.0)
         float weightOfNewSample = (1.0 - accumulatedColor.a);
         accumulatedColor += weightOfNewSample * newSample;
         

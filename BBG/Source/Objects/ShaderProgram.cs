@@ -121,16 +121,11 @@ namespace BBOpenGL
             private static readonly List<AbstractShaderProgram> globalInstances = new List<AbstractShaderProgram>();
 
             public AbstractShader[] Shaders { get; private set; }
-            public AbstractShaderProgram(AbstractShader[] shaders)
+            public AbstractShaderProgram(params AbstractShader[] shaders)
                 : base(shaders)
             {
                 Shaders = shaders;
                 globalInstances.Add(this);
-            }
-
-            public AbstractShaderProgram(AbstractShader first, params AbstractShader[] others)
-                : this([.. others, first])
-            {
             }
 
             public void Recompile()
