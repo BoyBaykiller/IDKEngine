@@ -55,7 +55,7 @@ ENUM_BSDF SelectBsdf(Surface surface, out float bsdfSelectionPdf)
 
 SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevIor, bool fromInside)
 {
-    surface.Roughness *= surface.Roughness; // just a convention to make roughness feel more linear perceptually
+    surface.Roughness *= surface.Roughness; // convention that makes roughness appear more linear
 
     float cosTheta = dot(-incomming, surface.Normal);
 

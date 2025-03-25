@@ -16,11 +16,16 @@ namespace IDKEngine.Render
         public float Sharpness = 0.5f;
 
         public BBG.Texture Result;
+
+        private FSR2.Context fsr2Context;
+        private byte[] fsr2ScratchMemory;
+        private bool isFsr2Initialized;
+
         public FSR2Wrapper(Vector2i maxInputSize, Vector2i outputSize)
         {
             if (!IS_SUPPORTED)
             {
-                Logger.Log(Logger.LogLevel.Fatal, $"{nameof(IS_SUPPORTED)} was {IS_SUPPORTED}. FSR2 is Windows only");
+                Logger.Log(Logger.LogLevel.Fatal, $"FSR2 is Windows only");
                 Environment.Exit(0);
             }
 
@@ -63,9 +68,6 @@ namespace IDKEngine.Render
             BBG.Debugging.PopDebugGroup();
         }
 
-        private FSR2.Context fsr2Context;
-        private byte[] fsr2ScratchMemory;
-        private bool isFsr2Initialized;
         public unsafe void SetSize(Vector2i inputSize, Vector2i outputSize)
         {
             if (Result != null) Result.Dispose();

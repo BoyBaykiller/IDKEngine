@@ -183,7 +183,7 @@ namespace IDKEngine.Render
                 externalCubemapTexture.Upload3D(
                     size, size, 1,
                     BBG.Texture.NumChannelsToPixelFormat(imageResult.Header.Channels),
-                    BBG.Texture.PixelType.UByte,
+                    BBG.Texture.PixelType.Ubyte,
                     imageResult.Memory,
                     0, 0, 0, i
                 );

@@ -43,7 +43,7 @@ float SSAO(vec3 fragPos, vec3 normal)
 
     float occlusion = 0.0;
 
-    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
+    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != ENUM_ANTI_ALIASING_MODE_NONE;
     uint noiseIndex = taaEnabled ? (perFrameDataUBO.Frame % taaDataUBO.SampleCount) * (settingsUBO.SampleCount * 3) : 0u;
     for (int i = 0; i < settingsUBO.SampleCount; i++)
     {

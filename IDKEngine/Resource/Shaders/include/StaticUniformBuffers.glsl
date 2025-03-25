@@ -1,3 +1,4 @@
+AppInclude(include/Constants.glsl)
 AppInclude(include/GpuTypes.glsl)
 
 // Keep in sync between shader and client code!
@@ -28,7 +29,7 @@ layout(std140, binding = 4) uniform TaaDataUBO
     vec2 Jitter;
     int SampleCount;
     float MipmapBias;
-    int TemporalAntiAliasingMode;
+    ENUM_ANTI_ALIASING_MODE TemporalAntiAliasingMode;
 } taaDataUBO;
 
 layout(std140, binding = 5) uniform SkyBoxUBO

@@ -11,6 +11,7 @@ Feature list:
  - CoD-Modern-Warfare Bloom
  - Ray Traced Shadows
  - Variable Rate Shading
+ - Order Independent Transparency
  - Ray marched Volumetric Lighting
  - GPU Frustum + Hi-Z Culling
  - Screen Space Reflections

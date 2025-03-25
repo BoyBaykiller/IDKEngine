@@ -13,17 +13,23 @@ AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
+layout(std430, binding = 0) restrict readonly buffer InCullingMeshInstanceIdSSBO
+{
+    uint Ids[];
+} inCullingMeshInstanceIdSSBO;
+
 layout(location = 0) uniform int ShadowIndex;
 layout(location = 1) uniform int NumVisibleFaces;
 layout(location = 2) uniform uint VisibleFaces;
 
 void main()
 {
-    uint meshInstanceId = gl_GlobalInvocationID.x;
-    if (meshInstanceId >= meshInstanceSSBO.MeshInstances.length())
+    if (gl_GlobalInvocationID.x >= inCullingMeshInstanceIdSSBO.Ids.length())
     {
         return;
     }
+
+    uint meshInstanceId = inCullingMeshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     uint meshId = meshInstance.MeshId;

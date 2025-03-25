@@ -208,6 +208,7 @@ namespace IDKEngine.Render
                     ImGui.Checkbox("Collision##Camera", ref app.SceneVsCamCollisionSettings.IsEnabled);
                     if (app.SceneVsCamCollisionSettings.IsEnabled)
                     {
+                        ImGui.SliderFloat("Radius##Camera", ref app.CameraCollisionRadius, 0.0f, 2.0f);
                         ImGui.SliderInt("TestSteps##Camera", ref app.SceneVsCamCollisionSettings.Settings.TestSteps, 1, 20);
                         ImGui.SliderInt("RecursiveSteps##Camera", ref app.SceneVsCamCollisionSettings.Settings.RecursiveSteps, 1, 20);
                         ImGui.SliderFloat("NormalOffset##Camera", ref app.SceneVsCamCollisionSettings.Settings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
@@ -280,7 +281,7 @@ namespace IDKEngine.Render
                     }
                     ImGui.Separator();
 
-                    if (app.CRenderMode == Application.RenderMode.PathTracer)
+                    if (app.RenderMode_ == Application.RenderMode.PathTracer)
                     {
                         tempInt = app.RecorderVars.PathTracingSamplesGoal;
                         if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
@@ -347,12 +348,12 @@ namespace IDKEngine.Render
                     }
                 }
 
-                if (ImGui.BeginCombo("Render Mode", app.CRenderMode.ToString()))
+                if (ImGui.BeginCombo("Render Mode", app.RenderMode_.ToString()))
                 {
                     Application.RenderMode[] renderModes = Enum.GetValues<Application.RenderMode>();
                     for (int i = 0; i < renderModes.Length; i++)
                     {
-                        bool isSelected = app.CRenderMode == renderModes[i];
+                        bool isSelected = app.RenderMode_ == renderModes[i];
                         string enumName = renderModes[i].ToString();
                         if (ImGui.Selectable(enumName, isSelected))
                         {
@@ -368,7 +369,7 @@ namespace IDKEngine.Render
                 }
                 ImGui.Separator();
 
-                if (app.CRenderMode == Application.RenderMode.Rasterizer)
+                if (app.RenderMode_ == Application.RenderMode.Rasterizer)
                 {
                     ImGui.Checkbox("IsWireframe", ref app.RasterizerPipeline.IsWireframe);
 
@@ -494,16 +495,16 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Shadows"))
                     {
-                        if (ImGui.BeginCombo("ShadowMode", app.RasterizerPipeline.ShadowMode.ToString()))
+                        if (ImGui.BeginCombo("ShadowMode", app.RasterizerPipeline.ShadowMode_.ToString()))
                         {
-                            RasterPipeline.ShadowTechnique[] shadowTechniques = Enum.GetValues<RasterPipeline.ShadowTechnique>();
+                            RasterPipeline.ShadowMode[] shadowTechniques = Enum.GetValues<RasterPipeline.ShadowMode>();
                             for (int i = 0; i < shadowTechniques.Length; i++)
                             {
-                                bool isSelected = app.RasterizerPipeline.ShadowMode == shadowTechniques[i];
+                                bool isSelected = app.RasterizerPipeline.ShadowMode_ == shadowTechniques[i];
                                 string enumName = shadowTechniques[i].ToString();
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
-                                    app.RasterizerPipeline.ShadowMode = (RasterPipeline.ShadowTechnique)i;
+                                    app.RasterizerPipeline.ShadowMode_ = (RasterPipeline.ShadowMode)i;
                                 }
 
                                 if (isSelected)
@@ -514,7 +515,7 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        if (app.RasterizerPipeline.ShadowMode == RasterPipeline.ShadowTechnique.RayTraced)
+                        if (app.RasterizerPipeline.ShadowMode_ == RasterPipeline.ShadowMode.RayTraced)
                         {
                             ImGui.Text(
                                 "This is mostly just a tech demo.\n" +
@@ -534,16 +535,16 @@ namespace IDKEngine.Render
 
                     if (ImGui.CollapsingHeader("Anti Aliasing"))
                     {
-                        if (ImGui.BeginCombo("Mode", app.RasterizerPipeline.TAAMode.ToString()))
+                        if (ImGui.BeginCombo("Mode", app.RasterizerPipeline.AntiAliasingMode_.ToString()))
                         {
-                            RasterPipeline.TemporalAntiAliasingMode[] options = Enum.GetValues<RasterPipeline.TemporalAntiAliasingMode>();
+                            RasterPipeline.AntiAliasingMode[] options = Enum.GetValues<RasterPipeline.AntiAliasingMode>();
                             for (int i = 0; i < options.Length; i++)
                             {
-                                bool isSelected = app.RasterizerPipeline.TAAMode == options[i];
+                                bool isSelected = app.RasterizerPipeline.AntiAliasingMode_ == options[i];
                                 string enumName = options[i].ToString();
                                 if (ImGui.Selectable(enumName, isSelected))
                                 {
-                                    app.RasterizerPipeline.TAAMode = (RasterPipeline.TemporalAntiAliasingMode)i;
+                                    app.RasterizerPipeline.AntiAliasingMode_ = (RasterPipeline.AntiAliasingMode)i;
                                 }
 
                                 if (isSelected)
@@ -554,7 +555,7 @@ namespace IDKEngine.Render
                             ImGui.EndCombo();
                         }
 
-                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.TAA)
+                        if (app.RasterizerPipeline.AntiAliasingMode_ == RasterPipeline.AntiAliasingMode.TAA)
                         {
                             ImGui.Checkbox("IsNaiveTaa", ref app.RasterizerPipeline.TaaResolve.Settings.IsNaiveTaa);
                             ToolTipForItemAboveHovered(
@@ -570,7 +571,7 @@ namespace IDKEngine.Render
                             }
                         }
 
-                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.FSR2)
+                        if (app.RasterizerPipeline.AntiAliasingMode_ == RasterPipeline.AntiAliasingMode.FSR2)
                         {
                             ImGui.Text(
                                 "FSR2 (by AMD) does Anti Aliasing but\n" +
@@ -587,8 +588,8 @@ namespace IDKEngine.Render
                             }
                         }
 
-                        if (app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.TAA ||
-                            app.RasterizerPipeline.TAAMode == RasterPipeline.TemporalAntiAliasingMode.FSR2)
+                        if (app.RasterizerPipeline.AntiAliasingMode_ == RasterPipeline.AntiAliasingMode.TAA ||
+                            app.RasterizerPipeline.AntiAliasingMode_ == RasterPipeline.AntiAliasingMode.FSR2)
                         {
                             ImGui.Checkbox("EnableMipBias", ref app.RasterizerPipeline.TAAEnableMipBias);
                             if (app.RasterizerPipeline.TAAEnableMipBias)
@@ -681,7 +682,7 @@ namespace IDKEngine.Render
                         }
                     }
                 }
-                if (app.CRenderMode == Application.RenderMode.PathTracer)
+                if (app.RenderMode_ == Application.RenderMode.PathTracer)
                 {
                     if (ImGui.CollapsingHeader("PathTracing"))
                     {
@@ -806,22 +807,24 @@ namespace IDKEngine.Render
                     tempVec3 = meshInstanceTransform.Translation.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
                     {
-                        modified = true;
                         meshInstanceTransform.Translation = tempVec3.ToOpenTK();
+                        modified = true;
                     }
 
                     tempVec3 = meshInstanceTransform.Scale.ToNumerics();
                     if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
                     {
-                        modified = true;
                         meshInstanceTransform.Scale = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
+                        modified = true;
                     }
 
-                    tempVec3 = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
+                    SysVec3 previous = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
+                    tempVec3 = previous;
                     if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
                     {
+                        SysVec3 diff = tempVec3 - previous;
+                        meshInstanceTransform.Rotation *= Quaternion.FromEulerAngles(diff.ToOpenTK());
                         modified = true;
-                        meshInstanceTransform.Rotation = Quaternion.FromEulerAngles(tempVec3.ToOpenTK());
                     }
 
                     ImGui.Separator();
@@ -856,8 +859,8 @@ namespace IDKEngine.Render
                     tempVec3 = mesh.AbsorbanceBias.ToNumerics();
                     if (ImGui.DragFloat3("AbsorbanceBias", ref tempVec3, 0.01f))
                     {
-                        modified = true;
                         mesh.AbsorbanceBias = tempVec3.ToOpenTK();
+                        modified = true;
                     }
 
                     if (ImGui.Checkbox("TintOnTransmissive", ref mesh.TintOnTransmissive))
@@ -876,9 +879,9 @@ namespace IDKEngine.Render
                     {
                         meshInstance.ModelMatrix = meshInstanceTransform.GetMatrix();
 
-                        resetPathTracer = true;
                         app.ModelManager.UploadMeshBuffer(meshInstance.MeshId, 1);
                         app.ModelManager.SetMeshInstance(meshInstanceInfo.MeshInstanceId, meshInstance);
+                        resetPathTracer = true;
                     }
 
                     if (ImGui.Button("Delete"))
@@ -925,8 +928,8 @@ namespace IDKEngine.Render
                         tempVec3 = gpuLight.Color.ToNumerics();
                         if (ImGui.DragFloat3("Color", ref tempVec3, 0.1f, 0.0f))
                         {
-                            modified = true;
                             gpuLight.Color = tempVec3.ToOpenTK();
+                            modified = true;
                         }
 
                         if (ImGui.DragFloat("Radius", ref gpuLight.Radius, 0.05f, 0.01f, 30.0f))
@@ -989,22 +992,24 @@ namespace IDKEngine.Render
                     tempVec3 = meshInstanceTransform.Translation.ToNumerics();
                     if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
                     {
-                        modified = true;
                         meshInstanceTransform.Translation = tempVec3.ToOpenTK();
+                        modified = true;
                     }
 
                     tempVec3 = meshInstanceTransform.Scale.ToNumerics();
                     if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
                     {
-                        modified = true;
                         meshInstanceTransform.Scale = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
+                        modified = true;
                     }
 
-                    tempVec3 = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
+                    SysVec3 previous = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
+                    tempVec3 = previous;
                     if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
                     {
+                        SysVec3 diff = tempVec3 - previous;
+                        meshInstanceTransform.Rotation *= Quaternion.FromEulerAngles(diff.ToOpenTK());
                         modified = true;
-                        meshInstanceTransform.Rotation = Quaternion.FromEulerAngles(tempVec3.ToOpenTK());
                     }
 
                     if (modified)
@@ -1346,7 +1351,7 @@ namespace IDKEngine.Render
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
             bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
 
-            if (app.CRenderMode == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights)
+            if (app.RenderMode_ == Application.RenderMode.PathTracer && !app.PathTracer.IsTraceLights)
             {
                 hitLight = false;
             }

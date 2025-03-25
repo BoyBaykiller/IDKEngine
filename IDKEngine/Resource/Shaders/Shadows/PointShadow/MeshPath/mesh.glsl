@@ -14,10 +14,13 @@ AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 
 layout(local_size_x = 32) in;
+
 // We write out indices in packs of 4 using writePackedPrimitiveIndices4x8NV as an optimization.
 // Because triangle indices count might not be divisble by 4, we need to overshoot written indices to not miss any.
 // To prevent out of bounds access we pad by 1
 layout(triangles, max_primitives = MESHLET_MAX_TRIANGLE_COUNT + 1, max_vertices = MESHLET_MAX_VERTEX_COUNT) out;
+
+layout(location = 0) uniform int ShadowIndex;
 
 taskNV in InOutData
 {
@@ -27,8 +30,6 @@ taskNV in InOutData
     uint MeshletsStart;
     uint8_t SurvivingMeshlets[32];
 } inData;
-
-layout(location = 0) uniform int ShadowIndex;
 
 void main()
 {

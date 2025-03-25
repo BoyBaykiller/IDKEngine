@@ -92,12 +92,16 @@ namespace BBOpenGL
             }
             public void Upload(string name, int x, int count = 1)
             {
-                GL.ProgramUniform1iv(ID, GetUniformLocation(name), count, &x);
+                Upload(GetUniformLocation(name), x);
             }
 
             public void Upload(int location, uint x, int count = 1)
             {
                 GL.ProgramUniform1uiv(ID, location, count, &x);
+            }
+            public void Upload(string name, uint x, int count = 1)
+            {
+                Upload(GetUniformLocation(name), x, count);
             }
 
             public void Upload(string name, bool x)

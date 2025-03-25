@@ -1,6 +1,7 @@
 AppInclude(include/Ray.glsl)
 AppInclude(include/Surface.glsl)
 AppInclude(include/Sampling.glsl)
+AppInclude(include/TraceCone.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
 struct ConeTraceGISettings
@@ -31,13 +32,13 @@ float GetMaterialVariance(float specularChance, float roughness)
 
 vec3 IndirectLight(Surface surface, sampler3D samplerVoxels, vec3 position, vec3 incomming, ConeTraceGISettings settings)
 {    
-    surface.Roughness *= surface.Roughness; // just a convention to make roughness feel more linear perceptually
+    surface.Roughness *= surface.Roughness; // convention that makes roughness appear more linear
     
     vec3 irradiance = vec3(0.0);
     float materialVariance = GetMaterialVariance(surface.Metallic, surface.Roughness);
     uint samples = uint(mix(1.0, float(settings.MaxSamples), materialVariance));
 
-    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
+    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != ENUM_ANTI_ALIASING_MODE_NONE;
     uint noiseIndex = (settings.IsTemporalAccumulation && taaEnabled) ? (perFrameDataUBO.Frame % taaDataUBO.SampleCount) * settings.MaxSamples : 0u;
     vec2 pixelCoord = GetPixelCoord();
     for (uint i = 0; i < samples; i++)

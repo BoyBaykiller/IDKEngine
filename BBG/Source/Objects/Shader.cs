@@ -88,13 +88,17 @@ namespace BBOpenGL
                     // This is only relevant for development.
                     // Runs Radeon GPU Analyzer on the processed shader code and writes the results and code to disk
 
-                    string shaderCodePath = Path.Combine(SHADER_PATH, "bin", localShaderPath);
+                    string preprocessedShaderPath = Path.Combine(SHADER_PATH, "bin", localShaderPath);
                     string shaderCode = Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath);
-                    File.WriteAllText(shaderCodePath, shaderCode);
+
+                    string outDir = Path.GetDirectoryName(preprocessedShaderPath);
+                    Directory.CreateDirectory(outDir);
+
+                    File.WriteAllText(preprocessedShaderPath, shaderCode);
 
                     if (IsCompiledSuccessfully())
                     {
-                        __DebugSaveAndRunRGA(shaderStage, shaderCodePath);
+                        __DebugSaveAndRunRGA(shaderStage, preprocessedShaderPath);
                     }
                 }
 
@@ -111,7 +115,7 @@ namespace BBOpenGL
             /// <summary>
             /// This is only meant to be used in development. It invokes the "rga" tool for shader analysis
             /// </summary>
-            private static void __DebugSaveAndRunRGA(ShaderStage shaderStage, string shaderCodePath)
+            private static void __DebugSaveAndRunRGA(ShaderStage shaderStage, string shaderPath)
             {
                 const string SHADER_ANALYZER_TOOL_NAME = "rga"; // https://github.com/GPUOpen-Tools/radeon_gpu_analyzer
 
@@ -124,10 +128,9 @@ namespace BBOpenGL
                     _ => throw new NotSupportedException($"Can not convert {nameof(shaderStage)} = {shaderStage} to {nameof(rgaShaderStage)}"),
                 };
 
-                string outDir = Path.GetDirectoryName(shaderCodePath);
-                Directory.CreateDirectory(outDir);
+                string outDir = Path.GetDirectoryName(shaderPath);
 
-                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {shaderCodePath} " +
+                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {shaderPath} " +
                                    $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
                                    $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
                 

@@ -8,6 +8,6 @@ namespace IDKEngine.GpuTypes
         public Vector2 Jitter;
         public int SampleCount;
         public float MipmapBias;
-        public RasterPipeline.TemporalAntiAliasingMode TemporalAntiAliasingMode;
+        public RasterPipeline.AntiAliasingMode TemporalAntiAliasingMode;
     }
 }

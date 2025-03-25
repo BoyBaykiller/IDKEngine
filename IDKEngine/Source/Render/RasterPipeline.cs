@@ -9,36 +9,36 @@ namespace IDKEngine.Render
 {
     class RasterPipeline : IDisposable
     {
-        public enum ShadowTechnique : int
+        public enum ShadowMode : uint
         {
             None,
-            PcfShadowMap,
+            Pcf,
             RayTraced
         }
 
-        public enum TemporalAntiAliasingMode : int
+        public enum AntiAliasingMode : uint
         {
             None,
             TAA,
             FSR2,
         }
 
-        private TemporalAntiAliasingMode _temporalAntiAliasingMode;
-        public TemporalAntiAliasingMode TAAMode
+        private AntiAliasingMode _temporalAntiAliasingMode;
+        public AntiAliasingMode AntiAliasingMode_
         {
             get => _temporalAntiAliasingMode;
 
             set
             {
-                if (!FSR2Wrapper.IS_SUPPORTED && value == TemporalAntiAliasingMode.FSR2)
+                if (!FSR2Wrapper.IS_SUPPORTED && value == AntiAliasingMode.FSR2)
                 {
-                    Logger.Log(Logger.LogLevel.Error, $"{TemporalAntiAliasingMode.FSR2} is Windows only");
+                    Logger.Log(Logger.LogLevel.Error, $"{AntiAliasingMode.FSR2} is Windows only");
                     return;
                 }
 
                 _temporalAntiAliasingMode = value;
 
-                if (TAAMode == TemporalAntiAliasingMode.TAA)
+                if (AntiAliasingMode_ == AntiAliasingMode.TAA)
                 {
                     TaaResolve?.Dispose();
                     TaaResolve = new TAAResolve(PresentationResolution, new TAAResolve.GpuSettings());
@@ -49,7 +49,7 @@ namespace IDKEngine.Render
                     TaaResolve = null;
                 }
 
-                if (TAAMode == TemporalAntiAliasingMode.FSR2)
+                if (AntiAliasingMode_ == AntiAliasingMode.FSR2)
                 {
                     FSR2Wrapper?.Dispose();
                     FSR2Wrapper = new FSR2Wrapper(RenderResolution, PresentationResolution);
@@ -78,7 +78,7 @@ namespace IDKEngine.Render
                 }
 
                 if (gBufferProgram != null) gBufferProgram.Dispose();
-                if (forwardTransparentProgram != null) forwardTransparentProgram.Dispose();
+                if (recordTransparentProgram != null) recordTransparentProgram.Dispose();
                 BBG.AbstractShaderProgram.SetShaderInsertionValue("TAKE_MESH_SHADER_PATH_CAMERA", TakeMeshShaderPath);
 
                 if (TakeMeshShaderPath)
@@ -88,10 +88,10 @@ namespace IDKEngine.Render
                        BBG.AbstractShader.FromFile(BBG.ShaderStage.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
 
-                    forwardTransparentProgram = new BBG.AbstractShaderProgram(
+                    recordTransparentProgram = new BBG.AbstractShaderProgram(
                         BBG.AbstractShader.FromFile(BBG.ShaderStage.TaskNV, "GBuffer/MeshPath/task.glsl"),
                         BBG.AbstractShader.FromFile(BBG.ShaderStage.MeshNV, "GBuffer/MeshPath/mesh.glsl"),
-                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "ForwardTransparent/fragment.glsl"));
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "RecordTransparent/fragment.glsl"));
                 }
                 else
                 {
@@ -99,9 +99,9 @@ namespace IDKEngine.Render
                         BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "GBuffer/VertexPath/vertex.glsl"),
                         BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "GBuffer/fragment.glsl"));
 
-                    forwardTransparentProgram = new BBG.AbstractShaderProgram(
+                    recordTransparentProgram = new BBG.AbstractShaderProgram(
                         BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "GBuffer/VertexPath/vertex.glsl"),
-                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "ForwardTransparent/fragment.glsl"));
+                        BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "RecordTransparent/fragment.glsl"));
                 }
             }
         }
@@ -122,12 +122,12 @@ namespace IDKEngine.Render
         {
             get
             {
-                if (TAAMode == TemporalAntiAliasingMode.TAA)
+                if (AntiAliasingMode_ == AntiAliasingMode.TAA)
                 {
                     return TaaResolve.Result;
                 }
 
-                if (TAAMode == TemporalAntiAliasingMode.FSR2)
+                if (AntiAliasingMode_ == AntiAliasingMode.FSR2)
                 {
                     return FSR2Wrapper.Result;
                 }
@@ -169,7 +169,7 @@ namespace IDKEngine.Render
         public int TAASamples;
 
         // Shadow Settings
-        public ShadowTechnique ShadowMode;
+        public ShadowMode ShadowMode_;
         public bool GenerateShadowMaps;
         public int RayTracingSamples;
 
@@ -181,15 +181,21 @@ namespace IDKEngine.Render
         public BBG.Texture VelocityTexture;
         public BBG.Texture DepthTexture;
 
+        // Order Independent Transparency
+        private BBG.Texture recordedColorsArrayTexture;
+        private BBG.Texture recordedDepthsArrayTexture;
+        private BBG.Texture recordedFragmentsCounterTexture;
+
+        private BBG.Texture beforeTAATexture;
+
         private BBG.AbstractShaderProgram gBufferProgram;
-        private BBG.AbstractShaderProgram forwardTransparentProgram;
+        private BBG.AbstractShaderProgram recordTransparentProgram;
+        private readonly BBG.AbstractShaderProgram resolveTransparentProgram;
         private readonly BBG.AbstractShaderProgram deferredLightingProgram;
         private readonly BBG.AbstractShaderProgram skyBoxProgram;
         private readonly BBG.AbstractShaderProgram mergeLightingProgram;
         private readonly BBG.AbstractShaderProgram hiZGenerateProgram;
         private readonly BBG.AbstractShaderProgram cullingProgram;
-
-        private BBG.Texture beforeTAATexture;
 
         private readonly BBG.TypedBuffer<GpuTaaData> taaDataBuffer;
         private GpuTaaData gpuTaaData;
@@ -198,14 +204,33 @@ namespace IDKEngine.Render
         private GpuBindlessGBuffer gpuBindlessGBuffer;
 
         private int frameIndex;
+
         public RasterPipeline(Vector2i renderSize, Vector2i presentationSize)
         {
+            SSAO = new SSAO(renderSize, new SSAO.GpuSettings());
+            SSR = new SSR(renderSize, new SSR.GpuSettings());
+            LightingVRS = new LightingShadingRateClassifier(renderSize, new LightingShadingRateClassifier.GpuSettings());
+            Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
+            ConeTracer = new ConeTracer(renderSize, new ConeTracer.GpuSettings());
+
+            taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
+            taaDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
+
+            bindlessGBufferBuffer = new BBG.TypedBuffer<GpuBindlessGBuffer>();
+            bindlessGBufferBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+            bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
+
+            SetSize(renderSize, presentationSize);
+
             TakeMeshShaderPath = false;
             IsHiZCulling = false;
 
             deferredLightingProgram = new BBG.AbstractShaderProgram(
                 BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "ToScreen/vertex.glsl"),
                 BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "DeferredLighting/fragment.glsl"));
+
+            resolveTransparentProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "ResolveTransparent/compute.glsl"));
 
             skyBoxProgram = new BBG.AbstractShaderProgram(
                 BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "SkyBox/vertex.glsl"),
@@ -219,20 +244,6 @@ namespace IDKEngine.Render
 
             mergeLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
 
-            taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
-            taaDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-            taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
-
-            bindlessGBufferBuffer = new BBG.TypedBuffer<GpuBindlessGBuffer>();
-            bindlessGBufferBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-            bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
-
-            SSAO = new SSAO(renderSize, new SSAO.GpuSettings());
-            SSR = new SSR(renderSize, new SSR.GpuSettings());
-            LightingVRS = new LightingShadingRateClassifier(renderSize, new LightingShadingRateClassifier.GpuSettings());
-            Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
-            ConeTracer = new ConeTracer(renderSize, new ConeTracer.GpuSettings());
-
             IsWireframe = false;
             IsSSAO = true;
             IsSSR = false;
@@ -242,14 +253,12 @@ namespace IDKEngine.Render
             GridReVoxelize = true;
 
             RayTracingSamples = 1;
-            ShadowMode = ShadowTechnique.PcfShadowMap;
-
-            SetSize(renderSize, presentationSize);
+            ShadowMode_ = ShadowMode.Pcf;
 
             TAAEnableMipBias = true;
             TAASamples = 6;
             TAAAdditionalMipBias = 0.25f;
-            TAAMode = TemporalAntiAliasingMode.TAA;
+            AntiAliasingMode_ = AntiAliasingMode.TAA;
         }
 
         public void Render(ModelManager modelManager, LightManager lightManager, Camera camera, float dT)
@@ -258,22 +267,22 @@ namespace IDKEngine.Render
             {
                 gpuTaaData.MipmapBias = 0.0f;
                 gpuTaaData.Jitter = new Vector2(0.0f);
-                gpuTaaData.TemporalAntiAliasingMode = TAAMode;
+                gpuTaaData.TemporalAntiAliasingMode = AntiAliasingMode_;
 
-                if (TAAMode == TemporalAntiAliasingMode.TAA)
+                if (AntiAliasingMode_ == AntiAliasingMode.TAA)
                 {
                     gpuTaaData.MipmapBias = TAAResolve.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + TAAAdditionalMipBias;
                     gpuTaaData.SampleCount = TAASamples;
                 }
 
-                if (TAAMode == TemporalAntiAliasingMode.FSR2)
+                if (AntiAliasingMode_ == AntiAliasingMode.FSR2)
                 {
                     gpuTaaData.MipmapBias = FSR2Wrapper.GetRecommendedMipmapBias(RenderResolution.X, PresentationResolution.X) + TAAAdditionalMipBias;
                     gpuTaaData.SampleCount = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
                 }
 
-                if (TAAMode == TemporalAntiAliasingMode.TAA || 
-                    TAAMode == TemporalAntiAliasingMode.FSR2)
+                if (AntiAliasingMode_ == AntiAliasingMode.TAA || 
+                    AntiAliasingMode_ == AntiAliasingMode.FSR2)
                 {
                     Vector2 jitter = MyMath.GetHalton2D(frameIndex++ % gpuTaaData.SampleCount, 2, 3);
                     jitter = jitter * 2.0f - new Vector2(1.0f);
@@ -406,7 +415,7 @@ namespace IDKEngine.Render
                 BBG.Cmd.Flush();
             }
 
-            if (ShadowMode == ShadowTechnique.RayTraced)
+            if (ShadowMode_ == ShadowMode.RayTraced)
             {
                 lightManager.ComputeRayTracedShadows(RayTracingSamples);
             }
@@ -432,7 +441,7 @@ namespace IDKEngine.Render
                 VariableRateShading = LightingVRS.GetRenderData(),
             }, () =>
             {
-                deferredLightingProgram.Upload("ShadowMode", (int)ShadowMode);
+                deferredLightingProgram.Upload("ShadowMode", (uint)ShadowMode_);
                 deferredLightingProgram.Upload("IsVXGI", IsVXGI);
 
                 BBG.Cmd.BindTextureUnit(SSAO.Result, 0, IsSSAO);
@@ -506,10 +515,11 @@ namespace IDKEngine.Render
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
 
-            BBG.Rendering.Render("Render transparents", new BBG.Rendering.RenderAttachmentsVerbose()
+            BBG.Rendering.Render("Record transparent fragments", new BBG.Rendering.RenderAttachmentsVerbose()
             {
                 ColorAttachments = [new BBG.Rendering.ColorAttachment()
                 {
+                    EnableWrites = false,
                     Texture = beforeTAATexture,
                     AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
                     BlendState = new BBG.Rendering.BlendState()
@@ -529,20 +539,24 @@ namespace IDKEngine.Render
             {
                 EnabledCapabilities = [
                     BBG.Rendering.Capability.DepthTest,
-                    BBG.Rendering.CapIf(!IsWireframe, BBG.Rendering.Capability.CullFace)
                 ],
                 EnableDepthWrites = false,
                 FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
-                DepthFunction = BBG.Rendering.DepthFunction.Less,
                 VariableRateShading = LightingVRS.GetRenderData(),
             },
             () =>
             {
-                forwardTransparentProgram.Upload("IsVXGI", IsVXGI);
+                recordTransparentProgram.Upload("IsVXGI", IsVXGI);
+                recordTransparentProgram.Upload("ShadowMode", (uint)ShadowMode_);
+
+                recordedFragmentsCounterTexture.Fill(BBG.Texture.PixelFormat.RInteger, BBG.Texture.PixelType.Uint, 0u);
 
                 BBG.Cmd.SetUniforms(ConeTracer.Settings);
                 BBG.Cmd.BindTextureUnit(Voxelizer.ResultVoxels, 0);
-                BBG.Cmd.UseShaderProgram(forwardTransparentProgram);
+                BBG.Cmd.BindImageUnit(recordedColorsArrayTexture, 0, 0, true);
+                BBG.Cmd.BindImageUnit(recordedDepthsArrayTexture, 1, 0, true);
+                BBG.Cmd.BindImageUnit(recordedFragmentsCounterTexture, 2);
+                BBG.Cmd.UseShaderProgram(recordTransparentProgram);
 
                 BBG.Rendering.InferViewportSize();
                 if (TakeMeshShaderPath)
@@ -553,6 +567,19 @@ namespace IDKEngine.Render
                 {
                     modelManager.Draw();
                 }
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit);
+            });
+
+            BBG.Computing.Compute("Resolve transparent fragments", () =>
+            {
+                BBG.Cmd.BindImageUnit(beforeTAATexture, 0);
+                BBG.Cmd.BindImageUnit(recordedColorsArrayTexture, 1, 0, true);
+                BBG.Cmd.BindImageUnit(recordedDepthsArrayTexture, 2, 0, true);
+                BBG.Cmd.BindImageUnit(recordedFragmentsCounterTexture, 3);
+
+                BBG.Cmd.UseShaderProgram(resolveTransparentProgram);
+                BBG.Computing.Dispatch(MyMath.DivUp(beforeTAATexture.Width, 8), MyMath.DivUp(beforeTAATexture.Height, 8), 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
 
             if (IsVariableRateShading || LightingVRS.Settings.DebugValue != LightingShadingRateClassifier.DebugMode.None)
@@ -576,11 +603,11 @@ namespace IDKEngine.Render
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
             });
 
-            if (TAAMode == TemporalAntiAliasingMode.TAA)
+            if (AntiAliasingMode_ == AntiAliasingMode.TAA)
             {
                 TaaResolve.Compute(beforeTAATexture);
             }
-            else if (TAAMode == TemporalAntiAliasingMode.FSR2)
+            else if (AntiAliasingMode_ == AntiAliasingMode.FSR2)
             {
                 FSR2Wrapper.Run(beforeTAATexture, DepthTexture, VelocityTexture, camera, gpuTaaData.Jitter, dT * 1000.0f);
 
@@ -650,6 +677,27 @@ namespace IDKEngine.Render
             gpuBindlessGBuffer.DepthTexture = DepthTexture.GetTextureHandleARB();
 
             bindlessGBufferBuffer.UploadElements(gpuBindlessGBuffer);
+
+            const int layers = 10;
+            BBG.AbstractShaderProgram.SetShaderInsertionValue("TRANSPARENT_LAYERS", layers);
+
+            if (recordedColorsArrayTexture != null) recordedColorsArrayTexture.Dispose();
+            recordedColorsArrayTexture = new BBG.Texture(BBG.Texture.Type.Texture2DArray);
+            recordedColorsArrayTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
+            recordedColorsArrayTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            recordedColorsArrayTexture.Allocate(renderSize.X, renderSize.Y, layers, beforeTAATexture.Format);
+
+            if (recordedDepthsArrayTexture != null) recordedDepthsArrayTexture.Dispose();
+            recordedDepthsArrayTexture = new BBG.Texture(BBG.Texture.Type.Texture2DArray);
+            recordedDepthsArrayTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
+            recordedDepthsArrayTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            recordedDepthsArrayTexture.Allocate(renderSize.X, renderSize.Y, layers, BBG.Texture.InternalFormat.R32Float);
+
+            if (recordedFragmentsCounterTexture != null) recordedFragmentsCounterTexture.Dispose();
+            recordedFragmentsCounterTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+            recordedFragmentsCounterTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
+            recordedFragmentsCounterTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+            recordedFragmentsCounterTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R32Uint);
         }
 
         private void DisposeBindlessGBufferTextures()
@@ -676,17 +724,21 @@ namespace IDKEngine.Render
             Voxelizer.Dispose();
             ConeTracer.Dispose();
 
-            beforeTAATexture.Dispose();
 
-            DisposeBindlessGBufferTextures();
-
-            forwardTransparentProgram.Dispose();
+            resolveTransparentProgram.Dispose();
+            recordTransparentProgram.Dispose();
             gBufferProgram.Dispose();
             deferredLightingProgram.Dispose();
             skyBoxProgram.Dispose();
             mergeLightingProgram.Dispose();
             cullingProgram.Dispose();
             hiZGenerateProgram.Dispose();
+
+            recordedFragmentsCounterTexture.Dispose();
+            recordedDepthsArrayTexture.Dispose();
+            recordedColorsArrayTexture.Dispose();
+            beforeTAATexture.Dispose();
+            DisposeBindlessGBufferTextures();
 
             bindlessGBufferBuffer.Dispose();
             taaDataBuffer.Dispose();

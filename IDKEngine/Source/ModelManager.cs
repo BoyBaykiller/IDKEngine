@@ -69,7 +69,7 @@ namespace IDKEngine
         private BBG.TypedBuffer<uint> vertexIndicesBuffer;
         private BBG.TypedBuffer<Matrix3x4> jointMatricesBuffer;
         private BBG.TypedBuffer<Vector3> prevVertexPositionsBuffer;
-        private BBG.TypedBuffer<uint> visibleMeshInstanceIdSSBO;
+        private BBG.TypedBuffer<uint> visibleMeshInstanceIdBuffer;
         private BBG.TypedBuffer<GpuMeshlet> meshletBuffer;
         private BBG.TypedBuffer<GpuMeshletInfo> meshletInfoBuffer;
         private BBG.TypedBuffer<uint> meshletsVertexIndicesBuffer;
@@ -90,7 +90,7 @@ namespace IDKEngine
             drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
             meshesBuffer = new BBG.TypedBuffer<GpuMesh>();
             meshInstanceBuffer = new BBG.TypedBuffer<GpuMeshInstance>();
-            visibleMeshInstanceIdSSBO = new BBG.TypedBuffer<uint>();
+            visibleMeshInstanceIdBuffer = new BBG.TypedBuffer<uint>();
             materialsBuffer = new BBG.TypedBuffer<GpuMaterial>();
             vertexBuffer = new BBG.TypedBuffer<GpuVertex>();
             vertexPositionsBuffer = new BBG.TypedBuffer<Vector3>();
@@ -111,7 +111,7 @@ namespace IDKEngine
             drawCommandBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 1);
             meshesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 2);
             meshInstanceBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 3);
-            visibleMeshInstanceIdSSBO.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 4);
+            visibleMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 4);
             materialsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 5);
             vertexBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 6);
             vertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 7);
@@ -948,7 +948,7 @@ namespace IDKEngine
             BBG.Buffer.Recreate(ref meshletsPrimitiveIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsPrimitiveIndices);
             BBG.Buffer.Recreate(ref jointMatricesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, JointMatrices);
             BBG.Buffer.Recreate(ref unskinnedVerticesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, unskinnedVertices);
-            BBG.Buffer.Recreate(ref visibleMeshInstanceIdSSBO, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
+            BBG.Buffer.Recreate(ref visibleMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
             BBG.Buffer.Recreate(ref meshletTasksCmdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
             BBG.Buffer.Recreate(ref prevVertexPositionsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertexPositions);
         }
@@ -963,7 +963,7 @@ namespace IDKEngine
             VertexPositions = new NativeMemoryView<Vector3>(vertexPositionsHostBuffer.Memory, vertexPositionsHostBuffer.NumElements);
             BBG.Buffer.Recreate(ref vertexIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, VertexIndices);
             BBG.Buffer.Recreate(ref jointMatricesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, JointMatrices);
-            BBG.Buffer.Recreate(ref visibleMeshInstanceIdSSBO, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
+            BBG.Buffer.Recreate(ref visibleMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
             BBG.Buffer.Recreate(ref meshletTasksCmdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
         }
 
@@ -1004,7 +1004,7 @@ namespace IDKEngine
             drawCommandBuffer.Dispose();
             meshesBuffer.Dispose();
             meshInstanceBuffer.Dispose();
-            visibleMeshInstanceIdSSBO.Dispose();
+            visibleMeshInstanceIdBuffer.Dispose();
             materialsBuffer.Dispose();
             vertexBuffer.Dispose();
             vertexIndicesBuffer.Dispose();

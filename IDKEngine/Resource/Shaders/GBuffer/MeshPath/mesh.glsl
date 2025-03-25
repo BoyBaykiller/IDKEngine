@@ -15,6 +15,7 @@ AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 
 layout(local_size_x = 32) in;
+
 // We write out indices in packs of 4 using writePackedPrimitiveIndices4x8NV as an optimization.
 // Because triangle indices count might not be divisble by 4, we need to overshoot written indices to not miss any.
 // To prevent out of bounds access we pad by 1

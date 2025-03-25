@@ -11,12 +11,8 @@ layout(location = 0) out vec4 OutFragColor;
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
 
-#define SHADOW_MODE_NONE 0
-#define SHADOW_MODE_PCF_SHADOW_MAP 1
-#define SHADOW_MODE_RAY_TRACED 2
-uniform int ShadowMode;
-
 uniform bool IsVXGI;
+uniform ENUM_SHADOW_MODE ShadowMode;
 
 in InOutData
 {
@@ -41,20 +37,14 @@ void main()
     vec3 fragPos = PerspectiveTransform(ndc, perFrameDataUBO.InvProjView);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
 
-    vec3 albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
-    float alpha = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).a;
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
-    float specular = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
-    float roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
-    vec3 emissive = texelFetch(gBufferDataUBO.Emissive, imgCoord, 0).rgb;
     float ambientOcclusion = texelFetch(SamplerAO, imgCoord, 0).r;
 
     Surface surface = GetDefaultSurface();
-    surface.Albedo = albedo;
-    surface.Normal = normal;
-    surface.Metallic = specular;
-    surface.Roughness = roughness;
-    surface.Emissive = emissive;
+    surface.Albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
+    surface.Normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
+    surface.Metallic = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
+    surface.Roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
+    surface.Emissive = texelFetch(gBufferDataUBO.Emissive, imgCoord, 0).rgb;
     surface.IOR = 1.0;
 
     vec3 directLighting = vec3(0.0);
@@ -70,13 +60,13 @@ void main()
             {
                 shadow = 0.0;
             }
-            else if (ShadowMode == SHADOW_MODE_PCF_SHADOW_MAP)
+            else if (ShadowMode == ENUM_SHADOW_MODE_PCF)
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
                 vec3 lightToSample = unjitteredFragPos - light.Position;
                 shadow = 1.0 - Visibility(pointShadow, surface.Normal, lightToSample);
             }
-            else if (ShadowMode == SHADOW_MODE_RAY_TRACED)
+            else if (ShadowMode == ENUM_SHADOW_MODE_RAY_TRACED)
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
                 shadow = imageLoad(image2D(pointShadow.RayTracedShadowMapImage), imgCoord).r;

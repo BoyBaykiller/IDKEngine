@@ -1023,7 +1023,7 @@ namespace IDKEngine.Utils
                                     stagingBuffer,
                                     textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height,
                                     GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels),
-                                    GLTexture.PixelType.UByte,
+                                    GLTexture.PixelType.Ubyte,
                                     null
                                 );
                                 texture.GenerateMipmap();

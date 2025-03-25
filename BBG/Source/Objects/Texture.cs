@@ -12,6 +12,7 @@ namespace BBOpenGL
             {
                 Cubemap = TextureTarget.TextureCubeMap,
                 Texture2D = TextureTarget.Texture2d,
+                Texture2DArray = TextureTarget.Texture2dArray,
                 Texture3D = TextureTarget.Texture3d,
             }
             
@@ -88,12 +89,14 @@ namespace BBOpenGL
                 RG = OpenTK.Graphics.OpenGL.PixelFormat.Rg,
                 RGB = OpenTK.Graphics.OpenGL.PixelFormat.Rgb,
                 RGBA = OpenTK.Graphics.OpenGL.PixelFormat.Rgba,
+                Depth = OpenTK.Graphics.OpenGL.PixelFormat.DepthComponent,
             }
 
             public enum PixelType : uint
             {
-                UByte = OpenTK.Graphics.OpenGL.PixelType.UnsignedByte,
+                Ubyte = OpenTK.Graphics.OpenGL.PixelType.UnsignedByte,
                 Int = OpenTK.Graphics.OpenGL.PixelType.Int,
+                Uint = OpenTK.Graphics.OpenGL.PixelType.UnsignedInt,
                 Float = OpenTK.Graphics.OpenGL.PixelType.Float,
             }
 
@@ -244,12 +247,13 @@ namespace BBOpenGL
             {
                 fixed (void* ptr = &value)
                 {
-                    Fill(pixelFormat, pixelType, ptr, level);
+                    Fill(pixelFormat, pixelType, ptr, Width, Height, Depth, level);
                 }
             }
-            public void Fill(PixelFormat pixelFormat, PixelType pixelType, void* data, int level = 0)
+
+            public void Fill(PixelFormat pixelFormat, PixelType pixelType, void* data, int width, int height, int depth, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
             {
-                GL.ClearTexImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, data);
+                GL.ClearTexSubImage(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, data);
             }
 
             public void GenerateMipmap()
@@ -270,6 +274,7 @@ namespace BBOpenGL
                         Levels = levels;
                         break;
 
+                    case Type.Texture2DArray:
                     case Type.Texture3D:
                         GL.TextureStorage3D(ID, levels, (SizedInternalFormat)format, width, height, depth);
                         Width = width;

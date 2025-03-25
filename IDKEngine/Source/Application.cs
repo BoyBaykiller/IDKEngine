@@ -44,7 +44,7 @@ namespace IDKEngine
             }
         }
 
-        public RenderMode CRenderMode
+        public RenderMode RenderMode_
         {
             get
             {
@@ -67,17 +67,17 @@ namespace IDKEngine
         {
             get
             {
-                if (CRenderMode == RenderMode.Rasterizer)
+                if (RenderMode_ == RenderMode.Rasterizer)
                 {
                     return RasterizerPipeline.RenderResolution;
                 }
 
-                if (CRenderMode == RenderMode.PathTracer)
+                if (RenderMode_ == RenderMode.PathTracer)
                 {
                     return PathTracer.RenderResolution;
                 }
 
-                throw new UnreachableException($"Unknown {nameof(CRenderMode)} = {CRenderMode}");
+                throw new UnreachableException($"Unknown {nameof(RenderMode_)} = {RenderMode_}");
             }
         }
 
@@ -127,6 +127,8 @@ namespace IDKEngine
                 LightManager.DoAdvanceSimulation = TimeEnabled;
             }
         }
+
+        public float CameraCollisionRadius = 0.5f;
 
         public SceneVsMovingSphereCollisionSettings SceneVsCamCollisionSettings = new SceneVsMovingSphereCollisionSettings()
         {
@@ -196,7 +198,7 @@ namespace IDKEngine
                 RequestRenderMode = null;
             }
 
-            if (CRenderMode == RenderMode.Rasterizer)
+            if (RenderMode_ == RenderMode.Rasterizer)
             {
                 RasterizerPipeline.Render(ModelManager, LightManager, Camera, dT);
                 if (RasterizerPipeline.IsConfigureGridMode)
@@ -221,7 +223,7 @@ namespace IDKEngine
                 }
             }
 
-            if (CRenderMode == RenderMode.PathTracer)
+            if (RenderMode_ == RenderMode.PathTracer)
             {
                 bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
                 if (cameraMoved || anyAnimatedNodeMoved || anyMeshInstanceMoved || anyLightMoved)
@@ -239,7 +241,6 @@ namespace IDKEngine
                 TonemapAndGamma.Settings.IsAgXTonemaping = !PathTracer.IsDebugBVHTraversal;
                 TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
             }
-
 
             if (gui.SelectedEntity is Gui.SelectedEntityInfo.MeshInstance meshInstanceInfo)
             {
@@ -389,9 +390,9 @@ namespace IDKEngine
                 LightManager.Update(dT, ModelManager);
             }
 
-            if (SceneVsCamCollisionSettings.IsEnabled)
+            if (SceneVsCamCollisionSettings.IsEnabled && MouseState[MouseButton.Button5] != Keyboard.InputState.Pressed)
             {
-                Sphere movingSphere = new Sphere(Camera.PrevPosition, 0.5f);
+                Sphere movingSphere = new Sphere(Camera.PrevPosition, CameraCollisionRadius);
                 Vector3 prevSpherePos = movingSphere.Center;
                 Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings.Settings, ref movingSphere, ref Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
                 {
@@ -496,10 +497,9 @@ namespace IDKEngine
                 //ModelLoader.Model cb = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
                 //ModelLoader.Model ast = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
                 //ModelLoader.Model alpha = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\AlphaBlendModeTest\glTF-Binary\AlphaBlendModeTest.glb", new Transformation().WithRotationDeg(0.0f, 90.0f, 0.0f).WithTranslation(-3.0f, 0.0f, 0.0f).GetMatrix()).Value;
-                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\window\scene.gltf", new Transformation().WithTranslation(-7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
-                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\window\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(MathF.PI / 2.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
+                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
+                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(MathF.PI / 2.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
 
-                //lucy.GpuModel.Materials[0].AlphaCutoff = 2.0f;
                 ModelManager.Add(sponza, lucy, helmet);
 
                 SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
@@ -586,7 +586,7 @@ namespace IDKEngine
             RasterizerPipeline?.SetSize(renderRes, presentRes);
             PathTracer?.SetSize(renderRes);
 
-            if (CRenderMode == RenderMode.Rasterizer || CRenderMode == RenderMode.PathTracer)
+            if (RenderMode_ == RenderMode.Rasterizer || RenderMode_ == RenderMode.PathTracer)
             {
                 if (VolumetricLight != null) VolumetricLight.SetSize(presentRes);
                 if (Bloom != null) Bloom.SetSize(presentRes);
@@ -671,8 +671,8 @@ namespace IDKEngine
         {
             if (RecorderVars.State == FrameRecorderState.Replaying)
             {
-                if (CRenderMode == RenderMode.Rasterizer ||
-                    (CRenderMode == RenderMode.PathTracer && PathTracer.AccumulatedSamples >= RecorderVars.PathTracingSamplesGoal))
+                if (RenderMode_ == RenderMode.Rasterizer ||
+                    (RenderMode_ == RenderMode.PathTracer && PathTracer.AccumulatedSamples >= RecorderVars.PathTracingSamplesGoal))
                 {
                     if (RecorderVars.IsOutputFrames)
                     {

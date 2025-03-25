@@ -27,11 +27,10 @@ vec4 TraceCone(sampler3D samplerVoxels, Ray ray, vec3 normal, float coneAngle, f
             break;
         }
 
-        // Voxel color already premultiplied with alpha
-        vec4 newSample = textureLod(samplerVoxels, sampleUVW, sampleLod);
+        vec4 samplePremult = textureLod(samplerVoxels, sampleUVW, sampleLod);
 
-        float weightOfNewSample = (1.0 - accumulatedColor.a);
-        accumulatedColor += weightOfNewSample * newSample;
+        float weightOfSample = 1.0 - accumulatedColor.a;
+        accumulatedColor += weightOfSample * samplePremult;
         
         distFromStart += sampleDiameter * stepMultiplier;
     }

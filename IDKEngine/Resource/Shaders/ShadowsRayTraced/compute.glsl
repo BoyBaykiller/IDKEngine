@@ -19,7 +19,7 @@ void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     
-    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != TEMPORAL_ANTI_ALIASING_MODE_NO_AA;
+    bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != ENUM_ANTI_ALIASING_MODE_NONE;
     uint noiseIndex = taaEnabled ? (perFrameDataUBO.Frame % taaDataUBO.SampleCount) * RayTracingSamples : 0u;
     // InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (noiseIndex + 1));
 

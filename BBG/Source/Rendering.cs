@@ -110,6 +110,8 @@ namespace BBOpenGL
 
             public enum BlendFactor : uint
             {
+                Zero = BlendingFactor.Zero,
+                One = BlendingFactor.One,
                 SrcAlpha = BlendingFactor.SrcAlpha,
                 OneMinusSrcAlpha = BlendingFactor.OneMinusSrcAlpha,
             }
@@ -156,16 +158,17 @@ namespace BBOpenGL
             public record struct ColorAttachments
             {
                 public Texture[] Textures;
-                public AttachmentLoadOp AttachmentLoadOp;
                 public Vector4 ClearColor; // Currently assumes floating point texture format
+                public AttachmentLoadOp AttachmentLoadOp;
             }
 
             public record struct ColorAttachment
             {
+                public bool EnableWrites = true;
                 public Texture Texture;
-                public AttachmentLoadOp AttachmentLoadOp;
-                public int Level;
                 public Vector4 ClearColor; // Currently assumes floating point texture format
+                public int Level;
+                public AttachmentLoadOp AttachmentLoadOp;
                 public BlendState BlendState = new BlendState();
 
                 public ColorAttachment()
@@ -176,10 +179,10 @@ namespace BBOpenGL
             public record struct DepthStencilAttachment
             {
                 public Texture Texture;
-                public AttachmentLoadOp AttachmentLoadOp;
-                public int Level;
                 public float DepthClearValue = 1.0f;
                 public int StencilClearValue = 0;
+                public int Level;
+                public AttachmentLoadOp AttachmentLoadOp;
 
                 public DepthStencilAttachment()
                 {
@@ -196,8 +199,8 @@ namespace BBOpenGL
             {
                 public bool Enabled = false;
                 public BlendOp BlendOp = BlendOp.Add;
-                public BlendFactor SrcFactor = BlendFactor.SrcAlpha;
-                public BlendFactor DstFactor = BlendFactor.OneMinusSrcAlpha;
+                public BlendFactor SrcFactor = BlendFactor.One;
+                public BlendFactor DstFactor = BlendFactor.Zero;
 
                 public BlendState()
                 {
@@ -300,10 +303,10 @@ namespace BBOpenGL
                     verboseRTs.ColorAttachments = new ColorAttachment[colorAttachments.Textures.Length];
                     for (int i = 0; i < renderAttachments.ColorAttachments.Value.Textures.Length; i++)
                     {
+                        verboseRTs.ColorAttachments[i] = new ColorAttachment();
                         verboseRTs.ColorAttachments[i].Texture = colorAttachments.Textures[i];
                         verboseRTs.ColorAttachments[i].AttachmentLoadOp = colorAttachments.AttachmentLoadOp;
                         verboseRTs.ColorAttachments[i].ClearColor = colorAttachments.ClearColor;
-                        verboseRTs.ColorAttachments[i].BlendState = new BlendState();
                     }
                 }
                 verboseRTs.DepthStencilAttachment = renderAttachments.DepthStencilAttachment;
@@ -317,8 +320,10 @@ namespace BBOpenGL
 
                 Debugging.PushDebugGroup(renderPassName);
 
-                int fbo = FramebufferCache.GetFramebuffer(RenderAttachmentsToFramebufferDesc(renderAttachments));
+                SetGraphicsPipelineState(pipelineState);
 
+                int fbo = FramebufferCache.GetFramebuffer(RenderAttachmentsToFramebufferDesc(renderAttachments));
+                
                 if (renderAttachments.ColorAttachments != null)
                 {
                     for (int i = 0; i < renderAttachments.ColorAttachments.Length; i++)
@@ -326,6 +331,21 @@ namespace BBOpenGL
                         ref readonly ColorAttachment colorAttachment = ref renderAttachments.ColorAttachments[i];
 
                         Debug.Assert(Texture.GetFormatType(colorAttachment.Texture.Format) == Texture.InternalFormatType.Color);
+
+                        bool enableWrites = colorAttachment.EnableWrites;
+                        GL.ColorMaski((uint)i, enableWrites, enableWrites, enableWrites, enableWrites);
+
+                        ref readonly BlendState blendState = ref colorAttachment.BlendState;
+                        if (blendState.Enabled)
+                        {
+                            GL.Enablei(EnableCap.Blend, (uint)i);
+                            GL.BlendEquationi((uint)i, (BlendEquationMode)blendState.BlendOp);
+                            GL.BlendFunci((uint)i, (BlendingFactor)blendState.SrcFactor, (BlendingFactor)blendState.DstFactor);
+                        }
+                        else
+                        {
+                            GL.Disablei(EnableCap.Blend, (uint)i);
+                        }
 
                         switch (colorAttachment.AttachmentLoadOp)
                         {
@@ -345,17 +365,9 @@ namespace BBOpenGL
 
                         Vector3i textureSize = Texture.GetMipmapLevelSize(colorAttachment.Texture.Width, colorAttachment.Texture.Height, 1, colorAttachment.Level);
                         inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
-
-                        ref readonly BlendState blendState = ref colorAttachment.BlendState;
-                        if (blendState.Enabled)
-                        {
-                            GL.Enablei(EnableCap.Blend, (uint)i);
-                            GL.BlendEquationi((uint)i, (BlendEquationMode)blendState.BlendOp);
-                            GL.BlendFunci((uint)i, (BlendingFactor)blendState.SrcFactor, (BlendingFactor)blendState.DstFactor);
-                        }
                     }
                 }
-
+                
                 if (renderAttachments.DepthStencilAttachment != null)
                 {
                     DepthStencilAttachment depthStencilAttachment = renderAttachments.DepthStencilAttachment.Value;
@@ -388,18 +400,20 @@ namespace BBOpenGL
 
                             break;
                     }
-
+                    
                     Vector3i textureSize = Texture.GetMipmapLevelSize(depthStencilAttachment.Texture.Width, depthStencilAttachment.Texture.Height, 1, depthStencilAttachment.Level);
                     inferredViewportSize = Vector2i.ComponentMax(inferredViewportSize, textureSize.Xy);
                 }
-
+                
                 GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
-                SetGraphicsPipelineState(pipelineState);
                 
                 funcRender();
 
                 UnsetGraphicsPipelineState(pipelineState);
-                GL.Disable(EnableCap.Blend);
+
+                // Let's be a good citizen and also unset these
+                GL.ColorMask(true, true, true, true);
+                GL.DepthMask(true);
 
                 Debugging.PopDebugGroup();
             }

@@ -1,23 +1,31 @@
 #version 460 core
-layout(location = 0) out vec4 OutFragColor;
+
+#define TRANSPARENT_LAYERS AppInsert(TRANSPARENT_LAYERS)
 
 AppInclude(include/Math.glsl)
 AppInclude(include/Sampling.glsl)
 AppInclude(include/Surface.glsl)
-AppInclude(include/TraceCone.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(VXGI/ConeTraceGI/include/Impl.glsl)
 AppInclude(DeferredLighting/include/Impl.glsl)
 
-layout(binding = 0) uniform sampler3D SamplerVoxels;
+// Incoherent memory operations such as image access in this shader
+// disable early fragment tests, but we can explicit re-enable it.
+layout(early_fragment_tests) in;
 
-#define SHADOW_MODE_NONE 0
-#define SHADOW_MODE_PCF_SHADOW_MAP 1
-#define SHADOW_MODE_RAY_TRACED 2
-uniform int ShadowMode;
+layout(binding = 0) uniform sampler3D SamplerVoxels;
+layout(binding = 0) restrict writeonly uniform image2DArray ImgRecordedColors;
+layout(binding = 1) restrict writeonly uniform image2DArray ImgRecordedDepths;
+layout(binding = 2, r32ui) restrict uniform uimage2D ImgRecordedFragmentsCounter;
+
+layout(std140, binding = 0) uniform SettingsUBO
+{
+    ConeTraceGISettings ConeTraceSettings;
+} settingsUBO;
 
 uniform bool IsVXGI;
+uniform ENUM_SHADOW_MODE ShadowMode;
 
 in InOutData
 {
@@ -27,11 +35,6 @@ in InOutData
     vec3 Tangent;
     flat uint MeshId;
 } inData;
-
-layout(std140, binding = 0) uniform SettingsUBO
-{
-    ConeTraceGISettings ConeTraceSettings;
-} settingsUBO;
 
 void main()
 {
@@ -45,7 +48,13 @@ void main()
 
     if (surface.Alpha == 0.0)
     {
-        discard;
+        return;
+    }
+
+    uint fragmentIndex = imageAtomicAdd(ImgRecordedFragmentsCounter, imgCoord, 1u);
+    if (fragmentIndex >= TRANSPARENT_LAYERS)
+    {
+        return;
     }
 
     vec3 interpTangent = normalize(inData.Tangent);
@@ -58,7 +67,8 @@ void main()
     vec3 ndc = vec3(uv * 2.0 - 1.0, gl_FragCoord.z);
     vec3 fragPos = PerspectiveTransform(vec3(ndc.xy, ndc.z), perFrameDataUBO.InvProjView);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
-
+    
+    
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)
     {
@@ -72,13 +82,13 @@ void main()
             {
                 shadow = 0.0;
             }
-            else if (ShadowMode == SHADOW_MODE_PCF_SHADOW_MAP)
+            else if (ShadowMode == ENUM_SHADOW_MODE_PCF)
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
                 vec3 lightToSample = unjitteredFragPos - light.Position;
                 shadow = 1.0 - Visibility(pointShadow, surface.Normal, lightToSample);
             }
-            else if (ShadowMode == SHADOW_MODE_RAY_TRACED)
+            else if (ShadowMode == ENUM_SHADOW_MODE_RAY_TRACED)
             {
                 // TODO: Implement
             }
@@ -101,5 +111,9 @@ void main()
         indirectLight = ambient * surface.Albedo;
     }
 
-    OutFragColor = vec4((directLighting + indirectLight) + surface.Emissive, surface.Alpha);
+    vec4 colorPremult = vec4((directLighting + indirectLight) + surface.Emissive, surface.Alpha);
+    colorPremult.rgb *= colorPremult.a;
+
+    imageStore(ImgRecordedColors, ivec3(imgCoord, fragmentIndex), colorPremult);
+    imageStore(ImgRecordedDepths, ivec3(imgCoord, fragmentIndex), vec4(gl_FragCoord.z));
 }

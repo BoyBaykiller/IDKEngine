@@ -48,7 +48,7 @@ float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample)
         vec3( 0.0,  1.0,  1.0 ), vec3(  0.0, -1.0,  1.0 ), vec3(  0.0, -1.0, -1.0 ), vec3(  0.0,  1.0, -1.0 )
     };
     
-    const float bias = 0.018;
+    const float bias = 0.01;
     const float sampleDiskRadius = 0.04;
 
     float visibilityFactor = 0.0;

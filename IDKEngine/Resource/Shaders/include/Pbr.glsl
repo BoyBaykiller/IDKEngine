@@ -71,7 +71,7 @@ vec3 GGXBrdf(Surface surface, vec3 V, vec3 L, float prevIor, out vec3 F)
     // L = outgoing vector (explicitly to a light with direct lighting)
     // H = halfway vector between V and L
 
-    surface.Roughness *= surface.Roughness; // just a convention to make roughness feel more linear perceptually
+    surface.Roughness *= surface.Roughness; // convention that makes roughness appear more linear
 
     vec3 f0 = BaseReflectivity(surface.Albedo, surface.Metallic, prevIor, surface.IOR);
     vec3 f90 = vec3(1.0);

@@ -113,7 +113,7 @@ namespace IDKEngine.Render
             SetSizeRayTracedShadowMap(rayTracedShadowMapSize);
         }
 
-        public void RenderShadowMap(ModelManager modelManager, Camera camera, int gpuPointShadowIndex)
+        public unsafe void RenderShadowMap(ModelManager modelManager, Camera camera, int gpuPointShadowIndex)
         {
             Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
             Span<Vector3> cameraFrustumVertices = stackalloc Vector3[8];
@@ -124,25 +124,32 @@ namespace IDKEngine.Render
 
             int numVisibleFaces = 0;
             uint visibleFaces = 0;
-            for (uint i = 0; i < 6; i++)
+            for (int i = 0; i < 6; i++)
             {
                 // We don't need to render a shadow face if it doesn't collide with the cameras frustum
 
-                Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + (int)i];
+                Matrix4 faceMatrix = gpuPointShadow[GpuPointShadow.RenderMatrix.PosX + i];
                 Frustum shadowFaceFrustum = new Frustum(faceMatrix);
                 MyMath.GetFrustumPoints(Matrix4.Invert(faceMatrix), shadowFrustumVertices);
                 bool frustaIntersect = Intersections.ConvexSATIntersect(cameraFrustum, shadowFaceFrustum, cameraFrustumVertices, shadowFrustumVertices);
 
                 if (frustaIntersect)
                 {
-                    visibleFaces |= (i << numVisibleFaces * 3);
+                    visibleFaces |= (uint)i << numVisibleFaces * 3;
                     numVisibleFaces++;
+
+                    // Clear the faces that will potentially be rendered to.
+                    // Some effects (VXGI) might access faces that the camera can't see so maintaining depth for these is better than no shadows at all
+                    float clear = 1.0f;
+                    int size = ShadowMap.Width;
+                    ShadowMap.Fill(BBG.Texture.PixelFormat.Depth, BBG.Texture.PixelType.Float, &clear, size, size, 1, 0, 0, 0, i);
                 }
             }
 
             BBG.Computing.Compute("Cubemap shadow map culling", () =>
             {
                 modelManager.ResetInstanceCounts();
+                modelManager.OpaqueMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 0);
 
                 cullingProgram.Upload(0, gpuPointShadowIndex);
                 cullingProgram.Upload(1, numVisibleFaces);
@@ -152,13 +159,13 @@ namespace IDKEngine.Render
                 BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
-
+            
             BBG.Rendering.Render("Generate Shadow Cubemap", new BBG.Rendering.RenderAttachments()
             {
                 DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
                 {
                     Texture = ShadowMap,
-                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
+                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load, 
                 }
             }, new BBG.Rendering.GraphicsPipelineState()
             {

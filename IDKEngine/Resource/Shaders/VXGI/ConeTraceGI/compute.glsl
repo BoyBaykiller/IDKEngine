@@ -2,7 +2,6 @@
 
 AppInclude(include/Surface.glsl)
 AppInclude(include/Sampling.glsl)
-AppInclude(include/TraceCone.glsl)
 AppInclude(include/Compression.glsl)
 AppInclude(include/Math.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
