@@ -122,13 +122,6 @@ namespace IDKEngine.Bvh
                     newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
                     newRightNode.SetBounds(ComputeBoundingBox(newRightNode.TriStartOrChild, newRightNode.TriCount, buildData));
 
-                    //Vector3 ext = Box.GetOverlappingExtends(Conversions.ToBox(newRightNode), Conversions.ToBox(newLeftNode));
-                    //float area = MyMath.HalfArea(ext);
-                    //if (area < 0.0f)
-                    //{
-                    //    Console.WriteLine(area);
-                    //}
-
                     int leftNodeId = nodesUsed + 0;
                     int rightNodeId = nodesUsed + 1;
 
@@ -561,7 +554,6 @@ namespace IDKEngine.Bvh
 
 
             Span<int> partitionAux = Helper.Reinterpret<float, int>(rightCostsAccum, triEnd - triPivot);
-
             Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 1) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
             Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 2) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
 

@@ -139,13 +139,6 @@ namespace IDKEngine.Utils
             where TFrom : unmanaged
             where TTo : unmanaged
         {
-            int sourceLeft = sizeof(TFrom) * source.Length;
-            int askedFor = sizeof(TTo) * length;
-            if (askedFor > sourceLeft)
-            {
-                throw new ArgumentException($"Out of bounds ");
-            }
-
             return MemoryMarshal.Cast<TFrom, TTo>(source).Slice(0, length);
         }
 

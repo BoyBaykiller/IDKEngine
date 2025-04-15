@@ -23,7 +23,8 @@
     <PublishAOT>true</PublishAOT>
     <OptimizationPreference>Speed</OptimizationPreference> 
     <IlcInstructionSet>avx2</IlcInstructionSet>
-    
+
+    <!--Settings to decrease size-->
     <!--<StackTraceSupport>false</StackTraceSupport>-->
     <!--<InvariantGlobalization>true</InvariantGlobalization>-->
     <!--<UseSystemResourceKeys>true</UseSystemResourceKeys>-->

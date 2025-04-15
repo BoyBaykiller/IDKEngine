@@ -121,16 +121,16 @@ namespace BBOpenGL
 
                 string rgaShaderStage = shaderStage switch
                 {
-                    ShaderStage.Vertex => "--vert",
-                    ShaderStage.Geometry => "--geom",
-                    ShaderStage.Fragment => "--frag",
-                    ShaderStage.Compute => "--comp",
+                    ShaderStage.Vertex => "vert",
+                    ShaderStage.Geometry => "geom",
+                    ShaderStage.Fragment => "frag",
+                    ShaderStage.Compute => "comp",
                     _ => throw new NotSupportedException($"Can not convert {nameof(shaderStage)} = {shaderStage} to {nameof(rgaShaderStage)}"),
                 };
 
                 string outDir = Path.GetDirectoryName(shaderPath);
 
-                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {shaderPath} " +
+                string arguments = $"-s opengl -c gfx1010 --{rgaShaderStage} {shaderPath} " +
                                    $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
                                    $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
                 

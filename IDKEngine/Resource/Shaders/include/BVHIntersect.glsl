@@ -49,7 +49,7 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight <= hitInfo.T;
 
-        uint summedTriCount = int(leftChildHit) * leftNode.TriCount + int(rightChildHit) * rightNode.TriCount;
+        uint summedTriCount = uint(leftChildHit) * leftNode.TriCount + uint(rightChildHit) * rightNode.TriCount;
         if (summedTriCount > 0)
         {
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
@@ -82,8 +82,8 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
             if (leftChildHit && rightChildHit)
             {
                 bool leftCloser = tMinLeft < tMinRight;
+
                 stackTop = leftCloser ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-                
                 StackPush(stackPtr, leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild);
             }
             else
@@ -124,7 +124,7 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft <= hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight <= hitInfo.T;
 
-        uint summedTriCount = int(leftChildHit) * leftNode.TriCount + int(rightChildHit) * rightNode.TriCount;
+        uint summedTriCount = uint(leftChildHit) * leftNode.TriCount + uint(rightChildHit) * rightNode.TriCount;
         if (summedTriCount > 0)
         {
             uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
@@ -157,7 +157,6 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
             if (leftChildHit && rightChildHit)
             {
                 stackTop = leftNode.TriStartOrChild;
-
                 StackPush(stackPtr, rightNode.TriStartOrChild);
             }
             else
@@ -249,6 +248,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
             if (leftChildHit && rightChildHit)
             {
                 bool leftCloser = tMinLeft < tMinRight;
+
                 stackTop = leftCloser ? leftChild : rightChild;
                 stack[stackPtr++] = leftCloser ? rightChild : leftChild;
             }
@@ -367,6 +367,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
             if (leftChildHit && rightChildHit)
             {
                 bool leftCloser = tMinLeft < tMinRight;
+
                 stackTop = leftCloser ? leftChild : rightChild;
                 stack[stackPtr++] = leftCloser ? rightChild : leftChild;
             }

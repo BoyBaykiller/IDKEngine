@@ -35,10 +35,10 @@ bool RayBoxIntersect(Ray ray, Box box, out float t1, out float t2)
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
 
-    t1 = max(t1, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
+    t1 = max(t1, max(tsmaller.x, max(tsmaller.y, max(tsmaller.z, 0.0))));
     t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
 
-    return t1 <= t2 && t2 > 0.0;
+    return t1 <= t2;
 }
 
 bool RayBoxIntersect(Ray ray, Box box, out float t1)

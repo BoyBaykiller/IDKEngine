@@ -172,6 +172,12 @@ namespace IDKEngine.Utils
 
             private void MarkDirty()
             {
+                // TODO: ???
+                //if (isDirty)
+                //{
+                //    return;
+                //}
+
                 isDirty = true;
                 MarkParentsDirty(this);
 
@@ -1480,9 +1486,9 @@ namespace IDKEngine.Utils
                 for (int j = 0; j < gltfAnimation.Channels.Count; j++)
                 {
                     AnimationChannel animationChannel = gltfAnimation.Channels[j];
-                    if (TryGetNodeAnimation(animationChannel, gltfNodeToMyNode, out NodeAnimation sampler))
+                    if (TryGetNodeAnimation(animationChannel, gltfNodeToMyNode, out NodeAnimation nodeAnimation))
                     {
-                        myAnimation.NodeAnimations[nodeAmimsCount++] = sampler;
+                        myAnimation.NodeAnimations[nodeAmimsCount++] = nodeAnimation;
                     }
                 }
 
@@ -1529,18 +1535,18 @@ namespace IDKEngine.Utils
 
                 animation.KeyFramesStart = new float[keys.Length];
                 animation.RawKeyFramesData = new byte[sizeof(Vector3) * keys.Length];
-                for (int k = 0; k < keys.Length; k++)
+                for (int i = 0; i < keys.Length; i++)
                 {
-                    (float time, System.Numerics.Vector3 value) = keys[k];
-                    animation.KeyFramesStart[k] = time;
-                    animation.GetKeyFrameDataAsVec3()[k] = value.ToOpenTK();
+                    (float time, System.Numerics.Vector3 value) = keys[i];
+                    animation.KeyFramesStart[i] = time;
+                    animation.GetKeyFrameDataAsVec3()[i] = value.ToOpenTK();
                 }
             }
             else if (animationChannel.TargetNodePath == PropertyPath.rotation)
             {
                 IAnimationSampler<System.Numerics.Quaternion> gltfAnimationSampler = animationChannel.GetRotationSampler();
                 animation.Mode = (NodeAnimation.InterpolationMode)gltfAnimationSampler.InterpolationMode;
-
+                
                 ValueTuple<float, System.Numerics.Quaternion>[] keys = null;
                 if (animation.Mode == NodeAnimation.InterpolationMode.Step ||
                     animation.Mode == NodeAnimation.InterpolationMode.Linear)
@@ -1822,7 +1828,7 @@ namespace IDKEngine.Utils
             {
                 for (int i = 0; i < accessor.Count; i++)
                 {
-                    T t;
+                    T t = new T();
                     byte* head = ptr + i * stride;
                     Memory.Copy(head, &t, itemSize);
 

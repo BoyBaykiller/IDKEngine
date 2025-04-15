@@ -366,10 +366,10 @@ namespace IDKEngine.Shapes
             Vector3 tsmaller = Vector3.ComponentMin(t0s, t1s);
             Vector3 tbigger = Vector3.ComponentMax(t0s, t1s);
 
-            t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, tsmaller.Z)));
+            t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, MathF.Max(tsmaller.Z, 0.0f))));
             t2 = MathF.Min(t2, MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z)));
 
-            return t1 <= t2 && t2 > 0.0f;
+            return t1 <= t2;
         }
         public static bool RayVsTriangle(in Ray ray, in Triangle triangle, out Vector3 bary, out float t)
         {

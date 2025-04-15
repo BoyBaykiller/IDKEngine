@@ -904,7 +904,7 @@ namespace IDKEngine
                             {
                                 newTransformation.Scale = result;
                             }
-                            if (nodeAnimation.Type == ModelLoader.NodeAnimation.AnimationType.Translation)
+                            else if (nodeAnimation.Type == ModelLoader.NodeAnimation.AnimationType.Translation)
                             {
                                 newTransformation.Translation = result;
                             }

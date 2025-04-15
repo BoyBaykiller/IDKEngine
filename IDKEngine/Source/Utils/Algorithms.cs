@@ -34,7 +34,7 @@ namespace IDKEngine.Utils
         {
             // http://stereopsis.com/radix.html
 
-            Debug.Assert(input.Length == output.Length);
+            Debug.Assert(output.Length >= input.Length);
 
             const int radixSize = 11;
             const int binSize = 1 << radixSize;
@@ -98,7 +98,7 @@ namespace IDKEngine.Utils
                     uint key3 = getKey(t3);
                     output[GetPrefixSumRef(key3, i)++] = t3;
                 }
-                for (; (uint)j < (uint)input.Length; j++)
+                for (; j < input.Length; j++)
                 {
                     T t0 = input[j];
                     uint key0 = getKey(t0);
@@ -237,7 +237,7 @@ namespace IDKEngine.Utils
         }
 
         /// <summary>
-        /// Reorders the integers in such a way that all elements for which bitArray[arr[i]]==flag
+        /// Reorders the integers in such a way that all elements for which bitArray[arr[i]]==true
         /// precede the integers for which it is not. Relative order of the elements is preserved.
         /// Auxiliary must be able to hold as many elements as bitArray has false entries
         /// Equivalent to std::stable_partition
