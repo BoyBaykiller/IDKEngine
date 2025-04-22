@@ -207,7 +207,7 @@ namespace BBOpenGL
                         AbstractShader shader = shaderProgram.Shaders[j];
 
                         string srcCode = File.ReadAllText(shader.FullShaderPath);
-                        AbstractShader.Preprocessor.PreProcess(srcCode, GlobalShaderInsertions, shader.ShaderStage, out AbstractShader.Preprocessor.PreProcessInfo preprocessInfo);
+                        AbstractShader.Preprocessor.PreProcess(srcCode, shader.ShaderStage, GlobalShaderInsertions, out AbstractShader.Preprocessor.PreProcessInfo preprocessInfo);
 
                         if (preprocessInfo.UsedAppInsertionKeys.Contains(key))
                         {

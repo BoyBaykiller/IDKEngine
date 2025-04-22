@@ -31,6 +31,7 @@ void main()
         return;
     }
 
+    // TODO: Use fragment shader + stencil texture instead?
     uint fragmentCount = min(imageLoad(ImgRecordedFragmentsCounter, imgCoord).r, TRANSPARENT_LAYERS);
     if (fragmentCount == 0)
     {

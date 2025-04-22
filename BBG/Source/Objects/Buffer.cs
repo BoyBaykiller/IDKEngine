@@ -52,15 +52,15 @@ namespace BBOpenGL
 
                 /// <summary>
                 /// Same as <see cref="MappedIncoherent"/> except that it's write-only AND leverages ReBAR/SAM on AMD (and NVIDIA?) drivers. <br/>
-                /// Read buffers are placed in HOST mem by AMD (and NVIIDA?) drivers because:
-                /// 1. "there is a massive CPU performance penalty, on the level of 2 to 3 orders of magnitude if you issue a CPU instruction to read from DEVICE_LOCAL"
-                /// 2. "there exists poorly programmed OGL apps who call MapBuffer and similar with flags thats do not properly indicate the app is going to read that memory via CPU"
-                /// 3. "out of caution for these apps we default to HOST memory"
+                /// Read buffers are placed in HOST mem by AMD (and NVIDIA?) drivers because:
+                /// "there is a massive CPU performance penalty, on the level of 2 to 3 orders of magnitude if you issue a CPU instruction to read from DEVICE_LOCAL
+                /// there exists poorly programmed OGL apps who call MapBuffer and similar with flags thats do not properly indicate the app is going to read that memory via CPU
+                /// out of caution for these apps we default to HOST memory"
                 /// </summary>
                 MappedCoherentWriteOnlyReBAR = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapCoherentBit | BufferStorageMask.MapWriteBit,
 
                 /// <summary>
-                /// The buffer must be written or read by to using the Upload/Download functions.
+                /// The buffer must be written or read by using the Upload/Download functions.
                 /// Synchronization is taken care of by OpenGL.
                 /// </summary>
                 AutoSync = BufferStorageMask.DynamicStorageBit,
@@ -109,10 +109,13 @@ namespace BBOpenGL
                 }
                 else
                 {
-                    // On AMD drivers uploading a lot of data to a GPU-side buffer the classical way takes a lot of time.
-                    // Staging buffer approach is much faster (800ms vs 30ms, 101MB).
-                    // We only do this when the buffer is not mapped, otherwise a glFinish/fence is required to have the new content be immediately visible.
-                    bool useFastUploadPathAMD = GetGpuVendor() == GpuVendor.AMD;
+                    // We use staging buffer upload pattern
+                    // We only do this when the buffer is not mapped, otherwise a glFinish/glFence is required to have the new content be immediately visible.
+                    // Reasons:
+                    // * On AMD uploading a lot of data to a GPU-side buffer driver the classical way takes a lot of time.
+                    //   Staging buffer approach is much faster (800ms vs 30ms, 101MB).
+                    // * On NVIDIA the uploaded data is kept arround even with GL_NONE flag
+                    //   https://discord.com/channels/337627185248468993/337629838770700290/1361819795573575730
 
                     bool fastUploadPathCandidate =
                         memLocation == MemLocation.DeviceLocal && 
@@ -120,11 +123,6 @@ namespace BBOpenGL
                         memAccess != MemAccess.MappedIncoherent && 
                         memAccess != MemAccess.MappedCoherentWriteOnlyReBAR &&
                         data != null;
-
-                    if (!useFastUploadPathAMD)
-                    {
-                        fastUploadPathCandidate = false;
-                    }
 
                     GL.NamedBufferStorage(ID, size, fastUploadPathCandidate ? null : data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
                     if (fastUploadPathCandidate)
@@ -139,7 +137,7 @@ namespace BBOpenGL
                     {
                         Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
                     }
-                    if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
+                    else if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
                     {
                         Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
                     }
@@ -176,7 +174,7 @@ namespace BBOpenGL
             {
                 fixed (void* ptr = &data)
                 {
-                    Fill(Texture.InternalFormat.R32Uint, Texture.PixelFormat.RInteger, Texture.PixelType.Int, offset, size, ptr);
+                    Fill(Texture.InternalFormat.R32UInt, Texture.PixelFormat.RInteger, Texture.PixelType.Int, offset, size, ptr);
                 }
             }
             

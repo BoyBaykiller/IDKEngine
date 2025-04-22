@@ -81,7 +81,7 @@ namespace BBOpenGL
             }
 
             private AbstractShader(ShaderStage shaderStage, string source, string localShaderPath, bool debugSaveAndRunRGA = false)
-                : base(shaderStage, Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath), localShaderPath)
+                : base(shaderStage, Preprocessor.PreProcess(source, shaderStage, AbstractShaderProgram.GlobalShaderInsertions, localShaderPath), localShaderPath)
             {
                 if (debugSaveAndRunRGA)
                 {
@@ -89,7 +89,7 @@ namespace BBOpenGL
                     // Runs Radeon GPU Analyzer on the processed shader code and writes the results and code to disk
 
                     string preprocessedShaderPath = Path.Combine(SHADER_PATH, "bin", localShaderPath);
-                    string shaderCode = Preprocessor.PreProcess(source, AbstractShaderProgram.GlobalShaderInsertions, shaderStage, localShaderPath);
+                    string shaderCode = Preprocessor.PreProcess(source, shaderStage, AbstractShaderProgram.GlobalShaderInsertions, localShaderPath);
 
                     string outDir = Path.GetDirectoryName(preprocessedShaderPath);
                     Directory.CreateDirectory(outDir);
@@ -121,16 +121,16 @@ namespace BBOpenGL
 
                 string rgaShaderStage = shaderStage switch
                 {
-                    ShaderStage.Vertex => "--vert",
-                    ShaderStage.Geometry => "--geom",
-                    ShaderStage.Fragment => "--frag",
-                    ShaderStage.Compute => "--comp",
+                    ShaderStage.Vertex => "vert",
+                    ShaderStage.Geometry => "geom",
+                    ShaderStage.Fragment => "frag",
+                    ShaderStage.Compute => "comp",
                     _ => throw new NotSupportedException($"Can not convert {nameof(shaderStage)} = {shaderStage} to {nameof(rgaShaderStage)}"),
                 };
 
                 string outDir = Path.GetDirectoryName(shaderPath);
 
-                string arguments = $"-s opengl -c gfx1010 {rgaShaderStage} {shaderPath} " +
+                string arguments = $"-s opengl -c gfx1010 --{rgaShaderStage} {shaderPath} " +
                                    $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
                                    $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
                 
@@ -169,17 +169,17 @@ namespace BBOpenGL
                     public string[] UsedAppInsertionKeys;
                 }
 
-                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, string name = null)
+                public static string PreProcess(string source, ShaderStage shaderStage, IReadOnlyDictionary<string, string> shaderInsertions, string name = null)
                 {
-                    return PreProcess(source, shaderInsertions, shaderStage, out _, name);
+                    return PreProcess(source, shaderStage, shaderInsertions, out _, name);
                 }
 
-                public static string PreProcess(string source, IReadOnlyDictionary<string, string> shaderInsertions, ShaderStage shaderStage, out PreProcessInfo preProcessInfo, string name = null)
+                public static string PreProcess(string source, ShaderStage shaderStage, IReadOnlyDictionary<string, string> shaderInsertions, out PreProcessInfo preProcessInfo, string name = null)
                 {
                     List<string> usedAppInsertions = new List<string>();
                     List<string> pathsAlreadyIncluded = new List<string>();
 
-                    string result = RecursiveResolveKeywords(source, name).ToString();
+                    string result = ResolveKeywordsRecursive(source, name).ToString();
                     result = RemoveUnusedShaderStorageBlocks(result).ToString();
 
                     Match match = Regex.Match(result, "#version .*\n*"); // detect GLSL version statement up to line break
@@ -205,7 +205,7 @@ namespace BBOpenGL
                     preProcessInfo.UsedAppInsertionKeys = usedAppInsertions.ToArray();
                     return result;
 
-                    StringBuilder RecursiveResolveKeywords(string source, string name = null)
+                    StringBuilder ResolveKeywordsRecursive(string source, string name = null)
                     {
                         StringBuilder result = new StringBuilder(source.Length);
 
@@ -237,44 +237,37 @@ namespace BBOpenGL
                             }
                             else if (keyword == Keyword.AppInclude)
                             {
-                                string path = SHADER_PATH + userKey;
-                                if (!File.Exists(path))
+                                string path = Path.Combine(SHADER_PATH, userKey);
+                                string includedText;
+                                if (pathsAlreadyIncluded.Contains(path))
                                 {
-                                    Logger.Log(Logger.LogLevel.Error, $"Include file {path} does not exist");
+                                    includedText = $"// Omitted including \"{path}\" as it's already part of this file";
+                                    result.AppendLine(includedText);
                                 }
                                 else
                                 {
-                                    string includedText;
-                                    if (pathsAlreadyIncluded.Contains(path))
+                                    includedText = File.ReadAllText(path);
+                                    pathsAlreadyIncluded.Add(path);
+
+                                    string lineDirective = "#line 1";
+                                    if (SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)
                                     {
-                                        includedText = $"// Omitted including \"{path}\" as it's already part of this file";
-                                        result.AppendLine(includedText);
+                                        lineDirective += $" \"{path}\"";
                                     }
-                                    else
+                                    lineDirective += $" // Including \"{path}\"";
+                                    result.AppendLine(lineDirective);
+
+                                    result.Append(ResolveKeywordsRecursive(includedText, path));
+                                    result.Append('\n');
+
+                                    string originalLine = $"#line {CountLines(source, currentIndex) + 1}";
+                                    string safeSourceName = name ?? "No source name given";
+                                    if (SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)
                                     {
-                                        includedText = File.ReadAllText(path);
-                                        pathsAlreadyIncluded.Add(path);
-
-                                        string lineDirective = "#line 1";
-                                        if (SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)
-                                        {
-                                            lineDirective += $" \"{path}\"";
-                                        }
-                                        lineDirective += $" // Including \"{path}\"";
-                                        result.AppendLine(lineDirective);
-
-                                        result.Append(RecursiveResolveKeywords(includedText, path));
-                                        result.Append('\n');
-
-                                        string origionalLine = $"#line {CountLines(source, currentIndex) + 1}";
-                                        string safeSourceName = name ?? "No source name given";
-                                        if (SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)
-                                        {
-                                            origionalLine += $" \"{safeSourceName}\"";
-                                        }
-                                        origionalLine += $" // Included \"{path}\"";
-                                        result.AppendLine(origionalLine);
+                                        originalLine += $" \"{safeSourceName}\"";
                                     }
+                                    originalLine += $" // Included \"{path}\"";
+                                    result.AppendLine(originalLine);
                                 }
                             }
 
@@ -360,15 +353,15 @@ namespace BBOpenGL
                     }
                 }
 
-                private static int CountLines(string searchString, int count, int startIndex = 0)
+                public static int CountLines(string searchString, int count, int startIndex = 0)
                 {
                     int lineCount = 0;
 
                     int end = startIndex + count;
-                    while (true)
+                    while (startIndex < end)
                     {
                         startIndex = searchString.IndexOf('\n', startIndex + 1);
-                        if (startIndex == -1 || startIndex > end)
+                        if (startIndex == -1)
                         {
                             break;
                         }

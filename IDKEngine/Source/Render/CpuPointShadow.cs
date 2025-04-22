@@ -140,9 +140,7 @@ namespace IDKEngine.Render
 
                     // Clear the faces that will potentially be rendered to.
                     // Some effects (VXGI) might access faces that the camera can't see so maintaining depth for these is better than no shadows at all
-                    float clear = 1.0f;
-                    int size = ShadowMap.Width;
-                    ShadowMap.Fill(BBG.Texture.PixelFormat.Depth, BBG.Texture.PixelType.Float, &clear, size, size, 1, 0, 0, 0, i);
+                    ShadowMap.Fill(1.0f, 0, 0, 0, i);
                 }
             }
 

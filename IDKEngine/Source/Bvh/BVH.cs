@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using OpenTK.Mathematics;
@@ -45,7 +46,7 @@ namespace IDKEngine.Bvh
 
         public record struct RayHitInfo
         {
-            public BLAS.IndicesTriplet TriangleIndices;
+            public GpuIndicesTriplet TriangleIndices;
             public Vector3 Bary;
             public float T;
             public int InstanceID;
@@ -53,24 +54,8 @@ namespace IDKEngine.Bvh
 
         public record struct BoxHitInfo
         {
-            public BLAS.IndicesTriplet TriangleIndices;
+            public GpuIndicesTriplet TriangleIndices;
             public int InstanceID;
-        }
-
-        public record struct BlasDesc
-        {
-            public GeometryDesc GeometryDesc;
-
-            public int RootNodeOffset;
-            public int NodeCount;
-            public int LeafIndicesOffset;
-            public int LeafIndicesCount;
-
-            public int MaxTreeDepth;
-            public int UnpaddedNodesCount;
-
-            public readonly int NodesEnd => RootNodeOffset + NodeCount;
-            public readonly int LeafIndicesEnd => LeafIndicesOffset + LeafIndicesCount;
         }
 
         private record struct BlasBuildPhaseData
@@ -80,14 +65,9 @@ namespace IDKEngine.Bvh
             public GpuBlasNode[] Nodes;
             public int[] ParentIds;
             public int[] LeafIds;
-        }
 
-        public record struct GeometryDesc
-        {
-            public int TriangleCount;
-            public int TriangleOffset;
-            public int VertexOffset;
-            public int VertexCount;
+            // Pre-splitting may create additional Triangles
+            public GpuIndicesTriplet[] Triangles;
         }
 
         public bool CpuUseTlas;
@@ -101,6 +81,7 @@ namespace IDKEngine.Bvh
             {
                 _rebuildTlas = value;
 
+                // Force update on toggle as automatic update may be supressed for when nothing moves
                 if (RebuildTlas)
                 {
                     TlasBuild();
@@ -110,15 +91,16 @@ namespace IDKEngine.Bvh
 
         public GpuTlasNode[] TlasNodes = [];
         public GpuBlasNode[] BlasNodes = [];
-        public BLAS.IndicesTriplet[] BlasTriangles = [];
-        public BlasDesc[] BlasesDesc = [];
+        public GpuIndicesTriplet[] BlasTriangles = [];
+        public GpuBlasDesc[] BlasesDesc = [];
 
         private NativeMemoryView<Vector3> vertexPositions;
         private uint[] vertexIndices = [];
         private GpuMeshInstance[] meshInstances = [];
 
+        private BBG.TypedBuffer<GpuBlasDesc> blasDescBuffer;
         private BBG.TypedBuffer<GpuBlasNode> blasNodesBuffer;
-        private BBG.TypedBuffer<BLAS.IndicesTriplet> blasTriangleIndicesBuffer;
+        private BBG.TypedBuffer<GpuIndicesTriplet> blasTriangleIndicesBuffer;
         private BBG.TypedBuffer<int> blasParentIdsBuffer;
         private BBG.TypedBuffer<int> blasLeafIndicesBuffer;
         private BBG.TypedBuffer<int> blasRefitLockBuffer;
@@ -128,20 +110,23 @@ namespace IDKEngine.Bvh
 
         public BVH()
         {
-            blasNodesBuffer = new BBG.TypedBuffer<GpuBlasNode>();
-            blasNodesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 20);
+            blasDescBuffer = new BBG.TypedBuffer<GpuBlasDesc>();
+            blasDescBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 20);
 
-            blasTriangleIndicesBuffer = new BBG.TypedBuffer<BLAS.IndicesTriplet>();
-            blasTriangleIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 21);
+            blasNodesBuffer = new BBG.TypedBuffer<GpuBlasNode>();
+            blasNodesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 21);
+
+            blasTriangleIndicesBuffer = new BBG.TypedBuffer<GpuIndicesTriplet>();
+            blasTriangleIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 22);
 
             blasParentIdsBuffer = new BBG.TypedBuffer<int>();
-            blasParentIdsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 22);
+            blasParentIdsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 23);
 
             blasLeafIndicesBuffer = new BBG.TypedBuffer<int>();
-            blasLeafIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 23);
+            blasLeafIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 24);
 
             blasRefitLockBuffer = new BBG.TypedBuffer<int>();
-            blasRefitLockBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 24);
+            blasRefitLockBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 25);
 
             tlasBuffer = new BBG.TypedBuffer<GpuTlasNode>();
             tlasBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 26);
@@ -168,7 +153,7 @@ namespace IDKEngine.Bvh
                 for (int i = 0; i < meshInstances.Length; i++)
                 {
                     ref readonly GpuMeshInstance meshInstance = ref meshInstances[i];
-                    ref readonly BlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
+                    ref readonly GpuBlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
 
                     Ray localRay = ray.Transformed(meshInstance.InvModelMatrix);
                     if (BLAS.Intersect(
@@ -199,14 +184,14 @@ namespace IDKEngine.Bvh
                 for (int i = 0; i < meshInstances.Length; i++)
                 {
                     ref readonly GpuMeshInstance meshInstance = ref meshInstances[i];
-                    ref readonly BlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
+                    ref readonly GpuBlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
 
                     Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
 
                     BLAS.Intersect(
                         GetBlas(blasDesc),
                         GetBlasGeometry(blasDesc.GeometryDesc),
-                        localBox, (in BLAS.IndicesTriplet hitTriangle) =>
+                        localBox, (in GpuIndicesTriplet hitTriangle) =>
                         {
                             BoxHitInfo hitInfo;
                             hitInfo.TriangleIndices = hitTriangle;
@@ -228,21 +213,30 @@ namespace IDKEngine.Bvh
         {
             this.meshInstances = meshInstances;
             TlasNodes = TLAS.AllocateRequiredNodes(meshInstances.Length);
+            TlasBuild(true);
         }
 
-        public void Add(ReadOnlySpan<GeometryDesc> geometriesDesc)
+        public void Add(ReadOnlySpan<GpuGeometryDesc> geometriesDesc)
         {
             Array.Resize(ref BlasesDesc, BlasesDesc.Length + geometriesDesc.Length);
-            Span<BlasDesc> blasesDesc = new Span<BlasDesc>(BlasesDesc, BlasesDesc.Length - geometriesDesc.Length, geometriesDesc.Length);
+            Array.Resize(ref BlasTriangles, BlasTriangles.Length + geometriesDesc.Sum(it => it.TriangleCount));
+
+            Span<GpuBlasDesc> blasesDesc = new Span<GpuBlasDesc>(BlasesDesc, BlasesDesc.Length - geometriesDesc.Length, geometriesDesc.Length);
             for (int i = 0; i < geometriesDesc.Length; i++)
             {
-                BlasDesc blasDesc = new BlasDesc();
+                GpuBlasDesc blasDesc = new GpuBlasDesc();
                 blasDesc.GeometryDesc = geometriesDesc[i];
+
+                BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
+                for (int j = 0; j < geometry.Triangles.Length; j++)
+                {
+                    geometry.Triangles[j].X = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 0]);
+                    geometry.Triangles[j].Y = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 1]);
+                    geometry.Triangles[j].Z = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 2]);
+                }
 
                 blasesDesc[i] = blasDesc;
             }
-
-            Array.Resize(ref BlasTriangles, Helper.Sum<BlasDesc>(BlasesDesc, it => it.GeometryDesc.TriangleCount));
         }
 
         public void RemoveBlas(Range rmBlasRange, NativeMemoryView<Vector3> vertexPositions, uint[] vertexIndices, GpuMeshInstance[] meshInstances)
@@ -261,16 +255,16 @@ namespace IDKEngine.Bvh
             Range rmVerticesRange = GetBlasesVerticesRange(rmBlasRange);
             for (int i = rmTriangleRange.End; i < BlasTriangles.Length; i++)
             {
-                ref BLAS.IndicesTriplet triangles = ref BlasTriangles[i];
-                triangles.X -= rmVerticesRange.Count;
-                triangles.Y -= rmVerticesRange.Count;
-                triangles.Z -= rmVerticesRange.Count;
+                ref GpuIndicesTriplet triIndices = ref BlasTriangles[i];
+                triIndices.X -= rmVerticesRange.Count;
+                triIndices.Y -= rmVerticesRange.Count;
+                triIndices.Z -= rmVerticesRange.Count;
             }
             Helper.ArrayRemove(ref BlasTriangles, rmTriangleRange.Start, rmTriangleRange.Count);
 
             for (int i = rmBlasRange.End; i < BlasesDesc.Length; i++)
             {
-                ref BlasDesc desc = ref BlasesDesc[i];
+                ref GpuBlasDesc desc = ref BlasesDesc[i];
                 desc.RootNodeOffset -= rmNodeRange.Count;
                 desc.LeafIndicesOffset -= rmLeafIdRange.Count;
 
@@ -279,6 +273,7 @@ namespace IDKEngine.Bvh
             }
             Helper.ArrayRemove(ref BlasesDesc, rmBlasRange.Start, rmBlasRange.Count);
 
+            BBG.Buffer.Recreate(ref blasDescBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc);
             BBG.Buffer.Recreate(ref blasNodesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasNodes);
             BBG.Buffer.Recreate(ref blasTriangleIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasTriangles);
             BBG.Buffer.Recreate(ref blasParentIdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasParentIds);
@@ -311,70 +306,87 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public unsafe void BlasesBuild(int start, int count)
+        public void BlasesBuild(int start, int count)
         {
             if (count == 0) return;
 
             BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
             ReinsertionOptimizer.Settings optimizationSettings = new ReinsertionOptimizer.Settings();
+
+            // Benefical in some scenes (with "inefficient" long triangles) and harmful in others
+            const bool enablePresplitting = false;
+
             BlasBuildPhaseData[] newBlasesData = new BlasBuildPhaseData[count];
-            
+            GpuBlasDesc prevEndBlasDesc = BlasesDesc[start + count - 1];
+            int preSplitAddedTris = 0;
+
             Stopwatch swBuilding = Stopwatch.StartNew();
             Parallel.For(0, count, i =>
             //for (int i = 0; i < count; i++)
             {
-                ref BlasDesc blasDesc = ref BlasesDesc[start + i];
+                ref GpuBlasDesc blasDesc = ref BlasesDesc[start + i];
                 BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
 
-                for (int j = 0; j < geometry.Triangles.Length; j++)
+                // TODO: Only store parent+leaf ids and allow pre-splitting for "refitable BLAS"
+
+                // Don't do pre-splitting repeatedly as that creates excessive amounts of triangles
+                bool doPresplitting = enablePresplitting && !blasDesc.PreSplittingWasDone;
+                if (doPresplitting)
                 {
-                    geometry.Triangles[j].X = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 0]);
-                    geometry.Triangles[j].Y = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 1]);
-                    geometry.Triangles[j].Z = (int)(blasDesc.GeometryDesc.VertexOffset + vertexIndices[(blasDesc.GeometryDesc.TriangleOffset + j) * 3 + 2]);
+                    blasDesc.PreSplittingWasDone = true;
                 }
 
-                //System.IO.File.WriteAllBytes("vertices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.VertexPositions));
-                //System.IO.File.WriteAllBytes("indices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.Triangles));
+                // Generate bounding boxes from (pre-split) triangles.
+                // If pre-splitting is enable we also create indices that
+                // map a box index to the corresponding source triangle index
+                (Box[] triangleBounds, int[] originalTriIds) = doPresplitting ?
+                    PreSplitting.PreSplit(geometry) :
+                    (BLAS.GetTriangleBounds(geometry), null);
 
-                GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(geometry.TriangleCount)];
+                // Allocate temporary build data and upper bound of required nodes
+                BLAS.BuildData buildData = BLAS.GetBuildData(triangleBounds);
+                GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(buildData.TriangleCount)];
+
+                // Build BLAS and resize nodes
                 BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
+                int nodesUsed = BLAS.Build(ref blas, buildData, buildSettings);
 
-                //float avg = 0.0f;
-                //for (int j = 0; j < 10; j++)
-                //{
-                //    Stopwatch debug = Stopwatch.StartNew();
-                //    BLAS.Build(ref blas, geometry, buildSettings);
-                //    if (j >= 3)
-                //    {
-                //        avg += debug.ElapsedMilliseconds;
-                //    }
-                //}
-                //Console.WriteLine($"Avg = {avg / 7.0f}");
-
-                int nodesUsed = BLAS.Build(ref blas, geometry, buildSettings);
-
-                blasDesc.NodeCount = nodesUsed;
-                blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;
-
-                // Resize array and update the Span because array got mutated
-                Array.Resize(ref nodes, blasDesc.NodeCount);
+                Array.Resize(ref nodes, nodesUsed);
                 blas.Nodes = nodes;
+
+                // The BLAS holds permutated indices into the inital triangles.
+                // Let's get rid of this indirection
+                GpuIndicesTriplet[] blasTriangles = doPresplitting ?
+                    PreSplitting.GetUnindexedTriangles(blas, buildData, geometry, originalTriIds) :
+                    BLAS.GetUnindexedTriangles(buildData, geometry);
 
                 int[] parentIds = BLAS.GetParentIndices(blas);
 
-                // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net-performance
-                // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
-                // ReinsertionOptimizer.Optimize(ref blas, parentIds, geometry.Triangles, optimizationSettings);
-
-                blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
+                if (false)
+                {
+                    // Post build optimizaton.
+                    // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net performance
+                    // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
+                    ReinsertionOptimizer.Optimize(ref blas, parentIds, blasTriangles, optimizationSettings);
+                }
 
                 int[] leafIds = BLAS.GetLeafIndices(blas);
+
+                if (doPresplitting)
+                {
+                    int added = blasTriangles.Length - geometry.TriangleCount;
+                    Interlocked.Add(ref preSplitAddedTris, added);
+                }
+
+                blasDesc.NodeCount = nodes.Length;
+                blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;
+                blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
                 blasDesc.LeafIndicesCount = leafIds.Length;
+                blasDesc.GeometryDesc.TriangleCount = blasTriangles.Length;
 
                 BlasBuildPhaseData blasData = new BlasBuildPhaseData();
+                blasData.Triangles = blasTriangles;
                 blasData.Nodes = nodes;
-
-                // TODO: Add concept of refitable BLAS and only store parent and leaf ids for those
                 blasData.ParentIds = parentIds;
                 blasData.LeafIds = leafIds;
                 newBlasesData[i] = blasData;
@@ -382,6 +394,11 @@ namespace IDKEngine.Bvh
             swBuilding.Stop();
 
             Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms");
+            
+            if (preSplitAddedTris > 0)
+            {
+                Logger.Log(Logger.LogLevel.Info, $"Pre-splitting added {preSplitAddedTris} triangles");
+            }
 
             if (true)
             {
@@ -394,41 +411,74 @@ namespace IDKEngine.Bvh
             }
 
             // Adjust offsets of all BLASes starting from the the ones that were rebuild
-            BlasDesc prevLastBlasDesc = BlasesDesc[start + count - 1];
             for (int i = start; i < BlasesDesc.Length; i++)
             {
-                ref BlasDesc blasDesc = ref BlasesDesc[i];
+                ref GpuBlasDesc blasDesc = ref BlasesDesc[i];
                 blasDesc.RootNodeOffset = i == 0 ? 0 : BlasesDesc[i - 1].NodesEnd;
                 blasDesc.LeafIndicesOffset = i == 0 ? 0 : BlasesDesc[i - 1].LeafIndicesEnd;
+
+                blasDesc.GeometryDesc.TriangleOffset = i == 0 ? 0 : BlasesDesc[i - 1].GeometryDesc.TrianglesEnd;
             }
-            BlasDesc newLastBlasDesc = BlasesDesc[start + count - 1];
+            GpuBlasDesc newEndBlasDesc = BlasesDesc[start + count - 1];
 
             blasParentIdsBuffer.DownloadElements(out int[] blasParentIds);
             blasLeafIndicesBuffer.DownloadElements(out int[] blasLeafIds);
 
-            // Resize arrays to hold new data
-            Array.Resize(ref BlasNodes, BlasesDesc[BlasesDesc.Length - 1].NodesEnd);
-            Array.Resize(ref blasParentIds, BlasesDesc[BlasesDesc.Length - 1].NodesEnd);
-            Array.Resize(ref blasLeafIds, BlasesDesc[BlasesDesc.Length - 1].LeafIndicesEnd);
-
             // Data in the middle resized, move the following data to new offsets so there are no holes
-            Array.Copy(BlasNodes, prevLastBlasDesc.NodesEnd, BlasNodes, newLastBlasDesc.NodesEnd, BlasNodes.Length - newLastBlasDesc.NodesEnd);
-            Array.Copy(blasParentIds, prevLastBlasDesc.NodesEnd, blasParentIds, newLastBlasDesc.NodesEnd, blasParentIds.Length - newLastBlasDesc.NodesEnd);
-            Array.Copy(blasLeafIds, prevLastBlasDesc.LeafIndicesEnd, blasLeafIds, newLastBlasDesc.LeafIndicesEnd, blasLeafIds.Length - newLastBlasDesc.LeafIndicesEnd);
+            {
+                if (newEndBlasDesc.NodesEnd < prevEndBlasDesc.NodesEnd)
+                {
+                    Helper.ArrayRemove(ref BlasNodes, newEndBlasDesc.NodesEnd, prevEndBlasDesc.NodesEnd - newEndBlasDesc.NodesEnd);
+                    Helper.ArrayRemove(ref blasParentIds, newEndBlasDesc.NodesEnd, prevEndBlasDesc.NodesEnd - newEndBlasDesc.NodesEnd);
+                }
+                else
+                {
+                    ShiftElements(ref BlasNodes, prevEndBlasDesc.NodesEnd, newEndBlasDesc.NodesEnd);
+                    ShiftElements(ref blasParentIds, prevEndBlasDesc.NodesEnd, newEndBlasDesc.NodesEnd);
+                }
+
+                if (newEndBlasDesc.GeometryDesc.TrianglesEnd < prevEndBlasDesc.GeometryDesc.TrianglesEnd)
+                {
+                    Helper.ArrayRemove(ref BlasTriangles, newEndBlasDesc.GeometryDesc.TrianglesEnd, prevEndBlasDesc.GeometryDesc.TrianglesEnd - newEndBlasDesc.GeometryDesc.TrianglesEnd);
+                }
+                else
+                {
+                    ShiftElements(ref BlasTriangles, prevEndBlasDesc.GeometryDesc.TrianglesEnd, newEndBlasDesc.GeometryDesc.TrianglesEnd);
+                }
+
+                if (newEndBlasDesc.LeafIndicesEnd < prevEndBlasDesc.LeafIndicesEnd)
+                {
+                    Helper.ArrayRemove(ref blasLeafIds, newEndBlasDesc.LeafIndicesEnd, prevEndBlasDesc.LeafIndicesEnd - newEndBlasDesc.LeafIndicesEnd);
+                }
+                else
+                {
+                    ShiftElements(ref blasLeafIds, prevEndBlasDesc.LeafIndicesEnd, newEndBlasDesc.LeafIndicesEnd);
+                }
+
+                static void ShiftElements<T>(ref T[] arr, int oldPosition, int newPosition)
+            {
+                int newCount = newPosition - oldPosition + arr.Length;
+
+                Array.Resize(ref arr, newCount);
+                Array.Copy(arr, oldPosition, arr, newPosition, arr.Length - newPosition);
+            }
+            }
 
             // Copy new data into global arrays
             for (int i = 0; i < count; i++)
             {
                 ref readonly BlasBuildPhaseData blasData = ref newBlasesData[i];
-                ref readonly BlasDesc blasDesc = ref BlasesDesc[start + i];
+                ref readonly GpuBlasDesc blasDesc = ref BlasesDesc[start + i];
 
                 Array.Copy(blasData.Nodes, 0, BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
+                Array.Copy(blasData.Triangles, 0, BlasTriangles, blasDesc.GeometryDesc.TriangleOffset, blasDesc.GeometryDesc.TriangleCount);
                 Array.Copy(blasData.ParentIds, 0, blasParentIds, blasDesc.RootNodeOffset, blasDesc.NodeCount);
                 Array.Copy(blasData.LeafIds, 0, blasLeafIds, blasDesc.LeafIndicesOffset, blasDesc.LeafIndicesCount);
             }
 
             UpdateMaxBlasTreeDepth();
 
+            BBG.Buffer.Recreate(ref blasDescBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc);
             BBG.Buffer.Recreate(ref blasTriangleIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasTriangles);
             BBG.Buffer.Recreate(ref blasNodesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasNodes);
             BBG.Buffer.Recreate(ref blasParentIdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasParentIds);
@@ -440,15 +490,12 @@ namespace IDKEngine.Bvh
         {
             for (int i = start; i < start + count; i++)
             {
-                BlasDesc blasDesc = BlasesDesc[i];
+                GpuBlasDesc blasDesc = BlasesDesc[i];
 
                 blasRefitLockBuffer.Fill(0, blasRefitLockBuffer.Size, 0);
                 BBG.Computing.Compute("Refit BLAS", () =>
                 {
-                    refitBlasProgram.Upload(0, (uint)blasDesc.RootNodeOffset);
-                    refitBlasProgram.Upload(1, (uint)blasDesc.GeometryDesc.TriangleOffset);
-                    refitBlasProgram.Upload(2, (uint)blasDesc.LeafIndicesOffset);
-                    refitBlasProgram.Upload(3, (uint)blasDesc.LeafIndicesCount);
+                    refitBlasProgram.Upload(0, (uint)i);
 
                     BBG.Cmd.UseShaderProgram(refitBlasProgram);
                     BBG.Computing.Dispatch(MyMath.DivUp(blasDesc.LeafIndicesCount, 64), 1, 1);
@@ -458,7 +505,7 @@ namespace IDKEngine.Bvh
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit);
         }
 
-        public void CpuBlasRefit(in BlasDesc blasDesc)
+        public void CpuBlasRefit(in GpuBlasDesc blasDesc)
         {
             BLAS.BuildResult blas = GetBlas(blasDesc);
             BLAS.Refit(blas, GetBlasGeometry(blasDesc.GeometryDesc));
@@ -469,7 +516,7 @@ namespace IDKEngine.Bvh
             return GetBlas(BlasesDesc[index]);
         }
 
-        public BLAS.BuildResult GetBlas(in BlasDesc blasDesc)
+        public BLAS.BuildResult GetBlas(in GpuBlasDesc blasDesc)
         {
             BLAS.BuildResult blas = new BLAS.BuildResult();
             blas.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
@@ -479,11 +526,11 @@ namespace IDKEngine.Bvh
             return blas;
         }
 
-        public BLAS.Geometry GetBlasGeometry(in GeometryDesc geometryDesc)
+        public BLAS.Geometry GetBlasGeometry(in GpuGeometryDesc geometryDesc)
         {
             BLAS.Geometry geometry = new BLAS.Geometry();
             geometry.VertexPositions = vertexPositions;
-            geometry.Triangles = new Span<BLAS.IndicesTriplet>(BlasTriangles, geometryDesc.TriangleOffset, geometryDesc.TriangleCount);
+            geometry.Triangles = new Span<GpuIndicesTriplet>(BlasTriangles, geometryDesc.TriangleOffset, geometryDesc.TriangleCount);
             return geometry;
         }
 
@@ -491,7 +538,7 @@ namespace IDKEngine.Bvh
         {
             Range range = new Range();
             range.Start = BlasesDesc[blases.Start].RootNodeOffset;
-            range.End = BlasesDesc[blases.End - 1].RootNodeOffset + BlasesDesc[blases.End - 1].NodeCount;
+            range.End = BlasesDesc[blases.End - 1].NodesEnd;
 
             return range;
         }
@@ -500,7 +547,7 @@ namespace IDKEngine.Bvh
         {
             Range range = new Range();
             range.Start = BlasesDesc[blases.Start].LeafIndicesOffset;
-            range.End = BlasesDesc[blases.End - 1].LeafIndicesOffset + BlasesDesc[blases.End - 1].LeafIndicesCount;
+            range.End = BlasesDesc[blases.End - 1].LeafIndicesEnd;
 
             return range;
         }
@@ -509,7 +556,7 @@ namespace IDKEngine.Bvh
         {
             Range range = new Range();
             range.Start = BlasesDesc[blases.Start].GeometryDesc.TriangleOffset;
-            range.End = BlasesDesc[blases.End - 1].GeometryDesc.TriangleOffset + BlasesDesc[blases.End - 1].GeometryDesc.TriangleCount;
+            range.End = BlasesDesc[blases.End - 1].GeometryDesc.TrianglesEnd;
 
             return range;
         }
@@ -518,7 +565,7 @@ namespace IDKEngine.Bvh
         {
             Range range = new Range();
             range.Start = BlasesDesc[blases.Start].GeometryDesc.VertexOffset;
-            range.End = BlasesDesc[blases.End - 1].GeometryDesc.VertexOffset + BlasesDesc[blases.End - 1].GeometryDesc.VertexCount;
+            range.End = BlasesDesc[blases.End - 1].GeometryDesc.VerticesEnd;
 
             return range;
         }
@@ -526,7 +573,7 @@ namespace IDKEngine.Bvh
         private void GetBlasAndGeometry(int instanceId, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform)
         {
             ref readonly GpuMeshInstance meshInstance = ref meshInstances[instanceId];
-            ref readonly BlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
+            ref readonly GpuBlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
 
             blas = GetBlas(blasDesc);
             geometry = GetBlasGeometry(blasDesc.GeometryDesc);
@@ -546,6 +593,7 @@ namespace IDKEngine.Bvh
 
         public void Dispose()
         {
+            blasDescBuffer.Dispose();
             refitBlasProgram.Dispose();
             tlasBuffer.Dispose();
             blasRefitLockBuffer.Dispose();

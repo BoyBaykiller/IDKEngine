@@ -159,7 +159,11 @@ namespace BBOpenGL
             {
                 public Texture[] Textures;
                 public Vector4 ClearColor; // Currently assumes floating point texture format
-                public AttachmentLoadOp AttachmentLoadOp;
+                public AttachmentLoadOp AttachmentLoadOp = AttachmentLoadOp.Load;
+
+                public ColorAttachments()
+                {
+                }
             }
 
             public record struct ColorAttachment
@@ -168,7 +172,7 @@ namespace BBOpenGL
                 public Texture Texture;
                 public Vector4 ClearColor; // Currently assumes floating point texture format
                 public int Level;
-                public AttachmentLoadOp AttachmentLoadOp;
+                public AttachmentLoadOp AttachmentLoadOp = AttachmentLoadOp.Load;
                 public BlendState BlendState = new BlendState();
 
                 public ColorAttachment()
@@ -182,7 +186,7 @@ namespace BBOpenGL
                 public float DepthClearValue = 1.0f;
                 public int StencilClearValue = 0;
                 public int Level;
-                public AttachmentLoadOp AttachmentLoadOp;
+                public AttachmentLoadOp AttachmentLoadOp = AttachmentLoadOp.Load;
 
                 public DepthStencilAttachment()
                 {
@@ -422,8 +426,10 @@ namespace BBOpenGL
             {
                 Debugging.PushDebugGroup(renderPassName);
 
-                GL.DeleteFramebuffers(1, ref fboNoAttachmentsGLHandle);
-                GL.CreateFramebuffers(1, ref fboNoAttachmentsGLHandle);
+                if (fboNoAttachmentsGLHandle == 0)
+                {
+                    GL.CreateFramebuffers(1, ref fboNoAttachmentsGLHandle);
+                }
 
                 GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
                 GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultHeight, fboParameters.Height);
@@ -447,16 +453,16 @@ namespace BBOpenGL
                 GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
             }
 
-            public static void SetVertexInputAssembly(in VertexInputDesc vertexInputAssembly)
+            public static void SetVertexInputDesc(in VertexInputDesc vertexInputDesc)
             {
                 GL.DeleteVertexArrays(1, ref vaoGLHandle);
                 GL.CreateVertexArrays(1, ref vaoGLHandle);
 
-                GL.VertexArrayElementBuffer(vaoGLHandle, vertexInputAssembly.IndexBuffer.ID);
+                GL.VertexArrayElementBuffer(vaoGLHandle, vertexInputDesc.IndexBuffer.ID);
 
-                if (vertexInputAssembly.VertexDescription.HasValue)
+                if (vertexInputDesc.VertexDescription.HasValue)
                 {
-                    VertexDescription vertexDescription = vertexInputAssembly.VertexDescription.Value;
+                    VertexDescription vertexDescription = vertexInputDesc.VertexDescription.Value;
                     for (int i = 0; i < vertexDescription.VertexBuffers.Length; i++)
                     {
                         ref readonly VertexBuffer vertexBuffer = ref vertexDescription.VertexBuffers[i];

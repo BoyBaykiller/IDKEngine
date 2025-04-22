@@ -43,7 +43,7 @@ namespace IDKEngine.Bvh
             }
         }
 
-        public static void Optimize(ref BLAS.BuildResult blas, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles, in Settings settings)
+        public static void Optimize(ref BLAS.BuildResult blas, Span<int> parentIds, Span<GpuIndicesTriplet> triangles, in Settings settings)
         {
             if (blas.Nodes.Length <= 3)
             {
@@ -56,9 +56,9 @@ namespace IDKEngine.Bvh
 
         private readonly Span<GpuBlasNode> nodes;
         private readonly Span<int> parentIds;
-        private readonly Span<BLAS.IndicesTriplet> triangles;
+        private readonly Span<GpuIndicesTriplet> triangles;
         
-        private ReinsertionOptimizer(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<BLAS.IndicesTriplet> triangles)
+        private ReinsertionOptimizer(Span<GpuBlasNode> nodes, Span<int> parentIds, Span<GpuIndicesTriplet> triangles)
         {
             this.nodes = nodes;
             this.parentIds = parentIds;
@@ -238,45 +238,21 @@ namespace IDKEngine.Bvh
                 SwapChildrenInMem(1, parentIds[3]);
             }
 
-            BLAS.IndicesTriplet[] newTriIndices = new BLAS.IndicesTriplet[triangles.Length];
+            GpuIndicesTriplet[] fixedTriangles = new GpuIndicesTriplet[triangles.Length];
             int triCounter = 0;
 
-            Span<int> stack = stackalloc int[32];
-            int stackPtr = 0;
-            stack[stackPtr++] = 1;
-
-            while (stackPtr > 0)
+            for (int i = 0; i < nodes.Length; i++)
             {
-                int stackTop = stack[--stackPtr];
-
-                ref GpuBlasNode leftChild = ref nodes[stackTop];
-                ref GpuBlasNode rightChild = ref nodes[stackTop + 1];
-
-                if (leftChild.IsLeaf)
+                ref GpuBlasNode node = ref nodes[i];
+                if (node.IsLeaf)
                 {
-                    Memory.CopyElements(ref triangles[leftChild.TriStartOrChild], ref newTriIndices[triCounter], leftChild.TriCount);
-                    leftChild.TriStartOrChild = triCounter;
-                    triCounter += leftChild.TriCount;
-                }
-                if (rightChild.IsLeaf)
-                {
-                    Memory.CopyElements(ref triangles[rightChild.TriStartOrChild], ref newTriIndices[triCounter], rightChild.TriCount);
-                    rightChild.TriStartOrChild = triCounter;
-                    triCounter += rightChild.TriCount;
-                }
-
-                if (!leftChild.IsLeaf)
-                {
-                    stack[stackPtr++] = leftChild.TriStartOrChild;
-                }
-
-                if (!rightChild.IsLeaf)
-                {
-                    stack[stackPtr++] = rightChild.TriStartOrChild;
+                    Memory.CopyElements(ref triangles[node.TriStartOrChild], ref fixedTriangles[triCounter], node.TriCount);
+                    node.TriStartOrChild = triCounter;
+                    triCounter += node.TriCount;
                 }
             }
 
-            newTriIndices.CopyTo(triangles);
+            fixedTriangles.CopyTo(triangles);
         }
 
         private readonly void SwapChildrenInMem(int inParent, int outParent)

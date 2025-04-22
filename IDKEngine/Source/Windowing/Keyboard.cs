@@ -14,12 +14,6 @@ namespace IDKEngine.Windowing
             Touched
         }
 
-        public InputState this[Keys key]
-        {
-            get => keyStates[key];
-        }
-
-        
         private static readonly Keys[] keyValues = Enum.GetValues<Keys>();
 
         private readonly Dictionary<Keys, InputState> keyStates;
@@ -35,6 +29,11 @@ namespace IDKEngine.Windowing
             {
                 keyStates[keyValues[i]] = InputState.Released;
             }
+        }
+        
+        public InputState this[Keys key]
+        {
+            get => keyStates[key];
         }
 
         public void Update()

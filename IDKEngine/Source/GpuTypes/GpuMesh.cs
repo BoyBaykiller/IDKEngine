@@ -18,10 +18,10 @@ namespace IDKEngine.GpuTypes
         public int MeshletCount;
 
         public int InstanceCount;
-        public int BlasRootNodeOffset;
         public bool TintOnTransmissive = true;
         private fixed bool _pad[3];
         private readonly float _pad0;
+        public readonly float _pad1;
 
         public GpuMesh()
         {

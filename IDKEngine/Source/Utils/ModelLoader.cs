@@ -93,7 +93,7 @@ namespace IDKEngine.Utils
             public bool IsLeaf => Children.Length == 0;
 
             public bool HasMeshInstances => MeshInstanceRange.Count > 0;
-            public bool HasSkin => Skin.Joints != null;
+            public bool HasSkin => Skin.Joints != null; // Skin implies HasMeshInstances
 
             public Transformation LocalTransform
             {
@@ -137,7 +137,7 @@ namespace IDKEngine.Utils
 
             public void DeepClone(Span<Node> newNodes, ReadOnlySpan<Node> oldNodes)
             {
-                HierarchyToArray(RecurseDeepClone(this), newNodes);
+                HierarchyToArray(DeepCloneRecursive(this), newNodes);
 
                 // Copying Skin needs to be done after all Nodes have been copied
                 for (int i = 0; i < newNodes.Length; i++)
@@ -148,7 +148,7 @@ namespace IDKEngine.Utils
                     }
                 }
 
-                static Node RecurseDeepClone(Node source)
+                static Node DeepCloneRecursive(Node source)
                 {
                     Node newNode = new Node();
                     newNode.Name = new string(source.Name);
@@ -162,7 +162,7 @@ namespace IDKEngine.Utils
                     newNode.Children = new Node[source.Children.Length];
                     for (int i = 0; i < source.Children.Length; i++)
                     {
-                        newNode.Children[i] = RecurseDeepClone(source.Children[i]);
+                        newNode.Children[i] = DeepCloneRecursive(source.Children[i]);
                         newNode.Children[i].Parent = newNode;
                     }
 
@@ -172,6 +172,11 @@ namespace IDKEngine.Utils
 
             private void MarkDirty()
             {
+                if (isDirty)
+                {
+                   return;
+                }
+
                 isDirty = true;
                 MarkParentsDirty(this);
 
@@ -360,14 +365,16 @@ namespace IDKEngine.Utils
 
         public record struct Skin
         {
+            public readonly int JointsCount => Joints.Length;
+
             public Node[] Joints;
             public Matrix4[] InverseJointMatrices;
 
             public readonly Skin DeepClone(ReadOnlySpan<Node> newNodes)
             {
                 Skin skin = new Skin();
-                skin.Joints = new Node[Joints.Length];
-                for (int i = 0; i < Joints.Length; i++)
+                skin.Joints = new Node[JointsCount];
+                for (int i = 0; i < JointsCount; i++)
                 {
                     skin.Joints[i] = newNodes[Joints[i].ArrayIndex];
                 }
@@ -1247,7 +1254,6 @@ namespace IDKEngine.Utils
                         tasks[uniqueMeshPrimitivesCount++] = Task.Run(() =>
                         {
                             (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(modelRoot.LogicalAccessors, meshDesc);
-                            OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
 
                             MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
                             (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);
@@ -1446,20 +1452,18 @@ namespace IDKEngine.Utils
                 GltfNode gltfNode = gltfNodes[i];
                 if (gltfNode.Skin != null)
                 {
-                    Node[] joints = new Node[gltfNode.Skin.JointsCount];
-                    Matrix4[] inverseJointMatrices = new Matrix4[joints.Length];
-                    for (int j = 0; j < joints.Length; j++)
+                    Node myNode = gltfNodeToMyNode[gltfNode];
+                    myNode.Skin = new Skin();
+                    myNode.Skin.Joints = new Node[gltfNode.Skin.JointsCount];
+                    myNode.Skin.InverseJointMatrices = new Matrix4[myNode.Skin.JointsCount];
+
+                    for (int j = 0; j < myNode.Skin.JointsCount; j++)
                     {
                         (GltfNode gltfJoint, System.Numerics.Matrix4x4 inverseJointMatrix) = gltfNode.Skin.GetJoint(j);
 
-                        joints[j] = gltfNodeToMyNode[gltfJoint];
-                        inverseJointMatrices[j] = inverseJointMatrix.ToOpenTK();
+                        myNode.Skin.Joints[j] = gltfNodeToMyNode[gltfJoint];
+                        myNode.Skin.InverseJointMatrices[j] = inverseJointMatrix.ToOpenTK();
                     }
-
-                    Node myNode = gltfNodeToMyNode[gltfNode];
-                    myNode.Skin = new Skin();
-                    myNode.Skin.Joints = joints;
-                    myNode.Skin.InverseJointMatrices = inverseJointMatrices;
                 }
             }
         }
@@ -1480,9 +1484,9 @@ namespace IDKEngine.Utils
                 for (int j = 0; j < gltfAnimation.Channels.Count; j++)
                 {
                     AnimationChannel animationChannel = gltfAnimation.Channels[j];
-                    if (TryGetNodeAnimation(animationChannel, gltfNodeToMyNode, out NodeAnimation sampler))
+                    if (TryGetNodeAnimation(animationChannel, gltfNodeToMyNode, out NodeAnimation nodeAnimation))
                     {
-                        myAnimation.NodeAnimations[nodeAmimsCount++] = sampler;
+                        myAnimation.NodeAnimations[nodeAmimsCount++] = nodeAnimation;
                     }
                 }
 
@@ -1529,18 +1533,18 @@ namespace IDKEngine.Utils
 
                 animation.KeyFramesStart = new float[keys.Length];
                 animation.RawKeyFramesData = new byte[sizeof(Vector3) * keys.Length];
-                for (int k = 0; k < keys.Length; k++)
+                for (int i = 0; i < keys.Length; i++)
                 {
-                    (float time, System.Numerics.Vector3 value) = keys[k];
-                    animation.KeyFramesStart[k] = time;
-                    animation.GetKeyFrameDataAsVec3()[k] = value.ToOpenTK();
+                    (float time, System.Numerics.Vector3 value) = keys[i];
+                    animation.KeyFramesStart[i] = time;
+                    animation.GetKeyFrameDataAsVec3()[i] = value.ToOpenTK();
                 }
             }
             else if (animationChannel.TargetNodePath == PropertyPath.rotation)
             {
                 IAnimationSampler<System.Numerics.Quaternion> gltfAnimationSampler = animationChannel.GetRotationSampler();
                 animation.Mode = (NodeAnimation.InterpolationMode)gltfAnimationSampler.InterpolationMode;
-
+                
                 ValueTuple<float, System.Numerics.Quaternion>[] keys = null;
                 if (animation.Mode == NodeAnimation.InterpolationMode.Step ||
                     animation.Mode == NodeAnimation.InterpolationMode.Linear)
@@ -1822,7 +1826,7 @@ namespace IDKEngine.Utils
             {
                 for (int i = 0; i < accessor.Count; i++)
                 {
-                    T t;
+                    T t = new T();
                     byte* head = ptr + i * stride;
                     Memory.Copy(head, &t, itemSize);
 
@@ -2001,7 +2005,7 @@ namespace IDKEngine.Utils
         {
             // We cache textures because many bindless textures have a performance overhead on AMD drivers
             // https://gist.github.com/BoyBaykiller/40d21d5b28391fb40d3f3bc348375ce8
-            // We check if user deleted them in which case we recreate (we are not owning)
+            // We need to check if user deleted them and recreate if so because we do not own them
 
             private static BindlessSampledTexture cachedWhiteTexture = new BindlessSampledTexture();
             private static BindlessSampledTexture cachedPurpleBackTexture = new BindlessSampledTexture();
@@ -2020,7 +2024,7 @@ namespace IDKEngine.Utils
                 {
                     texture = new GLTexture(GLTexture.Type.Texture2D);
                     texture.Allocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-                    texture.Fill(GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4(1.0f));
+                    texture.Fill(new Vector4(1.0f));
 
                     cachedWhiteTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
                 }

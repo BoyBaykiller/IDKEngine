@@ -178,7 +178,7 @@ namespace IDKEngine.Render
             Result.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
             Result.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
             Result.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
-            Result.Fill(BBG.Texture.PixelFormat.RGBA, BBG.Texture.PixelType.Float, new Vector4(0.0f));
+            Result.Fill(new Vector4(0.0f));
 
             BBG.Buffer.Recreate(ref wavefrontRayBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, size.X * size.Y);
             BBG.Buffer.Recreate(ref wavefrontPTBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));

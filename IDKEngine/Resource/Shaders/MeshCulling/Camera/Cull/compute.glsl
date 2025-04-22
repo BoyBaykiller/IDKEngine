@@ -32,7 +32,7 @@ void main()
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     uint meshId = meshInstance.MeshId;
 
-    GpuBlasNode node = blasNodeSSBO.Nodes[meshSSBO.Meshes[meshId].BlasRootNodeOffset];
+    GpuBlasNode node = blasNodeSSBO.Nodes[blasDescSSBO.Descs[meshId].RootNodeOffset];
     
     mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
     mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);

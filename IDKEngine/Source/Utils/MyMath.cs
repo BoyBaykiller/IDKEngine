@@ -185,7 +185,7 @@ namespace IDKEngine.Utils
 
         // Calculates a 30-bit Morton code for the
         // given 3D point located within the unit cube [0,1].
-        public static uint GetMorton(Vector3 normalizedV)
+        public static uint GetMortonCode(Vector3 normalizedV)
         {
             unchecked
             {

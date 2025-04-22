@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 
 namespace IDKEngine.Shapes
@@ -19,9 +21,22 @@ namespace IDKEngine.Shapes
 
         public readonly Vector3 Centroid => (Position0 + Position1 + Position2) * (1.0f / 3.0f);
 
+        public readonly Vector3 Edge01 => Position1 - Position0;
+        public readonly Vector3 Edge02 => Position2 - Position0;
+        public readonly Vector3 Edge12 => Position2 - Position1;
+
         public Vector3 Position0;
         public Vector3 Position1;
         public Vector3 Position2;
+
+        public readonly Vector3 this[int index]
+        {
+            get
+            {
+                Debug.Assert(index >= 0 && index < 3);
+                return Unsafe.Add(ref Unsafe.AsRef(in Position0), index);
+            }
+        }
 
         public Triangle(Vector3 p0, Vector3 p1, Vector3 p2)
         {

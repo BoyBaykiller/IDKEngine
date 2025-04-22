@@ -1020,13 +1020,9 @@ namespace IDKEngine.Render
 
                     if (ImGui.Button("Delete"))
                     {
-                        Range meshRange = app.ModelManager.GetNodeMeshRangeRecursive(node);
-                        if (meshRange.Count > 0)
-                        {
-                            app.ModelManager.RemoveMesh(new Range(meshRange.Start, meshRange.Count));
-                            SelectedEntity = null;
-                            resetPathTracer = true;
-                        }
+                        app.ModelManager.RemoveNodeRecursive(node);
+                        SelectedEntity = null;
+                        resetPathTracer = true;
                     }
 
                     ImGui.SeparatorText("Node Info");
@@ -1639,7 +1635,7 @@ namespace IDKEngine.Render
                                 {
                                     if (loadModelContext.CompressionsTasks[i] == null)
                                     {
-                                        // We override with optimizations turned off, as we know gltfpack is run on the model
+                                        // We override to optimizations turned off as we know gltfpack is run on the model
                                         // which already applies all optimizations
                                         loadingTask.LoadParams.ModelOptimizationSettings = ModelLoader.OptimizationSettings.AllTurnedOff;
 

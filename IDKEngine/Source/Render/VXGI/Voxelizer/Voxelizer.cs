@@ -167,9 +167,9 @@ namespace IDKEngine.Render
                 BBG.Cmd.BindImageUnit(ResultVoxels, 0, 0, true);
                 if (!TAKE_ATOMIC_FP16_PATH)
                 {
-                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[0], BBG.Texture.InternalFormat.R32Uint, 1, 0, true);
-                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[1], BBG.Texture.InternalFormat.R32Uint, 2, 0, true);
-                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[2], BBG.Texture.InternalFormat.R32Uint, 3, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[0], BBG.Texture.InternalFormat.R32UInt, 1, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[1], BBG.Texture.InternalFormat.R32UInt, 2, 0, true);
+                    BBG.Cmd.BindImageUnit(intermediateResultsRbg[2], BBG.Texture.InternalFormat.R32UInt, 3, 0, true);
                 }
 
                 BBG.Cmd.UseShaderProgram(voxelizeProgram);
@@ -245,7 +245,7 @@ namespace IDKEngine.Render
 
         }
 
-        public void SetSize(int width, int height, int depth)
+        public unsafe void SetSize(int width, int height, int depth)
         {
             if (ResultVoxels != null) ResultVoxels.Dispose();
             ResultVoxels = new BBG.Texture(BBG.Texture.Type.Texture3D);
@@ -253,6 +253,7 @@ namespace IDKEngine.Render
             ResultVoxels.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
             ResultVoxels.SetAnisotropy(BBG.Sampler.Anisotropy.Samples16x);
             ResultVoxels.Allocate(width, height, depth, BBG.Texture.InternalFormat.R16G16B16A16Float, BBG.Texture.GetMaxMipmapLevel(width, height, depth));
+            ResultVoxels.Fill(new Vector4(0.0f));
 
             if (!TAKE_ATOMIC_FP16_PATH)
             {

@@ -6,6 +6,11 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Bvh
 {
+    /// <summary>
+    /// Simple serial implementation of "PLOC" in 
+    /// "Parallel Locally-Ordered Clustering for Bounding Volume Hierarchy Construction"
+    /// https://meistdan.github.io/publications/ploc/paper.pdf
+    /// </summary>
     public static class TLAS
     {
         public record struct BuildSettings
@@ -20,45 +25,45 @@ namespace IDKEngine.Bvh
         public delegate Box FuncGetPrimitive(int primId);
         public delegate void FuncGetBlasAndGeometry(int instanceId, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
-        public static void Build(Span<GpuTlasNode> nodes, FuncGetPrimitive funcGetLeaf, int primitiveCount, BuildSettings buildSettings)
+        public static void Build(Span<GpuTlasNode> nodes, FuncGetPrimitive funcGetLeaf, int primitiveCount, in BuildSettings buildSettings)
         {
             if (nodes.Length == 0) return;
 
-            Span<GpuTlasNode> initialChildNodes = nodes.Slice(nodes.Length - primitiveCount, primitiveCount);
+            GpuTlasNode[] tempNodes = new GpuTlasNode[nodes.Length];
 
-            // Place initial tlasNodes at the end of array
-            Box globalBounds = Box.Empty();
-            for (int i = 0; i < initialChildNodes.Length; i++)
             {
-                Box worldSpaceBounds = funcGetLeaf(i);
-                globalBounds.GrowToFit(worldSpaceBounds);
+                // Create all leaf nodes at the end of the nodes array
 
-                GpuTlasNode newNode = new GpuTlasNode();
-                newNode.SetBox(worldSpaceBounds);
-                newNode.IsLeaf = true;
-                newNode.ChildOrInstanceID = (uint)i;
+                Span<GpuTlasNode> leafNodes = tempNodes.AsSpan(nodes.Length - primitiveCount, primitiveCount);
 
-                initialChildNodes[i] = newNode;
+                Box globalBounds = Box.Empty();
+                for (int i = 0; i < leafNodes.Length; i++)
+                {
+                    Box worldSpaceBounds = funcGetLeaf(i);
+                    globalBounds.GrowToFit(worldSpaceBounds);
+
+                    GpuTlasNode newNode = new GpuTlasNode();
+                    newNode.SetBox(worldSpaceBounds);
+                    newNode.IsLeaf = true;
+                    newNode.ChildOrInstanceID = (uint)i;
+
+                    leafNodes[i] = newNode;
+                }
+
+                // Sort the leaf nodes based on their position converted to a morton code.
+                // That means nodes which are spatially close will also be close in memory.
+                Span<GpuTlasNode> output = nodes.Slice(nodes.Length - primitiveCount, primitiveCount);
+                Algorithms.RadixSort(leafNodes, output, (GpuTlasNode node) =>
+                {
+                    Vector3 mapped = MyMath.MapToZeroOne((node.Max + node.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
+                    uint mortonCode = MyMath.GetMortonCode(mapped);
+
+                    return mortonCode;
+                });
             }
-
-            // Sort the initial child tlasNodes according to space filling morton curve.
-            // That means tlasNodes which are spatially close will also be close in memory.
-            MemoryExtensions.Sort(initialChildNodes, (GpuTlasNode a, GpuTlasNode b) =>
-            {
-                Vector3 mappedA = MyMath.MapToZeroOne((a.Max + a.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
-                uint mortonCodeA = MyMath.GetMorton(mappedA);
-
-                Vector3 mappedB = MyMath.MapToZeroOne((b.Max + b.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
-                uint mortonCodeB = MyMath.GetMorton(mappedB);
-
-                if (mortonCodeA > mortonCodeB) return 1;
-                if (mortonCodeA < mortonCodeB) return -1;
-                return 0;
-            });
 
             int activeRangeCount = primitiveCount;
             int activeRangeEnd = nodes.Length;
-            GpuTlasNode[] tempNodes = new GpuTlasNode[nodes.Length];
             int[] preferedNbors = new int[activeRangeCount];
             while (activeRangeCount > 1)
             {
@@ -227,7 +232,7 @@ namespace IDKEngine.Bvh
                     funcGetBlasAndGeometry(instanceID, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
                     Box localBox = Box.Transformed(box, invWorldTransform);
-                    BLAS.Intersect(blas, geometry, localBox, (in BLAS.IndicesTriplet leafNodeTriangle) =>
+                    BLAS.Intersect(blas, geometry, localBox, (in GpuIndicesTriplet leafNodeTriangle) =>
                     {
                         BVH.BoxHitInfo hitInfo;
                         hitInfo.TriangleIndices = leafNodeTriangle;

@@ -114,7 +114,6 @@ struct GpuMesh
     vec3 AbsorbanceBias;
     uint MeshletCount;
     uint InstanceCount;
-    uint BlasRootNodeOffset;
     bool TintOnTransmissive;
     float _pad0;
 };
@@ -126,6 +125,29 @@ struct GpuMeshInstance
     mat4x3 PrevModelMatrix;
     uint MeshId;
     uint _pad0, _pad1, _pad2;
+};
+
+struct GpuBlasGeometryDesc
+{
+    int TriangleCount;
+    int TriangleOffset;
+    int VertexOffset;
+    int VertexCount;
+};
+
+struct GpuBlasDesc
+{
+    GpuBlasGeometryDesc GeometryDesc;
+
+    int RootNodeOffset;
+    int NodeCount;
+    int LeafIndicesOffset;
+    int LeafIndicesCount;
+
+    int MaxTreeDepth;
+    int UnpaddedNodesCount;
+
+    bool PreSplittingWasDone;
 };
 
 struct GpuBlasNode

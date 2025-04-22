@@ -549,7 +549,7 @@ namespace IDKEngine.Render
                 recordTransparentProgram.Upload("IsVXGI", IsVXGI);
                 recordTransparentProgram.Upload("ShadowMode", (uint)ShadowMode_);
 
-                recordedFragmentsCounterTexture.Fill(BBG.Texture.PixelFormat.RInteger, BBG.Texture.PixelType.Uint, 0u);
+                recordedFragmentsCounterTexture.Fill(0u);
 
                 BBG.Cmd.SetUniforms(ConeTracer.Settings);
                 BBG.Cmd.BindTextureUnit(Voxelizer.ResultVoxels, 0);
@@ -697,7 +697,7 @@ namespace IDKEngine.Render
             recordedFragmentsCounterTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             recordedFragmentsCounterTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
             recordedFragmentsCounterTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-            recordedFragmentsCounterTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R32Uint);
+            recordedFragmentsCounterTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R32UInt);
         }
 
         private void DisposeBindlessGBufferTextures()

@@ -8,18 +8,6 @@ namespace IDKEngine.Shapes
 {
     public record struct Box
     {
-        public readonly Vector3 this[int index]
-        {
-            get
-            {
-                System.Diagnostics.Debug.Assert(index < 8);
-                bool isMaxX = (index & 1) != 0;
-                bool isMaxY = (index & 2) != 0;
-                bool isMaxZ = (index & 4) != 0;
-                return new Vector3(isMaxX ? SimdMax[0] : SimdMin[0], isMaxY ? SimdMax[1] : SimdMin[1], isMaxZ ? SimdMax[2] : SimdMin[2]);
-            }
-        }
-
         public readonly Vector3 Min => SimdMin.ToOpenTK();
         public readonly Vector3 Max => SimdMax.ToOpenTK();
 
@@ -30,6 +18,18 @@ namespace IDKEngine.Shapes
         {
             SimdMin = Vector128.Create(min.X, min.Y, min.Z, 0.0f);
             SimdMax = Vector128.Create(max.X, max.Y, max.Z, 0.0f);
+        }
+
+        public readonly Vector3 this[int index]
+        {
+            get
+            {
+                System.Diagnostics.Debug.Assert(index >= 0 && index < 8);
+                bool isMaxX = (index & 1) != 0;
+                bool isMaxY = (index & 2) != 0;
+                bool isMaxZ = (index & 4) != 0;
+                return new Vector3(isMaxX ? SimdMax[0] : SimdMin[0], isMaxY ? SimdMax[1] : SimdMin[1], isMaxZ ? SimdMax[2] : SimdMin[2]);
+            }
         }
 
         public void GrowToFit(in Vector128<float> point)
@@ -50,7 +50,7 @@ namespace IDKEngine.Shapes
 
             Vector128<float> p0 = Vector128.Create(node.Min.X, node.Min.Y, node.Min.Z, 0.0f);
             Vector128<float> p1 = Vector128.Create(node.Max.X, node.Max.Y, node.Max.Z, 0.0f);
-            
+
             SimdMin = Vector128.MinNative(SimdMin, p0);
             SimdMax = Vector128.MaxNative(SimdMax, p1);
         }
@@ -66,6 +66,12 @@ namespace IDKEngine.Shapes
             GrowToFit(tri.Position0);
             GrowToFit(tri.Position1);
             GrowToFit(tri.Position2);
+        }
+
+        public void ShrinkToFit(in Box box)
+        {
+            SimdMin = Vector128.MaxNative(SimdMin, box.SimdMin);
+            SimdMax = Vector128.MinNative(SimdMax, box.SimdMax);
         }
 
         public readonly Vector3 Center()
@@ -95,7 +101,16 @@ namespace IDKEngine.Shapes
             Vector3 size = Size();
             return size.X * size.Y * size.Z;
         }
-        
+
+        public readonly int LargestAxis()
+        {
+            Vector128<float> size = SimdSize();
+            int axis = 0;
+            if (size[0] < size[1]) axis = 1;
+            if (size[axis] < size[2]) axis = 2;
+            return axis;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)] // It's small and called in hot loop
         public readonly float HalfArea()
         {
@@ -121,7 +136,6 @@ namespace IDKEngine.Shapes
             return newBox;
         }
 
-        
         [MethodImpl(MethodImplOptions.AggressiveInlining)] // It's small and tends be a size decreasing inline
         public static Box Empty()
         {

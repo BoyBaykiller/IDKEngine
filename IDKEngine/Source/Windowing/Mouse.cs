@@ -50,11 +50,6 @@ namespace IDKEngine.Windowing
         public double ScrollX { get; private set; }
         public double ScrollY { get; private set; }
 
-        public Keyboard.InputState this[MouseButton button]
-        {
-            get => buttonStates[(int)button];
-        }
-
         private readonly Window* window;
         private readonly Keyboard.InputState[] buttonStates;
         public Mouse(Window* window)
@@ -67,6 +62,11 @@ namespace IDKEngine.Windowing
             
             GLFW.GetCursorPos(window, out double x, out double y);
             Position = new Vector2((float)x, (float)y);
+        }
+
+        public Keyboard.InputState this[MouseButton button]
+        {
+            get => buttonStates[(int)button];
         }
 
         private ScrollState scrollUpdateState = ScrollState.Unchanged;

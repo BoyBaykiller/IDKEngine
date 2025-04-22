@@ -8,7 +8,7 @@ namespace IDKEngine
         public float AnimationTime;
     }
 
-    public struct CameraState
+    public record struct CameraState
     {
         public Vector3 Position;
         public Vector3 UpVector;

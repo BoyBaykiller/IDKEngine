@@ -160,8 +160,7 @@ namespace IDKEngine.Render
             ImageLoader.ImageResult[] images = new ImageLoader.ImageResult[6];
             Parallel.For(0, images.Length, i =>
             {
-                ImageLoader.ImageResult imageResult = ImageLoader.Load(imagePaths[i], ImageLoader.ColorComponents.RGB);
-                images[i] = imageResult;
+                images[i] = ImageLoader.Load(imagePaths[i], ImageLoader.ColorComponents.RGB);
             });
 
             if (images.Any(it => !it.IsLoadedSuccesfully))

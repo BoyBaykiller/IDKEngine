@@ -88,27 +88,32 @@ layout(std430, binding = 16) restrict buffer PrevVertexPositionSSBO
     PackedVec3 Positions[];
 } prevVertexPositionSSBO;
 
-layout(std430, binding = 20) restrict buffer BlasNodeSSBO
+layout(std430, binding = 20) restrict readonly buffer BlasDescSSBO
+{
+    GpuBlasDesc Descs[];
+} blasDescSSBO;
+
+layout(std430, binding = 21) restrict buffer BlasNodeSSBO
 {
     GpuBlasNode Nodes[];
 } blasNodeSSBO;
 
-layout(std430, binding = 21) restrict readonly buffer BlasTriangleIndicesSSBO
+layout(std430, binding = 22) restrict readonly buffer BlasTriangleIndicesSSBO
 {
     PackedUVec3 Indices[];
 } blasTriangleIndicesSSBO;
 
-layout(std430, binding = 22) restrict readonly buffer BlasParentIndicesSSBO
+layout(std430, binding = 23) restrict readonly buffer BlasParentIndicesSSBO
 {
     int Indices[];
 } blasParentIndicesSSBO;
 
-layout(std430, binding = 23) restrict readonly buffer BlasLeafIndicesSSBO
+layout(std430, binding = 24) restrict readonly buffer BlasLeafIndicesSSBO
 {
     uint Indices[];
 } blasLeafIndicesSSBO;
 
-layout(std430, binding = 24) restrict buffer BlasRefitLocksSSBO
+layout(std430, binding = 25) restrict buffer BlasRefitLocksSSBO
 {
     uint Locks[];
 } blasRefitLocksSSBO;

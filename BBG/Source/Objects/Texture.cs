@@ -26,13 +26,13 @@ namespace BBOpenGL
                 // S     = stencil formats
 
                 R8Unorm = SizedInternalFormat.R8,
-                R8Uint = SizedInternalFormat.R8ui,
+                R8UInt = SizedInternalFormat.R8ui,
 
                 R16Float = SizedInternalFormat.R16f,
 
                 R32Float = SizedInternalFormat.R32f,
                 R32Int = SizedInternalFormat.R32i,
-                R32Uint = SizedInternalFormat.R32ui,
+                R32UInt = SizedInternalFormat.R32ui,
 
                 R8G8Unorm = SizedInternalFormat.Rg8,
                 R8G8Snorm = SizedInternalFormat.Rg8Snorm,
@@ -68,9 +68,9 @@ namespace BBOpenGL
                 D16Unorm = SizedInternalFormat.DepthComponent16,
                 D32Float = SizedInternalFormat.DepthComponent32f,
 
-                S8Uint = SizedInternalFormat.StencilIndex8,
+                S8UInt = SizedInternalFormat.StencilIndex8,
 
-                D24UnormS8Uint = SizedInternalFormat.Depth24Stencil8,
+                D24UnormS8UInt = SizedInternalFormat.Depth24Stencil8,
             }
 
             [Flags]
@@ -86,6 +86,7 @@ namespace BBOpenGL
             {
                 R = OpenTK.Graphics.OpenGL.PixelFormat.Red,
                 RInteger = OpenTK.Graphics.OpenGL.PixelFormat.RedInteger,
+                RGBAInteger = OpenTK.Graphics.OpenGL.PixelFormat.RgbaInteger,
                 RG = OpenTK.Graphics.OpenGL.PixelFormat.Rg,
                 RGB = OpenTK.Graphics.OpenGL.PixelFormat.Rgb,
                 RGBA = OpenTK.Graphics.OpenGL.PixelFormat.Rgba,
@@ -96,7 +97,7 @@ namespace BBOpenGL
             {
                 Ubyte = OpenTK.Graphics.OpenGL.PixelType.UnsignedByte,
                 Int = OpenTK.Graphics.OpenGL.PixelType.Int,
-                Uint = OpenTK.Graphics.OpenGL.PixelType.UnsignedInt,
+                UInt = OpenTK.Graphics.OpenGL.PixelType.UnsignedInt,
                 Float = OpenTK.Graphics.OpenGL.PixelType.Float,
             }
 
@@ -240,15 +241,27 @@ namespace BBOpenGL
 
             public void Download(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int bufSize, int level = 0)
             {
-                GL.GetTextureImage(ID, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, pixels);
+                Download(pixelFormat, pixelType, pixels, Width, Height, Depth, bufSize, level);
             }
 
-            public void Fill<T>(PixelFormat pixelFormat, PixelType pixelType, in T value, int level = 0) where T : unmanaged
+            public void Download(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int width, int height, int depth, int bufSize, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
             {
-                fixed (void* ptr = &value)
-                {
-                    Fill(pixelFormat, pixelType, ptr, Width, Height, Depth, level);
-                }
+                GL.GetTextureSubImage(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, pixels);
+            }
+
+            public void Fill(Vector4 color, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
+            {
+                Fill(GetIdentityPixelFormat(), PixelType.Float, &color, Width, Height, Depth, level, xOffset, yOffset, zOffset);
+            }
+
+            public void Fill(float color, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
+            {
+                Fill(GetIdentityPixelFormat(), PixelType.Float, &color, Width, Height, Depth, level, xOffset, yOffset, zOffset);
+            }
+
+            public void Fill(uint color, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
+            {
+                Fill(GetIdentityPixelFormat(), PixelType.UInt, &color, Width, Height, Depth, level, xOffset, yOffset, zOffset);
             }
 
             public void Fill(PixelFormat pixelFormat, PixelType pixelType, void* data, int width, int height, int depth, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
@@ -339,6 +352,21 @@ namespace BBOpenGL
                 return ID == 0;
             }
 
+            private PixelFormat GetIdentityPixelFormat()
+            {
+                InternalFormatType type = GetFormatType(Format);
+                if (type == InternalFormatType.Depth)
+                {
+                    return PixelFormat.Depth;
+                }
+                else if (type == InternalFormatType.Color)
+                {
+                    return IsIntegerFormat(Format) ? PixelFormat.RGBAInteger : PixelFormat.RGBA;
+                }
+
+                throw new NotImplementedException();
+            }
+
             public void Dispose()
             {
                 if (IsDeleted())
@@ -381,27 +409,6 @@ namespace BBOpenGL
                 return Vector3i.ComponentMax(size, new Vector3i(1));
             }
 
-            public static InternalFormatType GetFormatType(InternalFormat internalFormat)
-            {
-                if (internalFormat == InternalFormat.D16Unorm ||
-                    internalFormat == InternalFormat.D32Float)
-                {
-                    return InternalFormatType.Depth;
-                }
-
-                if (internalFormat == InternalFormat.S8Uint)
-                {
-                    return InternalFormatType.Stencil;
-                }
-
-                if (internalFormat == InternalFormat.D24UnormS8Uint)
-                {
-                    return InternalFormatType.DepthStencil;
-                }
-
-                return InternalFormatType.Color;
-            }
-
             public static int GetBlockCompressedImageSize(InternalFormat format, int width, int height, int depth)
             {
                 // Returns the same as KTX2.GetImageSize()
@@ -433,6 +440,36 @@ namespace BBOpenGL
                     default:
                         throw new NotSupportedException($"Unknown {nameof(format)} = {format}");
                 }
+            }
+
+            public static bool IsIntegerFormat(InternalFormat internalFormat)
+            {
+                return internalFormat == InternalFormat.R8UInt ||
+                       internalFormat == InternalFormat.R32Int ||
+                       internalFormat == InternalFormat.R32UInt ||
+                       internalFormat == InternalFormat.S8UInt ||
+                       internalFormat == InternalFormat.D24UnormS8UInt;
+            }
+
+            public static InternalFormatType GetFormatType(InternalFormat internalFormat)
+            {
+                if (internalFormat == InternalFormat.D16Unorm ||
+                    internalFormat == InternalFormat.D32Float)
+                {
+                    return InternalFormatType.Depth;
+                }
+
+                if (internalFormat == InternalFormat.S8UInt)
+                {
+                    return InternalFormatType.Stencil;
+                }
+
+                if (internalFormat == InternalFormat.D24UnormS8UInt)
+                {
+                    return InternalFormatType.DepthStencil;
+                }
+
+                return InternalFormatType.Color;
             }
 
             public static PixelFormat NumChannelsToPixelFormat(int numChannels)

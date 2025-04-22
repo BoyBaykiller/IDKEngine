@@ -98,7 +98,7 @@ namespace IDKEngine.Render
         public unsafe void Draw()
         {
             BBG.Cmd.UseShaderProgram(shaderProgram);
-            BBG.Rendering.SetVertexInputAssembly(new BBG.Rendering.VertexInputDesc()
+            BBG.Rendering.SetVertexInputDesc(new BBG.Rendering.VertexInputDesc()
             {
                 IndexBuffer = indexBuffer,
                 VertexDescription = new BBG.Rendering.VertexDescription()

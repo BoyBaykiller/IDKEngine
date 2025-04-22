@@ -98,7 +98,7 @@ namespace IDKEngine.Utils
             Array.Resize(ref array, array.Length - count);
         }
 
-        public static int Sum<T>(Span<T> array, Func<T, int> func)
+        public static int Sum<T>(this ReadOnlySpan<T> array, Func<T, int> func)
         {
             int sum = 0;
             for (int i = 0; i < array.Length; i++)
@@ -107,6 +107,20 @@ namespace IDKEngine.Utils
             }
 
             return sum;
+        }
+
+        public static ValueTuple<T, int> FindIndex<T>(this T[] array, Func<T, bool> func)
+        {
+            for (int i = 0; i < array.Length; i++)
+            {
+                T el = array[i];
+                if (func(el))
+                {
+                    return (el, i);
+                }
+            }
+
+            return (default, -1);
         }
 
         public static void FillIncreasing(Span<int> array, int startValue = 0)
@@ -135,17 +149,17 @@ namespace IDKEngine.Utils
             }
         }
 
-        public static unsafe Span<TTo> Reinterpret<TFrom, TTo>(Span<TFrom> source, int length)
+        public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source)
             where TFrom : unmanaged
             where TTo : unmanaged
         {
-            int sourceLeft = sizeof(TFrom) * source.Length;
-            int askedFor = sizeof(TTo) * length;
-            if (askedFor > sourceLeft)
-            {
-                throw new ArgumentException($"Out of bounds ");
-            }
+            return MemoryMarshal.Cast<TFrom, TTo>(source);
+        }
 
+        public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int length)
+            where TFrom : unmanaged
+            where TTo : unmanaged
+        {
             return MemoryMarshal.Cast<TFrom, TTo>(source).Slice(0, length);
         }
 

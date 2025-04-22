@@ -103,7 +103,7 @@ namespace IDKEngine.Render
             if (Result != null) Result.Dispose();
             Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
             Result.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
-            Result.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R8Uint);
+            Result.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R8UInt);
 
             if (debugTexture != null) debugTexture.Dispose();
             debugTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
