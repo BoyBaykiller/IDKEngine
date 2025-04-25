@@ -15,11 +15,15 @@ namespace IDKEngine.Bvh
     /// </summary>
     public static unsafe class BLAS
     {
+        // Do not change, instead modify TriangleCost
+        public const float TRAVERSAL_COST = 1.0f;
+
         public record struct BuildSettings
         {
             public int MinLeafTriangleCount = 1;
             public int MaxLeafTriangleCount = 8;
             public float TriangleCost = 1.1f;
+            public bool TryRePartitioning = false;
 
             public BuildSettings()
             {
@@ -86,7 +90,7 @@ namespace IDKEngine.Bvh
             public readonly Span<int> TriangleIndices => TrisAxesSorted[0];
 
             public float[] RightCostsAccum;
-            public BitArray TriMarks;
+            public BitArray TrisGoingLeft;
             public Box[] TriBounds;
             public TriAxesSorted TrisAxesSorted;
         }
@@ -96,10 +100,9 @@ namespace IDKEngine.Bvh
             int triangleCount = bounds.Length;
 
             BuildData buildData = new BuildData();
-            buildData.TriMarks = new BitArray(triangleCount, false);
+            buildData.TrisGoingLeft = new BitArray(triangleCount, false);
             buildData.TriBounds = bounds;
             buildData.RightCostsAccum = new float[triangleCount];
-            buildData.TrisAxesSorted = new TriAxesSorted();
             buildData.TrisAxesSorted[0] = new int[triangleCount];
             buildData.TrisAxesSorted[1] = new int[triangleCount];
             buildData.TrisAxesSorted[2] = new int[triangleCount];
@@ -112,7 +115,7 @@ namespace IDKEngine.Bvh
                 Helper.FillIncreasing(input);
                 Algorithms.RadixSort(input, output, (int index) =>
                 {
-                    float centerAxis = (bounds[index].Min[axis] + bounds[index].Max[axis]) * 0.5f;
+                    float centerAxis = (bounds[index].Min[axis] + bounds[index].Max[axis]) * 0.5f; // geometry->GetTriangle(index).Centroid[axis]
                     return Algorithms.FloatToKey(centerAxis);
                 });
             }
@@ -136,17 +139,22 @@ namespace IDKEngine.Bvh
             {
                 ref GpuBlasNode parentNode = ref blas.Nodes[stack[--stackPtr]];
 
-                if (TrySplit(parentNode, buildData, settings) is int partitionPivot)
+                if (TrySplit(parentNode, buildData, settings, out Box leftBounds, out Box rightBounds) is int partitionPivot)
                 {
                     GpuBlasNode newLeftNode = new GpuBlasNode();
                     newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
                     newLeftNode.TriCount = partitionPivot - newLeftNode.TriStartOrChild;
-                    newLeftNode.SetBounds(ComputeBoundingBox(newLeftNode.TriStartOrChild, newLeftNode.TriCount, buildData));
+                    newLeftNode.SetBounds(leftBounds);
 
                     GpuBlasNode newRightNode = new GpuBlasNode();
                     newRightNode.TriStartOrChild = partitionPivot;
                     newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
-                    newRightNode.SetBounds(ComputeBoundingBox(newRightNode.TriStartOrChild, newRightNode.TriCount, buildData));
+                    newRightNode.SetBounds(rightBounds);
+
+                    if (newLeftNode.TriCount == 0 || newRightNode.TriCount == 0)
+                    {
+                        continue;
+                    }
 
                     int leftNodeId = nodesUsed + 0;
                     int rightNodeId = nodesUsed + 1;
@@ -201,9 +209,7 @@ namespace IDKEngine.Bvh
                 ref readonly GpuBlasNode leftChild = ref blas.Nodes[parent.TriStartOrChild];
                 ref readonly GpuBlasNode rightChild = ref blas.Nodes[parent.TriStartOrChild + 1];
 
-                Box mergedBox = Conversions.ToBox(leftChild);
-                mergedBox.GrowToFit(Conversions.ToBox(rightChild));
-
+                Box mergedBox = Box.From(Conversions.ToBox(leftChild), Conversions.ToBox(rightChild));
                 parent.SetBounds(mergedBox);
             }
         }
@@ -218,9 +224,7 @@ namespace IDKEngine.Bvh
                     ref readonly GpuBlasNode leftChild = ref nodes[node.TriStartOrChild];
                     ref readonly GpuBlasNode rightChild = ref nodes[node.TriStartOrChild + 1];
 
-                    Box mergedBox = Conversions.ToBox(leftChild);
-                    mergedBox.GrowToFit(Conversions.ToBox(rightChild));
-
+                    Box mergedBox = Box.From(Conversions.ToBox(leftChild), Conversions.ToBox(rightChild));
                     node.SetBounds(mergedBox);
                 }
 
@@ -228,28 +232,25 @@ namespace IDKEngine.Bvh
             } while (nodeId != -1);
         }
 
-        public static float ComputeGlobalCost(in GpuBlasNode parentNode, ReadOnlySpan<GpuBlasNode> nodes, in BuildSettings settings)
+        public static float ComputeGlobalCost(in GpuBlasNode rootNode, ReadOnlySpan<GpuBlasNode> nodes, in BuildSettings settings)
         {
-            if (parentNode.IsLeaf)
+            float cost = 0.0f;
+
+            float rootArea = rootNode.HalfArea();
+            for (int i = 0; i < nodes.Length; i++)
             {
-                return CostLeafNode(parentNode.TriCount, settings.TriangleCost);
+                ref readonly GpuBlasNode node = ref nodes[i];
+                float probHitNode = nodes[i].HalfArea() / rootArea;
+
+                if (node.IsLeaf)
+                {
+                    cost += settings.TriangleCost * node.TriCount * probHitNode;
+                }
+                else
+                {
+                    cost += TRAVERSAL_COST * probHitNode;
+                }
             }
-
-            ref readonly GpuBlasNode leftChild = ref nodes[parentNode.TriStartOrChild];
-            ref readonly GpuBlasNode rightChild = ref nodes[parentNode.TriStartOrChild + 1];
-
-            float areaParent = parentNode.HalfArea();
-            float probHitLeftChild = leftChild.HalfArea() / areaParent;
-            float probHitRightChild = rightChild.HalfArea() / areaParent;
-
-            float cost = CostInternalNode(probHitLeftChild, probHitRightChild, ComputeGlobalCost(leftChild, nodes, settings), ComputeGlobalCost(rightChild, nodes, settings));
-
-            //if (parentNode.HalfArea() == 0.0f)
-            //{
-            //    // todo: this should not happen
-            //    Console.WriteLine("dsad");
-            //}
-
             return cost;
         }
 
@@ -496,8 +497,11 @@ namespace IDKEngine.Bvh
             return box;
         }
 
-        private static int? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, in BuildSettings settings)
+        private static int? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, in BuildSettings settings, out Box leftBox, out Box rightBox)
         {
+            leftBox = Box.Empty();
+            rightBox = Box.Empty();
+            
             if (parentNode.TriCount <= settings.MinLeafTriangleCount)
             {
                 return null;
@@ -518,14 +522,14 @@ namespace IDKEngine.Bvh
             // https://github.com/dotnet/runtime/issues/113107
             Span<float> rightCostsAccum = buildData.RightCostsAccum;
             Span<Box> triBounds = buildData.TriBounds;
-            BitArray triMarks = buildData.TriMarks;
+            BitArray trisGoingLeft = buildData.TrisGoingLeft;
 
             for (int axis = 0; axis < 3; axis++)
             {
+                Span<int> trisAxesSorted = buildData.TrisAxesSorted[axis];
+
                 Box rightBoxAccum = Box.Empty();
                 int firstRightTri = triStart + 1;
-
-                Span<int> trisAxesSorted = buildData.TrisAxesSorted[axis];
 
                 for (int i = triEnd - 1; i >= firstRightTri; i--)
                 {
@@ -573,6 +577,7 @@ namespace IDKEngine.Bvh
                         triPivot = triIndex;
                         splitAxis = axis;
                         splitCost = surfaceAreaHeuristic;
+                        leftBox = leftBoxAccum;
                     }
                     else if (leftCost >= splitCost)
                     {
@@ -601,6 +606,11 @@ namespace IDKEngine.Bvh
                 }
             }
 
+            for (int i = triPivot; i < triEnd; i++)
+            {
+                rightBox.GrowToFit(triBounds[buildData.TrisAxesSorted[splitAxis][i]]);
+            }
+
             // We found a split axis where the triangles are partitioned into a left and right set.
             // Now, the other two axes also need to have the same triangles in their sets respectively.
             // To do that we mark every triangle on the left side of the split axis.
@@ -610,30 +620,56 @@ namespace IDKEngine.Bvh
             Span<int> trisAxesSortedSplitAxis = buildData.TrisAxesSorted[splitAxis];
             for (int i = triStart; i < triPivot; i++)
             {
-                triMarks[trisAxesSortedSplitAxis[i]] = true;
+                trisGoingLeft[trisAxesSortedSplitAxis[i]] = true;
             }
             for (int i = triPivot; i < triEnd; i++)
             {
-                triMarks[trisAxesSortedSplitAxis[i]] = false;
+                trisGoingLeft[trisAxesSortedSplitAxis[i]] = false;
             }
 
-            Span<int> partitionAux = Helper.ReUseMemory<float, int>(rightCostsAccum, triEnd - triPivot);
-            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 1) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
-            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 2) % 3], triStart, triEnd, partitionAux, buildData.TriMarks);
+            Span<int> partitionAux = Helper.ReUseMemory<float, int>(rightCostsAccum, triEnd - triStart);
+            
+            if (settings.TryRePartitioning)
+            {
+                // Instead of just accepting the pivot given by Sweep-SAH we can see
+                // if moving any primitive to the other side improves SAH.
+                // This is a simple version which doesn't need to explicitly compute SAH
+                // inspired by "Reference Unsplitting" in https://www.nvidia.in/docs/IO/77714/sbvh.pdf
+
+                bool leftSmaller = leftBox.HalfArea() < rightBox.HalfArea();
+                Box smallerBox = leftSmaller ? leftBox : rightBox;
+                int start = leftSmaller ? triPivot : triStart;
+                int end = leftSmaller ? triEnd : triPivot;
+
+                for (int i = start; i < end; i++)
+                {
+                    Box mergedBox = Box.From(smallerBox, triBounds[trisAxesSortedSplitAxis[i]]);
+
+                    // Does moving the primitive to the smaller box leave it's area unchanged?
+                    if (mergedBox == smallerBox)
+                    {
+                        // If yes move to the other side
+                        trisGoingLeft[trisAxesSortedSplitAxis[i]] = leftSmaller;
+                    }
+                }
+
+                triPivot = Algorithms.StablePartition(buildData.TrisAxesSorted[splitAxis], triStart, triEnd, partitionAux, buildData.TrisGoingLeft);
+            }
+
+            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 1) % 3], triStart, triEnd, partitionAux, buildData.TrisGoingLeft);
+            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 2) % 3], triStart, triEnd, partitionAux, buildData.TrisGoingLeft);
 
             return triPivot;
         }
 
         private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild)
         {
-            const float traversalCost = 1.0f;
-            return traversalCost + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
+            return TRAVERSAL_COST + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
         }
 
         private static float CostInternalNode(float costLeft, float costRight)
         {
-            const float traversalCost = 1.0f;
-            return traversalCost + costLeft + costRight;
+            return TRAVERSAL_COST + costLeft + costRight;
         }
 
         private static float CostLeafNode(int numTriangles, float triangleCost)

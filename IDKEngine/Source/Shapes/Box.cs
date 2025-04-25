@@ -1,12 +1,12 @@
-﻿using System.Runtime.Intrinsics;
+﻿using System.Diagnostics;
+using System.Runtime.Intrinsics;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using IDKEngine.Utils;
-using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Shapes
 {
-    public record struct Box
+    public struct Box
     {
         public readonly Vector3 Min => SimdMin.ToOpenTK();
         public readonly Vector3 Max => SimdMax.ToOpenTK();
@@ -15,16 +15,21 @@ namespace IDKEngine.Shapes
         public Vector128<float> SimdMax;
 
         public Box(Vector3 min, Vector3 max)
+            : this(Vector128.Create(min.X, min.Y, min.Z, 0.0f), Vector128.Create(max.X, max.Y, max.Z, 0.0f))
         {
-            SimdMin = Vector128.Create(min.X, min.Y, min.Z, 0.0f);
-            SimdMax = Vector128.Create(max.X, max.Y, max.Z, 0.0f);
+        }
+
+        public Box(Vector128<float> min, Vector128<float> max)
+        {
+            SimdMin = min;
+            SimdMax = max;
         }
 
         public readonly Vector3 this[int index]
         {
             get
             {
-                System.Diagnostics.Debug.Assert(index >= 0 && index < 8);
+                Debug.Assert(index >= 0 && index < 8);
                 bool isMaxX = (index & 1) != 0;
                 bool isMaxY = (index & 2) != 0;
                 bool isMaxZ = (index & 4) != 0;
@@ -42,17 +47,6 @@ namespace IDKEngine.Shapes
         {
             SimdMin = Vector128.MinNative(SimdMin, box.SimdMin);
             SimdMax = Vector128.MaxNative(SimdMax, box.SimdMax);
-        }
-
-        public void GrowToFit(in GpuTlasNode node)
-        {
-            // This overload only exists because converting from Node to Box imposed significant overhead for some reason
-
-            Vector128<float> p0 = Vector128.Create(node.Min.X, node.Min.Y, node.Min.Z, 0.0f);
-            Vector128<float> p1 = Vector128.Create(node.Max.X, node.Max.Y, node.Max.Z, 0.0f);
-
-            SimdMin = Vector128.MinNative(SimdMin, p0);
-            SimdMax = Vector128.MaxNative(SimdMax, p1);
         }
 
         public void GrowToFit(Vector3 point)
@@ -125,6 +119,31 @@ namespace IDKEngine.Shapes
             this = Transformed(this, matrix);
         }
 
+        public static bool operator ==(in Box a, in Box b)
+        {
+            return a.SimdMin == b.SimdMin && a.SimdMax == b.SimdMax;
+        }
+
+        public static bool operator !=(in Box a, in Box b)
+        {
+            return !(a == b);
+        }
+
+        public static float GetOverlappingHalfArea(in Box a, in Box b)
+        {
+            Box shrinked = new Box(a.Min, a.Max);
+            shrinked.ShrinkToFit(b);
+
+            const float epsilon = 0.001f; // handle imprecision
+            Vector3 axesOverlap = shrinked.Max - shrinked.Min;
+            if (axesOverlap.X <= epsilon || axesOverlap.Y <= epsilon || axesOverlap.Z <= epsilon)
+            {
+                return 0.0f;
+            }
+
+            return MyMath.HalfArea(axesOverlap.X, axesOverlap.Y, axesOverlap.Z);
+        }
+
         public static Box Transformed(in Box box, in Matrix4 matrix)
         {
             // TODO: This function is unreasonable slow in debugger. The indexer and the matrix muls take time
@@ -150,6 +169,14 @@ namespace IDKEngine.Shapes
             Box box = new Box(triangle.Position0, triangle.Position0);
             box.GrowToFit(triangle.Position1);
             box.GrowToFit(triangle.Position2);
+
+            return box;
+        }
+
+        public static Box From(in Box a, in Box b)
+        {
+            Box box = new Box(a.SimdMin, a.SimdMax);
+            box.GrowToFit(b);
 
             return box;
         }

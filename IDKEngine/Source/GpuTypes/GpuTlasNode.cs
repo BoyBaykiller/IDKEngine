@@ -12,12 +12,6 @@ namespace IDKEngine.GpuTypes
         public Vector3 Max;
         private readonly float _pad0;
 
-        public void SetBox(in Box box)
-        {
-            Min = box.Min;
-            Max = box.Max;
-        }
-
         public bool IsLeaf
         {
             readonly get => isLeafAndChildOrInstanceID >> 31 == 1;
@@ -42,6 +36,12 @@ namespace IDKEngine.GpuTypes
                 Debug.Assert(value <= (1u << 31 - 1));
                 isLeafAndChildOrInstanceID |= value;
             }
+        }
+
+        public void SetBounds(in Box box)
+        {
+            Min = box.Min;
+            Max = box.Max;
         }
     }
 }

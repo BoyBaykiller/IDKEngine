@@ -182,8 +182,7 @@ namespace IDKEngine.Bvh
 
                     ref readonly GpuBlasNode outNode = ref nodes[stackTop.Item2];
 
-                    Box mergedBox = Conversions.ToBox(inputNode);
-                    mergedBox.GrowToFit(Conversions.ToBox(outNode));
+                    Box mergedBox = Box.From(Conversions.ToBox(inputNode), Conversions.ToBox(outNode));
 
                     float mergedArea = mergedBox.HalfArea();
                     float thisAreaDecrease = stackTop.Item1 - mergedArea;

@@ -264,7 +264,10 @@ namespace IDKEngine.Utils
                 }
             }
 
-            Memory.CopyElements(ref auxiliary[0], ref source[lCounter], rCounter);
+            if (rCounter > 0)
+            {
+                Memory.CopyElements(ref auxiliary[0], ref source[lCounter], rCounter);
+            }
 
             return lCounter;
         }

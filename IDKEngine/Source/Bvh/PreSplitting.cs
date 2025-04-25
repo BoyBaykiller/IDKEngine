@@ -5,6 +5,9 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Bvh
 {
+    /// <summary>
+    /// Implementation of "Early Split Clipping" in https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=ddfac027fa516d63fa705c52155ea9313543cf3a
+    /// </summary>
     public static class PreSplitting
     {
         public static ValueTuple<Box[], int[]> PreSplit(in BLAS.Geometry geometry)

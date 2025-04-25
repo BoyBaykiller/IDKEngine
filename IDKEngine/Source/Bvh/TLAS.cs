@@ -43,7 +43,7 @@ namespace IDKEngine.Bvh
                     globalBounds.GrowToFit(worldSpaceBounds);
 
                     GpuTlasNode newNode = new GpuTlasNode();
-                    newNode.SetBox(worldSpaceBounds);
+                    newNode.SetBounds(worldSpaceBounds);
                     newNode.IsLeaf = true;
                     newNode.ChildOrInstanceID = (uint)i;
 
@@ -119,11 +119,10 @@ namespace IDKEngine.Bvh
                             ref GpuTlasNode nodeA = ref tempNodes[mergedNodesHead + 0];
                             ref GpuTlasNode nodeB = ref tempNodes[mergedNodesHead + 1];
 
-                            Box mergedBox = Conversions.ToBox(nodeA);
-                            mergedBox.GrowToFit(Conversions.ToBox(nodeB));
+                            Box mergedBox = Box.From(Conversions.ToBox(nodeA), Conversions.ToBox(nodeB));
 
                             GpuTlasNode newNode = new GpuTlasNode();
-                            newNode.SetBox(mergedBox);
+                            newNode.SetBounds(mergedBox);
                             newNode.IsLeaf = false;
                             newNode.ChildOrInstanceID = (uint)mergedNodesHead;
 
@@ -281,7 +280,6 @@ namespace IDKEngine.Bvh
 
             ref readonly GpuTlasNode node = ref nodes[nodeIndex];
 
-            // Doing the conversion here cuts 15ms with searchRadius=15!?
             Box nodeBox = Conversions.ToBox(node);
 
             for (int i = start; i < end; i++)
@@ -293,10 +291,9 @@ namespace IDKEngine.Bvh
 
                 ref readonly GpuTlasNode otherNode = ref nodes[i];
 
-                Box fittingBox = nodeBox;
-                fittingBox.GrowToFit(otherNode);
+                Box mergedBox = Box.From(nodeBox, Conversions.ToBox(otherNode));
 
-                float area = fittingBox.HalfArea();
+                float area = mergedBox.HalfArea();
                 if (area < smallestArea)
                 {
                     smallestArea = area;
