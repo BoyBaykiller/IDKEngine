@@ -24,14 +24,14 @@ uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
 void StackPush(inout uint stackPtr, uint newEntry);
 uint StackPop(inout uint stackPtr);
 
-bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitInfo hitInfo, inout uint debugNodeCounter)
+bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout uint debugNodeCounter)
 {
     bool hit = false;
     float tMinLeft;
     float tMinRight;
     
     #if !USE_TLAS
-    GpuBlasNode rootNode = blasNodeSSBO.Nodes[rootNodeOffset];
+    GpuBlasNode rootNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -43,18 +43,22 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
     while (true)
     {
         debugNodeCounter++;
-        GpuBlasNode leftNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop];
-        GpuBlasNode rightNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop + 1];
+        GpuBlasNode leftNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + stackTop];
+        GpuBlasNode rightNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + stackTop + 1];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft < hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight < hitInfo.T;
 
-        uint summedTriCount = uint(leftChildHit) * leftNode.TriCount + uint(rightChildHit) * rightNode.TriCount;
-        if (summedTriCount > 0)
+        bool intersectLeft = leftChildHit && (leftNode.TriCount > 0);
+        bool intersectRight = rightChildHit && (rightNode.TriCount > 0);
+        if (intersectLeft || intersectRight)
         {
-            uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-            first += triangleOffset;
-            for (uint i = first; i < first + summedTriCount; i++)
+            uint first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+            uint end = !intersectRight ? (leftNode.TriStartOrChild + leftNode.TriCount) : (rightNode.TriStartOrChild + rightNode.TriCount);
+            first += blasDesc.GeometryDesc.TriangleOffset;
+            end += blasDesc.GeometryDesc.TriangleOffset;
+
+            for (uint i = first; i < end; i++)
             {
                 uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[i]);
 
@@ -101,13 +105,13 @@ bool IntersectBlas(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitI
     return hit;
 }
 
-bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout HitInfo hitInfo)
+bool IntersectBlasAny(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo)
 {
     float tMinLeft;
     float tMinRight;
     
     #if !USE_TLAS
-    GpuBlasNode rootNode = blasNodeSSBO.Nodes[rootNodeOffset];
+    GpuBlasNode rootNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -118,18 +122,22 @@ bool IntersectBlasAny(Ray ray, uint rootNodeOffset, uint triangleOffset, inout H
     uint stackTop = 1;
     while (true)
     {
-        GpuBlasNode leftNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop];
-        GpuBlasNode rightNode = blasNodeSSBO.Nodes[rootNodeOffset + stackTop + 1];
+        GpuBlasNode leftNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + stackTop];
+        GpuBlasNode rightNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + stackTop + 1];
 
         bool leftChildHit = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft < hitInfo.T;
         bool rightChildHit = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight < hitInfo.T;
 
-        uint summedTriCount = uint(leftChildHit) * leftNode.TriCount + uint(rightChildHit) * rightNode.TriCount;
-        if (summedTriCount > 0)
+        bool intersectLeft = leftChildHit && (leftNode.TriCount > 0);
+        bool intersectRight = rightChildHit && (rightNode.TriCount > 0);
+        if (intersectLeft || intersectRight)
         {
-            uint first = (leftChildHit && (leftNode.TriCount > 0)) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-            first += triangleOffset;
-            for (uint i = first; i < first + summedTriCount; i++)
+            uint first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+            uint end = !intersectRight ? (leftNode.TriStartOrChild + leftNode.TriCount) : (rightNode.TriStartOrChild + rightNode.TriCount);
+            first += blasDesc.GeometryDesc.TriangleOffset;
+            end += blasDesc.GeometryDesc.TriangleOffset;
+
+            for (uint i = first; i < end; i++)
             {
                 uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[i]);
                 vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
@@ -223,7 +231,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
 
-            if (IntersectBlas(localRay, blasDesc.RootNodeOffset, blasDesc.GeometryDesc.TriangleOffset, hitInfo, debugNodeCounter))
+            if (IntersectBlas(localRay, blasDesc, hitInfo, debugNodeCounter))
             {
                 hitInfo.InstanceId = childOrInstanceId;
             }
@@ -271,7 +279,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out uint debugNodeCounter, bool trac
 
         mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
         Ray localRay = RayTransform(ray, invModelMatrix);
-        if (IntersectBlas(localRay, blasDesc.RootNodeOffset, blasDesc.GeometryDesc.TriangleOffset, hitInfo, debugNodeCounter))
+        if (IntersectBlas(localRay, blasDesc, hitInfo, debugNodeCounter))
         {
             hitInfo.InstanceId = i;
         }
@@ -338,7 +346,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
             mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
             Ray localRay = RayTransform(ray, invModelMatrix);
 
-            if (IntersectBlasAny(localRay, blasDesc.RootNodeOffset, blasDesc.GeometryDesc.TriangleOffset, hitInfo))
+            if (IntersectBlasAny(localRay, blasDesc, hitInfo))
             {
                 hitInfo.InstanceId = childOrInstanceId;
 
@@ -388,7 +396,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 
         mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
         Ray localRay = RayTransform(ray, invModelMatrix);
-        if (IntersectBlasAny(localRay, blasDesc.RootNodeOffset, blasDesc.GeometryDesc.TriangleOffset, hitInfo))
+        if (IntersectBlasAny(localRay, blasDesc, hitInfo))
         {
             hitInfo.InstanceId = i;
             return true;
@@ -407,7 +415,6 @@ void StackPush(inout uint stackPtr, uint newEntry)
     BlasTraversalStack[stackPtr++] = newEntry;
 #endif
 }
-
 
 uint StackPop(inout uint stackPtr)
 {

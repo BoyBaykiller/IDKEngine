@@ -306,19 +306,27 @@ namespace IDKEngine.Bvh
             }
         }
 
+        public record struct Statistics
+        {
+            public ulong BoxIntersections;
+            public ulong TriIntersections;
+        }
+
+        public static Statistics DebugStatistics;
+
         public void BlasesBuild(int start, int count)
         {
             if (count == 0) return;
 
             BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
-            ReinsertionOptimizer.Settings optimizationSettings = new ReinsertionOptimizer.Settings();
+            PreSplitting.Settings preSplittingSettings = new PreSplitting.Settings();
 
-            // Benefical in some scenes (with "inefficient" long triangles) and harmful in others
-            const bool enablePresplitting = false;
+            const bool enablePresplitting = true;
 
             BlasBuildPhaseData[] newBlasesData = new BlasBuildPhaseData[count];
             GpuBlasDesc prevEndBlasDesc = BlasesDesc[start + count - 1];
-            int preSplitAddedTris = 0;
+            int preSplitNewTris = 0;
+            int preSplitNewTrisDeduplicated = 0;
 
             Stopwatch swBuilding = Stopwatch.StartNew();
             Parallel.For(0, count, i =>
@@ -327,7 +335,7 @@ namespace IDKEngine.Bvh
                 ref GpuBlasDesc blasDesc = ref BlasesDesc[start + i];
                 BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
 
-                // TODO: Only store parent+leaf ids and allow pre-splitting for "refitable BLAS"
+                // TODO: Only store parent+leaf ids for "refitable BLAS"
 
                 // Don't do pre-splitting repeatedly as that creates excessive amounts of triangles
                 bool doPresplitting = enablePresplitting && !blasDesc.PreSplittingWasDone;
@@ -335,21 +343,21 @@ namespace IDKEngine.Bvh
                 {
                     blasDesc.PreSplittingWasDone = true;
                 }
-
+                
                 // Generate bounding boxes from (pre-split) triangles.
                 // If pre-splitting is enable we also create indices that
                 // map a box index to the corresponding source triangle index
-                (Box[] triangleBounds, int[] originalTriIds) = doPresplitting ?
-                    PreSplitting.PreSplit(geometry) :
-                    (BLAS.GetTriangleBounds(geometry), null);
+                (Box[] bounds, int[] originalTriIds) = doPresplitting ?
+                    PreSplitting.PreSplit(geometry, preSplittingSettings) :
+                    (BLAS.GetTriangleBounds(geometry), []);
 
                 // Allocate temporary build data and upper bound of required nodes
-                BLAS.BuildData buildData = BLAS.GetBuildData(triangleBounds);
-                GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(buildData.TriangleCount)];
+                BLAS.BuildData buildData = BLAS.GetBuildData(bounds, originalTriIds);
+                GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(buildData.ReferenceCount)];
 
                 // Build BLAS and resize nodes
                 BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
-                int nodesUsed = BLAS.Build(ref blas, buildData, buildSettings);
+                int nodesUsed = BLAS.Build(ref blas, geometry, buildData, buildSettings);
 
                 Array.Resize(ref nodes, nodesUsed);
                 blas.Nodes = nodes;
@@ -360,23 +368,23 @@ namespace IDKEngine.Bvh
                     PreSplitting.GetUnindexedTriangles(blas, buildData, geometry, originalTriIds) :
                     BLAS.GetUnindexedTriangles(buildData, geometry);
 
-                int[] parentIds = BLAS.GetParentIndices(blas);
+                if (doPresplitting)
+                {
+                    Interlocked.Add(ref preSplitNewTris, bounds.Length - geometry.TriangleCount);
+                    Interlocked.Add(ref preSplitNewTrisDeduplicated, blasTriangles.Length - geometry.TriangleCount);
+                }
 
+                int[] parentIds = BLAS.GetParentIndices(blas);
+                
                 if (false)
                 {
                     // Post build optimizaton.
                     // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net performance
                     // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
-                    ReinsertionOptimizer.Optimize(ref blas, parentIds, blasTriangles, optimizationSettings);
+                    ReinsertionOptimizer.Optimize(ref blas, parentIds, blasTriangles, new ReinsertionOptimizer.Settings());
                 }
 
                 int[] leafIds = BLAS.GetLeafIndices(blas);
-
-                if (doPresplitting)
-                {
-                    int added = blasTriangles.Length - geometry.TriangleCount;
-                    Interlocked.Add(ref preSplitAddedTris, added);
-                }
 
                 blasDesc.NodeCount = nodes.Length;
                 blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;
@@ -395,9 +403,9 @@ namespace IDKEngine.Bvh
 
             Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms");
             
-            if (preSplitAddedTris > 0)
+            if (preSplitNewTris > 0)
             {
-                Logger.Log(Logger.LogLevel.Info, $"Pre-splitting added {preSplitAddedTris} triangles");
+                Logger.Log(Logger.LogLevel.Info, $"Pre-splitting added {preSplitNewTris} => {preSplitNewTrisDeduplicated} deduplicated triangles");
             }
 
             if (true)
@@ -433,8 +441,8 @@ namespace IDKEngine.Bvh
                 }
                 else
                 {
-                    ShiftElements(ref BlasNodes, prevEndBlasDesc.NodesEnd, newEndBlasDesc.NodesEnd);
-                    ShiftElements(ref blasParentIds, prevEndBlasDesc.NodesEnd, newEndBlasDesc.NodesEnd);
+                    Helper.ArrayShiftElements(ref BlasNodes, prevEndBlasDesc.NodesEnd, newEndBlasDesc.NodesEnd);
+                    Helper.ArrayShiftElements(ref blasParentIds, prevEndBlasDesc.NodesEnd, newEndBlasDesc.NodesEnd);
                 }
 
                 if (newEndBlasDesc.GeometryDesc.TrianglesEnd < prevEndBlasDesc.GeometryDesc.TrianglesEnd)
@@ -443,7 +451,7 @@ namespace IDKEngine.Bvh
                 }
                 else
                 {
-                    ShiftElements(ref BlasTriangles, prevEndBlasDesc.GeometryDesc.TrianglesEnd, newEndBlasDesc.GeometryDesc.TrianglesEnd);
+                    Helper.ArrayShiftElements(ref BlasTriangles, prevEndBlasDesc.GeometryDesc.TrianglesEnd, newEndBlasDesc.GeometryDesc.TrianglesEnd);
                 }
 
                 if (newEndBlasDesc.LeafIndicesEnd < prevEndBlasDesc.LeafIndicesEnd)
@@ -452,16 +460,8 @@ namespace IDKEngine.Bvh
                 }
                 else
                 {
-                    ShiftElements(ref blasLeafIds, prevEndBlasDesc.LeafIndicesEnd, newEndBlasDesc.LeafIndicesEnd);
+                    Helper.ArrayShiftElements(ref blasLeafIds, prevEndBlasDesc.LeafIndicesEnd, newEndBlasDesc.LeafIndicesEnd);
                 }
-
-                static void ShiftElements<T>(ref T[] arr, int oldPosition, int newPosition)
-            {
-                int newCount = newPosition - oldPosition + arr.Length;
-
-                Array.Resize(ref arr, newCount);
-                Array.Copy(arr, oldPosition, arr, newPosition, arr.Length - newPosition);
-            }
             }
 
             // Copy new data into global arrays

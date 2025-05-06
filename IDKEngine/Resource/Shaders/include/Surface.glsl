@@ -101,5 +101,5 @@ bool SurfaceIsTransparent(Surface surface)
     // Keep in sync between shader and client code!
     const float valueMeaniningBlendMode = 2.0;
     
-    return surface.AlphaCutoff == valueMeaniningBlendMode; 
+    return surface.AlphaCutoff == valueMeaniningBlendMode;
 }

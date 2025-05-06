@@ -126,12 +126,14 @@ namespace IDKEngine.Render
 
             if (ImGui.Begin("Stats"))
             {
+                ImGui.Text($"GC TotalPauseDuration= {GC.GetTotalPauseDuration().Milliseconds}");
+
                 {
                     float mbDrawVertices = (app.ModelManager.Vertices.SizeInBytes() + app.ModelManager.VertexPositions.SizeInBytes()) / 1000000.0f;
                     float mbDrawIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
                     float mbMeshInstances = app.ModelManager.MeshInstances.SizeInBytes() / 1000000.0f;
                     float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshInstances;
-                    if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb"))
+                    if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb###Rasterizer Geometry total"))
                     {
                         ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbDrawVertices}mb");
                         ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
@@ -145,7 +147,7 @@ namespace IDKEngine.Render
                     float mbBlasNodes = app.ModelManager.BVH.BlasNodes.SizeInBytes() / 1000000.0f;
                     float mbBTlasNodes = app.ModelManager.BVH.TlasNodes.SizeInBytes() / 1000000.0f;
                     float totalBVH = mbBlasTrianglesIndices + mbBlasNodes + mbBTlasNodes;
-                    if (ImGui.TreeNode($"BVH total = {totalBVH}mb"))
+                    if (ImGui.TreeNode($"BVH total = {totalBVH}mb###BVH Total"))
                     {
                         ImGui.Text($"  * Triangles ({app.ModelManager.BVH.BlasTriangles.Length}) = {mbBlasTrianglesIndices}mb");
                         ImGui.Text($"  * Blas Nodes ({app.ModelManager.BVH.BlasNodes.Length}) = {mbBlasNodes}mb");
@@ -157,7 +159,7 @@ namespace IDKEngine.Render
                 {
                     float mbJointMatrices = app.ModelManager.JointMatrices.SizeInBytes() / 1000000.0f;
                     float mbTotalAnimations = mbJointMatrices;
-                    if (ImGui.TreeNode($"Animations total = {mbTotalAnimations}mb"))
+                    if (ImGui.TreeNode($"Animations total = {mbTotalAnimations}mb###Animations total"))
                     {
                         ImGui.Text($"  * JointMatrices ({app.ModelManager.JointMatrices.Length}) = {mbJointMatrices}mb");
                         ImGui.TreePop();
@@ -1111,8 +1113,7 @@ namespace IDKEngine.Render
                                     flags |= ImGuiTreeNodeFlags.Selected;
                                 }
 
-                                string materialName = cpuMaterial.Name != string.Empty ? cpuMaterial.Name : $"Material_{j}";
-                                if (ImGui.TreeNodeEx(materialName, flags))
+                                if (ImGui.TreeNodeEx(cpuMaterial.Name, flags))
                                 {
                                     ImGui.TreePop();
                                 }
@@ -1321,23 +1322,27 @@ namespace IDKEngine.Render
             guiBackend.Dispose();
         }
 
-        //private static void Test(Application app)
-        //{
-        //    System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
-        //    OtkVec2 res = app.RenderResolution;
-        //    for (int y = 0; y < res.Y; y++)
-        //    {
-        //        int localY = y;
-        //        Parallel.For(0, app.RenderResolution.X, x =>
-        //        //for (int x = 0; x < res.X; x++)
-        //        {
-        //            OtkVec2 ndc = new OtkVec2(x, localY) / res * 2.0f - new OtkVec2(1.0f);
-        //            Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.PerFrameData.CameraPos, app.PerFrameData.InvProjection, app.PerFrameData.InvView, ndc);
-        //            app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
-        //        });
-        //    }
-        //    Console.WriteLine(sw.ElapsedMilliseconds);
-        //}
+        private static void Test(Application app)
+        {
+            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+            OtkVec2 res = app.RenderResolution;
+            BVH.DebugStatistics = new BVH.Statistics();
+            for (int y = 0; y < res.Y; y++)
+            {
+                int localY = y;
+                Parallel.For(0, app.RenderResolution.X, x =>
+                //for (int x = 0; x < res.X; x++)
+                {
+                    OtkVec2 ndc = new OtkVec2(x, localY) / res * 2.0f - new OtkVec2(1.0f);
+                    Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.PerFrameData.CameraPos, app.PerFrameData.InvProjection, app.PerFrameData.InvView, ndc);
+                    app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
+                });
+            }
+            BVH.DebugStatistics.TriIntersections /= (ulong)(res.X * res.Y);
+            BVH.DebugStatistics.BoxIntersections /= (ulong)(res.X * res.Y);
+            Console.WriteLine(BVH.DebugStatistics);
+            Console.WriteLine(sw.ElapsedMilliseconds);
+        }
 
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray, out float t)
         {

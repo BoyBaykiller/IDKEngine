@@ -98,6 +98,14 @@ namespace IDKEngine.Utils
             Array.Resize(ref array, array.Length - count);
         }
 
+        public static void ArrayShiftElements<T>(ref T[] arr, int oldPosition, int newPosition)
+        {
+            int newCount = newPosition - oldPosition + arr.Length;
+
+            Array.Resize(ref arr, newCount);
+            Array.Copy(arr, oldPosition, arr, newPosition, arr.Length - newPosition);
+        }
+
         public static int Sum<T>(this ReadOnlySpan<T> array, Func<T, int> func)
         {
             int sum = 0;

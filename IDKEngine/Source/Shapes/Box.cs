@@ -105,6 +105,16 @@ namespace IDKEngine.Shapes
             return axis;
         }
 
+        public readonly float LargestExtent()
+        {
+            return Size()[LargestAxis()];
+        }
+
+        public readonly float Area()
+        {
+            return HalfArea() * 2.0f;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)] // It's small and called in hot loop
         public readonly float HalfArea()
         {

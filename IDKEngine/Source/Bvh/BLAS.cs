@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Collections;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
@@ -23,7 +24,6 @@ namespace IDKEngine.Bvh
             public int MinLeafTriangleCount = 1;
             public int MaxLeafTriangleCount = 8;
             public float TriangleCost = 1.1f;
-            public bool TryRePartitioning = false;
 
             public BuildSettings()
             {
@@ -81,41 +81,45 @@ namespace IDKEngine.Bvh
 
         public record struct BuildData
         {
-            public readonly int TriangleCount => TriBounds.Length;
+            public readonly int ReferenceCount => TriRefsBounds.Count;
 
             /// <summary>
-            /// There are 3 arrays which store triangle indices sorted by position on each axis respectively.
+            /// There are 3 permutated arrays which store triangle indices sorted by position on each axis respectively.
             /// For the purpose of accessing triangle indices from a leaf-node range we can just return any axis
             /// </summary>
-            public readonly Span<int> TriangleIndices => TrisAxesSorted[0];
+            public readonly Span<int> PermutatedTriangleIds => TriRefsSortedOnAxis[0];
 
             public float[] RightCostsAccum;
-            public BitArray TrisGoingLeft;
-            public Box[] TriBounds;
-            public TriAxesSorted TrisAxesSorted;
+            public BitArray TriRefsGoingLeft;
+            public List<Box> TriRefsBounds;
+            public List<int> TriRefsOriginalTriIds;
+
+            public TriRefsAxesSorted TriRefsSortedOnAxis;
         }
 
-        public static BuildData GetBuildData(Box[] bounds)
+        public static BuildData GetBuildData(Box[] bounds, int[] originalTriIds)
         {
             int triangleCount = bounds.Length;
 
             BuildData buildData = new BuildData();
-            buildData.TrisGoingLeft = new BitArray(triangleCount, false);
-            buildData.TriBounds = bounds;
+            buildData.TriRefsGoingLeft = new BitArray(triangleCount, false);
+            buildData.TriRefsBounds = List<Box>.FromArray(bounds);
+            buildData.TriRefsOriginalTriIds = List<int>.FromArray(originalTriIds);
             buildData.RightCostsAccum = new float[triangleCount];
-            buildData.TrisAxesSorted[0] = new int[triangleCount];
-            buildData.TrisAxesSorted[1] = new int[triangleCount];
-            buildData.TrisAxesSorted[2] = new int[triangleCount];
+            buildData.TriRefsSortedOnAxis[0] = List<int>.WithCount(triangleCount);
+            buildData.TriRefsSortedOnAxis[1] = List<int>.WithCount(triangleCount);
+            buildData.TriRefsSortedOnAxis[2] = List<int>.WithCount(triangleCount);
 
             for (int axis = 0; axis < 3; axis++)
             {
                 Span<int> input = Helper.ReUseMemory<float, int>(buildData.RightCostsAccum);
-                Span<int> output = buildData.TrisAxesSorted[axis];
+                Span<int> output = buildData.TriRefsSortedOnAxis[axis];
 
                 Helper.FillIncreasing(input);
                 Algorithms.RadixSort(input, output, (int index) =>
                 {
-                    float centerAxis = (bounds[index].Min[axis] + bounds[index].Max[axis]) * 0.5f; // geometry->GetTriangle(index).Centroid[axis]
+                    float centerAxis = (bounds[index].Min[axis] + bounds[index].Max[axis]) * 0.5f;
+                    //float centerAxis = centers[index][axis];
                     return Algorithms.FloatToKey(centerAxis);
                 });
             }
@@ -123,13 +127,13 @@ namespace IDKEngine.Bvh
             return buildData;
         }
 
-        public static int Build(ref BuildResult blas, in BuildData buildData, in BuildSettings settings)
+        public static int Build(ref BuildResult blas, Geometry geometry, BuildData buildData, in BuildSettings settings)
         {
             int nodesUsed = 0;
 
             ref GpuBlasNode rootNode = ref blas.Nodes[nodesUsed++];
             rootNode.TriStartOrChild = 0;
-            rootNode.TriCount = buildData.TriangleCount;
+            rootNode.TriCount = buildData.ReferenceCount;
             rootNode.SetBounds(ComputeBoundingBox(rootNode.TriStartOrChild, rootNode.TriCount, buildData));
 
             int stackPtr = 0;
@@ -139,17 +143,17 @@ namespace IDKEngine.Bvh
             {
                 ref GpuBlasNode parentNode = ref blas.Nodes[stack[--stackPtr]];
 
-                if (TrySplit(parentNode, buildData, settings, out Box leftBounds, out Box rightBounds) is int partitionPivot)
+                if (TrySplit(parentNode, geometry, buildData, settings) is int partitionPivot)
                 {
                     GpuBlasNode newLeftNode = new GpuBlasNode();
                     newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
                     newLeftNode.TriCount = partitionPivot - newLeftNode.TriStartOrChild;
-                    newLeftNode.SetBounds(leftBounds);
+                    newLeftNode.SetBounds(ComputeBoundingBox(newLeftNode.TriStartOrChild, newLeftNode.TriCount, buildData));
 
                     GpuBlasNode newRightNode = new GpuBlasNode();
                     newRightNode.TriStartOrChild = partitionPivot;
                     newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
-                    newRightNode.SetBounds(rightBounds);
+                    newRightNode.SetBounds(ComputeBoundingBox(newRightNode.TriStartOrChild, newRightNode.TriCount, buildData));
 
                     if (newLeftNode.TriCount == 0 || newRightNode.TriCount == 0)
                     {
@@ -274,11 +278,16 @@ namespace IDKEngine.Bvh
                 bool leftChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
                 bool rightChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
-                int summedTriCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
-                if (summedTriCount > 0)
+                Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
+
+                bool intersectLeft = leftChildHit && leftNode.IsLeaf;
+                bool intersectRight = rightChildHit && rightNode.IsLeaf;
+                if (intersectLeft || intersectRight)
                 {
-                    int first = (leftChildHit && leftNode.IsLeaf) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-                    for (int i = first; i < first + summedTriCount; i++)
+                    int first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+                    int end = !intersectRight ? (first + leftNode.TriCount) : (rightNode.TriStartOrChild + rightNode.TriCount);
+
+                    for (int i = first; i < end; i++)
                     {
                         ref readonly GpuIndicesTriplet indicesTriplet = ref geometry.Triangles[i];
                         Triangle triangle = geometry.GetTriangle(indicesTriplet);
@@ -293,6 +302,8 @@ namespace IDKEngine.Bvh
 
                     if (leftNode.IsLeaf) leftChildHit = false;
                     if (rightNode.IsLeaf) rightChildHit = false;
+
+                    Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
                 }
 
                 if (leftChildHit || rightChildHit)
@@ -335,17 +346,17 @@ namespace IDKEngine.Bvh
                 bool leftChildHit = Intersections.BoxVsBox(Conversions.ToBox(leftNode), box);
                 bool rightChildHit = Intersections.BoxVsBox(Conversions.ToBox(rightNode), box);
 
-                int summedTriCount = (leftChildHit ? leftNode.TriCount : 0) + (rightChildHit ? rightNode.TriCount : 0);
-                if (summedTriCount > 0)
+                bool intersectLeft = leftChildHit && leftNode.IsLeaf;
+                bool intersectRight = rightChildHit && rightNode.IsLeaf;
+                if (intersectLeft || intersectRight)
                 {
-                    int first = (leftChildHit && leftNode.IsLeaf) ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
-                    for (int i = first; i < first + summedTriCount; i++)
+                    int first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
+                    int end = !intersectRight ? (first + leftNode.TriCount) : (rightNode.TriStartOrChild + rightNode.TriCount);
+
+                    for (int i = first; i < end; i++)
                     {
                         ref readonly GpuIndicesTriplet indicesTriplet = ref geometry.Triangles[i];
-                        if (intersectFunc(indicesTriplet))
-                        {
-                            return;
-                        }
+                        intersectFunc(indicesTriplet);
                     }
 
                     if (leftNode.IsLeaf) leftChildHit = false;
@@ -373,7 +384,7 @@ namespace IDKEngine.Bvh
             GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[geometry.TriangleCount];
             for (int j = 0; j < triangles.Length; j++)
             {
-                triangles[j] = geometry.Triangles[buildData.TriangleIndices[j]];
+                triangles[j] = geometry.Triangles[buildData.PermutatedTriangleIds[j]];
             }
 
             return triangles;
@@ -492,16 +503,13 @@ namespace IDKEngine.Bvh
             Box box = Box.Empty();
             for (int i = start; i < start + count; i++)
             {
-                box.GrowToFit(buildData.TriBounds[buildData.TriangleIndices[i]]);
+                box.GrowToFit(buildData.TriRefsBounds[buildData.PermutatedTriangleIds[i]]);
             }
             return box;
         }
 
-        private static int? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, in BuildSettings settings, out Box leftBox, out Box rightBox)
+        private static int? TrySplit(in GpuBlasNode parentNode, in Geometry geometry, BuildData buildData, in BuildSettings settings)
         {
-            leftBox = Box.Empty();
-            rightBox = Box.Empty();
-            
             if (parentNode.TriCount <= settings.MinLeafTriangleCount)
             {
                 return null;
@@ -511,22 +519,27 @@ namespace IDKEngine.Bvh
             int triEnd = triStart + parentNode.TriCount;
             float parentArea = parentNode.HalfArea();
 
+            if (parentArea == 0.0f)
+            {
+                return null;
+            }
+
             float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleCost);
 
             int triPivot = 0;
             int splitAxis = 0;
-            float splitCost = notSplitCost;
+            float splitCost = float.MaxValue;
 
             // Unfortunately we have to manually load the fields for best perf
             // as the JIT otherwise repeatedly loads them in the loop
             // https://github.com/dotnet/runtime/issues/113107
             Span<float> rightCostsAccum = buildData.RightCostsAccum;
-            Span<Box> triBounds = buildData.TriBounds;
-            BitArray trisGoingLeft = buildData.TrisGoingLeft;
+            Span<Box> triBounds = buildData.TriRefsBounds;
+            BitArray trisGoingLeft = buildData.TriRefsGoingLeft;
 
             for (int axis = 0; axis < 3; axis++)
             {
-                Span<int> trisAxesSorted = buildData.TrisAxesSorted[axis];
+                Span<int> trisAxesSorted = buildData.TriRefsSortedOnAxis[axis];
 
                 Box rightBoxAccum = Box.Empty();
                 int firstRightTri = triStart + 1;
@@ -577,7 +590,6 @@ namespace IDKEngine.Bvh
                         triPivot = triIndex;
                         splitAxis = axis;
                         splitCost = surfaceAreaHeuristic;
-                        leftBox = leftBoxAccum;
                     }
                     else if (leftCost >= splitCost)
                     {
@@ -586,30 +598,11 @@ namespace IDKEngine.Bvh
                 }
             }
 
-            if (splitCost >= notSplitCost)
+            if (splitCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
             {
-                if (parentNode.TriCount > settings.MaxLeafTriangleCount)
-                {
-                    // Simply split the triangles equally in this case.
-                    // Having a maximum triangle count regardless of what SAH says can be benefical in some scenes
-
-                    Vector3 size = parentNode.Max - parentNode.Min;
-                    int largestAxis = size.Y > size.X ? 1 : 0;
-                    largestAxis = size.Z > size[largestAxis] ? 2 : largestAxis;
-
-                    splitAxis = largestAxis;
-                    triPivot = (triStart + triEnd + 1) / 2;
-                }
-                else
-                {
-                    return null;
-                }
+                return null;
             }
 
-            for (int i = triPivot; i < triEnd; i++)
-            {
-                rightBox.GrowToFit(triBounds[buildData.TrisAxesSorted[splitAxis][i]]);
-            }
 
             // We found a split axis where the triangles are partitioned into a left and right set.
             // Now, the other two axes also need to have the same triangles in their sets respectively.
@@ -617,7 +610,7 @@ namespace IDKEngine.Bvh
             // Then the other two axes have their triangles partitioned such that all marked triangles precede the others.
             // The partitioning is stable so the triangles stay sorted otherwise which is crucial
 
-            Span<int> trisAxesSortedSplitAxis = buildData.TrisAxesSorted[splitAxis];
+            Span<int> trisAxesSortedSplitAxis = buildData.TriRefsSortedOnAxis[splitAxis];
             for (int i = triStart; i < triPivot; i++)
             {
                 trisGoingLeft[trisAxesSortedSplitAxis[i]] = true;
@@ -628,36 +621,9 @@ namespace IDKEngine.Bvh
             }
 
             Span<int> partitionAux = Helper.ReUseMemory<float, int>(rightCostsAccum, triEnd - triStart);
-            
-            if (settings.TryRePartitioning)
-            {
-                // Instead of just accepting the pivot given by Sweep-SAH we can see
-                // if moving any primitive to the other side improves SAH.
-                // This is a simple version which doesn't need to explicitly compute SAH
-                // inspired by "Reference Unsplitting" in https://www.nvidia.in/docs/IO/77714/sbvh.pdf
 
-                bool leftSmaller = leftBox.HalfArea() < rightBox.HalfArea();
-                Box smallerBox = leftSmaller ? leftBox : rightBox;
-                int start = leftSmaller ? triPivot : triStart;
-                int end = leftSmaller ? triEnd : triPivot;
-
-                for (int i = start; i < end; i++)
-                {
-                    Box mergedBox = Box.From(smallerBox, triBounds[trisAxesSortedSplitAxis[i]]);
-
-                    // Does moving the primitive to the smaller box leave it's area unchanged?
-                    if (mergedBox == smallerBox)
-                    {
-                        // If yes move to the other side
-                        trisGoingLeft[trisAxesSortedSplitAxis[i]] = leftSmaller;
-                    }
-                }
-
-                triPivot = Algorithms.StablePartition(buildData.TrisAxesSorted[splitAxis], triStart, triEnd, partitionAux, buildData.TrisGoingLeft);
-            }
-
-            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 1) % 3], triStart, triEnd, partitionAux, buildData.TrisGoingLeft);
-            Algorithms.StablePartition(buildData.TrisAxesSorted[(splitAxis + 2) % 3], triStart, triEnd, partitionAux, buildData.TrisGoingLeft);
+            Algorithms.StablePartition(buildData.TriRefsSortedOnAxis[(splitAxis + 1) % 3], triStart, triEnd, partitionAux, buildData.TriRefsGoingLeft);
+            Algorithms.StablePartition(buildData.TriRefsSortedOnAxis[(splitAxis + 2) % 3], triStart, triEnd, partitionAux, buildData.TriRefsGoingLeft);
 
             return triPivot;
         }
@@ -678,9 +644,9 @@ namespace IDKEngine.Bvh
         }
 
         [InlineArray(3)]
-        public struct TriAxesSorted
+        public struct TriRefsAxesSorted
         {
-            private int[] _element;
+            private List<int> _element;
         }
     }
 }

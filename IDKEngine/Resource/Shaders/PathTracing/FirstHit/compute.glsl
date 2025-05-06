@@ -91,14 +91,16 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
     HitInfo hitInfo;
     uint debugNodeCounter = 0;
-    if (TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, debugNodeCounter, settingsUBO.IsTraceLights, FLOAT_MAX))
+    bool hitScene = TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, debugNodeCounter, settingsUBO.IsTraceLights, FLOAT_MAX);
+    
+    if (settingsUBO.IsDebugBVHTraversal)
     {
-        if (settingsUBO.IsDebugBVHTraversal)
-        {
-            wavefrontRay.PreviousIOROrDebugNodeCounter = debugNodeCounter;
-            return false;
-        }
+        wavefrontRay.PreviousIOROrDebugNodeCounter = debugNodeCounter;
+        return false;
+    }
 
+    if (hitScene)
+    {
         wavefrontRay.Origin += rayDir * hitInfo.T;
 
         Surface surface = GetDefaultSurface();

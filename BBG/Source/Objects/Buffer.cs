@@ -10,7 +10,6 @@ namespace BBOpenGL
         {
             public enum BufferTarget : uint
             {
-                PixelUnpack = OpenTK.Graphics.OpenGL.BufferTarget.PixelUnpackBuffer,
                 DispatchIndirect = OpenTK.Graphics.OpenGL.BufferTarget.DispatchIndirectBuffer,
             }
 

@@ -1129,7 +1129,7 @@ namespace IDKEngine.Utils
                 Material gltfMaterial = gltfMaterials[i];
                 MaterialDesc materialDesc = new MaterialDesc();
                 materialDesc.MaterialParams = GetMaterialParams(gltfMaterial);
-                materialDesc.Name = gltfMaterial.Name;
+                materialDesc.Name = gltfMaterial.Name ?? $"Material_{i}";
 
                 for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
                 {

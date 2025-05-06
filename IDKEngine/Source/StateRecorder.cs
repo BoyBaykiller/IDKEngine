@@ -1,8 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using BBLogger;
 using IDKEngine.Utils;
 
@@ -93,7 +91,7 @@ namespace IDKEngine
                 File.Delete(path);
             }
 
-            Helper.WriteToFile<T>(path, CollectionsMarshal.AsSpan(recordedStates));
+            Helper.WriteToFile<T>(path, recordedStates);
         }
     }
 }

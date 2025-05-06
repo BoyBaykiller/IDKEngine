@@ -7,17 +7,9 @@ namespace IDKEngine.Shapes
 {
     public record struct Triangle
     {
-        public readonly Vector3 Normal
-        {
-            get
-            {
-                Vector3 p0p1 = Position1 - Position0;
-                Vector3 p0p2 = Position2 - Position0;
-                Vector3 triNormal = Vector3.Normalize(Vector3.Cross(p0p1, p0p2));
+        public readonly float Area => Vector3.Cross(Edge01, Edge02).Length * 0.5f;
 
-                return triNormal;
-            }
-        }
+        public readonly Vector3 Normal => Vector3.Normalize(Vector3.Cross(Edge01, Edge02));
 
         public readonly Vector3 Centroid => (Position0 + Position1 + Position2) * (1.0f / 3.0f);
 

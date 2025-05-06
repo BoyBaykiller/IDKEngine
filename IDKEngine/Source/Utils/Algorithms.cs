@@ -119,14 +119,14 @@ namespace IDKEngine.Utils
 
         /// <summary>
         /// Searches for the first element in the array which is not ordered before value. Runs in O(log N).
-        /// Equivalent to std::lower_bound
+        /// Input should be sorted. Equivalent to std::lower_bound
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="arr"></param>
         /// <param name="value"></param>
         /// <param name="comparison"></param>
         /// <returns>The first index in the array where array[index] >= value, or arr.Length if no such value is found</returns>
-        public static int BinarySearchLowerBound<T>(ReadOnlySpan<T> arr, in T value, Comparison<T> comparison)
+        public static int SortedLowerBound<T>(ReadOnlySpan<T> arr, in T value, Comparison<T> comparison)
         {
             int lo = 0;
             int hi = arr.Length - 1;
@@ -149,6 +149,34 @@ namespace IDKEngine.Utils
             }
 
             return lo;
+        }
+
+        /// <summary>
+        /// Removes all items except one from every group of consecutive equivalent items.
+        /// Input should be sorted. Equivalent to std::unique
+        /// </summary>
+        /// <param name="arr"></param>
+        /// <returns></returns>
+        public static int SortedFilterDuplicates(Span<int> arr)
+        {
+            if (arr.Length == 0)
+            {
+                return 0;
+            }
+
+            int lastNewItem = arr[0];
+            int uniqueItemCounter = 1;
+            for (int i = 1; i < arr.Length; i++)
+            {
+                int item = arr[i];
+                if (lastNewItem != item)
+                {
+                    arr[uniqueItemCounter++] = item;
+                    lastNewItem = item;
+                }
+            }
+
+            return uniqueItemCounter;
         }
 
         public static void PartialSort<T>(Span<T> values, int sortEnd, Random rng, Comparison<T> comparison, Action<int, int> onSwap = null)

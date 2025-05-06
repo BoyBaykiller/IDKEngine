@@ -4,7 +4,6 @@ using System.Threading;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using BBOpenGL;
 using IDKEngine.Bvh;
@@ -360,8 +359,8 @@ namespace IDKEngine
                     opaqueMeshInstanceIds.Add(i);
                 }
             }
-            BBG.Buffer.Recreate(ref OpaqueMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, CollectionsMarshal.AsSpan(opaqueMeshInstanceIds));
-            BBG.Buffer.Recreate(ref TransparentMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, CollectionsMarshal.AsSpan(transparentMeshInstanceIds));
+            BBG.Buffer.Recreate(ref OpaqueMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, opaqueMeshInstanceIds);
+            BBG.Buffer.Recreate(ref TransparentMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, transparentMeshInstanceIds);
         }
 
         public void Draw()
@@ -816,7 +815,7 @@ namespace IDKEngine
                             continue;
                         }
 
-                        int index = Algorithms.BinarySearchLowerBound(nodeAnimation.KeyFramesStart, animationTime, MyComparer.LessThan);
+                        int index = Algorithms.SortedLowerBound(nodeAnimation.KeyFramesStart, animationTime, MyComparer.LessThan);
                         index = Math.Max(index, 1);
 
                         float prevT = nodeAnimation.KeyFramesStart[index - 1];
