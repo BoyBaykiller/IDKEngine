@@ -186,12 +186,13 @@ namespace IDKEngine.Bvh
                 int rightChild = leftChild + 1;
                 ref readonly GpuTlasNode leftNode = ref tlasNodes[leftChild];
                 ref readonly GpuTlasNode rightNode = ref tlasNodes[rightChild];
-                bool leftChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
-                bool rightChildHit = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
 
-                if (leftChildHit || rightChildHit)
+                bool traverseLeft = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
+                bool traverseRight = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
+
+                if (traverseLeft || traverseRight)
                 {
-                    if (leftChildHit && rightChildHit)
+                    if (traverseLeft && traverseRight)
                     {
                         bool leftCloser = tMinLeft < tMinRight;
                         stackTop = leftCloser ? leftChild : rightChild;
@@ -199,7 +200,7 @@ namespace IDKEngine.Bvh
                     }
                     else
                     {
-                        stackTop = leftChildHit ? leftChild : rightChild;
+                        stackTop = traverseLeft ? leftChild : rightChild;
                     }
                 }
                 else
@@ -249,13 +250,14 @@ namespace IDKEngine.Bvh
                 int rightChild = leftChild + 1;
                 ref readonly GpuTlasNode leftNode = ref tlasNodes[leftChild];
                 ref readonly GpuTlasNode rightNode = ref tlasNodes[rightChild];
-                bool leftChildHit = Intersections.BoxVsBox(Conversions.ToBox(leftNode), box);
-                bool rightChildHit = Intersections.BoxVsBox(Conversions.ToBox(rightNode), box);
 
-                if (leftChildHit || rightChildHit)
+                bool traverseLeft = Intersections.BoxVsBox(Conversions.ToBox(leftNode), box);
+                bool traverseRight = Intersections.BoxVsBox(Conversions.ToBox(rightNode), box);
+
+                if (traverseLeft || traverseRight)
                 {
-                    stackTop = leftChildHit ? leftChild : rightChild;
-                    if (leftChildHit && rightChildHit)
+                    stackTop = traverseLeft ? leftChild : rightChild;
+                    if (traverseLeft && traverseRight)
                     {
                         stack[stackPtr++] = rightChild;
                     }

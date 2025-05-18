@@ -10,6 +10,8 @@ using IDKEngine.Render;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
 using IDKEngine.Windowing;
+using OpenTK.Graphics.Vulkan;
+using System.Runtime.CompilerServices;
 
 namespace IDKEngine
 {
@@ -492,17 +494,20 @@ namespace IDKEngine
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaRotatedBaked.glb", new Transformation().WithTranslation(2.5671894f, 0.0312f, 1.533f).GetMatrix()).Value;
+                ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaRotated45Baked.glb", new Transformation().WithTranslation(-0.1f, -0.1f, 0.4f).WithRotationRad(-0.42f, -0.4f, 0.368f).GetMatrix()).Value;
                 //ModelLoader.Model ast = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
                 //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
                 //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(MathF.PI / 2.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
                 //ModelLoader.Model dragon = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\black_dragon_with_idle_animation\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
-                //ModelLoader.Model cs = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\CesiumMan\glTF-Binary\CesiumMan.glb", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
+                ModelLoader.Model cs = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\CesiumMan\glTF-Binary\CesiumMan.glb", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
                 //ModelLoader.Model cb = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
+                ModelLoader.Model box = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\Box\glTF\Box.gltf", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
 
-                ModelManager.Add(sponza, lucy, helmet);
+                ModelManager.Add(test);
                 
-                SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
+                SetRenderMode(RenderMode.PathTracer, WindowFramebufferSize, WindowFramebufferSize);
+                PathTracer.IsDebugBVHTraversal = true;
+                PathTracer.LenseRadius = 0.0f;
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));

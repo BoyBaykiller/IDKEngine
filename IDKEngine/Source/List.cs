@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using IDKEngine.Utils;
 
 namespace IDKEngine
 {
@@ -13,7 +12,7 @@ namespace IDKEngine
 
         public int Capacity => buffer.Length;
 
-        public int Count;
+        public int Count { get; private set; }
         private T[] buffer;
 
         public List(ReadOnlySpan<T> items)
@@ -55,7 +54,6 @@ namespace IDKEngine
             }
         }
 
-
         public void Add(T item)
         {
             GrowIfNeeded(Count + 1);
@@ -75,10 +73,19 @@ namespace IDKEngine
         {
             GrowIfNeeded(Count + items.Length);
 
-            Helper.ArrayShiftElements(ref buffer, index, index + items.Length);
+            Array.Copy(buffer, index, buffer, index + items.Length, Count - index);
 
             items.CopyTo(buffer.AsSpan(index, buffer.Length - index));
             Count += items.Length;
+        }
+
+        public void ResizeIfLarger(int count)
+        {
+            if (count > Count)
+            {
+                GrowIfNeeded(count);
+                Count = count;
+            }
         }
 
         public void GrowIfNeeded(int requiredSize)
@@ -114,14 +121,34 @@ namespace IDKEngine
             return arr;
         }
 
+        public Span<T> AsSpan()
+        {
+            return buffer.AsSpan(0, Count);
+        }
+
+        public Span<T> AsSpan(int start, int count)
+        {
+            return buffer.AsSpan(start, count);
+        }
+
         public static implicit operator Span<T>(List<T> list)
         {
-            return list.buffer.AsSpan(0, list.Count);
+            return list.AsSpan(0, list.Count);
         }
 
         public static implicit operator ReadOnlySpan<T>(List<T> list)
         {
-            return list.buffer.AsSpan(0, list.Count);
+            return list.AsSpan(0, list.Count);
+        }
+
+        public static T[] DissolveToArray(ref List<T> list)
+        {
+            T[] arr = list.buffer;
+            Array.Resize(ref arr, list.Count);
+
+            list = null;
+
+            return arr;
         }
 
         public Enumerator GetEnumerator()

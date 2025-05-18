@@ -98,7 +98,7 @@ namespace IDKEngine.Utils
             Array.Resize(ref array, array.Length - count);
         }
 
-        public static void ArrayShiftElements<T>(ref T[] arr, int oldPosition, int newPosition)
+        public static void ArrayShiftElementsResize<T>(ref T[] arr, int oldPosition, int newPosition)
         {
             int newCount = newPosition - oldPosition + arr.Length;
 
@@ -133,12 +133,7 @@ namespace IDKEngine.Utils
 
         public static void FillIncreasing(Span<int> array, int startValue = 0)
         {
-            FillIncreasing(array, 0, array.Length, startValue);
-        }
-
-        public static void FillIncreasing(Span<int> array, int start, int count, int startValue = 0)
-        {
-            for (int i = start; i < start + count; i++)
+            for (int i = 0; i < array.Length; i++)
             {
                 array[i] = startValue + i;
             }
@@ -146,12 +141,7 @@ namespace IDKEngine.Utils
 
         public static void FillIncreasing(Span<uint> array, uint startValue = 0u)
         {
-            FillIncreasing(array, 0, array.Length, startValue);
-        }
-
-        public static void FillIncreasing(Span<uint> array, int start, int count, uint startValue = 0u)
-        {
-            for (int i = start; i < start + count; i++)
+            for (int i = 0; i < array.Length; i++)
             {
                 array[i] = (uint)(startValue + i);
             }

@@ -169,7 +169,7 @@ struct GpuTlasNode
 struct GpuWavefrontRay
 {
     vec3 Origin;
-    float PreviousIOROrDebugNodeCounter;
+    float PreviousIOROrTraverseCost;
 
     vec3 Throughput;
     float PackedDirectionX;

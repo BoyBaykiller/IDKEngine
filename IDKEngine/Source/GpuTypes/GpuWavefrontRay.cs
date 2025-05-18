@@ -5,7 +5,7 @@ namespace IDKEngine.GpuTypes
     record struct GpuWavefrontRay
     {
         public Vector3 Origin;
-        public float PreviousIOROrDebugNodeCounter;
+        public float PreviousIOROrTraverseCost;
 
         public Vector3 Throughput;
         public float PackedDirectionX;

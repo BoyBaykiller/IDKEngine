@@ -32,6 +32,7 @@ namespace IDKEngine.Utils
 
         public static unsafe void RadixSort<T>(Span<T> input, Span<T> output, Func<T, uint> getKey)
         {
+            // Out performs built-in sort except for small inputs (~64)
             // http://stereopsis.com/radix.html
 
             Debug.Assert(output.Length >= input.Length);
@@ -258,12 +259,6 @@ namespace IDKEngine.Utils
             return start;
         }
 
-        public static int StablePartition(Span<int> source, int start, int end, Span<int> auxiliary, BitArray bitArray)
-        {
-            source = source.Slice(start, end - start);
-            return start + StablePartition(source, auxiliary, bitArray);
-        }
-
         /// <summary>
         /// Reorders the integers in such a way that all elements for which bitArray[arr[i]]==true
         /// precede the integers for which it is not. Relative order of the elements is preserved.
@@ -292,9 +287,27 @@ namespace IDKEngine.Utils
                 }
             }
 
-            if (rCounter > 0)
+            auxiliary.Slice(0, rCounter).CopyTo(source.Slice(lCounter, rCounter));
+
+            return lCounter;
+        }
+
+        public static int StablePartitionWriteOut(Span<int> source, Span<int> auxiliary, BitArray bitArray)
+        {
+            int lCounter = 0;
+            int rCounter = 0;
+
+            for (int i = 0; i < source.Length; i++)
             {
-                Memory.CopyElements(ref auxiliary[0], ref source[lCounter], rCounter);
+                int id = source[i];
+                if (bitArray[id])
+                {
+                    source[lCounter++] = id;
+                }
+                else
+                {
+                    auxiliary[rCounter++] = id;
+                }
             }
 
             return lCounter;

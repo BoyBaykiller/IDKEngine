@@ -3,10 +3,11 @@ using System.Runtime.Intrinsics;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using IDKEngine.Utils;
+using System;
 
 namespace IDKEngine.Shapes
 {
-    public struct Box
+    public record struct Box
     {
         public readonly Vector3 Min => SimdMin.ToOpenTK();
         public readonly Vector3 Max => SimdMax.ToOpenTK();
