@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
@@ -7,6 +8,10 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Bvh
 {
+    /// <summary>
+    /// Improved implementation of "Early-Split-Clipping" from "Fast Parallel Construction of High-Quality Bounding Volume Hierarchies"
+    /// https://research.nvidia.com/sites/default/files/pubs/2013-07_Fast-Parallel-Construction/karras2013hpg_paper.pdf
+    /// </summary>
     public static class PreSplitting
     {
         public record struct Settings
@@ -34,21 +39,20 @@ namespace IDKEngine.Bvh
                 totalPriority += Priority(Box.From(triangle), triangle);
             }
 
-            int referenceCount = 0;
+            int counter = 0;
             for (int i = 0; i < geometry.TriangleCount; i++)
             {
                 Triangle triangle = geometry.GetTriangle(i);
                 float priority = Priority(Box.From(triangle), triangle);
                 int splitCount = GetSplitCount(priority, totalPriority, geometry.TriangleCount);
 
-                referenceCount += splitCount;
+                counter += splitCount;
             }
 
-            Box[] bounds = new Box[referenceCount];
-            int[] originalTriIds = new int[referenceCount];
-            Vector3[] centers = new Vector3[referenceCount];
+            Box[] bounds = new Box[counter];
+            int[] originalTriIds = new int[counter];
 
-            int counter = 0;
+            counter = 0;
 
             Span<ValueTuple<Box, int>> stack = stackalloc ValueTuple<Box, int>[64];
             for (int i = 0; i < geometry.TriangleCount; i++)
@@ -69,7 +73,6 @@ namespace IDKEngine.Bvh
                     {
                         bounds[counter] = box;
                         originalTriIds[counter] = i;
-                        centers[counter] = box.Center(); 
                         counter++;
                         continue;
                     }
@@ -77,14 +80,16 @@ namespace IDKEngine.Bvh
                     int splitAxis = box.LargestAxis();
                     float largestExtent = box.Size()[splitAxis];
 
-                    float depth = Math.Min(-1.0f, MathF.Floor(MathF.Log2(largestExtent / globalSize[splitAxis])));
-                    float cellSize = float.Exp2(depth) * globalSize[splitAxis];
-                    if (cellSize + 0.0001f >= largestExtent)
+                    float alpha = largestExtent / globalSize[splitAxis];
+                    float cellSize = GetCellSize(alpha) * globalSize[splitAxis];
+                    if (cellSize >= largestExtent - 0.0001f)
                     {
                         cellSize *= 0.5f;
                     }
 
                     float midPos = (box.Min[splitAxis] + box.Max[splitAxis]) * 0.5f;
+
+                    // This is computing [x = j * 2 ^ i, where i,j∈Z] as shown in the paper
                     float splitPos = globalBox.Min[splitAxis] + MathF.Round((midPos - globalBox.Min[splitAxis]) / cellSize) * cellSize;
                     if (splitPos < box.Min[splitAxis] || splitPos > box.Max[splitAxis])
                     {
@@ -97,15 +102,14 @@ namespace IDKEngine.Bvh
 
                     float leftExtent = lBox.LargestExtent();
                     float rightExtent = rBox.LargestExtent();
-                    
-                    int leftCount = (int)(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
-                    leftCount = Math.Max(leftCount, 1);
-                    leftCount = Math.Max(1, leftCount);
+
+                    int leftCount = (int)MathF.Round(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
+                    leftCount = Math.Clamp(leftCount, 1, splitsLeft - 1);
 
                     int rightCount = splitsLeft - leftCount;
 
-                    stack[stackPtr++] = (lBox, leftCount);
                     stack[stackPtr++] = (rBox, rightCount);
+                    stack[stackPtr++] = (lBox, leftCount);
                 }
             }
 
@@ -122,18 +126,29 @@ namespace IDKEngine.Bvh
                 return MathF.Cbrt(triBox.LargestExtent() * (triBox.Area() - triangle.Area));
             }
 
+            static float GetCellSize(float alpha)
+            {
+                // Erase all except the exponent bits.
+                // This has the same effect as 2^(floor(log2(alpha)))
+                int floatBits = Unsafe.BitCast<float, int>(alpha);
+                floatBits &= 255 << 23;
+
+                return Unsafe.BitCast<int, float>(floatBits);
+            }
+
             return (bounds, originalTriIds);
         }
 
         /// <summary>
-        /// This is equivalent to <see cref="BLAS.GetUnindexedTriangles(in BLAS.BuildData, in BLAS.Geometry)"/>
-        /// except that it also removes duplicate triangle references in leaf(-pairs) which may happen as a consequence of pre-splitting.
-        /// This means for a leaf-pair their triangle ranges [lStart, lEnd), [rStart, rEnd) can intersect. These are the "straddling triangles"
+        /// When Pre-Splitting was done prior to building the BLAS duplicate triangle references in a leaf(-pair) may happen.
+        /// Here we deduplicate them, possibly resulting in leaf-pair triangle ranges like:
+        /// [lStart, lEnd), [rStart, rEnd), where the "straddling triangles" in range [rStart, lEnd) is shared between the left and right node.
+        /// Otherwise this is equivalent to <see cref="BLAS.GetUnindexedTriangles(in BLAS.BuildData, in BLAS.Geometry)"/>
         /// </summary>
         /// <returns></returns>
-        public static unsafe GpuIndicesTriplet[] GetUnindexedTriangles(in BLAS.BuildResult blas, in BLAS.BuildData buildData, in BLAS.Geometry geometry, ReadOnlySpan<int> originalTriIds)
+        public static unsafe GpuIndicesTriplet[] GetUnindexedTriangles(in BLAS.BuildResult blas, in BLAS.BuildData buildData, in BLAS.Geometry geometry)
         {
-            GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.ReferenceCount];
+            GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.Fragments.Count];
 
             int globalTriCounter = 0;
 
@@ -149,8 +164,8 @@ namespace IDKEngine.Bvh
 
                 if (leftChild.IsLeaf && rightChild.IsLeaf)
                 {
-                    Span<int> leftUniqueTriIds = GetUniqueTriIds(leftChild, originalTriIds, buildData);
-                    Span<int> rightUniqueTriIds = GetUniqueTriIds(rightChild, originalTriIds, buildData);
+                    Span<int> leftUniqueTriIds = GetUniqueTriIds(leftChild, buildData);
+                    Span<int> rightUniqueTriIds = GetUniqueTriIds(rightChild, buildData);
                     Span<int> straddlingTriIds = GetStraddlingTriIds(leftUniqueTriIds, rightUniqueTriIds);
 
                     int onlyLeftTriCount = 0;
@@ -191,7 +206,7 @@ namespace IDKEngine.Bvh
                 {
                     ref GpuBlasNode theLeafNode = ref (leftChild.IsLeaf ? ref leftChild : ref rightChild);
 
-                    Span<int> uniqueTriIds = GetUniqueTriIds(theLeafNode, originalTriIds, buildData);
+                    Span<int> uniqueTriIds = GetUniqueTriIds(theLeafNode, buildData);
                     for (int i = 0; i < uniqueTriIds.Length; i++)
                     {
                         triangles[globalTriCounter + i] = geometry.Triangles[uniqueTriIds[i]];
@@ -212,12 +227,12 @@ namespace IDKEngine.Bvh
                 }
             }
 
-            static Span<int> GetUniqueTriIds(in GpuBlasNode leafNode, ReadOnlySpan<int> originalTriIds, in BLAS.BuildData buildData)
+            static Span<int> GetUniqueTriIds(in GpuBlasNode leafNode, in BLAS.BuildData buildData)
             {
                 Span<int> triIds = new int[leafNode.TriCount];
                 for (int i = 0; i < leafNode.TriCount; i++)
                 {
-                    triIds[i] = originalTriIds[buildData.PermutatedTriangleIds[leafNode.TriStartOrChild + i]];
+                    triIds[i] = buildData.Fragments.OriginalTriIds[buildData.PermutatedFragmentIds[leafNode.TriStartOrChild + i]];
                 }
 
                 MemoryExtensions.Sort(triIds);

@@ -66,7 +66,7 @@ void main()
 
     wavefrontRay.Throughput = vec3(1.0);
     wavefrontRay.Radiance = vec3(0.0);
-    wavefrontRay.PreviousIOROrDebugNodeCounter = 1.0;
+    wavefrontRay.PreviousIOROrTraverseCost = 1.0;
     
     uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
 
@@ -90,12 +90,12 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
     vec3 rayDir = DecodeUnitVec(vec2(wavefrontRay.PackedDirectionX, wavefrontRay.PackedDirectionY));
 
     HitInfo hitInfo;
-    uint debugNodeCounter = 0;
-    bool hitScene = TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, debugNodeCounter, settingsUBO.IsTraceLights, FLOAT_MAX);
+    float debugCost = 0;
+    bool hitScene = TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, debugCost, settingsUBO.IsTraceLights, FLOAT_MAX);
     
     if (settingsUBO.IsDebugBVHTraversal)
     {
-        wavefrontRay.PreviousIOROrDebugNodeCounter = debugNodeCounter;
+        wavefrontRay.PreviousIOROrTraverseCost = debugCost;
         return false;
     }
 
@@ -189,7 +189,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             geometricNormal *= -1.0;   
         }
         wavefrontRay.Origin += geometricNormal * 0.001;
-        wavefrontRay.PreviousIOROrDebugNodeCounter = result.NewIor;
+        wavefrontRay.PreviousIOROrTraverseCost = result.NewIor;
 
         vec2 packedDir = EncodeUnitVec(result.RayDirection);
         wavefrontRay.PackedDirectionX = packedDir.x;

@@ -21,12 +21,12 @@ namespace IDKEngine.Shapes
         public Vector3 Position1;
         public Vector3 Position2;
 
-        public readonly Vector3 this[int index]
+        public readonly ref Vector3 this[int index]
         {
             get
             {
                 Debug.Assert(index >= 0 && index < 3);
-                return Unsafe.Add(ref Unsafe.AsRef(in Position0), index);
+                return ref Unsafe.Add(ref Unsafe.AsRef(in Position0), index);
             }
         }
 
@@ -43,7 +43,6 @@ namespace IDKEngine.Shapes
             Position1 = (new Vector4(Position1, 1.0f) * model).Xyz;
             Position2 = (new Vector4(Position2, 1.0f) * model).Xyz;
         }
-
         public readonly ValueTuple<Box, Box> Split(int axis, float position)
         {
             // Source: https://github.com/madmann91/bvh/blob/2fd0db62022993963a7343669275647cb073e19a/include/bvh/triangle.hpp#L64

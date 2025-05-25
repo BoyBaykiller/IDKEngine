@@ -143,7 +143,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
         wavefrontRay.Radiance += surface.Emissive * wavefrontRay.Throughput;
 
-        SampleMaterialResult result = SampleMaterial(rayDir, surface, wavefrontRay.PreviousIOROrDebugNodeCounter, fromInside);
+        SampleMaterialResult result = SampleMaterial(rayDir, surface, wavefrontRay.PreviousIOROrTraverseCost, fromInside);
         wavefrontRay.Throughput *= result.Bsdf / result.Pdf;
 
         bool terminateRay = RussianRouletteTerminateRay(wavefrontRay.Throughput);
@@ -157,7 +157,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             geometricNormal *= -1.0;   
         }
         wavefrontRay.Origin += geometricNormal * 0.001;
-        wavefrontRay.PreviousIOROrDebugNodeCounter = result.NewIor;
+        wavefrontRay.PreviousIOROrTraverseCost = result.NewIor;
 
         vec2 packedDir = EncodeUnitVec(result.RayDirection);
         wavefrontRay.PackedDirectionX = packedDir.x;

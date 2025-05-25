@@ -28,7 +28,7 @@ void main()
     vec3 irradiance = wavefrontRay.Radiance;
     if (settingsUBO.IsDebugBVHTraversal)
     {
-        float x = wavefrontRay.PreviousIOROrDebugNodeCounter / 150.0;
+        float x = wavefrontRay.PreviousIOROrTraverseCost / 150.0;
         vec3 col = TurboColormap(x);
         irradiance = col;
     }

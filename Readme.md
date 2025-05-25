@@ -3,7 +3,7 @@
 Feature list:
  - Wavefront Path Tracer
  - Real-Time Voxel Global Illumination
- - Two-Level BVH with Pre-Splitting + Reinsertion Optimization and GPU Refitting
+ - Two-Level BVH with Pre-Splitting + Reinsertion Optimization + GPU Refitting
  - [AMD FSR2](https://github.com/JuanDiegoMontoya/FidelityFX-FSR2-OpenGL) and Temporal Anti Aliasing
  - Mesh Shaders + Multi Draw Indirect + Bindless Textures + lots of OpenGL...
  - glTF support including animations and various extensions
