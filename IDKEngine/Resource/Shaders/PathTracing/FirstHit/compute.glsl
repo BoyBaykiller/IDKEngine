@@ -28,7 +28,7 @@ layout(std140, binding = 0) uniform SettingsUBO
     float FocalLength;
     float LenseRadius;
     bool IsDebugBVHTraversal;
-    bool IsTraceLights;
+    bool DoTraceLights;
 } settingsUBO;
 
 bool TraceRay(inout GpuWavefrontRay wavefrontRay);
@@ -91,7 +91,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
 
     HitInfo hitInfo;
     float debugCost = 0;
-    bool hitScene = TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, debugCost, settingsUBO.IsTraceLights, FLOAT_MAX);
+    bool hitScene = TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, debugCost, settingsUBO.DoTraceLights, FLOAT_MAX);
     
     if (settingsUBO.IsDebugBVHTraversal)
     {
@@ -144,7 +144,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             geometricNormal = GetTriangleNormal(p0, p1, p2);
             geometricNormal = normalize(unitVecToWorld * geometricNormal);
         }
-        else if (settingsUBO.IsTraceLights)
+        else if (settingsUBO.DoTraceLights)
         {
             GpuLight light = lightsUBO.Lights[hitInfo.InstanceId];
             surface.Emissive = light.Color;

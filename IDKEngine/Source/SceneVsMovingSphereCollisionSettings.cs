@@ -1,10 +1,9 @@
 ﻿using IDKEngine.Shapes;
 
-namespace IDKEngine
+namespace IDKEngine;
+
+public record struct SceneVsMovingSphereCollisionSettings
 {
-    public record struct SceneVsMovingSphereCollisionSettings
-    {
-        public bool IsEnabled;
-        public Intersections.SceneVsMovingSphereSettings Settings;
-    }
+    public bool IsEnabled;
+    public Intersections.SceneVsMovingSphereSettings Settings;
 }

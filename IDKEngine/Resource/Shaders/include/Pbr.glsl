@@ -1,3 +1,4 @@
+AppInclude(include/Math.glsl)
 AppInclude(include/Surface.glsl)
 AppInclude(include/Constants.glsl)
 

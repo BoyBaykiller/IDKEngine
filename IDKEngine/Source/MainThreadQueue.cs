@@ -1,34 +1,33 @@
 ﻿using System;
 using System.Collections.Concurrent;
 
-namespace IDKEngine
+namespace IDKEngine;
+
+public static class MainThreadQueue
 {
-    public static class MainThreadQueue
+    private static readonly ConcurrentQueue<Action> lazyActionsQueue = new ConcurrentQueue<Action>();
+    private static readonly ConcurrentQueue<Action> hastyActionsQueue = new ConcurrentQueue<Action>();
+
+    public static void AddToHastyQueue(Action action)
     {
-        private static readonly ConcurrentQueue<Action> lazyActionsQueue = new ConcurrentQueue<Action>();
-        private static readonly ConcurrentQueue<Action> hastyActionsQueue = new ConcurrentQueue<Action>();
+        hastyActionsQueue.Enqueue(action);
+    }
 
-        public static void AddToHastyQueue(Action action)
+    public static void AddToLazyQueue(Action action)
+    {
+        lazyActionsQueue.Enqueue(action);
+    }
+
+    public static void Execute()
+    {
+        if (lazyActionsQueue.TryDequeue(out Action action))
         {
-            hastyActionsQueue.Enqueue(action);
+            action();
         }
 
-        public static void AddToLazyQueue(Action action)
+        while (hastyActionsQueue.TryDequeue(out action))
         {
-            lazyActionsQueue.Enqueue(action);
-        }
-
-        public static void Execute()
-        {
-            if (lazyActionsQueue.TryDequeue(out Action action))
-            {
-                action();
-            }
-
-            while (hastyActionsQueue.TryDequeue(out action))
-            {
-                action();
-            }
+            action();
         }
     }
 }

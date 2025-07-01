@@ -45,7 +45,7 @@ void main()
     uint meshletId = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x];
 
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
-    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[InstanceId];
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[instanceId];
     GpuMeshlet meshlet = meshletSSBO.Meshlets[meshletId];
 
     const uint verticesPerInvocationRounded = (MESHLET_MAX_VERTEX_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;

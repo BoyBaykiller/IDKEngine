@@ -17,6 +17,11 @@ uint GetPCGHash(inout uint seed)
     return (word >> 22u) ^ word;
 }
 
+uint GetRandomUInt()
+{
+    return GetPCGHash(Random_RNGSeed);
+}
+
 float GetRandomFloat01()
 {
     return float(GetPCGHash(Random_RNGSeed)) / 4294967296.0;

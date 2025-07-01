@@ -1,5 +1,5 @@
 #version 460 core
-#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_arithmetic : require
 
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(ShadingRateClassification/include/Constants.glsl)
@@ -20,21 +20,11 @@ layout(std140, binding = 0) uniform SettingsUBO
 void GetTileData(vec3 color, vec2 velocity, out float summedSpeed, out float summedLuminance, out float summedLuminanceSquared);
 float GetLuminance(vec3 color);
 
-#if !GL_KHR_shader_subgroup_arithmetic
-    #define MIN_EFFECTIVE_SUBGROUP_SIZE 1 // Effectively 1 if we can't use subgroup arithmetic
-#elif APP_VENDOR_NVIDIA
-    #define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // NVIDIA always has 32
-#elif APP_VENDOR_AMD
-    #define MIN_EFFECTIVE_SUBGROUP_SIZE 32 // AMD can run shaders in both wave32 or wave64 mode
-#else
-    #define MIN_EFFECTIVE_SUBGROUP_SIZE 8 // Intel can go as low as 8 (this is also for anything else) 
-#endif
-
 const uint SAMPLES_PER_TILE = TILE_SIZE * TILE_SIZE;
 
-shared float SharedSummedSpeed[SAMPLES_PER_TILE / MIN_EFFECTIVE_SUBGROUP_SIZE];
-shared float SharedSummedLum[SAMPLES_PER_TILE / MIN_EFFECTIVE_SUBGROUP_SIZE];
-shared float SharedSummedLumSquared[SAMPLES_PER_TILE / MIN_EFFECTIVE_SUBGROUP_SIZE];
+shared float SharedSummedSpeed[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
+shared float SharedSummedLum[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
+shared float SharedSummedLumSquared[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
 
 void main()
 {
@@ -96,14 +86,8 @@ void main()
 
 void GetTileData(vec3 color, vec2 velocity, out float summedSpeed, out float summedLuminance, out float summedLuminanceSquared)
 {
-    #if GL_KHR_shader_subgroup_arithmetic
-    uint effectiveSubgroupSize = gl_SubgroupSize;
-    #else
-    uint effectiveSubgroupSize = 1; // effectively 1 if we can't use subgroup arithmetic
-    #endif
     float luminance = GetLuminance(color);
 
-    #if GL_KHR_shader_subgroup_arithmetic
     float subgroupAddedSpeed = subgroupAdd(length(velocity));
     float subgroupAddedLum = subgroupAdd(luminance);
     float subgroupAddedSquaredLum = subgroupAdd(luminance * luminance);
@@ -114,16 +98,12 @@ void GetTileData(vec3 color, vec2 velocity, out float summedSpeed, out float sum
         SharedSummedLum[gl_SubgroupID] = subgroupAddedLum;
         SharedSummedLumSquared[gl_SubgroupID] = subgroupAddedSquaredLum;
     }
-    #else
-    SharedSummedSpeed[gl_LocalInvocationIndex] = length(velocity);
-    SharedSummedLum[gl_LocalInvocationIndex] = luminance;
-    SharedSummedLumSquared[gl_LocalInvocationIndex] = luminance * luminance;
-    #endif
+
     barrier();
 
     // Use parallel reduction to calculate sum (average) of all velocity and luminance values
     // Final results will have been collapsed into the first array element
-    for (uint cutoff = (SAMPLES_PER_TILE / effectiveSubgroupSize) / 2; cutoff > 0; cutoff /= 2)
+    for (uint cutoff = (SAMPLES_PER_TILE / gl_SubgroupSize) / 2; cutoff > 0; cutoff /= 2)
     {
         if (gl_LocalInvocationIndex < cutoff)
         {

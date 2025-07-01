@@ -1,3 +1,8 @@
+#define PI 3.14159265
+#define FLOAT_MAX 3.4028235e+38
+#define FLOAT_MIN -FLOAT_MAX
+#define FLOAT_NAN (0.0 / 0.0)
+
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 ndc)
 {   
     vec4 rayView;
@@ -76,19 +81,19 @@ vec3 PerspectiveTransformUvDepth(vec3 uvAndDepth, mat4 matrix)
     return PerspectiveTransform(ndc, matrix);
 }
 
-float MapRangeToAnOther(float value, float valueMin, float valueMax, float mapMin, float mapMax)
+float Remap(float value, float valueMin, float valueMax, float mapMin, float mapMax)
 {
     return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
 }
 
-vec3 MapRangeToAnOther(vec3 value, vec3 valueMin, vec3 valueMax, vec3 mapMin, vec3 mapMax)
+vec3 Remap(vec3 value, vec3 valueMin, vec3 valueMax, vec3 mapMin, vec3 mapMax)
 {
     return (value - valueMin) / (valueMax - valueMin) * (mapMax - mapMin) + mapMin;
 }
 
 vec3 MapToZeroOne(vec3 value, vec3 rangeMin, vec3 rangeMax)
 {
-    return MapRangeToAnOther(value, rangeMin, rangeMax, vec3(0.0), vec3(1.0));
+    return Remap(value, rangeMin, rangeMax, vec3(0.0), vec3(1.0));
 }
 
 vec3 GetTriangleNormal(vec3 p0, vec3 p1, vec3 p2)
@@ -147,6 +152,62 @@ uint NextPowerOfTwo(uint num)
     return 2u << findMSB(max(1u, num) - 1u);
 } 
 
+uint LeadingZeroCount(uint x)
+{
+    if (x == 0)
+    {
+        return 32;
+    }
+    return 31 - findMSB(x);
+}
+
+uint DivUp(uint numerator, uint divisor)
+{
+    return (numerator + divisor - 1) / divisor;
+}
+
+int CeilLog2Int(uint x)
+{
+    if (x <= 1)
+    {
+        return 0;
+    }
+
+    return 32 - int(LeadingZeroCount(x - 1));
+}
+
+uint FloatToKey(float value)
+{
+    // Integer comparisons between numbers returned from this function behave
+    // as if the original float values where compared.
+    // Simple reinterpretation works only for [0, ...], but this also handles negatives
+
+    // 1. Always flip the sign bit.
+    // 2. If the sign bit was set, flip the other bits too.
+    // Note: We do right shift on an int, meaning arithmetic shift
+
+    uint f = floatBitsToUint(value);
+    uint mask = (int(f) >> 31 | (1u << 31));
+
+    return f ^ mask;
+}
+
+uvec3 FloatToKey(vec3 vec)
+{
+    return uvec3(FloatToKey(vec.x), FloatToKey(vec.y), FloatToKey(vec.z));
+}
+
+float KeyToFloat(uint key)
+{
+    uint mask = ((key >> 31) - 1) | 0x80000000;
+    return uintBitsToFloat(key ^ mask);
+}
+
+vec3 KeyToFloat(uvec3 keys)
+{
+    return vec3(KeyToFloat(keys.x), KeyToFloat(keys.y), KeyToFloat(keys.z));
+}
+
 /// Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
 
 uint ExpandBits(uint v)
@@ -163,9 +224,9 @@ uint ExpandBits(uint v)
 // given 3D point located within the unit cube [0,1].
 uint GetMorton(vec3 normalizedV)
 {
-    uint x = clamp(uint(normalizedV.x * 1024.0f), 0u, 1023u);
-    uint y = clamp(uint(normalizedV.y * 1024.0f), 0u, 1023u);
-    uint z = clamp(uint(normalizedV.z * 1024.0f), 0u, 1023u);
+    uint x = clamp(uint(normalizedV.x * 1024.0), 0u, 1023u);
+    uint y = clamp(uint(normalizedV.y * 1024.0), 0u, 1023u);
+    uint z = clamp(uint(normalizedV.z * 1024.0), 0u, 1023u);
 
     uint xx = ExpandBits(x);
     uint yy = ExpandBits(y);
@@ -173,9 +234,4 @@ uint GetMorton(vec3 normalizedV)
     uint result = xx * 4 + yy * 2 + zz;
 
     return result;
-}
-
-int CeilLog2Int(int x)
-{
-    return int(ceil(log2(float(x))));
 }

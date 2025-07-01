@@ -13,7 +13,7 @@ layout(std140, binding = 0) uniform SettingsUBO
     float FocalLength;
     float LenseRadius;
     bool IsDebugBVHTraversal;
-    bool IsTraceLights;
+    bool DoTraceLights;
 } settingsUBO;
 
 vec3 TurboColormap(float x);
@@ -37,9 +37,9 @@ void main()
     irradiance = mix(lastFrameIrradiance, irradiance, 1.0 / (float(wavefrontPTSSBO.AccumulatedSamples) + 1.0));
     imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
 
-    // Reset global memory for next frame
     if (gl_GlobalInvocationID.x == 0)
     {
+        // Reset data for next frame
         wavefrontPTSSBO.DispatchCommand.NumGroupsX = 0;
         wavefrontPTSSBO.DispatchCommand.NumGroupsY = 1;
         wavefrontPTSSBO.DispatchCommand.NumGroupsZ = 1;

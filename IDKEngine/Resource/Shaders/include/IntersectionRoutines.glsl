@@ -105,9 +105,9 @@ bool BoxDepthBufferIntersect(Box geometryBoxNdc, sampler2D samplerHiZ)
     vec2 boxUvMax = clamp(geometryBoxNdc.Max.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0));
 
     vec2 scale = textureSize(samplerHiZ, 0);
-    ivec2 pMin = ivec2(floor(boxUvMin * scale));
-    ivec2 pMax = ivec2(ceil(boxUvMax * scale));
-    ivec2 size = pMax - pMin;
+    uvec2 pMin = uvec2(floor(boxUvMin * scale));
+    uvec2 pMax = uvec2(ceil(boxUvMax * scale));
+    uvec2 size = pMax - pMin;
     int level = min(CeilLog2Int(max(size.x, size.y)), textureQueryLevels(samplerHiZ) - 1);
 
     // If possible refine the level by minus one to be less conservative

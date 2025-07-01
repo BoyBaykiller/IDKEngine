@@ -1,7 +1,7 @@
 # IDKEngine
 
 Feature list:
- - Wavefront Path Tracer
+ - Wavefront Path Tracer with Ray Sorting
  - Real-Time Voxel Global Illumination
  - Two-Level BVH with Pre-Splitting + Reinsertion Optimization + GPU Refitting
  - [AMD FSR2](https://github.com/JuanDiegoMontoya/FidelityFX-FSR2-OpenGL) and Temporal Anti Aliasing
@@ -20,7 +20,7 @@ Feature list:
  - Asynchronous texture loading
  - Camera capture and playback with video output
 
-Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
+Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted` + `KHR_shader_subgroup` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
 
 Notes:
  * If [gltfpack](https://github.com/BoyBaykiller/meshoptimizer) is found in PATH or working dir you are given the option to automatically compress glTF files on load

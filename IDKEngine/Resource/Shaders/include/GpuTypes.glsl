@@ -33,6 +33,10 @@ struct PackedUVec3
 {
     uint x, y, z;
 };
+PackedUVec3 Pack(uvec3 uints)
+{
+    return PackedUVec3(uints.x, uints.y, uints.z);
+}
 uvec3 Unpack(PackedUVec3 uints)
 {
     return uvec3(uints.x, uints.y, uints.z);
@@ -96,6 +100,7 @@ struct GpuPointShadow
 
     // We don't store image2D itself but instead uvec2
     // and cast later because of NVIDIA driver bug: https://forums.developer.nvidia.com/t/driver-bug-bindless-image2d-in-std140-buffer/287957
+    // TODO: Apparently this is fixed now, revert the hack once I can confirm
     uvec2 RayTracedShadowMapImage;
     float FarPlane;
     int LightIndex;

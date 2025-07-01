@@ -8,6 +8,8 @@
     <RootNamespace>IDKEngine</RootNamespace>
     <Nullable>disable</Nullable>
 
+    <!--<UseWindowsThreadPool>true</UseWindowsThreadPool>-->
+
     <!-- 
     https://learn.microsoft.com/en-us/dotnet/core/runtime-config/compilation#quick-jit
     QuickJIT has an overhead for code called first time(s). 

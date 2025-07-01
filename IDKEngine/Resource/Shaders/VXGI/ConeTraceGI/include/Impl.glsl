@@ -26,8 +26,8 @@ vec2 GetPixelCoord()
 float GetMaterialVariance(float specularChance, float roughness)
 {
     float diffuseChance = 1.0 - specularChance;
-    float perceivedFinalRoughness = 1.0 - (specularChance * (1.0 - roughness));
-    return mix(perceivedFinalRoughness, 1.0, diffuseChance);
+    float variance = diffuseChance + specularChance * roughness;
+    return variance;
 }
 
 vec3 IndirectLight(Surface surface, sampler3D samplerVoxels, vec3 position, vec3 incomming, ConeTraceGISettings settings)

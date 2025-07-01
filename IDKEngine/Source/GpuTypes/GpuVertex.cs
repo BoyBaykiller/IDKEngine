@@ -1,11 +1,10 @@
 ﻿using OpenTK.Mathematics;
 
-namespace IDKEngine.GpuTypes
+namespace IDKEngine.GpuTypes;
+
+public record struct GpuVertex
 {
-    public record struct GpuVertex
-    {
-        public Vector2 TexCoord;
-        public uint Tangent;
-        public uint Normal;
-    }
+    public Vector2 TexCoord;
+    public uint Tangent;
+    public uint Normal;
 }

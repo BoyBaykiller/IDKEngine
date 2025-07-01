@@ -90,7 +90,7 @@ void main()
             }
             else if (ShadowMode == ENUM_SHADOW_MODE_RAY_TRACED)
             {
-                // TODO: Implement
+                // TODO: Implement ray traced shadows
             }
 
             contribution *= (1.0 - shadow);
