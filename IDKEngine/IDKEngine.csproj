@@ -27,6 +27,7 @@
     <IlcInstructionSet>avx2</IlcInstructionSet>
 
     <!--Settings to decrease size-->
+    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
     <!--<StackTraceSupport>false</StackTraceSupport>-->
     <!--<InvariantGlobalization>true</InvariantGlobalization>-->
     <!--<UseSystemResourceKeys>true</UseSystemResourceKeys>-->
@@ -65,11 +66,11 @@
     <PackageReference Include="Ktx2.NET" Version="1.0.3" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.6" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
-    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.13" />
-    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.13" />
+    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.14" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.14" />
     <PackageReference Include="ReFuel.StbImage" Version="2.1.0" />
-    <PackageReference Include="SharpGLTF.Core" Version="1.0.3" />
-    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.3" />
+    <PackageReference Include="SharpGLTF.Core" Version="1.0.4" />
+    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.4" />
   </ItemGroup>
 
 

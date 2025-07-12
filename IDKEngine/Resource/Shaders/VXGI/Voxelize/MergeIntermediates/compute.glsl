@@ -15,12 +15,11 @@ void main()
 {
     ivec3 imgCoord = ivec3(gl_GlobalInvocationID);
 
-    float a = imageLoad(ImgResult, imgCoord).a;
-    if (a > 0.0)
+    float r = texelFetch(SamplerVoxelsR, imgCoord, 0).r;
+    if (r > 0.0)
     {
-        float r = texelFetch(SamplerVoxelsR, imgCoord, 0).r;
         float g = texelFetch(SamplerVoxelsG, imgCoord, 0).r;
         float b = texelFetch(SamplerVoxelsB, imgCoord, 0).r;
-        imageStore(ImgResult, imgCoord, vec4(r, g, b, a));
+        imageStore(ImgResult, imgCoord, vec4(r, g, b, 1.0));
     }
 }

@@ -2,7 +2,7 @@
 
 AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
-AppInclude(CountingSort/BlellochScan/include/Constants.glsl)
+AppInclude(PathTracing/CountingSort/BlellochScan/include/Constants.glsl)
 
 layout(local_size_x = DOWN_UP_SWEEP_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 

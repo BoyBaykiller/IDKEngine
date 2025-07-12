@@ -65,19 +65,16 @@ void main()
     directLighting += surface.Albedo * ambient;
     directLighting += surface.Emissive;
 
-    // Using premultiplied Alpha gives better results.
-    // Write 1.0 into a-channel meaning "voxel was written" - used for optimizations
-
 #if TAKE_ATOMIC_FP16_PATH
 
     imageAtomicMax(ImgResult, voxelPos, f16vec4(directLighting * surface.Alpha, 1.0));
 
 #else
 
-    imageAtomicMax(ImgResultR, voxelPos, floatBitsToUint(directLighting.r * surface.Alpha));
+    const uint voxelWrittenBreadcrumb = 1u;
+    imageAtomicMax(ImgResultR, voxelPos, max(floatBitsToUint(directLighting.r * surface.Alpha), voxelWrittenBreadcrumb));
     imageAtomicMax(ImgResultG, voxelPos, floatBitsToUint(directLighting.g * surface.Alpha));
     imageAtomicMax(ImgResultB, voxelPos, floatBitsToUint(directLighting.b * surface.Alpha));
-    imageStore(ImgResult, voxelPos, vec4(0.0, 0.0, 0.0, 1.0));
 
 #endif
 

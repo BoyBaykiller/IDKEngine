@@ -142,14 +142,14 @@ unsafe class ImGuiBackend : IDisposable
             int requiredVertexSize = cmdList.VtxBuffer.Size * sizeof(ImDrawVert);
             if (requiredVertexSize > vertexBufferSize)
             {
-                GL.NamedBufferData(glVertexBuffer, requiredVertexSize, null, VertexBufferObjectUsage.StaticDraw);
+                GL.NamedBufferData(glVertexBuffer, requiredVertexSize, null, BufferUsage.StaticDraw);
                 vertexBufferSize = requiredVertexSize;
             }
 
             int requiredIndexSize = cmdList.IdxBuffer.Size * sizeof(ushort);
             if (requiredIndexSize > indexBufferSize)
             {
-                GL.NamedBufferData(glIndexBuffer, requiredIndexSize, null, VertexBufferObjectUsage.StaticDraw);
+                GL.NamedBufferData(glIndexBuffer, requiredIndexSize, null, BufferUsage.StaticDraw);
                 indexBufferSize = requiredIndexSize;
             }
         }

@@ -40,7 +40,7 @@ public static partial class BBG
             /// Writes by the DEVICE only become visible to the HOST after a call to glMemoryBarrier(CLIENT_MAPPED_BUFFER_BARRIER_BIT) followed by a wait for glFenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)
             /// Note: AMD driver places this in HOST memory!
             /// </summary>
-            MappedIncoherent = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapReadBit | BufferStorageMask.MapWriteBit /* MapFlushExplicitBit, MapUnsynchronizedBit*/,
+            MappedIncoherent = BufferStorageMask.MapPersistentBit | BufferStorageMask.MapReadBit | BufferStorageMask.MapWriteBit /* MapFlushExplicitBit*/,
 
             /// <summary>
             /// The buffer must be written or read to by using the mapped memory pointer or read by using the Download functions.
@@ -132,11 +132,11 @@ public static partial class BBG
                     stagingBuffer.CopyTo(this, 0, 0, stagingBuffer.Size);
                 }
 
-                if (memAccess == MemAccess.MappedCoherent)
+                if (memAccess == MemAccess.MappedCoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
                 {
                     Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
                 }
-                else if (memAccess == MemAccess.MappedIncoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
+                else if (memAccess == MemAccess.MappedIncoherent)
                 {
                     Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
                 }

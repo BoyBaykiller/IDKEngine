@@ -2,7 +2,7 @@
 
 #define TAKE_MESH_SHADER_PATH_SHADOW AppInsert(TAKE_MESH_SHADER_PATH_SHADOW)
 #if TAKE_MESH_SHADER_PATH_SHADOW
-    #extension GL_NV_gpu_shader5 : enable
+    #extension GL_NV_gpu_shader5 : require
     #define DECLARE_MESHLET_STORAGE_BUFFERS
     #define DECLARE_MESHLET_RENDERING_TYPES
 #endif

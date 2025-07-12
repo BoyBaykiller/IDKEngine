@@ -1,7 +1,6 @@
 ﻿using System;
 using OpenTK.Mathematics;
 using IDKEngine.Bvh;
-using System.Runtime.CompilerServices;
 
 namespace IDKEngine.Shapes;
 
@@ -145,7 +144,6 @@ public static class Intersections
         return distSq < sphere.RadiusSquared;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool BoxVsBox(in Box a, in Box b)
     {
         return a.Min.X < b.Max.X &&
@@ -355,6 +353,7 @@ public static class Intersections
 
         return t1 <= t2 && t2 > 0.0f;
     }
+
     public static bool RayVsBox(in Ray ray, in Box box, out float t1, out float t2)
     {
         // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
@@ -373,6 +372,7 @@ public static class Intersections
 
         return t1 <= t2;
     }
+
     public static bool RayVsTriangle(in Ray ray, in Triangle triangle, out Vector3 bary, out float t)
     {
         // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm

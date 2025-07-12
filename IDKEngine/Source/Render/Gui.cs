@@ -1322,19 +1322,18 @@ partial class Gui : IDisposable
     private static void Test(Application app)
     {
         System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
-        OtkVec2 res = app.RenderResolution;
+        Vector2i res = app.RenderResolution;
+
         BVH.DebugStatistics = new BVH.Statistics();
-        for (int y = 0; y < res.Y; y++)
+        Parallel.For(0, res.Y, y =>
         {
-            int localY = y;
-            Parallel.For(0, app.RenderResolution.X, x =>
-            //for (int x = 0; x < res.X; x++)
+            for (int x = 0; x < res.X; x++)
             {
-                OtkVec2 ndc = new OtkVec2(x, localY) / res * 2.0f - new OtkVec2(1.0f);
+                OtkVec2 ndc = new OtkVec2(x, y) / res * 2.0f - 1.0f;
                 Ray worldSpaceRay = Ray.GetWorldSpaceRay(app.PerFrameData.CameraPos, app.PerFrameData.InvProjection, app.PerFrameData.InvView, ndc);
                 app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
-            });
-        }
+            }
+        });
         BVH.DebugStatistics.TriIntersections /= (ulong)(res.X * res.Y);
         BVH.DebugStatistics.BoxIntersections /= (ulong)(res.X * res.Y);
         Console.WriteLine(BVH.DebugStatistics);

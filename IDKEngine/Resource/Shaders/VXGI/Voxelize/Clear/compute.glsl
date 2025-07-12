@@ -11,9 +11,9 @@ layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 layout(binding = 0) restrict uniform image3D ImgResult;
 
 #if !TAKE_ATOMIC_FP16_PATH
-layout(binding = 1) restrict writeonly uniform uimage3D ImgResultR;
-layout(binding = 2) restrict writeonly uniform uimage3D ImgResultG;
-layout(binding = 3) restrict writeonly uniform uimage3D ImgResultB;
+layout(binding = 1) restrict uniform uimage3D ImgResultR;
+layout(binding = 2) restrict uniform uimage3D ImgResultG;
+layout(binding = 3) restrict uniform uimage3D ImgResultB;
 #endif
 
 void main()
@@ -26,7 +26,7 @@ void main()
 
 #else
 
-    bool isNotEmpty = imageLoad(ImgResult, imgCoord).a > 0.0;
+    bool isNotEmpty = imageLoad(ImgResultR, imgCoord).r > 0;
     if (isNotEmpty)
     {
         imageStore(ImgResultR, imgCoord, uvec4(0));

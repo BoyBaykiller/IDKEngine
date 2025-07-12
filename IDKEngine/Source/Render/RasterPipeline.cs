@@ -285,7 +285,7 @@ class RasterPipeline : IDisposable
                 AntiAliasingMode_ == AntiAliasingMode.FSR2)
             {
                 Vector2 jitter = MyMath.GetHalton2D(frameIndex++ % gpuTaaData.SampleCount, 2, 3);
-                jitter = jitter * 2.0f - new Vector2(1.0f);
+                jitter = jitter * 2.0f - 1.0f;
 
                 gpuTaaData.Jitter = jitter / RenderResolution;
             }

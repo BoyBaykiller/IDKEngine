@@ -136,21 +136,19 @@ Fragment Shader Interlock is not in OpenGL Core and generally slower (certainly 
 So I decided to go with Atomic Operations, `imageAtomicMax` in particular.
 
 ```glsl
-layout(binding = 0, rgba16f) restrict uniform image3D ImgVoxels;
-layout(binding = 1, r32ui) restrict uniform uimage3D ImgVoxelsR;
-layout(binding = 2, r32ui) restrict uniform uimage3D ImgVoxelsG;
-layout(binding = 3, r32ui) restrict uniform uimage3D ImgVoxelsB;
+layout(binding = 0, r32ui) restrict uniform uimage3D ImgVoxelsR;
+layout(binding = 1, r32ui) restrict uniform uimage3D ImgVoxelsG;
+layout(binding = 2, r32ui) restrict uniform uimage3D ImgVoxelsB;
 
 void main() {
     uvec3 uintVoxelColor = floatBitsToUint(voxelColor);
     imageAtomicMax(ImgVoxelsR, voxelPos, uintVoxelColor.r);
     imageAtomicMax(ImgVoxelsG, voxelPos, uintVoxelColor.g);
     imageAtomicMax(ImgVoxelsB, voxelPos, uintVoxelColor.b);
-    imageStore(ImgVoxels, voxelPos, vec4(0.0, 0.0, 0.0, 1.0));
 }
 ```
 
-Image atomics can only be performed on single channel integer formats, but the voxel texture is required to be at least `rgba16f`. So I create three additional `r32ui`-format intermediate textures to perform the atomic operations on. Alpha is just always set to 1.0, no atomic operations needed. After voxelization, in a simple compute shader, they get merged into the final `rgba16f` texture.
+Image atomics can only be performed on single channel integer formats, but the voxel texture is required to be at least `rgba16f`. So I create three additional `r32ui`-format intermediate textures to perform the atomic operations on. If you have Alpha it's best to premultiply it here. After voxelization, in a simple compute shader, they get merged into the final `rgba16f` texture.
 
 ### 2.2 Fixing missing voxels
 
@@ -234,7 +232,7 @@ void main() {
 }
 ```
 
-This is like a standard voxelization geometry shader. It finds the axis from which the triangle should be rendered to maximize projected area and then applies the swizzle accordingly. Except that the swizzle is applied indirectly using `GL_NV_viewport_swizzle` and the geometry shader is written using `GL_NV_geometry_shader_passthrough`. How to associate a particular swizzle with a viewport is an exercise left to the reader :).
+This is like a standard voxelization geometry shader. It finds the axis from which the triangle should be rendered to maximize projected area and then applies the swizzle accordingly. Except that the swizzle is applied indirectly using `GL_NV_viewport_swizzle` and the geometry shader is written using `GL_NV_geometry_shader_passthrough`. How to associate a particular swizzle with a viewport is an exercise left to the reader :)
 
 ---
 
@@ -256,31 +254,37 @@ With this method you can have your textures gradually load in at run-time withou
 
 ![Asynchronus Textures Loading](Screenshots/Articles/TextureLoad.gif)
 
-For every image the technique does:
+The technique builds on two key points:
+1. You can upload to a Buffer Object from any thread
+2. You can transfer the memory from a Buffer Object into a Texture (only main thread)
 
-0. Calculate decoded size from dimensions and number of channels (main thread)
-1. Allocate "staging buffer" to store pixels (main thread)
-2. Decode image and copy the pixels into staging buffer (worker thread)
-3. Transfer pixels from staging buffer into texture (main thread)
+Normally when uploading to a texture we call `glTextureSubImage2D` with a pointer to the pixels on the main thread. However with this technique we first upload the image to a buffer on a worker thread. On the main thread we then only need to transfer the buffer into the texture.
 
-You might wonder what Buffer Objects have to do with any of this. They are used because we can upload data to them from any thread by using (persistently) mapped memory. The transfer from buffer into texture happens on the main thread but because the data is already on the GPU it should be pretty fast.
-Here's an example:
+Here is non parallel pseudocode:
 ```cs
 // 1. Allocate buffer to store pixels
+var imageSize = imageWidth * imageHeight * pixelSize;
 var flags = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapWriteBit;
 GL.CreateBuffers(1, out int stagingBuffer);
-GL.NamedBufferStorage(stagingBuffer, imageSize, null, flags);
-
-// 2. Upload pixels into buffer
+GL.NamedBufferStorage(stagingBuffer, imageSize, null, BufferStorageMask.ClientStorageBit | flags);
 void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
+
+// 2. Decode and upload pixels into buffer
+void* decodedImage = ImageLoader.Load(...);
 NativeMemory.Copy(decodedImage, bufferMemory, imageSize);
 
 // 3. Transfer pixels from buffer into texture
 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, stagingBuffer);
-GL.TextureSubImage2D(___, null);
+GL.TextureSubImage2D(..., null);
 GL.DeleteBuffer(stagingBuffer);
 ```
-Decoding the image and copying the pixels into the buffer will be done on a different thread. Notice how the pixels argument in `TextureSubImage2D` is null. That is because a Pixel Unpack Buffer is bound which is used as the data source. So the argument actually gets interpreted as an offset. By the way, don't worry about the CPU->Buffer->Texture method of uploading adding overhead compared to CPU->Texture. It's what the driver does anyway and it's the default method in Vulkan/DX12.
+Step 1: We create the "staging buffer" with size of the decoded image. The `stbi_info` family of functions (if you're using [stb_image](https://github.com/nothings/stb/blob/master/stb_image.h)) give you the necessary header data to compute the size without actually decoding. The important part is that the buffer gets mapped so we can later write to it from a different thread using the `bufferMemory` pointer.
+Also note the `BufferStorageMask.ClientStorageBit` flag. This makes the buffer reside in RAM instead of VRAM.
+We could also have the buffer be in VRAM (if ReBAR is available) and while that will make step 3 faster it also makes step 2 significantly slower.
+
+Step 2: The image gets decoded and uploaded into the staging buffer. This step will be done on worker threads asynchronously while the main thread is doing it's thing.
+
+Step 3: Finally the staging buffer (in RAM) gets transferred into the texture (in VRAM). Since a pixel unpack buffer is bound the `pixel` parameter in `glTextureSubImage2D` is interpreted as an offset into the buffer which is why it's null here. Just for understanding: You can also pass `bufferMemory` as an argument and dont bind a pixel unpack buffer although that would make the whole thing pointless.
 
 We need a way to signal to the main thread that it should start step 3 after a worker thread completed step 2.
 This can be implemented with a Queue.
@@ -294,7 +298,7 @@ public static class MainThreadQueue
         lazyQueue.Enqueue(action);
     }
 
-    // Intended to be called periodically from the main thread
+    // Should be called every frame from the main thread only
     public static void Execute()
     {
         if (lazyQueue.TryDequeue(out Action action))
@@ -305,35 +309,32 @@ public static class MainThreadQueue
 }
 ```
 C# has `ConcurrentQueue`, which is also thread-safe, so perfect for this use case.
-`Execute()` is called every frame on the main thread. When a worker thread wants something done on the main thread it enqueues the Action and shortly afterwards it will be dequeued and executed. I decided to dequeue only a single Action at a time as I prefer the work to be distributed across multiple frames.
+`Execute()` is called every frame on the main thread. When a worker thread wants something done on the main thread it enqueues the Action and shortly afterwards it will be dequeued and executed. I decided to dequeue only a single Action at a time to have work better distributed across multiple frames.
 
-With that done, the final texture loading algorithm is just a couple lines:
+With that done, the final asynchronous texture loading algorithm is just a couple lines:
 ```cs
-int imageSize = imageWidth * imageHeight * imageChannels;
+int imageSize = imageWidth * imageHeight * pixelSize;
 
 var flags = BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapWriteBit;
 GL.CreateBuffers(1, out int stagingBuffer);
-GL.NamedBufferStorage(stagingBuffer, imageSize, null, flags);
+GL.NamedBufferStorage(stagingBuffer, imageSize, null, BufferStorageMask.ClientStorageBit | flags);
 void* bufferMemory = GL.MapNamedBufferRange(stagingBuffer, 0, imageSize, flags);
 
 Task.Run(() =>
 {
-    byte* imageData = LoadImage(...);
-    NativeMemory.Copy(imageData, bufferMemory, imageSize);
+    void* decodedImage = ImageLoader.Load(...);
+    NativeMemory.Copy(decodedImage, bufferMemory, imageSize);
 
     MainThreadQueue.AddToLazyQueue(() =>
     {
         GL.BindBuffer(BufferTarget.PixelUnpackBuffer, stagingBuffer);
-        texture.Upload2D(imageWidth, imageHeight, PixelFormat, PixelType, null);
+        GL.TextureSubImage2D(..., null);
         GL.DeleteBuffer(stagingBuffer);
     });
 });
 ```
-The algorithm requires knowing the image extends and channels before it is decoded in order to compute the number of bytes to allocate for the buffer. If you are using stbi, the `stbi_info` family of functions can give you that information.
-The code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that loading only really starts as soon as the render loop is entered and `MainThreadQueue.Execute()` gets called.
-Creating a thread for every image might introduce lag so I am calling `Task.Run()` which uses a thread pool.
-
-Finally, a nice way to demonstrate that things are working is to have a random thread sleep inside the worker threads, causing textures to slowly load in at different times.
+This code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that loading only really starts as soon as the render loop is entered where `MainThreadQueue.Execute()` is called every frame.
+Creating a thread for every image can introduce lag so I use thread pool based `Task.Run()` with `ThreadPool.Set{Min/Max}Threads`.
 
 ## Variable Rate Shading
 
@@ -359,7 +360,7 @@ The ultimate goal of the algorithm should be to apply a as low as possible shadi
 
 This makes sense as you can generally see less detail in fast moving things. And if the luminance is roughly the same across a tile (which is what the variance tells you) there is not much detail to begin with.
 
-In both cases we need the average of some value over all 256 pixels.
+In both cases we need the average of some value over all 16x16 pixels.
 
 Average is defined as:
 
@@ -372,23 +373,24 @@ For starters you could call `atomicAdd(SharedMem, value * (1.0 / n))` on shared 
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
-const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
-shared float Average[TILE_SIZE * TILE_SIZE];
+const uint SAMPLES_PER_TILE = TILE_SIZE * TILE_SIZE;
+
+shared float SharedSum[SAMPLES_PER_TILE];
 
 void main() {
-    Average[gl_LocalInvocationIndex] = GetSpeed() * AVG_MULTIPLIER;
+    SharedSum[gl_LocalInvocationIndex] = GetSpeed();
 
-    for (int cutoff = (TILE_SIZE * TILE_SIZE) / 2; cutoff > 0; cutoff /= 2) {
+    for (int cutoff = SAMPLES_PER_TILE / 2; cutoff > 0; cutoff /= 2) {
         if (gl_LocalInvocationIndex < cutoff) {
-            Average[gl_LocalInvocationIndex] += Average[cutoff + gl_LocalInvocationIndex];
+            SharedSum[gl_LocalInvocationIndex] += SharedSum[cutoff + gl_LocalInvocationIndex];
         }
         barrier();
     }
-    // average is computed and stored in Average[0]
+    float average = SharedSum[0] / SAMPLES_PER_TILE;
 }
 ```
 This algorithm first loads all the values we want to average into shared memory.
-Then it adds the first half of array entries to the other half, storing results in the first half. After that, all the new values are again divided and added together. The output is now 1/4 the size of the original array. At some point, the final sum is collapsed into the first element.
+Then it adds the first half of array entries to the other half, storing results in the first half. After that, all the new values are again split and added together. The output is now 1/4 the size of the original array. After `log2(16x16)` steps the final sum is collapsed into the first element.
 
 That's it for the averaging part.
 
@@ -410,72 +412,82 @@ $$StdDev(x) = \sqrt{V(x)}$$
 $$CV = \frac{StdDev(x)}{\overline{x}}$$
 
 
-Here is an implementation. I put the parallel adding stuff from above in the function `ParallelSum`.
+Directly translating this math into a program would require two passes. One to get the average and a second to get variance, however [there is a simpler way](https://blog.demofox.org/2020/03/10/how-do-i-calculate-variance-in-1-pass/):
+
+$$V(x) = \overline{x^{2}} - \overline{x}^{2}$$
+
+Variance equals average of luminance-squared minus luminance average squared. Here is an implementation. I put the parallel adding stuff from above in the function `ParallelSum`.
 ```glsl
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
-const float AVG_MULTIPLIER = 1.0 / (TILE_SIZE * TILE_SIZE);
+const uint SAMPLES_PER_TILE = TILE_SIZE * TILE_SIZE;
 
 void main() {
     float pixelLuminance = GetLuminance();
 
-    float tileAvgLuminance = ParallelSum(pixelLuminance * AVG_MULTIPLIER);
-    float tileLuminanceVariance = ParallelSum(pow(pixelLuminance - tileAvgLuminance, 2.0) * AVG_MULTIPLIER);
+    float luminanceSum = ParallelSum(pixelLuminance);
+    float luminanceSquaredSum = ParallelSum(pixelLuminance * pixelLuminance);
 
     if (gl_LocalInvocationIndex == 0) {
-        float stdDev = sqrt(tileLuminanceVariance);
-        float coeffOfVariation = stdDev / tileAvgLuminance;
+        float luminanceAvg = luminanceSum / SAMPLES_PER_TILE;
+        float luminanceSquaredAvg = luminanceSquaredSum / SAMPLES_PER_TILE;
+
+        float variance = luminanceSquaredAvg - luminanceAvg * luminanceAvg;
+        float stdDev = sqrt(variance);
+        float coeffOfVariation = stdDev / luminanceAvg;
 
         // use coeffOfVariation as a measure of "how different are the luminance values to each other"
     }
 }
 ```
 
-At this point, you can use both the average speed and the Coefficient of variation of the luminance to get an appropriate shading rate. That is not the most interesting part.
+At this point, you can use both the average speed and the coefficient of variation of the luminance to get an appropriate shading rate. That is not the most interesting part.
 I decided to scale both of these factors, add them together and then use that to mix between different rates.
 
 ### 3.0 Subgroup optimizations
 
 While operating on shared memory is fast, Subgroup Intrinsics are faster.
-They are a relatively new topic on its own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are many subgroup operations. The whole thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt), but vendor specific/arb extensions with `ARB_shader_group_vote` actually being part of core also exist.
+They are a relatively new topic on it's own and you almost never see them mentioned in the context of OpenGL. The subgroup is an implementation dependent set of invocations in which data can be shared efficiently. There are many subgroup operations. The whole thing is document [here](https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt), but vendor specific/arb extensions with `ARB_shader_group_vote` actually being part of core also exist.
 Anyway, the one that is particularly interesting for our case of computing a sum is `KHR_shader_subgroup_arithmetic`, or more specifically the `subgroupAdd` function.
 
 On my GPU a subgroup is 32 invocations big.
 When I call `subgroupAdd(2)` the function will return 64.
 So it does a sum over all values passed to the function in the scope of all (active) subgroup invocations.
 
-Using this knowledge, my optimized version of a workgroup wide sum looks like this:
+Using this knowledge, an optimized version of a workgroup wide sum could look like this:
 ```glsl
-#define SUBGROUP_SIZE __subroupSize__
 #extension GL_KHR_shader_subgroup_arithmetic : require
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 shared float SharedSums[gl_WorkGroupSize.x / SUBGROUP_SIZE];
+
 void main() {
     float subgroupSum = subgroupAdd(GetValueToAdd());
 
-    // single invocation of the subgroup should write result
+    // Single invocation of each subgroup writes it's result
     // into shared mem for further workgroup wide processing
     if (subgroupElect()) {
         SharedSums[gl_SubgroupID] = subgroupSum;
     }
     barrier();
 
-    // finally add up all sums previously computed by the subgroups in this workgroup
-    for (int cutoff = gl_NumSubgroups / 2; cutoff > 0; cutoff /= 2) {
-        if (gl_LocalInvocationIndex < cutoff) {
-            SharedSums[gl_LocalInvocationIndex] += SharedSums[cutoff + gl_LocalInvocationIndex];
+    // Let one invocation compute final workgroup wide result
+    if (gl_LocalInvocationIndex == 0)
+    {
+        for (int i = 1; i < gl_NumSubgroups; i++)
+        {
+            SharedSums[0] += SharedSums[i];
         }
-        barrier();
     }
+    barrier();
 
-    // average is computed and stored in SharedSums[0]
+    // final sum is stored in SharedSums[0]
 }
 ```
 Note how the workgroup expands the size of a subgroup, so we still have to use shared memory to obtain a workgroup wide result.
-However in the for loop it now only has to iterate through `log2(gl_NumSubgroups / 2)` values instead of `log2(gl_WorkGroupSize.x / 2)`.
+However there are only `gl_WorkGroupSize.x / gl_SubgroupSize = 256 / 32 = 8` remaining elements. These can simply be handled by a single invocation. This is a common pattern, an implementation of a reduction, which occurs in parallel GPU algorithms. 
 
 ## Point Shadows
 

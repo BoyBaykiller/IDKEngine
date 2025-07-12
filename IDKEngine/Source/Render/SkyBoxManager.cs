@@ -182,7 +182,7 @@ static class SkyBoxManager
             externalCubemapTexture.Upload3D(
                 size, size, 1,
                 BBG.Texture.NumChannelsToPixelFormat(imageResult.Header.Channels),
-                BBG.Texture.PixelType.Ubyte,
+                BBG.Texture.PixelType.UByte,
                 imageResult.Memory,
                 0, 0, 0, i
             );

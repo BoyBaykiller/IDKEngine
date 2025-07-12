@@ -241,10 +241,9 @@ class Voxelizer : IDisposable
 
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
         });
-
     }
 
-    public unsafe void SetSize(int width, int height, int depth)
+    public void SetSize(int width, int height, int depth)
     {
         if (ResultVoxels != null) ResultVoxels.Dispose();
         ResultVoxels = new BBG.Texture(BBG.Texture.Type.Texture3D);

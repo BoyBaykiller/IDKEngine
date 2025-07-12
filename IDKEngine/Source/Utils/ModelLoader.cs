@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -523,7 +522,7 @@ public static unsafe class ModelLoader
 
         // If regular Image is used
         public ImageLoader.ImageHeader ImageHeader;
-        public ImageLoader.ColorComponents ImageLoadChannels; // e.g for "Transmissive" we can only load R instead of RGB
+        public ImageLoader.ColorComponents ImageLoadChannels; // e.g for "Transmissive" we can load only R instead of RGB
         public ReadOnlyMemory<byte> EncodedImageData;
     }
 
@@ -695,7 +694,7 @@ public static unsafe class ModelLoader
                 continue;
             }
 
-            Matrix4[] nodeTransformations = GetNodeTransformations(gltfNode);
+            Matrix4[] nodeTransformations = GetNodeTransformations(myNode, gltfNode.UseGpuInstancing());
 
             Range meshInstanceIdsRange = new Range();
             meshInstanceIdsRange.Start = listMeshInstances.Count;
@@ -855,7 +854,7 @@ public static unsafe class ModelLoader
             }
 
             CpuMaterial cpuMaterial = new CpuMaterial();
-            cpuMaterial.Name = materialDesc.Name;
+            cpuMaterial.Name = materialDesc.Name ?? $"Material_{i}";
 
             for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
             {
@@ -873,7 +872,7 @@ public static unsafe class ModelLoader
                 }
                 else if (!uniqueBindlessTextures.TryGetValue(sampledImage, out bindlessTexture))
                 {
-                    if (StartAsyncLoadGLTexture(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out bindlessTexture))
+                    if (LoadGLTextureAsync(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out bindlessTexture))
                     {
                         uniqueBindlessTextures[sampledImage] = bindlessTexture;
                     }
@@ -904,7 +903,7 @@ public static unsafe class ModelLoader
         return (cpuMaterials, gpuMaterials);
     }
 
-    private static bool StartAsyncLoadGLTexture(SampledImage sampledImage, TextureType textureType, bool useExtBc5NormalMetallicRoughness, out BindlessSampledTexture bindlessTexture)
+    private static bool LoadGLTextureAsync(SampledImage sampledImage, TextureType textureType, bool useExtBc5NormalMetallicRoughness, out BindlessSampledTexture bindlessTexture)
     {
         bindlessTexture = new BindlessSampledTexture();
         if (!TryGetGLTextureLoadData(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out GLTextureLoadData textureLoadData))
@@ -936,23 +935,25 @@ public static unsafe class ModelLoader
 
         MainThreadQueue.AddToLazyQueue(() =>
         {
-            /* For compressed textures:
-             * 1. Transcode the KTX texture into GPU compressed format in parallel 
-             * 2. Create staging buffer on main thread
-             * 3. Copy compressed pixels to staging buffer in parallel
-             * 4. Copy from staging buffer to texture on main thread
-             */
-
             /* For uncompressed textures:
              * 1. Create staging buffer on main thread
              * 2. Decode image and copy the pixels into staging buffer in parallel
              * 3. Copy from staging buffer to texture on main thread
              */
 
+            /* For compressed textures:
+             * 1. Transcode the KTX texture into GPU compressed format in parallel 
+             * 2. Directly upload pixels to texture on main thread
+             */
+
+
             // TODO: If the main thread is in Sleep State (for example when waiting on Parallel.For() to finish)
             //       it may end up participating as a worker in the ThreadPool.
             //       We want the main thread to only run the render loop only and not some random
             //       ThreadPool work (like loading texturs in this case), because it causes frame stutters. Fix!
+
+            //ThreadPool.SetMinThreads(Environment.ProcessorCount / 2, 1);
+            //ThreadPool.SetMaxThreads(Environment.ProcessorCount / 2, 1);
 
             if (textureLoadData.IsKtx2Compressed)
             {
@@ -971,12 +972,7 @@ public static unsafe class ModelLoader
 
                     MainThreadQueue.AddToLazyQueue(() =>
                     {
-                        int compressedImageSize = textureLoadData.Ktx2Texture.DataSize; // Compressed size after transcoding
-
-                        BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                        stagingBuffer.Allocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, compressedImageSize);
-
-                        Memory.Copy(textureLoadData.Ktx2Texture.Data, stagingBuffer.Memory, compressedImageSize);
+                        //int compressedImageSize = textureLoadData.Ktx2Texture.DataSize; // Compressed size after transcoding
 
                         // We don't own the texture so make sure it didn't get deleted
                         if (!texture.IsDeleted())
@@ -985,12 +981,11 @@ public static unsafe class ModelLoader
                             {
                                 Vector3i size = GLTexture.GetMipmapLevelSize(textureLoadData.Ktx2Texture.BaseWidth, textureLoadData.Ktx2Texture.BaseHeight, textureLoadData.Ktx2Texture.BaseDepth, level);
                                 textureLoadData.Ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
-                                texture.UploadCompressed2D(stagingBuffer, size.X, size.Y, dataOffset, level);
+                                texture.UploadCompressed2D(size.X, size.Y, textureLoadData.Ktx2Texture.Data + dataOffset, level);
                             }
 
                             TextureLoaded?.Invoke();
                         }
-                        stagingBuffer.Dispose();
                         textureLoadData.Ktx2Texture.Dispose();
                     });
                 });
@@ -998,20 +993,21 @@ public static unsafe class ModelLoader
             else
             {
                 BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                stagingBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.MappedIncoherent, textureLoadData.ImageHeader.SizeInBytes);
+                stagingBuffer.AllocateElements(BBG.Buffer.MemLocation.HostLocal, BBG.Buffer.MemAccess.MappedIncoherent, textureLoadData.ImageHeader.SizeInBytes);
 
                 Task.Run(() =>
                 {
-                    ReadOnlySpan<byte> imageData = textureLoadData.EncodedImageData.Span;
-                    using ImageLoader.ImageResult imageResult = ImageLoader.Load(imageData, textureLoadData.ImageHeader.ColorComponents);
-                    if (!imageResult.IsLoadedSuccesfully)
                     {
-                        Logger.Log(Logger.LogLevel.Error, $"Image could not be loaded");
-                        MainThreadQueue.AddToLazyQueue(stagingBuffer.Dispose);
-                        return;
-                    }
+                        using ImageLoader.ImageResult imageResult = ImageLoader.Load(textureLoadData.EncodedImageData.Span, textureLoadData.ImageHeader.ColorComponents);
+                        if (!imageResult.IsLoadedSuccesfully)
+                        {
+                            Logger.Log(Logger.LogLevel.Error, $"Image could not be loaded");
+                            MainThreadQueue.AddToLazyQueue(stagingBuffer.Dispose);
+                            return;
+                        }
 
-                    Memory.Copy(imageResult.Memory, stagingBuffer.Memory, textureLoadData.ImageHeader.SizeInBytes);
+                        Memory.Copy(imageResult.Memory, stagingBuffer.Memory, textureLoadData.ImageHeader.SizeInBytes);
+                    }
 
                     MainThreadQueue.AddToLazyQueue(() =>
                     {
@@ -1022,14 +1018,13 @@ public static unsafe class ModelLoader
                                 stagingBuffer,
                                 textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height,
                                 GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels),
-                                GLTexture.PixelType.Ubyte,
+                                GLTexture.PixelType.UByte,
                                 null
                             );
                             texture.GenerateMipmap();
 
                             TextureLoaded?.Invoke();
                         }
-
                         stagingBuffer.Dispose();
                     });
                 });
@@ -1121,7 +1116,7 @@ public static unsafe class ModelLoader
             Material gltfMaterial = gltfMaterials[i];
             MaterialDesc materialDesc = new MaterialDesc();
             materialDesc.MaterialParams = GetMaterialParams(gltfMaterial);
-            materialDesc.Name = gltfMaterial.Name ?? $"Material_{i}";
+            materialDesc.Name = gltfMaterial.Name;
 
             for (int j = 0; j < CpuMaterial.TEXTURE_COUNT; j++)
             {
@@ -1199,13 +1194,12 @@ public static unsafe class ModelLoader
         return state;
     }
 
-    private static Matrix4[] GetNodeTransformations(GltfNode node)
+    private static Matrix4[] GetNodeTransformations(Node node, MeshGpuInstancing meshGpuInstancing)
     {
-        MeshGpuInstancing meshGpuInstancing = node.UseGpuInstancing();
         if (meshGpuInstancing.Count == 0)
         {
             // If its not using EXT_mesh_gpu_instancing we must use local transform
-            return [node.LocalMatrix.ToOpenTK()];
+            return [node.LocalTransform.GetMatrix()];
         }
 
         Matrix4[] nodeInstances = new Matrix4[meshGpuInstancing.Count];

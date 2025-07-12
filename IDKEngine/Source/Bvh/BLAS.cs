@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading;
 using System.Collections;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
@@ -269,7 +268,7 @@ public static class BLAS
             bool traverseLeft = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
             bool traverseRight = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
-            //Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
+            //System.Threading.Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
 
             bool intersectLeft = traverseLeft && leftNode.IsLeaf;
             bool intersectRight = traverseRight && rightNode.IsLeaf;
@@ -294,16 +293,7 @@ public static class BLAS
                 if (leftNode.IsLeaf) traverseLeft = false;
                 if (rightNode.IsLeaf) traverseRight = false;
 
-                if (hitInfo.T < tMinLeft && traverseLeft)
-                {
-                    traverseLeft = false;
-                }
-                if (hitInfo.T < tMinRight && traverseRight)
-                {
-                    traverseRight = false;
-                }
-
-                //Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
+                //System.Threading.Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
             }
 
             if (traverseLeft || traverseRight)

@@ -115,7 +115,8 @@ public struct Box
         return HalfArea() * 2.0f;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)] // It's small and called in hot loop
+    // For BLAS TrySplit to match clang. It's small and called in hot loop
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly float HalfArea()
     {
         Vector128<float> size = SimdSize();
@@ -165,7 +166,8 @@ public struct Box
         return newBox;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)] // It's small and tends be a size decreasing inline
+    // It's small and tends be a size decreasing inline
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Box Empty()
     {
         Box box = new Box();

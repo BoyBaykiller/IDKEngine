@@ -17,14 +17,14 @@ layout(std140, binding = 0) uniform SettingsUBO
     float LumVarianceFactor;
 } settingsUBO;
 
-void GetTileData(vec3 color, vec2 velocity, out float summedSpeed, out float summedLuminance, out float summedLuminanceSquared);
+void GetTileData(vec3 color, vec2 velocity, out float speedSum, out float luminanceSum, out float luminanceSquaredSum);
 float GetLuminance(vec3 color);
 
 const uint SAMPLES_PER_TILE = TILE_SIZE * TILE_SIZE;
 
-shared float SharedSummedSpeed[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
-shared float SharedSummedLum[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
-shared float SharedSummedLumSquared[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
+shared float SharedSpeedSums[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
+shared float SharedLumSums[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
+shared float SharedLumSquaredSums[SAMPLES_PER_TILE / MIN_SUBGROUP_SIZE];
 
 void main()
 {
@@ -34,19 +34,19 @@ void main()
     vec2 velocity = texelFetch(gBufferDataUBO.Velocity, imgCoord, 0).rg;
     vec3 srcColor = texelFetch(SamplerShaded, imgCoord, 0).rgb;
 
-    float summedSpeed, summedLuminance, summedLuminanceSquared;
-    GetTileData(srcColor, velocity, summedSpeed, summedLuminance, summedLuminanceSquared);
+    float speedSum, luminanceSum, luminanceSquaredSum;
+    GetTileData(srcColor, velocity, speedSum, luminanceSum, luminanceSquaredSum);
 
     if (gl_LocalInvocationIndex == 0)
     {
-        float meanSpeed = summedSpeed / SAMPLES_PER_TILE;
+        float meanSpeed = speedSum / SAMPLES_PER_TILE;
         meanSpeed /= perFrameDataUBO.DeltaRenderTime;
                 
-        float meanLuminance = summedLuminance / SAMPLES_PER_TILE;
+        float luminanceMean = luminanceSum / SAMPLES_PER_TILE;
 
         ENUM_SHADING_RATE finalShadingRate;
         float coeffOfVariation;
-        if (meanLuminance <= 0.001)
+        if (luminanceMean <= 0.001)
         {
             finalShadingRate = ENUM_SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV;
             coeffOfVariation = 0.0;
@@ -55,10 +55,10 @@ void main()
         {
             // https://blog.demofox.org/2020/03/10/how-do-i-calculate-variance-in-1-pass/
             // https://en.wikipedia.org/wiki/Coefficient_of_variation
-            float meanLuminanceSquared = summedLuminanceSquared / SAMPLES_PER_TILE;
-            float variance = meanLuminanceSquared - meanLuminance * meanLuminance;
+            float luminanceSquaredMean = luminanceSquaredSum / SAMPLES_PER_TILE;
+            float variance = luminanceSquaredMean - luminanceMean * luminanceMean;
             float stdDev = sqrt(variance);
-            coeffOfVariation = stdDev / meanLuminance;
+            coeffOfVariation = stdDev / luminanceMean;
 
             float velocityShadingRate = mix(ENUM_SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, ENUM_SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, meanSpeed * settingsUBO.SpeedFactor);
             float varianceShadingRate = mix(ENUM_SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, ENUM_SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV, settingsUBO.LumVarianceFactor / coeffOfVariation);
@@ -75,7 +75,7 @@ void main()
         }
         else if (settingsUBO.DebugMode == ENUM_DEBUG_MODE_LUMINANCE)
         {
-            imageStore(ImgDebug, ivec2(gl_WorkGroupID.xy), vec4(meanLuminance));
+            imageStore(ImgDebug, ivec2(gl_WorkGroupID.xy), vec4(luminanceMean));
         }
         else if (settingsUBO.DebugMode == ENUM_DEBUG_MODE_LUMINANCE_VARIANCE)
         {
@@ -84,7 +84,7 @@ void main()
     }
 }
 
-void GetTileData(vec3 color, vec2 velocity, out float summedSpeed, out float summedLuminance, out float summedLuminanceSquared)
+void GetTileData(vec3 color, vec2 velocity, out float speedSum, out float luminanceSum, out float luminanceSquaredSum)
 {
     float luminance = GetLuminance(color);
 
@@ -94,29 +94,27 @@ void GetTileData(vec3 color, vec2 velocity, out float summedSpeed, out float sum
 
     if (subgroupElect())
     {
-        SharedSummedSpeed[gl_SubgroupID] = subgroupAddedSpeed;
-        SharedSummedLum[gl_SubgroupID] = subgroupAddedLum;
-        SharedSummedLumSquared[gl_SubgroupID] = subgroupAddedSquaredLum;
+        SharedSpeedSums[gl_SubgroupID] = subgroupAddedSpeed;
+        SharedLumSums[gl_SubgroupID] = subgroupAddedLum;
+        SharedLumSquaredSums[gl_SubgroupID] = subgroupAddedSquaredLum;
     }
 
     barrier();
 
-    // Use parallel reduction to calculate sum (average) of all velocity and luminance values
-    // Final results will have been collapsed into the first array element
-    for (uint cutoff = (SAMPLES_PER_TILE / gl_SubgroupSize) / 2; cutoff > 0; cutoff /= 2)
+    if (gl_LocalInvocationIndex == 0)
     {
-        if (gl_LocalInvocationIndex < cutoff)
+        for (int i = 1; i < gl_NumSubgroups; i++)
         {
-            SharedSummedSpeed[gl_LocalInvocationIndex] += SharedSummedSpeed[cutoff + gl_LocalInvocationIndex];
-            SharedSummedLum[gl_LocalInvocationIndex] += SharedSummedLum[cutoff + gl_LocalInvocationIndex];
-            SharedSummedLumSquared[gl_LocalInvocationIndex] += SharedSummedLumSquared[cutoff + gl_LocalInvocationIndex];
+            SharedSpeedSums[0] += SharedSpeedSums[i];
+            SharedLumSums[0] += SharedLumSums[i];
+            SharedLumSquaredSums[0] += SharedLumSquaredSums[i];
         }
-        barrier();
     }
+    barrier();
 
-    summedSpeed = SharedSummedSpeed[0];
-    summedLuminance = SharedSummedLum[0];
-    summedLuminanceSquared = SharedSummedLumSquared[0];
+    speedSum = SharedSpeedSums[0];
+    luminanceSum = SharedLumSums[0];
+    luminanceSquaredSum = SharedLumSquaredSums[0];
 }
 
 float GetLuminance(vec3 color)

@@ -1,8 +1,8 @@
 #version 460 core
-#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_arithmetic : require
 
 AppInclude(include/StaticStorageBuffers.glsl)
-AppInclude(CountingSort/BlellochScan/include/Constants.glsl)
+AppInclude(PathTracing/CountingSort/BlellochScan/include/Constants.glsl)
 
 layout(local_size_x = BLOCK_WISE_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
@@ -21,9 +21,8 @@ void main()
 
     if (gl_LocalInvocationIndex == 0)
     {
-        uint iter = gl_WorkGroupSize.x / gl_SubgroupSize;
         uint groupSum = 0;
-        for (uint i = 0; i < iter; i++)
+        for (uint i = 0; i < gl_NumSubgroups; i++)
         {
             uint temp = SharedSubgroupSumsPrefixSum[i];
             SharedSubgroupSumsPrefixSum[i] = groupSum;

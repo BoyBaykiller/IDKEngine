@@ -95,7 +95,7 @@ public static partial class BBG
 
         public enum PixelType : uint
         {
-            Ubyte = OpenTK.Graphics.OpenGL.PixelType.UnsignedByte,
+            UByte = OpenTK.Graphics.OpenGL.PixelType.UnsignedByte,
             Int = OpenTK.Graphics.OpenGL.PixelType.Int,
             UInt = OpenTK.Graphics.OpenGL.PixelType.UnsignedInt,
             Float = OpenTK.Graphics.OpenGL.PixelType.Float,

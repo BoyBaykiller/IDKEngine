@@ -145,10 +145,10 @@ class PathTracer : IDisposable
         wavefrontPTBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 31);
 
         // Ray Sorting
-        histogramProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "CountingSort/Histogram/compute.glsl"));
-        reorderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "CountingSort/Reorder/compute.glsl"));
-        downUpSweepProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "CountingSort/BlellochScan/DownUpSweep/compute.glsl"));
-        groupWiseScanProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "CountingSort/BlellochScan/GroupWise/compute.glsl"));
+        histogramProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/Histogram/compute.glsl"));
+        reorderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/Reorder/compute.glsl"));
+        downUpSweepProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/BlellochScan/DownUpSweep/compute.glsl"));
+        groupWiseScanProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/BlellochScan/GroupWise/compute.glsl"));
 
         sortedRayIndicesBuffer = new BBG.TypedBuffer<uint>();
         sortedRayIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 32);

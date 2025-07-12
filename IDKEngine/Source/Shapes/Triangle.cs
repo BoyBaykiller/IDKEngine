@@ -43,6 +43,7 @@ public record struct Triangle
         Position1 = (new Vector4(Position1, 1.0f) * model).Xyz;
         Position2 = (new Vector4(Position2, 1.0f) * model).Xyz;
     }
+
     public readonly ValueTuple<Box, Box> Split(int axis, float position)
     {
         // Source: https://github.com/madmann91/bvh/blob/2fd0db62022993963a7343669275647cb073e19a/include/bvh/triangle.hpp#L64

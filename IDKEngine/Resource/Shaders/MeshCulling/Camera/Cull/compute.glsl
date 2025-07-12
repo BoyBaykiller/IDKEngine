@@ -2,7 +2,7 @@
 
 #define TAKE_MESH_SHADER_PATH_CAMERA AppInsert(TAKE_MESH_SHADER_PATH_CAMERA)
 #if TAKE_MESH_SHADER_PATH_CAMERA
-    #extension GL_NV_gpu_shader5 : enable
+    #extension GL_NV_gpu_shader5 : require
     #define DECLARE_MESHLET_STORAGE_BUFFERS
     #define DECLARE_MESHLET_RENDERING_TYPES
 #endif
@@ -15,19 +15,19 @@ AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-layout(std430, binding = 0) restrict readonly buffer InCullingMeshInstanceIdSSBO
+layout(std430, binding = 0) restrict readonly buffer MeshInstanceIdSSBO
 {
     uint Ids[];
-} inCullingMeshInstanceIdSSBO;
+} meshInstanceIdSSBO;
 
 void main()
 {
-    if (gl_GlobalInvocationID.x >= inCullingMeshInstanceIdSSBO.Ids.length())
+    if (gl_GlobalInvocationID.x >= meshInstanceIdSSBO.Ids.length())
     {
         return;
     }
 
-    uint meshInstanceId = inCullingMeshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
+    uint meshInstanceId = meshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     uint meshId = meshInstance.MeshId;

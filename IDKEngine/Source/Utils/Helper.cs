@@ -245,7 +245,7 @@ public static class Helper
         int nChannels = 3;
 
         byte* pixels = Memory.Alloc<byte>(texture.Width * texture.Height * nChannels);
-        texture.Download(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.Ubyte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
+        texture.Download(BBG.Texture.NumChannelsToPixelFormat(nChannels), BBG.Texture.PixelType.UByte, pixels, texture.Width * texture.Height * nChannels * sizeof(byte));
         
         using FileStream fileStream = File.OpenWrite($"{path}.jpg");
         StbImage.FlipVerticallyOnSave = flipVertically;
