@@ -1,8 +1,9 @@
 #version 460 core
 
+AppInclude(include/Math.glsl)
+AppInclude(include/Surface.glsl)
 AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
-AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
@@ -38,15 +39,14 @@ void main()
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
     vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
 
-    vec3 sampleToLightDir = light.Position - unjitteredFragPos;
-    float cosTheta = dot(normal, sampleToLightDir);
+    float cosTheta = dot(normal, normalize(light.Position - unjitteredFragPos));
     if (cosTheta <= 0.0)
     {
         imageStore(image2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(0.0));
         return;
     }
     
-    float shadow = 0.0;
+    float visibility = 0.0;
     for (int i = 0; i < RayTracingSamples; i++)
     {
         vec3 biasedPosition = unjitteredFragPos + normal * 0.01;
@@ -64,12 +64,61 @@ void main()
         ray.Direction = direction;
 
         HitInfo hitInfo;
-        if (TraceRayAny(ray, hitInfo, true, distanceToLight - 0.001))
+        
+        float thisVisibility = 1.0;
+        while (TraceRay(ray, hitInfo, true, distanceToLight - 0.001))
         {
-            shadow += 1.0;
-        }
-    }
-    shadow /= RayTracingSamples;
+            bool hitLight = hitInfo.TriangleId == ~0u;
+            if (hitLight)
+            {
+                if (hitInfo.InstanceId == pointShadow.LightIndex)
+                {
+                    // Failsafe, distance cap should already prevent us from hitting the light
+                }
+                else
+                {
+                    thisVisibility = 0.0;
+                }
+                break;
+            }
 
-    imageStore(image2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(shadow));
+            uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId]);
+            GpuVertex v0 = vertexSSBO.Vertices[indices.x];
+            GpuVertex v1 = vertexSSBO.Vertices[indices.y];
+            GpuVertex v2 = vertexSSBO.Vertices[indices.z];
+            vec3 bary = vec3(hitInfo.BaryXY.xy, 1.0 - hitInfo.BaryXY.x - hitInfo.BaryXY.y);
+            vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, bary);
+
+            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceId];
+            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
+            GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
+
+            Surface surface = GetSurface(material, interpTexCoord);
+            SurfaceApplyModificatons(surface, mesh);
+
+            float alphaCutoff = SurfaceHasAlphaBlending(surface) ? GetRandomFloat01() : surface.AlphaCutoff;
+            if (SurfaceHasAlphaBlending(surface))
+            {
+                thisVisibility *= 1.0 - surface.Alpha;
+            }
+            else if (surface.Alpha > alphaCutoff)
+            {
+                thisVisibility = 0.0;
+            }
+
+            if (thisVisibility < 0.01)
+            {
+                break;
+            }
+
+            float dist = hitInfo.T + 0.001;
+            ray.Origin += ray.Direction * dist;
+            distanceToLight -= dist;
+        }
+
+        visibility += thisVisibility;
+    }
+    visibility /= RayTracingSamples;
+
+    imageStore(image2D(pointShadow.RayTracedShadowMapImage), imgCoord, vec4(visibility));
 }

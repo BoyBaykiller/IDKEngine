@@ -8,7 +8,7 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render;
 
-class CpuPointShadow : IDisposable
+public class CpuPointShadow : IDisposable
 {
     private static bool _takeMeshShaderPath;
     public static bool TakeMeshShaderPath
@@ -154,7 +154,7 @@ class CpuPointShadow : IDisposable
             cullingProgram.Upload(2, visibleFaces);
 
             BBG.Cmd.UseShaderProgram(cullingProgram);
-            BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
+            BBG.Computing.Dispatch(MyMath.DivUp(modelManager.OpaqueMeshInstanceIdBuffer.NumElements, 64), 1, 1);
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
         });
         

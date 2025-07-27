@@ -4,7 +4,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine.Windowing;
 
-unsafe class Keyboard
+public unsafe class Keyboard
 {
     public enum InputState : int
     {

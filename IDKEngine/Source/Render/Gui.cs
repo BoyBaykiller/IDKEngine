@@ -867,7 +867,8 @@ partial class Gui : IDisposable
                     modified = true;
                 }
 
-                ImGui.Text($"IsTransparent (AlphaBlend): {material.IsTransparent()}");
+                ImGui.Text($"Is IsVolumetric: {material.IsVolumetric}");
+                ImGui.Text($"Uses AlphaBlending: {material.HasAlphaBlending()}");
 
                 ImGui.SeparatorText("Mesh Info");
 

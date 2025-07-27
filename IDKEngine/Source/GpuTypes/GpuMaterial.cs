@@ -52,11 +52,11 @@ public unsafe struct GpuMaterial
     public BBG.Texture.BindlessHandle EmissiveTexture;
 
     public BBG.Texture.BindlessHandle TransmissionTexture;
-    public bool IsThinWalled;
+    public bool IsVolumetric;
     private fixed bool _pad[3];
     private readonly float _pad0;
 
-    public readonly bool IsTransparent()
+    public readonly bool HasAlphaBlending()
     {
         // Keep in sync between shader and client code!
         const float valueMeaniningBlendMode = 2.0f;

@@ -4,7 +4,7 @@ using BBOpenGL;
 
 namespace IDKEngine.GpuTypes;
 
-record struct GpuPointShadow
+public record struct GpuPointShadow
 {
     public const int FACE_COUNT = (int)RenderMatrix.Count;
 

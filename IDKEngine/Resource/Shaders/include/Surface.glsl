@@ -18,7 +18,7 @@ struct Surface
     float IOR;
     
     float AlphaCutoff;
-    bool IsThinWalled;
+    bool IsVolumetric; // Opposite of ThinWalled, affects transmission behaviour
     bool TintOnTransmissive;
 };
 
@@ -40,7 +40,7 @@ Surface GetDefaultSurface()
 
     surface.AlphaCutoff = 0.5;
 
-    surface.IsThinWalled = false;
+    surface.IsVolumetric = false;
     surface.TintOnTransmissive = true;
     
     return surface;
@@ -72,7 +72,7 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv, float baseColorLodBias)
     surface.IOR = gpuMaterial.IOR;
 
     surface.AlphaCutoff = gpuMaterial.AlphaCutoff;
-    surface.IsThinWalled = gpuMaterial.IsThinWalled;
+    surface.IsVolumetric = gpuMaterial.IsVolumetric;
 
     return surface;
 }
@@ -96,7 +96,7 @@ void SurfaceApplyModificatons(inout Surface surface, GpuMesh mesh)
     surface.TintOnTransmissive = mesh.TintOnTransmissive;
 }
 
-bool SurfaceIsTransparent(Surface surface)
+bool SurfaceHasAlphaBlending(Surface surface)
 {
     // Keep in sync between shader and client code!
     const float valueMeaniningBlendMode = 2.0;

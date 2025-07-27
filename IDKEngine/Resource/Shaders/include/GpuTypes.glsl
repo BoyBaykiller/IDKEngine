@@ -207,7 +207,7 @@ struct GpuMaterial
     MATERIAL_SAMPLER_2D_TYPE Emissive;
 
     MATERIAL_SAMPLER_2D_TYPE Transmission;
-    bool IsThinWalled;
+    bool IsVolumetric;
     float _pad0;
 };
 

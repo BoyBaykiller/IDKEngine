@@ -6,7 +6,7 @@ using IDKEngine.Windowing;
 
 namespace IDKEngine;
 
-class Camera
+public class Camera
 {
     public const float MASS = 60.0f;
 

@@ -7,9 +7,9 @@
 #endif
 
 AppInclude(include/Ray.glsl)
+AppInclude(include/Math.glsl)
 AppInclude(include/Sampling.glsl)
 AppInclude(include/Compression.glsl)
-AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
@@ -124,7 +124,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             surface = GetSurface(material, interpTexCoord);
             SurfaceApplyModificatons(surface, mesh);
 
-            float alphaCutoff = SurfaceIsTransparent(surface) ? GetRandomFloat01() : surface.AlphaCutoff;
+            float alphaCutoff = SurfaceHasAlphaBlending(surface) ? GetRandomFloat01() : surface.AlphaCutoff;
             if (surface.Alpha < alphaCutoff)
             {
                 wavefrontRay.Origin += rayDir * 0.001;
@@ -160,9 +160,12 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         if (fromInside)
         {
             prevIor = surface.IOR;
-
             geometricNormal *= -1.0;
-            wavefrontRay.Throughput *= exp(-surface.Absorbance * hitInfo.T);
+
+            if (surface.IsVolumetric)
+            {
+                wavefrontRay.Throughput *= exp(-surface.Absorbance * hitInfo.T);
+            }
         }
 
         float cosTheta = dot(-rayDir, surface.Normal);

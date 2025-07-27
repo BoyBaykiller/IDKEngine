@@ -347,10 +347,7 @@ public unsafe class ModelManager : IDisposable
             ref readonly GpuMeshInstance meshInstance = ref meshInstances[i];
             ref readonly GpuMesh mesh = ref Meshes[meshInstance.MeshId];
 
-            //transparentMeshInstanceIds.Add(i);
-            //continue;
-
-            if (GpuMaterials[mesh.MaterialId].IsTransparent())
+            if (GpuMaterials[mesh.MaterialId].HasAlphaBlending())
             {
                 transparentMeshInstanceIds.Add(i);
             }
@@ -1050,7 +1047,7 @@ public unsafe class ModelManager : IDisposable
         CpuModel newCpuModel = new CpuModel();
 
         newCpuModel.Nodes = new ModelLoader.Node[model.Nodes.Length];
-        model.RootNode.DeepClone(newCpuModel.Nodes, model.Nodes);
+        model.RootNode.DeepClone(model.Nodes, newCpuModel.Nodes);
 
         newCpuModel.Animations = new ModelLoader.ModelAnimation[model.Animations.Length];
         for (int i = 0; i < newCpuModel.Animations.Length; i++)

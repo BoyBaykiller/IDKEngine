@@ -134,16 +134,16 @@ public static unsafe class ModelLoader
             }
         }
 
-        public void DeepClone(Span<Node> newNodes, ReadOnlySpan<Node> oldNodes)
+        public void DeepClone(ReadOnlySpan<Node> srcNodes, Span<Node> dstNodes)
         {
-            HierarchyToArray(DeepCloneRecursive(this), newNodes);
+            HierarchyToArray(DeepCloneRecursive(this), dstNodes);
 
             // Copying Skin needs to be done after all Nodes have been copied
-            for (int i = 0; i < newNodes.Length; i++)
+            for (int i = 0; i < dstNodes.Length; i++)
             {
-                if (newNodes[i].HasSkin)
+                if (dstNodes[i].HasSkin)
                 {
-                    newNodes[i].Skin = oldNodes[i].Skin.DeepClone(newNodes);
+                    dstNodes[i].Skin = srcNodes[i].Skin.DeepClone(dstNodes);
                 }
             }
 
@@ -173,7 +173,7 @@ public static unsafe class ModelLoader
         {
             if (isDirty)
             {
-               return;
+                return;
             }
 
             isDirty = true;
@@ -288,7 +288,7 @@ public static unsafe class ModelLoader
 
         public NodeAnimation[] NodeAnimations;
 
-        public readonly ModelAnimation DeepClone(ReadOnlySpan<Node> newNodes)
+        public readonly ModelAnimation DeepClone(ReadOnlySpan<Node> srcNewNodes)
         {
             ModelAnimation animation = new ModelAnimation();
             animation.Start = Start;
@@ -297,7 +297,7 @@ public static unsafe class ModelLoader
             animation.NodeAnimations = new NodeAnimation[NodeAnimations.Length];
             for (int i = 0; i < animation.NodeAnimations.Length; i++)
             {
-                animation.NodeAnimations[i] = NodeAnimations[i].DeepClone(newNodes);
+                animation.NodeAnimations[i] = NodeAnimations[i].DeepClone(srcNewNodes);
             }
 
             return animation;
@@ -349,10 +349,10 @@ public static unsafe class ModelLoader
             return MemoryMarshal.Cast<byte, Quaternion>(RawKeyFramesData);
         }
 
-        public readonly NodeAnimation DeepClone(ReadOnlySpan<Node> newNodes)
+        public readonly NodeAnimation DeepClone(ReadOnlySpan<Node> srcNewNodes)
         {
             NodeAnimation sampler = new NodeAnimation();
-            sampler.TargetNode = newNodes[TargetNode.ArrayIndex];
+            sampler.TargetNode = srcNewNodes[TargetNode.ArrayIndex];
             sampler.Type = Type;
             sampler.Mode = Mode;
             sampler.KeyFramesStart = KeyFramesStart.DeepClone();
@@ -434,7 +434,7 @@ public static unsafe class ModelLoader
 
     public record struct MaterialParams
     {
-        public readonly bool IsThinWalled => ThicknessFactor == 0.0f;
+        public readonly bool IsVolumetric => ThicknessFactor > 0.0f;
 
         public Vector4 BaseColorFactor = new Vector4(1.0f);
         public float RoughnessFactor = 1.0f;
@@ -508,24 +508,6 @@ public static unsafe class ModelLoader
         public Vector4[] JointWeights;
     }
 
-    private record struct GLTextureLoadData
-    {
-        public readonly bool IsKtx2Compressed => Ktx2Texture != null;
-        public readonly int Width => IsKtx2Compressed ? Ktx2Texture.BaseWidth : ImageHeader.Width;
-        public readonly int Height => IsKtx2Compressed ? Ktx2Texture.BaseHeight : ImageHeader.Height;
-
-        public GLTexture.InternalFormat InternalFormat;
-        public GLSampler.SamplerState SamplerState;
-
-        // If Ktx2 is used (KHR_texture_basisu)
-        public Ktx2Texture Ktx2Texture;
-
-        // If regular Image is used
-        public ImageLoader.ImageHeader ImageHeader;
-        public ImageLoader.ColorComponents ImageLoadChannels; // e.g for "Transmissive" we can load only R instead of RGB
-        public ReadOnlyMemory<byte> EncodedImageData;
-    }
-
     private record struct MeshPrimitiveDesc
     {
         public readonly bool HasNormalAccessor => NormalAccessor != -1;
@@ -565,7 +547,7 @@ public static unsafe class ModelLoader
 
     public static Model? LoadGltfFromFile(string path, in Matrix4 rootTransform)
     {
-        return LoadGltfFromFile(path, rootTransform, OptimizationSettings.AllTurnedOff);
+        return LoadGltfFromFile(path, rootTransform, OptimizationSettings.Recommended);
     }
 
     public static Model? LoadGltfFromFile(string path, in Matrix4 rootTransform, OptimizationSettings optimizationSettings)
@@ -696,8 +678,8 @@ public static unsafe class ModelLoader
 
             Matrix4[] nodeTransformations = GetNodeTransformations(myNode, gltfNode.UseGpuInstancing());
 
-            Range meshInstanceIdsRange = new Range();
-            meshInstanceIdsRange.Start = listMeshInstances.Count;
+            Range meshInstanceRange = new Range();
+            meshInstanceRange.Start = listMeshInstances.Count;
 
             for (int i = 0; i < gltfMesh.Primitives.Count; i++)
             {
@@ -718,6 +700,7 @@ public static unsafe class ModelLoader
                 mesh.MeshletCount = meshGeometry.Meshlets.Length;
                 mesh.IORBias = 0.0f;
                 mesh.AbsorbanceBias = new Vector3(0.0f);
+                mesh.TintOnTransmissive = true; // Required by KHR_materials_transmission
                 if (gltfMeshPrimitive.Material == null)
                 {
                     // load some default material if mesh primitive doesn't have one
@@ -785,8 +768,8 @@ public static unsafe class ModelLoader
 
             jointsCount += gltfNode.Skin != null ? gltfNode.Skin.JointsCount : 0;
 
-            meshInstanceIdsRange.End = listMeshInstances.Count;
-            myNode.MeshInstanceRange = meshInstanceIdsRange;
+            meshInstanceRange.End = listMeshInstances.Count;
+            myNode.MeshInstanceRange = meshInstanceRange;
         }
 
         GpuModel gpuModel = new GpuModel();
@@ -839,7 +822,7 @@ public static unsafe class ModelLoader
             gpuMaterial.MetallicFactor = materialParams.MetallicFactor;
             gpuMaterial.Absorbance = materialParams.Absorbance;
             gpuMaterial.IOR = materialParams.IOR;
-            gpuMaterial.IsThinWalled = materialParams.IsThinWalled;
+            gpuMaterial.IsVolumetric = materialParams.IsVolumetric;
 
             if (materialParams.AlphaMode == AlphaMode.Opaque)
             {
@@ -906,22 +889,71 @@ public static unsafe class ModelLoader
     private static bool LoadGLTextureAsync(SampledImage sampledImage, TextureType textureType, bool useExtBc5NormalMetallicRoughness, out BindlessSampledTexture bindlessTexture)
     {
         bindlessTexture = new BindlessSampledTexture();
-        if (!TryGetGLTextureLoadData(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out GLTextureLoadData textureLoadData))
+
+        Image gltfImage = sampledImage.GltfImage;
+
+        GLTexture.InternalFormat internalFormat;
+        int width, height, levels;
+        if (gltfImage.Content.IsPng || gltfImage.Content.IsJpg)
         {
-            return false;
+            if (!ImageLoader.TryGetImageHeader(gltfImage.Content.Content.Span, out ImageLoader.ImageHeader imageHeader))
+            {
+                Logger.Log(Logger.LogLevel.Error, $"Error parsing header of image \"{gltfImage.Name}\"");
+                return false;
+            }
+
+            internalFormat = textureType switch
+            {
+                TextureType.BaseColor => GLTexture.InternalFormat.R8G8B8A8SRgb,
+                TextureType.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float,
+                TextureType.Normal => GLTexture.InternalFormat.R8G8Unorm,
+                TextureType.Emissive => GLTexture.InternalFormat.R8G8B8A8SRgb,
+                TextureType.Transmission => GLTexture.InternalFormat.R8Unorm,
+                _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
+            };
+
+            width = imageHeader.Width;
+            height = imageHeader.Height;
+            levels = GLTexture.GetMaxMipmapLevel(imageHeader.Width, height, 1);
+        }
+        else
+        {
+            Ktx2.Header header = MemoryMarshal.Cast<byte, Ktx2.Header>(gltfImage.Content.Content.Span)[0];
+            Ktx2.ErrorCode errorCode = Ktx2.CheckHeader(ref header, out _);
+            if (errorCode != Ktx2.ErrorCode.Success)
+            {
+                Logger.Log(Logger.LogLevel.Error, $"Invalid KTX header \"{gltfImage.Name}\". {nameof(Ktx2.CheckHeader)} returned {errorCode}");
+                return false;
+            }
+
+            internalFormat = textureType switch
+            {
+                TextureType.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
+
+                // BC5 support added with gltfpack fork (https://github.com/BoyBaykiller/meshoptimizer) implementing IDK_BC5_normal_metallicRoughness
+                TextureType.MetallicRoughness => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
+                TextureType.Normal => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
+
+                TextureType.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
+                TextureType.Transmission => GLTexture.InternalFormat.BC4RUnorm,
+                _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
+            };
+
+            width = (int)header.PixelWidth;
+            height = (int)header.PixelHeight;
+            levels = (int)header.LevelCount;
         }
 
-        GLTexture texture = new GLTexture(GLTexture.Type.Texture2D);
-        GLSampler sampler = new GLSampler(textureLoadData.SamplerState);
-
-        bool mipmapsRequired = GLSampler.IsMipmapFilter(sampler.State.MinFilter);
-        int levels = textureLoadData.IsKtx2Compressed ? textureLoadData.Ktx2Texture.Levels : GLTexture.GetMaxMipmapLevel(textureLoadData.Width, textureLoadData.Height, 1);
+        bool mipmapsRequired = GLSampler.IsMipmapFilter(sampledImage.SamplerState.MinFilter);
         if (!mipmapsRequired)
         {
             levels = 1;
         }
 
-        texture.Allocate(textureLoadData.Width, textureLoadData.Height, 1, textureLoadData.InternalFormat, levels);
+        GLTexture texture = new GLTexture(GLTexture.Type.Texture2D);
+        GLSampler sampler = new GLSampler(sampledImage.SamplerState);
+
+        texture.Allocate(width, height, 1, internalFormat, levels);
         if (textureType == TextureType.MetallicRoughness && !useExtBc5NormalMetallicRoughness)
         {
             // By the spec "The metalness values are sampled from the B channel. The roughness values are sampled from the G channel".
@@ -946,59 +978,71 @@ public static unsafe class ModelLoader
              * 2. Directly upload pixels to texture on main thread
              */
 
-
             // TODO: If the main thread is in Sleep State (for example when waiting on Parallel.For() to finish)
             //       it may end up participating as a worker in the ThreadPool.
             //       We want the main thread to only run the render loop only and not some random
-            //       ThreadPool work (like loading texturs in this case), because it causes frame stutters. Fix!
+            //       ThreadPool work (like loading texturs in this case), because it causes frame stutters
 
-            //ThreadPool.SetMinThreads(Environment.ProcessorCount / 2, 1);
-            //ThreadPool.SetMaxThreads(Environment.ProcessorCount / 2, 1);
+            //System.Threading.ThreadPool.SetMinThreads(Environment.ProcessorCount / 2, 1);
+            //System.Threading.ThreadPool.SetMaxThreads(Environment.ProcessorCount / 2, 1);
 
-            if (textureLoadData.IsKtx2Compressed)
+            if (gltfImage.Content.IsKtx2)
             {
                 Task.Run(() =>
                 {
-                    if (textureLoadData.Ktx2Texture.NeedsTranscoding)
+                    Ktx2.ErrorCode errCode = Ktx2Texture.FromMemory(gltfImage.Content.Content.Span, Ktx2.TextureCreateFlagBits.LoadImageData | Ktx2.TextureCreateFlagBits.CheckGltfBasisU, out Ktx2Texture ktx2Texture);
+                    if (errCode != Ktx2.ErrorCode.Success)
                     {
-                        //int supercompressedImageSize = ktx2Texture.DataSize; // Supercompressed size before transcoding
-                        Ktx2.ErrorCode errCode = textureLoadData.Ktx2Texture.Transcode(GLFormatToKtxFormat(texture.Format), Ktx2.TranscodeFlagBits.HighQuality);
-                        if (errCode != Ktx2.ErrorCode.Success)
-                        {
-                            Logger.Log(Logger.LogLevel.Error, $"Failed to transcode KTX texture. {nameof(textureLoadData.Ktx2Texture.Transcode)} returned {errCode}");
-                            return;
-                        }
+                        Logger.Log(Logger.LogLevel.Error, $"Failed to load KTX texture. {nameof(Ktx2Texture.FromMemory)} returned {errCode}");
+                        return;
+                    }
+
+                    errCode = ktx2Texture.Transcode(GLFormatToKtxFormat(texture.Format), Ktx2.TranscodeFlagBits.HighQuality);
+                    if (errCode != Ktx2.ErrorCode.Success)
+                    {
+                        Logger.Log(Logger.LogLevel.Error, $"Failed to transcode KTX texture. {nameof(ktx2Texture.Transcode)} returned {errCode}");
+                        return;
                     }
 
                     MainThreadQueue.AddToLazyQueue(() =>
                     {
-                        //int compressedImageSize = textureLoadData.Ktx2Texture.DataSize; // Compressed size after transcoding
-
                         // We don't own the texture so make sure it didn't get deleted
                         if (!texture.IsDeleted())
                         {
                             for (int level = 0; level < texture.Levels; level++)
                             {
-                                Vector3i size = GLTexture.GetMipmapLevelSize(textureLoadData.Ktx2Texture.BaseWidth, textureLoadData.Ktx2Texture.BaseHeight, textureLoadData.Ktx2Texture.BaseDepth, level);
-                                textureLoadData.Ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
-                                texture.UploadCompressed2D(size.X, size.Y, textureLoadData.Ktx2Texture.Data + dataOffset, level);
+                                Vector3i size = GLTexture.GetMipmapLevelSize(ktx2Texture.BaseWidth, ktx2Texture.BaseHeight, ktx2Texture.BaseDepth, level);
+                                ktx2Texture.GetImageDataOffset(level, out nint dataOffset);
+                                texture.UploadCompressed2D(size.X, size.Y, ktx2Texture.Data + dataOffset, level);
                             }
 
                             TextureLoaded?.Invoke();
                         }
-                        textureLoadData.Ktx2Texture.Dispose();
+                        ktx2Texture.Dispose();
                     });
                 });
             }
             else
             {
+                ImageLoader.TryGetImageHeader(gltfImage.Content.Content.Span, out ImageLoader.ImageHeader imageHeader);
+                ImageLoader.ColorComponents loadComponents = textureType switch
+                {
+                    TextureType.BaseColor => imageHeader.ColorComponents,
+                    TextureType.MetallicRoughness => ImageLoader.ColorComponents.RGB, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels :(
+                    TextureType.Normal => ImageLoader.ColorComponents.RGB,
+                    TextureType.Emissive => ImageLoader.ColorComponents.RGB,
+                    TextureType.Transmission => ImageLoader.ColorComponents.R,
+                    _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
+                };
+                imageHeader.SetChannels(loadComponents);
+
                 BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                stagingBuffer.AllocateElements(BBG.Buffer.MemLocation.HostLocal, BBG.Buffer.MemAccess.MappedIncoherent, textureLoadData.ImageHeader.SizeInBytes);
+                stagingBuffer.AllocateElements(BBG.Buffer.MemLocation.HostLocal, BBG.Buffer.MemAccess.MappedIncoherent, imageHeader.SizeInBytes);
 
                 Task.Run(() =>
                 {
                     {
-                        using ImageLoader.ImageResult imageResult = ImageLoader.Load(textureLoadData.EncodedImageData.Span, textureLoadData.ImageHeader.ColorComponents);
+                        using ImageLoader.ImageResult imageResult = ImageLoader.Load(gltfImage.Content.Content.Span, imageHeader.ColorComponents);
                         if (!imageResult.IsLoadedSuccesfully)
                         {
                             Logger.Log(Logger.LogLevel.Error, $"Image could not be loaded");
@@ -1006,7 +1050,7 @@ public static unsafe class ModelLoader
                             return;
                         }
 
-                        Memory.Copy(imageResult.Memory, stagingBuffer.Memory, textureLoadData.ImageHeader.SizeInBytes);
+                        Memory.Copy(imageResult.Memory, stagingBuffer.Memory, imageResult.Header.SizeInBytes);
                     }
 
                     MainThreadQueue.AddToLazyQueue(() =>
@@ -1016,8 +1060,8 @@ public static unsafe class ModelLoader
                         {
                             texture.Upload2D(
                                 stagingBuffer,
-                                textureLoadData.ImageHeader.Width, textureLoadData.ImageHeader.Height,
-                                GLTexture.NumChannelsToPixelFormat(textureLoadData.ImageHeader.Channels),
+                                imageHeader.Width, imageHeader.Height,
+                                GLTexture.NumChannelsToPixelFormat(imageHeader.Channels),
                                 GLTexture.PixelType.UByte,
                                 null
                             );
@@ -1030,80 +1074,6 @@ public static unsafe class ModelLoader
                 });
             }
         });
-
-        return true;
-    }
-
-    private static bool TryGetGLTextureLoadData(SampledImage sampledImage, TextureType textureType, bool useExtBc5NormalMetallicRoughness, out GLTextureLoadData textureLoadData)
-    {
-        Image gltfImage = sampledImage.GltfImage;
-        textureLoadData = new GLTextureLoadData();
-
-        if (gltfImage.Content.IsPng || gltfImage.Content.IsJpg)
-        {
-            textureLoadData.EncodedImageData = gltfImage.Content.Content;
-            if (!ImageLoader.TryGetImageHeader(textureLoadData.EncodedImageData.Span, out textureLoadData.ImageHeader))
-            {
-                Logger.Log(Logger.LogLevel.Error, $"Error parsing header of image \"{gltfImage.Name}\"");
-                return false;
-            }
-
-            textureLoadData.InternalFormat = textureType switch
-            {
-                TextureType.BaseColor => GLTexture.InternalFormat.R8G8B8A8SRgb,
-                TextureType.MetallicRoughness => GLTexture.InternalFormat.R11G11B10Float,
-                TextureType.Normal => GLTexture.InternalFormat.R8G8Unorm,
-                TextureType.Emissive => GLTexture.InternalFormat.R8G8B8A8SRgb,
-                TextureType.Transmission => GLTexture.InternalFormat.R8Unorm,
-                _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
-            };
-            textureLoadData.ImageLoadChannels = textureType switch
-            {
-                TextureType.BaseColor => textureLoadData.ImageHeader.ColorComponents,
-                TextureType.MetallicRoughness => ImageLoader.ColorComponents.RGB, // MetallicRoughnessTexture stores metalness and roughness in G and B components. Therefore need to load 3 channels :(
-                TextureType.Normal => ImageLoader.ColorComponents.RGB,
-                TextureType.Emissive => ImageLoader.ColorComponents.RGB,
-                TextureType.Transmission => ImageLoader.ColorComponents.R,
-                _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
-            };
-        }
-        else if (gltfImage.Content.IsKtx2)
-        {
-            ReadOnlySpan<byte> imageData = gltfImage.Content.Content.Span;
-
-            Ktx2.ErrorCode errCode = Ktx2Texture.FromMemory(imageData, Ktx2.TextureCreateFlagBits.LoadImageData, out textureLoadData.Ktx2Texture);
-            if (errCode != Ktx2.ErrorCode.Success)
-            {
-                Logger.Log(Logger.LogLevel.Error, $"Failed to load KTX texture. {nameof(Ktx2Texture.FromMemory)} returned {errCode}");
-                return false;
-            }
-            if (!textureLoadData.Ktx2Texture.NeedsTranscoding)
-            {
-                Logger.Log(Logger.LogLevel.Error, "KTX textures are expected to require transcoding, meaning they are either ETC1S or UASTC encoded.\n" +
-                                                    $"SupercompressionScheme = {textureLoadData.Ktx2Texture.SupercompressionScheme}");
-                return false;
-            }
-
-            textureLoadData.InternalFormat = textureType switch
-            {
-                TextureType.BaseColor => GLTexture.InternalFormat.BC7RgbaSrgb,
-
-                // BC5 support added with gltfpack fork (https://github.com/BoyBaykiller/meshoptimizer) implementing IDK_BC5_normal_metallicRoughness
-                TextureType.MetallicRoughness => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
-                TextureType.Normal => useExtBc5NormalMetallicRoughness ? GLTexture.InternalFormat.BC5RgUnorm : GLTexture.InternalFormat.BC7RgbaUnorm,
-
-                TextureType.Emissive => GLTexture.InternalFormat.BC7RgbaSrgb,
-                TextureType.Transmission => GLTexture.InternalFormat.BC4RUnorm,
-                _ => throw new NotSupportedException($"{nameof(textureType)} = {textureType} not supported")
-            };
-        }
-        else
-        {
-            Logger.Log(Logger.LogLevel.Error, $"Unsupported MimeType = {gltfImage.Content.MimeType}");
-            return false;
-        }
-
-        textureLoadData.SamplerState = sampledImage.SamplerState;
 
         return true;
     }
@@ -1240,6 +1210,7 @@ public static unsafe class ModelLoader
                     tasks[uniqueMeshPrimitivesCount++] = Task.Run(() =>
                     {
                         (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(modelRoot.LogicalAccessors, meshDesc);
+                        OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
 
                         MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
                         (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);
@@ -1702,12 +1673,13 @@ public static unsafe class ModelLoader
                 vertexStreams[1] = new Meshopt.Stream() { Data = meshPositionsPtr, Size = (nuint)sizeof(Vector3), Stride = (nuint)sizeof(Vector3) };
 
                 int optimizedVertexCount = (int)Meshopt.GenerateVertexRemapMulti(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length, vertexStreams[0], (nuint)vertexStreams.Length);
-                Array.Resize(ref meshVertices, optimizedVertexCount);
-                Array.Resize(ref meshVertexPositions, optimizedVertexCount);
 
                 Meshopt.RemapIndexBuffer(ref meshIndices[0], meshIndices[0], (nuint)meshIndices.Length, remapTable[0]);
                 Meshopt.RemapVertexBuffer(vertexStreams[0].Data, vertexStreams[0].Data, (nuint)meshVertices.Length, vertexStreams[0].Stride, remapTable[0]);
                 Meshopt.RemapVertexBuffer(vertexStreams[1].Data, vertexStreams[1].Data, (nuint)meshVertexPositions.Length, vertexStreams[1].Stride, remapTable[0]);
+
+                Array.Resize(ref meshVertices, optimizedVertexCount);
+                Array.Resize(ref meshVertexPositions, optimizedVertexCount);
             }
         }
         if (optimizationSettings.VertexCacheOptimization)
@@ -1720,12 +1692,13 @@ public static unsafe class ModelLoader
             fixed (void* meshVerticesPtr = meshVertices, meshPositionsPtr = meshVertexPositions)
             {
                 int optimizedVertexCount = (int)Meshopt.OptimizeVertexFetchRemap(ref remapTable[0], meshIndices[0], (nuint)meshIndices.Length, (nuint)meshVertices.Length);
-                Array.Resize(ref meshVertices, optimizedVertexCount);
-                Array.Resize(ref meshVertexPositions, optimizedVertexCount);
 
                 Meshopt.RemapIndexBuffer(ref meshIndices[0], meshIndices[0], (nuint)meshIndices.Length, remapTable[0]);
                 Meshopt.RemapVertexBuffer(meshVerticesPtr, meshVerticesPtr, (nuint)meshVertices.Length, (nuint)sizeof(GpuVertex), remapTable[0]);
                 Meshopt.RemapVertexBuffer(meshPositionsPtr, meshPositionsPtr, (nuint)meshVertexPositions.Length, (nuint)sizeof(Vector3), remapTable[0]);
+
+                Array.Resize(ref meshVertices, optimizedVertexCount);
+                Array.Resize(ref meshVertexPositions, optimizedVertexCount);
             }
         }
     }
@@ -1862,7 +1835,7 @@ public static unsafe class ModelLoader
 
             // -v         = verbose output
             // -noq       = no mesh quantization (KHR_mesh_quantization)
-            // -ac        = keep constant animation tracks even if they don't modify the myNode transform
+            // -ac        = keep constant animation tracks even if they don't modify the node transform
             // -tc        = do KTX2 texture compression (KHR_texture_basisu)
             // -tq        = texture quality
             // -mi        = use instancing (EXT_mesh_gpu_instancing)
@@ -2036,13 +2009,13 @@ public static unsafe class ModelLoader
             {
                 texture = new GLTexture(GLTexture.Type.Texture2D);
                 texture.Allocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-                texture.Upload2D(2, 2, GLTexture.PixelFormat.RGBA, GLTexture.PixelType.Float, new Vector4[]
+                texture.Upload2D(2, 2, GLTexture.PixelFormat.RGB, GLTexture.PixelType.UByte, new byte[]
                 {
                     // Source: https://en.wikipedia.org/wiki/File:Minecraft_missing_texture_block.svg
-                    new Vector4(251.0f / 255.0f, 62.0f / 255.0f, 249.0f / 255.0f, 1.0f), // Purple
-                    new Vector4(0.0f, 0.0f, 0.0f, 1.0f), // Black
-                    new Vector4(0.0f, 0.0f, 0.0f, 1.0f), // Black
-                    new Vector4(251.0f / 255.0f, 62.0f / 255.0f, 249.0f / 255.0f, 1.0f), // Purple
+                    251,  62, 249, // Purple
+                      0,   0,   0, // Black
+                      0,   0,   0, // Black
+                    251,  62, 249  // Purple
                 }[0]);
 
                 cachedPurpleBackTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);

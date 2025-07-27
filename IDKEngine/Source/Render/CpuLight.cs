@@ -3,7 +3,7 @@ using OpenTK.Mathematics;
 
 namespace IDKEngine.Render;
 
-class CpuLight
+public class CpuLight
 {
     public const float MASS = 0.5f;
 

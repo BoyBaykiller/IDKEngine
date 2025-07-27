@@ -9,7 +9,7 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render;
 
-class LightManager : IDisposable
+public class LightManager : IDisposable
 {
     // Light and PointShadow are in a 1-to-1 relationship.
     // Light is the owner.
@@ -126,6 +126,11 @@ class LightManager : IDisposable
     public void ComputeRayTracedShadows(int samples)
     {
         pointShadowManager.ComputeRayTracedShadowMaps(samples);
+    }
+
+    public void AddLight(GpuLight light)
+    {
+        AddLight(new CpuLight(light));
     }
 
     public bool AddLight(CpuLight light)

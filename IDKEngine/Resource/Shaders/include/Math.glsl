@@ -187,7 +187,7 @@ uint FloatToKey(float value)
     // Note: We do right shift on an int, meaning arithmetic shift
 
     uint f = floatBitsToUint(value);
-    uint mask = (int(f) >> 31 | (1u << 31));
+    uint mask = uint((int(f) >> 31) | (1 << 31));
 
     return f ^ mask;
 }
@@ -199,7 +199,7 @@ uvec3 FloatToKey(vec3 vec)
 
 float KeyToFloat(uint key)
 {
-    uint mask = ((key >> 31) - 1) | 0x80000000;
+    uint mask = ((key >> 31) - 1) | 0x80000000u;
     return uintBitsToFloat(key ^ mask);
 }
 

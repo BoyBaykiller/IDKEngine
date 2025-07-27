@@ -18,7 +18,7 @@ public unsafe struct GpuMesh
     public int MeshletCount;
 
     public int InstanceCount;
-    public bool TintOnTransmissive = true;
+    public bool TintOnTransmissive;
     private fixed bool _pad[3];
     private readonly float _pad0;
     public readonly float _pad1;

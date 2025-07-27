@@ -96,6 +96,8 @@ public struct Box
         return size.X * size.Y * size.Z;
     }
 
+    // For PreSplitting. Reduces code size and is called in hot loop
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly int LargestAxis()
     {
         Vector128<float> size = SimdSize();
@@ -105,9 +107,12 @@ public struct Box
         return axis;
     }
 
+    // For PreSplitting. Reduces code size and is called in hot loop
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly float LargestExtent()
     {
-        return Size()[LargestAxis()];
+        Vector128<float> size = SimdSize();
+        return MyMath.NativeMax(size[0], MyMath.NativeMax(size[1], size[2]));
     }
 
     public readonly float Area()

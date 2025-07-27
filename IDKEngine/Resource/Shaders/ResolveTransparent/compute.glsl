@@ -51,7 +51,6 @@ void main()
     // Front to back blending
     // glBlendEquation(mode: GL_FUNC_ADD)
     // glBlendFunc(sfactor: GL_ONE_MINUS_DST_ALPHA, dfactor: 1.0)
-
     vec4 accumulatedColor = vec4(0.0);
     for (int i = 0; i < fragmentCount; i++)
     {
@@ -61,6 +60,8 @@ void main()
         accumulatedColor += weightOfSample * samplePremult;
     }
 
+    // Finally calculate how much of the existing opaque color
+    // reaches the camera after alpha blending is applied
     vec4 opaqueColor = imageLoad(ImgResult, imgCoord);
     accumulatedColor += (1.0 - accumulatedColor.a) * opaqueColor;
 
@@ -69,6 +70,7 @@ void main()
 
 void InsertionSort(Fragment newItem, int count)
 {
+    // Sort by depth in ascending oder
     for (int i = 0; i < count; i++)
     {
         if (newItem.Depth < fragments[i].Depth)

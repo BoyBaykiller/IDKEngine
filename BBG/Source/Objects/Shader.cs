@@ -186,19 +186,20 @@ public static partial class BBG
                 int afterVersionStatement = match.Index + match.Length; // 0 if not found
                 int versionStatementLineCount = CountLines(result, afterVersionStatement);
                 result = result.Insert(afterVersionStatement,
+                    // The inserted code here is limited to preprocessor statements.
+                    // This is to avoid "can't enable extension in middle of shader" error.
                     $"""
+                    #extension GL_ARB_bindless_texture : require
+                    #extension GL_EXT_shader_image_load_formatted : require
+
                     #if {(EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE != null ? 1 : 0)}
                     #extension {EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE} : enable
                     #endif
 
-                    // Keep in sync between shader and client code!
                     #define {GetShaderStageInsertion(shaderStage)} 1
                     #define {GetVendorInsertion()} 1
-                    
-                    const uint MIN_SUBGROUP_SIZE = {GetMinSubgroupSize()};
+                    #define MIN_SUBGROUP_SIZE {GetMinSubgroupSize()}
 
-                    #extension GL_ARB_bindless_texture : require
-                    #extension GL_EXT_shader_image_load_formatted : require
                     #line {versionStatementLineCount + 1}
 
                     """

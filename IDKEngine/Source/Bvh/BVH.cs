@@ -334,7 +334,7 @@ public class BVH : IDisposable
         const bool enablePresplitting = true;
         BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
         PreSplitting.Settings preSplittingSettings = new PreSplitting.Settings();
-
+        
         // Statistics
         int preSplitNewTris = 0;
         int newTrisDeduplicated = 0;
@@ -364,8 +364,8 @@ public class BVH : IDisposable
                 (BLAS.GetTriangleBounds(geometry), []);
 
             // Allocate temporary build data and upper bound of required nodes
-            BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
             GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(fragments.Count)];
+            BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
 
             // Build BLAS and resize nodes
             BLAS.BuildResult blas = new BLAS.BuildResult(nodes);

@@ -190,6 +190,7 @@ class PathTracer : IDisposable
 
             if (DoRaySorting && i > 1)
             {
+                // Investigate: This is harmful on radeonsi driver even though sorting takes just as much time???
                 RaySorting();
             }
 

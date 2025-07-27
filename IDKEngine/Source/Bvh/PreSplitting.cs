@@ -78,7 +78,7 @@ public static class PreSplitting
                 }
 
                 int splitAxis = box.LargestAxis();
-                float largestExtent = box.Size()[splitAxis];
+                float largestExtent = box.LargestExtent();
 
                 float alpha = largestExtent / globalSize[splitAxis];
                 float cellSize = GetCellSize(alpha) * globalSize[splitAxis];

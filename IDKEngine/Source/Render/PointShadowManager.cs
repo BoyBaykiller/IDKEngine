@@ -122,7 +122,7 @@ class PointShadowManager : IDisposable
         }
     }
 
-    private unsafe void UploadPointShadow(int index)
+    private void UploadPointShadow(int index)
     {
         if (!TryGetPointShadow(index, out CpuPointShadow pointShadow))
         {

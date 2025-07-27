@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
@@ -7,7 +8,6 @@ using OpenTK.Mathematics;
 using ReFuel.Stb;
 using BBLogger;
 using BBOpenGL;
-using System.Diagnostics;
 
 namespace IDKEngine.Utils;
 
@@ -116,6 +116,26 @@ public static class Helper
         }
 
         return sum;
+    }
+
+    public static void InterlockedMax(ref ulong mem, ulong value)
+    {
+        while (true)
+        {
+            ulong cur = mem;
+            ulong newValue = Math.Max(cur, value);
+            bool written = Interlocked.CompareExchange(ref mem, newValue, cur) == cur;
+            if (written)
+            {
+                break;
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ref T UnsafeAt<T>(this Span<T> data, int index)
+    {
+        return ref Unsafe.Add(ref MemoryMarshal.GetReference(data), index);
     }
 
     public static ValueTuple<T, int> FindIndex<T>(this T[] array, Func<T, bool> func)

@@ -3,7 +3,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine.Windowing;
 
-unsafe class Mouse
+public unsafe class Mouse
 {
     private enum ScrollState : int
     {

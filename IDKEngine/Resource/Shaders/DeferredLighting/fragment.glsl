@@ -55,24 +55,23 @@ void main()
         
         if (contribution != vec3(0.0))
         {
-            float shadow = 0.0;
             if (light.PointShadowIndex == -1)
             {
-                shadow = 0.0;
+                // Light has no shadow
             }
             else if (ShadowMode == ENUM_SHADOW_MODE_PCF)
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
                 vec3 lightToSample = unjitteredFragPos - light.Position;
-                shadow = 1.0 - Visibility(pointShadow, surface.Normal, lightToSample);
+                float visibility = Visibility(pointShadow, surface.Normal, lightToSample);
+                contribution *= visibility;
             }
             else if (ShadowMode == ENUM_SHADOW_MODE_RAY_TRACED)
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
-                shadow = imageLoad(image2D(pointShadow.RayTracedShadowMapImage), imgCoord).r;
+                float visibility = imageLoad(image2D(pointShadow.RayTracedShadowMapImage), imgCoord).r;
+                contribution *= visibility;
             }
-
-            contribution *= (1.0 - shadow);
         }
 
         directLighting += contribution;
@@ -90,5 +89,5 @@ void main()
     }
 
     OutFragColor = vec4((directLighting + indirectLight) + surface.Emissive, 1.0);
-    // OutFragColor = vec4(alpha);
+    // OutFragColor = vec4(surface.Normal * 0.5 + 0.5, 1.0);
 }

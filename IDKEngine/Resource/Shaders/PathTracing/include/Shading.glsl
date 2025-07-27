@@ -107,7 +107,7 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
 
         vec3 refractionRayDir;
         bool totalInternalReflection;
-        if (surface.IsThinWalled)
+        if (!surface.IsVolumetric)
         {
             refractionRayDir = incomming;
             totalInternalReflection = false;
@@ -127,7 +127,8 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
         refractionRayDir = normalize(mix(refractionRayDir, !totalInternalReflection ? -diffuseRayDir : diffuseRayDir, surface.Roughness));
         result.RayDirection = refractionRayDir;
 
-        if (surface.TintOnTransmissive)
+        bool gltfWantsTint = surface.IsVolumetric || !fromInside;
+        if (gltfWantsTint && surface.TintOnTransmissive)
         {
             result.Bsdf = surface.Albedo;
         }

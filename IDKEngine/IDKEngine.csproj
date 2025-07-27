@@ -7,6 +7,7 @@
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
     <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!--<UseWindowsThreadPool>true</UseWindowsThreadPool>-->
 
@@ -36,25 +37,20 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
   </PropertyGroup>
-
 
   <ItemGroup>
     <PackageReference Include="FFX_FSR2" Version="1.0.2" />
@@ -63,16 +59,15 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="ImGui.NET" Version="1.90.8.1" />
-    <PackageReference Include="Ktx2.NET" Version="1.0.3" />
+    <PackageReference Include="Ktx2.NET" Version="1.0.4" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.6" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
     <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.14" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.14" />
     <PackageReference Include="ReFuel.StbImage" Version="2.1.0" />
-    <PackageReference Include="SharpGLTF.Core" Version="1.0.4" />
-    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.4" />
+    <PackageReference Include="SharpGLTF.Core" Version="1.0.5" />
+    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.5" />
   </ItemGroup>
-
 
   <ItemGroup>
     <ProjectReference Include="..\BBG\BBG.csproj" />
