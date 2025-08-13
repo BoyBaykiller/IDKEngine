@@ -57,7 +57,7 @@ bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout f
             uint end = !intersectRight ? (leftNode.TriStartOrChild + leftNode.TriCount) : (rightNode.TriStartOrChild + rightNode.TriCount);
             first += blasDesc.GeometryDesc.TriangleOffset;
             end += blasDesc.GeometryDesc.TriangleOffset;
-            debugCost += (end - first) * 1.1;
+            debugCost += (end - first) * 1.1; // hardcoded triangle cost
             
             for (uint i = first; i < end; i++)
             {

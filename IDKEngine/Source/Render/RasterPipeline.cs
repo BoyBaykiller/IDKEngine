@@ -419,10 +419,12 @@ class RasterPipeline : IDisposable
         {
             lightManager.ComputeRayTracedShadows(RayTracingSamples);
         }
+
         if (IsSSAO)
         {
             SSAO.Compute();
         }
+
         if (IsVXGI)
         {
             ConeTracer.Compute(Voxelizer.ResultVoxels);

@@ -143,7 +143,7 @@ public static class PreSplitting
     /// When Pre-Splitting was done prior to building the BLAS duplicate triangle references in a leaf(-pair) may happen.
     /// Here we deduplicate them, possibly resulting in leaf-pair triangle ranges like:
     /// [lStart, lEnd), [rStart, rEnd), where the "straddling triangles" in range [rStart, lEnd) are shared between the left and right node.
-    /// Otherwise this is equivalent to <see cref="BLAS.GetUnindexedTriangles(in BLAS.BuildData, in BLAS.Geometry)"/>
+    /// Otherwise this is equivalent to <see cref="BLAS.GetUnindexedTriangles(in BLAS.BuildResult, in BLAS.BuildData, in BLAS.Geometry)"/>
     /// </summary>
     /// <returns></returns>
     public static GpuIndicesTriplet[] GetUnindexedTriangles(in BLAS.BuildResult blas, in BLAS.BuildData buildData, in BLAS.Geometry geometry)
@@ -166,30 +166,31 @@ public static class PreSplitting
             {
                 Span<int> leftUniqueTriIds = GetUniqueTriIds(leftChild, buildData);
                 Span<int> rightUniqueTriIds = GetUniqueTriIds(rightChild, buildData);
-                Span<int> straddlingTriIds = GetStraddlingTriIds(leftUniqueTriIds, rightUniqueTriIds);
 
                 int onlyLeftTriCount = 0;
                 int backwardsCounter = 0;
                 for (int i = 0; i < leftUniqueTriIds.Length; i++)
                 {
-                    int triId = leftUniqueTriIds[i];
-                    if (straddlingTriIds.Contains(triId))
+                    int leftTriId = leftUniqueTriIds[i];
+                    bool isStraddling = rightUniqueTriIds.Contains(leftTriId);
+                    if (isStraddling)
                     {
-                        triangles[globalTriCounter + (leftUniqueTriIds.Length - backwardsCounter++ - 1)] = geometry.Triangles[triId];
+                        triangles[globalTriCounter + (leftUniqueTriIds.Length - backwardsCounter++ - 1)] = geometry.Triangles[leftTriId];
                     }
                     else
                     {
-                        triangles[globalTriCounter + onlyLeftTriCount++] = geometry.Triangles[triId];
+                        triangles[globalTriCounter + onlyLeftTriCount++] = geometry.Triangles[leftTriId];
                     }
                 }
 
                 int onlyRightTriCount = 0;
                 for (int i = 0; i < rightUniqueTriIds.Length; i++)
                 {
-                    int triId = rightUniqueTriIds[i];
-                    if (!straddlingTriIds.Contains(triId))
+                    int rightTriId = rightUniqueTriIds[i];
+                    bool isStraddling = leftUniqueTriIds.Contains(rightTriId);
+                    if (!isStraddling)
                     {
-                        triangles[globalTriCounter + leftUniqueTriIds.Length + onlyRightTriCount++] = geometry.Triangles[triId];
+                        triangles[globalTriCounter + leftUniqueTriIds.Length + onlyRightTriCount++] = geometry.Triangles[rightTriId];
                     }
                 }
 
@@ -241,22 +242,6 @@ public static class PreSplitting
             Span<int> uniqueTriIds = triIds.Slice(0, uniqueTriCount);
 
             return uniqueTriIds;
-        }
-
-        static Span<int> GetStraddlingTriIds(Span<int> leftTriIds, Span<int> rightTriIds)
-        {
-            List<int> straddlingTris = new List<int>((leftTriIds.Length + rightTriIds.Length) / 4);
-            for (int i = 0; i < leftTriIds.Length; i++)
-            {
-                int triId = leftTriIds[i];
-
-                if (rightTriIds.Contains(triId))
-                {
-                    straddlingTris.Add(triId);
-                }
-            }
-
-            return straddlingTris;
         }
 
         Array.Resize(ref triangles, globalTriCounter);

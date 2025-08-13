@@ -33,7 +33,6 @@ public static class TLAS
 
         {
             // Create all leaf nodes at the end of the nodes array
-
             Span<GpuTlasNode> leafNodes = tempNodes.AsSpan(nodes.Length - primitiveCount, primitiveCount);
 
             Box globalBounds = Box.Empty();

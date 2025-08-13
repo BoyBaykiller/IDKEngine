@@ -13,12 +13,12 @@ class FSR2Wrapper : IDisposable
     public static readonly bool IS_SUPPORTED = OperatingSystem.IsWindows();
 
     public bool IsSharpening;
-    public float Sharpness = 0.5f;
+    public float Sharpness;
 
     public BBG.Texture Result;
 
     private FSR2.Context fsr2Context;
-    private byte[] fsr2ScratchMemory;
+    private UnmanagedArray<byte> fsr2ScratchMemory;
     private bool isFsr2Initialized;
 
     public FSR2Wrapper(Vector2i maxInputSize, Vector2i outputSize)
@@ -31,6 +31,7 @@ class FSR2Wrapper : IDisposable
 
         SetSize(maxInputSize, outputSize);
         IsSharpening = true;
+        Sharpness = 0.5f;
     }
 
     public void Run(BBG.Texture color, BBG.Texture depth, BBG.Texture velocity, Camera camera, Vector2 jitter, float deltaMs)
@@ -52,11 +53,11 @@ class FSR2Wrapper : IDisposable
             JitterOffset = new FSR2Types.FloatCoords2D() { X = jitter.X, Y = jitter.Y },
             MotionVectorScale = new FSR2Types.FloatCoords2D() { X = -renderSize.X, Y = -renderSize.Y },
             RenderSize = new FSR2Types.Dimensions2D() { Width = (uint)renderSize.X, Height = (uint)renderSize.Y },
-            EnableSharpening = IsSharpening ? (byte)1 : (byte)0,
+            EnableSharpening = IsSharpening,
             Sharpness = Sharpness,
             FrameTimeDelta = deltaMs,
             PreExposure = 1.0f,
-            Reset = 0,
+            Reset = false,
             CameraNear = camera.NearPlane,
             CameraFar = camera.FarPlane,
             CameraFovAngleVertical = camera.FovY,
@@ -86,10 +87,10 @@ class FSR2Wrapper : IDisposable
             Flags = FSR2.InitializationFlagBits.EnableHighDynamicRange | FSR2.InitializationFlagBits.EnableAutoExposure | FSR2.InitializationFlagBits.EnableDebugChecking | FSR2.InitializationFlagBits.AllowNullDeviceAndCommandList,
             MaxRenderSize = new FSR2Types.Dimensions2D() { Width = (uint)inputSize.X, Height = (uint)inputSize.Y },
             DisplaySize = new FSR2Types.Dimensions2D() { Width = (uint)outputSize.X, Height = (uint)outputSize.Y },
-            FpMessage = (delegate* unmanaged<FSR2Interface.MsgType, string, void>)Marshal.GetFunctionPointerForDelegate((FSR2.FpMessageDelegate)Fsr2Message),
+            FpMessage = &Fsr2Message,
         };
-        fsr2ScratchMemory = new byte[FSR2.GL.GetScratchMemorySize()];
-        FSR2.GL.GetInterface(out contextDesc.Callbacks, ref fsr2ScratchMemory[0], (nuint)fsr2ScratchMemory.Length, GLFW.GetProcAddress);
+        fsr2ScratchMemory = new UnmanagedArray<byte>(FSR2.GL.GetScratchMemorySize());
+        FSR2.GL.GetInterface(out contextDesc.Callbacks, fsr2ScratchMemory.Elements, (nuint)fsr2ScratchMemory.Length, &GetProcAddress);
         FSR2.ContextCreate(out fsr2Context, contextDesc);
         isFsr2Initialized = true;
     }
@@ -97,6 +98,8 @@ class FSR2Wrapper : IDisposable
     public void Dispose()
     {
         FSR2.ContextDestroy(ref fsr2Context);
+        fsr2ScratchMemory.Dispose();
+
         Result.Dispose();
     }
 
@@ -110,8 +113,15 @@ class FSR2Wrapper : IDisposable
         return MathF.Log2((float)renderWidth / displayWith) - 1.0f;
     }
 
-    private static void Fsr2Message(FSR2Interface.MsgType type, string message)
+    [UnmanagedCallersOnly]
+    private static unsafe void Fsr2Message(FSR2Interface.MsgType type, char* message)
     {
-        Logger.Log(Logger.LogLevel.Warn, $"FSR2: {type} {message}");
+        Logger.Log(Logger.LogLevel.Warn, $"FSR2: {type} {new string(message)}");
+    }
+
+    [UnmanagedCallersOnly]
+    private static unsafe void* GetProcAddress(byte* name)
+    {
+        return (void*)GLFW.GetProcAddressRaw(name);
     }
 }

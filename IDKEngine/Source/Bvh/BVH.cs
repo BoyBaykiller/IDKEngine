@@ -379,8 +379,8 @@ public class BVH : IDisposable
             if (false)
             {
                 // Post build optimizaton. Even though it is succefull at decreasing global SAH cost
-                // this often does not transform into a performance increase. Top-down build implicitly optimize for less EPO.
-                // This reinsertion optimization can add EPO. This is my guess as to why.
+                // this often does not transform into a performance increase.
+                // It tends to increase max depth and EPO and I think there also other factors
                 ReinsertionOptimizer.Optimize(ref blas, parentIds, new ReinsertionOptimizer.Settings());
             }
 
@@ -389,11 +389,11 @@ public class BVH : IDisposable
                 PreSplitting.GetUnindexedTriangles(blas, buildData, geometry) :
                 BLAS.GetUnindexedTriangles(blas, buildData, geometry);
 
+            int[] leafIds = BLAS.GetLeafIndices(blas);
+
             // Statistics
             Interlocked.Add(ref preSplitNewTris, fragments.Count - geometry.TriangleCount);
             Interlocked.Add(ref newTrisDeduplicated, blasTriangles.Length - geometry.TriangleCount);
-
-            int[] leafIds = BLAS.GetLeafIndices(blas);
 
             blasDesc.NodeCount = blas.Nodes.Length;
             blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;

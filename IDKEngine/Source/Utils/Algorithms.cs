@@ -52,7 +52,7 @@ public static class Algorithms
         const int passes = 3;
 
         // We don't use Span<int> here because:
-        // 1. Even though it could, the JIT currently does not elide all bound checks: https://github.com/dotnet/runtime/issues/112725
+        // 1. Not all bounds check are elided: https://github.com/dotnet/runtime/issues/112725
         // 2. Constant offsets are not baked into address calculation: https://discord.com/channels/143867839282020352/312132327348240384/1342254292995801100
         // 3. Local functions can't capture Span<T>: https://discord.com/channels/143867839282020352/312132327348240384/1336514607493283881
         int* prefixSum = stackalloc int[binSize * passes];
@@ -162,8 +162,8 @@ public static class Algorithms
     }
 
     /// <summary>
-    /// Removes all items except one from every group of consecutive equivalent items.
-    /// Input should be sorted. Equivalent to std::unique
+    /// Input should be sorted. Removes all items except one from every group of consecutive equivalent items.
+    /// Equivalent to std::unique
     /// </summary>
     /// <param name="arr"></param>
     /// <returns></returns>

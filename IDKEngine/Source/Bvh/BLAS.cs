@@ -16,8 +16,8 @@ namespace IDKEngine.Bvh;
 /// There are a few properties we should be aware of and maintain:
 /// * The root must never be a leaf
 /// * The left child of the root must be at index 1
-/// * A leaf-pair always forms a continous range of triangles beginning left
-/// * Straddling triangles of a leaf-pair can be shared (when Pre-Splitting is enabled)
+/// * A leaf-pair always forms a continous range of geometry beginning left
+/// * Straddling geometry of a leaf-pair can be shared (when Pre-Splitting is enabled)
 /// </summary>
 public static class BLAS
 {
@@ -130,9 +130,11 @@ public static class BLAS
             Span<int> output = buildData.FragmentIdsSortedOnAxis[axis];
 
             Helper.FillIncreasing(input);
+
+            // We're loosing perf here compared to C++ because of indirect call on lambda func
             Algorithms.RadixSort(input, output, (int index) =>
             {
-                float centerAxis = (fragments.Bounds[index].Min[axis] + fragments.Bounds[index].Max[axis]) * 0.5f;
+                float centerAxis = (fragments.Bounds[index].SimdMin[axis] + fragments.Bounds[index].SimdMax[axis]) * 0.5f;
                 return Algorithms.FloatToKey(centerAxis);
             });
         }
@@ -377,7 +379,7 @@ public static class BLAS
 
     public static GpuIndicesTriplet[] GetUnindexedTriangles(in BuildResult blas, in BuildData buildData, in Geometry geometry)
     {
-        GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[geometry.TriangleCount];
+        GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.Fragments.Count];
         int triCounter = 0;
 
         for (int i = 0; i < blas.UnpaddedNodesCount; i++)
@@ -385,6 +387,10 @@ public static class BLAS
             ref GpuBlasNode node = ref blas.Nodes[i];
             if (node.IsLeaf)
             {
+                // It is important that we put the geometry of the left child first
+                // and then immeditaly afer the right childs geometry. Sweep-SAH builder
+                // already guarantees this layout but Reinserton opt can destroy it.
+
                 for (int j = 0; j < node.TriCount; j++)
                 {
                     triangles[triCounter + j] = geometry.Triangles[buildData.PermutatedFragmentIds[node.TriStartOrChild + j]];

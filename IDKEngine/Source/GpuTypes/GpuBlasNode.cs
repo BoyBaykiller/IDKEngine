@@ -8,7 +8,7 @@ namespace IDKEngine.GpuTypes;
 public record struct GpuBlasNode
 {
     public readonly bool IsLeaf => TriCount > 0;
-    
+
     public readonly int TriEnd
     {
         get
