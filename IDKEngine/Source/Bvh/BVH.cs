@@ -46,6 +46,7 @@ public class BVH : IDisposable
 
     public record struct RayHitInfo
     {
+        public int TriangleId;
         public GpuIndicesTriplet TriangleIndices;
         public Vector3 Bary;
         public float T;
@@ -156,12 +157,15 @@ public class BVH : IDisposable
                 ref readonly GpuBlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
 
                 Ray localRay = ray.Transformed(meshInstance.InvModelMatrix);
+                BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
+
                 if (BLAS.Intersect(
                     GetBlas(blasDesc),
-                    GetBlasGeometry(blasDesc.GeometryDesc),
+                    geometry,
                     localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                 {
-                    hitInfo.TriangleIndices = blasHitInfo.TriangleIndices;
+                    hitInfo.TriangleId = blasHitInfo.TriangleId;
+                    hitInfo.TriangleIndices = geometry.Triangles[blasHitInfo.TriangleId];
                     hitInfo.Bary = blasHitInfo.Bary;
                     hitInfo.T = blasHitInfo.T;
                     hitInfo.InstanceID = i;
@@ -173,7 +177,7 @@ public class BVH : IDisposable
     }
 
     public delegate bool FuncIntersectLeafNode(in BoxHitInfo hitInfo);
-    public void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
+    public unsafe void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
     {
         if (CpuUseTlas)
         {
@@ -187,14 +191,18 @@ public class BVH : IDisposable
                 ref readonly GpuBlasDesc blasDesc = ref BlasesDesc[meshInstance.MeshId];
 
                 Box localBox = Box.Transformed(box, meshInstance.InvModelMatrix);
+                BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
+                BLAS.Geometry* geometryPtr = &geometry;
 
                 BLAS.Intersect(
                     GetBlas(blasDesc),
-                    GetBlasGeometry(blasDesc.GeometryDesc),
-                    localBox, (in GpuIndicesTriplet hitTriangle) =>
+                    geometry,
+                    localBox, (int triangleId) =>
                     {
+                        GpuIndicesTriplet triangle = (*geometryPtr).Triangles[triangleId];
+
                         BoxHitInfo hitInfo;
-                        hitInfo.TriangleIndices = hitTriangle;
+                        hitInfo.TriangleIndices = triangle;
                         hitInfo.InstanceID = i;
 
                         return intersectFunc(hitInfo);
@@ -324,7 +332,7 @@ public class BVH : IDisposable
 
     public static Statistics DebugStatistics;
 
-    public void BlasesBuild(int start, int count)
+    public unsafe void BlasesBuild(int start, int count)
     {
         if (count == 0) return;
 
@@ -363,14 +371,14 @@ public class BVH : IDisposable
                 PreSplitting.PreSplit(geometry, preSplittingSettings) :
                 (BLAS.GetTriangleBounds(geometry), []);
 
-            // Allocate temporary build data and upper bound of required nodes
+            // Allocate upper bound of nodes
             GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(fragments.Count)];
-            BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
+            BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
 
             // Build BLAS and resize nodes
-            BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
+            BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
             int nodesUsed = BLAS.Build(ref blas, buildData, buildSettings);
-            
+
             Array.Resize(ref nodes, nodesUsed);
             blas.Nodes = nodes;
 

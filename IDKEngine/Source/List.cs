@@ -8,7 +8,7 @@ namespace IDKEngine;
 public class List<T>
 {
     public const float GROWTH_FACTOR = 2.0f;
-    public const int DefaultCapacity = 4;
+    public const int DEFAULT_CAPACITY = 4;
 
     public int Capacity => buffer.Length;
 
@@ -81,7 +81,7 @@ public class List<T>
 
     public void GrowIfNeeded(int requiredSize)
     {
-        int newCapacity = buffer.Length == 0 ? DefaultCapacity : buffer.Length;
+        int newCapacity = buffer.Length == 0 ? DEFAULT_CAPACITY : buffer.Length;
         while (newCapacity < requiredSize)
         {
             newCapacity = (int)(newCapacity * GROWTH_FACTOR);

@@ -29,17 +29,19 @@ public ref struct ReinsertionOptimizer
         public float AreaDecrease;
     }
 
-    private record struct Candidates
+    private record struct Candidate : MyComparer.IComparisons<Candidate>
     {
-        public readonly int Length => NodeIds.Length;
+        public int NodeId;
+        public float Cost;
 
-        public int[] NodeIds;
-        public float[] Costs;
-
-        public Candidates(int num)
+        public static bool operator >(in Candidate lhs, in Candidate rhs)
         {
-            NodeIds = new int[num];
-            Costs = new float[num];
+            return lhs.Cost > rhs.Cost;
+        }
+
+        public static bool operator <(in Candidate lhs, in Candidate rhs)
+        {
+            return lhs.Cost < rhs.Cost;
         }
     }
 
@@ -65,14 +67,14 @@ public ref struct ReinsertionOptimizer
 
     private readonly void Optimize(in Settings settings)
     {
-        Candidates candidatesMem = GetCandidatesMem();
+        Candidate[] candidates = GetCandidatesMem();
         for (int i = 0; i < settings.Iterations; i++)
         {
-            Span<int> nodeIds = GetCandidates(candidatesMem, settings.CandidatesPercentage);
+            int count = GetImportantCandidates(candidates, settings.CandidatesPercentage);
 
-            for (int j = 0; j < nodeIds.Length; j++)
+            for (int j = 0; j < count; j++)
             {
-                Reinsertion reinsertion = FindReinsertion(nodeIds[j]);
+                Reinsertion reinsertion = FindReinsertion(candidates[j].NodeId);
 
                 if (reinsertion.AreaDecrease > 0.0f)
                 {
@@ -93,6 +95,25 @@ public ref struct ReinsertionOptimizer
                 SwapChildrenInMem(1, parentIds[3]);
             }
         }
+    }
+
+    private readonly int GetImportantCandidates(Span<Candidate> candidates, float percentage)
+    {
+        int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
+        if (count == 0) return count;
+
+        for (int i = 1; i < candidates.Length + 1; i++)
+        {
+            ref Candidate candidate = ref candidates[i - 1];
+            float cost = nodes[i].HalfArea();
+            candidate.Cost = cost;
+            candidate.NodeId = i;
+        }
+
+        Random rng = new Random(42);
+        Algorithms.PartialSort(candidates, count, rng, MyComparer.GreaterThan);
+
+        return count;
     }
 
     private readonly void ReinsertNode(int inId, int outId)
@@ -131,32 +152,6 @@ public ref struct ReinsertionOptimizer
 
         BLAS.RefitFromNode(parentId, nodes, parentIds); // Refit old parent of 'in'
         BLAS.RefitFromNode(outId, nodes, parentIds); // Refit new parent of 'in'   
-    }
-
-    private readonly Candidates GetCandidatesMem()
-    {
-        return new Candidates(nodes.Length - 1);
-    }
-
-    private readonly Span<int> GetCandidates(Candidates candidates, float percentage)
-    {
-        int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
-        if (count == 0) return [];
-
-        for (int i = 1; i < candidates.Length + 1; i++)
-        {
-            candidates.Costs[i - 1] = nodes[i].HalfArea();
-            candidates.NodeIds[i - 1] = i;
-        }
-
-        Random rng = new Random(42);
-        Algorithms.PartialSort<float>(candidates.Costs, count, rng, MyComparer.GreaterThan, (int a, int b) =>
-        {
-            Algorithms.Swap(ref candidates.NodeIds[a], ref candidates.NodeIds[b]);
-        });
-        //MemoryExtensions.Sort<float, int>(candidates.Costs, candidates.NodeIds, MyComparer.GreaterThan);
-
-        return candidates.NodeIds.AsSpan(0, count);
     }
 
     private readonly Reinsertion FindReinsertion(int nodeId)
@@ -227,6 +222,11 @@ public ref struct ReinsertionOptimizer
         }
 
         return bestReinsertion;
+    }
+
+    private readonly Candidate[] GetCandidatesMem()
+    {
+        return new Candidate[nodes.Length - 1];
     }
 
     private readonly void SwapChildrenInMem(int inParent, int outParent)

@@ -120,7 +120,7 @@ partial class Gui : IDisposable
 
         if (ImGui.Begin("Stats"))
         {
-            ImGui.Text($"GC TotalPauseDuration= {GC.GetTotalPauseDuration().Milliseconds}");
+            ImGui.Text($"GC TotalPauseDuration = {GC.GetTotalPauseDuration().Milliseconds}");
 
             {
                 float mbDrawVertices = (app.ModelManager.Vertices.SizeInBytes() + app.ModelManager.VertexPositions.SizeInBytes()) / 1000000.0f;
@@ -866,8 +866,12 @@ partial class Gui : IDisposable
                 {
                     modified = true;
                 }
+                
+                if (ImGui.Checkbox("Volumetric", ref material.IsVolumetric))
+                {
+                    modified = true;
+                }
 
-                ImGui.Text($"Is IsVolumetric: {material.IsVolumetric}");
                 ImGui.Text($"Uses AlphaBlending: {material.HasAlphaBlending()}");
 
                 ImGui.SeparatorText("Mesh Info");
@@ -880,6 +884,7 @@ partial class Gui : IDisposable
                     meshInstance.ModelMatrix = meshInstanceTransform.GetMatrix();
 
                     app.ModelManager.UploadMeshBuffer(meshInstance.MeshId, 1);
+                    app.ModelManager.UploadMaterialBuffer(mesh.MaterialId, 1);
                     app.ModelManager.SetMeshInstance(meshInstanceInfo.MeshInstanceId, meshInstance);
                     resetPathTracer = true;
                 }
@@ -1335,9 +1340,9 @@ partial class Gui : IDisposable
                 app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
             }
         });
-        BVH.DebugStatistics.TriIntersections /= (ulong)(res.X * res.Y);
-        BVH.DebugStatistics.BoxIntersections /= (ulong)(res.X * res.Y);
-        Console.WriteLine(BVH.DebugStatistics);
+        //BVH.DebugStatistics.TriIntersections /= (ulong)(res.X * res.Y);
+        //BVH.DebugStatistics.BoxIntersections /= (ulong)(res.X * res.Y);
+        Console.WriteLine($"Statistics BoxIntersections = {BVH.DebugStatistics.BoxIntersections / (double)(res.X * res.Y)}, TriIntersections = {BVH.DebugStatistics.TriIntersections / (double)(res.X * res.Y)}");
         Console.WriteLine(sw.ElapsedMilliseconds);
     }
 

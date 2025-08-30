@@ -25,7 +25,7 @@ public static class TLAS
     public delegate Box FuncGetPrimitive(int primId);
     public delegate void FuncGetBlasAndGeometry(int instanceId, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
-    public static void Build(Span<GpuTlasNode> nodes, FuncGetPrimitive funcGetLeaf, int primitiveCount, in BuildSettings buildSettings)
+    public static void Build(Span<GpuTlasNode> nodes, FuncGetPrimitive funcGetLeaf, int primitiveCount, BuildSettings buildSettings)
     {
         if (nodes.Length == 0) return;
 
@@ -170,7 +170,7 @@ public static class TLAS
                 Ray localRay = ray.Transformed(invWorldTransform);
                 if (BLAS.Intersect(blas, geometry, localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                 {
-                    hitInfo.TriangleIndices = blasHitInfo.TriangleIndices;
+                    hitInfo.TriangleIndices = geometry.Triangles[blasHitInfo.TriangleId];
                     hitInfo.Bary = blasHitInfo.Bary;
                     hitInfo.T = blasHitInfo.T;
                     hitInfo.InstanceID = instanceID;
@@ -212,7 +212,7 @@ public static class TLAS
         return hitInfo.T != tMax;
     }
 
-    public static void Intersect(
+    public static unsafe void Intersect(
         ReadOnlySpan<GpuTlasNode> tlasNodes,
         FuncGetBlasAndGeometry funcGetBlasAndGeometry,
         in Box box, BVH.FuncIntersectLeafNode intersectFunc)
@@ -231,10 +231,12 @@ public static class TLAS
                 funcGetBlasAndGeometry(instanceID, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
                 Box localBox = Box.Transformed(box, invWorldTransform);
-                BLAS.Intersect(blas, geometry, localBox, (in GpuIndicesTriplet leafNodeTriangle) =>
+                BLAS.Geometry* geometryPtr = &geometry;
+
+                BLAS.Intersect(blas, geometry, localBox, (int triangleId) =>
                 {
                     BVH.BoxHitInfo hitInfo;
-                    hitInfo.TriangleIndices = leafNodeTriangle;
+                    hitInfo.TriangleIndices = (*geometryPtr).Triangles[triangleId];
                     hitInfo.InstanceID = instanceID;
 
                     return intersectFunc(hitInfo);

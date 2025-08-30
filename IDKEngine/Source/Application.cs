@@ -62,7 +62,7 @@ class Application : GameWindowBase
     }
 
     public Vector2i PresentationResolution => new Vector2i(TonemapAndGamma.Result.Width, TonemapAndGamma.Result.Height);
-    
+
     public Vector2i RenderResolution
     {
         get
@@ -134,7 +134,7 @@ class Application : GameWindowBase
     {
         IsEnabled = true,
         Settings = new Intersections.SceneVsMovingSphereSettings()
-        { 
+        {
             TestSteps = 3,
             RecursiveSteps = 12,
             EpsilonNormalOffset = 0.001f
@@ -157,7 +157,7 @@ class Application : GameWindowBase
     protected override void OnRender(float dT)
     {
         MainThreadQueue.Execute();
-        
+
         HandleFrameRecorderLogic();
 
         Camera.ProjectionSize = RenderResolution;
@@ -244,7 +244,7 @@ class Application : GameWindowBase
 
         if (gui.SelectedEntity is Gui.SelectedEntityInfo.MeshInstance meshInstanceInfo)
         {
-            ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId]; 
+            ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId];
 
             Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(meshInstance.MeshId).Root);
             BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
@@ -437,7 +437,7 @@ class Application : GameWindowBase
         }
         if (!glContextInfo.DeviceInfo.ExtensionSupport.ImageLoadFormatted)
         {
-            Logger.Log(Logger.LogLevel.Fatal, 
+            Logger.Log(Logger.LogLevel.Fatal,
                 "Your system does not support GL_EXT_shader_image_load_formatted.\n" +
                 "Execution is still continued because AMD drivers older than 24.10 have a bug to not report this extension even though its there.\n" +
                 "https://community.amd.com/t5/opengl-vulkan/opengl-bug-gl-ext-shader-image-load-formatted-not-reported-even/m-p/676326#M5140\n" +
@@ -500,11 +500,11 @@ class Application : GameWindowBase
 
             //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().GetMatrix()).Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb", new Transformation().GetMatrix()).Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaRotated45Baked.glb", new Transformation().WithTranslation(-0.1f, -0.1f, 0.4f).WithRotationRad(-0.42f, -0.4f, 0.368f).GetMatrix()).Value;
             //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
             //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(MathF.PI / 2.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
             // ModelLoader.Model tT = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\TransmissionThinwallTestGrid\glTF-Binary\TransmissionThinwallTestGrid.glb").Value;
-
             ModelManager.Add(sponza, lucy, helmet);
 
             SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);

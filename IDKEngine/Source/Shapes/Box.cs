@@ -8,8 +8,8 @@ namespace IDKEngine.Shapes;
 
 public struct Box
 {
-    public readonly Vector3 Min => SimdMin.ToOpenTK();
-    public readonly Vector3 Max => SimdMax.ToOpenTK();
+    public readonly Vector3 Min => SimdMin.AsVector3().ToOpenTK();
+    public readonly Vector3 Max => SimdMax.AsVector3().ToOpenTK();
 
     public Vector128<float> SimdMin;
     public Vector128<float> SimdMax;
@@ -70,12 +70,17 @@ public struct Box
 
     public readonly Vector3 Center()
     {
-        return ((SimdMax + SimdMin) * 0.5f).ToOpenTK();
+        return SimdCenter().AsVector3().ToOpenTK();
+    }
+
+    public readonly Vector128<float> SimdCenter()
+    {
+        return ((SimdMax + SimdMin) * 0.5f);
     }
 
     public readonly Vector3 Size()
     {
-        return SimdSize().ToOpenTK();
+        return SimdSize().AsVector3().ToOpenTK();
     }
 
     public readonly Vector128<float> SimdSize()

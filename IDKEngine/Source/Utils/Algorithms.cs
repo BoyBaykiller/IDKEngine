@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
@@ -196,7 +195,8 @@ public static class Algorithms
 
     /// <summary>
     /// Rearranges elements such that the range [start, end) contains the sorted (end − start) smallest elements in the range [start, end).
-    /// The order of equal elements is not guaranteed to be preserved. The order of the remaining elements in the range [middle, last) is unspecified.
+    /// The order of equal elements is not guaranteed to be preserved.
+    /// The order of the unsorted elements in the range [middle, last) is unspecified and depending on the rng undeterministic.
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <param name="values"></param>

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
@@ -87,7 +86,7 @@ public static class BLAS
 
     public record struct RayHitInfo
     {
-        public GpuIndicesTriplet TriangleIndices;
+        public int TriangleId;
         public Vector3 Bary;
         public float T;
     }
@@ -135,6 +134,7 @@ public static class BLAS
             Algorithms.RadixSort(input, output, (int index) =>
             {
                 float centerAxis = (fragments.Bounds[index].SimdMin[axis] + fragments.Bounds[index].SimdMax[axis]) * 0.5f;
+
                 return Algorithms.FloatToKey(centerAxis);
             });
         }
@@ -142,7 +142,7 @@ public static class BLAS
         return buildData;
     }
 
-    public static int Build(ref BuildResult blas, in BuildData buildData, in BuildSettings settings)
+    public static int Build(ref BuildResult blas, in BuildData buildData, BuildSettings settings)
     {
         int nodesUsed = 0;
 
@@ -270,7 +270,7 @@ public static class BLAS
             bool traverseLeft = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float rayTMax) && tMinLeft <= hitInfo.T;
             bool traverseRight = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out rayTMax) && tMinRight <= hitInfo.T;
 
-            //System.Threading.Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
+            System.Threading.Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
 
             bool intersectLeft = traverseLeft && leftNode.IsLeaf;
             bool intersectRight = traverseRight && rightNode.IsLeaf;
@@ -286,7 +286,7 @@ public static class BLAS
 
                     if (Intersections.RayVsTriangle(ray, triangle, out Vector3 bary, out float t) && t < hitInfo.T)
                     {
-                        hitInfo.TriangleIndices = indicesTriplet;
+                        hitInfo.TriangleId = i;
                         hitInfo.Bary = bary;
                         hitInfo.T = t;
                     }
@@ -295,7 +295,7 @@ public static class BLAS
                 if (leftNode.IsLeaf) traverseLeft = false;
                 if (rightNode.IsLeaf) traverseRight = false;
 
-                //System.Threading.Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
+                System.Threading.Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
             }
 
             if (traverseLeft || traverseRight)
@@ -321,11 +321,10 @@ public static class BLAS
         return hitInfo.T != tMaxDist;
     }
 
-    public delegate bool FuncIntersectLeafNode(in GpuIndicesTriplet leafNodeTriangle);
     public static void Intersect(
         in BuildResult blas,
         in Geometry geometry,
-        in Box box, FuncIntersectLeafNode intersectFunc)
+        in Box box, Func<int, bool> intersectFunc)
     {
         Span<int> stack = stackalloc int[32];
         int stackPtr = 0;
@@ -353,8 +352,7 @@ public static class BLAS
 
                 for (int i = first; i < end; i++)
                 {
-                    ref readonly GpuIndicesTriplet indicesTriplet = ref geometry.Triangles[i];
-                    intersectFunc(indicesTriplet);
+                    intersectFunc(i);
                 }
 
                 if (leftNode.IsLeaf) traverseLeft = false;
@@ -473,7 +471,7 @@ public static class BLAS
         return Math.Max(2 * triangleCount - 1, 3);
     }
 
-    public static float ComputeGlobalSAH(in BuildResult blas, in BuildSettings settings)
+    public static float ComputeGlobalSAH(in BuildResult blas, BuildSettings settings)
     {
         float cost = 0.0f;
 
@@ -574,21 +572,21 @@ public static class BLAS
         return box;
     }
 
-    private static ObjectSplit? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, in BuildSettings settings)
+    private static ObjectSplit? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, BuildSettings settings)
     {
         Box parentBox = Conversions.ToBox(parentNode);
-        float parentArea = parentBox.HalfArea();
 
-        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentArea == 0.0f)
+        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentBox.HalfArea() == 0.0f)
         {
             return null;
         }
 
         int start = parentNode.TriStartOrChild;
         int end = parentNode.TriEnd;
+        float invParentArea = 1.0f / parentBox.HalfArea();
 
         ObjectSplit split = new ObjectSplit();
-        split.NewCost = float.MaxValue;
+        split.NewCost = parentNode.TriCount;
 
         // Unfortunately we have to manually load the fields for best perf
         // as the JIT otherwise repeatedly loads them in the loop
@@ -609,8 +607,8 @@ public static class BLAS
                 rightBoxAccum.GrowToFit(fragBounds[fragIdsSorted[i]]);
 
                 int fragCount = end - i;
-                float probHitRightChild = rightBoxAccum.HalfArea() / parentArea;
-                float rightCost = probHitRightChild * CostLeafNode(fragCount, settings.TriangleCost);
+                float probHitRightChild = rightBoxAccum.HalfArea() * invParentArea;
+                float rightCost = probHitRightChild * fragCount;
 
                 rightCostsAccum[i] = rightCost;
 
@@ -635,21 +633,21 @@ public static class BLAS
                 // https://www.nvidia.in/docs/IO/77714/sbvh.pdf 2.1 BVH Construction
                 int fragIndex = i + 1;
                 int fragCount = fragIndex - start;
-                float probHitLeftChild = leftBoxAccum.HalfArea() / parentArea;
+                float probHitLeftChild = leftBoxAccum.HalfArea() * invParentArea;
 
-                float leftCost = probHitLeftChild * CostLeafNode(fragCount, settings.TriangleCost);
-                float rightCost = rightCostsAccum[i + 1];
+                float leftCost = probHitLeftChild * fragCount;
+                float rightCost = rightCostsAccum[fragIndex];
 
                 // Estimates cost of hitting parentNode if it was split at the evaluated split position.
                 // The full "Surface Area Heuristic" is recursive, but in practice we assume
                 // the resulting child nodes are leafs. This the greedy SAH approach
-                float surfaceAreaHeuristic = CostInternalNode(leftCost, rightCost);
+                float cost = leftCost + rightCost;
 
-                if (surfaceAreaHeuristic < split.NewCost)
+                if (cost < split.NewCost)
                 {
                     split.Pivot = fragIndex;
                     split.Axis = axis;
-                    split.NewCost = surfaceAreaHeuristic;
+                    split.NewCost = cost;
                 }
                 else if (leftCost >= split.NewCost)
                 {
@@ -658,7 +656,8 @@ public static class BLAS
             }
         }
 
-        float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleCost);
+        float notSplitCost = parentNode.TriCount * settings.TriangleCost;
+        split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost);
         if (split.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
         {
             return null;
@@ -709,21 +708,6 @@ public static class BLAS
         Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 2) % 3].AsSpan(start, parentNode.TriCount), partitionAux, partitionLeft);
 
         return split;
-    }
-
-    private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild)
-    {
-        return TRAVERSAL_COST + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
-    }
-
-    private static float CostInternalNode(float costLeft, float costRight)
-    {
-        return TRAVERSAL_COST + costLeft + costRight;
-    }
-
-    private static float CostLeafNode(int numTriangles, float triangleCost)
-    {
-        return numTriangles * triangleCost;
     }
 
     [InlineArray(3)]

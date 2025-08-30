@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Diagnostics;
-using OpenTK;
-using OpenTK.Mathematics;
 using System.Runtime.InteropServices;
+using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using BBLogger;
 
 namespace IDKEngine.Windowing;
 
-abstract unsafe class GameWindowBase : IDisposable, IBindingsContext
+abstract unsafe class GameWindowBase : IDisposable
 {
     private string _title;
     public string WindowTitle
@@ -155,7 +154,7 @@ abstract unsafe class GameWindowBase : IDisposable, IBindingsContext
         WindowPosition = new Vector2i(videoMode->Width / 2 - _framebufferSize.X / 2, videoMode->Height / 2 - _framebufferSize.Y / 2);
 
         GLFW.MakeContextCurrent(window);
-        OpenTK.Graphics.GLLoader.LoadBindings(this);
+        OpenTK.Graphics.GLLoader.LoadBindings(new GLFWBindingsContext());
         
         {
             // Make window black (calling SwapBuffers here irritates diagnostic tools like renderdoc)
@@ -264,10 +263,5 @@ abstract unsafe class GameWindowBase : IDisposable, IBindingsContext
     {
         GLFW.Terminate();
         glfwInitialized = false;
-    }
-
-    public nint GetProcAddress(string procName)
-    {
-        return GLFW.GetProcAddress(procName);
     }
 }

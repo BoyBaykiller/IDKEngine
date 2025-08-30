@@ -135,7 +135,21 @@ public static class Helper
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ref T UnsafeAt<T>(this Span<T> data, int index)
     {
+#if DEBUG
+        return ref data[index];
+#else
         return ref Unsafe.Add(ref MemoryMarshal.GetReference(data), index);
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ref T UnsafeAt<T>(this T[] data, uint index)
+    {
+#if DEBUG
+        return ref data[index];
+#else
+        return ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(data), index);
+#endif
     }
 
     public static ValueTuple<T, int> FindIndex<T>(this T[] array, Func<T, bool> func)
@@ -194,10 +208,6 @@ public static class Helper
     public static Vector3 ToOpenTK(this System.Numerics.Vector3 vector3)
     {
         return Unsafe.BitCast<System.Numerics.Vector3, Vector3>(vector3);
-    }
-    public static Vector3 ToOpenTK(this Vector128<float> vector128)
-    {
-        return vector128.AsVector3().ToOpenTK();
     }
 
     public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
