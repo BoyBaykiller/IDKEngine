@@ -1734,9 +1734,12 @@ public static unsafe class ModelLoader
             CONE_WEIGHT
         );
 
+        byte[] meshletsPrimitiveIndicesPacked = new byte[maxMeshlets * (MESHLET_MAX_TRIANGLE_COUNT * 3 + 3)];
+        uint meshletsPrimitiveIndicesPackedOffset = 0;
+
         for (int i = 0; i < meshlets.Length; i++)
         {
-            ref readonly Meshopt.Meshlet meshlet = ref meshlets[i];
+            ref Meshopt.Meshlet meshlet = ref meshlets[i];
 
             // https://zeux.io/2024/04/09/meshlet-triangle-locality/
             Meshopt.OptimizeMeshlet(
@@ -1745,6 +1748,11 @@ public static unsafe class ModelLoader
                 meshlet.TriangleCount,
                 meshlet.VertexCount
             );
+
+            // Repack meshlets to be aligned to 4 bytes (to be able to use 32-bit loads and writePackedPrimitiveIndices4x8NV)
+            Array.Copy(meshletsPrimitiveIndices, meshlet.TriangleOffset, meshletsPrimitiveIndicesPacked, meshletsPrimitiveIndicesPackedOffset, meshlet.TriangleCount * 3);
+            meshlet.TriangleOffset = meshletsPrimitiveIndicesPackedOffset;
+            meshletsPrimitiveIndicesPackedOffset += (meshlet.TriangleCount * 3 + 3) & ~3u;
         }
 
         ref readonly Meshopt.Meshlet last = ref meshlets[meshletCount - 1];
@@ -1758,7 +1766,8 @@ public static unsafe class ModelLoader
         result.VertexIndices = meshletsVertexIndices;
         result.VertexIndicesLength = (int)meshletsVertexIndicesLength;
 
-        result.LocalIndices = meshletsPrimitiveIndices;
+        Debug.Assert(meshletsLocalIndicesLength == meshletsPrimitiveIndicesPackedOffset);
+        result.LocalIndices = meshletsPrimitiveIndicesPacked;
         result.LocalIndicesLength = (int)meshletsLocalIndicesLength;
 
         return result;
