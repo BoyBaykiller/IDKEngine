@@ -1144,11 +1144,11 @@ namespace IDKEngine.Bvh
                     continue;
                 }
 
-                const int samples = 16;
+                const int bins = 17;
 
-                for (int i = 0; i < samples; i++)
+                for (int i = 0; i < bins - 1; i++)
                 {
-                    float position = parentBox.Min[axis] + size * ((i + 1.0f) / (samples + 1.0f));
+                    float position = parentBox.Min[axis] + size * ((i + 1.0f) / bins);
 
                     Box leftBox = Box.Empty();
                     Box rightBox = Box.Empty();

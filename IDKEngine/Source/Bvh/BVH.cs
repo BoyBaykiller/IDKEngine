@@ -349,8 +349,8 @@ namespace IDKEngine.Bvh
                 // TODO: Only store parent+leaf ids for "refitable BLAS"
 
                 BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
-                buildSettings.SBVH.SplitFactor = 0.0f;
-                //buildSettings.PreSplitting.SplitFactor = 0.0f;
+                //buildSettings.SBVH.SplitFactor = 0.0f;
+                buildSettings.PreSplitting.SplitFactor = 0.0f;
 
                 if (blasDesc.PreSplittingWasDone)
                 {

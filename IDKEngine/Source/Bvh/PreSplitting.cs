@@ -1,6 +1,7 @@
 ﻿using System;
-using IDKEngine.Shapes;
+using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.Bvh
 {
@@ -90,9 +91,9 @@ namespace IDKEngine.Bvh
                     int splitAxis = box.LargestAxis();
                     float largestExtent = box.Size()[splitAxis];
 
-                    float depth = Math.Min(-1.0f, MathF.Floor(MathF.Log2(largestExtent / globalSize[splitAxis])));
-                    float cellSize = float.Exp2(depth) * globalSize[splitAxis];
-                    if (cellSize + 0.0001f >= largestExtent)
+                    float alpha = largestExtent / globalSize[splitAxis];
+                    float cellSize = GetCellSize(alpha) * globalSize[splitAxis];
+                    if (cellSize >= largestExtent - 0.0001f)
                     {
                         cellSize *= 0.5f;
                     }
@@ -111,9 +112,8 @@ namespace IDKEngine.Bvh
                     float leftExtent = lBox.LargestExtent();
                     float rightExtent = rBox.LargestExtent();
 
-                    int leftCount = (int)(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
-                    leftCount = Math.Min(splitsLeft - 1, leftCount);
-                    leftCount = Math.Max(leftCount, 1);
+                    int leftCount = (int)MathF.Round(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
+                    leftCount = Math.Clamp(leftCount, 1, splitsLeft - 1);
 
                     int rightCount = splitsLeft - leftCount;
 
@@ -134,6 +134,16 @@ namespace IDKEngine.Bvh
         private static float Priority(Box triBox, Triangle triangle)
         {
             return MathF.Cbrt(triBox.LargestExtent() * (triBox.Area() - triangle.Area));
+        }
+
+        private static float GetCellSize(float alpha)
+        {
+            // Erase all except the exponent bits.
+            // This has the same effect as 2^(floor(log2(alpha)))
+            int floatBits = Unsafe.BitCast<float, int>(alpha);
+            floatBits &= 255 << 23;
+
+            return Unsafe.BitCast<int, float>(floatBits);
         }
     }
 }
