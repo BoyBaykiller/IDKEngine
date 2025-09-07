@@ -31,7 +31,7 @@ bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout f
     float tMinRight;
     
     #if !USE_TLAS
-    GpuBlasNode rootNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset];
+    GpuBlasNode rootNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + 1];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -39,7 +39,7 @@ bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout f
     #endif
 
     uint stackPtr = 0;
-    uint stackTop = 1;
+    uint stackTop = 2;
     while (true)
     {
         debugCost++;
@@ -112,7 +112,7 @@ bool IntersectBlasAny(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo)
     float tMinRight;
     
     #if !USE_TLAS
-    GpuBlasNode rootNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset];
+    GpuBlasNode rootNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + 1];
     if (!(RayBoxIntersect(ray, Box(rootNode.Min, rootNode.Max), tMinLeft) && tMinLeft < hitInfo.T))
     {
         return false;
@@ -120,7 +120,7 @@ bool IntersectBlasAny(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo)
     #endif
 
     uint stackPtr = 0;
-    uint stackTop = 1;
+    uint stackTop = 2;
     while (true)
     {
         GpuBlasNode leftNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + stackTop];

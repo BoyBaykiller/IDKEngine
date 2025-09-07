@@ -35,6 +35,11 @@ public static class MyMath
         return (numerator + divisor - 1) / divisor;
     }
 
+    public static uint AlignUp(uint value, uint alignment)
+    {
+        return (value + alignment - 1) & ~(alignment - 1);
+    }
+
     public static Vector2 GetHalton2D(int index, int baseA, int baseB)
     {
         float x = GetHalton(index + 1, baseA);

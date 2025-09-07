@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
 using IDKEngine.Utils;
@@ -13,8 +12,9 @@ namespace IDKEngine.Bvh;
 /// https://jcgt.org/published/0004/03/02/paper-lowres.pdf
 /// 
 /// There are a few properties we should be aware of and maintain:
-/// * The root must never be a leaf
-/// * The left child of the root must be at index 1
+/// * There are 32 bytes padding at the start to have child nodes be 64-byte aligned
+/// * The root starts at index 1 and is never a leaf
+/// * The left child of the root is at index 2
 /// * A leaf-pair always forms a continous range of geometry beginning left
 /// * Straddling geometry of a leaf-pair can be shared (when Pre-Splitting is enabled)
 /// </summary>
@@ -44,11 +44,10 @@ public static class BLAS
 
     public ref struct BuildResult
     {
-        public readonly ref GpuBlasNode Root => ref Nodes[0];
+        public readonly ref GpuBlasNode Root => ref Nodes[1];
 
         public Span<GpuBlasNode> Nodes;
         public int MaxTreeDepth;
-        public int UnpaddedNodesCount;
 
         public BuildResult(Span<GpuBlasNode> nodes)
         {
@@ -146,6 +145,10 @@ public static class BLAS
     {
         int nodesUsed = 0;
 
+        // Add padding to make left children 64 byte aligned.
+        // This increases performance on SponzaMerged: 128fps->133fps.
+        blas.Nodes[nodesUsed++] = new GpuBlasNode();
+
         ref GpuBlasNode rootNode = ref blas.Nodes[nodesUsed++];
         rootNode.TriStartOrChild = 0;
         rootNode.TriCount = buildData.Fragments.Count;
@@ -153,12 +156,13 @@ public static class BLAS
 
         int stackPtr = 0;
         Span<int> stack = stackalloc int[64];
-        stack[stackPtr++] = 0;
+        stack[stackPtr++] = 1;
         while (stackPtr > 0)
         {
             ref GpuBlasNode parentNode = ref blas.Nodes[stack[--stackPtr]];
+            bool forceSplit = parentNode.TriCount == buildData.Fragments.Count; //always split root
 
-            if (TrySplit(parentNode, buildData, settings) is ObjectSplit objectSplit)
+            if (TrySplit(parentNode, buildData, settings, forceSplit) is ObjectSplit objectSplit)
             {
                 GpuBlasNode newLeftNode = new GpuBlasNode();
                 newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
@@ -185,24 +189,6 @@ public static class BLAS
             }
         }
 
-        blas.UnpaddedNodesCount = nodesUsed;
-        if (nodesUsed == 1)
-        {
-            blas.UnpaddedNodesCount++;
-
-            // Handle edge case of the root node being a leaf by creating an artificial child node
-            blas.Nodes[1] = blas.Nodes[0];
-            blas.Nodes[0].TriCount = 0;
-            blas.Nodes[0].TriStartOrChild = 1;
-
-            // Add an other dummy invisible node because the traversal algorithm always tests two nodes at once
-            blas.Nodes[2] = new GpuBlasNode();
-            blas.Nodes[2].Min = new Vector3(float.MinValue);
-            blas.Nodes[2].Max = new Vector3(float.MinValue);
-            blas.Nodes[2].TriCount = 1;
-
-            nodesUsed = 3;
-        }
         blas.MaxTreeDepth = ComputeTreeDepth(blas);
 
         return nodesUsed;
@@ -210,7 +196,7 @@ public static class BLAS
 
     public static void Refit(in BuildResult blas, in Geometry geometry)
     {
-        for (int i = blas.UnpaddedNodesCount - 1; i >= 0; i--)
+        for (int i = blas.Nodes.Length - 1; i >= 1; i--)
         {
             ref GpuBlasNode parent = ref blas.Nodes[i];
             if (parent.IsLeaf)
@@ -255,7 +241,7 @@ public static class BLAS
 
         Span<int> stack = stackalloc int[blas.MaxTreeDepth];
         int stackPtr = 0;
-        int stackTop = 1;
+        int stackTop = 2;
 
         if (!Intersections.RayVsBox(ray, Conversions.ToBox(blas.Root), out _, out _))
         {
@@ -328,7 +314,7 @@ public static class BLAS
     {
         Span<int> stack = stackalloc int[32];
         int stackPtr = 0;
-        int stackTop = 1;
+        int stackTop = 2;
 
         if (!Intersections.BoxVsBox(box, Conversions.ToBox(blas.Root)))
         {
@@ -380,7 +366,7 @@ public static class BLAS
         GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.Fragments.Count];
         int triCounter = 0;
 
-        for (int i = 0; i < blas.UnpaddedNodesCount; i++)
+        for (int i = 2; i < blas.Nodes.Length; i++)
         {
             ref GpuBlasNode node = ref blas.Nodes[i];
             if (node.IsLeaf)
@@ -419,8 +405,9 @@ public static class BLAS
     {
         int[] parents = new int[blas.Nodes.Length];
         parents[0] = -1;
+        parents[1] = -1;
 
-        for (int i = 1; i < blas.Nodes.Length; i++)
+        for (int i = 2; i < blas.Nodes.Length; i++)
         {
             ref readonly GpuBlasNode node = ref blas.Nodes[i];
             if (!node.IsLeaf)
@@ -435,13 +422,11 @@ public static class BLAS
 
     public static int[] GetLeafIndices(in BuildResult blas)
     {
-        ReadOnlySpan<GpuBlasNode> nodes = MemoryMarshal.CreateReadOnlySpan(in blas.Nodes[0], blas.UnpaddedNodesCount);
-
-        int[] indices = new int[nodes.Length / 2 + 1];
+        int[] indices = new int[blas.Nodes.Length / 2 + 1];
         int counter = 0;
-        for (int i = 1; i < nodes.Length; i++)
+        for (int i = 2; i < blas.Nodes.Length; i++)
         {
-            if (nodes[i].IsLeaf)
+            if (blas.Nodes[i].IsLeaf)
             {
                 indices[counter++] = i;
             }
@@ -453,7 +438,7 @@ public static class BLAS
 
     public static bool IsLeftSibling(int nodeId)
     {
-        return nodeId % 2 == 1;
+        return nodeId % 2 == 0;
     }
 
     public static int GetSiblingId(int nodeId)
@@ -468,7 +453,7 @@ public static class BLAS
 
     public static int GetUpperBoundNodes(int triangleCount)
     {
-        return Math.Max(2 * triangleCount - 1, 3);
+        return Math.Max(2 * triangleCount, 4);
     }
 
     public static float ComputeGlobalSAH(in BuildResult blas, BuildSettings settings)
@@ -476,7 +461,7 @@ public static class BLAS
         float cost = 0.0f;
 
         float rootArea = blas.Root.HalfArea();
-        for (int i = 0; i < blas.Nodes.Length; i++)
+        for (int i = 1; i < blas.Nodes.Length; i++)
         {
             ref readonly GpuBlasNode node = ref blas.Nodes[i];
             float probHitNode = node.HalfArea() / rootArea;
@@ -499,7 +484,7 @@ public static class BLAS
 
         int stackPtr = 0;
         Span<int> stack = stackalloc int[64];
-        stack[stackPtr++] = 1;
+        stack[stackPtr++] = 2;
 
         while (stackPtr > 0)
         {
@@ -526,9 +511,10 @@ public static class BLAS
     public static int ComputeTreeDepth(in BuildResult blas)
     {
         int treeDepth = 0;
+
         int stackPtr = 0;
         Span<int> stack = stackalloc int[64];
-        stack[stackPtr++] = 1;
+        stack[stackPtr++] = 2;
 
         while (stackPtr > 0)
         {
@@ -572,7 +558,7 @@ public static class BLAS
         return box;
     }
 
-    private static ObjectSplit? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, BuildSettings settings)
+    private static ObjectSplit? TrySplit(in GpuBlasNode parentNode, in BuildData buildData, BuildSettings settings, bool forceSplit = false)
     {
         Box parentBox = Conversions.ToBox(parentNode);
 
@@ -586,7 +572,7 @@ public static class BLAS
         float invParentArea = 1.0f / parentBox.HalfArea();
 
         ObjectSplit split = new ObjectSplit();
-        split.NewCost = parentNode.TriCount;
+        split.NewCost = float.MaxValue;
 
         // Unfortunately we have to manually load the fields for best perf
         // as the JIT otherwise repeatedly loads them in the loop
@@ -658,7 +644,7 @@ public static class BLAS
 
         float notSplitCost = parentNode.TriCount * settings.TriangleCost;
         split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost);
-        if (split.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
+        if (split.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount && !forceSplit)
         {
             return null;
         }

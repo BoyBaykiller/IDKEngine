@@ -61,8 +61,6 @@ public class BVH : IDisposable
 
     private record struct BlasBuildPhaseData
     {
-        public readonly ref GpuBlasNode Root => ref Nodes[0];
-
         public GpuBlasNode[] Nodes;
         public int[] ParentIds;
         public int[] LeafIds;
@@ -404,7 +402,6 @@ public class BVH : IDisposable
             Interlocked.Add(ref newTrisDeduplicated, blasTriangles.Length - geometry.TriangleCount);
 
             blasDesc.NodeCount = blas.Nodes.Length;
-            blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;
             blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
             blasDesc.LeafIndicesCount = leafIds.Length;
             blasDesc.GeometryDesc.TriangleCount = blasTriangles.Length;
@@ -538,7 +535,6 @@ public class BVH : IDisposable
         BLAS.BuildResult blas = new BLAS.BuildResult();
         blas.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
         blas.MaxTreeDepth = blasDesc.MaxTreeDepth;
-        blas.UnpaddedNodesCount = blasDesc.UnpaddedNodesCount;
 
         return blas;
     }

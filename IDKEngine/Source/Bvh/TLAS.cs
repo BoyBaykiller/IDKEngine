@@ -38,11 +38,11 @@ public static class TLAS
             Box globalBounds = Box.Empty();
             for (int i = 0; i < leafNodes.Length; i++)
             {
-                Box worldSpaceBounds = funcGetLeaf(i);
-                globalBounds.GrowToFit(worldSpaceBounds);
+                Box bounds = funcGetLeaf(i);
+                globalBounds.GrowToFit(bounds);
 
                 GpuTlasNode newNode = new GpuTlasNode();
-                newNode.SetBounds(worldSpaceBounds);
+                newNode.SetBounds(bounds);
                 newNode.IsLeaf = true;
                 newNode.ChildOrInstanceID = (uint)i;
 

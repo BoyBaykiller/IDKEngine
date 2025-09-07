@@ -19,7 +19,7 @@ dotnet_diagnostic.CS0649.severity = none
 # CS0169: The field 'field' is never used
 dotnet_diagnostic.CS0169.severity = none
 
-# Because callers should be aware when they pass a reference to a `ref readonl` parameters
+# Because callers should be aware when they pass a reference to a `ref readonly` parameter
 # CS9192: Argument should be passed with 'ref' or 'in' keyword
 dotnet_diagnostic.CS9192.severity = error
 

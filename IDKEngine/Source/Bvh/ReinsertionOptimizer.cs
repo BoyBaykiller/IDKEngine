@@ -47,11 +47,6 @@ public ref struct ReinsertionOptimizer
 
     public static void Optimize(ref BLAS.BuildResult blas, Span<int> parentIds, in Settings settings)
     {
-        if (blas.Nodes.Length <= 3)
-        {
-            return;
-        }
-
         new ReinsertionOptimizer(blas.Nodes, parentIds).Optimize(settings);
         blas.MaxTreeDepth = BLAS.ComputeTreeDepth(blas);
     }
@@ -84,28 +79,29 @@ public ref struct ReinsertionOptimizer
         }
 
         {
-            // Always make node 0 point to 1, as this is expected by traversal
-            // Always make node 1 point to 3, as this is good memory access
-            if (nodes[0].TriStartOrChild != 1)
+            // Make left child of root be at index 2, as this is expected by traversal
+            // Make left child of left child of root be at index 4, as this is good memory access
+            if (nodes[1].TriStartOrChild != 2)
             {
-                SwapChildrenInMem(0, parentIds[1]);
+                SwapChildrenInMem(1, parentIds[2]);
             }
-            if (!nodes[1].IsLeaf && nodes[1].TriStartOrChild != 3)
+            if (!nodes[2].IsLeaf && nodes[2].TriStartOrChild != 4)
             {
-                SwapChildrenInMem(1, parentIds[3]);
+                SwapChildrenInMem(2, parentIds[4]);
             }
         }
     }
 
     private readonly int GetImportantCandidates(Span<Candidate> candidates, float percentage)
     {
-        int count = Math.Min(nodes.Length - 1, (int)(nodes.Length * percentage));
+        int count = Math.Min(candidates.Length, (int)(nodes.Length * percentage));
         if (count == 0) return count;
 
-        for (int i = 1; i < candidates.Length + 1; i++)
+        for (int i = 2; i < nodes.Length; i++)
         {
-            ref Candidate candidate = ref candidates[i - 1];
             float cost = nodes[i].HalfArea();
+
+            ref Candidate candidate = ref candidates[i - 2];
             candidate.Cost = cost;
             candidate.NodeId = i;
         }
@@ -226,7 +222,7 @@ public ref struct ReinsertionOptimizer
 
     private readonly Candidate[] GetCandidatesMem()
     {
-        return new Candidate[nodes.Length - 1];
+        return new Candidate[nodes.Length - 2];
     }
 
     private readonly void SwapChildrenInMem(int inParent, int outParent)

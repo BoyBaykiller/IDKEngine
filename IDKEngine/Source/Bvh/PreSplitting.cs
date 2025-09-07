@@ -16,7 +16,7 @@ public static class PreSplitting
 {
     public record struct Settings
     {
-        public float SplitFactor = 0.4f;
+        public float SplitFactor = 0.3f;
 
         public Settings()
         {
@@ -123,17 +123,19 @@ public static class PreSplitting
 
         static float Priority(Box triBox, Triangle triangle)
         {
-            return MathF.Cbrt(triBox.LargestExtent() * (triBox.Area() - triangle.Area));
+            // Cbqrt to avoid spending the entire split budget on a few large triangles in pathological case
+            // Extent^2 to concentrate more splits on large triangles specifically
+            return MathF.Cbrt(MathF.Pow(triBox.LargestExtent(), 2.0f) * (triBox.Area() - triangle.Area));
         }
 
         static float GetCellSize(float alpha)
         {
             // Erase all except the exponent bits.
             // This has the same effect as 2^(floor(log2(alpha)))
-            int floatBits = Unsafe.BitCast<float, int>(alpha);
-            floatBits &= 255 << 23;
+            uint floatBits = Unsafe.BitCast<float, uint>(alpha);
+            floatBits &= 255u << 23;
 
-            return Unsafe.BitCast<int, float>(floatBits);
+            return Unsafe.BitCast<uint, float>(floatBits);
         }
 
         return (bounds, originalTriIds);
@@ -154,7 +156,7 @@ public static class PreSplitting
 
         int stackPtr = 0;
         Span<int> stack = stackalloc int[64];
-        stack[stackPtr++] = 1;
+        stack[stackPtr++] = 2;
         while (stackPtr > 0)
         {
             int stackTop = stack[--stackPtr];

@@ -70,7 +70,7 @@ public unsafe class ModelManager : IDisposable
     private BBG.TypedBuffer<GpuMeshlet> meshletBuffer;
     private BBG.TypedBuffer<GpuMeshletInfo> meshletInfoBuffer;
     private BBG.TypedBuffer<uint> meshletsVertexIndicesBuffer;
-    private BBG.TypedBuffer<byte> meshletsPrimitiveIndicesBuffer;
+    private BBG.TypedBuffer<byte> meshletsLocalIndicesBuffer;
     private BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV> meshletTasksCmdsBuffer;
     private readonly BBG.TypedBuffer<uint> meshletTasksCountBuffer;
 
@@ -97,7 +97,7 @@ public unsafe class ModelManager : IDisposable
         meshletBuffer = new BBG.TypedBuffer<GpuMeshlet>();
         meshletInfoBuffer = new BBG.TypedBuffer<GpuMeshletInfo>();
         meshletsVertexIndicesBuffer = new BBG.TypedBuffer<uint>();
-        meshletsPrimitiveIndicesBuffer = new BBG.TypedBuffer<byte>();
+        meshletsLocalIndicesBuffer = new BBG.TypedBuffer<byte>();
         jointMatricesBuffer = new BBG.TypedBuffer<Matrix3x4>();
         unskinnedVerticesBuffer = new BBG.TypedBuffer<GpuUnskinnedVertex>();
         vertexPositionsHostBuffer = new BBG.TypedBuffer<Vector3>();
@@ -117,7 +117,7 @@ public unsafe class ModelManager : IDisposable
         meshletBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 10);
         meshletInfoBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 11);
         meshletsVertexIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 12);
-        meshletsPrimitiveIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 13);
+        meshletsLocalIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 13);
         jointMatricesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 14);
         unskinnedVerticesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 15);
         prevVertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 16);
@@ -135,7 +135,7 @@ public unsafe class ModelManager : IDisposable
         meshletBuffer.DownloadElements(out GpuMeshlet[] meshlets);
         meshletInfoBuffer.DownloadElements(out GpuMeshletInfo[] meshletsInfo);
         meshletsVertexIndicesBuffer.DownloadElements(out uint[] meshletsVertexIndices);
-        meshletsPrimitiveIndicesBuffer.DownloadElements(out byte[] meshletsPrimitiveIndices);
+        meshletsLocalIndicesBuffer.DownloadElements(out byte[] meshletsLocalIndices);
         unskinnedVerticesBuffer.DownloadElements(out GpuUnskinnedVertex[] unskinnedVertices);
 
         int prevDrawCommandsLength = DrawCommands.Length;
@@ -186,7 +186,7 @@ public unsafe class ModelManager : IDisposable
             {
                 ref GpuMeshlet newMeshlet = ref meshlets[j];
                 newMeshlet.VertexOffset += (uint)meshletsVertexIndices.Length;
-                newMeshlet.IndicesOffset += (uint)meshletsPrimitiveIndices.Length;
+                newMeshlet.IndicesOffset += (uint)meshletsLocalIndices.Length;
             }
 
             Helper.ArrayAdd(ref CpuMaterials, model.Materials);
@@ -196,14 +196,14 @@ public unsafe class ModelManager : IDisposable
             Helper.ArrayAdd(ref VertexIndices, gpuModel.VertexIndices);
             Helper.ArrayAdd(ref meshletsInfo, gpuModel.MeshletsInfo);
             Helper.ArrayAdd(ref meshletsVertexIndices, gpuModel.MeshletsVertexIndices);
-            Helper.ArrayAdd(ref meshletsPrimitiveIndices, gpuModel.MeshletsLocalIndices);
+            Helper.ArrayAdd(ref meshletsLocalIndices, gpuModel.MeshletsLocalIndices);
             Helper.ArrayAdd(ref unskinnedVertices, LoadUnskinnedVertices(model));
         }
 
         skinningCmds = GetSkinningCommands(out int numJoints, vertexPositions);
         Array.Resize(ref JointMatrices, numJoints);
 
-        UpdateBuffers(vertexPositions, meshlets, meshletsInfo, meshletsVertexIndices, meshletsPrimitiveIndices, unskinnedVertices);
+        UpdateBuffers(vertexPositions, meshlets, meshletsInfo, meshletsVertexIndices, meshletsLocalIndices, unskinnedVertices);
 
         ReadOnlySpan<BBG.DrawElementsIndirectCommand> newDrawCommands = new ReadOnlySpan<BBG.DrawElementsIndirectCommand>(DrawCommands, prevDrawCommandsLength, DrawCommands.Length - prevDrawCommandsLength);
         GpuGeometryDesc[] geometriesDesc = new GpuGeometryDesc[newDrawCommands.Length];
@@ -243,7 +243,7 @@ public unsafe class ModelManager : IDisposable
             meshletBuffer.DownloadElements(out GpuMeshlet[] meshlets);
             meshletInfoBuffer.DownloadElements(out GpuMeshletInfo[] meshletsInfo);
             meshletsVertexIndicesBuffer.DownloadElements(out uint[] meshletsVertexIndices);
-            meshletsPrimitiveIndicesBuffer.DownloadElements(out byte[] meshletsPrimitiveIndices);
+            meshletsLocalIndicesBuffer.DownloadElements(out byte[] meshletsLocalIndices);
             unskinnedVerticesBuffer.DownloadElements(out GpuUnskinnedVertex[] unskinnedVertices);
 
             Range rmMeshRange = GetNodeMeshRange(rmNode);
@@ -316,7 +316,7 @@ public unsafe class ModelManager : IDisposable
                 Helper.ArrayRemove(ref CpuMaterials, rmMaterialId, 1);
             }
 
-            UpdateBuffers(vertexPositions, meshlets, meshletsInfo, meshletsVertexIndices, meshletsPrimitiveIndices, unskinnedVertices);
+            UpdateBuffers(vertexPositions, meshlets, meshletsInfo, meshletsVertexIndices, meshletsLocalIndices, unskinnedVertices);
             BVH.RemoveBlas(rmMeshRange, VertexPositions, VertexIndices, meshInstances);
             UpdateOpqauesAndTransparents();
             meshInstancesDirty = new BitArray(meshInstances.Length, true);
@@ -862,7 +862,7 @@ public unsafe class ModelManager : IDisposable
         ReadOnlySpan<GpuMeshlet> meshlets,
         ReadOnlySpan<GpuMeshletInfo> meshletsInfo,
         ReadOnlySpan<uint> meshletsVertexIndices,
-        ReadOnlySpan<byte> meshletsPrimitiveIndices,
+        ReadOnlySpan<byte> meshletsLocalIndices,
         ReadOnlySpan<GpuUnskinnedVertex> unskinnedVertices)
     {
         BBG.Buffer.Recreate(ref drawCommandBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, DrawCommands);
@@ -877,7 +877,7 @@ public unsafe class ModelManager : IDisposable
         BBG.Buffer.Recreate(ref meshletBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshlets);
         BBG.Buffer.Recreate(ref meshletInfoBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsInfo);
         BBG.Buffer.Recreate(ref meshletsVertexIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsVertexIndices);
-        BBG.Buffer.Recreate(ref meshletsPrimitiveIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsPrimitiveIndices);
+        BBG.Buffer.Recreate(ref meshletsLocalIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsLocalIndices);
         BBG.Buffer.Recreate(ref jointMatricesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, JointMatrices);
         BBG.Buffer.Recreate(ref unskinnedVerticesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, unskinnedVertices);
         BBG.Buffer.Recreate(ref visibleMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshInstances.Length * 6);
@@ -946,7 +946,7 @@ public unsafe class ModelManager : IDisposable
         meshletInfoBuffer.Dispose();
         vertexPositionsBuffer.Dispose();
         meshletsVertexIndicesBuffer.Dispose();
-        meshletsPrimitiveIndicesBuffer.Dispose();
+        meshletsLocalIndicesBuffer.Dispose();
         jointMatricesBuffer.Dispose();
         vertexPositionsHostBuffer.Dispose();
         unskinnedVerticesBuffer.Dispose();
