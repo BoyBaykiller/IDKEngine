@@ -1,23 +1,24 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using OpenTK.Mathematics;
-using OpenTK.Windowing.GraphicsLibraryFramework;
-using ImGuiNET;
-using NativeFileDialogSharp;
 using BBLogger;
 using BBOpenGL;
 using IDKEngine.Bvh;
-using IDKEngine.Utils;
-using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
-using IDKEngine.Windowing;
+using IDKEngine.Shapes;
 using IDKEngine.ThirdParty;
-using SysVec3 = System.Numerics.Vector3;
-using SysVec2 = System.Numerics.Vector2;
-using OtkVec3 = OpenTK.Mathematics.Vector3;
+using IDKEngine.Utils;
+using IDKEngine.Windowing;
+using ImGuiNET;
+using NativeFileDialogSharp;
+using OpenTK.Mathematics;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using OtkVec2 = OpenTK.Mathematics.Vector2;
+using OtkVec3 = OpenTK.Mathematics.Vector3;
+using SysVec2 = System.Numerics.Vector2;
+using SysVec3 = System.Numerics.Vector3;
 
 namespace IDKEngine.Render
 {
@@ -123,6 +124,8 @@ namespace IDKEngine.Render
                 }
                 openModelLoadPopup = false;
             }
+
+            ImGui.SliderInt("Debug", ref Application.Debug, 0, app.ModelManager.BVH.BlasNodes.Length);
 
             if (ImGui.Begin("Stats"))
             {
@@ -1346,7 +1349,7 @@ namespace IDKEngine.Render
 
         private static SelectedEntityInfo RayTraceEntity(Application app, in Ray ray, out float t)
         {
-            //Test(app);
+            Test(app);
 
             t = float.MaxValue;
             bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);

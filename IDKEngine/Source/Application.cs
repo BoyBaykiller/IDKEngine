@@ -1,17 +1,18 @@
 ﻿using System;
-using System.IO;
 using System.Diagnostics;
-using OpenTK.Mathematics;
-using OpenTK.Windowing.GraphicsLibraryFramework;
+using System.IO;
+using System.Runtime.CompilerServices;
 using BBLogger;
 using BBOpenGL;
-using IDKEngine.Utils;
+using IDKEngine.GpuTypes;
 using IDKEngine.Render;
 using IDKEngine.Shapes;
-using IDKEngine.GpuTypes;
+using IDKEngine.Utils;
 using IDKEngine.Windowing;
 using OpenTK.Graphics.Vulkan;
-using System.Runtime.CompilerServices;
+using OpenTK.Mathematics;
+using OpenTK.Windowing.GraphicsLibraryFramework;
+using static IDKEngine.Render.Gui.SelectedEntityInfo;
 
 namespace IDKEngine
 {
@@ -273,7 +274,12 @@ namespace IDKEngine
                     }
                 });
             }
+            //{
+            //    ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[0];
 
+            //    Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(0).Nodes[Debug]);
+            //    BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
+            //}
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderImGui)
             {
@@ -296,7 +302,7 @@ namespace IDKEngine
                 fpsTimer.Restart();
             }
         }
-
+        public static int Debug;
         protected override void OnUpdate(float dT)
         {
             gui.Update(this);
@@ -493,7 +499,7 @@ namespace IDKEngine
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
                 //ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroCompressed\Bistro.glb").Value;
-                ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().WithTranslation(2.0f, 0.0f, 1.3f).GetMatrix()).Value;
+                ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().GetMatrix()).Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaRotated45Baked.glb", new Transformation().WithTranslation(-0.1f, -0.1f, 0.4f).WithRotationRad(-0.42f, -0.4f, 0.368f).GetMatrix()).Value;
                 //ModelLoader.Model ast = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
                 //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
@@ -505,9 +511,9 @@ namespace IDKEngine
 
                 ModelManager.Add(test);
                 
-                SetRenderMode(RenderMode.PathTracer, WindowFramebufferSize, WindowFramebufferSize);
-                PathTracer.IsDebugBVHTraversal = true;
-                PathTracer.LenseRadius = 0.0f;
+                SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
+                //PathTracer.IsDebugBVHTraversal = true;
+                //PathTracer.LenseRadius = 0.0f;
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));

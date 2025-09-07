@@ -13,8 +13,6 @@
         public int LeafIndicesCount;
 
         public int MaxTreeDepth;
-        public int UnpaddedNodesCount;
-
         public bool PreSplittingWasDone;
     }
 }

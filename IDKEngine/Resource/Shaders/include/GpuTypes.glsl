@@ -145,8 +145,6 @@ struct GpuBlasDesc
     int LeafIndicesCount;
 
     int MaxTreeDepth;
-    int UnpaddedNodesCount;
-
     bool PreSplittingWasDone;
 };
 

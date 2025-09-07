@@ -15,7 +15,7 @@ namespace IDKEngine.Bvh
         {
             public readonly bool Enabled => SplitFactor > 0.0f;
 
-            public float SplitFactor = 0.4f;
+            public float SplitFactor = 0.3f;
 
             public Settings()
             {
@@ -133,7 +133,7 @@ namespace IDKEngine.Bvh
 
         private static float Priority(Box triBox, Triangle triangle)
         {
-            return MathF.Cbrt(triBox.LargestExtent() * (triBox.Area() - triangle.Area));
+            return MathF.Cbrt(MathF.Pow(triBox.LargestExtent(), 2.0f) * (triBox.Area() - triangle.Area));
         }
 
         private static float GetCellSize(float alpha)

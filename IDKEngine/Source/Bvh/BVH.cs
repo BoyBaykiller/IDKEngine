@@ -1,14 +1,14 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using OpenTK.Mathematics;
 using BBLogger;
 using BBOpenGL;
-using IDKEngine.Utils;
-using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
+using IDKEngine.Shapes;
+using IDKEngine.Utils;
 
 namespace IDKEngine.Bvh
 {
@@ -60,8 +60,6 @@ namespace IDKEngine.Bvh
 
         private record struct BlasBuildPhaseData
         {
-            public readonly ref GpuBlasNode Root => ref Nodes[0];
-
             public GpuBlasNode[] Nodes;
             public int[] ParentIds;
             public int[] LeafIds;
@@ -326,36 +324,34 @@ namespace IDKEngine.Bvh
 
         public unsafe void BlasesBuild(int start, int count)
         {
-            // sbvh todo: 
-            // * totalSah: Move pre-splitting to user again so it becomes its own setting and we can make build setting global
-
             if (count == 0) return;
 
             BlasBuildPhaseData[] newBlasesData = new BlasBuildPhaseData[count];
             GpuBlasDesc prevEndBlasDesc = BlasesDesc[start + count - 1];
             
+            BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
+            //buildSettings.SBVH.SplitFactor = 0.0f;
+            buildSettings.PreSplitting.SplitFactor = 0.0f;
+
             // Statistics
             int preSplitNewTris = 0;
             int sbvhNewTris = 0;
             int newTrisDeduplicated = 0;
 
             Stopwatch swBuilding = Stopwatch.StartNew();
-            //Parallel.For(0, count, i =>
-            for (int i = 0; i < count; i++)
+            Parallel.For(0, count, i =>
+            //for (int i = 0; i < count; i++)
             {
                 ref GpuBlasDesc blasDesc = ref BlasesDesc[start + i];
                 BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
 
                 // TODO: Only store parent+leaf ids for "refitable BLAS"
 
-                BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
-                //buildSettings.SBVH.SplitFactor = 0.0f;
-                buildSettings.PreSplitting.SplitFactor = 0.0f;
-
-                if (blasDesc.PreSplittingWasDone)
+                // Don't do pre-splitting repeatedly as that creates excessive amounts of triangles
+                bool doPresplitting = buildSettings.PreSplitting.Enabled && !blasDesc.PreSplittingWasDone;
+                if (doPresplitting)
                 {
-                    // Don't do pre-splitting repeatedly as that creates excessive amounts of triangles
-                    buildSettings.PreSplitting.SplitFactor = 0.0f;   
+                    blasDesc.PreSplittingWasDone = true;
                 }
 
                 // Generate fragments from triangles.
@@ -373,36 +369,30 @@ namespace IDKEngine.Bvh
                 Array.Resize(ref nodes, nodesUsed);
                 blas.Nodes = nodes;
 
+                int[] parentIds = BLAS.GetParentIndices(blas);
+
+                if (false)
+                {
+                    // Post build optimizaton.
+                    // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net performance
+                    // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
+                    ReinsertionOptimizer.Optimize(ref blas, parentIds, new ReinsertionOptimizer.Settings());
+                }
+
                 // The BLAS holds permutated indices into the inital triangles. Let's get rid of this indirection
                 GpuIndicesTriplet[] blasTriangles = BLAS.GetUnindexedTriangles(blas, buildData, geometry, buildSettings);
+
+                int[] leafIds = BLAS.GetLeafIndices(blas);
 
                 // Statistics
                 Interlocked.Add(ref preSplitNewTris, fragments.Count - geometry.TriangleCount);
                 Interlocked.Add(ref newTrisDeduplicated, blasTriangles.Length - geometry.TriangleCount);
                 Interlocked.Add(ref sbvhNewTris, buildData.Fragments.Count - fragments.Count);
 
-                int[] parentIds = BLAS.GetParentIndices(blas);
-                
-                if (false)
-                {
-                    // Post build optimizaton.
-                    // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net performance
-                    // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
-                    ReinsertionOptimizer.Optimize(ref blas, parentIds, blasTriangles, new ReinsertionOptimizer.Settings());
-                }
-
-                int[] leafIds = BLAS.GetLeafIndices(blas);
-
                 blasDesc.NodeCount = nodes.Length;
-                blasDesc.UnpaddedNodesCount = blas.UnpaddedNodesCount;
                 blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
                 blasDesc.LeafIndicesCount = leafIds.Length;
                 blasDesc.GeometryDesc.TriangleCount = blasTriangles.Length;
-
-                if (buildSettings.PreSplitting.Enabled)
-                {
-                    blasDesc.PreSplittingWasDone = true;
-                }
 
                 BlasBuildPhaseData blasData = new BlasBuildPhaseData();
                 blasData.Triangles = blasTriangles;
@@ -410,25 +400,8 @@ namespace IDKEngine.Bvh
                 blasData.ParentIds = parentIds;
                 blasData.LeafIds = leafIds;
                 newBlasesData[i] = blasData;
-            };
+            });
             swBuilding.Stop();
-
-            Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms");
-            
-            if (preSplitNewTris > 0 || sbvhNewTris > 0)
-            {
-                Logger.Log(Logger.LogLevel.Info, $"Added triangles {preSplitNewTris} + {sbvhNewTris} => {newTrisDeduplicated} (Pre-Splitting, SBVH, after deduplication)");
-            }
-
-            if (true)
-            {
-                float totalSAH = 0;
-                for (int i = 0; i < count; i++)
-                {
-                    totalSAH += BLAS.ComputeGlobalCost(newBlasesData[i].Root, newBlasesData[i].Nodes, new BLAS.BuildSettings());
-                }
-                Logger.Log(Logger.LogLevel.Info, $"Added SAH of all new BLAS'es = {totalSAH}");
-            }
 
             // Adjust offsets of all BLASes starting from the the ones that were rebuild
             for (int i = start; i < BlasesDesc.Length; i++)
@@ -496,6 +469,25 @@ namespace IDKEngine.Bvh
             BBG.Buffer.Recreate(ref blasParentIdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasParentIds);
             BBG.Buffer.Recreate(ref blasLeafIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasLeafIds);
             BBG.Buffer.Recreate(ref blasRefitLockBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc.Select(it => it.NodeCount).DefaultIfEmpty(0).Max());
+
+            Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms");
+
+            if (preSplitNewTris > 0 || sbvhNewTris > 0)
+            {
+                Logger.Log(Logger.LogLevel.Info, $"Added triangles {preSplitNewTris} + {sbvhNewTris} => {newTrisDeduplicated} (Pre-Splitting, SBVH, after deduplication)");
+            }
+
+            if (true)
+            {
+                float totalSAH = 0;
+                for (int i = 0; i < count; i++)
+                {
+                    totalSAH += BLAS.ComputeGlobalSAH(GetBlas(i), buildSettings);
+                }
+                Logger.Log(Logger.LogLevel.Info, $"Added SAH of all new BLAS'es = {totalSAH}");
+                Console.WriteLine(BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0].GeometryDesc), buildSettings));
+            }
+
         }
 
         public void GpuBlasesRefit(int start, int count)
@@ -533,7 +525,6 @@ namespace IDKEngine.Bvh
             BLAS.BuildResult blas = new BLAS.BuildResult();
             blas.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
             blas.MaxTreeDepth = blasDesc.MaxTreeDepth;
-            blas.UnpaddedNodesCount = blasDesc.UnpaddedNodesCount;
 
             return blas;
         }

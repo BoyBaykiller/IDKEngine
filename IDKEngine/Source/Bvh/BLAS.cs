@@ -69,11 +69,11 @@ namespace IDKEngine.Bvh
 
         public ref struct BuildResult
         {
-            public ref GpuBlasNode Root => ref Nodes[0];
+            public readonly ref GpuBlasNode Root => ref Nodes[1];
+            //public readonly int UnpaddedNodesCount => Nodes.Length - 1;
 
             public Span<GpuBlasNode> Nodes;
             public int MaxTreeDepth;
-            public int UnpaddedNodesCount;
 
             public BuildResult(Span<GpuBlasNode> nodes)
             {
@@ -230,6 +230,10 @@ namespace IDKEngine.Bvh
             {
                 int nodesUsed = 0;
 
+                // Add padding to make left children 64 byte aligned.
+                // This increases performance on SponzaMerged: 128fps->133fps.
+                blas.Nodes[nodesUsed++] = new GpuBlasNode();
+
                 ref GpuBlasNode rootNode = ref blas.Nodes[nodesUsed++];
                 rootNode.TriStartOrChild = 0;
                 rootNode.TriCount = buildData.Fragments.Count;
@@ -239,7 +243,7 @@ namespace IDKEngine.Bvh
 
                 int stackPtr = 0;
                 Span<BuildStackItem> stack = stackalloc BuildStackItem[64];
-                stack[stackPtr++] = new BuildStackItem() { ParentNodeId = 0, ReservedSpaceBoundary = buildData.Fragments.ReservedSpace, FragmentsAreSorted = true };
+                stack[stackPtr++] = new BuildStackItem() { ParentNodeId = 1, ReservedSpaceBoundary = buildData.Fragments.ReservedSpace, FragmentsAreSorted = true };
                 while (stackPtr > 0)
                 {
                     ref readonly BuildStackItem parentData = ref stack[--stackPtr];
@@ -318,6 +322,12 @@ namespace IDKEngine.Bvh
 
                     if (useSpatialSplit && (remainingSpaceAfterSplit < 0 || spatialSplit.LeftCount == 0 || spatialSplit.RightCount == 0))
                     {
+                        //if (remainingSpaceAfterSplit < 0)
+                        //{
+                        //    Console.WriteLine(spatialSplit.NewCost);
+                        //    Console.WriteLine(objectSplit.NewCost);
+                        //    Console.WriteLine("aborted, no space");
+                        //}
                         useSpatialSplit = false;
                         remainingSpaceAfterSplit = reservedCount - parentNode.TriCount;
                     }
@@ -505,25 +515,6 @@ namespace IDKEngine.Bvh
                     Debug.Assert(newReservedSpaceBoundary <= newRightNode.TriStartOrChild);
                 }
 
-                blas.UnpaddedNodesCount = nodesUsed;
-                if (nodesUsed == 1)
-                {
-                    blas.UnpaddedNodesCount++;
-
-                    // Handle edge case of the root node being a leaf by creating an artificial child node
-                    blas.Nodes[1] = blas.Nodes[0];
-                    blas.Nodes[0].TriCount = 0;
-                    blas.Nodes[0].TriStartOrChild = 1;
-
-                    // Add an other dummy invisible node because the traversal algorithm always tests two nodes at once
-                    blas.Nodes[2] = new GpuBlasNode();
-                    blas.Nodes[2].Min = new Vector3(float.MinValue);
-                    blas.Nodes[2].Max = new Vector3(float.MinValue);
-                    blas.Nodes[2].TriCount = 1;
-
-                    nodesUsed = 3;
-                }
-
                 blas.MaxTreeDepth = ComputeTreeDepth(blas);
 
                 return nodesUsed;
@@ -539,7 +530,7 @@ namespace IDKEngine.Bvh
 
                 int stackPtr = 0;
                 Span<int> stack = stackalloc int[64];
-                stack[stackPtr++] = 0;
+                stack[stackPtr++] = 1;
                 while (stackPtr > 0)
                 {
                     ref GpuBlasNode parentNode = ref blas.Nodes[stack[--stackPtr]];
@@ -574,24 +565,6 @@ namespace IDKEngine.Bvh
                     stack[stackPtr++] = leftNodeId;
                 }
 
-                blas.UnpaddedNodesCount = nodesUsed;
-                if (nodesUsed == 1)
-                {
-                    blas.UnpaddedNodesCount++;
-
-                    // Handle edge case of the root node being a leaf by creating an artificial child node
-                    blas.Nodes[1] = blas.Nodes[0];
-                    blas.Nodes[0].TriCount = 0;
-                    blas.Nodes[0].TriStartOrChild = 1;
-
-                    // Add an other dummy invisible node because the traversal algorithm always tests two nodes at once
-                    blas.Nodes[2] = new GpuBlasNode();
-                    blas.Nodes[2].Min = new Vector3(float.MinValue);
-                    blas.Nodes[2].Max = new Vector3(float.MinValue);
-                    blas.Nodes[2].TriCount = 1;
-
-                    nodesUsed = 3;
-                }
                 blas.MaxTreeDepth = ComputeTreeDepth(blas);
 
                 return nodesUsed;
@@ -600,7 +573,7 @@ namespace IDKEngine.Bvh
 
         public static void Refit(in BuildResult blas, in Geometry geometry)
         {
-            for (int i = blas.UnpaddedNodesCount - 1; i >= 0; i--)
+            for (int i = blas.Nodes.Length - 1; i >= 1; i--)
             {
                 ref GpuBlasNode parent = ref blas.Nodes[i];
                 if (parent.IsLeaf)
@@ -635,15 +608,15 @@ namespace IDKEngine.Bvh
             } while (nodeId != -1);
         }
 
-        public static float ComputeGlobalCost(in GpuBlasNode rootNode, ReadOnlySpan<GpuBlasNode> nodes, in BuildSettings settings)
+        public static float ComputeGlobalSAH(in BuildResult blas, BuildSettings settings)
         {
             float cost = 0.0f;
 
-            float rootArea = rootNode.HalfArea();
-            for (int i = 0; i < nodes.Length; i++)
+            float rootArea = blas.Root.HalfArea();
+            for (int i = 1; i < blas.Nodes.Length; i++)
             {
-                ref readonly GpuBlasNode node = ref nodes[i];
-                float probHitNode = nodes[i].HalfArea() / rootArea;
+                ref readonly GpuBlasNode node = ref blas.Nodes[i];
+                float probHitNode = node.HalfArea() / rootArea;
 
                 if (node.IsLeaf)
                 {
@@ -657,6 +630,190 @@ namespace IDKEngine.Bvh
             return cost;
         }
 
+        public static float ComputeOverlap(in BuildResult blas)
+        {
+            float overlap = 0.0f;
+
+            int stackPtr = 0;
+            Span<int> stack = stackalloc int[64];
+            stack[stackPtr++] = 2;
+
+            while (stackPtr > 0)
+            {
+                int stackTop = stack[--stackPtr];
+
+                ref readonly GpuBlasNode leftNode = ref blas.Nodes[stackTop];
+                ref readonly GpuBlasNode rightNode = ref blas.Nodes[stackTop + 1];
+
+                overlap += Box.GetOverlappingHalfArea(Conversions.ToBox(leftNode), Conversions.ToBox(rightNode));
+
+                if (!rightNode.IsLeaf)
+                {
+                    stack[stackPtr++] = rightNode.TriStartOrChild;
+                }
+                if (!leftNode.IsLeaf)
+                {
+                    stack[stackPtr++] = leftNode.TriStartOrChild;
+                }
+            }
+
+            return overlap;
+        }
+
+        private static float EPOArea(in BuildResult blas, in Geometry geometry, int subtreeRoot, int nodeId = 1)
+        {
+            if (nodeId == subtreeRoot) return 0;
+
+            ref readonly GpuBlasNode parent = ref blas.Nodes[nodeId];
+            ref readonly GpuBlasNode subtree = ref blas.Nodes[subtreeRoot];
+
+            float area = 0.0f;
+            if (parent.IsLeaf)
+            {
+                // clip triangles to AABB of subtreeRoot and sum resulting areas
+
+                Span<Vector3> vin = stackalloc Vector3[10];
+                Span<Vector3> vout = stackalloc Vector3[10];
+                Vector3 bmin = subtree.Min;
+                Vector3 bmax = subtree.Max;
+
+                for (int i = parent.TriStartOrChild; i < parent.TriEnd; i++)
+                {
+                    {
+                        Triangle tri = geometry.GetTriangle(i);
+                        vin[0] = tri[0];
+                        vin[1] = tri[1];
+                        vin[2] = tri[2];
+                    }
+
+                    // Sutherland-Hodgeman against six bounding planes
+                    Vector3 C = new Vector3();
+                    int Nin = 3;
+                    for (int a = 0; a < 3; a++)
+                    {
+                        int Nout = 0;
+                        float l = bmin[a], r = bmax[a];
+                        for (int v = 0; v < Nin; v++)
+                        {
+                            Vector3 v0 = vin[v];
+                            Vector3 v1 = vin[(v + 1) % Nin];
+                            bool v0in = v0[a] >= l;
+                            bool v1in = v1[a] >= l;
+
+                            if (!(v0in || v1in))
+                            {
+                                continue;
+                            }
+                            else if (v0in ^ v1in)
+                            {
+                                C = v0 + (l - v0[a]) / (v1[a] - v0[a]) * (v1 - v0);
+                                C[a] = l;
+                                vout[Nout++] = C;
+                            }
+
+                            if (v1in)
+                            {
+                                vout[Nout++] = v1;
+                            }
+                        }
+
+                        Nin = 0;
+                        for (int v = 0; v < Nout; v++)
+                        {
+                            Vector3 v0 = vout[v];
+                            Vector3 v1 = vout[(v + 1) % Nout];
+                            bool v0in = v0[a] <= r;
+                            bool v1in = v1[a] <= r;
+
+                            if (!(v0in || v1in))
+                            {
+                                continue;
+                            }
+                            else if (v0in ^ v1in)
+                            {
+                                C = v0 + (r - v0[a]) / (v1[a] - v0[a]) * (v1 - v0);
+                                C[a] = r;
+                                vin[Nin++] = C;
+                            }
+
+                            if (v1in)
+                            {
+                                vin[Nin++] = v1;
+                            }
+                        }
+                    }
+
+                    if (Nin < 3)
+                    {
+                        continue;
+                    }
+
+                    {
+                        // calculate area of remaining convex shape in vin
+                        Triangle tri = new Triangle();
+                        tri.Position0 = vin[0];
+                        for (int j = 0; j < Nin - 2; j++)
+                        {
+                            tri[1] = vin[j + 1];
+                            tri[2] = vin[j + 2];
+                            area += tri.Area;
+                        }
+                    }
+                }
+                return area;
+            }
+
+            ref GpuBlasNode left = ref blas.Nodes[parent.TriStartOrChild];
+            ref GpuBlasNode right = ref blas.Nodes[parent.TriStartOrChild + 1];
+
+            if (Intersections.BoxVsBox(Conversions.ToBox(left), Conversions.ToBox(subtree)))
+            {
+                area += EPOArea(blas, geometry, subtreeRoot, parent.TriStartOrChild);
+            }
+
+            if (Intersections.BoxVsBox(Conversions.ToBox(right), Conversions.ToBox(subtree)))
+            {
+                area += EPOArea(blas, geometry, subtreeRoot, parent.TriStartOrChild + 1);
+            }
+
+            return area;
+        }
+
+        public static float ComputeGlobalEPO(in BuildResult blas, in Geometry geometry, in BuildSettings settings, int nodeId = 1)
+        {
+            ref readonly GpuBlasNode node = ref blas.Nodes[nodeId];
+            float area = EPOArea(blas,  geometry, nodeId);
+            float cost = (node.IsLeaf ? (node.TriCount * settings.TriangleCost) : TRAVERSAL_COST) * area;
+
+            if (!node.IsLeaf)
+            {
+                cost += ComputeGlobalEPO(blas, geometry, settings, node.TriStartOrChild);
+                cost += ComputeGlobalEPO(blas, geometry, settings, node.TriStartOrChild + 1);
+            }
+
+            if (nodeId > 1)
+            {
+                return cost;
+            }
+
+            float totalArea = 0.0f;
+            for (int i = 1; i < blas.Nodes.Length; i++)
+            {
+                ref readonly GpuBlasNode n = ref blas.Nodes[i];
+                if (n.IsLeaf)
+                {
+                    for (int j = n.TriStartOrChild; j < n.TriEnd; j++)
+                    {
+                        Triangle triangle = geometry.GetTriangle(j);
+                        totalArea += triangle.Area;
+                    }
+                }
+            }
+            cost /= totalArea;
+
+            return cost;
+        }
+
         public static bool Intersect(
             in BuildResult blas,
             in Geometry geometry,
@@ -667,7 +824,7 @@ namespace IDKEngine.Bvh
 
             Span<int> stack = stackalloc int[blas.MaxTreeDepth];
             int stackPtr = 0;
-            int stackTop = 1;
+            int stackTop = 2;
 
             while (true)
             {
@@ -745,7 +902,7 @@ namespace IDKEngine.Bvh
         {
             Span<int> stack = stackalloc int[32];
             int stackPtr = 0;
-            int stackTop = 1;
+            int stackTop = 2;
 
             while (true)
             {
@@ -802,7 +959,7 @@ namespace IDKEngine.Bvh
 
                 int stackPtr = 0;
                 Span<int> stack = stackalloc int[64];
-                stack[stackPtr++] = 1;
+                stack[stackPtr++] = 2;
                 while (stackPtr > 0)
                 {
                     int stackTop = stack[--stackPtr];
@@ -909,7 +1066,7 @@ namespace IDKEngine.Bvh
             }
             else
             {
-                for (int i = 0; i < blas.UnpaddedNodesCount; i++)
+                for (int i = 2; i < blas.Nodes.Length; i++)
                 {
                     ref GpuBlasNode node = ref blas.Nodes[i];
                     if (node.IsLeaf)
@@ -943,7 +1100,7 @@ namespace IDKEngine.Bvh
             int treeDepth = 0;
             int stackPtr = 0;
             Span<int> stack = stackalloc int[64];
-            stack[stackPtr++] = 1;
+            stack[stackPtr++] = 2;
 
             while (stackPtr > 0)
             {
@@ -970,8 +1127,9 @@ namespace IDKEngine.Bvh
         {
             int[] parents = new int[blas.Nodes.Length];
             parents[0] = -1;
+            parents[1] = -1;
 
-            for (int i = 1; i < blas.Nodes.Length; i++)
+            for (int i = 2; i < blas.Nodes.Length; i++)
             {
                 ref readonly GpuBlasNode node = ref blas.Nodes[i];
                 if (!node.IsLeaf)
@@ -986,13 +1144,11 @@ namespace IDKEngine.Bvh
 
         public static int[] GetLeafIndices(in BuildResult blas)
         {
-            ReadOnlySpan<GpuBlasNode> nodes = MemoryMarshal.CreateReadOnlySpan(in blas.Nodes[0], blas.UnpaddedNodesCount);
-
-            int[] indices = new int[nodes.Length / 2 + 1];
+            int[] indices = new int[blas.Nodes.Length / 2 + 1];
             int counter = 0;
-            for (int i = 1; i < nodes.Length; i++)
+            for (int i = 2; i < blas.Nodes.Length; i++)
             {
-                if (nodes[i].IsLeaf)
+                if (blas.Nodes[i].IsLeaf)
                 {
                     indices[counter++] = i;
                 }
@@ -1004,7 +1160,7 @@ namespace IDKEngine.Bvh
 
         public static bool IsLeftSibling(int nodeId)
         {
-            return nodeId % 2 == 1;
+            return nodeId % 2 == 0;
         }
 
         public static int GetSiblingId(int nodeId)
@@ -1019,7 +1175,7 @@ namespace IDKEngine.Bvh
 
         public static int GetUpperBoundNodes(int triangleCount)
         {
-            return Math.Max(2 * triangleCount - 1, 3);
+            return Math.Max(2 * triangleCount, 3);
         }
 
         public static Box ComputeBoundingBox(int start, int count, in Geometry geometry)
