@@ -25,7 +25,7 @@ namespace IDKEngine.Bvh
         public delegate Box FuncGetPrimitive(int primId);
         public delegate void FuncGetBlasAndGeometry(int instanceId, out BLAS.BuildResult blas, out BLAS.Geometry geometry, out Matrix4 invWorldTransform);
 
-        public static void Build(Span<GpuTlasNode> nodes, FuncGetPrimitive funcGetLeaf, int primitiveCount, in BuildSettings buildSettings)
+        public static void Build(Span<GpuTlasNode> nodes, FuncGetPrimitive funcGetLeaf, int primitiveCount, BuildSettings buildSettings)
         {
             if (nodes.Length == 0) return;
 

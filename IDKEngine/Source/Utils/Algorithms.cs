@@ -129,6 +129,11 @@ namespace IDKEngine.Utils
         /// <returns>The first index in the array where array[index] >= value, or arr.Length if no such value is found</returns>
         public static int SortedLowerBound<T>(ReadOnlySpan<T> arr, in T value, Comparison<T> comparison)
         {
+            if (arr.Length == 0)
+            {
+                return 0;
+            }
+
             int lo = 0;
             int hi = arr.Length - 1;
             while (lo < hi)
@@ -288,27 +293,6 @@ namespace IDKEngine.Utils
             }
 
             auxiliary.Slice(0, rCounter).CopyTo(source.Slice(lCounter, rCounter));
-
-            return lCounter;
-        }
-
-        public static int StablePartitionWriteOut(Span<int> source, Span<int> auxiliary, BitArray bitArray)
-        {
-            int lCounter = 0;
-            int rCounter = 0;
-
-            for (int i = 0; i < source.Length; i++)
-            {
-                int id = source[i];
-                if (bitArray[id])
-                {
-                    source[lCounter++] = id;
-                }
-                else
-                {
-                    auxiliary[rCounter++] = id;
-                }
-            }
 
             return lCounter;
         }

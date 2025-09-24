@@ -125,7 +125,7 @@ namespace IDKEngine.Render
                 openModelLoadPopup = false;
             }
 
-            ImGui.SliderInt("Debug", ref Application.Debug, 0, app.ModelManager.BVH.BlasNodes.Length);
+            ImGui.SliderInt("Debug", ref Application.Debug, 0, app.ModelManager.BVH.BlasNodes.Length - 1);
 
             if (ImGui.Begin("Stats"))
             {
@@ -1341,9 +1341,9 @@ namespace IDKEngine.Render
                     app.ModelManager.BVH.Intersect(worldSpaceRay, out _);
                 });
             }
-            BVH.DebugStatistics.TriIntersections /= (ulong)(res.X * res.Y);
-            BVH.DebugStatistics.BoxIntersections /= (ulong)(res.X * res.Y);
-            Console.WriteLine(BVH.DebugStatistics);
+            //BVH.DebugStatistics.TriIntersections /= (ulong)(res.X * res.Y);
+            //BVH.DebugStatistics.BoxIntersections /= (ulong)(res.X * res.Y);
+            Console.WriteLine($"BoxIntersections = {BVH.DebugStatistics.BoxIntersections / (double)(res.X * res.Y)}, TriIntersections = {BVH.DebugStatistics.TriIntersections / (double)(res.X * res.Y)}");
             Console.WriteLine(sw.ElapsedMilliseconds);
         }
 

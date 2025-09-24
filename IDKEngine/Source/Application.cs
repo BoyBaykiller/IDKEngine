@@ -274,12 +274,15 @@ namespace IDKEngine
                     }
                 });
             }
-            //{
-            //    ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[0];
+            {
+                ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[0];
 
-            //    Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(0).Nodes[Debug]);
-            //    BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
-            //}
+                if (Debug < ModelManager.BVH.GetBlas(0).Nodes.Length)
+                {
+                    Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(0).Nodes[Debug]);
+                    BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
+                }
+            }
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderImGui)
             {
@@ -505,9 +508,9 @@ namespace IDKEngine
                 //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
                 //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(MathF.PI / 2.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
                 //ModelLoader.Model dragon = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\black_dragon_with_idle_animation\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
-                ModelLoader.Model cs = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\CesiumMan\glTF-Binary\CesiumMan.glb", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
+                //ModelLoader.Model cs = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\CesiumMan\glTF-Binary\CesiumMan.glb", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
                 //ModelLoader.Model cb = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
-                ModelLoader.Model box = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\Box\glTF\Box.gltf", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
+                ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\Duck\glTF\Duck.gltf", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
 
                 ModelManager.Add(test);
                 

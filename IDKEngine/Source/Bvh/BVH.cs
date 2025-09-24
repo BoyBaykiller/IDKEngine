@@ -485,7 +485,9 @@ namespace IDKEngine.Bvh
                     totalSAH += BLAS.ComputeGlobalSAH(GetBlas(i), buildSettings);
                 }
                 Logger.Log(Logger.LogLevel.Info, $"Added SAH of all new BLAS'es = {totalSAH}");
-                Console.WriteLine(BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0].GeometryDesc), buildSettings));
+                Logger.Log(Logger.LogLevel.Info, $"Added Area of all new BLAS'es = {BLAS.ComputeGlobalArea(GetBlas(0), buildSettings)}");
+                Logger.Log(Logger.LogLevel.Info, $"Added EPO of all new BLAS'es = {BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0].GeometryDesc), buildSettings)}");
+                Logger.Log(Logger.LogLevel.Info, $"Added Overlap of all new BLAS'es = {BLAS.ComputeOverlap(GetBlas(0))}");
             }
 
         }
