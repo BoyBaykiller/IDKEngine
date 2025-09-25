@@ -1,10 +1,21 @@
 ﻿using System;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
 
 namespace IDKEngine.Utils
 {
     public static class MyMath
     {
+        public static float NativeMax(float a, float b)
+        {
+            // TODO: Use float.MaxNative in .NET10
+            Vector128<float> va = Vector128.CreateScalarUnsafe(a);
+            Vector128<float> vb = Vector128.CreateScalarUnsafe(b);
+
+            return Sse.MaxScalar(va, vb).ToScalar();
+        }
+
         public static int DivUp(int numerator, int divisor)
         {
             return (numerator + divisor - 1) / divisor;

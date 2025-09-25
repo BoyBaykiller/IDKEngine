@@ -330,8 +330,8 @@ namespace IDKEngine.Bvh
             GpuBlasDesc prevEndBlasDesc = BlasesDesc[start + count - 1];
             
             BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
-            //buildSettings.SBVH.SplitFactor = 0.0f;
-            buildSettings.PreSplitting.SplitFactor = 0.0f;
+            buildSettings.SBVH.SplitFactor = 0.0f;
+            //buildSettings.PreSplitting.SplitFactor = 0.0f;
 
             // Statistics
             int preSplitNewTris = 0;
@@ -339,8 +339,8 @@ namespace IDKEngine.Bvh
             int newTrisDeduplicated = 0;
 
             Stopwatch swBuilding = Stopwatch.StartNew();
-            Parallel.For(0, count, i =>
-            //for (int i = 0; i < count; i++)
+            //Parallel.For(0, count, i =>
+            for (int i = 0; i < count; i++)
             {
                 ref GpuBlasDesc blasDesc = ref BlasesDesc[start + i];
                 BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
@@ -364,18 +364,28 @@ namespace IDKEngine.Bvh
 
                 // Build BLAS and resize nodes
                 BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
-                int nodesUsed = BLAS.Build(ref blas, geometry, ref buildData, buildSettings);
 
-                Array.Resize(ref nodes, nodesUsed);
-                blas.Nodes = nodes;
+                bool ploc = false;
+                int nodesUsed = 0;
+                if (ploc)
+                {
+                    nodesUsed = BLAS.Build(ref blas, fragments.Bounds);
+                    Helper.FillIncreasing(buildData.PermutatedFragmentIds);
+                }
+                else
+                {
+                    nodesUsed = BLAS.Build(ref blas, geometry, ref buildData, buildSettings);
+                    Array.Resize(ref nodes, nodesUsed);
+                    blas.Nodes = nodes;
+                }
 
                 int[] parentIds = BLAS.GetParentIndices(blas);
 
                 if (false)
                 {
-                    // Post build optimizaton.
-                    // Although it still decreases SAH from a Full-Sweep BLAS it either has no or even a harmful impact on net performance
-                    // It was more effective on the older binned BLAS. More investigation needed. For now it's disabled
+                    // Post build optimizaton. Even though it is succefull at decreasing global SAH cost
+                    // this often does not transform into a performance increase.
+                    // It tends to increase max depth and EPO and I think there also other factors
                     ReinsertionOptimizer.Optimize(ref blas, parentIds, new ReinsertionOptimizer.Settings());
                 }
 
@@ -400,7 +410,7 @@ namespace IDKEngine.Bvh
                 blasData.ParentIds = parentIds;
                 blasData.LeafIds = leafIds;
                 newBlasesData[i] = blasData;
-            });
+            };
             swBuilding.Stop();
 
             // Adjust offsets of all BLASes starting from the the ones that were rebuild
@@ -486,7 +496,7 @@ namespace IDKEngine.Bvh
                 }
                 Logger.Log(Logger.LogLevel.Info, $"Added SAH of all new BLAS'es = {totalSAH}");
                 Logger.Log(Logger.LogLevel.Info, $"Added Area of all new BLAS'es = {BLAS.ComputeGlobalArea(GetBlas(0), buildSettings)}");
-                Logger.Log(Logger.LogLevel.Info, $"Added EPO of all new BLAS'es = {BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0].GeometryDesc), buildSettings)}");
+                //Logger.Log(Logger.LogLevel.Info, $"Added EPO of all new BLAS'es = {BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0].GeometryDesc), buildSettings)}");
                 Logger.Log(Logger.LogLevel.Info, $"Added Overlap of all new BLAS'es = {BLAS.ComputeOverlap(GetBlas(0))}");
             }
 

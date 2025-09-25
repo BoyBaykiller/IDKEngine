@@ -125,7 +125,7 @@ namespace IDKEngine.Render
                 openModelLoadPopup = false;
             }
 
-            ImGui.SliderInt("Debug", ref Application.Debug, 0, app.ModelManager.BVH.BlasNodes.Length - 1);
+            //ImGui.SliderInt("Debug", ref Application.Debug, 0, app.ModelManager.BVH.BlasNodes.Length - 1);
 
             if (ImGui.Begin("Stats"))
             {

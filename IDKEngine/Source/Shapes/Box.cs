@@ -108,7 +108,8 @@ namespace IDKEngine.Shapes
 
         public readonly float LargestExtent()
         {
-            return Size()[LargestAxis()];
+            Vector128<float> size = SimdSize();
+            return MyMath.NativeMax(size[0], MyMath.NativeMax(size[1], size[2]));
         }
 
         public readonly float Area()

@@ -185,7 +185,7 @@ namespace IDKEngine.Bvh
             }
             else
             {
-                int maxFragmentCount = geometry.TriangleCount + (int)(geometry.TriangleCount * settings.SBVH.SplitFactor) + 1000;
+                int maxFragmentCount = geometry.TriangleCount + (int)(geometry.TriangleCount * settings.SBVH.SplitFactor);
                 fragments.Bounds = new Box[maxFragmentCount];
 
                 if (settings.SBVH.Enabled)
@@ -287,13 +287,6 @@ namespace IDKEngine.Bvh
                     {
                         //spatialSplit = FindSpatialSplit(invParentArea, parentNode.TriStartOrChild, parentNode.TriEnd, geometry, buildData, settings);
                         spatialSplit = FindSpatialSplit(parentBox, parentNode.TriStartOrChild, parentNode.TriEnd, geometry, buildData, settings);
-
-                        bool debug = parentBox.HalfArea() > 370.0f;
-                        if (debug)
-                        {
-                            Console.WriteLine($"area = {parentBox.HalfArea()} used = {nodesUsed} cost = {spatialSplit.NewCost}");
-                        }
-
                     }
                 }
 
@@ -925,30 +918,31 @@ namespace IDKEngine.Bvh
                     {
                         Span<int> leftUniqueTriIds = GetUniqueTriIds(leftChild, buildData);
                         Span<int> rightUniqueTriIds = GetUniqueTriIds(rightChild, buildData);
-                        Span<int> straddlingTriIds = GetStraddlingTriIds(leftUniqueTriIds, rightUniqueTriIds);
 
                         int onlyLeftTriCount = 0;
                         int backwardsCounter = 0;
                         for (int i = 0; i < leftUniqueTriIds.Length; i++)
                         {
-                            int triId = leftUniqueTriIds[i];
-                            if (straddlingTriIds.Contains(triId))
+                            int leftTriId = leftUniqueTriIds[i];
+                            bool isStraddling = rightUniqueTriIds.Contains(leftTriId);
+                            if (isStraddling)
                             {
-                                triangles[globalTriCounter + (leftUniqueTriIds.Length - backwardsCounter++ - 1)] = geometry.Triangles[triId];
+                                triangles[globalTriCounter + (leftUniqueTriIds.Length - backwardsCounter++ - 1)] = geometry.Triangles[leftTriId];
                             }
                             else
                             {
-                                triangles[globalTriCounter + onlyLeftTriCount++] = geometry.Triangles[triId];
+                                triangles[globalTriCounter + onlyLeftTriCount++] = geometry.Triangles[leftTriId];
                             }
                         }
 
                         int onlyRightTriCount = 0;
                         for (int i = 0; i < rightUniqueTriIds.Length; i++)
                         {
-                            int triId = rightUniqueTriIds[i];
-                            if (!straddlingTriIds.Contains(triId))
+                            int rightTriId = rightUniqueTriIds[i];
+                            bool isStraddling = leftUniqueTriIds.Contains(rightTriId);
+                            if (!isStraddling)
                             {
-                                triangles[globalTriCounter + leftUniqueTriIds.Length + onlyRightTriCount++] = geometry.Triangles[triId];
+                                triangles[globalTriCounter + leftUniqueTriIds.Length + onlyRightTriCount++] = geometry.Triangles[rightTriId];
                             }
                         }
 
@@ -1001,22 +995,6 @@ namespace IDKEngine.Bvh
 
                     return uniqueTriIds;
                 }
-
-                static Span<int> GetStraddlingTriIds(Span<int> leftTriIds, Span<int> rightTriIds)
-                {
-                    List<int> straddlingTris = new List<int>((leftTriIds.Length + rightTriIds.Length) / 4);
-                    for (int i = 0; i < leftTriIds.Length; i++)
-                    {
-                        int triId = leftTriIds[i];
-
-                        if (rightTriIds.Contains(triId))
-                        {
-                            straddlingTris.Add(triId);
-                        }
-                    }
-
-                    return straddlingTris;
-                }
             }
             else
             {
@@ -1028,7 +1006,7 @@ namespace IDKEngine.Bvh
                         for (int j = 0; j < node.TriCount; j++)
                         {
                             int triId = buildData.PermutatedFragmentIds[node.TriStartOrChild + j];
-                            triangles[globalTriCounter + j] = geometry.Triangles[triId];
+                            triangles[globalTriCounter + j] = geometry.Triangles[buildData.Fragments.OriginalTriIds[triId]];
                         }
                         node.TriStartOrChild = globalTriCounter;
                         globalTriCounter += node.TriCount;
@@ -1625,6 +1603,181 @@ namespace IDKEngine.Bvh
             newRightNode.SetBounds(objectSplit.RightBox);
 
             return (newLeftNode, newRightNode);
+        }
+
+        public static int Build(ref BuildResult blas, Span<Box> fragBounds, int searchRadius = 15)
+        {
+            int primitiveCount = fragBounds.Length;
+
+            Span<GpuBlasNode> nodes = blas.Nodes;
+            if (nodes.Length == 0) return 0;
+
+            GpuBlasNode[] tempNodes = new GpuBlasNode[nodes.Length];
+
+            {
+                // Create all leaf nodes at the end of the nodes array
+                Span<GpuBlasNode> leafNodes = tempNodes.AsSpan(nodes.Length - primitiveCount, primitiveCount);
+
+                Box globalBounds = Box.Empty();
+                for (int i = 0; i < leafNodes.Length; i++)
+                {
+                    Box bounds = fragBounds[i];
+                    globalBounds.GrowToFit(bounds);
+
+                    GpuBlasNode newNode = new GpuBlasNode();
+                    newNode.SetBounds(bounds);
+                    newNode.TriCount = 1;
+                    newNode.TriStartOrChild = i;
+
+                    leafNodes[i] = newNode;
+                }
+
+                // Sort the leaf nodes based on their position converted to a morton code.
+                // That means nodes which are spatially close will also be close in memory.
+                Span<GpuBlasNode> output = nodes.Slice(nodes.Length - primitiveCount, primitiveCount);
+                Algorithms.RadixSort(leafNodes, output, (GpuBlasNode node) =>
+                {
+                    Vector3 mapped = MyMath.MapToZeroOne((node.Max + node.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
+                    uint mortonCode = MyMath.GetMortonCode(mapped);
+
+                    return mortonCode;
+                });
+            }
+
+            int activeRangeCount = primitiveCount;
+            int activeRangeEnd = nodes.Length;
+            int[] preferedNbors = new int[activeRangeCount];
+            while (activeRangeCount > 1)
+            {
+                int activeRangeStart = activeRangeEnd - activeRangeCount;
+
+                // Find the nodeId each node prefers to merge with
+                for (int i = 0; i < activeRangeCount; i++)
+                {
+                    int nodeAId = activeRangeStart + i;
+                    int searchStart = Math.Max(nodeAId - searchRadius, activeRangeStart);
+                    int searchEnd = Math.Min(nodeAId + searchRadius + 1, activeRangeEnd);
+                    int nodeBId = FindBestMatch(nodes, searchStart, searchEnd, nodeAId);
+                    int nodeBIdLocal = nodeBId - activeRangeStart;
+                    preferedNbors[i] = nodeBIdLocal;
+                }
+
+                // Find number of merged tlasNodes in advance so we know where to insert new parent tlasNodes
+                int mergedNodesCount = 0;
+                for (int i = 0; i < activeRangeCount; i++)
+                {
+                    int nodeAIdLocal = i;
+                    int nodeBIdLocal = preferedNbors[nodeAIdLocal];
+                    int nodeCIdLocal = preferedNbors[nodeBIdLocal];
+
+                    if (nodeAIdLocal == nodeCIdLocal && nodeAIdLocal < nodeBIdLocal)
+                    {
+                        mergedNodesCount += 2;
+                    }
+                }
+
+                int unmergedNodesCount = activeRangeCount - mergedNodesCount;
+                int newNodesCount = mergedNodesCount / 2;
+
+                int mergedNodesHead = activeRangeEnd - mergedNodesCount;
+                int newBegin = mergedNodesHead - unmergedNodesCount - newNodesCount;
+                int unmergedNodesHead = newBegin;
+                for (int i = 0; i < activeRangeCount; i++)
+                {
+                    int nodeAIdLocal = i;
+                    int nodeBIdLocal = preferedNbors[nodeAIdLocal];
+                    int nodeCIdLocal = preferedNbors[nodeBIdLocal];
+                    int nodeAId = nodeAIdLocal + activeRangeStart;
+
+                    if (nodeAIdLocal == nodeCIdLocal)
+                    {
+                        if (nodeAIdLocal < nodeBIdLocal)
+                        {
+                            int nodeBId = nodeBIdLocal + activeRangeStart;
+
+                            tempNodes[mergedNodesHead + 0] = nodes[nodeAId];
+                            tempNodes[mergedNodesHead + 1] = nodes[nodeBId];
+
+                            ref GpuBlasNode nodeA = ref tempNodes[mergedNodesHead + 0];
+                            ref GpuBlasNode nodeB = ref tempNodes[mergedNodesHead + 1];
+
+                            Box mergedBox = Box.From(Conversions.ToBox(nodeA), Conversions.ToBox(nodeB));
+
+                            GpuBlasNode newNode = new GpuBlasNode();
+                            newNode.SetBounds(mergedBox);
+                            newNode.TriStartOrChild = mergedNodesHead;
+
+                            tempNodes[unmergedNodesHead] = newNode;
+
+                            unmergedNodesHead++;
+                            mergedNodesHead += 2;
+                        }
+                    }
+                    else
+                    {
+                        tempNodes[unmergedNodesHead++] = nodes[nodeAId];
+                    }
+                }
+
+                // Copy from temp into final array
+                Memory.CopyElements(ref tempNodes[newBegin], ref nodes[newBegin], activeRangeEnd - newBegin);
+
+                // For every merged pair, 2 tlasNodes become inactive and 1 new one gets active
+                activeRangeCount -= mergedNodesCount / 2;
+                activeRangeEnd -= mergedNodesCount;
+            }
+
+            // Add padding. This increases performance on SponaMerged: 128fps->133fps.
+            nodes[0] = new GpuBlasNode();
+
+            int nodesUsed = nodes.Length;
+            if (nodesUsed == 2)
+            {
+                // The root should never be a leaf.
+                // Handle this edge case by creating a leaf-pair
+
+                blas.Nodes[2] = blas.Root;
+                blas.Nodes[3] = blas.Root;
+
+                blas.Root.TriCount = 0;
+                blas.Root.TriStartOrChild = 2;
+
+                nodesUsed = 4;
+            }
+            blas.MaxTreeDepth = ComputeTreeDepth(blas);
+
+            return nodesUsed;
+        }
+
+        private static int FindBestMatch(ReadOnlySpan<GpuBlasNode> nodes, int start, int end, int nodeIndex)
+        {
+            float smallestArea = float.MaxValue;
+            int bestNodeIndex = -1;
+
+            ref readonly GpuBlasNode node = ref nodes[nodeIndex];
+
+            Box nodeBox = Conversions.ToBox(node);
+
+            for (int i = start; i < end; i++)
+            {
+                if (i == nodeIndex)
+                {
+                    continue;
+                }
+
+                ref readonly GpuBlasNode otherNode = ref nodes[i];
+
+                Box mergedBox = Box.From(nodeBox, Conversions.ToBox(otherNode));
+
+                float area = mergedBox.HalfArea();
+                if (area < smallestArea)
+                {
+                    smallestArea = area;
+                    bestNodeIndex = i;
+                }
+            }
+
+            return bestNodeIndex;
         }
 
         private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild)

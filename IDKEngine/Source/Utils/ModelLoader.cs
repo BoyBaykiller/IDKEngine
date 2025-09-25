@@ -566,7 +566,7 @@ namespace IDKEngine.Utils
 
         public static Model? LoadGltfFromFile(string path, in Matrix4 rootTransform)
         {
-            return LoadGltfFromFile(path, rootTransform, OptimizationSettings.AllTurnedOff);
+            return LoadGltfFromFile(path, rootTransform, OptimizationSettings.Recommended);
         }
 
         public static Model? LoadGltfFromFile(string path, in Matrix4 rootTransform, OptimizationSettings optimizationSettings)
@@ -1254,6 +1254,7 @@ namespace IDKEngine.Utils
                         tasks[uniqueMeshPrimitivesCount++] = Task.Run(() =>
                         {
                             (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(modelRoot.LogicalAccessors, meshDesc);
+                            OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
 
                             MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
                             (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);

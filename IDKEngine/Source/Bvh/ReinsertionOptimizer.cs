@@ -79,8 +79,8 @@ public ref struct ReinsertionOptimizer
         }
 
         {
-            // Always make node 0 point to 1, as this is expected by traversal
-            // Always make node 1 point to 3, as this is good memory access
+            // Make left child of root be at index 2, as this is expected by traversal
+            // Make left child of left child of root be at index 4, as this is good memory access
             if (nodes[1].TriStartOrChild != 2)
             {
                 SwapChildrenInMem(1, parentIds[2]);

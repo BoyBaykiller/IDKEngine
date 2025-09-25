@@ -54,7 +54,7 @@ namespace IDKEngine.Bvh
             return info;
         }
 
-        public static void PreSplit(PrepareData prepareData, Span<Box> bounds, Span<int> originalTriIds, in Settings settings, in BLAS.Geometry geometry)
+        public static int PreSplit(PrepareData prepareData, Span<Box> bounds, Span<int> originalTriIds, in Settings settings, in BLAS.Geometry geometry)
         {
             // Source:
             // * https://github.com/madmann91/bvh/blob/2fd0db62022993963a7343669275647cb073e19a/include/bvh/heuristic_primitive_splitter.hpp
@@ -89,7 +89,7 @@ namespace IDKEngine.Bvh
                     }
 
                     int splitAxis = box.LargestAxis();
-                    float largestExtent = box.Size()[splitAxis];
+                    float largestExtent = box.LargestExtent();
 
                     float alpha = largestExtent / globalSize[splitAxis];
                     float cellSize = GetCellSize(alpha) * globalSize[splitAxis];
@@ -99,6 +99,8 @@ namespace IDKEngine.Bvh
                     }
 
                     float midPos = (box.Min[splitAxis] + box.Max[splitAxis]) * 0.5f;
+
+                    // This is computing [x = j * 2 ^ i, where i,j∈Z] as shown in the paper
                     float splitPos = globalBox.Min[splitAxis] + MathF.Round((midPos - globalBox.Min[splitAxis]) / cellSize) * cellSize;
                     if (splitPos < box.Min[splitAxis] || splitPos > box.Max[splitAxis])
                     {
@@ -117,10 +119,12 @@ namespace IDKEngine.Bvh
 
                     int rightCount = splitsLeft - leftCount;
 
-                    stack[stackPtr++] = (lBox, leftCount);
                     stack[stackPtr++] = (rBox, rightCount);
+                    stack[stackPtr++] = (lBox, leftCount);
                 }
             }
+
+            return counter;
         }
 
         private static int GetSplitCount(float priority, float totalPriority, int triangleCount, float splitFactor)
@@ -133,6 +137,8 @@ namespace IDKEngine.Bvh
 
         private static float Priority(Box triBox, Triangle triangle)
         {
+            // Cbqrt to avoid spending the entire split budget on a few large triangles in pathological case
+            // Extent^2 to concentrate more splits on large triangles specifically
             return MathF.Cbrt(MathF.Pow(triBox.LargestExtent(), 2.0f) * (triBox.Area() - triangle.Area));
         }
 
@@ -140,10 +146,10 @@ namespace IDKEngine.Bvh
         {
             // Erase all except the exponent bits.
             // This has the same effect as 2^(floor(log2(alpha)))
-            int floatBits = Unsafe.BitCast<float, int>(alpha);
-            floatBits &= 255 << 23;
+            uint floatBits = Unsafe.BitCast<float, uint>(alpha);
+            floatBits &= 255u << 23;
 
-            return Unsafe.BitCast<int, float>(floatBits);
+            return Unsafe.BitCast<uint, float>(floatBits);
         }
     }
 }
