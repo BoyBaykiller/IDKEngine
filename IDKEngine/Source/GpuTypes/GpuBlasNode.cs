@@ -31,10 +31,7 @@ namespace IDKEngine.GpuTypes
 
         public readonly float HalfArea()
         {
-            Vector3 size = Max - Min;
-            float area = MyMath.HalfArea(size.X, size.Y, size.Z);
-
-            return area;
+            return MyMath.HalfArea(Max - Min);
         }
     }
 }

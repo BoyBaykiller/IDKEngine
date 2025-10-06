@@ -24,8 +24,8 @@ namespace IDKEngine.Bvh
 
         public record struct BuildSettings
         {
-            public int MinLeafTriangleCount = 1;
-            public int MaxLeafTriangleCount = 8;
+            public int StopSplittingThreshold = 1;
+            public int MaxLeafTriangleCount = 1;
             public float TriangleCost = 1.1f;
 
             public SBVHSettings SBVH = new SBVHSettings();
@@ -41,7 +41,7 @@ namespace IDKEngine.Bvh
             public readonly bool Enabled => SplitFactor > 0.0f;
 
             public float SplitFactor = 1.0f;
-            public float OverlapTreshold = 0.0001f;
+            public float OverlapThreshold = 0.00001f;
 
             public SBVHSettings()
             {
@@ -166,6 +166,18 @@ namespace IDKEngine.Bvh
             public int ParentNodeId;
             public int ReservedSpaceBoundary;
             public bool FragmentsNeedSorting;
+            public int Depth;
+        }
+
+        private record struct Bin
+        {
+            public Box Box = Box.Empty();
+            public int Entry;
+            public int Exit;
+
+            public Bin()
+            {
+            }
         }
 
         public static Fragments GetFragments(in Geometry geometry, BuildSettings settings)
@@ -237,28 +249,24 @@ namespace IDKEngine.Bvh
             rootNode.TriCount = buildData.Fragments.Count;
             rootNode.SetBounds(ComputeBoundingBox(rootNode.TriStartOrChild, rootNode.TriCount, buildData));
 
-            float globalArea = rootNode.HalfArea();
+            float rootArea = rootNode.HalfArea();
 
             int stackPtr = 0;
             Span<BuildStackItem> stack = stackalloc BuildStackItem[64];
-            stack[stackPtr++] = new BuildStackItem() { ParentNodeId = 1, ReservedSpaceBoundary = buildData.Fragments.ReservedSpace, FragmentsNeedSorting = true };
+            stack[stackPtr++] = new BuildStackItem() { ParentNodeId = 1, ReservedSpaceBoundary = buildData.Fragments.ReservedSpace, FragmentsNeedSorting = true, Depth = 0 };
             while (stackPtr > 0)
             {
                 ref readonly BuildStackItem buildStackItem = ref stack[--stackPtr];
                 ref GpuBlasNode parentNode = ref blas.Nodes[buildStackItem.ParentNodeId];
 
-                Box parentBox = Conversions.ToBox(parentNode);
-
-                if (parentNode.TriCount <= settings.MinLeafTriangleCount || parentBox.HalfArea() == 0.0f)
+                if (parentNode.TriCount <= settings.StopSplittingThreshold || parentNode.HalfArea() == 0.0f)
                 {
                     continue;
                 }
 
                 if (buildStackItem.FragmentsNeedSorting)
                 {
-                    // FindObjectSplit method requires sorted fragments.
-                    // If spatial split added new fragments we need to sort again
-
+                    // Sweep-SAH object split search requires sorted fragments. If spatial split added new fragments we need to sort again
                     for (int axis = 0; axis < 3; axis++)
                     {
                         Span<int> input = Helper.ReUseMemory<float, int>(buildData.RightCostsAccum, parentNode.TriCount);
@@ -274,51 +282,43 @@ namespace IDKEngine.Bvh
                     }
                 }
 
-                float invParentArea = 1.0f / parentBox.HalfArea();
-
-                ObjectSplit objectSplit = FindObjectSplit(invParentArea, parentNode.TriStartOrChild, parentNode.TriEnd, buildData, settings);
-                    
-                SpatialSplit spatialSplit = new SpatialSplit() { NewCost = float.MaxValue };
-                if (settings.SBVH.Enabled)
-                {
-                    float overlap = Box.GetOverlappingHalfArea(objectSplit.LeftBox, objectSplit.RightBox);
-                    float percentOverlap = overlap / globalArea;
-                    if (percentOverlap > settings.SBVH.OverlapTreshold)
-                    {
-                        //spatialSplit = FindSpatialSplit(invParentArea, parentNode.TriStartOrChild, parentNode.TriEnd, geometry, buildData, settings);
-                        spatialSplit = FindSpatialSplit(parentBox, parentNode.TriStartOrChild, parentNode.TriEnd, geometry, buildData, settings);
-                    }
-                }
-
-                bool useSpatialSplit = spatialSplit.NewCost < objectSplit.NewCost; // spatialSplit.NewCost < objectSplit.NewCost;
-                {
-                    float notSplitCost = CostLeafNode(parentNode.TriCount, settings.TriangleCost);
-                    float splitCost = useSpatialSplit ? spatialSplit.NewCost : objectSplit.NewCost;
-                    if (splitCost >= notSplitCost)
-                    {
-                        if (parentNode.TriCount <= settings.MaxLeafTriangleCount)
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            // Spatial splits aren't worth it at the bottom and we just want to reach MaxLeafTriangleCount fast.
-                            // Chances are we dont have the necessary split budget at this point anyway
-                            useSpatialSplit = false;
-                        }
-                    }
-                }
-
                 bool parentIsLeft = parentNode.TriEnd <= buildStackItem.ReservedSpaceBoundary;
                 int reservedStart = parentIsLeft ? parentNode.TriStartOrChild : buildStackItem.ReservedSpaceBoundary;
                 int reservedEnd = parentIsLeft ? buildStackItem.ReservedSpaceBoundary : parentNode.TriEnd;
                 int reservedCount = reservedEnd - reservedStart;
-                int remainingSpaceAfterSplit = reservedCount - (useSpatialSplit ? spatialSplit.Count : parentNode.TriCount);
 
+                Box parentBox = Conversions.ToBox(parentNode);
+                ObjectSplit objectSplit = FindObjectSplit(parentBox, parentNode.TriStartOrChild, parentNode.TriEnd, buildData, settings);
+
+                SpatialSplit spatialSplit = new SpatialSplit() { NewCost = float.MaxValue };
+                if (settings.SBVH.Enabled)
+                {
+                    float overlap = MyMath.HalfArea(objectSplit.LeftBox.Max - objectSplit.RightBox.Min);
+                    float percentOverlap = overlap / rootArea;
+                    bool aboveThreshold = percentOverlap > settings.SBVH.OverlapThreshold;
+
+                    bool spaceForNew = reservedCount > parentNode.TriCount;
+
+                    if (spaceForNew && aboveThreshold)
+                    {
+                        //spatialSplit = FindSpatialSplitSweep(1.0f / parentBox.HalfArea(), parentNode.TriStartOrChild, parentNode.TriEnd, geometry, buildData, settings);
+                        spatialSplit = FindSpatialSplit(parentBox, parentNode.TriStartOrChild, parentNode.TriEnd, geometry, buildData, settings);
+                    }
+                }
+
+                bool useSpatialSplit = spatialSplit.NewCost < objectSplit.NewCost;
+                int remainingSpaceAfterSplit = reservedCount - (useSpatialSplit ? spatialSplit.Count : parentNode.TriCount);
                 if (useSpatialSplit && (remainingSpaceAfterSplit < 0 || spatialSplit.LeftCount == 0 || spatialSplit.RightCount == 0))
                 {
                     useSpatialSplit = false;
                     remainingSpaceAfterSplit = reservedCount - parentNode.TriCount;
+                }
+
+                float notSplitCost = parentNode.TriCount * settings.TriangleCost;
+                float splitCost = useSpatialSplit ? spatialSplit.NewCost : objectSplit.NewCost;
+                if (splitCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
+                {
+                    continue;
                 }
 
                 GpuBlasNode newLeftNode = new GpuBlasNode();
@@ -347,7 +347,6 @@ namespace IDKEngine.Bvh
                     newRightNode.TriCount = parentNode.TriEnd - objectSplit.Pivot;
                     newRightNode.SetBounds(objectSplit.RightBox);
 
-                    // See Figure 1. in "Parallel Spatial Splits in Bounding Volume Hierarchies"
                     if (parentIsLeft)
                     {
                         int newStart = reservedEnd - newRightNode.TriCount;
@@ -366,11 +365,9 @@ namespace IDKEngine.Bvh
                 }
                 else
                 {
-                    int leftDest = reservedStart;
-                    int rightDest = reservedEnd - spatialSplit.RightCount;
-
                     int leftCounter = 0;
                     int rightCounter = 0;
+                    int outputAxis = (spatialSplit.Axis + 1) % 3;
                     for (int i = parentNode.TriStartOrChild; i < parentNode.TriEnd; i++)
                     {
                         int fragmentId = buildData.FragmentIdsSortedOnAxis[spatialSplit.Axis][i];
@@ -378,45 +375,29 @@ namespace IDKEngine.Bvh
                         Box fragmentBounds = buildData.Fragments.Bounds[fragmentId];
                         int triangleId = buildData.Fragments.OriginalTriIds[fragmentId];
 
-                        bool completlyLeft = fragmentBounds.Max[spatialSplit.Axis] <= spatialSplit.Position;
-                        bool completlyRight = fragmentBounds.Min[spatialSplit.Axis] >= spatialSplit.Position;
-                        bool isStraddling = !completlyLeft && !completlyRight;
-                        if (completlyLeft)
+                        bool fullyLeft = fragmentBounds.Max[spatialSplit.Axis] <= spatialSplit.Position;
+                        bool fullyRight = fragmentBounds.Min[spatialSplit.Axis] >= spatialSplit.Position;
+                        if (fullyLeft)
                         {
-                            buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3][leftDest + leftCounter] = fragmentId;
+                            buildData.FragmentIdsSortedOnAxis[outputAxis][reservedStart + leftCounter] = fragmentId;
                             leftCounter++;
                         }
-                        else if (completlyRight)
+                        else if (fullyRight)
                         {
-                            buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3][rightDest + rightCounter] = fragmentId;
+                            buildData.FragmentIdsSortedOnAxis[outputAxis][reservedEnd - rightCounter - 1] = fragmentId;
                             rightCounter++;
                         }
                         else
                         {
                             Box putInLeftBox = spatialSplit.LeftBox;
-                            putInLeftBox.GrowToFit(fragmentBounds);
-
                             Box putInRightBox = spatialSplit.RightBox;
+
+                            putInLeftBox.GrowToFit(fragmentBounds);
                             putInRightBox.GrowToFit(fragmentBounds);
 
-                            float straddlingCost = spatialSplit.NewCost;
-                            {
-                                float probHitLeftChild = spatialSplit.LeftBox.HalfArea() * invParentArea;
-                                float probHitRightChild = spatialSplit.RightBox.HalfArea() * invParentArea;
-                                straddlingCost = CostInternalNode(probHitLeftChild, probHitRightChild, CostLeafNode(spatialSplit.LeftCount, settings.TriangleCost), CostLeafNode(spatialSplit.RightCount, settings.TriangleCost));
-                            }
-                            float putInLeftCost;
-                            {
-                                float probHitLeftChild = putInLeftBox.HalfArea() * invParentArea;
-                                float probHitRightChild = spatialSplit.RightBox.HalfArea() * invParentArea;
-                                putInLeftCost = CostInternalNode(probHitLeftChild, probHitRightChild, CostLeafNode(spatialSplit.LeftCount, settings.TriangleCost), CostLeafNode(spatialSplit.RightCount - 1, settings.TriangleCost));
-                            }
-                            float putInRightCost;
-                            {
-                                float probHitLeftChild = spatialSplit.LeftBox.HalfArea() * invParentArea;
-                                float probHitRightChild = putInRightBox.HalfArea() * invParentArea;
-                                putInRightCost = CostInternalNode(probHitLeftChild, probHitRightChild, CostLeafNode(spatialSplit.LeftCount - 1, settings.TriangleCost), CostLeafNode(spatialSplit.RightCount, settings.TriangleCost));
-                            }
+                            float straddlingCost = spatialSplit.LeftBox.HalfArea() * spatialSplit.LeftCount + spatialSplit.RightBox.HalfArea() * spatialSplit.RightCount;
+                            float putInLeftCost = putInLeftBox.HalfArea() * spatialSplit.LeftCount + spatialSplit.RightBox.HalfArea() * (spatialSplit.RightCount - 1);
+                            float putInRightCost = spatialSplit.LeftBox.HalfArea() * (spatialSplit.LeftCount - 1) + putInRightBox.HalfArea() * spatialSplit.RightCount;
 
                             if (straddlingCost < putInLeftCost && straddlingCost < putInRightCost)
                             {
@@ -425,59 +406,64 @@ namespace IDKEngine.Bvh
                                 lSplittedBox.ShrinkToFit(fragmentBounds);
                                 rSplittedBox.ShrinkToFit(fragmentBounds);
 
-                                buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3][leftDest + leftCounter] = buildData.Fragments.Count;
+                                buildData.FragmentIdsSortedOnAxis[outputAxis][reservedStart + leftCounter++] = buildData.Fragments.Count;
                                 buildData.Fragments.Add(lSplittedBox, triangleId);
-                                leftCounter++;
                                     
-                                buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3][rightDest + rightCounter] = fragmentId;
+                                buildData.FragmentIdsSortedOnAxis[outputAxis][reservedEnd - rightCounter++ - 1] = fragmentId;
                                 buildData.Fragments.Bounds[fragmentId] = rSplittedBox;
-                                rightCounter++;
+                            }
+                            else if (putInLeftCost < putInRightCost)
+                            {
+                                buildData.FragmentIdsSortedOnAxis[outputAxis][reservedStart + leftCounter++] = fragmentId;
+                                buildData.Fragments.Bounds[fragmentId] = fragmentBounds;
+
+                                spatialSplit.LeftBox.GrowToFit(fragmentBounds);
                             }
                             else
                             {
-                                if (putInLeftCost < putInRightCost)
-                                {
-                                    buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3][leftDest + leftCounter] = fragmentId;
-                                    buildData.Fragments.Bounds[fragmentId] = fragmentBounds;
-                                    leftCounter++;
+                                buildData.FragmentIdsSortedOnAxis[outputAxis][reservedEnd - rightCounter++ - 1] = fragmentId;
+                                buildData.Fragments.Bounds[fragmentId] = fragmentBounds;
 
-                                    spatialSplit.LeftBox.GrowToFit(fragmentBounds);
-                                }
-                                else
-                                {
-                                    buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3][rightDest + rightCounter] = fragmentId;
-                                    buildData.Fragments.Bounds[fragmentId] = fragmentBounds;
-                                    rightCounter++;
-
-                                    spatialSplit.RightBox.GrowToFit(fragmentBounds);
-                                }
+                                spatialSplit.RightBox.GrowToFit(fragmentBounds);
                             }
                         }
                     }
 
+                    spatialSplit.LeftCount = leftCounter;
+                    spatialSplit.RightCount = rightCounter;
+
+                    // Reference unsplitting can lower the number of split triangles, so recompute
+                    remainingSpaceAfterSplit = reservedCount - spatialSplit.Count;
+
                     if (spatialSplit.LeftCount == 0 || spatialSplit.RightCount == 0)
                     {
-                        throw new Exception("uh no handle this");
+                        continue;
                     }
 
-                    Debug.Assert(leftDest + leftCounter <= rightDest);
-                    Array.Copy(buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3], leftDest, buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 2) % 3], leftDest, leftCounter);
-                    Array.Copy(buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3], leftDest, buildData.FragmentIdsSortedOnAxis[spatialSplit.Axis], leftDest, leftCounter);
+                    Debug.Assert(reservedStart + leftCounter <= (reservedEnd - rightCounter));
+                    Array.Copy(buildData.FragmentIdsSortedOnAxis[outputAxis], reservedStart, buildData.FragmentIdsSortedOnAxis[(outputAxis + 1) % 3], reservedStart, leftCounter);
+                    Array.Copy(buildData.FragmentIdsSortedOnAxis[outputAxis], reservedStart, buildData.FragmentIdsSortedOnAxis[(outputAxis + 2) % 3], reservedStart, leftCounter);
+                    Array.Copy(buildData.FragmentIdsSortedOnAxis[outputAxis], reservedEnd - rightCounter, buildData.FragmentIdsSortedOnAxis[(outputAxis + 1) % 3], reservedEnd - rightCounter, rightCounter);
+                    Array.Copy(buildData.FragmentIdsSortedOnAxis[outputAxis], reservedEnd - rightCounter, buildData.FragmentIdsSortedOnAxis[(outputAxis + 2) % 3], reservedEnd - rightCounter, rightCounter);
 
-                    Array.Copy(buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3], rightDest, buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 2) % 3], rightDest, rightCounter);
-                    Array.Copy(buildData.FragmentIdsSortedOnAxis[(spatialSplit.Axis + 1) % 3], rightDest, buildData.FragmentIdsSortedOnAxis[spatialSplit.Axis], rightDest, rightCounter);
-
-                    newLeftNode.TriStartOrChild = leftDest;
+                    newLeftNode.TriStartOrChild = reservedStart;
                     newLeftNode.TriCount = leftCounter;
                     newLeftNode.SetBounds(spatialSplit.LeftBox);
 
-                    newRightNode.TriStartOrChild = rightDest;
+                    newRightNode.TriStartOrChild = reservedEnd - rightCounter;
                     newRightNode.TriCount = rightCounter;
                     newRightNode.SetBounds(spatialSplit.RightBox);
                 }
 
                 float leftCost = newLeftNode.HalfArea() * newLeftNode.TriCount;
                 float rightCost = newRightNode.HalfArea() * newRightNode.TriCount;
+
+                // Don't accept zero areas, to prevent NaN
+                if (leftCost + rightCost == 0.0f)
+                {
+                    continue;
+                }
+
                 float shareOfReservedSpace = leftCost / (leftCost + rightCost);
                 int newReservedSpaceBoundary = newLeftNode.TriEnd + (int)(remainingSpaceAfterSplit * shareOfReservedSpace);
 
@@ -491,8 +477,8 @@ namespace IDKEngine.Bvh
                 parentNode.TriCount = 0;
                 nodesUsed += 2;
 
-                stack[stackPtr++] = new BuildStackItem() { ParentNodeId = rightNodeId, ReservedSpaceBoundary = newReservedSpaceBoundary, FragmentsNeedSorting = useSpatialSplit };
-                stack[stackPtr++] = new BuildStackItem() { ParentNodeId = leftNodeId, ReservedSpaceBoundary = newReservedSpaceBoundary, FragmentsNeedSorting = useSpatialSplit };
+                stack[stackPtr++] = new BuildStackItem() { ParentNodeId = rightNodeId, ReservedSpaceBoundary = newReservedSpaceBoundary, FragmentsNeedSorting = useSpatialSplit, Depth = buildStackItem.Depth + 1 };
+                stack[stackPtr++] = new BuildStackItem() { ParentNodeId = leftNodeId, ReservedSpaceBoundary = newReservedSpaceBoundary, FragmentsNeedSorting = useSpatialSplit, Depth = buildStackItem.Depth + 1 };
 
                 Debug.Assert(newRightNode.TriStartOrChild >= newLeftNode.TriEnd);
                 Debug.Assert(newReservedSpaceBoundary >= newLeftNode.TriEnd);
@@ -607,158 +593,97 @@ namespace IDKEngine.Bvh
             return overlap;
         }
 
-        private static float EPOArea(in BuildResult blas, in Geometry geometry, int subtreeRoot, int nodeId = 1)
+        private static float ComputeEPOArea(in BuildResult blas, in Geometry geometry, int subtreeRootId)
         {
-            if (nodeId == subtreeRoot) return 0;
+            if (subtreeRootId == 1)
+            {
+                return 0.0f;
+            }
 
-            ref readonly GpuBlasNode parent = ref blas.Nodes[nodeId];
-            ref readonly GpuBlasNode subtree = ref blas.Nodes[subtreeRoot];
+            Box subtreeBox = Conversions.ToBox(blas.Nodes[subtreeRootId]);
 
             float area = 0.0f;
-            if (parent.IsLeaf)
+
+            Span<int> stack = stackalloc int[64];
+            int stackPtr = 0;
+            stack[stackPtr++] = 2;
+            stack[stackPtr++] = 3;
+            while (stackPtr > 0)
             {
-                // clip triangles to AABB of subtreeRoot and sum resulting areas
+                int nodeId = stack[--stackPtr];
 
-                Span<Vector3> vin = stackalloc Vector3[10];
-                Span<Vector3> vout = stackalloc Vector3[10];
-                Vector3 bmin = subtree.Min;
-                Vector3 bmax = subtree.Max;
-
-                for (int i = parent.TriStartOrChild; i < parent.TriEnd; i++)
+                // EPO measures the triangles which overlap with this subtree but don't belong to it.
+                // We ignore the triangles belonging to this subtree by not traversing it
+                if (nodeId == subtreeRootId)
                 {
+                    continue;
+                }
+
+                ref readonly GpuBlasNode node = ref blas.Nodes[nodeId];
+
+                bool doIntersect = Intersections.BoxVsBox(subtreeBox, Conversions.ToBox(node));
+                if (!doIntersect)
+                {
+                    continue;
+                }
+
+                if (!node.IsLeaf)
+                {
+                    stack[stackPtr++] = node.TriStartOrChild + 1;
+                    stack[stackPtr++] = node.TriStartOrChild;
+                }
+                else
+                {
+                    for (int j = node.TriStartOrChild; j < node.TriEnd; j++)
                     {
-                        Triangle tri = geometry.GetTriangle(i);
-                        vin[0] = tri[0];
-                        vin[1] = tri[1];
-                        vin[2] = tri[2];
-                    }
-
-                    // Sutherland-Hodgeman against six bounding planes
-                    Vector3 C = new Vector3();
-                    int Nin = 3;
-                    for (int a = 0; a < 3; a++)
-                    {
-                        int Nout = 0;
-                        float l = bmin[a], r = bmax[a];
-                        for (int v = 0; v < Nin; v++)
-                        {
-                            Vector3 v0 = vin[v];
-                            Vector3 v1 = vin[(v + 1) % Nin];
-                            bool v0in = v0[a] >= l;
-                            bool v1in = v1[a] >= l;
-
-                            if (!(v0in || v1in))
-                            {
-                                continue;
-                            }
-                            else if (v0in ^ v1in)
-                            {
-                                C = v0 + (l - v0[a]) / (v1[a] - v0[a]) * (v1 - v0);
-                                C[a] = l;
-                                vout[Nout++] = C;
-                            }
-
-                            if (v1in)
-                            {
-                                vout[Nout++] = v1;
-                            }
-                        }
-
-                        Nin = 0;
-                        for (int v = 0; v < Nout; v++)
-                        {
-                            Vector3 v0 = vout[v];
-                            Vector3 v1 = vout[(v + 1) % Nout];
-                            bool v0in = v0[a] <= r;
-                            bool v1in = v1[a] <= r;
-
-                            if (!(v0in || v1in))
-                            {
-                                continue;
-                            }
-                            else if (v0in ^ v1in)
-                            {
-                                C = v0 + (r - v0[a]) / (v1[a] - v0[a]) * (v1 - v0);
-                                C[a] = r;
-                                vin[Nin++] = C;
-                            }
-
-                            if (v1in)
-                            {
-                                vin[Nin++] = v1;
-                            }
-                        }
-                    }
-
-                    if (Nin < 3)
-                    {
-                        continue;
-                    }
-
-                    {
-                        // calculate area of remaining convex shape in vin
-                        Triangle tri = new Triangle();
-                        tri.Position0 = vin[0];
-                        for (int j = 0; j < Nin - 2; j++)
-                        {
-                            tri[1] = vin[j + 1];
-                            tri[2] = vin[j + 2];
-                            area += tri.Area;
-                        }
+                        Triangle tri = geometry.GetTriangle(j);
+                        area += MyMath.GetTriangleAreaInBox(tri, subtreeBox);
                     }
                 }
-                return area;
-            }
-
-            ref GpuBlasNode left = ref blas.Nodes[parent.TriStartOrChild];
-            ref GpuBlasNode right = ref blas.Nodes[parent.TriStartOrChild + 1];
-
-            if (Intersections.BoxVsBox(Conversions.ToBox(left), Conversions.ToBox(subtree)))
-            {
-                area += EPOArea(blas, geometry, subtreeRoot, parent.TriStartOrChild);
-            }
-
-            if (Intersections.BoxVsBox(Conversions.ToBox(right), Conversions.ToBox(subtree)))
-            {
-                area += EPOArea(blas, geometry, subtreeRoot, parent.TriStartOrChild + 1);
             }
 
             return area;
         }
 
-        public static float ComputeGlobalEPO(in BuildResult blas, in Geometry geometry, BuildSettings settings, int nodeId = 1)
+        public static float ComputeGlobalEPO(in BuildResult blas, in Geometry geometry, BuildSettings settings, int subtreeRootId = 1)
         {
-            ref readonly GpuBlasNode node = ref blas.Nodes[nodeId];
-            float area = EPOArea(blas,  geometry, nodeId);
-            float cost = (node.IsLeaf ? (node.TriCount * settings.TriangleCost) : TRAVERSAL_COST) * area;
-
-            if (!node.IsLeaf)
-            {
-                cost += ComputeGlobalEPO(blas, geometry, settings, node.TriStartOrChild);
-                cost += ComputeGlobalEPO(blas, geometry, settings, node.TriStartOrChild + 1);
-            }
-
-            if (nodeId > 1)
-            {
-                return cost;
-            }
+            // https://users.aalto.fi/~ailat1/publications/aila2013hpg_paper.pdf
+            // https://research.nvidia.com/sites/default/files/pubs/2013-09_On-Quality-Metrics/aila2013hpg_slides.pdf
 
             float totalArea = 0.0f;
-            for (int i = 1; i < blas.Nodes.Length; i++)
+
+            float cost = 0.0f;
+
+            Span<int> stack = stackalloc int[64];
+            int stackPtr = 0;
+            stack[stackPtr++] = subtreeRootId;
+            while (stackPtr > 0)
             {
-                ref readonly GpuBlasNode n = ref blas.Nodes[i];
-                if (n.IsLeaf)
+                int nodeId = stack[--stackPtr];
+
+                ref readonly GpuBlasNode subtreeRoot = ref blas.Nodes[nodeId];
+                float area = ComputeEPOArea(blas, geometry, nodeId);
+
+                if (subtreeRoot.IsLeaf)
                 {
-                    for (int j = n.TriStartOrChild; j < n.TriEnd; j++)
+                    cost += subtreeRoot.TriCount * settings.TriangleCost * area;
+
+                    for (int j = subtreeRoot.TriStartOrChild; j < subtreeRoot.TriEnd; j++)
                     {
-                        Triangle triangle = geometry.GetTriangle(j);
-                        totalArea += triangle.Area;
+                        Triangle tri = geometry.GetTriangle(j);
+                        totalArea += tri.Area;
                     }
                 }
-            }
-            cost /= totalArea;
+                else
+                {
+                    cost += TRAVERSAL_COST * area;
 
-            return cost;
+                    stack[stackPtr++] = subtreeRoot.TriStartOrChild + 1;
+                    stack[stackPtr++] = subtreeRoot.TriStartOrChild;
+                }
+            }
+
+            return cost / totalArea;
         }
 
         public static bool Intersect(
@@ -1006,7 +931,7 @@ namespace IDKEngine.Bvh
                         for (int j = 0; j < node.TriCount; j++)
                         {
                             int triId = buildData.PermutatedFragmentIds[node.TriStartOrChild + j];
-                            triangles[globalTriCounter + j] = geometry.Triangles[buildData.Fragments.OriginalTriIds[triId]];
+                            triangles[globalTriCounter + j] = geometry.Triangles[triId];
                         }
                         node.TriStartOrChild = globalTriCounter;
                         globalTriCounter += node.TriCount;
@@ -1131,7 +1056,7 @@ namespace IDKEngine.Bvh
             return box;
         }
 
-        private static ObjectSplit FindObjectSplit(float invParentArea, int start, int end, BuildData buildData, BuildSettings settings)
+        private static ObjectSplit FindObjectSplit(in Box parentBox, int start, int end, in BuildData buildData, BuildSettings settings)
         {
             ObjectSplit split = new ObjectSplit();
 
@@ -1158,8 +1083,7 @@ namespace IDKEngine.Bvh
                     rightBoxAccum.GrowToFit(fragBounds[fragIdsSorted[i]]);
 
                     int fragCount = end - i;
-                    float probHitRightChild = rightBoxAccum.HalfArea() * invParentArea;
-                    float rightCost = probHitRightChild * fragCount;
+                    float rightCost = rightBoxAccum.HalfArea() * fragCount;
 
                     rightCostsAccum[i] = rightCost;
 
@@ -1184,9 +1108,8 @@ namespace IDKEngine.Bvh
                     // https://www.nvidia.in/docs/IO/77714/sbvh.pdf 2.1 BVH Construction
                     int fragIndex = i + 1;
                     int fragCount = fragIndex - start;
-                    float probHitLeftChild = leftBoxAccum.HalfArea() * invParentArea;
 
-                    float leftCost = probHitLeftChild * fragCount;
+                    float leftCost = leftBoxAccum.HalfArea() * fragCount;
                     float rightCost = rightCostsAccum[fragIndex];
 
                     // Estimates cost of hitting parentNode if it was split at the evaluated split position.
@@ -1208,7 +1131,7 @@ namespace IDKEngine.Bvh
                     }
                 }
             }
-            split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost);
+            split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost / parentBox.HalfArea());
 
             fragIdsSorted = buildData.FragmentIdsSortedOnAxis[split.Axis];
 
@@ -1223,85 +1146,109 @@ namespace IDKEngine.Bvh
 
         private static SpatialSplit FindSpatialSplit(in Box parentBox, int start, int end, in Geometry geometry, in BuildData buildData, BuildSettings settings)
         {
+            const int binCount = 16;
+            Span<Bin> bins = stackalloc Bin[binCount];
+            Span<Box> accumBoxes = stackalloc Box[binCount];
+
             SpatialSplit split = new SpatialSplit();
             split.NewCost = float.MaxValue;
 
+            Span<Box> fragBounds = buildData.Fragments.Bounds;
+            Span<int> originalTriIds = buildData.Fragments.OriginalTriIds;
+
             for (int axis = 0; axis < 3; axis++)
             {
-                float size = parentBox.Max[axis] - parentBox.Min[axis];
-                if (size < 0.0001f)
+                float min = parentBox.Min[axis];
+                float max = parentBox.Max[axis];
+                float size = max - min;
+
+                float binSize = size / binCount;
+
+                // Skip if we don't have enough precision to differentiate between two bins
+                if (min == min + binSize)
                 {
                     continue;
                 }
 
-                const int bins = 16;
+                float invSize = 1.0f / binSize;
+                bins.Fill(new Bin());
 
-                for (int i = 0; i < bins - 1; i++)
+                Span<int> fragIdsSorted = buildData.FragmentIdsSortedOnAxis[axis];
+                for (int i = start; i < end; i++)
                 {
-                    float position = parentBox.Min[axis] + size * ((i + 1.0f) / (bins + 1.0f));
+                    int fragmentId = fragIdsSorted[i];
+                    Box fragmentBounds = fragBounds[fragmentId];
 
-                    Box leftBox = Box.Empty();
-                    Box rightBox = Box.Empty();
+                    int firstBin = Math.Clamp((int)(invSize * (fragmentBounds.Min[axis] - min)), 0, binCount - 1);
+                    int lastBin = Math.Clamp((int)(invSize * (fragmentBounds.Max[axis] - min)), 0, binCount - 1);
+                    bins[firstBin].Entry++;
+                    bins[lastBin].Exit++;
 
-                    int leftCounter = 0;
-                    int rightCounter = 0;
-                    for (int j = start; j < end; j++)
+                    if (firstBin == lastBin)
                     {
-                        int fragmentId = buildData.FragmentIdsSortedOnAxis[axis][j];
-
-                        Box fragmentBounds = buildData.Fragments.Bounds[fragmentId];
-                        int triangleId = buildData.Fragments.OriginalTriIds[fragmentId];
-
-                        bool completlyLeft = fragmentBounds.Max[axis] <= position;
-                        bool completlyRight = fragmentBounds.Min[axis] >= position;
-                        if (completlyLeft)
-                        {
-                            leftBox.GrowToFit(fragmentBounds);
-                            leftCounter++;
-                        }
-                        else if (completlyRight)
-                        {
-                            rightBox.GrowToFit(fragmentBounds);
-                            rightCounter++;
-                        }
-                        else
-                        {
-                            Triangle triangle = geometry.GetTriangle(triangleId);
-                            (Box lSplittedBox, Box rSplittedBox) = triangle.Split(axis, position);
-                            lSplittedBox.ShrinkToFit(fragmentBounds);
-                            rSplittedBox.ShrinkToFit(fragmentBounds);
-
-                            leftBox.GrowToFit(lSplittedBox);
-                            rightBox.GrowToFit(rSplittedBox);
-
-                            leftCounter++;
-                            rightCounter++;
-                        }
+                        bins[firstBin].Box.GrowToFit(fragmentBounds);
                     }
+                    else
+                    {
+                        Triangle triangle = geometry.GetTriangle(originalTriIds[fragmentId]);
 
-                    float areaParent = parentBox.HalfArea();
-                    float probHitLeftChild = leftBox.HalfArea() / areaParent;
-                    float probHitRightChild = rightBox.HalfArea() / areaParent;
-                    float cost = CostInternalNode(probHitLeftChild, probHitRightChild, CostLeafNode(leftCounter, settings.TriangleCost), CostLeafNode(rightCounter, settings.TriangleCost));
+                        Box curBox = fragmentBounds;
+                        for (int j = firstBin; j < lastBin; j++)
+                        {
+                            float splitPos = min + (j + 1) * binSize;
+                            (Box lSplittedBox, Box rSplittedBox) = triangle.Split(axis, splitPos);
+                            lSplittedBox.ShrinkToFit(curBox);
+                            bins[j].Box.GrowToFit(lSplittedBox);
+
+                            curBox.ShrinkToFit(rSplittedBox);
+                        }
+                        bins[lastBin].Box.GrowToFit(curBox);
+                    }
+                }
+
+                Box accumBox = Box.Empty();
+                for (int i = binCount - 1; i >= 0; i--)
+                {
+                    accumBox.GrowToFit(bins[i].Box);
+                    accumBoxes[i] = accumBox;
+                }
+
+                int leftCount = 0;
+                int rightCount = end - start;
+                accumBox = Box.Empty();
+                for (int i = 0; i < binCount - 1; i++)
+                {
+                    ref readonly Bin bin = ref bins[i];
+
+                    leftCount += bin.Entry;
+                    rightCount -= bin.Exit;
+                    accumBox.GrowToFit(bin.Box);
+
+                    Box leftBox = accumBox;
+                    Box rightBox = accumBoxes[i + 1];
+
+                    float cost = leftBox.HalfArea() * leftCount + rightBox.HalfArea() * rightCount;
 
                     if (cost < split.NewCost)
                     {
                         split.LeftBox = leftBox;
                         split.RightBox = rightBox;
-                        split.LeftCount = leftCounter;
-                        split.RightCount = rightCounter;
+                        split.LeftCount = leftCount;
+                        split.RightCount = rightCount;
 
                         split.Axis = axis;
                         split.NewCost = cost;
-                        split.Position = position;
+                        split.Position = min + (i + 1) * binSize;
                     }
                 }
             }
 
+            split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost / parentBox.HalfArea());
+
             return split;
         }
 
-        private static SpatialSplit FindSpatialSplit(float invParentArea, int start, int end, in Geometry geometry, in BuildData buildData, BuildSettings settings)
+        private static SpatialSplit FindSpatialSplitSweep(float invParentArea, int start, int end, in Geometry geometry, in BuildData buildData, BuildSettings settings)
         {
             SpatialSplit split = new SpatialSplit();
             split.NewCost = float.MaxValue;
@@ -1333,7 +1280,7 @@ namespace IDKEngine.Bvh
                         }
                     }
                     Box leftBox = Box.Empty();
-                    int completlyLeftHead = 0;
+                    int fullyLeftHead = 0;
                     int straddlingSearchStart = 0;
                     int lastStraddlingCount = 0;
                     for (int i = 1; i < fragIdsSorted.Length; i++)
@@ -1346,14 +1293,14 @@ namespace IDKEngine.Bvh
                         }
 
                         // Find all fragments which are fully left to the split position
-                        while (completlyLeftHead < i)
+                        while (fullyLeftHead < i)
                         {
-                            Box box = fragBounds[sortedByMax[completlyLeftHead]];
+                            Box box = fragBounds[sortedByMax[fullyLeftHead]];
 
                             if (box.Max[axis] < splitPos)
                             {
                                 leftBox.GrowToFit(box);
-                                completlyLeftHead++;
+                                fullyLeftHead++;
                             }
                             else
                             {
@@ -1364,7 +1311,7 @@ namespace IDKEngine.Bvh
                         // By having sorted we always known how many fragments are left.
                         // We also computed the fragments which are fully left.
                         // The difference between the two are the remaining straddling fragments
-                        int leftCounter = completlyLeftHead;
+                        int leftCounter = fullyLeftHead;
                         int rightCounter = fragIdsSorted.Length - i;
                         int straddlingCount = i - leftCounter;
 
@@ -1458,7 +1405,7 @@ namespace IDKEngine.Bvh
                         }
                     }
                     Box rightBox = Box.Empty();
-                    int completlyRightHead = fragIdsSorted.Length - 1;
+                    int fullyRightHead = fragIdsSorted.Length - 1;
                     int straddlingSearchStart = fragIdsSorted.Length - 1;
                     int lastStraddlingCount = 0;
                     for (int i = fragIdsSorted.Length - 2; i >= 0; i--)
@@ -1470,14 +1417,14 @@ namespace IDKEngine.Bvh
                             continue;
                         }
 
-                        while (completlyRightHead > i)
+                        while (fullyRightHead > i)
                         {
-                            Box box = fragBounds[sortedByMin[completlyRightHead]];
+                            Box box = fragBounds[sortedByMin[fullyRightHead]];
 
                             if (box.Min[axis] > splitPos)
                             {
                                 rightBox.GrowToFit(box);
-                                completlyRightHead--;
+                                fullyRightHead--;
                             }
                             else
                             {
@@ -1486,8 +1433,8 @@ namespace IDKEngine.Bvh
                         }
 
                         int leftCounter = i + 1;
-                        int rightCounter = fragIdsSorted.Length - completlyRightHead - 1;
-                        int straddlingCount = completlyRightHead - i;
+                        int rightCounter = fragIdsSorted.Length - fullyRightHead - 1;
+                        int straddlingCount = fullyRightHead - i;
 
                         int straddlingCounter = 0;
                         for (int j = 0; j < lastStraddlingCount; j++)
@@ -1569,43 +1516,7 @@ namespace IDKEngine.Bvh
             return split;
         }
 
-        private static ValueTuple<GpuBlasNode, GpuBlasNode> ApplyObjectSplit(in BuildData buildData, int start, int end, in ObjectSplit objectSplit)
-        {
-            // We found a split axis where the triangles are partitioned into a left and right set.
-            // Now, the other two axes also need to have the same triangles in their sets respectively.
-            // To do that we mark every triangle on the left side of the split axis.
-            // Then the other two axes have their triangles partitioned such that all marked triangles precede the others.
-            // The partitioning is stable so the triangles stay sorted otherwise which is crucial
-
-            int count = end - start;
-
-            for (int i = start; i < objectSplit.Pivot; i++)
-            {
-                buildData.PartitionLeft[buildData.FragmentIdsSortedOnAxis[objectSplit.Axis][i]] = true;
-            }
-            for (int i = objectSplit.Pivot; i < end; i++)
-            {
-                buildData.PartitionLeft[buildData.FragmentIdsSortedOnAxis[objectSplit.Axis][i]] = false;
-            }
-
-            Span<int> partitionAux = Helper.ReUseMemory<float, int>(buildData.RightCostsAccum, end - objectSplit.Pivot);
-            Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(objectSplit.Axis + 1) % 3].AsSpan(start, count), partitionAux, buildData.PartitionLeft);
-            Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(objectSplit.Axis + 2) % 3].AsSpan(start, count), partitionAux, buildData.PartitionLeft);
-
-            GpuBlasNode newLeftNode = new GpuBlasNode();
-            newLeftNode.TriStartOrChild = start;
-            newLeftNode.TriCount = objectSplit.Pivot - newLeftNode.TriStartOrChild;
-            newLeftNode.SetBounds(objectSplit.LeftBox);
-
-            GpuBlasNode newRightNode = new GpuBlasNode();
-            newRightNode.TriStartOrChild = objectSplit.Pivot;
-            newRightNode.TriCount = end - newLeftNode.TriEnd;
-            newRightNode.SetBounds(objectSplit.RightBox);
-
-            return (newLeftNode, newRightNode);
-        }
-
-        public static int Build(ref BuildResult blas, Span<Box> fragBounds, int searchRadius = 15)
+        public static int BuildPLOC(ref BuildResult blas, Span<Box> fragBounds, int searchRadius = 15)
         {
             int primitiveCount = fragBounds.Length;
 
@@ -1783,11 +1694,6 @@ namespace IDKEngine.Bvh
         private static float CostInternalNode(float probabilityHitLeftChild, float probabilityHitRightChild, float costLeftChild, float costRightChild)
         {
             return TRAVERSAL_COST + (probabilityHitLeftChild * costLeftChild + probabilityHitRightChild * costRightChild);
-        }
-
-        private static float CostInternalNode(float costLeft, float costRight)
-        {
-            return TRAVERSAL_COST + costLeft + costRight;
         }
 
         private static float CostLeafNode(int numTriangles, float triangleCost)

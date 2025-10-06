@@ -330,8 +330,8 @@ namespace IDKEngine.Bvh
             GpuBlasDesc prevEndBlasDesc = BlasesDesc[start + count - 1];
             
             BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
-            buildSettings.SBVH.SplitFactor = 0.0f;
-            //buildSettings.PreSplitting.SplitFactor = 0.0f;
+            //buildSettings.SBVH.SplitFactor = 0.0f;
+            // buildSettings.PreSplitting.SplitFactor = 0.0f;
 
             // Statistics
             int preSplitNewTris = 0;
@@ -344,6 +344,9 @@ namespace IDKEngine.Bvh
             {
                 ref GpuBlasDesc blasDesc = ref BlasesDesc[start + i];
                 BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
+
+                //System.IO.File.WriteAllBytes(@"C:\Programming\Main\BlasBuilder\BlasBuilder\vertices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.VertexPositions));
+                //System.IO.File.WriteAllBytes(@"C:\Programming\Main\BlasBuilder\BlasBuilder\indices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.Triangles));
 
                 // TODO: Only store parent+leaf ids for "refitable BLAS"
 
@@ -369,7 +372,7 @@ namespace IDKEngine.Bvh
                 int nodesUsed = 0;
                 if (ploc)
                 {
-                    nodesUsed = BLAS.Build(ref blas, fragments.Bounds);
+                    nodesUsed = BLAS.BuildPLOC(ref blas, fragments.Bounds);
                     Helper.FillIncreasing(buildData.PermutatedFragmentIds);
                 }
                 else
@@ -389,8 +392,24 @@ namespace IDKEngine.Bvh
                     ReinsertionOptimizer.Optimize(ref blas, parentIds, new ReinsertionOptimizer.Settings());
                 }
 
-                // The BLAS holds permutated indices into the inital triangles. Let's get rid of this indirection
+                // The BLAS holds permutated indices into the inital triangles.Let's get rid of this indirection
                 GpuIndicesTriplet[] blasTriangles = BLAS.GetUnindexedTriangles(blas, buildData, geometry, buildSettings);
+
+                // Helper.WriteToFile<Vector3>("bistro.vertices", vertexPositions);
+                // Helper.WriteToFile<GpuIndicesTriplet>("bistro.triIndices", blasTriangles);
+                // Helper.WriteToFile<GpuBlasNode>("bistro.nodes", blas.Nodes);
+
+
+                //Helper.TryReadFromFile("bistro.vertices", out Vector3[] fileVertexPositions);
+                //fileVertexPositions.CopyTo(geometry.VertexPositions);
+
+                //Helper.TryReadFromFile("bistro.triIndices", out GpuIndicesTriplet[] blasTriangles);
+                //Helper.TryReadFromFile("bistro.nodes", out GpuBlasNode[] nodes);
+
+                //BLAS.BuildResult blas = new BLAS.BuildResult();
+                //blas.Nodes = nodes;
+                //blas.MaxTreeDepth = BLAS.ComputeTreeDepth(blas);
+                //int[] parentIds = BLAS.GetParentIndices(blas);
 
                 int[] leafIds = BLAS.GetLeafIndices(blas);
 
@@ -499,7 +518,6 @@ namespace IDKEngine.Bvh
                 //Logger.Log(Logger.LogLevel.Info, $"Added EPO of all new BLAS'es = {BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0].GeometryDesc), buildSettings)}");
                 Logger.Log(Logger.LogLevel.Info, $"Added Overlap of all new BLAS'es = {BLAS.ComputeOverlap(GetBlas(0))}");
             }
-
         }
 
         public void GpuBlasesRefit(int start, int count)

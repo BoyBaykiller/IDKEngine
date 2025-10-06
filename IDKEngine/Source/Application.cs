@@ -274,15 +274,15 @@ namespace IDKEngine
                     }
                 });
             }
-            {
-                ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[0];
+            //{
+            //    ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[0];
 
-                //if (Debug < ModelManager.BVH.GetBlas(0).Nodes.Length)
-                //{
-                //    Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(0).Nodes[Debug]);
-                //    BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
-                //}
-            }
+            //    if (Debug < ModelManager.BVH.GetBlas(0).Nodes.Length)
+            //    {
+            //        Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(0).Nodes[Debug]);
+            //        BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
+            //    }
+            //}
             BBG.Rendering.SetViewport(WindowFramebufferSize);
             if (RenderImGui)
             {
@@ -305,6 +305,7 @@ namespace IDKEngine
                 fpsTimer.Restart();
             }
         }
+
         public static int Debug;
         protected override void OnUpdate(float dT)
         {
@@ -501,22 +502,20 @@ namespace IDKEngine
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
-                ModelLoader.Model bistro = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroMerged.glb").Value;
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().GetMatrix()).Value;
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroMerged.glb").Value;
+                ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().GetMatrix()).Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaRotated45Baked.glb", new Transformation().WithTranslation(-0.1f, -0.1f, 0.4f).WithRotationRad(-0.42f, -0.4f, 0.368f).GetMatrix()).Value;
                 //ModelLoader.Model ast = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
-                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(7.63f, 2.71f, 0.8f).WithRotationRad(0.0f, 1.571f, 0.0f).GetMatrix()).Value;
-                //ModelLoader.Model window = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\window\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(MathF.PI / 2.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
                 //ModelLoader.Model dragon = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\black_dragon_with_idle_animation\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
-                //ModelLoader.Model cs = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\CesiumMan\glTF-Binary\CesiumMan.glb", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;
                 //ModelLoader.Model cb = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\CornellBox\scene.gltf", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
-                //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\Duck\glTF\Duck.gltf", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
+                //ModelLoader.Model standfor = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\dragon100.glb", new Transformation().WithTranslation(Camera.Position).GetMatrix()).Value;
+                //ModelLoader.Model miguel = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SanMiguel\SanMiguelMerged.glb").Value;
 
-                ModelManager.Add(bistro);
+                ModelManager.Add(test);
                 
-                SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
-                //PathTracer.IsDebugBVHTraversal = true;
-                //PathTracer.LenseRadius = 0.0f;
+                SetRenderMode(RenderMode.PathTracer, WindowFramebufferSize, WindowFramebufferSize);
+                PathTracer.IsDebugBVHTraversal = true;
+                PathTracer.LenseRadius = 0.0f;
 
                 LightManager.AddLight(new CpuLight(new Vector3(-4.5f, 5.7f, -2.0f), new Vector3(429.8974f, 22.459948f, 28.425867f), 0.3f));
                 LightManager.AddLight(new CpuLight(new Vector3(-0.5f, 5.7f, -2.0f), new Vector3(8.773416f, 506.7525f, 28.425867f), 0.3f));

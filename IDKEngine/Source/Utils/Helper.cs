@@ -174,10 +174,6 @@ namespace IDKEngine.Utils
         {
             return Unsafe.BitCast<System.Numerics.Vector3, Vector3>(vector3);
         }
-        public static Vector3 ToOpenTK(this Vector128<float> vector128)
-        {
-            return vector128.AsVector3().ToOpenTK();
-        }
 
         public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
         {

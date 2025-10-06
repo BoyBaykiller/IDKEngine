@@ -2,11 +2,104 @@
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.Utils
 {
     public static class MyMath
     {
+        public static float GetTriangleAreaInBox(in Triangle tri, in Box box)
+        {
+            // This requires the triangle to actually intersect the box.
+            // Source: https://github.com/jbikker/tinybvh/blob/4b5b649f1193374762b0247ee20de3345633bf9b/tiny_bvh.h#L1917
+
+            Span<Vector3> vin = stackalloc Vector3[10];
+            Span<Vector3> vout = stackalloc Vector3[10];
+
+            Vector3 bmin = box.Min;
+            Vector3 bmax = box.Max;
+
+            vin[0] = tri[0];
+            vin[1] = tri[1];
+            vin[2] = tri[2];
+
+            float area = 0.0f;
+
+            // Sutherland-Hodgeman against six bounding planes
+            Vector3 C = new Vector3();
+            int countIn = 3;
+            for (int axis = 0; axis < 3; axis++)
+            {
+                int countOut = 0;
+                float l = bmin[axis], r = bmax[axis];
+                for (int v = 0; v < countIn; v++)
+                {
+                    Vector3 v0 = vin[v];
+                    Vector3 v1 = vin[(v + 1) % countIn];
+                    bool v0in = v0[axis] >= l;
+                    bool v1in = v1[axis] >= l;
+
+                    if (!(v0in || v1in))
+                    {
+                        continue;
+                    }
+                    else if (v0in ^ v1in)
+                    {
+                        C = v0 + (l - v0[axis]) / (v1[axis] - v0[axis]) * (v1 - v0);
+                        C[axis] = l;
+                        vout[countOut++] = C;
+                    }
+
+                    if (v1in)
+                    {
+                        vout[countOut++] = v1;
+                    }
+                }
+
+                countIn = 0;
+                for (int v = 0; v < countOut; v++)
+                {
+                    Vector3 v0 = vout[v];
+                    Vector3 v1 = vout[(v + 1) % countOut];
+                    bool v0in = v0[axis] <= r;
+                    bool v1in = v1[axis] <= r;
+
+                    if (!(v0in || v1in))
+                    {
+                        continue;
+                    }
+                    else if (v0in ^ v1in)
+                    {
+                        C = v0 + (r - v0[axis]) / (v1[axis] - v0[axis]) * (v1 - v0);
+                        C[axis] = r;
+                        vin[countIn++] = C;
+                    }
+
+                    if (v1in)
+                    {
+                        vin[countIn++] = v1;
+                    }
+                }
+            }
+
+            if (countIn < 3)
+            {
+                return area;
+            }
+
+            // Calculate area of remaining convex shape in vin
+            Triangle clippedTri = new Triangle();
+            clippedTri.Position0 = vin[0];
+            for (int j = 0; j < countIn - 2; j++)
+            {
+                clippedTri[1] = vin[j + 1];
+                clippedTri[2] = vin[j + 2];
+                area += clippedTri.Area;
+            }
+
+            return area;
+        }
+
         public static float NativeMax(float a, float b)
         {
             // TODO: Use float.MaxNative in .NET10
@@ -115,6 +208,11 @@ namespace IDKEngine.Utils
                 points[j * 4 + 2] = rightBottom.Xyz;
                 points[j * 4 + 3] = leftBottom.Xyz;
             }
+        }
+
+        public static float HalfArea(Vector3 size)
+        {
+            return HalfArea(size.X, size.Y, size.Z);
         }
 
         public static float HalfArea(float sizeX, float sizeY, float sizeZ)

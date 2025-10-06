@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
 using IDKEngine.Bvh;
 
@@ -146,13 +148,8 @@ namespace IDKEngine.Shapes
 
         public static bool BoxVsBox(in Box a, in Box b)
         {
-            return a.Min.X < b.Max.X &&
-                   a.Min.Y < b.Max.Y &&
-                   a.Min.Z < b.Max.Z &&
-
-                   a.Max.X > b.Min.X &&
-                   a.Max.Y > b.Min.Y &&
-                   a.Max.Z > b.Min.Z;
+            return (Sse.MoveMask(Vector128.LessThanOrEqual(a.SimdMin, b.SimdMax)) & 0b0111) == 0b0111 &&
+                (Sse.MoveMask(Vector128.GreaterThanOrEqual(a.SimdMax, b.SimdMin)) & 0b0111) == 0b0111;
         }
         public static bool BoxVsTriangle(in Box box, in Triangle triangle)
         {

@@ -60,14 +60,14 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="ImGui.NET" Version="1.90.8.1" />
-    <PackageReference Include="Ktx2.NET" Version="1.0.3" />
-    <PackageReference Include="Meshoptimizer.NET" Version="1.0.6" />
+    <PackageReference Include="Ktx2.NET" Version="1.0.5" />
+    <PackageReference Include="Meshoptimizer.NET" Version="1.0.7" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
-    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.13" />
-    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.13" />
+    <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.15" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.15" />
     <PackageReference Include="ReFuel.StbImage" Version="2.1.0" />
-    <PackageReference Include="SharpGLTF.Core" Version="1.0.3" />
-    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.3" />
+    <PackageReference Include="SharpGLTF.Core" Version="1.0.5" />
+    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.5" />
   </ItemGroup>
 
 
