@@ -357,7 +357,7 @@ When building a BVH in a top-down manner, we need to split the parent's set of p
 6. **{C}** + **{A, E, J}**
 7. **{E}** + **{A, C, J}**
 
-Notice how the classic partitions can be created by placing a single "split index" that divides the set into two. Unlike other methods, Sweep-SAH tests all $N - 1$ classic partitions and picks the one with the lowest cost, as measured by the Surface Area Heuristic. Here you can see it sweeping from left to right, exploring the first three partitions in the order I've listed them.
+Notice how the classic partitions can be created by placing a single "split index" that divides the set into two. Unlike other methods, Sweep-SAH tests all $N - 1$ classic partitions and picks the one with the lowest cost, as measured by the Surface Area Heuristic. Here you can see it sweeping from left to right, exploring the first three partitions in the order I've listed them:
 
 ![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
 
@@ -395,8 +395,7 @@ for (int i = start; i < end - 1; i++)
     // find all primitives left & right to splitPos
 }
 ```
-Because the primitives are now sorted, we can easily answer this question. All left primitives must be before the current index `i`, with the right ones following afterwards. Let's say the current primitive that defines the split position is also part of left. This means every iteration the current primitive is added to the left side and removed from the right side! This insight removes the need for an inner loop to scan all triangles.
-We can just update the left side as we are sweeping:
+Because the primitives are now sorted, we can easily answer this question. All left primitives must be before the current index `i`, with the right ones following afterwards. Let's say the current primitive that defines the split position is also part of left. This means every iteration the current primitive is added to the left side and removed from the right side. This insight removes the need for an inner loop to scan all triangles. We can just update the left side as we are sweeping:
 
 ```cs
 Box leftBoxAccum = Box.Empty();
@@ -418,7 +417,7 @@ for (int i = start; i < end - 1; i++)
     float cost = leftCost + rightCost;
 }
 ```
-I've also added the cost calculation here. As you can see, we already have enough information to compute `leftCost` of the current split. However, we're still missing `rightCost`. To get that we can apply the same concept again. We perform an additional pass before this one that sweeps in reverse, from right to left. We also write out the values for later use:
+I've also added the cost calculation here. As you can see, we already have enough information to compute `leftCost` of the current split. However, we're still missing `rightCost`. To get that we can apply the same concept again. We perform an additional pass before this one that sweeps in reverse, from right to left. And we also write out the values for later use:
 
 ```cs
 // Reverse sweep to gather rightCost values
@@ -456,17 +455,17 @@ If you have already implemented Binned-SAH, steps 2 and 3 may be familiar to you
 
 Once the search for the lowest-cost object split across all axes is complete, there are two more things to do.
 
-As a reminder, I've hoisted some components from the SAH calculation during sweeping as these are uneeded at that stage. So here we update it with the missing `TRAVERSAL_COST`, `TRIANGLE_COST` and normalization by `parentArea` to get the proper SAH.
+As a reminder, I've hoisted some components from the SAH calculation during sweeping as they are not needed at that stage. Now is a good place to update it with the missing `TRAVERSAL_COST`, `TRIANGLE_COST` and normalization by `parentArea` to get the proper SAH.
 ```cs
 bestSplit.Cost = TRAVERSAL_COST + (TRIANGLE_COST * bestSplit.Cost / parentArea);
 ```
 
-Lastly, there is one important step. We need to actually put the triangles into the best partition. To do this, just sort one more time on the best axis:
+Lastly, there is one important step. Unless splitting of the subtree is aborted because some threshold is reached, we still need to actually put the triangles into the best partition. To do this, just sort one more time on the best axis:
 ```cs
 Sort(start, end, primitives, (box) => box.Center()[bestSplit.Axis]);
 ```
 
-In theory, a partial sort (`std::partial_sort`) would suffice, but I'll discuss how to remove all sorts during construction in the next chapter anyway!
+In theory, a partial sort (`std::partial_sort`) would suffice, but I'll show how to remove all sorts during construction in the next chapter anyway!
 
 ### 3.0 Optimize to O(N) and more
 
