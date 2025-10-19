@@ -383,7 +383,7 @@ Sort(start, end, primitives, (box) => box.Center()[axis]);
 ```
 
 > [!NOTE]
-> My BVH builder uses bounding boxes as primitives. The user has to create them from the triangles. This keeps the build process primitive agnostic, supports spatial splits, and speeds up some operations. Sorting by box centers instead of triangle centroids can increase or decrease trace times depending on the scene. I’ve actually seen positive results and recommend it, though centroids work fine with Sweep-SAH.
+> My BVH builder uses bounding boxes as primitives. The user has to create them from the triangles. This keeps the build process primitive agnostic, supports spatial splits, and speeds up some operations. Sorting by box centers instead of triangle centroids can increase or decrease trace times depending on the scene. I’ve actually seen positive results and recommend it, though triangle centroids work fine with Sweep-SAH.
 
 Then let us iterate through all split positions and ask again: "What are the primitives left and right to the current split position?"
 ```cs
@@ -450,7 +450,7 @@ To summarize:
 2. Sweep from right to left to get `rightCost`s and temporarily store them
 3. Sweep from left to right to get `leftCost` and add it to the fetched `rightCost` to get the total cost
 
-If you have already implemented Binned-SAH, step 2 and 3 might be familiar. The difference is that we sweep over primitives instead of bins.
+If you have already implemented Binned-SAH, steps 2 and 3 may be familiar to you. The difference is that we sweep over primitives rather than bins.
 
 ---
 
