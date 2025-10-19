@@ -336,11 +336,11 @@ Task.Run(() =>
 This code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that loading only really starts as soon as the render loop is entered where `MainThreadQueue.Execute()` is called every frame.
 Creating a thread for every image can introduce lag so I use thread pool based `Task.Run()` with `ThreadPool.Set{Min/Max}Threads`.
 
-## Good BVHs with Sweep-SAH
+## Good BVHs using Sweep-SAH
 
 ### 1.0 Overview
 
-Sweep-SAH is a method to find low cost object splits in top-down BVH builds. Other methods include Spatial-Median-Split, Object-Median-Split or Binned-SAH already, but Sweep-SAH produces superior results and is often used as a "reference" for trace speed in the literature. I want to discuss how this method works and how it can be implemented efficiently.
+Sweep-SAH is a method to find low cost object splits in top-down BVH builds. Other methods include Spatial-Median-Split, Object-Median-Split or Binned-SAH, but Sweep-SAH produces superior results and is often used as a "reference" for trace speed in the literature. I want to discuss how this method works and how it can be implemented efficiently.
 
 When building a BVH in a top-down manner, we need to split the parent's set of primitives into two new sets. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for **{A, C, E, J}**:
 
@@ -383,7 +383,7 @@ Sort(start, end, primitives, (box) => box.Center()[axis]);
 ```
 
 > [!NOTE]
-> My BVH builder uses bounding boxes as primitives. The user has to create them from the triangles. This keeps the build process primitive agnostic, supports spatial splits, and speeds up some operations. Sorting by box centers instead of triangle centroids can improve or decrease trace times depending on the scene. I’ve actually seen positive results and recommend it, though centroids work fine with Sweep-SAH.
+> My BVH builder uses bounding boxes as primitives. The user has to create them from the triangles. This keeps the build process primitive agnostic, supports spatial splits, and speeds up some operations. Sorting by box centers instead of triangle centroids can increase or decrease trace times depending on the scene. I’ve actually seen positive results and recommend it, though centroids work fine with Sweep-SAH.
 
 Then let us iterate through all split positions and ask again: "What are the primitives left and right to the current split position?"
 ```cs
@@ -395,7 +395,7 @@ for (int i = start; i < end - 1; i++)
     // find all primitives left & right to splitPos
 }
 ```
-Because they are sorted, we can easily answer this question. All left primitives must be before the current index `i`, with the right ones following afterwards. And let's make the primitive that defines the split position also part of left. This means every iteration the current primitive is added to the left side and removed from the right side. This insight removes the need for an inner loop to scan all triangles.
+Because the primitives are now sorted, we can easily answer this question. All left primitives must be before the current index `i`, with the right ones following afterwards. Let's say the current primitive that defines the split position is also part of left. This means every iteration the current primitive is added to the left side and removed from the right side! This insight removes the need for an inner loop to scan all triangles.
 We can just update the left side as we are sweeping:
 
 ```cs
@@ -468,7 +468,7 @@ Sort(start, end, primitives, (box) => box.Center()[bestSplit.Axis]);
 
 In theory, a partial sort (`std::partial_sort`) would suffice, but I'll discuss how to remove all sorts during construction in the next chapter anyway!
 
-### 3.0 Optimizate to O(N) and more
+### 3.0 Optimize to O(N) and more
 
 TODO
 
