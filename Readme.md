@@ -361,7 +361,7 @@ Notice how the classic partitions can be created by placing a single "split inde
 
 ![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
 
-But what about the remaining exotic partitions? Let's look at number 5. This corresponds to the far left and far right triangle forming a child. The two middle triangles form the other child. These kind of partitions are usually uninteresting. So as with other split methods, they are ignored.
+But what about the exotic partitions? Let's look at number 5 as an example. This corresponds to the far left and far right triangle forming a child. The two middle triangles form the other child. These kind of partitions are usually uninteresting. So as with other split methods, they are ignored. However, I do have a small extension that [tests some exotic partitions](#40-considering-exotic-partitions).
 
 ### 2.0 Implementation
 
@@ -469,6 +469,10 @@ Sort(start, end, primitives, (box) => box.Center()[bestSplit.Axis]);
 In theory, a partial sort (`std::partial_sort`) would suffice, but I'll discuss how to remove all sorts during construction in the next chapter anyway!
 
 ### 3.0 Optimize to O(N) and more
+
+TODO
+
+### 4.0 Considering exotic partitions
 
 TODO
 
