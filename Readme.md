@@ -340,9 +340,9 @@ Creating a thread for every image can introduce lag so I use thread pool based `
 
 ### 1.0 Overview
 
-Sweep-SAH is a method to find the lowest cost object splits in top-down BVH builds. You might have heard of other methods like Spatial-Median-Split, Object-Median-Split or Binned-SAH already. Sweep-SAH produces superior results and is often used as a "reference" for trace speed in the literature.
+Sweep-SAH is a method to find low cost object splits in top-down BVH builds. Other methods include Spatial-Median-Split, Object-Median-Split or Binned-SAH already, but Sweep-SAH produces superior results and is often used as a "reference" for trace speed in the literature. I want to discuss how this method works and how it can be implemented efficiently.
 
-When building a BVH in a top-down manner, at each recursion step we want to split the parent set of primitives into two new sets which make up the left and right child. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for **{A, C, E, J}**:
+When building a BVH in a top-down manner, we need to split the parent's set of primitives into two new sets. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for **{A, C, E, J}**:
 
 #### "Classic" partitions
 
