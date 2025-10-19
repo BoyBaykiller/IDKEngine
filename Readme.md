@@ -342,7 +342,7 @@ Creating a thread for every image can introduce lag so I use thread pool based `
 
 Sweep-SAH is a method to find the lowest cost object splits in top-down BVH builds. You might have heard of other methods like Spatial-Median-Split, Object-Median-Split or Binned-SAH already. Sweep-SAH produces superior results and is often used as a "reference" for trace speed in the literature.
 
-When building a BVH in a top-down manner, at each recursion step we want to split the parent set of primitives into two new sets which make up the left and right child. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for $\{A, C, E, J\}$:
+When building a BVH in a top-down manner, at each recursion step we want to split the parent set of primitives into two new sets which make up the left and right child. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for $\text{\{A, C, E, J\}}$:
 
 #### "Classic" partitions
 
@@ -383,7 +383,7 @@ Sort(start, end, primitives, (box) => box.Center()[axis]);
 ```
 
 > [!NOTE]
-> My BVH builder exclusively uses the bounding box to represent a primitive. The user creates the array of bounding boxes from the triangles. This makes the build process agnostic to the underlying primitive and compatible with spatial splits. It also makes certain operations faster to compute. The quality impact of sorting by box centers instead of triangle centroids depends on the scene. I've actually seen positive results from switching to box centers and I would recommend it, although using triangle centroids works fine with Sweep-SAH.
+> My BVH builder uses bounding boxes as primitives. The user has to create them from the triangles. This keeps the build process primitive agnostic, supports spatial splits, and speeds up some operations. Sorting by box centers instead of triangle centroids can improve or decrease trace times depending on the scene. I’ve actually seen positive results and recommend it, though centroids work fine with Sweep-SAH.
 
 Then let us iterate through all split positions and ask again: "What are the primitives left and right to the current split position?"
 ```cs
@@ -422,7 +422,6 @@ I've also added the cost calculation here. As you can see, we already have enoug
 
 ```cs
 // Reverse sweep to gather rightCost values
-
 Box rightBoxAccum = Box.Empty();
 int rightCounter = 0;
 for (int i = end - 1; i >= start + 1; i--)
@@ -443,15 +442,7 @@ float rightCost = rightCosts[i + 1];
 float cost = leftCost + rightCost;
 ```
 
-The split with the lowest cost should be recorded into an object like this:
-```cs
-struct ObjectSplit
-{
-    int Axis;
-    int SplitIndex;
-    float Cost;
-}
-```
+The split with the lowest cost should be recorded into an object.
 
 To summarize:
 
