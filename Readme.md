@@ -336,26 +336,26 @@ Task.Run(() =>
 This code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that loading only really starts as soon as the render loop is entered where `MainThreadQueue.Execute()` is called every frame.
 Creating a thread for every image can introduce lag so I use thread pool based `Task.Run()` with `ThreadPool.Set{Min/Max}Threads`.
 
-## High quality BVH with Sweep-SAH
+## Good BVHs with Sweep-SAH
 
 ### 1.0 Overview
 
 Sweep-SAH is a method to find the lowest cost object splits in top-down BVH builds. You might have heard of other methods like Spatial-Median-Split, Object-Median-Split or Binned-SAH already. Sweep-SAH produces superior results and is often used as a "reference" for trace speed in the literature.
 
-When building a BVH in a top-down manner, at each recursion step we want to split the parent set of primitives into two new sets which make up the left and right child. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for $\text{\{A, C, E, J\}}$:
+When building a BVH in a top-down manner, at each recursion step we want to split the parent set of primitives into two new sets which make up the left and right child. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for **{A, C, E, J}**:
 
 #### "Classic" partitions
 
-1. $\{A\} + \{C, E, J\}$
-2. $\{A, C\} + \{E, J\}$
-3. $\{A, C, E\} + \{J\}$
+1. **{A\} + \{C, E, J}**
+2. **{A, C\} + \{E, J}**
+3. **{A, C, E\} + \{J}**
 
 #### "Exotic" partitions
 
-4. $\{A, E\} + \{C, J\}$
-5. $\{A, J\} + \{C, E\}$
-6. $\{C\} + \{A, E, J\}$
-7. $\{E\} + \{A, C, J\}$
+4. **{A, E}** + **{C, J}**
+5. **{A, J}** + **{C, E}**
+6. **{C}** + **{A, E, J}**
+7. **{E}** + **{A, C, J}**
 
 Notice how the classic partitions can be created by placing a single "split index" that divides the set into two. Unlike other methods, Sweep-SAH tests all $N - 1$ classic partitions and picks the one with the lowest cost, as measured by the Surface Area Heuristic. Here you can see it sweeping from left to right, exploring the first three partitions in the order I've listed them.
 
