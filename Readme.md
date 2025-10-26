@@ -342,7 +342,7 @@ Creating a thread for every image can introduce lag so I use thread pool based `
 
 SweepSAH is a method to find low cost object splits in top-down BVH builds. Other methods include Spatial-Median-Split, Object-Median-Split or BinnedSAH, but SweepSAH produces superior results and is often used as a "reference" for trace speed in the literature. I want to discuss how this method works and how it can be implemented efficiently.
 
-When building a BVH in a top-down manner, we need to partition the parent's set of primitives into two new sets. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for **{A, C, E, J}**:
+When building a BVH in a top-down manner, we want to partition the parent's set of primitives into two new sets. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for **{A, C, E, J}**:
 
 #### "Classic" partitions
 
@@ -357,7 +357,7 @@ When building a BVH in a top-down manner, we need to partition the parent's set 
 6. **{C}** + **{A, E, J}**
 7. **{E}** + **{A, C, J}**
 
-Notice how the classic partitions can be created by placing a single "split index" that divides the set into two. Unlike other methods, SweepSAH tests all those $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping from left to right, exploring the first three partitions in the order I've listed them:
+Notice how the classic partitions can be created by placing a single "split index" that divides the set into two. Unlike other methods, SweepSAH tests all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping from left to right (on the x-axis), moving the split index one step further to the right every time.
 
 ![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
 
