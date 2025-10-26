@@ -527,7 +527,7 @@ for (int i = bestSplit.SplitIndex; i < end; i++)
 StablePartition(primOnAxis[(bestSplit.Axis + 1) % 3].Slice(start, end), moveLeft);
 StablePartition(primOnAxis[(bestSplit.Axis + 2) % 3].Slice(start, end), moveLeft);
 ```
-`moveLeft` is a bool-array that is used like a dictionary to store `true` for all primitive references that are on of the left side. Just like the other arrays, it is allocated before recursion begins with a length of the primitive count. `StablePartition` moves all elements for which true is retuned first, in order.
+`moveLeft` is a bool-array that is used like a dictionary to store `true` for all primitive references that are on the left side. Just like the other arrays, it is allocated before recursion begins with a length of the primitive count. `StablePartition` moves all elements for which true is retuned first, in order.
 
 ### 3.0 Optimizations
 
