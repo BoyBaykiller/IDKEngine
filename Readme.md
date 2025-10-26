@@ -472,7 +472,7 @@ In theory, a partial sort ([`std::partial_sort`](https://en.cppreference.com/w/c
 The implementation discussed so far is functional but requires four sorts per recursion. Once per axis and one more to partition the primitives. As it turns out, this can be algorithmically improved: It's enough to globally sort only once per axis before recursion starts and use a fast stable partition ([`std::stable_partition`](https://en.cppreference.com/w/cpp/algorithm/stable_partition.html)) during recursion to keep things correct. This provides a significant reduction in build time. This insight comes from [Bonsai: Rapid Bounding Volume Hierarchy
 Generation using Mini Trees](https://jcgt.org/published/0004/03/02/paper-lowres.pdf).
 
-The method maintains three primitive-arrays, one per axis. Each array is initialized to hold primitive references which are sorted by their primitive position along the axis - as required by SweepSAH. It's a good idea to use references to save memory: 
+The method maintains three arrays, one per axis. Each array is initialized to hold primitive references which get sorted by their primitive position along the axis - as required by SweepSAH. It's a good idea to use references to save memory: 
 ```cs
 for (int axis = 0; axis < 3; axis++)
 {
@@ -491,11 +491,11 @@ With that, primitives are accessed as follows during SweepSAH.
 Span<int> indices = primOnAxis[axis];
 Box primitive = primitives[indices[i]];
 ```
-`indices` already contains sorted references, so the `Sort` procedure I mentioned in the [initial implementation](#20-implementation) can be removed.
+`indices` is assumed to already contain sorted references, so the `Sort` procedure which I mentioned in the [initial implementation](#20-implementation) that happens during recursion can be removed.
 
 After SweepSAH has found the best split, we need to do some work to correctly partition the arrays. This lies at the heart of the improved algorithm. Let's look at an example. Here, I've listed the parent "primitives" sorted by the x-, y- and z-axis respectively. SweepSAH has found the best split to be on the x-axis at `splitIndex=2`.
 ```
-x- [A, C, E, J]; y- [J, C, E, A]; z- [C, E, A, J]
+x: [A, C, E, J];  y: [J, C, E, A];  z: [C, E, A, J]
          ^
         / \
   [A, C] + [E, J]
