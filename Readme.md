@@ -340,9 +340,11 @@ Creating a thread for every image can introduce lag so I use thread pool based `
 
 ### 1.0 Overview
 
-SweepSAH is a method to find low cost object splits in top-down BVH builds. Other methods include Spatial-Median-Split, Object-Median-Split or BinnedSAH, but SweepSAH produces superior results and is often used as a "reference" for trace speed in the literature. I want to discuss how this method works and how it can be implemented efficiently.
+SweepSAH is a method to find the best split position in top-down BVH builds. It produces better results than other methods like SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions.
 
-When building a BVH in a top-down manner, we want to partition the parent's set of primitives into two new sets. We don't care about ordering and empty sides, so for N primitives that gives us $2^{N - 1} - 1$ possible partitions. As an example, here are all for **{A, C, E, J}**:
+You might wonder: Isn't there an infinite amount of split positions, how can we test all of them? While there is an infinite number of points in space the number of objects is finite. And BVHs are object splitting not space splitting. Even with spatial splits, the number of split positions is finite because the SAH-Cost is a piecewise linear function.
+
+Because BVHs are object spliting, we should not think of the split search process as finding a spatial position, but rather as finding a way to partition the parent primitives into two new sets. For N primitives in the parent there are $2^{N - 1} - 1$ possible partitionings. As an example, here are all for **{A, C, E, J}**:
 
 #### "Classic" partitions
 
@@ -357,7 +359,7 @@ When building a BVH in a top-down manner, we want to partition the parent's set 
 6. **{C}** + **{A, E, J}**
 7. **{E}** + **{A, C, J}**
 
-Notice how the classic partitions can be created by placing a single "split index" that divides the set into two. Unlike other methods, SweepSAH tests all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping from left to right (on the x-axis), moving the split index one step further to the right every time.
+Notice how the classic partitions can be created by placing a single "split index" that divides the primitives into two sets. Split index being the object space equivalent of split position. Unlike other methods, SweepSAH tests all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping from left to right (on the x-axis), moving the split index one step further to the right every time.
 
 ![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
 
@@ -375,7 +377,7 @@ float cost = leftCost + rightCost;
 ```
 I've excluded the fixed traversal/triangle cost and normalization by parent area here because these components only scale both sides by the same amount. We can worry about them later.
 
-So the SAH requires us to know the bounding box and count of all primitives which are left and right to a split position. We have $N-1$ split positions. And for each split position we have $N$ primitives to check. That sounds like a painfully slow $O(N^2)$ algorithm. But it can actually be reduced to $O(N)$!
+So the SAH requires us to know the bounding box and count of all primitives which are left and right to a split index. We have $N-1$ split indexes. And for each potential split we have $N$ primitives to check. That sounds like a painfully slow $O(N^2)$ algorithm. But it can actually be reduced to $O(N)$.
 
 Imagine for a moment that the primitives are sorted by their position on the axis of interest. `start` and `end` denote the primitive range of the parent node:
 ```
@@ -385,11 +387,12 @@ Sort(start, end, primitives, (box) => box.Center()[axis]);
 > [!NOTE]
 > My BVH builder uses bounding boxes as primitives. The user has to create them from the triangles. This keeps the build process primitive agnostic, supports spatial splits, and speeds up some operations. Sorting by box centers instead of triangle centroids can increase or decrease trace times depending on the scene. I’ve actually seen positive results and recommend it, though triangle centroids work fine with SweepSAH.
 
-Then let us iterate through all split positions and ask again: "What are the primitives left and right to the current split position?"
+Then let us iterate through all splits like this and ask: "What are the primitives left and right to the current split position?"
 ```cs
 for (int i = start; i < end - 1; i++)
 {
-    Box primitive = primitives[i];
+    int splitIndex = i + 1;
+    Box primitive = primitives[splitIndex];
     float splitPos = primitive.Center()[axis];
 
     // find all primitives left & right to splitPos
@@ -404,8 +407,6 @@ int leftCounter = 0;
 // Sweep over primitives from left to right
 for (int i = start; i < end - 1; i++)
 {
-    // int splitIndex = i + 1;
-
     // Update left side to include the new primitive
     leftCounter++; // equal to `splitIndex - start`
     leftBoxAccum.Grow(primitives[i]);
@@ -417,7 +418,7 @@ for (int i = start; i < end - 1; i++)
     float cost = leftCost + rightCost;
 }
 ```
-I've also added the cost calculation here. As you can see, we already have enough information to compute `leftCost` of the current split. However, we're still missing `rightCost`. To get that we can apply the same concept again. We perform an additional pass before this one that sweeps in reverse, from right to left. And we also write out the values for later use:
+I've also added the cost calculation here. As you can see, we already have enough information to compute `leftCost` of the current split. However, we're still missing `rightCost`. To get that we can apply the same concept again. We perform an additional pass before this one that sweeps in reverse, from right to left. And we write out the right costs for later use:
 
 ```cs
 // Reverse sweep to gather rightCost values
@@ -441,7 +442,7 @@ float rightCost = rightCosts[i + 1];
 float cost = leftCost + rightCost;
 ```
 
-The split with the lowest cost should be recorded into an object.
+The split with the lowest cost should be recorded into an object `bestSplit`.
 
 To summarize:
 
@@ -500,7 +501,7 @@ x: [A, C, E, J];  y: [J, C, E, A];  z: [C, E, A, J]
         / \
   [A, C] + [E, J]
 ```
-That makes the set of left primitives {A, C} and right {E, J}. All three arrays must contain the same primitives left and right to the `splitIndex`. The x-array doesnt need any processing. However for the y- and z-array we still need to move the left primitives before the right ones. And that while preserving relative order. This is done with a stable partition.
+That makes the set of left primitives {A, C} and right {E, J}. All three arrays must contain the same primitives left and right to the `splitIndex`. The x-array, on which we split, doesnt need any processing. However for the y- and z-array we still need to move the left primitives before the right ones. And that while preserving relative order. This is done with a stable partition.
 Here is what the new y- and z- subsets look like:
 ```
 y => [C, A] + [J, E]
@@ -527,11 +528,13 @@ for (int i = bestSplit.SplitIndex; i < end; i++)
 StablePartition(primOnAxis[(bestSplit.Axis + 1) % 3].Slice(start, end), moveLeft);
 StablePartition(primOnAxis[(bestSplit.Axis + 2) % 3].Slice(start, end), moveLeft);
 ```
-`moveLeft` is a bool-array that is used like a dictionary to store `true` for all primitive references that are on the left side. Just like the other arrays, it is allocated before recursion begins with a length of the primitive count. `StablePartition` moves all elements for which true is retuned first, in order.
+`moveLeft` is a bool-array to flag all primitive references as `true` that are on the left side. Just like the other arrays, it is allocated before recursion begins with a length of the primitive count. `StablePartition` moves all elements for which true is retuned first, in order.
 
 ### 3.0 Optimizations
 
-TODO
+#### Early out
+
+#### Multithreading
 
 ### 4.0 Considering exotic partitions
 
