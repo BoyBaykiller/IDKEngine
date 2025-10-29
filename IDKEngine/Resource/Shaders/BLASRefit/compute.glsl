@@ -22,11 +22,11 @@ void main()
     
     uint leafId = blasLeafIndicesSSBO.Indices[blasDesc.LeafIndicesOffset + gl_GlobalInvocationID.x];
 
-    GpuBlasNode leafNode = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + leafId];
+    GpuBlasNode leafNode = blasNodeSSBO.Nodes[blasDesc.NodeOffset + leafId];
     Box bounds = ComputeBoundingBox(blasDesc.GeometryDesc.TriangleOffset + leafNode.TriStartOrChild, leafNode.TriCount);
-    SetNodeBounds(blasDesc.RootNodeOffset + leafId, bounds);
+    SetNodeBounds(blasDesc.NodeOffset + leafId, bounds);
 
-    int parentId = blasParentIndicesSSBO.Indices[blasDesc.RootNodeOffset + leafId];
+    int parentId = blasParentIndicesSSBO.Indices[blasDesc.NodeOffset + leafId];
     do
     {
         if (atomicExchange(blasRefitLocksSSBO.Locks[parentId], 1u) == 0u)
@@ -35,16 +35,16 @@ void main()
             return;
         }
 
-        GpuBlasNode parent = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + parentId];
-        GpuBlasNode left = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + parent.TriStartOrChild];
-        GpuBlasNode right = blasNodeSSBO.Nodes[blasDesc.RootNodeOffset + parent.TriStartOrChild + 1];
+        GpuBlasNode parent = blasNodeSSBO.Nodes[blasDesc.NodeOffset + parentId];
+        GpuBlasNode left = blasNodeSSBO.Nodes[blasDesc.NodeOffset + parent.TriStartOrChild];
+        GpuBlasNode right = blasNodeSSBO.Nodes[blasDesc.NodeOffset + parent.TriStartOrChild + 1];
 
         Box mergedBox = Box(left.Min, left.Max);
         BoxGrowToFit(mergedBox, Box(right.Min, right.Max));
 
-        SetNodeBounds(blasDesc.RootNodeOffset + parentId, mergedBox);
+        SetNodeBounds(blasDesc.NodeOffset + parentId, mergedBox);
 
-        parentId = blasParentIndicesSSBO.Indices[blasDesc.RootNodeOffset + parentId];
+        parentId = blasParentIndicesSSBO.Indices[blasDesc.NodeOffset + parentId];
     } while (parentId != -1);
 }
 

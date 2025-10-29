@@ -18,7 +18,7 @@ class FSR2Wrapper : IDisposable
     public BBG.Texture Result;
 
     private FSR2.Context fsr2Context;
-    private UnmanagedArray<byte> fsr2ScratchMemory;
+    private NativeArray<byte> fsr2ScratchMemory;
     private bool isFsr2Initialized;
 
     public FSR2Wrapper(Vector2i maxInputSize, Vector2i outputSize)
@@ -89,7 +89,7 @@ class FSR2Wrapper : IDisposable
             DisplaySize = new FSR2Types.Dimensions2D() { Width = (uint)outputSize.X, Height = (uint)outputSize.Y },
             FpMessage = &Fsr2Message,
         };
-        fsr2ScratchMemory = new UnmanagedArray<byte>(FSR2.GL.GetScratchMemorySize());
+        fsr2ScratchMemory = new NativeArray<byte>(FSR2.GL.GetScratchMemorySize());
         FSR2.GL.GetInterface(out contextDesc.Callbacks, fsr2ScratchMemory.Elements, (nuint)fsr2ScratchMemory.Length, &GetProcAddress);
         FSR2.ContextCreate(out fsr2Context, contextDesc);
         isFsr2Initialized = true;

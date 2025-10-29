@@ -80,17 +80,15 @@ public static class PreSplitting
                 int splitAxis = box.LargestAxis();
                 float largestExtent = box.LargestExtent();
 
-                float alpha = largestExtent / globalSize[splitAxis];
-                float cellSize = GetCellSize(alpha) * globalSize[splitAxis];
-                if (cellSize >= largestExtent - 0.0001f)
+                float nodeSize = GetNodeSize(largestExtent, globalSize[splitAxis]);
+                if (nodeSize >= largestExtent - 0.0001f)
                 {
-                    cellSize *= 0.5f;
+                    nodeSize *= 0.5f;
                 }
 
-                float midPos = (box.Min[splitAxis] + box.Max[splitAxis]) * 0.5f;
-
                 // This is computing [x = j * 2 ^ i, where i,j∈Z] as shown in the paper
-                float splitPos = globalBox.Min[splitAxis] + MathF.Round((midPos - globalBox.Min[splitAxis]) / cellSize) * cellSize;
+                float midPos = (box.Min[splitAxis] + box.Max[splitAxis]) * 0.5f;
+                float splitPos = globalBox.Min[splitAxis] + MathF.Round((midPos - globalBox.Min[splitAxis]) / nodeSize) * nodeSize;
                 if (splitPos < box.Min[splitAxis] || splitPos > box.Max[splitAxis])
                 {
                     splitPos = midPos;
@@ -113,6 +111,8 @@ public static class PreSplitting
             }
         }
 
+        return (bounds, originalTriIds);
+
         int GetSplitCount(float priority, float totalPriority, int triangleCount)
         {
             float shareOfTris = priority / totalPriority * triangleCount;
@@ -128,17 +128,34 @@ public static class PreSplitting
             return MathF.Cbrt(MathF.Pow(triBox.LargestExtent(), 2.0f) * (triBox.Area() - triangle.Area));
         }
 
-        static float GetCellSize(float alpha)
+        static float GetNodeSize(float extent, float globalSize)
         {
-            // Erase all except the exponent bits.
-            // This has the same effect as 2^(floor(log2(alpha)))
-            uint floatBits = Unsafe.BitCast<float, uint>(alpha);
-            floatBits &= 255u << 23;
+            // See slide 64 in https://www.highperformancegraphics.org/wp-content/uploads/2013/Karras-BVH.pdf
+            // We assume the BVH will be build with spatial split on largest axis.
+            // Given that, here we find the smallest node size which fits the extent
+            // For alpha between 0.5 and 1.0. level => -1, size => 0.5
+            // For alpha between 0.25 and 0.5. level => -2, size => 0.25
+            // For alpha between 0.125 and 0.25. level => -3, size => 0.125
 
-            return Unsafe.BitCast<uint, float>(floatBits);
+            // Transform into [0.0, 1.0]
+            float alpha = extent / globalSize;
+
+            // This computes 2^(floor(log2(alpha)))
+            uint exponentBits = Unsafe.BitCast<float, uint>(alpha) & (255u << 23);
+
+            // Transform back into global space
+            float size = Unsafe.BitCast<uint, float>(exponentBits) * globalSize;
+
+            return size;
         }
+    }
 
-        return (bounds, originalTriIds);
+    static float Abs(float value)
+    {
+        const uint mask = 0x7FFFFFFF;
+        uint raw = BitConverter.SingleToUInt32Bits(value);
+
+        return BitConverter.UInt32BitsToSingle(raw & mask);
     }
 
     /// <summary>
@@ -150,6 +167,9 @@ public static class PreSplitting
     /// <returns></returns>
     public static GpuIndicesTriplet[] GetUnindexedTriangles(in BLAS.BuildResult blas, in BLAS.BuildData buildData, in BLAS.Geometry geometry)
     {
+        const bool straddlingOpt = true;
+        const bool leafOpt = true;
+
         GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.Fragments.Count];
 
         int globalTriCounter = 0;
@@ -174,14 +194,15 @@ public static class PreSplitting
                 for (int i = 0; i < leftUniqueTriIds.Length; i++)
                 {
                     int leftTriId = leftUniqueTriIds[i];
-                    bool isStraddling = rightUniqueTriIds.Contains(leftTriId);
+                    bool isStraddling = straddlingOpt && rightUniqueTriIds.Contains(leftTriId);
+
                     if (isStraddling)
                     {
-                        triangles[globalTriCounter + (leftUniqueTriIds.Length - backwardsCounter++ - 1)] = geometry.Triangles[leftTriId];
+                        triangles[globalTriCounter + leftUniqueTriIds.Length - backwardsCounter++ - 1] = geometry.TriIndices[leftTriId];
                     }
                     else
                     {
-                        triangles[globalTriCounter + onlyLeftTriCount++] = geometry.Triangles[leftTriId];
+                        triangles[globalTriCounter + onlyLeftTriCount++] = geometry.TriIndices[leftTriId];
                     }
                 }
 
@@ -189,10 +210,10 @@ public static class PreSplitting
                 for (int i = 0; i < rightUniqueTriIds.Length; i++)
                 {
                     int rightTriId = rightUniqueTriIds[i];
-                    bool isStraddling = leftUniqueTriIds.Contains(rightTriId);
+                    bool isStraddling = straddlingOpt && leftUniqueTriIds.Contains(rightTriId);
                     if (!isStraddling)
                     {
-                        triangles[globalTriCounter + leftUniqueTriIds.Length + onlyRightTriCount++] = geometry.Triangles[rightTriId];
+                        triangles[globalTriCounter + leftUniqueTriIds.Length + onlyRightTriCount++] = geometry.TriIndices[rightTriId];
                     }
                 }
 
@@ -212,7 +233,7 @@ public static class PreSplitting
                 Span<int> uniqueTriIds = GetUniqueTriIds(theLeafNode, buildData);
                 for (int i = 0; i < uniqueTriIds.Length; i++)
                 {
-                    triangles[globalTriCounter + i] = geometry.Triangles[uniqueTriIds[i]];
+                    triangles[globalTriCounter + i] = geometry.TriIndices[uniqueTriIds[i]];
                 }
 
                 theLeafNode.TriStartOrChild = globalTriCounter;
@@ -238,9 +259,14 @@ public static class PreSplitting
                 triIds[i] = buildData.Fragments.OriginalTriIds[buildData.PermutatedFragmentIds[leafNode.TriStartOrChild + i]];
             }
 
-            MemoryExtensions.Sort(triIds);
+            int uniqueTriCount = triIds.Length;
+            
+            if (leafOpt)
+            {
+                MemoryExtensions.Sort(triIds);
+                uniqueTriCount = Algorithms.SortedFilterDuplicates(triIds);
+            }
 
-            int uniqueTriCount = Algorithms.SortedFilterDuplicates(triIds);
             Span<int> uniqueTriIds = triIds.Slice(0, uniqueTriCount);
 
             return uniqueTriIds;

@@ -3,21 +3,21 @@ AppInclude(include/Box.glsl)
 AppInclude(include/Math.glsl)
 AppInclude(include/Frustum.glsl)
 
-bool RayTriangleIntersect(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 bary, out float t)
+bool RayTriangleIntersect(Ray ray, vec3 p0, vec3 p1, vec3 p2, out vec3 bary, out float t)
 {
     // Source: https://www.iquilezles.org/www/articles/intersectors/intersectors.htm
 
-    vec3 v1v0 = v1 - v0;
-    vec3 v2v0 = v2 - v0;
-    vec3 rov0 = ray.Origin - v0;
-    vec3 normal = cross(v1v0, v2v0);
-    vec3 q = cross(rov0, ray.Direction);
+    vec3 p1p0 = p1 - p0;
+    vec3 p2p0 = p2 - p0;
+    vec3 rop0 = ray.Origin - p0;
+    vec3 normal = cross(p1p0, p2p0);
+    vec3 q = cross(rop0, ray.Direction);
 
     float x = dot(ray.Direction, normal);
-    bary.yz = vec2(dot(-q, v2v0), dot(q, v1v0)) / x;
-    bary.x = 1.0 - bary.y - bary.z;
+    t = dot(-normal, rop0) / x;
 
-    t = dot(-normal, rov0) / x;
+    bary.yz = vec2(dot(-q, p2p0), dot(q, p1p0)) / x;
+    bary.x = 1.0 - bary.y - bary.z;
 
     return all(greaterThanEqual(vec4(bary, t), vec4(0.0)));
 }

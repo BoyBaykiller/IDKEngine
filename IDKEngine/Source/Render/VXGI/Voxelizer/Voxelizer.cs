@@ -181,7 +181,7 @@ class Voxelizer : IDisposable
             else
             {
                 // Instead of doing a single draw call with a standard geometry shader to select the swizzle
-                // we render the scene 3 times, each time with a different swizzle. I have observed this to be slightly faster
+                // we render the scene 3 times, each time with a different swizzle. I have observed this to be faster
                 for (int i = 0; i < 3; i++)
                 {
                     voxelizeProgram.Upload(0, i);

@@ -51,36 +51,32 @@ public record struct Triangle
         Box lBox = Box.Empty();
         Box rBox = Box.Empty();
 
-        Vector3 p0 = Position0;
-        Vector3 p1 = Position1;
-        Vector3 p2 = Position2;
+        bool q0 = Position0[axis] <= position;
+        bool q1 = Position1[axis] <= position;
+        bool q2 = Position2[axis] <= position;
 
-        bool q0 = p0[axis] <= position;
-        bool q1 = p1[axis] <= position;
-        bool q2 = p2[axis] <= position;
-
-        if (q0) lBox.GrowToFit(p0);
-        else    rBox.GrowToFit(p0);
-        if (q1) lBox.GrowToFit(p1);
-        else    rBox.GrowToFit(p1);
-        if (q2) lBox.GrowToFit(p2);
-        else    rBox.GrowToFit(p2);
+        if (q0) lBox.GrowToFit(Position0);
+        else    rBox.GrowToFit(Position0);
+        if (q1) lBox.GrowToFit(Position1);
+        else    rBox.GrowToFit(Position1);
+        if (q2) lBox.GrowToFit(Position2);
+        else    rBox.GrowToFit(Position2);
 
         if (q0 ^ q1)
         {
-            Vector3 m = SplitEdge(p0, p1);
+            Vector3 m = SplitEdge(Position0, Position1);
             lBox.GrowToFit(m);
             rBox.GrowToFit(m);
         }
         if (q1 ^ q2)
         {
-            Vector3 m = SplitEdge(p1, p2);
+            Vector3 m = SplitEdge(Position1, Position2);
             lBox.GrowToFit(m);
             rBox.GrowToFit(m);
         }
         if (q2 ^ q0)
         {
-            Vector3 m = SplitEdge(p2, p0);
+            Vector3 m = SplitEdge(Position2, Position0);
             lBox.GrowToFit(m);
             rBox.GrowToFit(m);
         }

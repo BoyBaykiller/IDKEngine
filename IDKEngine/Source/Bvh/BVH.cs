@@ -88,11 +88,13 @@ public class BVH : IDisposable
         }
     }
 
+    // Owning
     public GpuTlasNode[] TlasNodes = [];
     public GpuBlasNode[] BlasNodes = [];
     public GpuIndicesTriplet[] BlasTriangles = [];
     public GpuBlasDesc[] BlasesDesc = [];
 
+    // Non owning
     private NativeMemoryView<Vector3> vertexPositions;
     private uint[] vertexIndices = [];
     private GpuMeshInstance[] meshInstances = [];
@@ -163,7 +165,7 @@ public class BVH : IDisposable
                     localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                 {
                     hitInfo.TriangleId = blasHitInfo.TriangleId;
-                    hitInfo.TriangleIndices = geometry.Triangles[blasHitInfo.TriangleId];
+                    hitInfo.TriangleIndices = geometry.TriIndices[blasHitInfo.TriangleId];
                     hitInfo.Bary = blasHitInfo.Bary;
                     hitInfo.T = blasHitInfo.T;
                     hitInfo.InstanceID = i;
@@ -197,7 +199,7 @@ public class BVH : IDisposable
                     geometry,
                     localBox, (int triangleId) =>
                     {
-                        GpuIndicesTriplet triangle = (*geometryPtr).Triangles[triangleId];
+                        GpuIndicesTriplet triangle = (*geometryPtr).TriIndices[triangleId];
 
                         BoxHitInfo hitInfo;
                         hitInfo.TriangleIndices = triangle;
@@ -244,11 +246,11 @@ public class BVH : IDisposable
             blasDesc.GeometryDesc.TriangleCount = userGeometryDesc.TriangleCount;
 
             BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
-            for (int j = 0; j < geometry.Triangles.Length; j++)
+            for (int j = 0; j < geometry.TriIndices.Length; j++)
             {
-                geometry.Triangles[j].X = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + j) * 3 + 0]);
-                geometry.Triangles[j].Y = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + j) * 3 + 1]);
-                geometry.Triangles[j].Z = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + j) * 3 + 2]);
+                geometry.TriIndices[j].X = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + j) * 3 + 0]);
+                geometry.TriIndices[j].Y = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + j) * 3 + 1]);
+                geometry.TriIndices[j].Z = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + j) * 3 + 2]);
             }
 
             blasesDesc[i] = blasDesc;
@@ -281,7 +283,7 @@ public class BVH : IDisposable
         for (int i = rmBlasRange.End; i < BlasesDesc.Length; i++)
         {
             ref GpuBlasDesc desc = ref BlasesDesc[i];
-            desc.RootNodeOffset -= rmNodeRange.Count;
+            desc.NodeOffset -= rmNodeRange.Count;
             desc.LeafIndicesOffset -= rmLeafIdRange.Count;
 
             desc.GeometryDesc.TriangleOffset -= rmTriangleRange.Count;
@@ -336,7 +338,7 @@ public class BVH : IDisposable
 
         BlasBuildPhaseData[] newBlasesData = new BlasBuildPhaseData[count];
         GpuBlasDesc prevEndBlasDesc = BlasesDesc[start + count - 1];
-
+        
         const bool enablePresplitting = true;
         BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
         PreSplitting.Settings preSplittingSettings = new PreSplitting.Settings();
@@ -353,6 +355,9 @@ public class BVH : IDisposable
             BLAS.Geometry geometry = GetBlasGeometry(blasDesc.GeometryDesc);
 
             // TODO: Only store parent+leaf ids for "refitable BLAS"
+
+            //System.IO.File.WriteAllBytes(@"C:\Programming\Main\BlasBuilder\BlasBuilder\vertices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.VertexPositions));
+            //System.IO.File.WriteAllBytes(@"C:\Programming\Main\BlasBuilder\BlasBuilder\indices.bin", System.Runtime.InteropServices.MemoryMarshal.AsBytes(geometry.TriIndices));
 
             // Don't do pre-splitting repeatedly as that creates excessive amounts of triangles
             bool doPresplitting = enablePresplitting && !blasDesc.PreSplittingWasDone;
@@ -375,7 +380,7 @@ public class BVH : IDisposable
 
             // Build BLAS and resize nodes
             BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
-            int nodesUsed = BLAS.Build(ref blas, buildData, buildSettings);
+            int nodesUsed = BLAS.Build(ref blas, buildData, geometry, buildSettings);
 
             Array.Resize(ref nodes, nodesUsed);
             blas.Nodes = nodes;
@@ -419,7 +424,7 @@ public class BVH : IDisposable
         for (int i = start; i < BlasesDesc.Length; i++)
         {
             ref GpuBlasDesc blasDesc = ref BlasesDesc[i];
-            blasDesc.RootNodeOffset = i > 0 ? BlasesDesc[i - 1].NodesEnd : 0;
+            blasDesc.NodeOffset = i > 0 ? BlasesDesc[i - 1].NodesEnd : 0;
             blasDesc.LeafIndicesOffset = i > 0 ? BlasesDesc[i - 1].LeafIndicesEnd : 0;
 
             blasDesc.GeometryDesc.TriangleOffset = i > 0 ? BlasesDesc[i - 1].GeometryDesc.TrianglesEnd : 0;
@@ -467,9 +472,9 @@ public class BVH : IDisposable
             ref readonly BlasBuildPhaseData blasData = ref newBlasesData[i];
             ref readonly GpuBlasDesc blasDesc = ref BlasesDesc[start + i];
 
-            Array.Copy(blasData.Nodes, 0, BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
+            Array.Copy(blasData.Nodes, 0, BlasNodes, blasDesc.NodeOffset, blasDesc.NodeCount);
             Array.Copy(blasData.Triangles, 0, BlasTriangles, blasDesc.GeometryDesc.TriangleOffset, blasDesc.GeometryDesc.TriangleCount);
-            Array.Copy(blasData.ParentIds, 0, blasParentIds, blasDesc.RootNodeOffset, blasDesc.NodeCount);
+            Array.Copy(blasData.ParentIds, 0, blasParentIds, blasDesc.NodeOffset, blasDesc.NodeCount);
             Array.Copy(blasData.LeafIds, 0, blasLeafIds, blasDesc.LeafIndicesOffset, blasDesc.LeafIndicesCount);
         }
 
@@ -480,7 +485,7 @@ public class BVH : IDisposable
         BBG.Buffer.Recreate(ref blasNodesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasNodes);
         BBG.Buffer.Recreate(ref blasParentIdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasParentIds);
         BBG.Buffer.Recreate(ref blasLeafIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasLeafIds);
-        BBG.Buffer.Recreate(ref blasRefitLockBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc.Select(it => it.NodeCount).DefaultIfEmpty(0).Max());
+        BBG.Buffer.Recreate(ref blasRefitLockBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc.Max(it => it.NodeCount));
 
         Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms");
 
@@ -533,7 +538,7 @@ public class BVH : IDisposable
     public BLAS.BuildResult GetBlas(in GpuBlasDesc blasDesc)
     {
         BLAS.BuildResult blas = new BLAS.BuildResult();
-        blas.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.RootNodeOffset, blasDesc.NodeCount);
+        blas.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.NodeOffset, blasDesc.NodeCount);
         blas.MaxTreeDepth = blasDesc.MaxTreeDepth;
 
         return blas;
@@ -543,14 +548,14 @@ public class BVH : IDisposable
     {
         BLAS.Geometry geometry = new BLAS.Geometry();
         geometry.VertexPositions = vertexPositions;
-        geometry.Triangles = new Span<GpuIndicesTriplet>(BlasTriangles, geometryDesc.TriangleOffset, geometryDesc.TriangleCount);
+        geometry.TriIndices = new Span<GpuIndicesTriplet>(BlasTriangles, geometryDesc.TriangleOffset, geometryDesc.TriangleCount);
         return geometry;
     }
 
     public Range GetBlasesNodeRange(Range blases)
     {
         Range range = new Range();
-        range.Start = BlasesDesc[blases.Start].RootNodeOffset;
+        range.Start = BlasesDesc[blases.Start].NodeOffset;
         range.End = BlasesDesc[blases.End - 1].NodesEnd;
 
         return range;

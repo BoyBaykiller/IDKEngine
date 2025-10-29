@@ -9,7 +9,7 @@
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
-    <!--<UseWindowsThreadPool>true</UseWindowsThreadPool>-->
+    <!-- <UseWindowsThreadPool>true</UseWindowsThreadPool> -->
 
     <!-- 
     https://learn.microsoft.com/en-us/dotnet/core/runtime-config/compilation#quick-jit
@@ -28,14 +28,16 @@
     <IlcInstructionSet>avx2</IlcInstructionSet>
 
     <!--For Sizoscope-->
-    <!--<IlcGenerateMstatFile>true</IlcGenerateMstatFile>
-    <IlcGenerateDgmlFile>true</IlcGenerateDgmlFile>-->
+    <!-- <IlcGenerateMstatFile>true</IlcGenerateMstatFile> -->
+    <!-- <IlcGenerateDgmlFile>true</IlcGenerateDgmlFile> -->
 
     <!--Settings to decrease size-->
+    <IlcDehydrate>true</IlcDehydrate>
     <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
-    <!--<StackTraceSupport>false</StackTraceSupport>-->
-    <!--<InvariantGlobalization>true</InvariantGlobalization>-->
-    <!--<UseSystemResourceKeys>true</UseSystemResourceKeys>-->
+    <UseSizeOptimizedLinq>true</UseSizeOptimizedLinq>
+    <!-- <StackTraceSupport>false</StackTraceSupport> -->
+    <!-- <InvariantGlobalization>true</InvariantGlobalization> -->
+    <!-- <UseSystemResourceKeys>true</UseSystemResourceKeys> -->
     <!--<IlcDisableReflection>true</IlcDisableReflection>-->
 
   </PropertyGroup>
@@ -63,7 +65,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="ImGui.NET" Version="1.90.8.1" />
-    <PackageReference Include="Ktx2.NET" Version="1.0.4" />
+    <PackageReference Include="Ktx2.NET" Version="1.0.5" />
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.7" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.15" />

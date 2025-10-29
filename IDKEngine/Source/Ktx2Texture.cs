@@ -18,6 +18,8 @@ public unsafe class Ktx2Texture
     public int Channels => (int)Ktx2.GetNumComponents(texture);
     public bool NeedsTranscoding => Ktx2.NeedsTranscoding(texture);
 
+    public Ktx2.Helper.DataFormatDescriptor FormatDescriptor => Ktx2.Helper.GetDataFormatDescriptor(texture);
+
     public static Ktx2.ErrorCode FromFile(string filename, Ktx2.TextureCreateFlagBits createFlags, out Ktx2Texture ktx2Texture)
     {
         ktx2Texture = new Ktx2Texture();

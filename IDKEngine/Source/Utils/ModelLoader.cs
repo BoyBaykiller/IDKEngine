@@ -269,6 +269,13 @@ public static unsafe class ModelLoader
             VertexFetchOptimization = false,
         };
 
+        public static readonly OptimizationSettings AllTurnedOn = new OptimizationSettings()
+        {
+            VertexRemapOptimization = true,
+            VertexCacheOptimization = true,
+            VertexFetchOptimization = true,
+        };
+
         public static readonly OptimizationSettings Recommended = new OptimizationSettings()
         {
             VertexRemapOptimization = false,
@@ -336,7 +343,7 @@ public static unsafe class ModelLoader
                 throw new ArgumentException($"{nameof(Type)} = {Type} is not meant to be interpreted as Vector3");
             }
 
-            return MemoryMarshal.Cast<byte, Vector3>(RawKeyFramesData);
+            return MemoryMarshal.Cast<byte, Vector3>((Span<byte>)RawKeyFramesData);
         }
 
         public readonly Span<Quaternion> GetKeyFrameDataAsQuaternion()
@@ -346,7 +353,7 @@ public static unsafe class ModelLoader
                 throw new ArgumentException($"{nameof(Type)} = {Type} is not meant to be interpreted as Quaternion");
             }
 
-            return MemoryMarshal.Cast<byte, Quaternion>(RawKeyFramesData);
+            return MemoryMarshal.Cast<byte, Quaternion>((Span<byte>)RawKeyFramesData);
         }
 
         public readonly NodeAnimation DeepClone(ReadOnlySpan<Node> srcNewNodes)

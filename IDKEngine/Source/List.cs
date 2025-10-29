@@ -15,12 +15,6 @@ public class List<T>
     public int Count { get; private set; }
     private T[] buffer;
 
-    public List(ReadOnlySpan<T> items)
-    {
-        buffer = items.ToArray();
-        Count = buffer.Length;
-    }
-
     public List(int capacity)
     {
         buffer = new T[capacity];
@@ -174,5 +168,8 @@ public class List<T>
 
 internal static class ListBuilder
 {
-    internal static List<T> Create<T>(ReadOnlySpan<T> values) => new List<T>(values);
+    internal static List<T> Create<T>(ReadOnlySpan<T> values)
+    {
+        return List<T>.FromArray(values.ToArray());
+    }
 }

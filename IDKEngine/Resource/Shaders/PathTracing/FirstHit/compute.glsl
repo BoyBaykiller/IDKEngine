@@ -90,7 +90,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
     vec3 rayDir = DecodeUnitVec(vec2(wavefrontRay.PackedDirectionX, wavefrontRay.PackedDirectionY));
 
     HitInfo hitInfo;
-    float debugCost = 0;
+    float debugCost = 0.0;
     bool hitScene = TraceRay(Ray(wavefrontRay.Origin, rayDir), hitInfo, debugCost, settingsUBO.DoTraceLights, FLOAT_MAX);
     
     if (settingsUBO.IsDebugBVHTraversal)

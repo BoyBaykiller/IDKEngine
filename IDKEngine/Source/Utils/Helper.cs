@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
@@ -182,11 +183,11 @@ public static class Helper
         }
     }
 
-    public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source)
+    public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int start, int length)
         where TFrom : unmanaged
         where TTo : unmanaged
     {
-        return MemoryMarshal.Cast<TFrom, TTo>(source);
+        return MemoryMarshal.Cast<TFrom, TTo>(source).Slice(start, length);
     }
 
     public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int length)
@@ -224,6 +225,17 @@ public static class Helper
         return Unsafe.BitCast<System.Numerics.Matrix4x4, Matrix4>(Matrix4);
     }
 
+    public static Task ExecuteMaybeThreaded(bool cond, Action action)
+    {
+        if (cond)
+        {
+            return Task.Run(action);
+        }
+
+        action();
+        return Task.CompletedTask;
+    }
+
     public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 Matrix4)
     {
         return Unsafe.BitCast<Matrix4, System.Numerics.Matrix4x4>(Matrix4);
@@ -257,7 +269,7 @@ public static class Helper
 
         dest = new T[fileStream.Length / sizeof(T)];
 
-        Span<byte> byteData = MemoryMarshal.AsBytes<T>(dest);
+        Span<byte> byteData = MemoryMarshal.AsBytes((Span<T>)dest);
         fileStream.ReadExactly(byteData);
 
         return true;

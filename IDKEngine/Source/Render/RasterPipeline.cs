@@ -281,7 +281,7 @@ class RasterPipeline : IDisposable
                 gpuTaaData.SampleCount = FSR2Wrapper.GetRecommendedSampleCount(RenderResolution.X, PresentationResolution.X);
             }
 
-            if (AntiAliasingMode_ == AntiAliasingMode.TAA || 
+            if (AntiAliasingMode_ == AntiAliasingMode.TAA ||
                 AntiAliasingMode_ == AntiAliasingMode.FSR2)
             {
                 Vector2 jitter = MyMath.GetHalton2D(frameIndex++ % gpuTaaData.SampleCount, 2, 3);

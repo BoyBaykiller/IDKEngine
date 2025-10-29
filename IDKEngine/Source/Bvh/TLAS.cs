@@ -170,7 +170,7 @@ public static class TLAS
                 Ray localRay = ray.Transformed(invWorldTransform);
                 if (BLAS.Intersect(blas, geometry, localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                 {
-                    hitInfo.TriangleIndices = geometry.Triangles[blasHitInfo.TriangleId];
+                    hitInfo.TriangleIndices = geometry.TriIndices[blasHitInfo.TriangleId];
                     hitInfo.Bary = blasHitInfo.Bary;
                     hitInfo.T = blasHitInfo.T;
                     hitInfo.InstanceID = instanceID;
@@ -236,7 +236,7 @@ public static class TLAS
                 BLAS.Intersect(blas, geometry, localBox, (int triangleId) =>
                 {
                     BVH.BoxHitInfo hitInfo;
-                    hitInfo.TriangleIndices = (*geometryPtr).Triangles[triangleId];
+                    hitInfo.TriangleIndices = (*geometryPtr).TriIndices[triangleId];
                     hitInfo.InstanceID = instanceID;
 
                     return intersectFunc(hitInfo);

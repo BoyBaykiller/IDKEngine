@@ -278,7 +278,7 @@ public static class Algorithms
     /// <param name="auxiliary"></param>
     /// <param name="bitArray"></param>
     /// <returns></returns>
-    public static int StablePartition(Span<int> source, Span<int> auxiliary, BitArray bitArray)
+    public static int StablePartition(Span<int> source, Span<int> auxiliary, bool[] bitArray)
     {
         int lCounter = 0;
         int rCounter = 0;

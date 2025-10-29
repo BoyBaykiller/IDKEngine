@@ -336,6 +336,210 @@ Task.Run(() =>
 This code sits in the model loader, but I like to wrap it inside an other `MainThreadQueue.AddToLazyQueue()` so that loading only really starts as soon as the render loop is entered where `MainThreadQueue.Execute()` is called every frame.
 Creating a thread for every image can introduce lag so I use thread pool based `Task.Run()` with `ThreadPool.Set{Min/Max}Threads`.
 
+## Good BVHs using SweepSAH
+
+### 1.0 Overview
+
+SweepSAH is a method to find the best split position in top-down BVH builds. It produces better results than other methods like SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions.
+
+You might wonder: Isn't there an infinite number of split positions, how can we test all of them? While there is an infinite number of points in space the number of objects is finite. And BVHs are object splitting not space splitting. Even with spatial splits, the number of split positions is finite because the SAH-Cost is a piecewise linear function.
+
+Because BVHs are object spliting, we should not think of the split search process as finding a spatial position, but rather as finding a partitioning of the parent primitives into two new sets. For N primitives in the parent there are $2^{N - 1} - 1$ possible partitionings. As an example, here are all for **{A, C, E, J}**:
+
+#### "Classic" partitions
+
+1. **{A\} + \{C, E, J}**
+2. **{A, C\} + \{E, J}**
+3. **{A, C, E\} + \{J}**
+
+#### "Exotic" partitions
+
+4. **{A, E}** + **{C, J}**
+5. **{A, J}** + **{C, E}**
+6. **{C}** + **{A, E, J}**
+7. **{E}** + **{A, C, J}**
+
+Notice how the classic partitions can be created by placing a single split index that divides the primitives into two sets. "Split index" being the object space equivalent of split position. Unlike other methods, SweepSAH tests all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping from left to right (on the x-axis), moving the split index one step further to the right every time.
+
+![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
+
+But what about the exotic partitions? Let's look at number 5 as an example. This corresponds to the far left and far right triangle forming a child. The two middle triangles form the other child. These kind of partitions are usually uninteresting. So as with other split methods, they are ignored. However, I do have a small extension that [tests some exotic partitions](#40-considering-exotic-partitions).
+
+### 2.0 Implementation
+
+As the name suggests, the Surface Area Heuristic (SAH) is used to estimate the cost of a split. During the split search we can use this simplified model:
+```cs
+// Weigh primitive count by area of enclosing box 
+float leftCost = leftBox.Area() * leftPrimCount;
+float rightCost = rightBox.Area() * rightPrimCount; 
+
+float cost = leftCost + rightCost;
+```
+I've excluded the fixed traversal/triangle cost and normalization by parent area here because these components only scale both sides by the same amount. We can worry about them later.
+
+As you can see the SAH requires us to know the bounding box and count of all primitives which are left and right to a split index. We have $N-1$ split indexes. And for each potential split we have $N$ primitives to check. That sounds like a painfully slow $O(N^2)$ algorithm. But it can actually be reduced to $O(N)$.
+
+Imagine for a moment that the primitives are sorted by their position on the axis of interest. `start` and `end` denote the primitive range of the parent node:
+```
+Sort(start, end, primitives, (box) => box.Center()[axis]);
+```
+
+> [!NOTE]
+> My BVH builder uses bounding boxes as primitives. The user has to create them from the triangles. This keeps the build process primitive agnostic, supports spatial splits, and speeds up some operations. Sorting by box centers instead of triangle centroids can increase or decrease trace times depending on the scene. I’ve actually seen positive results and recommend it, though triangle centroids work fine with SweepSAH.
+
+Then let us iterate through all splits like this and ask: "What are the primitives left and right to the current split position?"
+```cs
+for (int i = start; i < end - 1; i++)
+{
+    int splitIndex = i + 1;
+    Box primitive = primitives[splitIndex];
+    float splitPos = primitive.Center()[axis];
+
+    // find all primitives left & right to splitPos
+}
+```
+Because the primitives are now sorted, we can easily answer this question. All left primitives must be before the current index `i` (and let's include `i` itself too), with the right ones following afterwards. This means every iteration the current primitive must be added to the left side. This insight removes the need for an inner loop to find all left triangles. We can just accumulate the left side as we sweep:
+
+```cs
+Box leftBoxAccum = Box.Empty();
+int leftCounter = 0;
+
+// Sweep over primitives from left to right
+for (int i = start; i < end - 1; i++)
+{
+    // Update left side to include the new primitive
+    leftCounter++; // equal to `splitIndex - start`
+    leftBoxAccum.Grow(primitives[i]);
+
+    // Compute split cost
+    float leftCost = leftBoxAccum.Area() * leftCounter;
+    float rightCost = ???; // missing
+
+    float cost = leftCost + rightCost;
+}
+```
+I've also added the cost calculation here. As you can see, we already have enough information to compute `leftCost` of the current split. However, we're still missing `rightCost`. To get that we can apply the same concept again. We perform an additional pass before this one that sweeps in reverse, from right to left. And we write out the right costs for later use:
+
+```cs
+// Reverse sweep to gather rightCost values
+Box rightBoxAccum = Box.Empty();
+int rightCounter = 0;
+for (int i = end - 1; i >= start + 1; i--)
+{
+    rightCounter++;
+    rightBoxAccum.Grow(primitives[i]);
+
+    float rightCost = rightBoxAccum.Area() * rightCounter;
+    rightCosts[i] = rightCost;
+}
+```
+
+With that, we can fetch the missing `rightCost` and compute the total cost during the left-right sweep:
+```cs
+// Compute split cost
+float leftCost = leftBoxAccum.Area() * leftCounter;
+float rightCost = rightCosts[i + 1];
+float cost = leftCost + rightCost;
+```
+
+The split with the lowest cost should be recorded into an object `bestSplit`.
+
+To summarize:
+
+1. Sort the primitives by their position on the current axis
+2. Sweep from right to left to get `rightCost`s and temporarily store them
+3. Sweep from left to right to get `leftCost` and add it to the fetched `rightCost` to get the total cost
+
+If you have already implemented BinnedSAH, steps 2 and 3 may be familiar to you. The difference is that we sweep over primitives rather than bins.
+
+---
+
+Once the search for the lowest-cost object split across all axes is complete, there are two more things to do.
+
+As a reminder, I've hoisted some components from the SAH calculation during sweeping as they are not needed at that stage. Now is a good place to update it with the missing `TRAVERSAL_COST`, `TRIANGLE_COST` and normalization by `parentArea` to get the proper SAH.
+```cs
+bestSplit.Cost = TRAVERSAL_COST + (TRIANGLE_COST * bestSplit.Cost / parentArea);
+```
+
+Lastly, there is one important step. Unless splitting of the subtree is aborted because some threshold is reached, we still need to actually put the triangles into the best partition. To do this, just sort one more time on the best axis:
+```cs
+Sort(start, end, primitives, (box) => box.Center()[bestSplit.Axis]);
+```
+
+In theory, a partial sort ([`std::partial_sort`](https://en.cppreference.com/w/cpp/algorithm/partial_sort.html)) would suffice here, but I'll show how to remove all sorts during recursion in the next chapter anyway!
+
+### 2.1 Running in O(N)
+
+The implementation discussed so far is functional but requires four sorts per recursion. Once per axis and one more to partition the primitives. As it turns out, this can be algorithmically improved: It's enough to globally sort only once per axis before recursion starts and use a fast stable partition ([`std::stable_partition`](https://en.cppreference.com/w/cpp/algorithm/stable_partition.html)) during recursion to keep things correct. This provides a significant reduction in build time. This insight comes from [Bonsai: Rapid Bounding Volume Hierarchy
+Generation using Mini Trees](https://jcgt.org/published/0004/03/02/paper-lowres.pdf).
+
+The method maintains three arrays, one per axis. Each array is initialized to hold primitive references which get sorted by their primitive position along the axis - as required by SweepSAH. It's a good idea to use references to save memory: 
+```cs
+for (int axis = 0; axis < 3; axis++)
+{
+    // Allocate primitive indices
+    primOnAxis[axis] = new int[primCount];
+
+    // Fill with increasing values starting from 0
+    FillIncreasing(primOnAxis[axis]);
+
+    // Then sort them based on the position on the axis
+    Sort(primOnAxis[axis], (id) => primitives[id].Center()[axis]);
+}
+```
+With that, primitives are accessed as follows during SweepSAH.
+```
+Span<int> indices = primOnAxis[axis];
+Box primitive = primitives[indices[i]];
+```
+`indices` is assumed to already contain sorted references, so the `Sort` procedure which I mentioned in the [initial implementation](#20-implementation) that happens during recursion can be removed.
+
+After SweepSAH has found the best split, we need to do some work to correctly partition the arrays. This lies at the heart of the improved algorithm. Let's look at an example. Here, I've listed the parent "primitives" sorted by the x-, y- and z-axis respectively. SweepSAH has found the best split to be on the x-axis at `splitIndex=2`.
+```
+x: [A, C, E, J];  y: [J, C, E, A];  z: [C, E, A, J]
+         ^
+        / \
+  [A, C] + [E, J]
+```
+That makes the set of left primitives {A, C} and right {E, J}. All three arrays must contain the same primitives left and right to the `splitIndex`. The x-array, on which we split, doesnt need any processing. However for the y- and z-array we still need to move the left primitives before the right ones. And that while preserving relative order. This is done with a stable partition.
+Here is what the new y- and z- subsets look like:
+```
+y => [C, A] + [J, E]
+z => [C, A] + [E, J]
+```
+Since the initial parent primitives were sorted and the partitioning is stable (i.e. it preserves the relative order) the new child sets are also sorted. For example, in the initial y-array `J` was ordered before `E` and as you can see this is still the case.
+
+In code it looks like this. Remember, this runs after SweepSAH has found a `bestSplit`. `start` and `end` denote the primitive range of the parent node:
+```cs
+// Mark primitive references on the
+// * left side => true 
+// * right side => false 
+Span<int> primOnSplitAxis = primOnAxis[bestSplit.Axis];
+for (int i = start; i < bestSplit.SplitIndex; i++)
+{
+    moveLeft[primOnSplitAxis[i]] = true;
+}
+for (int i = bestSplit.SplitIndex; i < end; i++)
+{
+    moveLeft[primOnSplitAxis[i]] = false;
+}
+
+// For the other axes, move left primitives before the right ones, while preserving relative order
+StablePartition(primOnAxis[(bestSplit.Axis + 1) % 3].Slice(start, end), moveLeft);
+StablePartition(primOnAxis[(bestSplit.Axis + 2) % 3].Slice(start, end), moveLeft);
+```
+`moveLeft` is a bool-array to flag all primitive references as `true` that are on the left side. Just like the other arrays, it is allocated before recursion begins with a length of the primitive count. `StablePartition` moves all elements for which true is retuned first, in order.
+
+### 3.0 Optimizations
+
+#### Early out
+
+#### Multithreading
+
+### 4.0 Considering exotic partitions
+
+TODO
+
 ## Variable Rate Shading
 
 ### 1.0 Overview

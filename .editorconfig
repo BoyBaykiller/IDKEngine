@@ -50,6 +50,9 @@ dotnet_style_namespace_match_folder = false
 # IDE0090: Use 'new(...)'
 csharp_style_implicit_object_creation_when_type_is_apparent = false
 
+# IDE0161: Convert to file-scoped namespace
+csharp_style_namespace_declarations = file_scoped
+
 # IDE0017: Simplify object initialization
 dotnet_style_object_initializer = false
 

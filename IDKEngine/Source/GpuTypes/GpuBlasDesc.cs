@@ -2,12 +2,12 @@
 
 public record struct GpuBlasDesc
 {
-    public readonly int NodesEnd => RootNodeOffset + NodeCount;
+    public readonly int NodesEnd => NodeOffset + NodeCount;
     public readonly int LeafIndicesEnd => LeafIndicesOffset + LeafIndicesCount;
 
     public GpuGeometryDesc GeometryDesc;
 
-    public int RootNodeOffset;
+    public int NodeOffset;
     public int NodeCount;
     public int LeafIndicesOffset;
     public int LeafIndicesCount;

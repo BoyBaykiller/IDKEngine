@@ -144,7 +144,7 @@ struct GpuBlasDesc
 {
     GpuBlasGeometryDesc GeometryDesc;
 
-    int RootNodeOffset;
+    int NodeOffset;
     int NodeCount;
     int LeafIndicesOffset;
     int LeafIndicesCount;
