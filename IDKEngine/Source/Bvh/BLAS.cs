@@ -163,16 +163,9 @@ public static class BLAS
         rootNode.TriStartOrChild = 0;
         rootNode.TriCount = buildData.Fragments.Count;
 
-        int threadsRunning = 0;
         fixed (BuildResult* blasPtr = &blas)
         {
             ProcessBuildTask(1, 2, blasPtr, &geometry);
-        }
-
-        SpinWait spinner = new SpinWait();
-        while (Volatile.Read(ref threadsRunning) > 0)
-        {
-            spinner.SpinOnce();
         }
 
         int nodeCounter = InPlaceCompact(blas);
@@ -206,26 +199,23 @@ public static class BLAS
                 parentNode.TriStartOrChild = leftNodeId;
                 parentNode.TriCount = 0;
 
-                bool threaded = newLeftNode.TriCount >= THREADED_RECURSION_THRESHOLD;
-                if (threaded)
+                if (newLeftNode.TriCount >= THREADED_RECURSION_THRESHOLD)
                 {
-                    Interlocked.Add(ref threadsRunning, 1);
-
                     // Using a thread pool (Task.Run) is slightly faster if we don't do other BLAS builds in other threads.
                     // But when there are enough BLASes to build and we can saturate the cores that way,
                     // then using a thread pool obliterates performance (far worse than no MT at all) for some reason
-                    new Thread(() =>
-                    {
-                        ProcessBuildTask(leftNodeId, rightNodeId + 1, blas, geometry);
-                        if (threaded) Interlocked.Add(ref threadsRunning, -1);
-                    }).Start();
+                    Thread t = new Thread(() => { ProcessBuildTask(leftNodeId, rightNodeId + 1, blas, geometry); });
+                    t.Start();
+                    ProcessBuildTask(rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount), blas, geometry);
+
+                    t.Join();
                 }
                 else
                 {
                     ProcessBuildTask(leftNodeId, rightNodeId + 1, blas, geometry);
+                    ProcessBuildTask(rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount), blas, geometry);
                 }
 
-                ProcessBuildTask(rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount), blas, geometry);
 
                 static int MaxNodeCountFromTriCount(int triCount)
                 {
@@ -271,7 +261,7 @@ public static class BLAS
         }
     }
 
-    public static void Refit(in BuildResult blas, in Geometry geometry)
+    public static void Refit(BuildResult blas, in Geometry geometry)
     {
         for (int i = blas.Nodes.Length - 1; i >= 1; i--)
         {
@@ -483,7 +473,7 @@ public static class BLAS
         parents[0] = -1;
         parents[1] = -1;
 
-        for (int i = 2; i < blas.Nodes.Length; i++)
+        for (int i = 1; i < blas.Nodes.Length; i++)
         {
             ref readonly GpuBlasNode node = ref blas.Nodes[i];
             if (!node.IsLeaf)

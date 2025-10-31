@@ -13,7 +13,6 @@ public record struct GpuBlasNode
     {
         get
         {
-            Debug.Assert(IsLeaf);
             return TriStartOrChild + TriCount;
         }
     }
