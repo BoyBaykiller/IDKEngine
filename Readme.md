@@ -338,15 +338,18 @@ Creating a thread for every image can introduce lag so I use thread pool based `
 
 ## Good BVHs using SweepSAH
 
-![Heatmap SweepSAH BVH](Screenshots/Articles/HeatmapSweepBVH.png?raw=true)
-
 ### 1.0 Overview
 
-SweepSAH is a method to find the best split position in top-down BVH builds. It produces better results than other methods like SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions.
+<p align="center">
+  <img src="Screenshots/Articles/HeatmapSweepBVH.png?raw=true" alt="Heatmap SweepSAH BVH"/><br>
+  <em>Traversal heatmap of SweepSAH BVH for Stanford dragon</em>
+</p>
 
-You might wonder: Isn't there an infinite number of split positions, how can we test all of them? While there is an infinite number of points in space the number of objects is finite. And BVHs are object splitting not space splitting. Even with spatial splits, the number of split positions is finite because the SAH-Cost is a piecewise linear function.
+SweepSAH is a method to find the optimal split position in top-down BVH builds. It produces better results than other methods such as SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions.
 
-Because BVHs are object spliting, we should not think of the split search process as finding a spatial position, but rather as finding a partitioning of the parent primitives into two new sets. For N primitives in the parent there are $2^{N - 1} - 1$ possible partitionings. As an example, here are all for **{A, C, E, J}**:
+You might wonder: Isn't there an infinite number of split positions, how can we test all of them? While there is an infinite number of points in space the number of objects is finite. And BVHs are object splitting not space splitting.
+
+Because BVHs are object spliting, we should not think of the split search process as finding a spatial position, but rather as finding a partitioning of the parent primitives. For $N$ primitives there are $2^{N - 1} - 1$ possible partitionings. As an example, here are all for **{A, C, E, J}**:
 
 #### "Classic" partitions
 
@@ -361,11 +364,11 @@ Because BVHs are object spliting, we should not think of the split search proces
 6. **{C}** + **{A, E, J}**
 7. **{E}** + **{A, C, J}**
 
-Notice how the classic partitions can be created by placing a single split index that divides the primitives into two sets. "Split index" being the object space equivalent of split position. Unlike other methods, SweepSAH tests all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping from left to right (on the x-axis), moving the split index one step further to the right every time.
+Notice how the classic partitions can be created by defining a single split index that divides the primitives into two sets. "Split index" being the object space equivalent of split position. Unlike other methods, SweepSAH goes through all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping through the triangles (on the x-axis), moving the split index one step further to the right every time. These correspond to the first three partitions I've listed: 
 
 ![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
 
-But what about the exotic partitions? Let's look at number 5 as an example. This corresponds to the far left and far right triangle forming a child. The two middle triangles form the other child. These kind of partitions are usually uninteresting. So as with other split methods, they are ignored. However, I do have a small extension that [tests some exotic partitions](#50-considering-exotic-partitions).
+But what about the exotic partitions? Let's look at number 5 as an example. This corresponds to the far left and far right triangle forming a child. The two middle triangles form the other child. These kind of partitions are usually uninteresting. So as with other split methods, they are ignored. However, I do have a small extension that [tests some](#50-considering-exotic-partitions).
 
 ### 2.0 Implementation
 
