@@ -340,11 +340,16 @@ Creating a thread for every image can introduce lag so I use thread pool based `
 
 ### 1.0 Overview
 
-SweepSAH is a method to find the best split position in top-down BVH builds. It produces better results than other methods like SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions.
+<p align="center">
+  <img src="Screenshots/Articles/HeatmapSweepBVH.png?raw=true" alt="Heatmap SweepSAH BVH"/><br>
+  <em>Traversal heatmap of SweepSAH BVH for Stanford dragon</em>
+</p>
 
-You might wonder: Isn't there an infinite number of split positions, how can we test all of them? While there is an infinite number of points in space the number of objects is finite. And BVHs are object splitting not space splitting. Even with spatial splits, the number of split positions is finite because the SAH-Cost is a piecewise linear function.
+SweepSAH is a method to find the optimal split position in top-down BVH builds. It produces better results than other methods such as SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions.
 
-Because BVHs are object spliting, we should not think of the split search process as finding a spatial position, but rather as finding a partitioning of the parent primitives into two new sets. For N primitives in the parent there are $2^{N - 1} - 1$ possible partitionings. As an example, here are all for **{A, C, E, J}**:
+You might wonder: Isn't there an infinite number of split positions, how can we test all of them? While there is an infinite number of points in space the number of objects is finite. And BVHs are object splitting not space splitting.
+
+Because BVHs are object spliting, we should not think of the split search process as finding a spatial position, but rather as finding a partitioning of the parent primitives. For $N$ primitives there are $2^{N - 1} - 1$ possible partitionings. As an example, here are all for **{A, C, E, J}**:
 
 #### "Classic" partitions
 
@@ -359,11 +364,11 @@ Because BVHs are object spliting, we should not think of the split search proces
 6. **{C}** + **{A, E, J}**
 7. **{E}** + **{A, C, J}**
 
-Notice how the classic partitions can be created by placing a single split index that divides the primitives into two sets. "Split index" being the object space equivalent of split position. Unlike other methods, SweepSAH tests all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping from left to right (on the x-axis), moving the split index one step further to the right every time.
+Notice how the classic partitions can be created by defining a single split index that divides the primitives into two sets. "Split index" being the object space equivalent of split position. Unlike other methods, SweepSAH goes through all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping through the triangles on the x-axis, moving the split index one step further to the right every time. These correspond to the first three partitions I've listed: 
 
 ![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
 
-But what about the exotic partitions? Let's look at number 5 as an example. This corresponds to the far left and far right triangle forming a child. The two middle triangles form the other child. These kind of partitions are usually uninteresting. So as with other split methods, they are ignored. However, I do have a small extension that [tests some exotic partitions](#40-considering-exotic-partitions).
+But what about the exotic partitions? Let's look at number 5 as an example. This corresponds to the far left and far right triangle forming a child. The two middle triangles form the other child. These kind of partitions are usually uninteresting. So as with other split methods, they are ignored. However, I do have a small extension that [tests some](#50-considering-exotic-partitions).
 
 ### 2.0 Implementation
 
@@ -532,11 +537,73 @@ StablePartition(primOnAxis[(bestSplit.Axis + 2) % 3].Slice(start, end), moveLeft
 
 ### 3.0 Optimizations
 
+There are many optimizations that can be made to further reduce the build time. I will quickly describe some opts I implemented.
+
 #### Early out
+
+The cost always increases in one direction. So in the right-to-left sweep when `rightCost >= bestSplit.Cost`, I save the last index into `firstRight` and break out of the loop early. The following left-to-right sweeps starts from `firstRight` instead of `start`. This culls triangles on the right. Similarly, for the left-to-right sweep triangles can be culled on the left: When `leftCost >= bestSplit.Cost`, break.
+
+#### Alloc free stable partition
+
+A O(N) stable partition needs to allocate a temporary buffer of length `N`. We already have a large enough temporary buffer: `rightCosts`. At this point the cost values are no longer needed so its fine to trash them. I implemented my own stable partition that reuses this buffer, avoiding extra allocations.
+
+#### Codegen
+
+The box is padded to 16 bytes for efficient vectorization using SSE instructions. 
+The `Grow` procedure is accelerated with vector min & max (`vminps` + `vmaxps`). For `HalfArea()`, a vector subtract (`vsubps`) gets the size on all dimensions and fused multiply-add (`vfmadd231ss`) is used to get the area. Methods are all inlined.
+
+#### Sorting
+
+A three pass LSB Radix Sort is used for the initial sorting on all axes. This almost halves the total build time for 262k triangles Sponza compared to using the built-in comparison-based sort.
 
 #### Multithreading
 
-### 4.0 Considering exotic partitions
+Two places are multithreaded. First, during the initial sort, all three axes are processed in parallel. Second, and more importantly, the actual recursion is also threaded. When the triangle count of the left subtree is above a threshold it is processed in a new thread. The right subtree is always processed on the current thread:
+```cpp
+std::thread t(Build(leftNodeId, rightNodeId + 1)); // left
+Build(rightNodeId, rightNodeId + (2 * newLeftNode.TriCount - 1)); // right
+
+t.Join();
+```
+The new node offset for the right subtree is obtained using simple arithmetic, assuming the left subtree is built with 1 primitive per leaf.
+Since I am not actually building with 1PPL, but rather terminating based on SAH, this leads to empty subtrees at the bottom.
+So the BVH is compacted in-place after the recursion completed with a simple depth-first traversal that writes out all visited nodes and adjusts the parent link to child. This more than halves build time.
+
+### 4.0 Results
+
+A very small set of data to compare against:
+
+| Scene (triangles) | Build | SAH  |
+|---------|-----|------|
+| Sponza (262k) | 36ms | 76.6 |
+| Stanford Dragon (871k) | 94ms | 49.2 |
+| Bistro (2.8m) | 443ms | 88.4 |
+| San Miguel (5.6m) | 1196ms | 62.6 |
+
+All scenes are merged into a single mesh. I have `TRAVERSAL_COST=1.0` and `settings.TriangleCost=1.1` and I force a maximum primitive count of 8 per leaf. Results were produced on Ryzen 7 5700X3D.
+
+To compute the global SAH cost of a BVH you can use the following. 
+
+```cs
+float rootArea = blas.Nodes[0].HalfArea();
+for (int i = 0; i < blas.Nodes.Length; i++)
+{
+    GpuBlasNode node = blas.Nodes[i];
+    float probHitNode = node.HalfArea() / rootArea;
+
+    if (node.IsLeaf)
+    {
+        cost += settings.TriangleCost * node.TriCount * probHitNode;
+    }
+    else
+    {
+        cost += TRAVERSAL_COST * probHitNode;
+    }
+}
+```
+
+
+### 5.0 Considering exotic partitions
 
 TODO
 

@@ -502,6 +502,7 @@ public class BVH : IDisposable
                 totalSAH += BLAS.ComputeGlobalSAH(GetBlas(i), buildSettings);
             }
             Logger.Log(Logger.LogLevel.Info, $"Added SAH of all new BLAS'es = {totalSAH}");
+            //Logger.Log(Logger.LogLevel.Info, $"Added EPO of all new BLAS'es = {BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0].GeometryDesc), buildSettings)}");
         }
     }
 
