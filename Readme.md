@@ -541,7 +541,7 @@ There are many optimizations that can be made to further reduce the build time. 
 
 #### Early out
 
-The cost always increases in one direction. So in the right-to-left sweep when `rightCost >= bestSplit.Cost`, I save the last index into `firstRight` and break out of the loop early. The following left-to-right sweeps starts from `firstRight` instead of `start`. This culls triangles on the right. Similarly, for the left-to-right sweep triangles can be culled on the left: When `leftCost >= bestSplit.Cost`, break.
+The cost always increases in one direction. So in the right-to-left sweep when `rightCost >= bestSplit.Cost`, I save the last index into `firstRight` and break out of the loop early. The following left-to-right sweeps starts from `firstRight` instead of `start`. This culls triangles on the left. Similarly, for the left-to-right sweep triangles can be culled on the right: When `leftCost >= bestSplit.Cost`, break.
 
 #### Alloc free stable partition
 
