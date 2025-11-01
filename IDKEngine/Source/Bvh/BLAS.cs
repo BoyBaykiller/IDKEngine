@@ -231,7 +231,7 @@ public static class BLAS
             int nodeCounter = 2; // skip padding and root
 
             int stackPtr = 0;
-            Span<int> stack = stackalloc int[64];
+            Span<int> stack = stackalloc int[128];
             stack[stackPtr++] = 1;
             while (stackPtr > 0)
             {
@@ -306,7 +306,7 @@ public static class BLAS
         hitInfo = new RayHitInfo();
         hitInfo.T = tMaxDist;
 
-        Span<int> stack = stackalloc int[blas.MaxTreeDepth];
+        Span<int> stack = stackalloc int[128];
         int stackPtr = 0;
         int stackTop = 2;
 
@@ -323,7 +323,7 @@ public static class BLAS
             bool traverseLeft = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
             bool traverseRight = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
 
-            System.Threading.Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
+            Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
 
             bool intersectLeft = traverseLeft && leftNode.IsLeaf;
             bool intersectRight = traverseRight && rightNode.IsLeaf;
@@ -347,7 +347,7 @@ public static class BLAS
                 if (leftNode.IsLeaf) traverseLeft = false;
                 if (rightNode.IsLeaf) traverseRight = false;
 
-                System.Threading.Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
+                Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
             }
 
             if (traverseLeft || traverseRight)
@@ -378,7 +378,7 @@ public static class BLAS
         in Geometry geometry,
         in Box box, Func<int, bool> intersectFunc)
     {
-        Span<int> stack = stackalloc int[32];
+        Span<int> stack = stackalloc int[128];
         int stackPtr = 0;
         int stackTop = 2;
 
@@ -533,7 +533,7 @@ public static class BLAS
 
         float area = 0.0f;
 
-        Span<int> stack = stackalloc int[64];
+        Span<int> stack = stackalloc int[128];
         int stackPtr = 0;
         stack[stackPtr++] = 2;
         stack[stackPtr++] = 3;
@@ -583,7 +583,7 @@ public static class BLAS
 
         float cost = 0.0f;
 
-        Span<int> stack = stackalloc int[64];
+        Span<int> stack = stackalloc int[128];
         int stackPtr = 0;
         stack[stackPtr++] = subtreeRootId;
         while (stackPtr > 0)
@@ -656,7 +656,7 @@ public static class BLAS
         float overlap = 0.0f;
 
         int stackPtr = 0;
-        Span<int> stack = stackalloc int[64];
+        Span<int> stack = stackalloc int[128];
         stack[stackPtr++] = 2;
 
         while (stackPtr > 0)
@@ -686,7 +686,7 @@ public static class BLAS
         int treeDepth = 0;
 
         int stackPtr = 0;
-        Span<int> stack = stackalloc int[64];
+        Span<int> stack = stackalloc int[128];
         stack[stackPtr++] = 2;
         while (stackPtr > 0)
         {
@@ -696,13 +696,13 @@ public static class BLAS
             ref readonly GpuBlasNode leftChild = ref blas.Nodes[stackTop];
             ref readonly GpuBlasNode rightChild = ref blas.Nodes[stackTop + 1];
 
-            if (!leftChild.IsLeaf)
-            {
-                stack[stackPtr++] = leftChild.TriStartOrChild;
-            }
             if (!rightChild.IsLeaf)
             {
                 stack[stackPtr++] = rightChild.TriStartOrChild;
+            }
+            if (!leftChild.IsLeaf)
+            {
+                stack[stackPtr++] = leftChild.TriStartOrChild;
             }
         }
 
@@ -737,7 +737,6 @@ public static class BLAS
     private static ObjectSplit? TrySplit(in GpuBlasNode parentNode, BuildData buildData, BuildSettings settings, bool forceSplit = false)
     {
         Box parentBox = Conversions.ToBox(parentNode);
-        float parentArea = parentBox.HalfArea();
 
         if (parentNode.TriCount <= settings.StopSplittingThreshold)
         {
@@ -758,12 +757,8 @@ public static class BLAS
         Box[] fragBounds = buildData.Fragments.Bounds;
         Span<int> fragIdsSorted;
 
-        for (int i = 0; i < 3; i++)
+        for (int axis = 0; axis < 3; axis++)
         {
-            // If different axes yield the same lowest cost values this will make it so
-            // the one on the largest axis is choosen. It reduces max depth on sponza by 1
-            int axis = (parentBox.LargestAxis() + i) % 3;
-
             fragIdsSorted = buildData.FragmentIdsSortedOnAxis[axis];
 
             int firstRight = start + 1;
@@ -818,7 +813,7 @@ public static class BLAS
         }
 
         float notSplitCost = settings.TriangleCost * parentNode.TriCount;
-        split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost / parentArea);
+        split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost / parentBox.HalfArea());
         if (split.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount && !forceSplit)
         {
             return null;
