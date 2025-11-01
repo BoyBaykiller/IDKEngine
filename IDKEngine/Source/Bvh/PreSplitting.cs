@@ -175,7 +175,7 @@ public static class PreSplitting
         int globalTriCounter = 0;
 
         int stackPtr = 0;
-        Span<int> stack = stackalloc int[64];
+        Span<int> stack = stackalloc int[128];
         stack[stackPtr++] = 2;
         while (stackPtr > 0)
         {

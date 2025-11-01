@@ -345,7 +345,7 @@ Creating a thread for every image can introduce lag so I use thread pool based `
   <em>Traversal heatmap of SweepSAH BVH for Stanford dragon</em>
 </p>
 
-SweepSAH is a method to find the optimal split position in top-down BVH builds. It produces better results than other methods such as SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions.
+SweepSAH is a method to find the optimal split position in top-down BVH builds. It produces better results than other methods such as SpatialMedianSplit, ObjectMedianSplit or BinnedSAH, because it evaluates all split positions. It can also be implemented in a surprisingly efficient manner, taking around the same time to build as BinnedSAH with N=16.
 
 You might wonder: Isn't there an infinite number of split positions, how can we test all of them? While there is an infinite number of points in space the number of objects is finite. And BVHs are object splitting not space splitting.
 
@@ -364,7 +364,7 @@ Because BVHs are object spliting, we should not think of the split search proces
 6. **{C}** + **{A, E, J}**
 7. **{E}** + **{A, C, J}**
 
-Notice how the classic partitions can be created by defining a single split index that divides the primitives into two sets. "Split index" being the object space equivalent of split position. Unlike other methods, SweepSAH goes through all $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping through the triangles on the x-axis, moving the split index one step further to the right every time. These correspond to the first three partitions I've listed: 
+Notice how the classic partitions can be created by defining a single split index that divides the primitives into two sets. "Split index" being the object space equivalent of split position. Unlike other methods, SweepSAH goes through all these $N - 1$ classic partitions and picks the one with the lowest cost. Here you can see it sweeping through the triangles on the x-axis, moving the split index one step further to the right every time. These correspond to the first three partitions I've listed: 
 
 ![BVH Sweep](Screenshots/Articles/LeftRightSweep.gif)
 
@@ -438,6 +438,15 @@ for (int i = end - 1; i >= start + 1; i--)
     rightCosts[i] = rightCost;
 }
 ```
+In order to store the right costs we need to allocate a float array before the recursion begins.
+From now on, I will represent all temporary build data in this struct:
+```diff
+struct BuildData
+{
++   float RightCosts[primCount];
+}
+```
+
 
 With that, we can fetch the missing `rightCost` and compute the total cost during the left-right sweep:
 ```cs
@@ -475,65 +484,82 @@ In theory, a partial sort ([`std::partial_sort`](https://en.cppreference.com/w/c
 
 ### 2.1 Running in O(N)
 
-The implementation discussed so far is functional but requires four sorts per recursion. Once per axis and one more to partition the primitives. As it turns out, this can be algorithmically improved: It's enough to globally sort only once per axis before recursion starts and use a fast stable partition ([`std::stable_partition`](https://en.cppreference.com/w/cpp/algorithm/stable_partition.html)) during recursion to keep things correct. This provides a significant reduction in build time. This insight comes from [Bonsai: Rapid Bounding Volume Hierarchy
+The implementation described so far is functional but requires four sorts per recursion. Once per axis and one more to partition the primitives. As it turns out, this can be algorithmically improved: It's enough to globally sort only once per axis before recursion starts and use a fast stable partition ([`std::stable_partition`](https://en.cppreference.com/w/cpp/algorithm/stable_partition.html)) during recursion to keep things correct. This provides a significant reduction in build time. This insight comes from [Bonsai: Rapid Bounding Volume Hierarchy
 Generation using Mini Trees](https://jcgt.org/published/0004/03/02/paper-lowres.pdf).
 
-The method maintains three arrays, one per axis. Each array is initialized to hold primitive references which get sorted by their primitive position along the axis - as required by SweepSAH. It's a good idea to use references to save memory: 
+The method maintains three primitive indices arrays, one per axis. It's a good idea to use indices instead of actual primitives to save memory.
+```diff
+struct BuildData
+{
+    float RightCosts[primCount];
++   int PrimIndicesSorted[primCount][3];
+}
+```
+
+Each array is initialized with increasing numbers to reference the primitives. Then the indices get sorted by their primitive position along the axis - as required by SweepSAH. 
 ```cs
 for (int axis = 0; axis < 3; axis++)
 {
     // Allocate primitive indices
-    primOnAxis[axis] = new int[primCount];
+    primIndicesSorted[axis] = new int[primCount];
 
-    // Fill with increasing values starting from 0
-    FillIncreasing(primOnAxis[axis]);
+    // Let each index reference a primitive
+    FillIncreasing(primIndicesSorted[axis]);
 
     // Then sort them based on the position on the axis
-    Sort(primOnAxis[axis], (id) => primitives[id].Center()[axis]);
+    Sort(primIndicesSorted[axis], (id) => primitives[id].Center()[axis]);
 }
 ```
-With that, primitives are accessed as follows during SweepSAH.
+With that, primitives are accessed as follows during SweepSAH:
 ```
-Span<int> indices = primOnAxis[axis];
+Span<int> indices = primIndicesSorted[axis];
 Box primitive = primitives[indices[i]];
 ```
-`indices` is assumed to already contain sorted references, so the `Sort` procedure which I mentioned in the [initial implementation](#20-implementation) that happens during recursion can be removed.
+`indices` is already sorted, so the `Sort` procedure which I mentioned in the [initial implementation](#20-implementation) that happens during recursion can be removed.
 
-After SweepSAH has found the best split, we need to do some work to correctly partition the arrays. This lies at the heart of the improved algorithm. Let's look at an example. Here, I've listed the parent "primitives" sorted by the x-, y- and z-axis respectively. SweepSAH has found the best split to be on the x-axis at `splitIndex=2`.
+After SweepSAH has found the best split, we need to do some work to correctly partition the arrays. This lies at the heart of the algorithm. Let's look at an example. Here, I've listed the parent "primitives" sorted by the x-, y- and z-axis respectively. SweepSAH has found the best split to be on the x-axis at `splitIndex=2`.
 ```
 x: [A, C, E, J];  y: [J, C, E, A];  z: [C, E, A, J]
          ^
         / \
   [A, C] + [E, J]
 ```
-That makes the set of left primitives {A, C} and right {E, J}. All three arrays must contain the same primitives left and right to the `splitIndex`. The x-array, on which we split, doesnt need any processing. However for the y- and z-array we still need to move the left primitives before the right ones. And that while preserving relative order. This is done with a stable partition.
-Here is what the new y- and z- subsets look like:
+That makes the set of left primitives {A, C} and right {E, J}. The goal is for all three arrays to contain the same primitives left and right to the `splitIndex` and to be sorted within each set. The x-array on which we split, is naturally partitioned that way. However, for the y- and z-array, the left primitives, {A, C}, still need to be moved before the right ones. And that while preserving relative order. This is achieved using a stable partition.
+Below are the new y- and z- subsets:
 ```
 y => [C, A] + [J, E]
 z => [C, A] + [E, J]
 ```
 Since the initial parent primitives were sorted and the partitioning is stable (i.e. it preserves the relative order) the new child sets are also sorted. For example, in the initial y-array `J` was ordered before `E` and as you can see this is still the case.
 
-In code it looks like this. Remember, this runs after SweepSAH has found a `bestSplit`. `start` and `end` denote the primitive range of the parent node:
+In code, we need to mark all primitives as being on the left/right side. For that we add a bool array:
+```diff
+struct BuildData
+{
+    float RightCosts[primCount];
+    int PrimIndicesSorted[primCount][3];
++   bool PartitionLeft[primCount];
+}
+```
+
+All left primitive indices are flagged as `true` and right `false`. When we `StablePartition` the other two primitive indices array it will move all elements for which `PartitionLeft[input[i]]` is `true` first, in order:
 ```cs
-// Mark primitive references on the
-// * left side => true 
-// * right side => false 
-Span<int> primOnSplitAxis = primOnAxis[bestSplit.Axis];
+// Mark on which side primitive references are
 for (int i = start; i < bestSplit.SplitIndex; i++)
 {
-    moveLeft[primOnSplitAxis[i]] = true;
+    partitionLeft[primIndicesSorted[bestSplit.Axis][i]] = true;
 }
 for (int i = bestSplit.SplitIndex; i < end; i++)
 {
-    moveLeft[primOnSplitAxis[i]] = false;
+    partitionLeft[primIndicesSorted[bestSplit.Axis][i]] = false;
 }
 
-// For the other axes, move left primitives before the right ones, while preserving relative order
-StablePartition(primOnAxis[(bestSplit.Axis + 1) % 3].Slice(start, end), moveLeft);
-StablePartition(primOnAxis[(bestSplit.Axis + 2) % 3].Slice(start, end), moveLeft);
+// For the other axes, move the left primitives before the right ones, while preserving relative order
+StablePartition(primIndicesSorted[(bestSplit.Axis + 1) % 3].Slice(start, end), partitionLeft);
+StablePartition(primIndicesSorted[(bestSplit.Axis + 2) % 3].Slice(start, end), partitionLeft);
 ```
-`moveLeft` is a bool-array to flag all primitive references as `true` that are on the left side. Just like the other arrays, it is allocated before recursion begins with a length of the primitive count. `StablePartition` moves all elements for which true is retuned first, in order.
+
+Once the BVH has been built, you can use any of the three primitive indices arrays for traversal, etc.
 
 ### 3.0 Optimizations
 
