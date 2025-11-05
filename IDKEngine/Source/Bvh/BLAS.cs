@@ -23,8 +23,8 @@ namespace IDKEngine.Bvh
         // Do not change, instead modify TriangleCost
         public const float TRAVERSAL_COST = 1.0f;
 
-        public const int THREADED_RECURSION_THRESHOLD = 1 << 14;
-        public const int THREADED_SORTING_THRESHOLD = 1 << 16;
+        public const int THREADED_RECURSION_THRESHOLD = 1 << 13;
+        public const int THREADED_SORTING_THRESHOLD = 1 << 17;
 
         // Normally spatial splits are evaluated by binning. This is an experimental mode that evaluates all spatial splits.
         // Currently only single threaded compatible
@@ -49,8 +49,8 @@ namespace IDKEngine.Bvh
             public readonly bool Enabled => SplitFactor > 0.0f;
 
             // tinybvh: SplitFactor=0.5f, OverlapThreshold=0.0001f, BinCount=8, TriangleCost=1.0
-            public float SplitFactor = 0.5f;
-            public float OverlapThreshold = 0.0001f;
+            public float SplitFactor = 1.0f;
+            public float OverlapThreshold = 0.00001f;
             public const int BinCount = 16;
 
             public SBVHSettings()
@@ -508,7 +508,7 @@ namespace IDKEngine.Bvh
                 parentNode.TriStartOrChild = leftNodeId;
                 parentNode.TriCount = 0;
 
-                if (newLeftNode.TriCount >= THREADED_RECURSION_THRESHOLD)
+                if (Math.Min(newLeftNode.TriCount, newRightNode.TriCount) >= THREADED_RECURSION_THRESHOLD)
                 {
                     Thread t = new Thread(() => ProcessBuildTask(new BuildStackItem() { ParentNodeId = leftNodeId, ReservedSpaceBoundary = newReservedSpaceBoundary, FragmentsNeedSorting = useSpatialSplit }, rightNodeId + 1, blasPtr, geometryPtr, buildDataPtr));
                     t.Start();

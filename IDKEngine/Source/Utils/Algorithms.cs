@@ -52,7 +52,7 @@ namespace IDKEngine.Utils
             // Compute histogram for all passes
             for (int i = 0; i < input.Length; i++)
             {
-                uint key = getKey(input[i]);
+                uint key = GetKey(input[i]);
 
                 GetPrefixSumRef(key, 0)++;
                 GetPrefixSumRef(key, 1)++;
@@ -85,25 +85,25 @@ namespace IDKEngine.Utils
                 for (; j < input.Length - 3; j += 4)
                 {
                     int t0 = input[j + 0];
-                    uint key0 = getKey(t0);
+                    uint key0 = GetKey(t0);
                     output[GetPrefixSumRef(key0, i)++] = t0;
 
                     int t1 = input[j + 1];
-                    uint key1 = getKey(t1);
+                    uint key1 = GetKey(t1);
                     output[GetPrefixSumRef(key1, i)++] = t1;
 
                     int t2 = input[j + 2];
-                    uint key2 = getKey(t2);
+                    uint key2 = GetKey(t2);
                     output[GetPrefixSumRef(key2, i)++] = t2;
 
                     int t3 = input[j + 3];
-                    uint key3 = getKey(t3);
+                    uint key3 = GetKey(t3);
                     output[GetPrefixSumRef(key3, i)++] = t3;
                 }
                 for (; j < input.Length; j++)
                 {
                     int t0 = input[j];
-                    uint key0 = getKey(t0);
+                    uint key0 = GetKey(t0);
                     output[GetPrefixSumRef(key0, i)++] = t0;
                 }
 
@@ -118,9 +118,10 @@ namespace IDKEngine.Utils
                 return ref offset;
             }
 
-            uint getKey(int t)
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            uint GetKey(int t)
             {
-                float p = bounds[t].Min[axis] + bounds[t].Max[axis];
+                float p = bounds[t].SimdMin[axis] + bounds[t].SimdMax[axis];
                 return FloatToKey(p);
             }
         }
