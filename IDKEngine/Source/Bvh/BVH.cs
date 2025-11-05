@@ -331,7 +331,7 @@ namespace IDKEngine.Bvh
             
             BLAS.BuildSettings buildSettings = new BLAS.BuildSettings();
             //buildSettings.SBVH.SplitFactor = 0.0f;
-            // buildSettings.PreSplitting.SplitFactor = 0.0f;
+            //buildSettings.PreSplitting.SplitFactor = 2.0f;
 
             // Statistics
             int preSplitNewTris = 0;

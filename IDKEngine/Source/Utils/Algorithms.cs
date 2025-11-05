@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using IDKEngine.Shapes;
 
 namespace IDKEngine.Utils
 {
@@ -27,6 +28,100 @@ namespace IDKEngine.Utils
                 uint mask = (uint)((int)f >> 31 | (1 << 31));
 
                 return f ^ mask;
+            }
+        }
+
+        public static unsafe void RadixSortSpecialized(Span<int> input, Span<int> output, Box[] bounds, int axis)
+        {
+            // Out performs built-in sort except for small inputs (~64)
+            // http://stereopsis.com/radix.html
+
+            Debug.Assert(output.Length >= input.Length);
+
+            const int radixSize = 11;
+            const int binSize = 1 << radixSize;
+            const int mask = binSize - 1;
+            const int passes = 3;
+
+            // We don't use Span<int> here because:
+            // 1. Even though it could, the JIT currently does not elide all bound checks: https://github.com/dotnet/runtime/issues/112725
+            // 2. Constant offsets are not baked into address calculation: https://discord.com/channels/143867839282020352/312132327348240384/1342254292995801100
+            // 3. Local functions can't capture Span<T>: https://discord.com/channels/143867839282020352/312132327348240384/1336514607493283881
+            int* prefixSum = stackalloc int[binSize * passes];
+
+            // Compute histogram for all passes
+            for (int i = 0; i < input.Length; i++)
+            {
+                uint key = getKey(input[i]);
+
+                GetPrefixSumRef(key, 0)++;
+                GetPrefixSumRef(key, 1)++;
+                GetPrefixSumRef(key, 2)++;
+            }
+
+            // Compute prefix sum for all passes
+            {
+                int sum0 = 0, sum1 = 0, sum2 = 0;
+                for (int i = 0; i < binSize; i++)
+                {
+                    int temp0 = prefixSum[i + 0u * binSize];
+                    int temp1 = prefixSum[i + 1u * binSize];
+                    int temp2 = prefixSum[i + 2u * binSize];
+
+                    prefixSum[i + 0u * binSize] = sum0;
+                    prefixSum[i + 1u * binSize] = sum1;
+                    prefixSum[i + 2u * binSize] = sum2;
+
+                    sum0 += temp0;
+                    sum1 += temp1;
+                    sum2 += temp2;
+                }
+            }
+
+            // Sort from LSB to MSB in radix-sized steps
+            for (int i = 0; i < passes; i++)
+            {
+                int j = 0;
+                for (; j < input.Length - 3; j += 4)
+                {
+                    int t0 = input[j + 0];
+                    uint key0 = getKey(t0);
+                    output[GetPrefixSumRef(key0, i)++] = t0;
+
+                    int t1 = input[j + 1];
+                    uint key1 = getKey(t1);
+                    output[GetPrefixSumRef(key1, i)++] = t1;
+
+                    int t2 = input[j + 2];
+                    uint key2 = getKey(t2);
+                    output[GetPrefixSumRef(key2, i)++] = t2;
+
+                    int t3 = input[j + 3];
+                    uint key3 = getKey(t3);
+                    output[GetPrefixSumRef(key3, i)++] = t3;
+                }
+                for (; j < input.Length; j++)
+                {
+                    int t0 = input[j];
+                    uint key0 = getKey(t0);
+                    output[GetPrefixSumRef(key0, i)++] = t0;
+                }
+
+                Swap(ref input, ref output);
+            }
+
+            ref int GetPrefixSumRef(uint key, int pass)
+            {
+                uint radix = (key >> (pass * radixSize)) & mask;
+                ref int offset = ref prefixSum[radix + pass * binSize];
+
+                return ref offset;
+            }
+
+            uint getKey(int t)
+            {
+                float p = bounds[t].Min[axis] + bounds[t].Max[axis];
+                return FloatToKey(p);
             }
         }
 
@@ -274,7 +369,7 @@ namespace IDKEngine.Utils
         /// <param name="auxiliary"></param>
         /// <param name="bitArray"></param>
         /// <returns></returns>
-        public static int StablePartition(Span<int> source, Span<int> auxiliary, BitArray bitArray)
+        public static int StablePartition(Span<int> source, Span<int> auxiliary, bool[] bitArray)
         {
             int lCounter = 0;
             int rCounter = 0;

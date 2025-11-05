@@ -337,7 +337,7 @@ namespace IDKEngine.Utils
                     throw new ArgumentException($"{nameof(Type)} = {Type} is not meant to be interpreted as Vector3");
                 }
 
-                return MemoryMarshal.Cast<byte, Vector3>(RawKeyFramesData);
+                return MemoryMarshal.Cast<byte, Vector3>((Span<byte>)RawKeyFramesData);
             }
 
             public readonly Span<Quaternion> GetKeyFrameDataAsQuaternion()
@@ -347,7 +347,7 @@ namespace IDKEngine.Utils
                     throw new ArgumentException($"{nameof(Type)} = {Type} is not meant to be interpreted as Quaternion");
                 }
 
-                return MemoryMarshal.Cast<byte, Quaternion>(RawKeyFramesData);
+                return MemoryMarshal.Cast<byte, Quaternion>((Span<byte>)RawKeyFramesData);
             }
 
             public readonly NodeAnimation DeepClone(ReadOnlySpan<Node> newNodes)

@@ -502,8 +502,8 @@ namespace IDKEngine
 
                 ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
-                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroMerged.glb").Value;
-                ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().GetMatrix()).Value;
+                ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroMerged.glb").Value;
+                //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().GetMatrix()).Value;
                 //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaRotated45Baked.glb", new Transformation().WithTranslation(-0.1f, -0.1f, 0.4f).WithRotationRad(-0.42f, -0.4f, 0.368f).GetMatrix()).Value;
                 //ModelLoader.Model ast = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\NodePerformanceTest\glTF-Binary\NodePerformanceTest.glb").Value;
                 //ModelLoader.Model dragon = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\black_dragon_with_idle_animation\scene.gltf", new Transformation().WithTranslation(-16.4f, 17.1f, -8.7f).WithRotationRad(0.0f, 0.0f, 0.0f).WithScale(7.0f).GetMatrix()).Value;

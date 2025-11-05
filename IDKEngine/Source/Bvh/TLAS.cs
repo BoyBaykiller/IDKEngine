@@ -159,7 +159,7 @@ namespace IDKEngine.Bvh
 
             int stackPtr = 0;
             int stackTop = 0;
-            Span<int> stack = stackalloc int[32];
+            Span<int> stack = stackalloc int[128];
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref tlasNodes[stackTop];
@@ -222,7 +222,7 @@ namespace IDKEngine.Bvh
 
             int stackPtr = 0;
             int stackTop = 0;
-            Span<int> stack = stackalloc int[32];
+            Span<int> stack = stackalloc int[128];
             while (true)
             {
                 ref readonly GpuTlasNode parent = ref tlasNodes[stackTop];

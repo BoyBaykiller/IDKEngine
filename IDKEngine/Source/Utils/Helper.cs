@@ -1,6 +1,6 @@
 ﻿using System;
 using System.IO;
-using System.Runtime.Intrinsics;
+using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
@@ -117,6 +117,17 @@ namespace IDKEngine.Utils
             return sum;
         }
 
+        public static Task ExecuteMaybeThreaded(bool cond, Action action)
+        {
+            if (cond)
+            {
+                return Task.Run(action);
+            }
+
+            action();
+            return Task.CompletedTask;
+        }
+
         public static ValueTuple<T, int> FindIndex<T>(this T[] array, Func<T, bool> func)
         {
             for (int i = 0; i < array.Length; i++)
@@ -147,11 +158,11 @@ namespace IDKEngine.Utils
             }
         }
 
-        public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source)
+        public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int start, int length)
             where TFrom : unmanaged
             where TTo : unmanaged
         {
-            return MemoryMarshal.Cast<TFrom, TTo>(source);
+            return MemoryMarshal.Cast<TFrom, TTo>(source).Slice(start, length);
         }
 
         public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int length)
@@ -222,7 +233,7 @@ namespace IDKEngine.Utils
 
             dest = new T[fileStream.Length / sizeof(T)];
 
-            Span<byte> byteData = MemoryMarshal.AsBytes<T>(dest);
+            Span<byte> byteData = MemoryMarshal.AsBytes((Span<T>)dest);
             fileStream.ReadExactly(byteData);
 
             return true;
