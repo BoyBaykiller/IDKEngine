@@ -48,7 +48,7 @@ public ref struct ReinsertionOptimizer
     public static void Optimize(ref BLAS.BuildResult blas, Span<int> parentIds, in Settings settings)
     {
         new ReinsertionOptimizer(blas.Nodes, parentIds).Optimize(settings);
-        blas.MaxTreeDepth = BLAS.ComputeTreeDepth(blas);
+        blas.RequiredStackSize = BLAS.ComputeRequiredStackSize(blas);
     }
 
     private readonly Span<GpuBlasNode> nodes;

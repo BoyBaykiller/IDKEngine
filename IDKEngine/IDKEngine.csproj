@@ -23,22 +23,22 @@
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit><!-- True by default-->
     <TieredCompilationQuickJitForLoops>false</TieredCompilationQuickJitForLoops> <!-- False by default-->
 
-    <PublishAOT>true</PublishAOT>
+    <PublishAot>true</PublishAot>
+    <UseSizeOptimizedLinq>true</UseSizeOptimizedLinq>
+    <InvariantGlobalization>true</InvariantGlobalization> 
+
     <OptimizationPreference>Speed</OptimizationPreference> 
     <IlcInstructionSet>avx2</IlcInstructionSet>
+    <IlcDisableVxsort>true</IlcDisableVxsort>
+    <IlcDehydrate>true</IlcDehydrate>
+    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+    <!-- <UseSystemResourceKeys>true</UseSystemResourceKeys> -->
+    <!-- <IlcDisableReflection>true</IlcDisableReflection> -->
+    <!-- <StackTraceSupport>false</StackTraceSupport> -->
 
     <!--For Sizoscope-->
     <!-- <IlcGenerateMstatFile>true</IlcGenerateMstatFile> -->
     <!-- <IlcGenerateDgmlFile>true</IlcGenerateDgmlFile> -->
-
-    <!--Settings to decrease size-->
-    <IlcDehydrate>true</IlcDehydrate>
-    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
-    <UseSizeOptimizedLinq>true</UseSizeOptimizedLinq>
-    <!-- <StackTraceSupport>false</StackTraceSupport> -->
-    <!-- <InvariantGlobalization>true</InvariantGlobalization> -->
-    <!-- <UseSystemResourceKeys>true</UseSystemResourceKeys> -->
-    <!--<IlcDisableReflection>true</IlcDisableReflection>-->
 
   </PropertyGroup>
 

@@ -302,7 +302,7 @@ public static class MyMath
 
     // Calculates a 30-bit Morton code for the
     // given 3D point located within the unit cube [0,1].
-    public static uint GetMortonCode(Vector3 normalizedV)
+    public static uint GetMortonCode30(Vector3 normalizedV)
     {
         unchecked
         {

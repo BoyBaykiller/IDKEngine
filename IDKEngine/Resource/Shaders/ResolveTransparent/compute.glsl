@@ -17,7 +17,7 @@ struct Fragment
 };
 
 // We need to declare this globally as passing it in to the function
-// causes a huge performance degradation on AMD
+// causes a huge performance degradation on AMD (didn't test on NV)
 Fragment fragments[TRANSPARENT_LAYERS];
 
 void InsertionSort(Fragment newItem, int count);

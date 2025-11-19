@@ -6,7 +6,7 @@ using IDKEngine.Utils;
 
 namespace IDKEngine;
 
-public struct BitArray
+public record struct BitArray
 {
     public const int BITS_PER_ELEMENT = sizeof(uint) * 8;
 

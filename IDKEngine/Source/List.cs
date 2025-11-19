@@ -141,7 +141,7 @@ public class List<T>
         return new Enumerator(this);
     }
 
-    public struct Enumerator
+    public record struct Enumerator
     {
         private readonly List<T> list;
         private int index;

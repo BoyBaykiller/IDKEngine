@@ -112,14 +112,14 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
             GpuVertex v2 = vertexSSBO.Vertices[indices.z];
-            vec3 bary = vec3(hitInfo.BaryXY.xy, 1.0 - hitInfo.BaryXY.x - hitInfo.BaryXY.y);
-            vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, bary);
+            vec3 bary = vec3(hitInfo.BaryXY, 1.0 - hitInfo.BaryXY.x - hitInfo.BaryXY.y);
+            vec2 interpTexCoord = Interpolate(Unpack(v0.TexCoord), Unpack(v1.TexCoord), Unpack(v2.TexCoord), bary);
             vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), bary));
             vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), bary));
 
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceId];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
-            GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
+            GpuMaterial material = materialSSBO.Materials[v0.MaterialId];
 
             surface = GetSurface(material, interpTexCoord);
             SurfaceApplyModificatons(surface, mesh);

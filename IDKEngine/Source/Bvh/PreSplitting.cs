@@ -23,7 +23,7 @@ public static class PreSplitting
         }
     }
 
-    public static ValueTuple<Box[], int[]> PreSplit(in BLAS.Geometry geometry, Settings settings)
+    public static ValueTuple<Box[], int[]> PreSplit(BLAS.Geometry geometry, Settings settings)
     {
         // Source:
         // * https://github.com/madmann91/bvh/blob/2fd0db62022993963a7343669275647cb073e19a/include/bvh/heuristic_primitive_splitter.hpp
@@ -148,14 +148,6 @@ public static class PreSplitting
 
             return size;
         }
-    }
-
-    static float Abs(float value)
-    {
-        const uint mask = 0x7FFFFFFF;
-        uint raw = BitConverter.SingleToUInt32Bits(value);
-
-        return BitConverter.UInt32BitsToSingle(raw & mask);
     }
 
     /// <summary>

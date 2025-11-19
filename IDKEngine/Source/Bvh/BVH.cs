@@ -26,28 +26,27 @@ public class BVH : IDisposable
         }
     }
 
-    private int _maxBlasTreeDepth;
-    public int MaxBlasTreeDepth
+    private int _blasStackSize;
+    public int BlasStackSize
     {
-        get => _maxBlasTreeDepth;
+        get => _blasStackSize;
 
         set
         {
-            if (MaxBlasTreeDepth == value)
+            if (BlasStackSize == value)
             {
                 return;
             }
 
-            _maxBlasTreeDepth = value;
+            _blasStackSize = value;
 
-            BBG.AbstractShaderProgram.SetShaderInsertionValue("MAX_BLAS_TREE_DEPTH", MaxBlasTreeDepth);
+            BBG.AbstractShaderProgram.SetShaderInsertionValue("BLAS_STACK_SIZE", BlasStackSize);
         }
     }
 
     public record struct RayHitInfo
     {
         public int TriangleId;
-        public GpuIndicesTriplet TriangleIndices;
         public Vector3 Bary;
         public float T;
         public int InstanceID;
@@ -137,7 +136,7 @@ public class BVH : IDisposable
         GpuUseTlas = false; // Only pays of on scenes with many Blas'es (not sponza). So disabled by default.
         CpuUseTlas = false;
         RebuildTlas = false;
-        MaxBlasTreeDepth = 1;
+        BlasStackSize = 1;
     }
 
     public bool Intersect(in Ray ray, out RayHitInfo hitInfo, float tMax = float.MaxValue)
@@ -165,7 +164,6 @@ public class BVH : IDisposable
                     localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                 {
                     hitInfo.TriangleId = blasHitInfo.TriangleId;
-                    hitInfo.TriangleIndices = geometry.TriIndices[blasHitInfo.TriangleId];
                     hitInfo.Bary = blasHitInfo.Bary;
                     hitInfo.T = blasHitInfo.T;
                     hitInfo.InstanceID = i;
@@ -301,7 +299,7 @@ public class BVH : IDisposable
         SetSourceGeometry(vertexPositions, vertexIndices);
         SetSourceInstances(meshInstances);
 
-        UpdateMaxBlasTreeDepth();
+        UpdateBlasStackSize();
     }
 
     public void TlasBuild(bool force = false)
@@ -380,7 +378,7 @@ public class BVH : IDisposable
 
             // Build BLAS and resize nodes
             BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
-            int nodesUsed = BLAS.Build(ref blas, buildData, geometry, buildSettings);
+            int nodesUsed = BLAS.Build(ref blas, buildData, buildSettings);
 
             Array.Resize(ref nodes, nodesUsed);
             blas.Nodes = nodes;
@@ -407,7 +405,7 @@ public class BVH : IDisposable
             Interlocked.Add(ref newTrisDeduplicated, blasTriangles.Length - geometry.TriangleCount);
 
             blasDesc.NodeCount = blas.Nodes.Length;
-            blasDesc.MaxTreeDepth = blas.MaxTreeDepth;
+            blasDesc.RequiredStackSize = blas.RequiredStackSize;
             blasDesc.LeafIndicesCount = leafIds.Length;
             blasDesc.GeometryDesc.TriangleCount = blasTriangles.Length;
 
@@ -478,7 +476,7 @@ public class BVH : IDisposable
             Array.Copy(blasData.LeafIds, 0, blasLeafIds, blasDesc.LeafIndicesOffset, blasDesc.LeafIndicesCount);
         }
 
-        UpdateMaxBlasTreeDepth();
+        UpdateBlasStackSize();
 
         BBG.Buffer.Recreate(ref blasDescBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc);
         BBG.Buffer.Recreate(ref blasTriangleIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasTriangles);
@@ -512,7 +510,7 @@ public class BVH : IDisposable
         {
             GpuBlasDesc blasDesc = BlasesDesc[i];
 
-            blasRefitLockBuffer.Fill(0, blasRefitLockBuffer.Size, 0);
+            blasRefitLockBuffer.Fill(0);
             BBG.Computing.Compute("Refit BLAS", () =>
             {
                 refitBlasProgram.Upload(0, (uint)i);
@@ -540,7 +538,7 @@ public class BVH : IDisposable
     {
         BLAS.BuildResult blas = new BLAS.BuildResult();
         blas.Nodes = new Span<GpuBlasNode>(BlasNodes, blasDesc.NodeOffset, blasDesc.NodeCount);
-        blas.MaxTreeDepth = blasDesc.MaxTreeDepth;
+        blas.RequiredStackSize = blasDesc.RequiredStackSize;
 
         return blas;
     }
@@ -600,14 +598,14 @@ public class BVH : IDisposable
         invWorldTransform = meshInstance.InvModelMatrix;
     }
 
-    private void UpdateMaxBlasTreeDepth()
+    private void UpdateBlasStackSize()
     {
-        int maxTreeDepth = 0;
+        int max = 0;
         for (int i = 0; i < BlasesDesc.Length; i++)
         {
-            maxTreeDepth = Math.Max(maxTreeDepth, BlasesDesc[i].MaxTreeDepth);
+            max = Math.Max(max, BlasesDesc[i].RequiredStackSize);
         }
-        MaxBlasTreeDepth = maxTreeDepth;
+        BlasStackSize = max;
     }
 
     public void Dispose()

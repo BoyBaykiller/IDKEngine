@@ -29,11 +29,8 @@ void main()
     if (invocationId == 0)
     {
         // Reset data for next ray bounce
-        uvec3 rayBoundsMin = FloatToKey(vec3(FLOAT_MAX));
-        uvec3 rayBoundsMax = FloatToKey(vec3(FLOAT_MIN));
-
-        wavefrontPTSSBO.RayBoundsMin = Pack(rayBoundsMin);
-        wavefrontPTSSBO.RayBoundsMax = Pack(rayBoundsMax);
+        wavefrontPTSSBO.RayBoundsMin[wavefrontPTSSBO.PingPongIndex] = Pack(FloatToKey(vec3(FLOAT_MAX)));
+        wavefrontPTSSBO.RayBoundsMax[wavefrontPTSSBO.PingPongIndex] = Pack(FloatToKey(vec3(FLOAT_MIN)));
     }
 }
 

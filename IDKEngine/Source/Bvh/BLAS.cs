@@ -25,8 +25,8 @@ public static class BLAS
     // Do not change, instead modify TriangleCost
     public const float TRAVERSAL_COST = 1.0f;
 
-    public const int THREADED_RECURSION_THRESHOLD = 1 << 14;
-    public const int THREADED_SORTING_THRESHOLD = 1 << 14;
+    public const int THREADED_RECURSION_THRESHOLD = 1 << 13;
+    public const int THREADED_SORTING_THRESHOLD = 1 << 16;
 
     public record struct BuildSettings
     {
@@ -52,7 +52,7 @@ public static class BLAS
         public readonly ref GpuBlasNode Root => ref Nodes[1];
 
         public Span<GpuBlasNode> Nodes;
-        public int MaxTreeDepth;
+        public int RequiredStackSize;
 
         public BuildResult(Span<GpuBlasNode> nodes)
         {
@@ -131,7 +131,7 @@ public static class BLAS
         for (int axis = 0; axis < 3; axis++)
         {
             int copyAxis = axis;
-            
+
             bool threaded = fragments.Count >= THREADED_SORTING_THRESHOLD;
             tasks[copyAxis] = Helper.ExecuteMaybeThreaded(threaded, () =>
             {
@@ -139,13 +139,8 @@ public static class BLAS
                 Span<int> output = buildData.FragmentIdsSortedOnAxis[copyAxis];
 
                 Helper.FillIncreasing(input);
-
-                // We're loosing perf here compared to C++ because of indirect call on lambda func
-                Algorithms.RadixSort(input, output, (int index) =>
-                {
-                    float p = fragments.Bounds[index].SimdMin[copyAxis] + fragments.Bounds[index].SimdMax[copyAxis];
-                    return Algorithms.FloatToKey(p);
-                });
+                
+                Algorithms.RadixSort(input, output, new LambdaSortFragments(fragments, copyAxis));
             });
         }
         Task.WaitAll(tasks);
@@ -153,10 +148,9 @@ public static class BLAS
         return buildData;
     }
 
-    public static unsafe int Build(ref BuildResult blas, BuildData buildData, Geometry geometry, BuildSettings settings)
+    public static unsafe int Build(ref BuildResult blas, BuildData buildData, BuildSettings settings)
     {
-        // Add padding to make child pairs 64 byte aligned.
-        // This increases performance on SponzaMerged: 128fps->133fps.
+        // Adding padding to make child pairs 64 byte aligned can noticable increase perf
         blas.Nodes[0] = new GpuBlasNode();
 
         ref GpuBlasNode rootNode = ref blas.Nodes[1];
@@ -165,21 +159,23 @@ public static class BLAS
 
         fixed (BuildResult* blasPtr = &blas)
         {
-            ProcessBuildTask(1, 2, blasPtr, &geometry);
+            ProcessBuildTask(blasPtr);
         }
 
-        int nodeCounter = InPlaceCompact(blas);
+        // Multithreaded building logic causes empty subtrees (unless 1PPL). I want my trees to be comapct so let's remove them.
+        // An atomic counter could be used to add nodes, but that gives less coherent and undeterministic ordering
+        int nodeCounter = RemoveEmptySubtrees(blas);
 
-        blas.MaxTreeDepth = ComputeTreeDepth(blas);
+        blas.RequiredStackSize = ComputeRequiredStackSize(blas);
 
         return nodeCounter;
 
-        void ProcessBuildTask(int parentNodeId, int newNodesId, BuildResult* blas, Geometry* geometry)
+        void ProcessBuildTask(BuildResult* blas, int parentNodeId = 1, int newNodesId = 2)
         {
             ref GpuBlasNode parentNode = ref blas->Nodes[parentNodeId];
             parentNode.SetBounds(ComputeBoundingBox(parentNode.TriStartOrChild, parentNode.TriCount, buildData));
 
-            bool forceSplit = parentNodeId == 1; // always split root
+            bool forceSplit = parentNodeId == 1;
             if (TrySplit(parentNode, buildData, settings, forceSplit) is ObjectSplit objectSplit)
             {
                 GpuBlasNode newLeftNode = new GpuBlasNode();
@@ -199,21 +195,21 @@ public static class BLAS
                 parentNode.TriStartOrChild = leftNodeId;
                 parentNode.TriCount = 0;
 
-                if (newLeftNode.TriCount >= THREADED_RECURSION_THRESHOLD)
+                if (Math.Min(newLeftNode.TriCount, newRightNode.TriCount) >= THREADED_RECURSION_THRESHOLD)
                 {
                     // Using a thread pool (Task.Run) is slightly faster if we don't do other BLAS builds in other threads.
                     // But when there are enough BLASes to build and we can saturate the cores that way,
                     // then using a thread pool obliterates performance (far worse than no MT at all) for some reason
-                    Thread t = new Thread(() => { ProcessBuildTask(leftNodeId, rightNodeId + 1, blas, geometry); });
+                    Thread t = new Thread(() => { ProcessBuildTask(blas, leftNodeId, rightNodeId + 1); });
                     t.Start();
-                    ProcessBuildTask(rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount), blas, geometry);
+                    ProcessBuildTask(blas, rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount));
 
                     t.Join();
                 }
                 else
                 {
-                    ProcessBuildTask(leftNodeId, rightNodeId + 1, blas, geometry);
-                    ProcessBuildTask(rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount), blas, geometry);
+                    ProcessBuildTask(blas, leftNodeId, rightNodeId + 1);
+                    ProcessBuildTask(blas, rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount));
                 }
 
 
@@ -224,11 +220,9 @@ public static class BLAS
             }
         }
 
-        static int InPlaceCompact(BuildResult blas)
+        static int RemoveEmptySubtrees(BuildResult blas)
         {
-            // In place collapse of empty subtrees at the bottom
-
-            int nodeCounter = 2; // skip padding and root
+            int nodeCounter = 2;
 
             int stackPtr = 0;
             Span<int> stack = stackalloc int[128];
@@ -261,7 +255,7 @@ public static class BLAS
         }
     }
 
-    public static void Refit(BuildResult blas, in Geometry geometry)
+    public static void Refit(BuildResult blas, Geometry geometry)
     {
         for (int i = blas.Nodes.Length - 1; i >= 1; i--)
         {
@@ -299,9 +293,9 @@ public static class BLAS
     }
 
     public static bool Intersect(
-        in BuildResult blas,
-        in Geometry geometry,
-        in Ray ray, out RayHitInfo hitInfo, float tMaxDist = float.MaxValue)
+        BuildResult blas,
+        Geometry geometry,
+        Ray ray, out RayHitInfo hitInfo, float tMaxDist = float.MaxValue)
     {
         hitInfo = new RayHitInfo();
         hitInfo.T = tMaxDist;
@@ -374,9 +368,9 @@ public static class BLAS
     }
 
     public static void Intersect(
-        in BuildResult blas,
-        in Geometry geometry,
-        in Box box, Func<int, bool> intersectFunc)
+        BuildResult blas,
+        Geometry geometry,
+        Box box, Func<int, bool> intersectFunc)
     {
         Span<int> stack = stackalloc int[128];
         int stackPtr = 0;
@@ -427,7 +421,7 @@ public static class BLAS
         }
     }
 
-    public static GpuIndicesTriplet[] GetUnindexedTriangles(BuildResult blas, BuildData buildData, in Geometry geometry)
+    public static GpuIndicesTriplet[] GetUnindexedTriangles(BuildResult blas, BuildData buildData, Geometry geometry)
     {
         GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.Fragments.Count];
         int triCounter = 0;
@@ -454,7 +448,7 @@ public static class BLAS
         return triangles;
     }
 
-    public static Box[] GetTriangleBounds(in Geometry geometry)
+    public static Box[] GetTriangleBounds(Geometry geometry)
     {
         Box[] bounds = new Box[geometry.TriangleCount];
 
@@ -522,7 +516,7 @@ public static class BLAS
         return Math.Max(2 * triangleCount, 4);
     }
 
-    public static float ComputeEPOArea(BuildResult blas, in Geometry geometry, int subtreeRootId)
+    public static float ComputeEPOArea(BuildResult blas, Geometry geometry, int subtreeRootId)
     {
         if (subtreeRootId == 1)
         {
@@ -573,8 +567,8 @@ public static class BLAS
 
         return area;
     }
-    
-    public static float ComputeGlobalEPO(BuildResult blas, in Geometry geometry, BuildSettings settings, int subtreeRootId = 1)
+
+    public static float ComputeGlobalEPO(BuildResult blas, Geometry geometry, BuildSettings settings, int subtreeRootId = 1)
     {
         // https://users.aalto.fi/~ailat1/publications/aila2013hpg_paper.pdf
         // https://research.nvidia.com/sites/default/files/pubs/2013-09_On-Quality-Metrics/aila2013hpg_slides.pdf
@@ -681,35 +675,39 @@ public static class BLAS
         return overlap;
     }
 
-    public static int ComputeTreeDepth(BuildResult blas)
+    public static int ComputeRequiredStackSize(BuildResult blas, int nodeId = 2)
     {
-        int treeDepth = 0;
+        // Computes the maximum required stack size for an efficient traversal that:
+        // 1. Stores the top in a register
+        // 2. Skips the root
+        // 3. Never puts leaf nodes on the stack
 
-        int stackPtr = 0;
-        Span<int> stack = stackalloc int[128];
-        stack[stackPtr++] = 2;
-        while (stackPtr > 0)
+        ref readonly GpuBlasNode leftNode = ref blas.Nodes[nodeId + 0];
+        ref readonly GpuBlasNode rightNode = ref blas.Nodes[nodeId + 1];
+
+        bool traverseLeft = !leftNode.IsLeaf;
+        bool traverseRight = !rightNode.IsLeaf;
+
+        if (traverseLeft || traverseRight)
         {
-            treeDepth = Math.Max(stackPtr + 1, treeDepth);
-
-            int stackTop = stack[--stackPtr];
-            ref readonly GpuBlasNode leftChild = ref blas.Nodes[stackTop];
-            ref readonly GpuBlasNode rightChild = ref blas.Nodes[stackTop + 1];
-
-            if (!rightChild.IsLeaf)
+            if (traverseLeft && traverseRight)
             {
-                stack[stackPtr++] = rightChild.TriStartOrChild;
+                int left = ComputeRequiredStackSize(blas, leftNode.TriStartOrChild);
+                int right = ComputeRequiredStackSize(blas, rightNode.TriStartOrChild);
+                return Math.Max(left, right) + 1;
             }
-            if (!leftChild.IsLeaf)
+            else
             {
-                stack[stackPtr++] = leftChild.TriStartOrChild;
+                return ComputeRequiredStackSize(blas, traverseLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild);
             }
         }
-
-        return treeDepth;
+        else
+        {
+            return 0;
+        }
     }
 
-    public static Box ComputeBoundingBox(int start, int count, in Geometry geometry)
+    public static Box ComputeBoundingBox(int start, int count, Geometry geometry)
     {
         Box box = Box.Empty();
 
@@ -722,19 +720,20 @@ public static class BLAS
         return box;
     }
 
-    public static Box ComputeBoundingBox(int start, int count, in BuildData buildData, int axis = 0)
+    public static Box ComputeBoundingBox(int start, int count, BuildData buildData, int axis = 0)
     {
         Box box = Box.Empty();
 
-        Span<int> fragIds = buildData.FragmentIdsSortedOnAxis[axis];
-        for (int i = start; i < start + count; i++)
+        Span<int> fragIds = buildData.FragmentIdsSortedOnAxis[axis].AsSpan(start, count);
+        Span<Box> fragBounds = buildData.Fragments.Bounds;
+        for (int i = 0; i < fragIds.Length; i++)
         {
-            box.GrowToFit(buildData.Fragments.Bounds[fragIds[i]]);
+            box.GrowToFit(fragBounds[fragIds[i]]);
         }
         return box;
     }
 
-    private static ObjectSplit? TrySplit(in GpuBlasNode parentNode, BuildData buildData, BuildSettings settings, bool forceSplit = false)
+    private static ObjectSplit? TrySplit(GpuBlasNode parentNode, BuildData buildData, BuildSettings settings, bool forceSplit = false)
     {
         Box parentBox = Conversions.ToBox(parentNode);
 
@@ -781,7 +780,7 @@ public static class BLAS
                     break;
                 }
             }
-            
+
             Box leftBoxAccum = Box.Empty();
             int leftCounter = firstRight - start - 1;
             for (int j = start; j < firstRight - 1; j++)
@@ -819,51 +818,76 @@ public static class BLAS
             return null;
         }
 
+        Box leftBox = ComputeBoundingBox(start, split.SplitIndex - start, buildData, split.Axis);
+        Box rightBox = ComputeBoundingBox(split.SplitIndex, end - split.SplitIndex, buildData, split.Axis);
+        bool leftSmaller = leftBox.HalfArea() < rightBox.HalfArea();
+
+        // Make the larger child always be on the left as it's more likely to be hit and traversing the left path is more memory friendly
+        bool swapSides = leftSmaller;
+
         fragIdsSorted = buildData.FragmentIdsSortedOnAxis[split.Axis];
         for (int i = start; i < split.SplitIndex; i++)
         {
-            partitionLeft[fragIdsSorted[i]] = true;
+            partitionLeft[fragIdsSorted[i]] = !swapSides;
         }
         for (int i = split.SplitIndex; i < end; i++)
         {
-            partitionLeft[fragIdsSorted[i]] = false;
+            partitionLeft[fragIdsSorted[i]] = swapSides;
         }
 
-        Span<int> partitionAux = Helper.ReUseMemory<float, int>(buildData.RightCostsAccum, parentNode.TriStartOrChild, parentNode.TriCount);
+        Span<int> partitionAux = Helper.ReUseMemory<float, int>(buildData.RightCostsAccum, start, parentNode.TriCount);
 
         if (false)
         {
-            Box leftBox = ComputeBoundingBox(start, split.SplitIndex - start, buildData, split.Axis);
-            Box rightBox = ComputeBoundingBox(split.SplitIndex, end - split.SplitIndex, buildData, split.Axis);
-
-            bool leftSmaller = leftBox.HalfArea() < rightBox.HalfArea();
             Box smallerBox = leftSmaller ? leftBox : rightBox;
             int sideStart = leftSmaller ? split.SplitIndex : start;
             int sideEnd = leftSmaller ? end : split.SplitIndex;
 
             for (int i = sideStart; i < sideEnd; i++)
             {
-                Box mergedBox = Box.From(smallerBox, buildData.Fragments.Bounds[buildData.FragmentIdsSortedOnAxis[split.Axis][i]]);
+                Box mergedBox = Box.From(smallerBox, fragBounds[fragIdsSorted[i]]);
 
-                // Does moving the primitive to the smaller box leave it's area unchanged?
+                // Does moving the fragment to the smaller box leave it's area unchanged?
                 if (mergedBox == smallerBox)
                 {
                     // If yes move to the other side
-                    buildData.PartitionLeft[buildData.FragmentIdsSortedOnAxis[split.Axis][i]] = leftSmaller;
+                    buildData.PartitionLeft[fragIdsSorted[i]] = leftSmaller;
                 }
             }
-            split.SplitIndex = start + Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[split.Axis].AsSpan(start, parentNode.TriCount), partitionAux, buildData.PartitionLeft);
+            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, buildData.PartitionLeft);
 
             if (split.SplitIndex == start || split.SplitIndex == end)
             {
                 return null;
             }
         }
+        else if (swapSides)
+        {
+            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, partitionLeft);
+        }
 
-        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 1) % 3].AsSpan(parentNode.TriStartOrChild, parentNode.TriCount), partitionAux, partitionLeft);
-        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 2) % 3].AsSpan(parentNode.TriStartOrChild, parentNode.TriCount), partitionAux, partitionLeft);
+        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 1) % 3].AsSpan(start, parentNode.TriCount), partitionAux, partitionLeft);
+        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 2) % 3].AsSpan(start, parentNode.TriCount), partitionAux, partitionLeft);
 
         return split;
+    }
+
+    private record struct LambdaSortFragments : Algorithms.IRadixSortable<int>
+    {
+        private readonly Fragments fragments;
+        private readonly int axis;
+
+        public LambdaSortFragments(Fragments fragments, int axis)
+        {
+            this.fragments = fragments;
+            this.axis = axis;
+        }
+
+        public readonly uint GetKey(int index)
+        {
+            float p = fragments.Bounds[index].SimdMin[axis] + fragments.Bounds[index].SimdMax[axis];
+            return Algorithms.FloatToKey(p);
+        }
     }
 
     [InlineArray(3)]

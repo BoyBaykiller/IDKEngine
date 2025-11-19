@@ -3,7 +3,7 @@
 Feature list:
  - Wavefront Path Tracer with Ray Sorting
  - Real-Time Voxel Global Illumination
- - Two-Level BVH with Pre-Splitting + Reinsertion Optimization + GPU Refitting
+ - High Quality SweepSAH BVH with Pre-Splitting + GPU Refitting
  - [AMD FSR2](https://github.com/JuanDiegoMontoya/FidelityFX-FSR2-OpenGL) and Temporal Anti Aliasing
  - Mesh Shaders + Multi Draw Indirect + Bindless Textures + lots of OpenGL...
  - glTF support including animations and various extensions
@@ -581,10 +581,11 @@ The `Grow` procedure is accelerated with vector min & max (`vminps` + `vmaxps`).
 #### Sorting
 
 A three pass LSB Radix Sort is used for the initial sorting on all axes. This almost halves the total build time for 262k triangles Sponza compared to using the built-in comparison-based sort.
+When computing the centers, the multiplication by 0.5 is omitted.
 
 #### Multithreading
 
-Two places are multithreaded. First, during the initial sort, all three axes are processed in parallel. Second, and more importantly, the actual recursion is also threaded. When the triangle count of the left subtree is above a threshold it is processed in a new thread. The right subtree is always processed on the current thread:
+Two places are multithreaded. First, during the initial sort, all three axes are processed in parallel. Second, and more importantly, the actual recursion is also threaded. When the triangle count of both subtrees is above a threshold the left subtree is processed in a new thread and the right on the current thread:
 ```cpp
 std::thread t(Build(leftNodeId, rightNodeId + 1)); // left
 Build(rightNodeId, rightNodeId + (2 * newLeftNode.TriCount - 1)); // right
@@ -601,12 +602,12 @@ A very small set of data to compare against:
 
 | Scene (triangles) | Build | SAH  |
 |---------|-----|------|
-| Sponza (262k) | 36ms | 76.6 |
-| Stanford Dragon (871k) | 94ms | 49.2 |
-| Bistro (2.8m) | 443ms | 88.4 |
-| San Miguel (5.6m) | 1196ms | 62.6 |
+| Sponza (262k) | 30ms | 76.6 |
+| Stanford Dragon (871k) | 92ms | 49.2 |
+| Bistro (2.8m) | 409ms | 88.4 |
+| San Miguel (5.6m) | 1118ms | 62.6 |
 
-All scenes are merged into a single mesh. I have `TRAVERSAL_COST=1.0` and `settings.TriangleCost=1.1` and I force a maximum primitive count of 8 per leaf. Results were produced on Ryzen 7 5700X3D.
+All scenes are merged into a single mesh. I have `TRAVERSAL_COST=1.0` and `settings.TriangleCost=1.1` and I force a maximum primitive count of 8 per leaf. Results were produced on Ryzen 7 5700X3D and C# runtime .NET10.
 
 To compute the global SAH cost of a BVH you can use the following. 
 

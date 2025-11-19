@@ -52,13 +52,7 @@ public static class TLAS
             // Sort the leaf nodes based on their position converted to a morton code.
             // That means nodes which are spatially close will also be close in memory.
             Span<GpuTlasNode> output = nodes.Slice(nodes.Length - primitiveCount, primitiveCount);
-            Algorithms.RadixSort(leafNodes, output, (GpuTlasNode node) =>
-            {
-                Vector3 mapped = MyMath.MapToZeroOne((node.Max + node.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
-                uint mortonCode = MyMath.GetMortonCode(mapped);
-
-                return mortonCode;
-            });
+            Algorithms.RadixSort(leafNodes, output, new LambdaSortNodes(globalBounds));
         }
 
         int activeRangeCount = primitiveCount;
@@ -170,7 +164,6 @@ public static class TLAS
                 Ray localRay = ray.Transformed(invWorldTransform);
                 if (BLAS.Intersect(blas, geometry, localRay, out BLAS.RayHitInfo blasHitInfo, hitInfo.T))
                 {
-                    hitInfo.TriangleIndices = geometry.TriIndices[blasHitInfo.TriangleId];
                     hitInfo.Bary = blasHitInfo.Bary;
                     hitInfo.T = blasHitInfo.T;
                     hitInfo.InstanceID = instanceID;
@@ -305,5 +298,23 @@ public static class TLAS
         }
 
         return bestNodeIndex;
+    }
+
+    private record struct LambdaSortNodes : Algorithms.IRadixSortable<GpuTlasNode>
+    {
+        private readonly Box globalBounds;
+
+        public LambdaSortNodes(Box globalBounds)
+        {
+            this.globalBounds = globalBounds;
+        }
+
+        public readonly uint GetKey(GpuTlasNode node)
+        {
+            Vector3 mapped = MyMath.MapToZeroOne((node.Max + node.Min) * 0.5f, globalBounds.Min, globalBounds.Max);
+            uint mortonCode = MyMath.GetMortonCode30(mapped);
+
+            return mortonCode;
+        }
     }
 }

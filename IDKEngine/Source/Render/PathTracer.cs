@@ -90,7 +90,17 @@ class PathTracer : IDisposable
         }
     }
 
-    public bool DoRaySorting;
+    private bool _doRaySorting;
+    public bool DoRaySorting
+    {
+        get => _doRaySorting;
+
+        set
+        {
+            _doRaySorting = value;
+            BBG.AbstractShaderProgram.SetShaderInsertionValue("PATH_TRACER_RAY_SORTING", DoRaySorting);
+        }
+    }
 
     public record struct GpuSettings
     {
@@ -121,7 +131,6 @@ class PathTracer : IDisposable
     private const int DOWN_UP_SWEEP_PROGRAM_STEPS = 7; // Keep in sync between shader and client code!
     private const int PREFIX_SUM_CAPACITY = 1 << (DOWN_UP_SWEEP_PROGRAM_STEPS + GROUP_WISE_PROGRAM_STEPS);
 
-    private readonly BBG.AbstractShaderProgram histogramProgram;
     private readonly BBG.AbstractShaderProgram reorderProgram;
     private readonly BBG.AbstractShaderProgram downUpSweepProgram;
     private readonly BBG.AbstractShaderProgram groupWiseScanProgram;
@@ -133,6 +142,9 @@ class PathTracer : IDisposable
 
     public PathTracer(Vector2i size, in GpuSettings settings)
     {
+        this.settings = settings;
+        DoRaySorting = true;
+
         // Wavefront Path Tracing
         firstHitProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/FirstHit/compute.glsl"));
         nHitProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/NHit/compute.glsl"));
@@ -145,7 +157,6 @@ class PathTracer : IDisposable
         wavefrontPTBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 31);
 
         // Ray Sorting
-        histogramProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/Histogram/compute.glsl"));
         reorderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/Reorder/compute.glsl"));
         downUpSweepProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/BlellochScan/DownUpSweep/compute.glsl"));
         groupWiseScanProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/BlellochScan/GroupWise/compute.glsl"));
@@ -166,10 +177,7 @@ class PathTracer : IDisposable
 
         SetSize(size);
 
-        this.settings = settings;
-
         RayDepth = 7;
-        DoRaySorting = true;
     }
 
     public void Compute()
@@ -188,10 +196,15 @@ class PathTracer : IDisposable
         {
             int pingPongIndex = i % 2;
 
-            if (DoRaySorting && i > 1)
+            if (DoRaySorting)
             {
-                // Investigate: This is harmful on radeonsi driver even though sorting takes just as much time???
-                RaySorting();
+                if (i > 1)
+                {
+                    // Clear the buffer so we can build the inital histogram of sorting keys
+                    RaySorting();
+                }
+
+                workGroupPrefixSumBuffer.Fill(0);
             }
 
             BBG.Computing.Compute($"PathTrace Ray bounce {i}", () =>
@@ -221,23 +234,14 @@ class PathTracer : IDisposable
 
     public unsafe void RaySorting()
     {
-        workGroupPrefixSumBuffer.Fill(0, workGroupPrefixSumBuffer.Size, 0);
-
-        BBG.Computing.Compute("Generate histogram", () =>
-        {
-            BBG.Cmd.UseShaderProgram(histogramProgram);
-            BBG.Computing.DispatchIndirect(wavefrontPTBuffer, Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommand)));
-            BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit);
-        });
-
-        BBG.Computing.Compute("Block-Wise Blelloch Scan", () =>
+        BBG.Computing.Compute("Group wise Prefix Scan", () =>
         {
             BBG.Cmd.UseShaderProgram(groupWiseScanProgram);
             BBG.Computing.Dispatch(workGroupSumsPrefixSumBuffer.NumElements, 1, 1);
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit);
         });
 
-        BBG.Computing.Compute($"Blelloch Scan Down-Up Sweep", () =>
+        BBG.Computing.Compute($"Blelloch Scan Down+Up Sweep over Groups", () =>
         {
             BBG.Cmd.UseShaderProgram(downUpSweepProgram);
             BBG.Computing.Dispatch(1, 1, 1);
@@ -267,7 +271,7 @@ class PathTracer : IDisposable
         BBG.Buffer.Recreate(ref wavefrontPTBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (size.X * size.Y * sizeof(uint)));
         wavefrontPTBuffer.UploadData(0, sizeof(GpuWavefrontPTHeader), new GpuWavefrontPTHeader()
         {
-            DispatchCommand = new BBG.DispatchIndirectCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 }
+            DispatchCommand = new BBG.DispatchIndirectCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 },
         });
 
         BBG.Buffer.Recreate(ref cachedKeyBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, size.X * size.Y);
@@ -293,7 +297,6 @@ class PathTracer : IDisposable
         firstHitProgram.Dispose();
         nHitProgram.Dispose();
         finalDrawProgram.Dispose();
-        histogramProgram.Dispose();
         reorderProgram.Dispose();
         downUpSweepProgram.Dispose();
         groupWiseScanProgram.Dispose();

@@ -34,7 +34,7 @@ public unsafe class ModelManager : IDisposable
         /// </summary>
         public int VertexOffset;
 
-        public int JointMatrixOffset;
+        public int JointOffset;
     }
 
     public CpuModel[] CpuModels = [];
@@ -181,6 +181,13 @@ public unsafe class ModelManager : IDisposable
                 newMesh.MeshletsOffset += meshlets.Length;
             }
 
+            Helper.ArrayAdd(ref Vertices, gpuModel.Vertices);
+            for (int j = Vertices.Length - gpuModel.Vertices.Length; j < Vertices.Length; j++)
+            {
+                ref GpuVertex vertex = ref Vertices[j];
+                Vertices[j].MaterialId += GpuMaterials.Length;
+            }
+
             Helper.ArrayAdd(ref meshlets, gpuModel.Meshlets);
             for (int j = meshlets.Length - gpuModel.Meshlets.Length; j < meshlets.Length; j++)
             {
@@ -191,7 +198,6 @@ public unsafe class ModelManager : IDisposable
 
             Helper.ArrayAdd(ref CpuMaterials, model.Materials);
             Helper.ArrayAdd(ref GpuMaterials, gpuModel.Materials);
-            Helper.ArrayAdd(ref Vertices, gpuModel.Vertices);
             Helper.ArrayAdd(ref vertexPositions, gpuModel.VertexPositions);
             Helper.ArrayAdd(ref VertexIndices, gpuModel.VertexIndices);
             Helper.ArrayAdd(ref meshletsInfo, gpuModel.MeshletsInfo);
@@ -235,7 +241,9 @@ public unsafe class ModelManager : IDisposable
 
     public void RemoveNode(ModelLoader.Node rmNode)
     {
-        // TODO: System that decouples removing, from buffer updates (et al) for performance
+        // TODO:
+        // * Meshlet support (when I have a mesh-shader capable GPU)
+        // * System that decouples removing, from buffer updates (et al) for performance
 
         if (rmNode.HasMeshInstances)
         {
@@ -271,50 +279,54 @@ public unsafe class ModelManager : IDisposable
             }
 
             Helper.ArrayRemove(ref DrawCommands, rmMeshRange.Start, rmMeshRange.Count);
-        
-            SortedSet<int> freeListMaterials = new SortedSet<int>();
-            for (int meshId = rmMeshRange.Start; meshId < rmMeshRange.End; meshId++)
-            {
-                ref readonly GpuMesh rmMesh = ref Meshes[meshId];
 
-                bool removeMaterial = !IsMaterialReferenced(rmMesh.MaterialId, Meshes, rmMeshRange);
-                if (removeMaterial)
-                {
-                    freeListMaterials.Add(rmMesh.MaterialId);
-                }
-            }
+            // TODO: Move vertex.Material id into blas triangles only (indirectly).
+            // Keep meshes intact even when scene merged for rasterizer and feed blas build many geometries instead
+            // then redo deletion to be less general purpose
+
+            //SortedSet<int> freeListMaterials = new SortedSet<int>();
+            //for (int meshId = rmMeshRange.Start; meshId < rmMeshRange.End; meshId++)
+            //{
+            //    ref readonly GpuMesh rmMesh = ref Meshes[meshId];
+
+            //    bool removeMaterial = !IsMaterialReferenced(rmMesh.MaterialId, Meshes, rmMeshRange);
+            //    if (removeMaterial)
+            //    {
+            //        freeListMaterials.Add(rmMesh.MaterialId);
+            //    }
+            //}
             Helper.ArrayRemove(ref Meshes, rmMeshRange.Start, rmMeshRange.Count);
-        
-            foreach (int rmMaterialId in freeListMaterials.Reverse())
-            {
-                GpuMaterial rmGpuMaterial = GpuMaterials[rmMaterialId];
-                ModelLoader.CpuMaterial rmCpuMaterial = CpuMaterials[rmMaterialId];
 
-                for (int i = 0; i < GpuMaterial.TEXTURE_COUNT; i++)
-                {
-                    BBG.Texture.BindlessHandle handle = rmGpuMaterial[(GpuMaterial.TextureType)i];
+            //foreach (int rmMaterialId in freeListMaterials.Reverse())
+            //{
+            //    GpuMaterial rmGpuMaterial = GpuMaterials[rmMaterialId];
+            //    ModelLoader.CpuMaterial rmCpuMaterial = CpuMaterials[rmMaterialId];
 
-                    if (!IsTextureHandleReferenced(handle, GpuMaterials, freeListMaterials))
-                    {
-                        rmCpuMaterial.SampledTextures[i].Dispose();
-                    }
-                }
+            //    for (int i = 0; i < GpuMaterial.TEXTURE_COUNT; i++)
+            //    {
+            //        BBG.Texture.BindlessHandle handle = rmGpuMaterial[(GpuMaterial.TextureType)i];
+
+            //        if (!IsTextureHandleReferenced(handle, GpuMaterials, freeListMaterials))
+            //        {
+            //            rmCpuMaterial.SampledTextures[i].Dispose();
+            //        }
+            //    }
             
-                for (int i = 0; i < Meshes.Length; i++)
-                {
-                    ref GpuMesh mesh = ref Meshes[i];
-                    if (mesh.MaterialId > rmMaterialId)
-                    {
-                        mesh.MaterialId--;
-                    }
-                }
-            }
+            //    for (int i = 0; i < Meshes.Length; i++)
+            //    {
+            //        ref GpuMesh mesh = ref Meshes[i];
+            //        if (mesh.MaterialId > rmMaterialId)
+            //        {
+            //            mesh.MaterialId--;
+            //        }
+            //    }
+            //}
         
-            foreach (int rmMaterialId in freeListMaterials.Reverse())
-            {
-                Helper.ArrayRemove(ref GpuMaterials, rmMaterialId, 1);
-                Helper.ArrayRemove(ref CpuMaterials, rmMaterialId, 1);
-            }
+            //foreach (int rmMaterialId in freeListMaterials.Reverse())
+            //{
+            //    Helper.ArrayRemove(ref GpuMaterials, rmMaterialId, 1);
+            //    Helper.ArrayRemove(ref CpuMaterials, rmMaterialId, 1);
+            //}
 
             UpdateBuffers(vertexPositions, meshlets, meshletsInfo, meshletsVertexIndices, meshletsLocalIndices, unskinnedVertices);
             BVH.RemoveBlas(rmMeshRange, VertexPositions, VertexIndices, meshInstances);
@@ -383,7 +395,8 @@ public unsafe class ModelManager : IDisposable
         UpdateMeshInstanceBufferBatched(out anyMeshInstanceMoved);
         ComputeSkinnedPositions(anyNodeMoved);
 
-        // Only need to update BLAS when node was animated, could use more granular check
+        // Need to refit BLAS when geometry changed (e.g a skinned node was animated).
+        // This check could be made more precise to only refit the specific nodes instead of all
         if (anyNodeMoved)
         {
             for (int i = 0; i < skinningCmds.Length; i++)
@@ -391,10 +404,12 @@ public unsafe class ModelManager : IDisposable
                 ref readonly SkinningCmd cmd = ref skinningCmds[i];
                 Range meshRange = GetNodeMeshRange(cmd.SkinnedNode);
                 BVH.GpuBlasesRefit(meshRange.Start, meshRange.Count);
+
+                // TODO: Refit all meshlet bounds (when I have a mesh-shader capable GPU)
             }
         }
 
-        // Only need to update TLAS if a BLAS was moved or animated
+        // Need to refit TLAS when a BLAS bounds changed (e.g it moved or was animated)
         if (anyMeshInstanceMoved || anyNodeMoved)
         {
             BVH.TlasBuild();
@@ -413,7 +428,7 @@ public unsafe class ModelManager : IDisposable
                 Matrix4 inverseNodeTransform = Matrix4.Invert(skinningCmd.SkinnedNode.GlobalTransform);
                 for (int j = 0; j < skin.JointsCount; j++)
                 {
-                    JointMatrices[skinningCmd.JointMatrixOffset + j] = MyMath.Matrix4x4ToTranposed3x4(skin.InverseJointMatrices[j] * skin.Joints[j].GlobalTransform * inverseNodeTransform);
+                    JointMatrices[skinningCmd.JointOffset + j] = MyMath.Matrix4x4ToTranposed3x4(skin.InverseJointMatrices[j] * skin.Joints[j].GlobalTransform * inverseNodeTransform);
                 }
             }
             jointMatricesBuffer.UploadElements(JointMatrices);
@@ -471,7 +486,7 @@ public unsafe class ModelManager : IDisposable
                 {
                     skinningShaderProgram.Upload(0, (uint)skinningCmd.VertexOffset);
                     skinningShaderProgram.Upload(1, (uint)outputVertexOffset);
-                    skinningShaderProgram.Upload(2, (uint)skinningCmd.JointMatrixOffset);
+                    skinningShaderProgram.Upload(2, (uint)skinningCmd.JointOffset);
                     skinningShaderProgram.Upload(3, (uint)vertexCount);
 
                     BBG.Cmd.UseShaderProgram(skinningShaderProgram);
@@ -674,10 +689,10 @@ public unsafe class ModelManager : IDisposable
                         {
                             ref SkinningCmd otherCmd = ref skinningCmds[k];
                             otherCmd.VertexOffset -= vertexCount;
-                            otherCmd.JointMatrixOffset -= node.Skin.JointsCount;
+                            otherCmd.JointOffset -= node.Skin.JointsCount;
                         }
 
-                        Helper.ArrayRemove(ref JointMatrices, cmd.JointMatrixOffset, node.Skin.JointsCount);
+                        Helper.ArrayRemove(ref JointMatrices, cmd.JointOffset, node.Skin.JointsCount);
                         Helper.ArrayRemove(ref skinningCmds, rmIndex, 1);
                         Helper.ArrayRemove(ref unskinnedVertices, cmd.VertexOffset, vertexCount);
 
@@ -755,19 +770,19 @@ public unsafe class ModelManager : IDisposable
             {
                 anyNodeMovedCopy = true;
 
-                Transformation nodeTransformBefore = Transformation.FromMatrix(node.GlobalTransform);
+                Matrix4 before = node.GlobalTransform;
                 node.UpdateGlobalTransform();
 
                 if (node.HasMeshInstances)
                 {
-                    Transformation nodeTransformAfter = Transformation.FromMatrix(node.GlobalTransform);
+                    Matrix4 after = node.GlobalTransform;
+                    Matrix4 diff = after * Matrix4.Invert(before);
+
                     for (int j = node.MeshInstanceRange.Start; j < node.MeshInstanceRange.End; j++)
                     {
                         GpuMeshInstance meshInstance = MeshInstances[j];
-                        Transformation transformDiff = Transformation.FromMatrix(meshInstance.ModelMatrix) - nodeTransformBefore;
-                        Transformation adjustedTransform = nodeTransformAfter + transformDiff;
 
-                        meshInstance.ModelMatrix = adjustedTransform.GetMatrix();
+                        meshInstance.ModelMatrix = diff * meshInstance.ModelMatrix;
                         SetMeshInstance(j, meshInstance);
                     }
                 }
@@ -915,7 +930,7 @@ public unsafe class ModelManager : IDisposable
                     SkinningCmd skinningCmd = new SkinningCmd();
                     skinningCmd.VertexOffset = unskinnedVerticesCount;
                     skinningCmd.SkinnedNode = node;
-                    skinningCmd.JointMatrixOffset = numJoints;
+                    skinningCmd.JointOffset = numJoints;
 
                     skinningCmds.Add(skinningCmd);
                     Range meshRange = GetNodeMeshRange(node, meshInstances);
@@ -999,11 +1014,11 @@ public unsafe class ModelManager : IDisposable
         return unskinnedVertices.ToArray();
     }
 
-    private static bool IsMaterialReferenced(int materialId, ReadOnlySpan<GpuMesh> meshes, Range meshExcludeRange)
+    private static bool IsMaterialReferenced(int materialId, ReadOnlySpan<GpuMesh> meshes, Range excludeRange)
     {
         for (int i = 0; i < meshes.Length; i++)
         {
-            if (meshExcludeRange.Contains(i))
+            if (excludeRange.Contains(i))
             {
                 continue;
             }

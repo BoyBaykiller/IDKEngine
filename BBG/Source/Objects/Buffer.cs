@@ -169,6 +169,11 @@ public static partial class BBG
             GL.CopyNamedBufferSubData(ID, buffer.ID, readOffset, writeOffset, size);
         }
 
+        public void Fill(in uint data)
+        {
+            Fill(0, Size, data);
+        }
+
         public void Fill(nint offset, nint size, in uint data)
         {
             fixed (void* ptr = &data)

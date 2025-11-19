@@ -12,7 +12,7 @@ public record struct GpuBlasDesc
     public int LeafIndicesOffset;
     public int LeafIndicesCount;
 
-    public int MaxTreeDepth;
+    public int RequiredStackSize;
     public bool PreSplittingWasDone;
     private byte _pad0, _pad1, _pad2;
 }

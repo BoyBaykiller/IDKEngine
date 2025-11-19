@@ -87,11 +87,11 @@ void main()
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
             GpuVertex v2 = vertexSSBO.Vertices[indices.z];
             vec3 bary = vec3(hitInfo.BaryXY.xy, 1.0 - hitInfo.BaryXY.x - hitInfo.BaryXY.y);
-            vec2 interpTexCoord = Interpolate(v0.TexCoord, v1.TexCoord, v2.TexCoord, bary);
+            vec2 interpTexCoord = Interpolate(Unpack(v0.TexCoord), Unpack(v1.TexCoord), Unpack(v2.TexCoord), bary);
 
             GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceId];
             GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
-            GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
+            GpuMaterial material = materialSSBO.Materials[v0.MaterialId];
 
             Surface surface = GetSurface(material, interpTexCoord);
             SurfaceApplyModificatons(surface, mesh);

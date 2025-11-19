@@ -119,6 +119,17 @@ public static class Helper
         return sum;
     }
 
+    public static Task ExecuteMaybeThreaded(bool cond, Action action)
+    {
+        if (cond)
+        {
+            return Task.Run(action);
+        }
+
+        action();
+        return Task.CompletedTask;
+    }
+
     public static void InterlockedMax(ref ulong mem, ulong value)
     {
         while (true)
@@ -225,17 +236,6 @@ public static class Helper
         return Unsafe.BitCast<System.Numerics.Matrix4x4, Matrix4>(Matrix4);
     }
 
-    public static Task ExecuteMaybeThreaded(bool cond, Action action)
-    {
-        if (cond)
-        {
-            return Task.Run(action);
-        }
-
-        action();
-        return Task.CompletedTask;
-    }
-
     public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 Matrix4)
     {
         return Unsafe.BitCast<Matrix4, System.Numerics.Matrix4x4>(Matrix4);
@@ -258,12 +258,12 @@ public static class Helper
         using FileStream fileStream = File.OpenRead(path);
         if (fileStream.Length % sizeof(T) != 0)
         {
-            Logger.Log(Logger.LogLevel.Error, $"Cannot load \"{path}\", because file size is not a multiple of {sizeof(T)} bytes");
+            Logger.Log(Logger.LogLevel.Error, $"Cannot load \"{path}\" because file size is not a multiple of {sizeof(T)} bytes");
             return false;
         }
         if (fileStream.Length == 0)
         {
-            Logger.Log(Logger.LogLevel.Warn, $"Cannot load \"{path}\", because it's an empty file");
+            Logger.Log(Logger.LogLevel.Warn, $"Cannot load \"{path}\" because it's an empty file");
             return false;
         }
 

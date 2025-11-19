@@ -17,8 +17,8 @@ public unsafe struct GpuMesh
     public Vector3 AbsorbanceBias;
     public int MeshletCount;
 
-    public int InstanceCount;
-    public bool TintOnTransmissive;
+    public int InstanceCount = 1;
+    public bool TintOnTransmissive = true; // Required by KHR_materials_transmission
     private fixed bool _pad[3];
     private readonly float _pad0;
     public readonly float _pad1;

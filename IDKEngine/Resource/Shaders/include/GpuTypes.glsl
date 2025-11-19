@@ -2,24 +2,36 @@ struct PackedVec4
 {
     float x, y, z, w;
 };
-vec4 Unpack(PackedVec4 floats)
-{
-    return vec4(floats.x, floats.y, floats.z, floats.w);
-}
 
 struct PackedUVec4
 {
     uint x, y, z, w;
 };
-uvec4 Unpack(PackedUVec4 uints)
-{
-    return uvec4(uints.x, uints.y, uints.z, uints.w);
-}
 
 struct PackedVec3
 {
     float x, y, z;
 };
+
+struct PackedUVec3
+{
+    uint x, y, z;
+};
+
+struct PackedVec2
+{
+    float x, y;
+};
+
+vec4 Unpack(PackedVec4 floats)
+{
+    return vec4(floats.x, floats.y, floats.z, floats.w);
+}
+uvec4 Unpack(PackedUVec4 uints)
+{
+    return uvec4(uints.x, uints.y, uints.z, uints.w);
+}
+
 PackedVec3 Pack(vec3 floats)
 {
     return PackedVec3(floats.x, floats.y, floats.z);
@@ -29,10 +41,6 @@ vec3 Unpack(PackedVec3 floats)
     return vec3(floats.x, floats.y, floats.z);
 }
 
-struct PackedUVec3
-{
-    uint x, y, z;
-};
 PackedUVec3 Pack(uvec3 uints)
 {
     return PackedUVec3(uints.x, uints.y, uints.z);
@@ -40,6 +48,11 @@ PackedUVec3 Pack(uvec3 uints)
 uvec3 Unpack(PackedUVec3 uints)
 {
     return uvec3(uints.x, uints.y, uints.z);
+}
+
+vec2 Unpack(PackedVec2 floats)
+{
+    return vec2(floats.x, floats.y);
 }
 
 struct GpuDrawElementsCmd
@@ -108,7 +121,7 @@ struct GpuPointShadow
 
 struct GpuMesh
 {
-    int MaterialId;
+    int _pad0;
     float NormalMapStrength;
     float EmissiveBias;
     float SpecularBias;
@@ -120,7 +133,7 @@ struct GpuMesh
     uint MeshletCount;
     uint InstanceCount;
     bool TintOnTransmissive;
-    float _pad0;
+    float _pad1;
 };
 
 struct GpuMeshInstance
@@ -134,8 +147,8 @@ struct GpuMeshInstance
 
 struct GpuBlasGeometryDesc
 {
-    int TriangleCount;
     int TriangleOffset;
+    int TriangleCount;
     int VertexOffset;
     int VertexCount;
 };
@@ -149,7 +162,7 @@ struct GpuBlasDesc
     int LeafIndicesOffset;
     int LeafIndicesCount;
 
-    int MaxTreeDepth;
+    int RequiredStackSize;
     bool PreSplittingWasDone;
 };
 
@@ -211,9 +224,10 @@ struct GpuMaterial
 
 struct GpuVertex
 {
-    vec2 TexCoord;
+    PackedVec2 TexCoord;
     uint Tangent;
     uint Normal;
+    uint MaterialId;
 };
 
 #ifdef DECLARE_MESHLET_RENDERING_TYPES

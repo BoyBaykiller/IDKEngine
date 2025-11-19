@@ -25,7 +25,7 @@ partial class Gui : IDisposable
 {
     public abstract record SelectedEntityInfo
     {
-        public record MeshInstance(int MeshInstanceId) : SelectedEntityInfo;
+        public record MeshInstance(int MeshInstanceId, int MaterialId) : SelectedEntityInfo;
         public record Light(int LightId) : SelectedEntityInfo;
         public record Node(ModelLoader.Node Node_) : SelectedEntityInfo;
         public record Material(int MaterialId) : SelectedEntityInfo;
@@ -245,7 +245,7 @@ partial class Gui : IDisposable
             if (app.RecorderVars.State != Application.FrameRecorderState.Replaying)
             {
                 bool isRecording = app.RecorderVars.State == Application.FrameRecorderState.Recording;
-                ImGui.Text($"Is Recording (Press {Keys.LeftControl} + {Keys.R}): {isRecording}");
+                ImGui.SeparatorText($"Recording ({Keys.LeftControl} + {Keys.R}): {isRecording}");
 
                 if (ImGui.InputInt("Recording FPS", ref app.RecorderVars.FPSGoal))
                 {
@@ -263,9 +263,32 @@ partial class Gui : IDisposable
             bool isReplaying = app.RecorderVars.State == Application.FrameRecorderState.Replaying;
             if ((app.RecorderVars.State == Application.FrameRecorderState.None && app.FrameStateRecorder.Count > 0) || isReplaying)
             {
-                ImGui.Text($"Is Replaying (Press {Keys.LeftControl} + {Keys.Space}): {isReplaying}");
+                ImGui.SeparatorText($"Replaying ({Keys.LeftControl} + {Keys.Space}): {isReplaying}");
+
+                string saveFileName = string.Empty;
+                for (int i = 0; i < app.ModelManager.CpuModels.Length; i++)
+                {
+                    saveFileName += Path.GetFileNameWithoutExtension(app.ModelManager.CpuModels[i].Root.Name);
+                }
+                saveFileName += DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss");
+                saveFileName += Application.RecordingSettings.FRAME_RECORD_FILE_EXTENSION;
+
+                if (ImGui.Button($"Save as \"{saveFileName}\""))
+                {
+                    app.FrameStateRecorder.SaveToFile(saveFileName);
+                }
+
                 ImGui.Checkbox("Is Video Render", ref app.RecorderVars.IsOutputFrames);
                 ToolTipForItemAboveHovered("When enabled rendered images are saved into a folder.");
+
+                if (app.RenderMode_ == Application.RenderMode.PathTracer)
+                {
+                    tempInt = app.RecorderVars.PathTracingSamplesGoal;
+                    if (ImGui.InputInt("Samples Per Pixel", ref tempInt))
+                    {
+                        app.RecorderVars.PathTracingSamplesGoal = Math.Max(1, tempInt);
+                    }
+                }
 
                 tempInt = app.FrameStateRecorder.ReplayStateIndex;
                 if (ImGui.SliderInt("ReplayFrame", ref tempInt, 0, Math.Max(app.FrameStateRecorder.Count - 1, 0)))
@@ -275,31 +298,23 @@ partial class Gui : IDisposable
                     FrameState state = app.FrameStateRecorder[app.FrameStateRecorder.ReplayStateIndex];
                     app.SetFrameState(state);
                 }
-                ImGui.Separator();
-
-                if (app.RenderMode_ == Application.RenderMode.PathTracer)
-                {
-                    tempInt = app.RecorderVars.PathTracingSamplesGoal;
-                    if (ImGui.InputInt("Path Tracing SPP", ref tempInt))
-                    {
-                        app.RecorderVars.PathTracingSamplesGoal = Math.Max(1, tempInt);
-                    }
-                }
-                ImGui.Separator();
             }
 
             if (app.RecorderVars.State == Application.FrameRecorderState.None)
             {
-                if (ImGui.Button($"Save"))
+                ImGui.SeparatorText("Saved Frame Data Files");
+
+                string searchDir = Directory.GetCurrentDirectory();
+                string[] files = Directory.GetFiles(searchDir, $"*{Application.RecordingSettings.FRAME_RECORD_FILE_EXTENSION}", SearchOption.TopDirectoryOnly);
+                for (int i = 0; i < files.Length; i++)
                 {
-                    app.FrameStateRecorder.SaveToFile(Application.RecordingSettings.FRAME_STATES_INPUT_FILE);
+                    string name = Path.GetRelativePath(searchDir, files[i]);
+
+                    if (ImGui.Button(name))
+                    {
+                        app.FrameStateRecorder = StateRecorder<FrameState>.Load(name);
+                    }
                 }
-                ImGui.SameLine();
-                if (ImGui.Button("Load"))
-                {
-                    app.FrameStateRecorder = StateRecorder<FrameState>.Load(Application.RecordingSettings.FRAME_STATES_INPUT_FILE);
-                }
-                ImGui.Separator();
             }
         }
         ImGui.End();
@@ -691,7 +706,11 @@ partial class Gui : IDisposable
                         app.PathTracer.IsDebugBVHTraversal = tempBool;
                     }
 
-                    ImGui.Checkbox("Do RaySorting", ref app.PathTracer.DoRaySorting);
+                    tempBool = app.PathTracer.DoRaySorting;
+                    if (ImGui.Checkbox("Do RaySorting", ref tempBool))
+                    {
+                        app.PathTracer.DoRaySorting = tempBool;
+                    }
 
                     tempBool = app.PathTracer.DoTraceLights;
                     if (ImGui.Checkbox("DoTraceLights", ref tempBool))
@@ -797,7 +816,7 @@ partial class Gui : IDisposable
                 GpuMeshInstance meshInstance = app.ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId];
                 ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[meshInstance.MeshId];
                 ref GpuMesh mesh = ref app.ModelManager.Meshes[meshInstance.MeshId];
-                ref GpuMaterial material = ref app.ModelManager.GpuMaterials[mesh.MaterialId];
+                ref GpuMaterial material = ref app.ModelManager.GpuMaterials[meshInstanceInfo.MaterialId];
 
                 Transformation meshInstanceTransform = Transformation.FromMatrix(meshInstance.ModelMatrix);
 
@@ -876,7 +895,7 @@ partial class Gui : IDisposable
 
                 ImGui.SeparatorText("Mesh Info");
 
-                ImGui.Text($"MeshId: {meshInstance.MeshId} | MaterialId: {mesh.MaterialId}");
+                ImGui.Text($"MeshId: {meshInstance.MeshId}");
                 ImGui.Text($"InstanceId: {meshInstanceInfo.MeshInstanceId - cmd.BaseInstance} | Triangle Count: {cmd.IndexCount / 3}");
 
                 if (modified)
@@ -884,7 +903,7 @@ partial class Gui : IDisposable
                     meshInstance.ModelMatrix = meshInstanceTransform.GetMatrix();
 
                     app.ModelManager.UploadMeshBuffer(meshInstance.MeshId, 1);
-                    app.ModelManager.UploadMaterialBuffer(mesh.MaterialId, 1);
+                    app.ModelManager.UploadMaterialBuffer(meshInstanceInfo.MaterialId, 1);
                     app.ModelManager.SetMeshInstance(meshInstanceInfo.MeshInstanceId, meshInstance);
                     resetPathTracer = true;
                 }
@@ -1201,7 +1220,7 @@ partial class Gui : IDisposable
                             }
                             if (ImGui.IsItemClicked())
                             {
-                                SelectedEntity = new SelectedEntityInfo.MeshInstance(i);
+                                SelectedEntity = new SelectedEntityInfo.MeshInstance(i, 0);
                             }
                         }
                         ImGui.TreePop();
@@ -1377,7 +1396,7 @@ partial class Gui : IDisposable
         if (meshHitInfo.T < lightHitInfo.T)
         {
             t = meshHitInfo.T;
-            hitEntity = new SelectedEntityInfo.MeshInstance(meshHitInfo.InstanceID);
+            hitEntity = new SelectedEntityInfo.MeshInstance(meshHitInfo.InstanceID, app.ModelManager.Vertices[app.ModelManager.BVH.BlasTriangles[meshHitInfo.TriangleId].X].MaterialId);
         }
         else
         {

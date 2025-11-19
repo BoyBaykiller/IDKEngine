@@ -21,6 +21,7 @@ using GltfTexture = SharpGLTF.Schema2.Texture;
 using GltfSampler = SharpGLTF.Schema2.TextureSampler;
 using GltfNode = SharpGLTF.Schema2.Node;
 using GltfAnimation = SharpGLTF.Schema2.Animation;
+using GltfSkin = SharpGLTF.Schema2.Skin;
 
 namespace IDKEngine.Utils;
 
@@ -108,7 +109,7 @@ public static unsafe class ModelLoader
             }
         }
 
-        private Transformation _localTransform = new Transformation();
+        private Transformation _localTransform = Transformation.Identity;
         public Matrix4 GlobalTransform { get; private set; } = Matrix4.Identity; // local * parent.Global
 
         public Node Parent;
@@ -119,8 +120,8 @@ public static unsafe class ModelLoader
         public Skin Skin;
         public Range MeshInstanceRange;
 
-        private bool isDirty = true;
-        private bool isAscendantOfDirty = false;
+        private bool isDirty;
+        private bool isAscendantOfDirty;
 
         public void UpdateGlobalTransform()
         {
@@ -157,6 +158,7 @@ public static unsafe class ModelLoader
                 newNode.MeshInstanceRange = source.MeshInstanceRange;
                 newNode.Skin = source.Skin;
                 newNode.isDirty = source.isDirty;
+                newNode.isAscendantOfDirty = source.isAscendantOfDirty;
 
                 newNode.Children = new Node[source.Children.Length];
                 for (int i = 0; i < source.Children.Length; i++)
@@ -190,8 +192,7 @@ public static unsafe class ModelLoader
         }
 
         /// <summary>
-        /// Traverses into all dirty parents and marks them as no longer dirty. The caller is expected to call
-        /// <see cref="UpdateGlobalTransform"/> inside <paramref name="updateFunc"/>
+        /// Traverse into all dirty children which need to <see cref="UpdateGlobalTransform"/> and calls <paramref name="updateFunc"/>
         /// </summary>
         /// <param name="parent"></param>
         /// <param name="updateFunc"></param>
@@ -649,17 +650,15 @@ public static unsafe class ModelLoader
             }
         }
 
-        int jointsCount = 0;
         Dictionary<GltfNode, Node> gltfNodeToMyNode = new Dictionary<GltfNode, Node>(gltf.LogicalNodes.Count);
         while (nodeStack.Count > 0)
         {
             (GltfNode gltfNode, Node myNode) = nodeStack.Pop();
+            gltfNodeToMyNode[gltfNode] = myNode;
 
             myNode.ArrayIndex = nodeCounter++;
             myNode.LocalTransform = Transformation.FromMatrix(gltfNode.LocalMatrix.ToOpenTK());
             myNode.UpdateGlobalTransform();
-
-            gltfNodeToMyNode[gltfNode] = myNode;
 
             {
                 GltfNode[] gltfChildren = gltfNode.VisualChildren.ToArray();
@@ -676,107 +675,105 @@ public static unsafe class ModelLoader
                     nodeStack.Push((gltfChild, myChild));
                 }
             }
-
-            Mesh gltfMesh = gltfNode.Mesh;
-            if (gltfMesh == null)
+            
+            if (gltfNode.Mesh is Mesh gltfMesh)
             {
-                continue;
+                if (gltfNode.Skin is GltfSkin skin)
+                {
+                    myNode.Skin = new Skin();
+                    myNode.Skin.Joints = new Node[skin.JointsCount];
+                    myNode.Skin.InverseJointMatrices = new Matrix4[myNode.Skin.JointsCount];
+                }
+
+                Matrix4[] nodeTransformations = GetNodeTransformations(myNode, gltfNode.UseGpuInstancing());
+
+                myNode.MeshInstanceRange = new Range(listMeshInstances.Count, gltfMesh.Primitives.Count * nodeTransformations.Length);
+
+                for (int i = 0; i < gltfMesh.Primitives.Count; i++)
+                {
+                    MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
+                    if (!meshPrimitivesGeometry.TryGetValue(GetMeshPrimitiveDesc(gltfMeshPrimitive), out MeshGeometry meshGeometry))
+                    {
+                        // MeshPrimitive was not loaded for some reason
+                        continue;
+                    }
+
+                    GpuMesh mesh = new GpuMesh();
+                    mesh.InstanceCount = nodeTransformations.Length;
+                    mesh.MeshletsOffset = listMeshlets.Count;
+                    mesh.MeshletCount = meshGeometry.Meshlets.Length;
+                    if (gltfMeshPrimitive.Material == null)
+                    {
+                        // Load default material if mesh primitive doesn't have one
+                        (CpuMaterial[] cpuMaterial, GpuMaterial[] gpuMaterial) = LoadMaterials([new MaterialDesc()]);
+                        Helper.ArrayAdd(ref cpuMaterials, cpuMaterial[0]);
+                        Helper.ArrayAdd(ref gpuMaterials, gpuMaterial[0]);
+
+                        mesh.NormalMapStrength = 0.0f;
+                        mesh.MaterialId = gpuMaterial.Length - 1;
+                    }
+                    else
+                    {
+                        bool normalMapProvided = !cpuMaterials[gltfMeshPrimitive.Material.LogicalIndex].HasFallbackPixels(TextureType.Normal);
+                        mesh.NormalMapStrength = normalMapProvided ? 1.0f : 0.0f;
+                        mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
+                    }
+
+                    for (int j = 0; j < meshGeometry.VertexData.Vertices.Length; j++)
+                    {
+                        meshGeometry.VertexData.Vertices[j].MaterialId = mesh.MaterialId;
+                    }
+
+                    GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
+                    for (int j = 0; j < meshInstances.Length; j++)
+                    {
+                        ref GpuMeshInstance meshInstance = ref meshInstances[j];
+
+                        // fix for small_city.glb which has a couple malformed transformations
+                        //if (nodeTransformations[j].Row1 == new Vector4(0.0f))
+                        //{
+                        //    nodeTransformations[j].Row1 = Vector4.UnitY;
+                        //}
+
+                        meshInstance.ModelMatrix = nodeTransformations[j] * myNode.Parent.GlobalTransform;
+                        meshInstance.MeshId = listMeshes.Count;
+                    }
+
+                    BBG.DrawElementsIndirectCommand drawCmd = new BBG.DrawElementsIndirectCommand();
+                    drawCmd.IndexCount = meshGeometry.VertexIndices.Length;
+                    drawCmd.InstanceCount = meshInstances.Length;
+                    drawCmd.FirstIndex = listIndices.Count;
+                    drawCmd.BaseVertex = listVertices.Count;
+                    drawCmd.BaseInstance = listMeshInstances.Count;
+
+                    listVertices.AddRange(meshGeometry.VertexData.Vertices);
+                    listVertexPositions.AddRange(meshGeometry.VertexData.Positons);
+                    listIndices.AddRange(meshGeometry.VertexIndices);
+                    listMeshes.Add(mesh);
+                    listMeshInstances.AddRange(meshInstances);
+                    listDrawCommands.Add(drawCmd);
+                    listMeshlets.AddRange(meshGeometry.Meshlets);
+                    listMeshletsInfo.AddRange(meshGeometry.MeshletsInfo);
+                    listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshGeometry.MeshletData.VertexIndices, 0, meshGeometry.MeshletData.VertexIndicesLength));
+                    listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshGeometry.MeshletData.LocalIndices, 0, meshGeometry.MeshletData.LocalIndicesLength));
+
+                    // If node has a Skin
+                    listJointIndices.AddRange(meshGeometry.VertexData.JointIndices);
+                    listJointWeights.AddRange(meshGeometry.VertexData.JointWeights);
+
+                    int prevCount = listMeshlets.Count - meshGeometry.Meshlets.Length;
+                    for (int j = prevCount; j < listMeshlets.Count; j++)
+                    {
+                        GpuMeshlet myMeshlet = listMeshlets[j];
+
+                        // These overflow on big models
+                        myMeshlet.VertexOffset += (uint)(listMeshletsVertexIndices.Count - meshGeometry.MeshletData.VertexIndicesLength);
+                        myMeshlet.IndicesOffset += (uint)(listMeshletsLocalIndices.Count - meshGeometry.MeshletData.LocalIndicesLength);
+
+                        listMeshlets[j] = myMeshlet;
+                    }
+                }
             }
-
-            Matrix4[] nodeTransformations = GetNodeTransformations(myNode, gltfNode.UseGpuInstancing());
-
-            Range meshInstanceRange = new Range();
-            meshInstanceRange.Start = listMeshInstances.Count;
-
-            for (int i = 0; i < gltfMesh.Primitives.Count; i++)
-            {
-                MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
-                if (!meshPrimitivesGeometry.TryGetValue(GetMeshPrimitiveDesc(gltfMeshPrimitive), out MeshGeometry meshGeometry))
-                {
-                    // MeshPrimitive was not loaded for some reason
-                    continue;
-                }
-
-                GpuMesh mesh = new GpuMesh();
-                mesh.InstanceCount = nodeTransformations.Length;
-                mesh.EmissiveBias = 0.0f;
-                mesh.SpecularBias = 0.0f;
-                mesh.RoughnessBias = 0.0f;
-                mesh.TransmissionBias = 0.0f;
-                mesh.MeshletsOffset = listMeshlets.Count;
-                mesh.MeshletCount = meshGeometry.Meshlets.Length;
-                mesh.IORBias = 0.0f;
-                mesh.AbsorbanceBias = new Vector3(0.0f);
-                mesh.TintOnTransmissive = true; // Required by KHR_materials_transmission
-                if (gltfMeshPrimitive.Material == null)
-                {
-                    // load some default material if mesh primitive doesn't have one
-                    (CpuMaterial[] cpuMaterial, GpuMaterial[] gpuMaterial) = LoadMaterials([new MaterialDesc()]);
-                    Helper.ArrayAdd(ref cpuMaterials, cpuMaterial[0]);
-                    Helper.ArrayAdd(ref gpuMaterials, gpuMaterial[0]);
-
-                    mesh.NormalMapStrength = 0.0f;
-                    mesh.MaterialId = gpuMaterial.Length - 1;
-                }
-                else
-                {
-                    bool normalMapProvided = !cpuMaterials[gltfMeshPrimitive.Material.LogicalIndex].HasFallbackPixels(TextureType.Normal);
-                    mesh.NormalMapStrength = normalMapProvided ? 1.0f : 0.0f;
-                    mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
-                }
-
-                GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
-                for (int j = 0; j < meshInstances.Length; j++)
-                {
-                    ref GpuMeshInstance meshInstance = ref meshInstances[j];
-
-                    // fix for small_city.glb which has a couple malformed transformations
-                    //if (nodeTransformations[j].Row1 == new Vector4(0.0f))
-                    //{
-                    //    nodeTransformations[j].Row1 = Vector4.UnitY;
-                    //}
-
-                    meshInstance.ModelMatrix = nodeTransformations[j] * myNode.Parent.GlobalTransform;
-                    meshInstance.MeshId = listMeshes.Count;
-                }
-
-                BBG.DrawElementsIndirectCommand drawCmd = new BBG.DrawElementsIndirectCommand();
-                drawCmd.IndexCount = meshGeometry.VertexIndices.Length;
-                drawCmd.InstanceCount = meshInstances.Length;
-                drawCmd.FirstIndex = listIndices.Count;
-                drawCmd.BaseVertex = listVertices.Count;
-                drawCmd.BaseInstance = listMeshInstances.Count;
-
-                listVertices.AddRange(meshGeometry.VertexData.Vertices);
-                listVertexPositions.AddRange(meshGeometry.VertexData.Positons);
-                listIndices.AddRange(meshGeometry.VertexIndices);
-                listMeshes.Add(mesh);
-                listMeshInstances.AddRange(meshInstances);
-                listDrawCommands.Add(drawCmd);
-                listMeshlets.AddRange(meshGeometry.Meshlets);
-                listMeshletsInfo.AddRange(meshGeometry.MeshletsInfo);
-                listMeshletsVertexIndices.AddRange(new ReadOnlySpan<uint>(meshGeometry.MeshletData.VertexIndices, 0, meshGeometry.MeshletData.VertexIndicesLength));
-                listMeshletsLocalIndices.AddRange(new ReadOnlySpan<byte>(meshGeometry.MeshletData.LocalIndices, 0, meshGeometry.MeshletData.LocalIndicesLength));
-                listJointIndices.AddRange(meshGeometry.VertexData.JointIndices);
-                listJointWeights.AddRange(meshGeometry.VertexData.JointWeights);
-
-                int prevCount = listMeshlets.Count - meshGeometry.Meshlets.Length;
-                for (int j = prevCount; j < listMeshlets.Count; j++)
-                {
-                    GpuMeshlet myMeshlet = listMeshlets[j];
-
-                    // These overflow on big models
-                    myMeshlet.VertexOffset += (uint)(listMeshletsVertexIndices.Count - meshGeometry.MeshletData.VertexIndicesLength);
-                    myMeshlet.IndicesOffset += (uint)(listMeshletsLocalIndices.Count - meshGeometry.MeshletData.LocalIndicesLength);
-
-                    listMeshlets[j] = myMeshlet;
-                }
-            }
-
-            jointsCount += gltfNode.Skin != null ? gltfNode.Skin.JointsCount : 0;
-
-            meshInstanceRange.End = listMeshInstances.Count;
-            myNode.MeshInstanceRange = meshInstanceRange;
         }
 
         GpuModel gpuModel = new GpuModel();
@@ -811,7 +808,7 @@ public static unsafe class ModelLoader
 
     private static ValueTuple<CpuMaterial[], GpuMaterial[]> LoadMaterials(ReadOnlySpan<MaterialDesc> materialsLoadData, bool useExtBc5NormalMetallicRoughness = false)
     {
-        Dictionary<SampledImage, BindlessSampledTexture> uniqueBindlessTextures = new Dictionary<SampledImage, BindlessSampledTexture>();
+        Dictionary<Image, BindlessSampledTexture> uniqueBindlessTextures = new Dictionary<Image, BindlessSampledTexture>();
 
         CpuMaterial[] cpuMaterials = new CpuMaterial[materialsLoadData.Length];
         GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
@@ -860,11 +857,11 @@ public static unsafe class ModelLoader
                     bindlessTexture = FallbackTextures.GetWhite();
                     hasFallbackPixels = true;
                 }
-                else if (!uniqueBindlessTextures.TryGetValue(sampledImage, out bindlessTexture))
+                else if (!uniqueBindlessTextures.TryGetValue(sampledImage.GltfImage, out bindlessTexture))
                 {
                     if (LoadGLTextureAsync(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out bindlessTexture))
                     {
-                        uniqueBindlessTextures[sampledImage] = bindlessTexture;
+                        uniqueBindlessTextures[sampledImage.GltfImage] = bindlessTexture;
                     }
                     else
                     {
@@ -1188,17 +1185,17 @@ public static unsafe class ModelLoader
         return nodeInstances;
     }
 
-    private static Dictionary<MeshPrimitiveDesc, MeshGeometry> LoadMeshPrimitivesGeometry(ModelRoot modelRoot, OptimizationSettings optimizationSettings)
+    private static Dictionary<MeshPrimitiveDesc, MeshGeometry> LoadMeshPrimitivesGeometry(ModelRoot gltf, OptimizationSettings optimizationSettings)
     {
-        int maxMeshPrimitives = modelRoot.LogicalMeshes.Sum(it => it.Primitives.Count);
+        int maxMeshPrimitives = gltf.LogicalMeshes.Sum(it => it.Primitives.Count);
 
         Task[] tasks = new Task[maxMeshPrimitives];
         Dictionary<MeshPrimitiveDesc, MeshGeometry> uniqueMeshPrimitives = new Dictionary<MeshPrimitiveDesc, MeshGeometry>(maxMeshPrimitives);
 
         int uniqueMeshPrimitivesCount = 0;
-        for (int i = 0; i < modelRoot.LogicalMeshes.Count; i++)
+        for (int i = 0; i < gltf.LogicalMeshes.Count; i++)
         {
-            Mesh mesh = modelRoot.LogicalMeshes[i];
+            Mesh mesh = gltf.LogicalMeshes[i];
             for (int j = 0; j < mesh.Primitives.Count; j++)
             {
                 MeshPrimitive meshPrimitive = mesh.Primitives[j];
@@ -1216,7 +1213,7 @@ public static unsafe class ModelLoader
                 {
                     tasks[uniqueMeshPrimitivesCount++] = Task.Run(() =>
                     {
-                        (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(modelRoot.LogicalAccessors, meshDesc);
+                        (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(gltf.LogicalAccessors, meshDesc);
                         OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
 
                         MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
@@ -1417,10 +1414,6 @@ public static unsafe class ModelLoader
             if (gltfNode.Skin != null)
             {
                 Node myNode = gltfNodeToMyNode[gltfNode];
-                myNode.Skin = new Skin();
-                myNode.Skin.Joints = new Node[gltfNode.Skin.JointsCount];
-                myNode.Skin.InverseJointMatrices = new Matrix4[myNode.Skin.JointsCount];
-
                 for (int j = 0; j < myNode.Skin.JointsCount; j++)
                 {
                     (GltfNode gltfJoint, System.Numerics.Matrix4x4 inverseJointMatrix) = gltfNode.Skin.GetJoint(j);
@@ -1820,6 +1813,72 @@ public static unsafe class ModelLoader
         return new Vector4(usvec4.Data[0] / 65535.0f, usvec4.Data[1] / 65535.0f, usvec4.Data[2] / 65535.0f, usvec4.Data[3] / 65535.0f);
     }
 
+    private static class FallbackTextures
+    {
+        // We cache textures because many bindless textures have a performance overhead on AMD drivers
+        // https://gist.github.com/BoyBaykiller/40d21d5b28391fb40d3f3bc348375ce8
+
+        // We need to check if user deleted them and recreate if so because we do not own them
+
+        private static BindlessSampledTexture cachedWhiteTexture = new BindlessSampledTexture();
+        private static BindlessSampledTexture cachedPurpleBackTexture = new BindlessSampledTexture();
+
+        public static BindlessSampledTexture GetWhite()
+        {
+            ref GLTexture texture = ref cachedWhiteTexture.SampledTexture.Texture;
+            ref GLSampler sampler = ref cachedWhiteTexture.SampledTexture.Sampler;
+
+            if (sampler == null || sampler.IsDeleted())
+            {
+                sampler = new GLSampler(new GLSampler.SamplerState());
+            }
+
+            if (texture == null || texture.IsDeleted())
+            {
+                texture = new GLTexture(GLTexture.Type.Texture2D);
+                texture.Allocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                texture.Fill(new Vector4(1.0f));
+
+                cachedWhiteTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
+            }
+
+            return cachedWhiteTexture;
+        }
+
+        public static BindlessSampledTexture GetPurpleBlack()
+        {
+            ref GLTexture texture = ref cachedPurpleBackTexture.SampledTexture.Texture;
+            ref GLSampler sampler = ref cachedPurpleBackTexture.SampledTexture.Sampler;
+
+            if (sampler == null || sampler.IsDeleted())
+            {
+                sampler = new GLSampler(new GLSampler.SamplerState()
+                {
+                    WrapModeS = GLSampler.WrapMode.Repeat,
+                    WrapModeT = GLSampler.WrapMode.Repeat,
+                });
+            }
+
+            if (texture == null || texture.IsDeleted())
+            {
+                texture = new GLTexture(GLTexture.Type.Texture2D);
+                texture.Allocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
+                texture.Upload2D(2, 2, GLTexture.PixelFormat.RGB, GLTexture.PixelType.UByte, new byte[]
+                {
+                    // Source: https://en.wikipedia.org/wiki/File:Minecraft_missing_texture_block.svg
+                    251,  62, 249, // Purple
+                      0,   0,   0, // Black
+                      0,   0,   0, // Black
+                    251,  62, 249  // Purple
+                }[0]);
+
+                cachedPurpleBackTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
+            }
+
+            return cachedPurpleBackTexture;
+        }
+    }
+
     public static class GtlfpackWrapper
     {
         public const string CLI_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer
@@ -1976,68 +2035,88 @@ public static unsafe class ModelLoader
         }
     }
 
-    private static class FallbackTextures
+    public static void MergeMeshes(ref Model model)
     {
-        // We cache textures because many bindless textures have a performance overhead on AMD drivers
-        // https://gist.github.com/BoyBaykiller/40d21d5b28391fb40d3f3bc348375ce8
-        // We need to check if user deleted them and recreate if so because we do not own them
+        GpuModel gpuModel = model.GpuModel;
 
-        private static BindlessSampledTexture cachedWhiteTexture = new BindlessSampledTexture();
-        private static BindlessSampledTexture cachedPurpleBackTexture = new BindlessSampledTexture();
+        Vector3[] newVertexPositions;
+        GpuVertex[] newVertices;
+        uint[] newVertexIndices;
 
-        public static BindlessSampledTexture GetWhite()
         {
-            ref GLTexture texture = ref cachedWhiteTexture.SampledTexture.Texture;
-            ref GLSampler sampler = ref cachedWhiteTexture.SampledTexture.Sampler;
-
-            if (sampler == null || sampler.IsDeleted())
+            int vertexCount = 0;
+            int indicesCount = 0;
+            for (int i = 0; i < gpuModel.DrawCommands.Length; i++)
             {
-                sampler = new GLSampler(new GLSampler.SamplerState());
+                BBG.DrawElementsIndirectCommand cmd = gpuModel.DrawCommands[i];
+                vertexCount += GetMeshesVertexCount(i) * cmd.InstanceCount;
+                indicesCount += cmd.IndexCount * cmd.InstanceCount;
             }
 
-            if (texture == null || texture.IsDeleted())
-            {
-                texture = new GLTexture(GLTexture.Type.Texture2D);
-                texture.Allocate(1, 1, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-                texture.Fill(new Vector4(1.0f));
-
-                cachedWhiteTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
-            }
-
-            return cachedWhiteTexture;
+            newVertexPositions = new Vector3[vertexCount];
+            newVertices = new GpuVertex[vertexCount];
+            newVertexIndices = new uint[indicesCount];
         }
 
-        public static BindlessSampledTexture GetPurpleBlack()
+        int vertexCounter = 0;
+        int vertexIndicesCounter = 0;
+        for (int i = 0; i < gpuModel.MeshInstances.Length; i++)
         {
-            ref GLTexture texture = ref cachedPurpleBackTexture.SampledTexture.Texture;
-            ref GLSampler sampler = ref cachedPurpleBackTexture.SampledTexture.Sampler;
+            ref readonly GpuMeshInstance meshInstance = ref gpuModel.MeshInstances[i];
+            ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref gpuModel.DrawCommands[meshInstance.MeshId];
 
-            if (sampler == null || sampler.IsDeleted())
+            for (int j = drawCmd.FirstIndex; j < drawCmd.FirstIndex + drawCmd.IndexCount; j++)
             {
-                sampler = new GLSampler(new GLSampler.SamplerState()
-                {
-                    WrapModeS = GLSampler.WrapMode.Repeat,
-                    WrapModeT = GLSampler.WrapMode.Repeat,
-                });
+                newVertexIndices[vertexIndicesCounter++] = (uint)vertexCounter + gpuModel.VertexIndices[j];
             }
 
-            if (texture == null || texture.IsDeleted())
+            Matrix4x3 worldMatrix = Matrix3x4.Transpose(meshInstance.ModelMatrix3x4);
+            Matrix3 unitVecToWorld = new Matrix3(Matrix4.Transpose(meshInstance.InvModelMatrix));
+
+            int vertexCount = GetMeshesVertexCount(meshInstance.MeshId);
+            for (int j = drawCmd.BaseVertex; j < drawCmd.BaseVertex + vertexCount; j++)
             {
-                texture = new GLTexture(GLTexture.Type.Texture2D);
-                texture.Allocate(2, 2, 1, GLTexture.InternalFormat.R16G16B16A16Float);
-                texture.Upload2D(2, 2, GLTexture.PixelFormat.RGB, GLTexture.PixelType.UByte, new byte[]
-                {
-                    // Source: https://en.wikipedia.org/wiki/File:Minecraft_missing_texture_block.svg
-                    251,  62, 249, // Purple
-                      0,   0,   0, // Black
-                      0,   0,   0, // Black
-                    251,  62, 249  // Purple
-                }[0]);
+                Vector3 position = new Vector4(gpuModel.VertexPositions[j], 1.0f) * worldMatrix;
 
-                cachedPurpleBackTexture.BindlessHandle = texture.GetTextureHandleARB(sampler);
+                GpuVertex vertex = gpuModel.Vertices[j];
+                Vector3 tangent = Compression.DecompressSR11G11B10(vertex.Tangent);
+                Vector3 normal = Compression.DecompressSR11G11B10(vertex.Normal);
+                vertex.Tangent = Compression.CompressSR11G11B10(Vector3.Normalize(tangent * unitVecToWorld));
+                vertex.Normal = Compression.CompressSR11G11B10(Vector3.Normalize(normal * unitVecToWorld));
+
+                newVertexPositions[vertexCounter] = position;
+                newVertices[vertexCounter] = vertex;
+                vertexCounter++;
             }
+        }
 
-            return cachedPurpleBackTexture;
+        model.GpuModel.Meshes = [new GpuMesh()];
+        model.GpuModel.DrawCommands = [new BBG.DrawElementsIndirectCommand() { IndexCount = vertexIndicesCounter, InstanceCount = 1 }];
+        model.GpuModel.MeshInstances = [new GpuMeshInstance() { ModelMatrix = Matrix4.Identity }];
+
+        model.GpuModel.Vertices = newVertices;
+        model.GpuModel.VertexPositions = newVertexPositions;
+        model.GpuModel.VertexIndices = newVertexIndices;
+
+        // TODO: Meshlet support (when I have a mesh-shader capable GPU)
+
+        model.GpuModel.JointIndices = [];
+        model.GpuModel.JointWeights = [];
+
+        model.Animations = [];
+        model.RootNode.Children = [];
+        model.RootNode.MeshInstanceRange = new Range(0, 1);
+        model.RootNode.Skin = new Skin();
+        model.Nodes = [model.RootNode];
+
+        int GetMeshesVertexCount(int startMesh)
+        {
+            ReadOnlySpan<BBG.DrawElementsIndirectCommand> drawCmds = gpuModel.DrawCommands;
+            ReadOnlySpan<Vector3> vertexPositions = gpuModel.VertexPositions;
+
+            int baseVertex = drawCmds[startMesh].BaseVertex;
+            int nextBaseVertex = startMesh + 1 == drawCmds.Length ? vertexPositions.Length : drawCmds[startMesh + 1].BaseVertex;
+            return nextBaseVertex - baseVertex;
         }
     }
 }

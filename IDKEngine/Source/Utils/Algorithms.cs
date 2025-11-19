@@ -7,6 +7,10 @@ namespace IDKEngine.Utils;
 public static class Algorithms
 {
     public delegate bool Predicate<T>(in T v);
+    public interface IRadixSortable<T>
+    {
+        public uint GetKey(T item);
+    }
 
     public static uint FloatToKey(float value)
     {
@@ -38,7 +42,7 @@ public static class Algorithms
         }
     }
 
-    public static unsafe void RadixSort<T>(Span<T> input, Span<T> output, Func<T, uint> getKey)
+    public static unsafe void RadixSort<T, F>(Span<T> input, Span<T> output, F lambda) where F : struct, IRadixSortable<T>
     {
         // Out performs built-in sort except for small inputs (~64)
         // http://stereopsis.com/radix.html
@@ -55,11 +59,11 @@ public static class Algorithms
         // 2. Constant offsets are not baked into address calculation: https://discord.com/channels/143867839282020352/312132327348240384/1342254292995801100
         // 3. Local functions can't capture Span<T>: https://discord.com/channels/143867839282020352/312132327348240384/1336514607493283881
         int* prefixSum = stackalloc int[binSize * passes];
-        
+
         // Compute histogram for all passes
         for (int i = 0; i < input.Length; i++)
         {
-            uint key = getKey(input[i]);
+            uint key = lambda.GetKey(input[i]);
 
             GetPrefixSumRef(key, 0)++;
             GetPrefixSumRef(key, 1)++;
@@ -88,35 +92,16 @@ public static class Algorithms
         // Sort from LSB to MSB in radix-sized steps
         for (int i = 0; i < passes; i++)
         {
-            int j = 0;
-            for (; j < input.Length - 3; j += 4)
+            for (int j = 0; j < input.Length; j++)
             {
-                T t0 = input[j + 0];
-                uint key0 = getKey(t0);
-                output[GetPrefixSumRef(key0, i)++] = t0;
-
-                T t1 = input[j + 1];
-                uint key1 = getKey(t1);
-                output[GetPrefixSumRef(key1, i)++] = t1;
-
-                T t2 = input[j + 2];
-                uint key2 = getKey(t2);
-                output[GetPrefixSumRef(key2, i)++] = t2;
-
-                T t3 = input[j + 3];
-                uint key3 = getKey(t3);
-                output[GetPrefixSumRef(key3, i)++] = t3;
-            }
-            for (; j < input.Length; j++)
-            {
-                T t0 = input[j];
-                uint key0 = getKey(t0);
-                output[GetPrefixSumRef(key0, i)++] = t0;
+                T el = input[j];
+                uint key = lambda.GetKey(el);
+                output[GetPrefixSumRef(key, i)++] = el;
             }
 
             Swap(ref input, ref output);
         }
-        
+
         ref int GetPrefixSumRef(uint key, int pass)
         {
             uint radix = (key >> (pass * radixSize)) & mask;

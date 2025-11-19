@@ -38,9 +38,9 @@ void main()
 
     mat3 unitVecToWorld = mat3(transpose(invModelMatrix));
     outData.Normal = normalize(unitVecToWorld * normal);
-    outData.TexCoord = vertex.TexCoord;
+    outData.TexCoord = Unpack(vertex.TexCoord);
 
-    outData.MaterialId = mesh.MaterialId;
+    outData.MaterialId = vertex.MaterialId;
     outData.EmissiveBias = mesh.EmissiveBias;
 
     vec3 ndc = MapToZeroOne(outData.FragPos, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax) * 2.0 - 1.0;

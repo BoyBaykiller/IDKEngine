@@ -13,10 +13,10 @@ bool RayTriangleIntersect(Ray ray, vec3 p0, vec3 p1, vec3 p2, out vec3 bary, out
     vec3 normal = cross(p1p0, p2p0);
     vec3 q = cross(rop0, ray.Direction);
 
-    float x = dot(ray.Direction, normal);
-    t = dot(-normal, rop0) / x;
+    float invDet = 1.0 / dot(ray.Direction, normal);
+    t = dot(-normal, rop0) * invDet;
 
-    bary.yz = vec2(dot(-q, p2p0), dot(q, p1p0)) / x;
+    bary.yz = vec2(dot(-q, p2p0), dot(q, p1p0)) * invDet;
     bary.x = 1.0 - bary.y - bary.z;
 
     return all(greaterThanEqual(vec4(bary, t), vec4(0.0)));

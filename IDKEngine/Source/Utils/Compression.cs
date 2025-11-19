@@ -17,6 +17,12 @@ public static class Compression
 
         return new Vector3(r, g, b);
     }
+
+    public static Vector3 DecompressSR11G11B10(uint data)
+    {
+        return DecompressUR11G11B10(data) * 2.0f - 1.0f;
+    }
+
     public static uint CompressSR11G11B10(Vector3 data)
     {
         return CompressUR11G11B10(data * 0.5f + new Vector3(0.5f));
@@ -33,7 +39,7 @@ public static class Compression
         return compressed;
     }
 
-    public static uint CompressUR8G8B8A8(in Vector4 data)
+    public static uint CompressUR8G8B8A8(Vector4 data)
     {
         uint r = (uint)MathF.Round(data.X * ((1u << 8) - 1));
         uint g = (uint)MathF.Round(data.Y * ((1u << 8) - 1));
@@ -45,7 +51,7 @@ public static class Compression
         return compressed;
     }
 
-    public static uint CompressSR8G8B8A8(in Vector4 data)
+    public static uint CompressSR8G8B8A8(Vector4 data)
     {
         return CompressUR8G8B8A8(data * 0.5f + 0.5f);
     }

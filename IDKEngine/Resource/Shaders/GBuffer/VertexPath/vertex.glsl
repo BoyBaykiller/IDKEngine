@@ -12,6 +12,7 @@ out InOutData
     vec3 Normal;
     vec3 Tangent;
     uint MeshId;
+    uint MaterialId;
 } outData;
 
 void main()
@@ -32,8 +33,9 @@ void main()
 
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.Tangent = normalize(unitVecToWorld * tangent);
-    outData.TexCoord = vertex.TexCoord;
+    outData.TexCoord = Unpack(vertex.TexCoord);
     outData.MeshId = gl_DrawID;
+    outData.MaterialId = vertex.MaterialId;
     outData.PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(prevVertexPosition, 1.0);
     
     vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(vertexPosition, 1.0);

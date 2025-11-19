@@ -30,7 +30,7 @@ class Application : GameWindowBase
 
     public record struct RecordingSettings
     {
-        public const string FRAME_STATES_INPUT_FILE = "frameRecordData.frd";
+        public const string FRAME_RECORD_FILE_EXTENSION = ".frd";
         public const string FRAMES_OUTPUT_FOLDER = "RecordedFrames";
 
         public int FPSGoal = 30;
@@ -238,7 +238,7 @@ class Application : GameWindowBase
                 Bloom.Compute(PathTracer.Result);
             }
 
-            TonemapAndGamma.Settings.IsAgXTonemaping = !PathTracer.IsDebugBVHTraversal;
+            TonemapAndGamma.Settings.DoTonemapAndSrgbTransform = !PathTracer.IsDebugBVHTraversal;
             TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
         }
 
@@ -501,8 +501,15 @@ class Application : GameWindowBase
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroMerged.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponzaMerged.glb").Value;
-            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaRotated45Baked.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb").Value;
+
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\deccer-cubes\SM_Deccer_Cubes_Textured_Complex.gltf").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\SimpleInstancing\glTF-Binary\SimpleInstancing.glb").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\Bistro.glb").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SanMiguel\SanMiguel.gltf").Value;
+
+            // Merging a model with many meshes into one can more than 2x Ray Tracing performance! (even with TLAS)
+            //ModelLoader.MergeMeshes(ref sponza);
 
             ModelManager.Add(sponza, lucy, helmet);
 
@@ -524,11 +531,14 @@ class Application : GameWindowBase
         else
         {
             ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
-            ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+            //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
             //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
             //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
             //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-            ModelManager.Add(a, b);
+            ModelLoader.MergeMeshes(ref a);
+            //ModelLoader.MergeIntoOneMesh(ref b);
+
+            ModelManager.Add(a);
 
             SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -654,6 +664,7 @@ class Application : GameWindowBase
         Camera.UpVector = state.CameraState.UpVector;
         Camera.LookX = state.CameraState.LookX;
         Camera.LookY = state.CameraState.LookY;
+        Camera.FovY = state.CameraState.FovY;
         animationTime = state.AnimationTime;
     }
 
@@ -664,6 +675,7 @@ class Application : GameWindowBase
         state.CameraState.UpVector = Camera.UpVector;
         state.CameraState.LookX = Camera.LookX;
         state.CameraState.LookY = Camera.LookY;
+        state.CameraState.FovY = Camera.FovY;
         state.AnimationTime = animationTime;
 
         return state;

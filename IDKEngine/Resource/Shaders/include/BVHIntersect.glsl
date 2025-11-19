@@ -1,7 +1,7 @@
 #define USE_TLAS AppInsert(USE_TLAS)
 
-#define MAX_BLAS_TREE_DEPTH max(AppInsert(MAX_BLAS_TREE_DEPTH), 1)
-#define MAX_TLAS_TREE_DEPTH max(24, 1)
+#define BLAS_STACK_SIZE max(AppInsert(BLAS_STACK_SIZE), 1)
+#define TLAS_STACK_SIZE max(24, 1)
 
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
@@ -16,9 +16,9 @@ struct HitInfo
 };
 
 #ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
-shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][MAX_BLAS_TREE_DEPTH];
+shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][BLAS_STACK_SIZE];
 #else
-uint BlasTraversalStack[MAX_BLAS_TREE_DEPTH];
+uint BlasTraversalStack[BLAS_STACK_SIZE];
 #endif
 
 void StackPush(inout uint stackPtr, uint newEntry);
@@ -211,7 +211,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out float debugCost, bool traceLight
 
     uint stackPtr = 0;
     uint stackTop = 0;
-    uint stack[MAX_TLAS_TREE_DEPTH];
+    uint stack[TLAS_STACK_SIZE];
     while (true)
     {
         GpuTlasNode parent = tlasSSBO.Nodes[stackTop];
@@ -326,7 +326,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 
     uint stackPtr = 0;
     uint stackTop = 0;
-    uint stack[MAX_TLAS_TREE_DEPTH];
+    uint stack[TLAS_STACK_SIZE];
     while (true)
     {
         GpuTlasNode parent = tlasSSBO.Nodes[stackTop];

@@ -397,5 +397,6 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Other
-frameRecordData.frd
+*.frd
 log.txt
+RecordedFrames

@@ -14,7 +14,7 @@ class TonemapAndGammaCorrect : IDisposable
         public float Linear = 0.18f;
         public float Peak = 1.0f;
         public float Compression = 0.1f;
-        public bool IsAgXTonemaping = true;
+        public bool DoTonemapAndSrgbTransform = true;
 
         public GpuSettings()
         {

@@ -5,6 +5,8 @@ namespace IDKEngine;
 
 public record struct Transformation
 {
+    public static readonly Transformation Identity = new Transformation().WithRotation(Quaternion.Identity).WithScale(1.0f); 
+
     public Vector3 Translation;
     public Quaternion Rotation = Quaternion.Identity;
     public Vector3 Scale = new Vector3(1.0f);
@@ -32,6 +34,12 @@ public record struct Transformation
     public Transformation WithTranslation(Vector3 position)
     {
         Translation = position;
+        return this;
+    }
+
+    public Transformation WithRotation(Quaternion quaternion)
+    {
+        this.Rotation = quaternion;
         return this;
     }
 

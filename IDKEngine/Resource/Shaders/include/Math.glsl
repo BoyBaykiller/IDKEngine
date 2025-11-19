@@ -222,7 +222,7 @@ uint ExpandBits(uint v)
 
 // Calculates a 30-bit Morton code for the
 // given 3D point located within the unit cube [0,1].
-uint GetMorton(vec3 normalizedV)
+uint GetMortonCode30(vec3 normalizedV)
 {
     uint x = clamp(uint(normalizedV.x * 1024.0), 0u, 1023u);
     uint y = clamp(uint(normalizedV.y * 1024.0), 0u, 1023u);

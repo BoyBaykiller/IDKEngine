@@ -57,7 +57,7 @@ public unsafe struct NativeArray<T> : IDisposable
         return new Enumerator(this);
     }
 
-    public struct Enumerator
+    public record struct Enumerator
     {
         private readonly NativeArray<T> nativeArray;
         private int index;
