@@ -227,33 +227,33 @@ public ref struct ReinsertionOptimizer
 
     private readonly void SwapChildrenInMem(int inParent, int outParent)
     {
-        int inLeftChildId = nodes[inParent].TriStartOrChild;
-        int inRightChildId = nodes[inParent].TriStartOrChild + 1;
+        int inLeftNodeId = nodes[inParent].TriStartOrChild;
+        int inRightNodeId = nodes[inParent].TriStartOrChild + 1;
 
-        int outLeftChildId = nodes[outParent].TriStartOrChild;
-        int outRightChildId = nodes[outParent].TriStartOrChild + 1;
+        int outLeftNodeId = nodes[outParent].TriStartOrChild;
+        int outRightNodeId = nodes[outParent].TriStartOrChild + 1;
 
-        Algorithms.Swap(ref nodes[inLeftChildId], ref nodes[outLeftChildId]);
-        Algorithms.Swap(ref nodes[inRightChildId], ref nodes[outRightChildId]);
+        Algorithms.Swap(ref nodes[inLeftNodeId], ref nodes[outLeftNodeId]);
+        Algorithms.Swap(ref nodes[inRightNodeId], ref nodes[outRightNodeId]);
 
-        nodes[inParent].TriStartOrChild = outLeftChildId;
+        nodes[inParent].TriStartOrChild = outLeftNodeId;
 
-        if (inLeftChildId == outParent)
+        if (inLeftNodeId == outParent)
         {
-            outParent = outLeftChildId;
+            outParent = outLeftNodeId;
         }
-        if (inRightChildId == outParent)
+        if (inRightNodeId == outParent)
         {
-            outParent = outRightChildId;
+            outParent = outRightNodeId;
         }
-        nodes[outParent].TriStartOrChild = inLeftChildId;
+        nodes[outParent].TriStartOrChild = inLeftNodeId;
 
         UpdateChildParentIds(nodes, parentIds, inParent);
         UpdateChildParentIds(nodes, parentIds, outParent);
-        UpdateChildParentIds(nodes, parentIds, inLeftChildId);
-        UpdateChildParentIds(nodes, parentIds, inRightChildId);
-        UpdateChildParentIds(nodes, parentIds, outLeftChildId);
-        UpdateChildParentIds(nodes, parentIds, outRightChildId);
+        UpdateChildParentIds(nodes, parentIds, inLeftNodeId);
+        UpdateChildParentIds(nodes, parentIds, inRightNodeId);
+        UpdateChildParentIds(nodes, parentIds, outLeftNodeId);
+        UpdateChildParentIds(nodes, parentIds, outRightNodeId);
 
         static void UpdateChildParentIds(Span<GpuBlasNode> nodes, Span<int> parentIds, int parentNodeId)
         {

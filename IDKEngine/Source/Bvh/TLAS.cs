@@ -174,10 +174,10 @@ public static class TLAS
                 continue;
             }
 
-            int leftChild = (int)parent.ChildOrInstanceID;
-            int rightChild = leftChild + 1;
-            ref readonly GpuTlasNode leftNode = ref tlasNodes[leftChild];
-            ref readonly GpuTlasNode rightNode = ref tlasNodes[rightChild];
+            int leftNodeId = (int)parent.ChildOrInstanceID;
+            int rightNodeId = leftNodeId + 1;
+            ref readonly GpuTlasNode leftNode = ref tlasNodes[leftNodeId];
+            ref readonly GpuTlasNode rightNode = ref tlasNodes[rightNodeId];
 
             bool traverseLeft = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
             bool traverseRight = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
@@ -187,12 +187,12 @@ public static class TLAS
                 if (traverseLeft && traverseRight)
                 {
                     bool leftCloser = tMinLeft < tMinRight;
-                    stackTop = leftCloser ? leftChild : rightChild;
-                    stack[stackPtr++] = leftCloser ? rightChild : leftChild;
+                    stackTop = leftCloser ? leftNodeId : rightNodeId;
+                    stack[stackPtr++] = leftCloser ? rightNodeId : leftNodeId;
                 }
                 else
                 {
-                    stackTop = traverseLeft ? leftChild : rightChild;
+                    stackTop = traverseLeft ? leftNodeId : rightNodeId;
                 }
             }
             else
@@ -240,20 +240,20 @@ public static class TLAS
                 continue;
             }
 
-            int leftChild = (int)parent.ChildOrInstanceID;
-            int rightChild = leftChild + 1;
-            ref readonly GpuTlasNode leftNode = ref tlasNodes[leftChild];
-            ref readonly GpuTlasNode rightNode = ref tlasNodes[rightChild];
+            int leftNodeId = (int)parent.ChildOrInstanceID;
+            int rightNodeId = leftNodeId + 1;
+            ref readonly GpuTlasNode leftNode = ref tlasNodes[leftNodeId];
+            ref readonly GpuTlasNode rightNode = ref tlasNodes[rightNodeId];
 
             bool traverseLeft = Intersections.BoxVsBox(Conversions.ToBox(leftNode), box);
             bool traverseRight = Intersections.BoxVsBox(Conversions.ToBox(rightNode), box);
 
             if (traverseLeft || traverseRight)
             {
-                stackTop = traverseLeft ? leftChild : rightChild;
+                stackTop = traverseLeft ? leftNodeId : rightNodeId;
                 if (traverseLeft && traverseRight)
                 {
-                    stack[stackPtr++] = rightChild;
+                    stack[stackPtr++] = rightNodeId;
                 }
             }
             else

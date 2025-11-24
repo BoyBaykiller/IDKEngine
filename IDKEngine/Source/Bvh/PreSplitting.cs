@@ -154,10 +154,10 @@ public static class PreSplitting
     /// When Pre-Splitting was done prior to building the BLAS duplicate triangle references in a leaf(-pair) may happen.
     /// Here we deduplicate them, possibly resulting in leaf-pair triangle ranges like:
     /// [lStart, lEnd), [rStart, rEnd), where the "straddling triangles" in range [rStart, lEnd) are shared between the left and right node.
-    /// Otherwise this is equivalent to <see cref="BLAS.GetUnindexedTriangles(in BLAS.BuildResult, in BLAS.BuildData, in BLAS.Geometry)"/>
+    /// Otherwise this is equivalent to <see cref="BLAS.GetUnindexedTriangles(BLAS.BuildResult, BLAS.BuildData, BLAS.Geometry)"/>
     /// </summary>
     /// <returns></returns>
-    public static GpuIndicesTriplet[] GetUnindexedTriangles(in BLAS.BuildResult blas, in BLAS.BuildData buildData, in BLAS.Geometry geometry)
+    public static GpuIndicesTriplet[] GetUnindexedTriangles(BLAS.BuildResult blas, BLAS.BuildData buildData, BLAS.Geometry geometry)
     {
         const bool straddlingOpt = true;
         const bool leafOpt = true;
@@ -173,13 +173,13 @@ public static class PreSplitting
         {
             int stackTop = stack[--stackPtr];
 
-            ref GpuBlasNode leftChild = ref blas.Nodes[stackTop];
-            ref GpuBlasNode rightChild = ref blas.Nodes[stackTop + 1];
+            ref GpuBlasNode leftNode = ref blas.Nodes[stackTop];
+            ref GpuBlasNode rightNode = ref blas.Nodes[stackTop + 1];
 
-            if (leftChild.IsLeaf && rightChild.IsLeaf)
+            if (leftNode.IsLeaf && rightNode.IsLeaf)
             {
-                Span<int> leftUniqueTriIds = GetUniqueTriIds(leftChild, buildData);
-                Span<int> rightUniqueTriIds = GetUniqueTriIds(rightChild, buildData);
+                Span<int> leftUniqueTriIds = GetUniqueTriIds(leftNode, buildData);
+                Span<int> rightUniqueTriIds = GetUniqueTriIds(rightNode, buildData);
 
                 int onlyLeftTriCount = 0;
                 int backwardsCounter = 0;
@@ -209,18 +209,18 @@ public static class PreSplitting
                     }
                 }
 
-                leftChild.TriStartOrChild = globalTriCounter;
-                leftChild.TriCount = leftUniqueTriIds.Length;
+                leftNode.TriStartOrChild = globalTriCounter;
+                leftNode.TriCount = leftUniqueTriIds.Length;
 
-                rightChild.TriStartOrChild = globalTriCounter + onlyLeftTriCount;
-                rightChild.TriCount = rightUniqueTriIds.Length;
+                rightNode.TriStartOrChild = globalTriCounter + onlyLeftTriCount;
+                rightNode.TriCount = rightUniqueTriIds.Length;
 
-                int leafsTriCount = rightChild.TriEnd - leftChild.TriStartOrChild;
+                int leafsTriCount = rightNode.TriEnd - leftNode.TriStartOrChild;
                 globalTriCounter += leafsTriCount;
             }
-            else if (leftChild.IsLeaf || rightChild.IsLeaf)
+            else if (leftNode.IsLeaf || rightNode.IsLeaf)
             {
-                ref GpuBlasNode theLeafNode = ref (leftChild.IsLeaf ? ref leftChild : ref rightChild);
+                ref GpuBlasNode theLeafNode = ref (leftNode.IsLeaf ? ref leftNode : ref rightNode);
 
                 Span<int> uniqueTriIds = GetUniqueTriIds(theLeafNode, buildData);
                 for (int i = 0; i < uniqueTriIds.Length; i++)
@@ -233,14 +233,8 @@ public static class PreSplitting
                 globalTriCounter += uniqueTriIds.Length;
             }
 
-            if (!rightChild.IsLeaf)
-            {
-                stack[stackPtr++] = rightChild.TriStartOrChild;
-            }
-            if (!leftChild.IsLeaf)
-            {
-                stack[stackPtr++] = leftChild.TriStartOrChild;
-            }
+            if (!rightNode.IsLeaf) stack[stackPtr++] = rightNode.TriStartOrChild;
+            if (!leftNode.IsLeaf) stack[stackPtr++] = leftNode.TriStartOrChild;
         }
 
         static Span<int> GetUniqueTriIds(in GpuBlasNode leafNode, in BLAS.BuildData buildData)

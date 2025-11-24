@@ -244,10 +244,10 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out float debugCost, bool traceLight
         }
         
 
-        uint leftChild = childOrInstanceId;
-        uint rightChild = leftChild + 1;
-        GpuTlasNode leftNode = tlasSSBO.Nodes[leftChild];
-        GpuTlasNode rightNode = tlasSSBO.Nodes[rightChild];
+        uint leftChildId = childOrInstanceId;
+        uint rightChildId = leftChildId + 1;
+        GpuTlasNode leftNode = tlasSSBO.Nodes[leftChildId];
+        GpuTlasNode rightNode = tlasSSBO.Nodes[rightChildId];
 
         bool traverseLeft = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft < hitInfo.T;
         bool traverseRight = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight < hitInfo.T;
@@ -258,12 +258,12 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out float debugCost, bool traceLight
             {
                 bool leftCloser = tMinLeft < tMinRight;
 
-                stackTop = leftCloser ? leftChild : rightChild;
-                stack[stackPtr++] = leftCloser ? rightChild : leftChild;
+                stackTop = leftCloser ? leftChildId : rightChildId;
+                stack[stackPtr++] = leftCloser ? rightChildId : leftChildId;
             }
             else
             {
-                stackTop = traverseLeft ? leftChild : rightChild;
+                stackTop = traverseLeft ? leftChildId : rightChildId;
             }
         }
         else
@@ -361,10 +361,10 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
         }
         
 
-        uint leftChild = childOrInstanceId;
-        uint rightChild = leftChild + 1;
-        GpuTlasNode leftNode = tlasSSBO.Nodes[leftChild];
-        GpuTlasNode rightNode = tlasSSBO.Nodes[rightChild];
+        uint leftChildId = childOrInstanceId;
+        uint rightChildId = leftChildId + 1;
+        GpuTlasNode leftNode = tlasSSBO.Nodes[leftChildId];
+        GpuTlasNode rightNode = tlasSSBO.Nodes[rightChildId];
 
         bool traverseLeft = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft < hitInfo.T;
         bool traverseRight = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight < hitInfo.T;
@@ -375,12 +375,12 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
             {
                 bool leftCloser = tMinLeft < tMinRight;
 
-                stackTop = leftCloser ? leftChild : rightChild;
-                stack[stackPtr++] = leftCloser ? rightChild : leftChild;
+                stackTop = leftCloser ? leftChildId : rightChildId;
+                stack[stackPtr++] = leftCloser ? rightChildId : leftChildId;
             }
             else
             {
-                stackTop = traverseLeft ? leftChild : rightChild;
+                stackTop = traverseLeft ? leftChildId : rightChildId;
             }
         }
         else

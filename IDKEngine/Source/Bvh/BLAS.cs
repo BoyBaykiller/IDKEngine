@@ -33,6 +33,7 @@ public static class BLAS
         public int StopSplittingThreshold = 1;
         public int MaxLeafTriangleCount = 8;
         public float TriangleCost = 1.1f;
+        public float StackSizeOptSAHIncreaseAcceptance = 0.0006f; // 0.06%
 
         public BuildSettings()
         {
@@ -159,18 +160,21 @@ public static class BLAS
 
         fixed (BuildResult* blasPtr = &blas)
         {
-            ProcessBuildTask(blasPtr);
+            ProcessBuildTask(blasPtr, 1, 2);
         }
 
-        // Multithreaded building logic causes empty subtrees (unless 1PPL). I want my trees to be comapct so let's remove them.
-        // An atomic counter could be used to add nodes, but that gives less coherent and undeterministic ordering
-        int nodeCounter = RemoveEmptySubtrees(blas);
+        // It's typical to end up with a few deep paths that can be collapsed for a very small SAH increase.
+        // Meanwhile the reduced stack size unlocks occupancy making the shader run faster overall.
+        OptimizeStackSize(ref blas, settings);
 
-        blas.RequiredStackSize = ComputeRequiredStackSize(blas);
+        // Multithreaded building logic assumes 1PPL to get node offsets.
+        // An atomic counter could be used to add nodes, but that gives uncoherent and undeterministic ordering.
+        // Plus OptimizeStackSize does node collapse also causing empty subtrees. Let's compact.
+        int nodeCounter = RemoveEmptySubtrees(blas);
 
         return nodeCounter;
 
-        void ProcessBuildTask(BuildResult* blas, int parentNodeId = 1, int newNodesId = 2)
+        void ProcessBuildTask(BuildResult* blas, int parentNodeId, int newNodesId)
         {
             ref GpuBlasNode parentNode = ref blas->Nodes[parentNodeId];
             parentNode.SetBounds(ComputeBoundingBox(parentNode.TriStartOrChild, parentNode.TriCount, buildData));
@@ -178,40 +182,39 @@ public static class BLAS
             bool forceSplit = parentNodeId == 1;
             if (TrySplit(parentNode, buildData, settings, forceSplit) is ObjectSplit objectSplit)
             {
-                GpuBlasNode newLeftNode = new GpuBlasNode();
-                newLeftNode.TriStartOrChild = parentNode.TriStartOrChild;
-                newLeftNode.TriCount = objectSplit.SplitIndex - newLeftNode.TriStartOrChild;
+                GpuBlasNode leftNode = new GpuBlasNode();
+                leftNode.TriStartOrChild = parentNode.TriStartOrChild;
+                leftNode.TriCount = objectSplit.SplitIndex - leftNode.TriStartOrChild;
 
-                GpuBlasNode newRightNode = new GpuBlasNode();
-                newRightNode.TriStartOrChild = objectSplit.SplitIndex;
-                newRightNode.TriCount = parentNode.TriCount - newLeftNode.TriCount;
+                GpuBlasNode rightNode = new GpuBlasNode();
+                rightNode.TriStartOrChild = objectSplit.SplitIndex;
+                rightNode.TriCount = parentNode.TriCount - leftNode.TriCount;
 
                 int leftNodeId = newNodesId;
                 int rightNodeId = leftNodeId + 1;
 
-                blas->Nodes[leftNodeId] = newLeftNode;
-                blas->Nodes[rightNodeId] = newRightNode;
+                blas->Nodes[leftNodeId] = leftNode;
+                blas->Nodes[rightNodeId] = rightNode;
 
                 parentNode.TriStartOrChild = leftNodeId;
                 parentNode.TriCount = 0;
 
-                if (Math.Min(newLeftNode.TriCount, newRightNode.TriCount) >= THREADED_RECURSION_THRESHOLD)
+                if (Math.Min(leftNode.TriCount, rightNode.TriCount) >= THREADED_RECURSION_THRESHOLD)
                 {
                     // Using a thread pool (Task.Run) is slightly faster if we don't do other BLAS builds in other threads.
                     // But when there are enough BLASes to build and we can saturate the cores that way,
                     // then using a thread pool obliterates performance (far worse than no MT at all) for some reason
                     Thread t = new Thread(() => { ProcessBuildTask(blas, leftNodeId, rightNodeId + 1); });
                     t.Start();
-                    ProcessBuildTask(blas, rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount));
+                    ProcessBuildTask(blas, rightNodeId, rightNodeId + MaxNodeCountFromTriCount(leftNode.TriCount));
 
                     t.Join();
                 }
                 else
                 {
                     ProcessBuildTask(blas, leftNodeId, rightNodeId + 1);
-                    ProcessBuildTask(blas, rightNodeId, rightNodeId + MaxNodeCountFromTriCount(newLeftNode.TriCount));
+                    ProcessBuildTask(blas, rightNodeId, rightNodeId + MaxNodeCountFromTriCount(leftNode.TriCount));
                 }
-
 
                 static int MaxNodeCountFromTriCount(int triCount)
                 {
@@ -224,31 +227,27 @@ public static class BLAS
         {
             int nodeCounter = 2;
 
-            int stackPtr = 0;
             Span<int> stack = stackalloc int[128];
+            int stackPtr = 0;
             stack[stackPtr++] = 1;
             while (stackPtr > 0)
             {
                 ref GpuBlasNode parentNode = ref blas.Nodes[stack[--stackPtr]];
-                if (parentNode.IsLeaf)
-                {
-                    continue;
-                }
 
-                ref readonly GpuBlasNode leftChild = ref blas.Nodes[parentNode.TriStartOrChild];
-                ref readonly GpuBlasNode rightChild = ref blas.Nodes[parentNode.TriStartOrChild + 1];
+                ref readonly GpuBlasNode leftNode = ref blas.Nodes[parentNode.TriStartOrChild];
+                ref readonly GpuBlasNode rightNode = ref blas.Nodes[parentNode.TriStartOrChild + 1];
 
                 int leftNodeId = nodeCounter + 0;
                 int rightNodeId = nodeCounter + 1;
 
-                blas.Nodes[leftNodeId] = leftChild;
-                blas.Nodes[rightNodeId] = rightChild;
+                blas.Nodes[leftNodeId] = leftNode;
+                blas.Nodes[rightNodeId] = rightNode;
 
                 parentNode.TriStartOrChild = leftNodeId;
                 nodeCounter += 2;
 
-                stack[stackPtr++] = rightNodeId;
-                stack[stackPtr++] = leftNodeId;
+                if (!rightNode.IsLeaf) stack[stackPtr++] = rightNodeId;
+                if (!leftNode.IsLeaf) stack[stackPtr++] = leftNodeId;
             }
 
             return nodeCounter;
@@ -266,10 +265,10 @@ public static class BLAS
                 continue;
             }
 
-            ref readonly GpuBlasNode leftChild = ref blas.Nodes[parent.TriStartOrChild];
-            ref readonly GpuBlasNode rightChild = ref blas.Nodes[parent.TriStartOrChild + 1];
+            ref readonly GpuBlasNode leftNode = ref blas.Nodes[parent.TriStartOrChild];
+            ref readonly GpuBlasNode rightNode = ref blas.Nodes[parent.TriStartOrChild + 1];
 
-            Box mergedBox = Box.From(Conversions.ToBox(leftChild), Conversions.ToBox(rightChild));
+            Box mergedBox = Box.From(Conversions.ToBox(leftNode), Conversions.ToBox(rightNode));
             parent.SetBounds(mergedBox);
         }
     }
@@ -281,10 +280,10 @@ public static class BLAS
             ref GpuBlasNode node = ref nodes[nodeId];
             if (!node.IsLeaf)
             {
-                ref readonly GpuBlasNode leftChild = ref nodes[node.TriStartOrChild];
-                ref readonly GpuBlasNode rightChild = ref nodes[node.TriStartOrChild + 1];
+                ref readonly GpuBlasNode leftNode = ref nodes[node.TriStartOrChild];
+                ref readonly GpuBlasNode rightNode = ref nodes[node.TriStartOrChild + 1];
 
-                Box mergedBox = Box.From(Conversions.ToBox(leftChild), Conversions.ToBox(rightChild));
+                Box mergedBox = Box.From(Conversions.ToBox(leftNode), Conversions.ToBox(rightNode));
                 node.SetBounds(mergedBox);
             }
 
@@ -609,16 +608,20 @@ public static class BLAS
         return cost / totalArea;
     }
 
-    public static float ComputeGlobalSAH(BuildResult blas, BuildSettings settings)
+    public static double ComputeGlobalSAH(BuildResult blas, BuildSettings settings)
     {
-        float cost = 0.0f;
+        double cost = 0.0f;
 
-        float rootArea = blas.Root.HalfArea();
-        for (int i = 1; i < blas.Nodes.Length; i++)
+        double rootArea = 1.0f / blas.Root.HalfArea();
+
+        Span<int> stack = stackalloc int[128];
+        int stackPtr = 0;
+        stack[stackPtr++] = 1;
+        while (stackPtr > 0)
         {
-            ref readonly GpuBlasNode node = ref blas.Nodes[i];
-            float probHitNode = node.HalfArea() / rootArea;
-
+            ref readonly GpuBlasNode node = ref blas.Nodes[stack[--stackPtr]];
+            double probHitNode = node.HalfArea() * rootArea;
+            
             if (node.IsLeaf)
             {
                 cost += settings.TriangleCost * node.TriCount * probHitNode;
@@ -626,53 +629,26 @@ public static class BLAS
             else
             {
                 cost += TRAVERSAL_COST * probHitNode;
+
+                stack[stackPtr++] = node.TriStartOrChild + 1;
+                stack[stackPtr++] = node.TriStartOrChild;
             }
         }
+
         return cost;
     }
 
-    public static float ComputeGlobalArea(BuildResult blas)
+    public static int ComputeTreeDepth(BuildResult blas, int nodeId = 1)
     {
-        float cost = 0.0f;
-
-        float rootArea = blas.Root.HalfArea();
-        for (int i = 1; i < blas.Nodes.Length; i++)
+        ref readonly GpuBlasNode parent = ref blas.Nodes[nodeId];
+        if (parent.IsLeaf)
         {
-            ref readonly GpuBlasNode node = ref blas.Nodes[i];
-            float probHitNode = node.HalfArea() / rootArea;
-            cost += probHitNode;
-        }
-        return cost;
-    }
-
-    public static float ComputeOverlap(BuildResult blas)
-    {
-        float overlap = 0.0f;
-
-        int stackPtr = 0;
-        Span<int> stack = stackalloc int[128];
-        stack[stackPtr++] = 2;
-
-        while (stackPtr > 0)
-        {
-            int stackTop = stack[--stackPtr];
-
-            ref readonly GpuBlasNode leftNode = ref blas.Nodes[stackTop];
-            ref readonly GpuBlasNode rightNode = ref blas.Nodes[stackTop + 1];
-
-            overlap += Box.GetOverlappingHalfArea(Conversions.ToBox(leftNode), Conversions.ToBox(rightNode));
-
-            if (!rightNode.IsLeaf)
-            {
-                stack[stackPtr++] = rightNode.TriStartOrChild;
-            }
-            if (!leftNode.IsLeaf)
-            {
-                stack[stackPtr++] = leftNode.TriStartOrChild;
-            }
+            return 1;
         }
 
-        return overlap;
+        int left = ComputeTreeDepth(blas, parent.TriStartOrChild);
+        int right = ComputeTreeDepth(blas, parent.TriStartOrChild + 1);
+        return Math.Max(left, right) + 1;
     }
 
     public static int ComputeRequiredStackSize(BuildResult blas, int nodeId = 2)
@@ -737,7 +713,7 @@ public static class BLAS
     {
         Box parentBox = Conversions.ToBox(parentNode);
 
-        if (parentNode.TriCount <= settings.StopSplittingThreshold)
+        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentNode.HalfArea() == 0.0f)
         {
             return null;
         }
@@ -822,7 +798,8 @@ public static class BLAS
         Box rightBox = ComputeBoundingBox(split.SplitIndex, end - split.SplitIndex, buildData, split.Axis);
         bool leftSmaller = leftBox.HalfArea() < rightBox.HalfArea();
 
-        // Make the larger child always be on the left as it's more likely to be hit and traversing the left path is more memory friendly
+        // Make the larger child always be on the left as it's more likely
+        // to be hit and traversing the left path is memory friendly
         bool swapSides = leftSmaller;
 
         fragIdsSorted = buildData.FragmentIdsSortedOnAxis[split.Axis];
@@ -870,6 +847,62 @@ public static class BLAS
         Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 2) % 3].AsSpan(start, parentNode.TriCount), partitionAux, partitionLeft);
 
         return split;
+    }
+
+    private static void OptimizeStackSize(ref BuildResult blas, BuildSettings settings)
+    {
+        double initalCost = ComputeGlobalSAH(blas, settings);
+        int newStackSize = ComputeRequiredStackSize(blas);
+
+        double costIncrease = 0.0f;
+
+        // Before we collapse the level we need to gather the cost increase first
+        CollapseDeepestLevel(blas, newStackSize - 1, firstPass: true, ref costIncrease);
+        double increasePercent = costIncrease / initalCost;
+
+        while (increasePercent <= settings.StackSizeOptSAHIncreaseAcceptance && newStackSize > 0)
+        {
+            // Collapse the deepest level and also add cost for collapsing the next level
+            CollapseDeepestLevel(blas, --newStackSize, firstPass: false, ref costIncrease);
+            increasePercent = costIncrease / initalCost;
+        }
+
+        blas.RequiredStackSize = newStackSize;
+
+        void CollapseDeepestLevel(BuildResult blas, int newStackSize, bool firstPass, ref double nextCollapseCost, int parentId = 1, int stackSize = 0)
+        {
+            ref GpuBlasNode parentNode = ref blas.Nodes[parentId];
+
+            ref readonly GpuBlasNode leftNode = ref blas.Nodes[parentNode.TriStartOrChild];
+            ref readonly GpuBlasNode rightNode = ref blas.Nodes[parentNode.TriStartOrChild + 1];
+
+            if (!leftNode.IsLeaf)
+            {
+                CollapseDeepestLevel(blas, newStackSize, firstPass, ref nextCollapseCost, parentNode.TriStartOrChild + 0, stackSize + 1);
+            }
+
+            if (!rightNode.IsLeaf)
+            {
+                CollapseDeepestLevel(blas, newStackSize, firstPass, ref nextCollapseCost, parentNode.TriStartOrChild + 1, stackSize + 1);
+            }
+
+            if (leftNode.IsLeaf && rightNode.IsLeaf)
+            {
+                if (stackSize > newStackSize && !firstPass)
+                {
+                    parentNode.TriStartOrChild = leftNode.TriStartOrChild;
+                    parentNode.TriCount = leftNode.TriCount + rightNode.TriCount;
+                }
+                
+                if ((stackSize == newStackSize && !firstPass) || (stackSize > newStackSize && firstPass))
+                {
+                    double leavesCost = settings.TriangleCost * ((double)leftNode.TriCount * leftNode.HalfArea() + (double)rightNode.TriCount * rightNode.HalfArea());
+                    double newParentLeafCost = (double)settings.TriangleCost * (leftNode.TriCount + rightNode.TriCount);
+
+                    nextCollapseCost += (parentNode.HalfArea() * (newParentLeafCost - TRAVERSAL_COST) - leavesCost) / blas.Root.HalfArea();
+                }
+            }
+        }
     }
 
     private record struct LambdaSortFragments : Algorithms.IRadixSortable<int>

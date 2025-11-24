@@ -2,7 +2,7 @@
 #extension GL_AMD_gpu_shader_half_float : enable
 #extension GL_AMD_gpu_shader_half_float_fetch : enable
 
-#define PATH_TRACER_RAY_SORTING AppInsert(PATH_TRACER_RAY_SORTING)
+#define PATH_TRACER_DO_RAY_SORTING AppInsert(PATH_TRACER_DO_RAY_SORTING)
 
 #if GL_AMD_gpu_shader_half_float_fetch
 #define MATERIAL_SAMPLER_2D_TYPE f16sampler2D
@@ -67,7 +67,7 @@ void main()
             atomicAdd(wavefrontPTSSBO.DispatchCommand.NumGroupsX, 1);
         }
 
-    #if PATH_TRACER_RAY_SORTING
+    #if PATH_TRACER_DO_RAY_SORTING
         uint key = GetSortingKey(wavefrontRay, pingPongIndex);
         
         // Build histogram and cache the key for subsequent shaders to do the sorting

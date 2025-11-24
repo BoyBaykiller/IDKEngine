@@ -494,7 +494,7 @@ public class BVH : IDisposable
 
         if (true)
         {
-            float totalSAH = 0.0f;
+            double totalSAH = 0.0f;
             for (int i = start; i < start + count; i++)
             {
                 totalSAH += BLAS.ComputeGlobalSAH(GetBlas(i), buildSettings);

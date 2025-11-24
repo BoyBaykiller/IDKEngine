@@ -98,7 +98,7 @@ class PathTracer : IDisposable
         set
         {
             _doRaySorting = value;
-            BBG.AbstractShaderProgram.SetShaderInsertionValue("PATH_TRACER_RAY_SORTING", DoRaySorting);
+            BBG.AbstractShaderProgram.SetShaderInsertionValue("PATH_TRACER_DO_RAY_SORTING", DoRaySorting);
         }
     }
 
