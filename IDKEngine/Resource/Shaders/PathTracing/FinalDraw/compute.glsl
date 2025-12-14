@@ -12,8 +12,9 @@ layout(std140, binding = 0) uniform SettingsUBO
 {
     float FocalLength;
     float LenseRadius;
-    bool IsDebugBVHTraversal;
+    bool DoDebugBVHTraversal;
     bool DoTraceLights;
+    bool DoRussianRoulette;
 } settingsUBO;
 
 vec3 TurboColormap(float x);
@@ -26,7 +27,7 @@ void main()
     GpuWavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
 
     vec3 irradiance = wavefrontRay.Radiance;
-    if (settingsUBO.IsDebugBVHTraversal)
+    if (settingsUBO.DoDebugBVHTraversal)
     {
         float x = wavefrontRay.PreviousIOROrTraverseCost / 150.0;
         vec3 col = TurboColormap(x);

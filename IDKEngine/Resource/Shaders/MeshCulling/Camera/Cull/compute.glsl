@@ -30,26 +30,26 @@ void main()
     uint meshInstanceId = meshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
+    GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
     uint meshId = meshInstance.MeshId;
 
-    GpuBlasNode node = blasNodeSSBO.Nodes[blasDescSSBO.Descs[meshId].NodeOffset + 1];
+    GpuMesh mesh = meshSSBO.Meshes[meshId];
+    Box localBounds = Box(mesh.LocalBoundsMin, mesh.LocalBoundsMax);
     
-    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
-    mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
+    mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
+    mat4 prevModelMatrix = mat4(meshTransform.PrevModelMatrix);
 
     bool isVisible = true;
 
-    Box meshLocalBounds = Box(node.Min, node.Max);
-
     Frustum frustum = GetFrustum(perFrameDataUBO.ProjView * modelMatrix);
-    isVisible = FrustumBoxIntersect(frustum, meshLocalBounds);
+    isVisible = FrustumBoxIntersect(frustum, localBounds);
 
 #if IS_HI_Z_CULLING
     if (isVisible)
     {
         // Occlusion Culling
         bool vertexBehindFrustum;
-        Box meshletOldNdcBounds = BoxTransformPerspective(meshLocalBounds, perFrameDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
+        Box meshletOldNdcBounds = BoxTransformPerspective(localBounds, perFrameDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
         if (!vertexBehindFrustum)
         {
             isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
@@ -65,7 +65,7 @@ void main()
         visibleMeshInstanceIdSSBO.Ids[meshletTaskId] = meshInstanceId;
         
         const uint taskShaderWorkGroupSize = 32;
-        uint meshletCount = meshSSBO.Meshes[meshId].MeshletCount;
+        uint meshletCount = mesh.MeshletCount;
         uint meshletsWorkGroupCount = (meshletCount + taskShaderWorkGroupSize - 1) / taskShaderWorkGroupSize;
         meshletTaskCmdSSBO.Commands[meshletTaskId].Count = meshletsWorkGroupCount;
 

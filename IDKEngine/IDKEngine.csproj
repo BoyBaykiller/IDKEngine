@@ -16,8 +16,6 @@
     QuickJIT has an overhead for code called first time(s). 
     It doubles the time spent on building BLASes for Sponza+Helmet+Lucy on application load.
     On the other hand it increase performance for parallel BLAS refitting.
-    The first-dispatch overhead of QuickJIT only exists when no precompiled code is given as a basis with the "ReadyToRun"-feature.
-    Tiered compilation has no effect when NativeAOT is used since all code is precompiled.
     -->
     <TieredCompilation>true</TieredCompilation> <!-- True by default-->
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit><!-- True by default-->
@@ -25,13 +23,15 @@
 
     <PublishAot>true</PublishAot>
     <UseSizeOptimizedLinq>true</UseSizeOptimizedLinq>
-    <InvariantGlobalization>true</InvariantGlobalization> 
+    <InvariantGlobalization>true</InvariantGlobalization>
 
     <OptimizationPreference>Speed</OptimizationPreference> 
     <IlcInstructionSet>avx2</IlcInstructionSet>
     <IlcDisableVxsort>true</IlcDisableVxsort>
     <IlcDehydrate>true</IlcDehydrate>
     <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+    <PublishLzmaCompressed>true</PublishLzmaCompressed> <!-- https://github.com/MichalStrehovsky/PublishAotCompressed -->
+
     <!-- <UseSystemResourceKeys>true</UseSystemResourceKeys> -->
     <!-- <IlcDisableReflection>true</IlcDisableReflection> -->
     <!-- <StackTraceSupport>false</StackTraceSupport> -->
@@ -69,6 +69,7 @@
     <PackageReference Include="Meshoptimizer.NET" Version="1.0.7" />
     <PackageReference Include="NativeFileDialogSharp" Version="0.6.0-alpha" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="5.0.0-pre.15" />
+    <PackageReference Include="PublishAotCompressed" Version="1.0.5" />
     <PackageReference Include="ReFuel.StbImage" Version="2.1.0" />
     <PackageReference Include="SharpGLTF.Core" Version="1.0.5" />
     <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.5" />

@@ -53,7 +53,7 @@ public unsafe struct GpuMaterial
 
     public BBG.Texture.BindlessHandle TransmissionTexture;
     public bool IsVolumetric;
-    private fixed bool _pad[3];
+    private fixed byte _pad[3];
     private readonly float _pad0;
 
     public readonly bool HasAlphaBlending()

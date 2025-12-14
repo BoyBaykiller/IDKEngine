@@ -28,9 +28,10 @@ void main()
 
     GpuMesh mesh = meshSSBO.Meshes[gl_DrawID];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[gl_BaseInstance + gl_InstanceID];
+    GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
 
-    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
-    mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
+    mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
+    mat4 invModelMatrix = mat4(meshTransform.InvModelMatrix);
 
     outData.FragPos = (modelMatrix * vec4(vertexPosition, 1.0)).xyz;
 
@@ -40,7 +41,7 @@ void main()
     outData.Normal = normalize(unitVecToWorld * normal);
     outData.TexCoord = Unpack(vertex.TexCoord);
 
-    outData.MaterialId = vertex.MaterialId;
+    outData.MaterialId = mesh.MaterialId;
     outData.EmissiveBias = mesh.EmissiveBias;
 
     vec3 ndc = MapToZeroOne(outData.FragPos, voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax) * 2.0 - 1.0;

@@ -23,13 +23,13 @@ void main()
     uint leafId = blasLeafIndicesSSBO.Indices[blasDesc.LeafIndicesOffset + gl_GlobalInvocationID.x];
 
     GpuBlasNode leafNode = blasNodeSSBO.Nodes[blasDesc.NodeOffset + leafId];
-    Box bounds = ComputeBoundingBox(blasDesc.GeometryDesc.TriangleOffset + leafNode.TriStartOrChild, leafNode.TriCount);
+    Box bounds = ComputeBoundingBox(blasDesc.TriangleOffset + leafNode.TriStartOrChild, leafNode.TriCount);
     SetNodeBounds(blasDesc.NodeOffset + leafId, bounds);
 
-    int parentId = blasParentIndicesSSBO.Indices[blasDesc.NodeOffset + leafId];
+    int parentId = blasParentIndicesSSBO.Indices[blasDesc.ParentIndicesOffset + leafId];
     do
     {
-        if (atomicExchange(blasRefitLocksSSBO.Locks[parentId], 1u) == 0u)
+        if (atomicExchange(blasRefitLockSSBO.Locks[parentId], 1u) == 0u)
         {
             // Thread arrived first, meaning the other child is not refitted yet, terminate.
             return;
@@ -44,7 +44,7 @@ void main()
 
         SetNodeBounds(blasDesc.NodeOffset + parentId, mergedBox);
 
-        parentId = blasParentIndicesSSBO.Indices[blasDesc.NodeOffset + parentId];
+        parentId = blasParentIndicesSSBO.Indices[blasDesc.ParentIndicesOffset + parentId];
     } while (parentId != -1);
 }
 
@@ -59,7 +59,7 @@ Box ComputeBoundingBox(uint start, uint count)
     Box box = CreateBoxEmpty();
     for (uint i = start; i < start + count; i++)
     {
-        uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[i]);
+        uvec3 indices = blasTriangleIndicesSSBO.Indices[i].Indices;
 
         vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
         vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);

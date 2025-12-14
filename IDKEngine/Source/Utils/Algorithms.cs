@@ -286,6 +286,31 @@ public static class Algorithms
         return lCounter;
     }
 
+    public static int StablePartition<T>(Span<T> source, Predicate<int> leftSide)
+    {
+        int lCounter = 0;
+        int rCounter = 0;
+
+        Span<T> auxiliary = new T[source.Length];
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            T el = source[i];
+            if (leftSide(i))
+            {
+                source[lCounter++] = el;
+            }
+            else
+            {
+                auxiliary[rCounter++] = el;
+            }
+        }
+
+        auxiliary.Slice(0, rCounter).CopyTo(source.Slice(lCounter, rCounter));
+
+        return lCounter;
+    }
+
     public static void Swap<T>(ref T a, ref T b) where T : allows ref struct
     {
         T temp = a;

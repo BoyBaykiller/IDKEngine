@@ -7,16 +7,10 @@ namespace IDKEngine.Render;
 
 class Bloom : IDisposable
 {
-    private enum Stage : int
-    {
-        Downsample,
-        Upsample,
-    }
-
     public record struct GpuSettings
     {
-        public float Threshold = 1.0f;
-        public float MaxColor = 2.8f;
+        public float Threshold = 1.5f;
+        public float MaxColor = 3.8f;
 
         public GpuSettings()
         {
@@ -34,6 +28,12 @@ class Bloom : IDisposable
             // Multiply with 2 to get size of original src texture
             SetSize(new Vector2i(Result.Width, Result.Height) * 2);
         }
+    }
+
+    private enum Stage : int
+    {
+        Downsample,
+        Upsample,
     }
 
     public GpuSettings Settings;

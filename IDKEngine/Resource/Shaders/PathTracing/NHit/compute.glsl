@@ -25,8 +25,9 @@ layout(std140, binding = 0) uniform SettingsUBO
 {
     float FocalLength;
     float LenseRadius;
-    bool IsDebugBVHTraversal;
+    bool DoDebugBVHTraversal;
     bool DoTraceLights;
+    bool DoRussianRoulette;
 } settingsUBO;
 
 bool TraceRay(inout GpuWavefrontRay wavefrontRay);
@@ -92,7 +93,9 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         bool hitLight = hitInfo.TriangleId == ~0u;
         if (!hitLight)
         {
-            uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId]);
+            uvec3 indices = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].Indices;
+            uint meshId = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].GeometryId;
+
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
             GpuVertex v2 = vertexSSBO.Vertices[indices.z];
@@ -102,9 +105,9 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
             vec3 interpNormal = normalize(Interpolate(DecompressSR11G11B10(v0.Normal), DecompressSR11G11B10(v1.Normal), DecompressSR11G11B10(v2.Normal), bary));
             vec3 interpTangent = normalize(Interpolate(DecompressSR11G11B10(v0.Tangent), DecompressSR11G11B10(v1.Tangent), DecompressSR11G11B10(v2.Tangent), bary));
 
-            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceId];
-            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
-            GpuMaterial material = materialSSBO.Materials[v0.MaterialId];
+            GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[hitInfo.MeshTransformId];
+            GpuMesh mesh = meshSSBO.Meshes[meshId];
+            GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
 
             surface = GetSurface(material, interpTexCoord);
             SurfaceApplyModificatons(surface, mesh);
@@ -116,7 +119,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
                 return true;
             }
 
-            mat3 unitVecToWorld = mat3(transpose(meshInstance.InvModelMatrix));
+            mat3 unitVecToWorld = mat3(transpose(meshTransform.InvModelMatrix));
             vec3 worldNormal = normalize(unitVecToWorld * interpNormal);
             vec3 worldTangent = normalize(unitVecToWorld * interpTangent);
             mat3 tbn = GetTBN(worldTangent, worldNormal);
@@ -131,7 +134,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         }
         else if (settingsUBO.DoTraceLights)
         {
-            GpuLight light = lightsUBO.Lights[hitInfo.InstanceId];
+            GpuLight light = lightsUBO.Lights[hitInfo.MeshTransformId];
             surface.Emissive = light.Color;
             surface.Albedo = light.Color;
             surface.Normal = (wavefrontRay.Origin - light.Position) / light.Radius;
@@ -162,7 +165,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         SampleMaterialResult result = SampleMaterial(rayDir, surface, wavefrontRay.PreviousIOROrTraverseCost, fromInside);
         wavefrontRay.Throughput *= result.Bsdf / result.Pdf;
 
-        bool terminateRay = RussianRouletteTerminateRay(wavefrontRay.Throughput);
+        bool terminateRay = settingsUBO.DoRussianRoulette && RussianRouletteTerminateRay(wavefrontRay.Throughput);
         if (terminateRay)
         {
             return false;

@@ -26,7 +26,8 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    vec3 hdrColor = texture(Sampler0, uv).rgb;
+    vec3 hdrColor = vec3(0.0);
+    hdrColor += texture(Sampler0, uv).rgb;
     hdrColor += texture(Sampler1, uv).rgb;
     hdrColor += texture(Sampler2, uv).rgb;
 

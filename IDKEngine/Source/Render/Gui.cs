@@ -25,11 +25,12 @@ partial class Gui : IDisposable
 {
     public abstract record SelectedEntityInfo
     {
-        public record MeshInstance(int MeshInstanceId, int MaterialId) : SelectedEntityInfo;
-        public record Light(int LightId) : SelectedEntityInfo;
+        public record Mesh(int MeshId, int MeshTransformId) : SelectedEntityInfo;
+        public record MeshTransform(int MeshTransformId) : SelectedEntityInfo;
         public record Node(ModelLoader.Node Node_) : SelectedEntityInfo;
         public record Material(int MaterialId) : SelectedEntityInfo;
         public record Animation(int ModelId, int AnimationId) : SelectedEntityInfo;
+        public record Light(int LightId) : SelectedEntityInfo;
     }
 
     public SelectedEntityInfo SelectedEntity;
@@ -123,14 +124,16 @@ partial class Gui : IDisposable
             ImGui.Text($"GC TotalPauseDuration = {GC.GetTotalPauseDuration().Milliseconds}");
 
             {
-                float mbDrawVertices = (app.ModelManager.Vertices.SizeInBytes() + app.ModelManager.VertexPositions.SizeInBytes()) / 1000000.0f;
-                float mbDrawIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
+                float mbVertices = app.ModelManager.Vertices.SizeInBytes() / 1000000.0f;
+                float mbVertexPositions = app.ModelManager.VertexPositions.SizeInBytes() / 1000000.0f;
+                float mbIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
                 float mbMeshInstances = app.ModelManager.MeshInstances.SizeInBytes() / 1000000.0f;
-                float totalRasterizer = mbDrawVertices + mbDrawIndices + mbMeshInstances;
+                float totalRasterizer = mbVertices + mbVertexPositions + mbIndices + mbMeshInstances;
                 if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb###Rasterizer Geometry total"))
                 {
-                    ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbDrawVertices}mb");
-                    ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbDrawIndices}mb");
+                    ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbVertices}mb");
+                    ImGui.Text($"  * VertexPositions ({app.ModelManager.Vertices.Length}) = {mbVertexPositions}mb");
+                    ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbIndices}mb");
                     ImGui.Text($"  * MeshInstances ({app.ModelManager.MeshInstances.Length}) = {mbMeshInstances}mb");
                     ImGui.TreePop();
                 }
@@ -329,16 +332,18 @@ partial class Gui : IDisposable
             {
                 app.ModelManager.BVH.GpuUseTlas = gpuUseTlas;
             }
-            ToolTipForItemAboveHovered(
-                "This increases GPU BVH traversal performance when there exist a lot of instances.\n" +
-                $"You probably want this together with {nameof(app.ModelManager.BVH.RebuildTlas)}"
+            ToolTipForItemAboveHovered($"""
+                This increases GPU BVH traversal performance when there exist a lot of instances.
+                You probably want this together with. {nameof(app.ModelManager.BVH.RebuildTlas)}
+                """
             );
 
             ImGui.SameLine();
             ImGui.Checkbox("CpuUseTlas", ref app.ModelManager.BVH.CpuUseTlas);
-            ToolTipForItemAboveHovered(
-                "This increases CPU BVH traversal performance when there exist a lot of instances.\n" +
-                $"You probably want this together with {nameof(app.ModelManager.BVH.RebuildTlas)}"
+            ToolTipForItemAboveHovered($"""
+                This increases CPU BVH traversal performance when there exist a lot of instances.
+                You probably want this together with. {nameof(app.ModelManager.BVH.RebuildTlas)}
+                """
             );
             ImGui.SameLine();
             tempBool = app.ModelManager.BVH.RebuildTlas;
@@ -392,8 +397,10 @@ partial class Gui : IDisposable
                     app.RasterizerPipeline.TakeMeshShaderPath = tempBool;
                     CpuPointShadow.TakeMeshShaderPath = tempBool;
                 }
-                ToolTipForItemAboveHovered(
-                    "If your GPU supports them this can significantly improve performance depending on the scene (not old sponza)."
+                ToolTipForItemAboveHovered("""
+                    Uses task + mesh shader from GL_NV_mesh_shader to process geometry.
+                    If your GPU supports them this can significantly improve performance depending on the scene (not old sponza).
+                    """
                 );
 
                 ImGui.SameLine();
@@ -403,9 +410,10 @@ partial class Gui : IDisposable
                 {
                     app.RasterizerPipeline.IsHiZCulling = tempBool;
                 }
-                ToolTipForItemAboveHovered(
-                    "Occlusion Culling. This is turned off because of a small edge-case issue.\n" +
-                    "Significantly improves performance depending on the amount of object occlusion."
+                ToolTipForItemAboveHovered("""
+                    Occlusion Culling. This is turned off because of a small edge-case issue.
+                    Significantly improves performance depending on the amount of object occlusion.
+                    """
                 );
 
                 if (ImGui.CollapsingHeader("Voxel Global Illumination"))
@@ -419,10 +427,11 @@ partial class Gui : IDisposable
                         ImGui.Checkbox("GridFollowCamera", ref app.RasterizerPipeline.GridFollowCamera);
 
                         ImGui.Checkbox("IsConfigureGrid", ref app.RasterizerPipeline.IsConfigureGridMode);
-                        ToolTipForItemAboveHovered(
-                            "Allows to change the size of the VXGI grid.\n" +
-                            "It defines the space the VXGI Lighting algorithm is applied over.\n" +
-                            "This needs to be set manually. The green box marks the grid."
+                        ToolTipForItemAboveHovered("""
+                            Allows to change the size of the VXGI grid.
+                            It defines the space the VXGI Lighting algorithm is applied over.
+                            This needs to be set manually. The green box marks the grid.
+                            """
                         );
 
                         string[] resolutions = ["512", "384", "256", "128", "64"];
@@ -472,9 +481,10 @@ partial class Gui : IDisposable
                             ImGui.SliderFloat("GISkyBoxBoost", ref app.RasterizerPipeline.ConeTracer.Settings.GISkyBoxBoost, 0.0f, 5.0f);
                             ImGui.SliderFloat("NormalRayOffset", ref app.RasterizerPipeline.ConeTracer.Settings.NormalRayOffset, 1.0f, 3.0f);
                             ImGui.Checkbox("IsTemporalAccumulation", ref app.RasterizerPipeline.ConeTracer.Settings.IsTemporalAccumulation);
-                            ToolTipForItemAboveHovered(
-                                $"When active samples are accumulated over multiple frames.\n" +
-                                "If there is no Temporal Anti Aliasing this is treated as being disabled."
+                            ToolTipForItemAboveHovered("""
+                                When active samples are accumulated over multiple frames.
+                                If there is no Temporal Anti Aliasing this is treated as being disabled.
+                                """
                             );
                         }
 
@@ -485,21 +495,25 @@ partial class Gui : IDisposable
                         }
 
                         ImGui.Text($"NV_conservative_raster: {Voxelizer.ALLOW_CONSERVATIVE_RASTER}");
-                        ToolTipForItemAboveHovered(
-                            "Allows to make the rasterizer invoke the fragment shader even if a pixel is only partially covered.\n" +
-                            "Currently there is some bug with this which causes overly bright voxels."
+                        ToolTipForItemAboveHovered("""
+                            Makes the rasterizer invoke the fragment shader even if a pixel is only partially covered.
+                            Currently there is some bug with this which causes overly bright voxels.
+                            """
                         );
 
                         ImGui.Text($"TAKE_FAST_GEOMETRY_SHADER_PATH: {Voxelizer.TAKE_FAST_GEOMETRY_SHADER_PATH}");
-                        ToolTipForItemAboveHovered(
-                            "Combination of NV_geometry_shader_passthrough and NV_viewport_swizzle to take advantage of a fast \"passthrough geometry\" shader instead of having to render the scene 3 times.\n" +
-                            "Regular geometry shaders were even slower which is why I decided to avoided them entirely."
+                        ToolTipForItemAboveHovered("""
+                            Combination of NV_geometry_shader_passthrough and NV_viewport_swizzle to take advantage
+                            of a fast "passthrough geometry" shader instead of having to render the scene 3 times.
+                            Regular geometry shaders were even slower which is why I decided to avoided them entirely.
+                            """
                         );
 
                         ImGui.Text($"NV_shader_atomic_fp16_vector: {Voxelizer.TAKE_ATOMIC_FP16_PATH}");
-                        ToolTipForItemAboveHovered(
-                            "Allows to perform atomics on fp16 images without having to emulate such behaviour.\n" +
-                            "Most noticeably without this extension voxelizing requires 2.5x times the memory."
+                        ToolTipForItemAboveHovered("""
+                            Allows to perform atomics on fp16 images without having to emulate such behaviour.
+                            Most noticeably without this extension voxelizing requires 2.5x times the memory.
+                            """
                         );
                     }
                 }
@@ -528,10 +542,11 @@ partial class Gui : IDisposable
 
                     if (app.RasterizerPipeline.ShadowMode_ == RasterPipeline.ShadowMode.RayTraced)
                     {
-                        ImGui.Text(
-                            "This is mostly just a tech demo.\n" +
-                            "For example there is no dedicated denoising.\n" +
-                            "Requires abuse of TAA. FSR2 works best"
+                        ImGui.Text("""
+                            This is mostly just a tech demo.
+                            There is no dedicated denoising.
+                            Requires abuse of TAA. FSR2 works best.
+                            """
                         );
 
                         ImGui.SliderInt("Samples##SamplesRayTracing", ref app.RasterizerPipeline.RayTracingSamples, 1, 10);
@@ -693,17 +708,17 @@ partial class Gui : IDisposable
                     }
                 }
             }
-            if (app.RenderMode_ == Application.RenderMode.PathTracer)
+            else if (app.RenderMode_ == Application.RenderMode.PathTracer)
             {
                 if (ImGui.CollapsingHeader("PathTracing"))
                 {
                     ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
 
-                    tempBool = app.PathTracer.IsDebugBVHTraversal;
+                    tempBool = app.PathTracer.DoDebugBVHTraversal;
 
-                    if (ImGui.Checkbox("IsDebugBVHTraversal", ref tempBool))
+                    if (ImGui.Checkbox("DoDebugBVHTraversal", ref tempBool))
                     {
-                        app.PathTracer.IsDebugBVHTraversal = tempBool;
+                        app.PathTracer.DoDebugBVHTraversal = tempBool;
                     }
 
                     tempBool = app.PathTracer.DoRaySorting;
@@ -711,6 +726,11 @@ partial class Gui : IDisposable
                     {
                         app.PathTracer.DoRaySorting = tempBool;
                     }
+                    ToolTipForItemAboveHovered("""
+                        Sorts all rays by their position between each bounce to restore coherency.
+                        This is only useful if many rays stay alive (e.g no Russian Roulette).
+                        """
+                    );
 
                     tempBool = app.PathTracer.DoTraceLights;
                     if (ImGui.Checkbox("DoTraceLights", ref tempBool))
@@ -718,7 +738,20 @@ partial class Gui : IDisposable
                         app.PathTracer.DoTraceLights = tempBool;
                     }
 
-                    if (!app.PathTracer.IsDebugBVHTraversal)
+                    tempBool = app.PathTracer.DoRussianRoulette;
+                    if (ImGui.Checkbox("DoRussianRoulette", ref tempBool))
+                    {
+                        app.PathTracer.DoRussianRoulette = tempBool;
+                    }
+                    ToolTipForItemAboveHovered("""
+                        Probabilistically eliminates rays which carry little contribution.
+                        This can significantly boost performance. How many
+                        rays are eliminated depends on the albedo color.
+                        Never done for the first bounce.
+                        """
+                    );
+
+                    if (!app.PathTracer.DoDebugBVHTraversal)
                     {
                         tempInt = app.PathTracer.RayDepth;
                         if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
@@ -803,45 +836,25 @@ partial class Gui : IDisposable
                     }
                 }
             }
-
         }
         ImGui.End();
 
         if (ImGui.Begin("Entity Properties"))
         {
-            if (SelectedEntity is SelectedEntityInfo.MeshInstance meshInstanceInfo)
+            if (SelectedEntity is SelectedEntityInfo.Mesh meshInfo)
             {
                 bool modified = false;
 
-                GpuMeshInstance meshInstance = app.ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId];
-                ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[meshInstance.MeshId];
-                ref GpuMesh mesh = ref app.ModelManager.Meshes[meshInstance.MeshId];
-                ref GpuMaterial material = ref app.ModelManager.GpuMaterials[meshInstanceInfo.MaterialId];
+                ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[meshInfo.MeshId];
+                ref GpuMesh mesh = ref app.ModelManager.Meshes[meshInfo.MeshId];
+                ref GpuMaterial material = ref app.ModelManager.GpuMaterials[mesh.MaterialId];
+                GpuMeshTransform gpuMeshTransform = app.ModelManager.MeshTransforms[meshInfo.MeshTransformId];
 
-                Transformation meshInstanceTransform = Transformation.FromMatrix(meshInstance.ModelMatrix);
+                Transformation meshTransform = Transformation.FromMatrix(gpuMeshTransform.ModelMatrix);
 
-                ImGui.SeparatorText("Mesh Instance");
-
-                tempVec3 = meshInstanceTransform.Translation.ToNumerics();
-                if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
+                ImGui.SeparatorText("Mesh Transform");
+                if (RenderTransformPanel(ref meshTransform))
                 {
-                    meshInstanceTransform.Translation = tempVec3.ToOpenTK();
-                    modified = true;
-                }
-
-                tempVec3 = meshInstanceTransform.Scale.ToNumerics();
-                if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
-                {
-                    meshInstanceTransform.Scale = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
-                    modified = true;
-                }
-
-                SysVec3 previous = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
-                tempVec3 = previous;
-                if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
-                {
-                    SysVec3 diff = tempVec3 - previous;
-                    meshInstanceTransform.Rotation *= Quaternion.FromEulerAngles(diff.ToOpenTK());
                     modified = true;
                 }
 
@@ -885,35 +898,106 @@ partial class Gui : IDisposable
                 {
                     modified = true;
                 }
-                
+                ToolTipForItemAboveHovered("""
+                    glTF dictates we tint by the materials base color if 
+                    it's volumetric or upon entering, however we may not want to do that.
+                    """
+                );
+
                 if (ImGui.Checkbox("Volumetric", ref material.IsVolumetric))
                 {
                     modified = true;
                 }
+                ToolTipForItemAboveHovered("""
+                    This corresponds to KHR_materials_volume.
+                    Volumetric materials are subject to refraction and absorption.
+                    Thin walled materials on the other hand let light pass through undisturbed.
+                    """
+                );
 
                 ImGui.Text($"Uses AlphaBlending: {material.HasAlphaBlending()}");
 
                 ImGui.SeparatorText("Mesh Info");
 
-                ImGui.Text($"MeshId: {meshInstance.MeshId}");
-                ImGui.Text($"InstanceId: {meshInstanceInfo.MeshInstanceId - cmd.BaseInstance} | Triangle Count: {cmd.IndexCount / 3}");
+                ImGui.Text($"MeshId: {meshInfo.MeshId} | MaterialId: {mesh.MaterialId}");
 
                 if (modified)
                 {
-                    meshInstance.ModelMatrix = meshInstanceTransform.GetMatrix();
+                    gpuMeshTransform.ModelMatrix = meshTransform.GetMatrix();
 
-                    app.ModelManager.UploadMeshBuffer(meshInstance.MeshId, 1);
-                    app.ModelManager.UploadMaterialBuffer(meshInstanceInfo.MaterialId, 1);
-                    app.ModelManager.SetMeshInstance(meshInstanceInfo.MeshInstanceId, meshInstance);
+                    app.ModelManager.UploadMeshBuffer(meshInfo.MeshId, 1);
+                    app.ModelManager.SetMeshTransform(meshInfo.MeshTransformId, gpuMeshTransform);
+                    app.ModelManager.UploadMaterialBuffer(mesh.MaterialId, 1);
                     resetPathTracer = true;
                 }
+            }
+            else if (SelectedEntity is SelectedEntityInfo.MeshTransform meshTransformInfo)
+            {
+                GpuMeshTransform meshTransform = app.ModelManager.MeshTransforms[meshTransformInfo.MeshTransformId];
+                Transformation transform = Transformation.FromMatrix(meshTransform.ModelMatrix);
 
-                if (ImGui.Button("Delete"))
+                ImGui.SeparatorText("Mesh Transform");
+                if (RenderTransformPanel(ref transform))
                 {
-                    app.ModelManager.RemoveMeshInstances(new Range(meshInstanceInfo.MeshInstanceId, 1));
-                    SelectedEntity = null;
+                    meshTransform.ModelMatrix = transform.GetMatrix();
+                    resetPathTracer = true;
+
+                    app.ModelManager.SetMeshTransform(meshTransformInfo.MeshTransformId, meshTransform);
+                }
+            }
+            else if (SelectedEntity is SelectedEntityInfo.Node nodeInfo)
+            {
+                ModelLoader.Node node = nodeInfo.Node_;
+
+                Transformation transform = node.LocalTransform;
+
+                ImGui.SeparatorText("Node Transform");
+                if (RenderTransformPanel(ref transform))
+                {
+                    node.LocalTransform = transform;
                     resetPathTracer = true;
                 }
+
+                ImGui.SeparatorText("Node Info");
+
+                ImGui.Text($"Name: {node.Name} | ArrayIndex: {node.ArrayIndex}");
+                ImGui.Text($"HasSkin: {node.HasSkin} | HasMeshes: {node.HasMeshes}");
+            }
+            else if (SelectedEntity is SelectedEntityInfo.Material materialInfo)
+            {
+                ref readonly ModelLoader.CpuMaterial cpuMaterial = ref app.ModelManager.CpuMaterials[materialInfo.MaterialId];
+
+                for (int i = 0; i < ModelLoader.CpuMaterial.TEXTURE_COUNT; i++)
+                {
+                    ModelLoader.TextureType textureType = (ModelLoader.TextureType)i;
+                    if (cpuMaterial.HasFallbackPixels(textureType))
+                    {
+                        continue;
+                    }
+
+                    (BBG.Texture texture, BBG.Sampler sampler) = cpuMaterial.SampledTextures[i];
+                    BBG.TextureView textureView = new BBG.TextureView(texture, sampler.State);
+
+                    SysVec2 content = ImGui.GetContentRegionAvail();
+                    ImGui.SeparatorText($"{textureType} ({texture.Width}x{texture.Height}, {texture.Format})");
+                    ImGui.Image(textureView.ID, new SysVec2(content.X), new SysVec2(0.0f, 0.0f), new SysVec2(1.0f, 1.0f));
+
+                    frameDeletionQueue.Enqueue(textureView);
+                }
+            }
+            else if (SelectedEntity is SelectedEntityInfo.Animation animationInfo)
+            {
+                ref readonly ModelManager.CpuModel model = ref app.ModelManager.CpuModels[animationInfo.ModelId];
+                ref readonly ModelLoader.ModelAnimation animation = ref model.Animations[animationInfo.AnimationId];
+
+                bool enabled = model.EnabledAnimations[animationInfo.AnimationId];
+                if (ImGui.Checkbox("Apply", ref enabled))
+                {
+                    model.EnabledAnimations[animationInfo.AnimationId] = enabled;
+                }
+
+                ImGui.Text($"Start - End: {animation.Start} - {animation.End}sec");
+                ImGui.Text($"Node Animatons: {animation.NodeAnimations.Length}");
             }
             else if (SelectedEntity is SelectedEntityInfo.Light lightInfo)
             {
@@ -1004,100 +1088,44 @@ partial class Gui : IDisposable
 
                 ImGui.Text($"LightID: {lightInfo.LightId}");
             }
-            else if (SelectedEntity is SelectedEntityInfo.Node nodeInfo)
-            {
-                ModelLoader.Node node = nodeInfo.Node_;
-
-                Transformation meshInstanceTransform = node.LocalTransform;
-                bool modified = false;
-
-                ImGui.SeparatorText("Node Transform");
-
-                tempVec3 = meshInstanceTransform.Translation.ToNumerics();
-                if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
-                {
-                    meshInstanceTransform.Translation = tempVec3.ToOpenTK();
-                    modified = true;
-                }
-
-                tempVec3 = meshInstanceTransform.Scale.ToNumerics();
-                if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
-                {
-                    meshInstanceTransform.Scale = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
-                    modified = true;
-                }
-
-                SysVec3 previous = meshInstanceTransform.Rotation.ToEulerAngles().ToNumerics();
-                tempVec3 = previous;
-                if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
-                {
-                    SysVec3 diff = tempVec3 - previous;
-                    meshInstanceTransform.Rotation *= Quaternion.FromEulerAngles(diff.ToOpenTK());
-                    modified = true;
-                }
-
-                if (modified)
-                {
-                    node.LocalTransform = meshInstanceTransform;
-                    resetPathTracer = true;
-                }
-
-                if (ImGui.Button("Delete"))
-                {
-                    app.ModelManager.RemoveNodeRecursive(node);
-                    SelectedEntity = null;
-                    resetPathTracer = true;
-                }
-
-                ImGui.SeparatorText("Node Info");
-
-                ImGui.Text($"Name: {node.Name} | ArrayIndex: {node.ArrayIndex}");
-                ImGui.Text($"HasSkin: {node.HasSkin} | HasMeshInstances: {node.HasMeshInstances}");
-            }
-            else if (SelectedEntity is SelectedEntityInfo.Material materialInfo)
-            {
-                ref readonly ModelLoader.CpuMaterial cpuMaterial = ref app.ModelManager.CpuMaterials[materialInfo.MaterialId];
-
-                for (int i = 0; i < ModelLoader.CpuMaterial.TEXTURE_COUNT; i++)
-                {
-                    ModelLoader.TextureType textureType = (ModelLoader.TextureType)i;
-                    if (cpuMaterial.HasFallbackPixels(textureType))
-                    {
-                        continue;
-                    }
-
-                    (BBG.Texture texture, BBG.Sampler sampler) = cpuMaterial.SampledTextures[i];
-                    BBG.TextureView textureView = new BBG.TextureView(texture, sampler.State);
-
-                    SysVec2 content = ImGui.GetContentRegionAvail();
-                    ImGui.SeparatorText($"{textureType} ({texture.Width}x{texture.Height}, {texture.Format})");
-                    ImGui.Image(textureView.ID, new SysVec2(content.X), new SysVec2(0.0f, 0.0f), new SysVec2(1.0f, 1.0f));
-
-                    frameDeletionQueue.Enqueue(textureView);
-                }
-            }
-            else if (SelectedEntity is SelectedEntityInfo.Animation animationInfo)
-            {
-                ref readonly ModelManager.CpuModel model = ref app.ModelManager.CpuModels[animationInfo.ModelId];
-                ref readonly ModelLoader.ModelAnimation animation = ref model.Animations[animationInfo.AnimationId];
-
-                bool enabled = model.EnabledAnimations[animationInfo.AnimationId];
-                if (ImGui.Checkbox("Apply", ref enabled))
-                {
-                    model.EnabledAnimations[animationInfo.AnimationId] = enabled;
-                }
-
-                ImGui.Text($"Start - End: {animation.Start} - {animation.End}sec");
-                ImGui.Text($"Node Animatons: {animation.NodeAnimations.Length}");
-            }
             else
             {
                 BothAxisCenteredText("SELECT AN ENTITY TO VIEW DETAILS");
             }
 
-            if (SelectedEntity is SelectedEntityInfo.MeshInstance || SelectedEntity is SelectedEntityInfo.Light)
+            if (SelectedEntity is SelectedEntityInfo.Mesh || SelectedEntity is SelectedEntityInfo.Light)
             {
                 ImGui.Text($"Distance {MathF.Round(clickedEntityDistance, 3)}");
+            }
+
+            bool RenderTransformPanel(ref Transformation transform)
+            {
+                bool modified = false;
+
+                tempVec3 = transform.Translation.ToNumerics();
+                if (ImGui.DragFloat3("Position", ref tempVec3, 0.1f))
+                {
+                    transform.Translation = tempVec3.ToOpenTK();
+                    modified = true;
+                }
+
+                tempVec3 = transform.Scale.ToNumerics();
+                if (ImGui.DragFloat3("Scale", ref tempVec3, 0.005f))
+                {
+                    transform.Scale = OtkVec3.ComponentMax(tempVec3.ToOpenTK(), new OtkVec3(0.001f));
+                    modified = true;
+                }
+
+                SysVec3 previous = transform.Rotation.ToEulerAngles().ToNumerics();
+                tempVec3 = previous;
+                if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
+                {
+                    SysVec3 diff = tempVec3 - previous;
+                    transform.Rotation *= Quaternion.FromEulerAngles(diff.ToOpenTK());
+                    modified = true;
+                }
+
+                return modified;
             }
         }
         ImGui.End();
@@ -1139,6 +1167,7 @@ partial class Gui : IDisposable
                             {
                                 ImGui.TreePop();
                             }
+
                             if (ImGui.IsItemClicked())
                             {
                                 SelectedEntity = new SelectedEntityInfo.Material(j);
@@ -1185,7 +1214,7 @@ partial class Gui : IDisposable
                     ImGui.TableNextColumn();
 
                     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
-                    if (node.IsLeaf && node.MeshInstanceRange.Count == 0)
+                    if (node.IsLeaf && node.MeshTransformsRange.Count == 0)
                     {
                         flags |= ImGuiTreeNodeFlags.Leaf;
                     }
@@ -1194,7 +1223,6 @@ partial class Gui : IDisposable
                     {
                         flags |= ImGuiTreeNodeFlags.Selected;
                     }
-
                     bool nodeOpen = ImGui.TreeNodeEx(node.Name, flags);
                     if (ImGui.IsItemClicked())
                     {
@@ -1207,20 +1235,21 @@ partial class Gui : IDisposable
                         {
                             RenderNodesGraph(node.Children[i]);
                         }
-                        for (int i = node.MeshInstanceRange.Start; i < node.MeshInstanceRange.End; i++)
+                        for (int i = node.MeshTransformsRange.Start; i < node.MeshTransformsRange.End; i++)
                         {
                             flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.Leaf;
-                            if (SelectedEntity is SelectedEntityInfo.MeshInstance meshInstanceInfo && meshInstanceInfo.MeshInstanceId == i)
+                            if (SelectedEntity is SelectedEntityInfo.Mesh mesh && mesh.MeshTransformId == i ||
+                                SelectedEntity is SelectedEntityInfo.MeshTransform meshTransform && meshTransform.MeshTransformId == i)
                             {
                                 flags |= ImGuiTreeNodeFlags.Selected;
                             }
-                            if (ImGui.TreeNodeEx($"MeshInstance_{i}", flags))
+                            if (ImGui.TreeNodeEx($"MeshTransform_{i}", flags))
                             {
                                 ImGui.TreePop();
                             }
                             if (ImGui.IsItemClicked())
                             {
-                                SelectedEntity = new SelectedEntityInfo.MeshInstance(i, 0);
+                                SelectedEntity = new SelectedEntityInfo.MeshTransform(i);
                             }
                         }
                         ImGui.TreePop();
@@ -1396,7 +1425,11 @@ partial class Gui : IDisposable
         if (meshHitInfo.T < lightHitInfo.T)
         {
             t = meshHitInfo.T;
-            hitEntity = new SelectedEntityInfo.MeshInstance(meshHitInfo.InstanceID, app.ModelManager.Vertices[app.ModelManager.BVH.BlasTriangles[meshHitInfo.TriangleId].X].MaterialId);
+
+            int meshId = app.ModelManager.BVH.BlasTriangles[meshHitInfo.TriangleId].GeometryId;
+            int meshTransformId = app.ModelManager.BVH.BlasInstances[meshHitInfo.BlasInstanceId].MeshTransformId;
+
+            hitEntity = new SelectedEntityInfo.Mesh(meshId, meshTransformId);
         }
         else
         {
@@ -1407,9 +1440,9 @@ partial class Gui : IDisposable
         return hitEntity;
     }
 
-    private static void ToolTipForItemAboveHovered(string text, ImGuiHoveredFlags imGuiHoveredFlags = ImGuiHoveredFlags.AllowWhenDisabled)
+    private static void ToolTipForItemAboveHovered(string text, ImGuiHoveredFlags flags = ImGuiHoveredFlags.AllowWhenDisabled)
     {
-        if (ImGui.IsItemHovered(imGuiHoveredFlags))
+        if (ImGui.IsItemHovered(flags))
         {
             ImGui.SetTooltip(text);
         }
@@ -1487,6 +1520,7 @@ partial class Gui
         public record struct LoadParams
         {
             public bool SpawnInCamera = true;
+            public bool FlattenNodeHierachy = true;
             public OtkVec3 Scale = new OtkVec3(1.0f);
             public ModelLoader.OptimizationSettings ModelOptimizationSettings = ModelLoader.OptimizationSettings.Recommended;
 
@@ -1608,6 +1642,13 @@ partial class Gui
                 ImGui.Separator();
 
                 ImGui.Checkbox("SpawnInCamera", ref loadingTask.LoadParams.SpawnInCamera);
+                ImGui.Checkbox("FlattenNodeHierachy", ref loadingTask.LoadParams.FlattenNodeHierachy);
+                ToolTipForItemAboveHovered("""
+                    Attempts to hoist non animated/instanced mesh primitives into a single node.
+                    Meshes in a node share the same mesh transform. This will lead to the
+                    generation of a larger BLASes which typically improves performance.
+                    """
+                );
 
                 tempVec3 = loadingTask.LoadParams.Scale.ToNumerics();
                 if (ImGui.InputFloat3("Scale", ref tempVec3))
@@ -1623,7 +1664,7 @@ partial class Gui
                 {
                     string gltfInputPath = loadingTask.CompressGltfSettings.InputPath;
 
-                    if (loadModelContext.PreprocessMode != GuiLoadModel.ModelPreprocessingMode.gltfpack)
+                    if (loadModelContext.PreprocessMode == GuiLoadModel.ModelPreprocessingMode.meshoptimizer)
                     {
                         if (LoadModel(app, gltfInputPath, loadingTask.LoadParams))
                         {
@@ -1725,22 +1766,19 @@ partial class Gui
         }
     }
     
-    private bool LoadModel(Application app, string modelPath, in GuiLoadModel.LoadParams loadParams)
+    private static bool LoadModel(Application app, string modelPath, in GuiLoadModel.LoadParams loadParams)
     {
         OtkVec3 modelPos = loadParams.SpawnInCamera ? app.Camera.Position : new OtkVec3(0.0f);
         Transformation transformation = new Transformation().WithScale(loadParams.Scale).WithTranslation(modelPos);
-        ModelLoader.Model? newModel = ModelLoader.LoadGltfFromFile(modelPath, transformation.GetMatrix(), loadParams.ModelOptimizationSettings);
-        if (!newModel.HasValue)
+        
+        if (ModelLoader.LoadGltfFromFile(modelPath, transformation.GetMatrix(), loadParams.ModelOptimizationSettings) is ModelLoader.Model model)
         {
-            Logger.Log(Logger.LogLevel.Error, $"Failed loading model \"{modelPath}\"");
-            return false;
+            ModelLoader.FlattenNodeHierachy(ref model);
+            app.ModelManager.Add(model);
+            return true;
         }
 
-        app.ModelManager.Add(newModel.Value);
-
-        int newMeshIndex = app.ModelManager.Meshes.Length - 1;
-        ref readonly BBG.DrawElementsIndirectCommand cmd = ref app.ModelManager.DrawCommands[newMeshIndex];
-
-        return true;
+        Logger.Log(Logger.LogLevel.Error, $"Failed loading model \"{modelPath}\"");
+        return false;
     }
 }

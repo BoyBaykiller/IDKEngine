@@ -53,9 +53,8 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv, float baseColorLodBias)
 #if APP_SHADER_STAGE_FRAGMENT
     vec4 baseColorAndAlpha = texture(gpuMaterial.BaseColor, uv, baseColorLodBias) * DecompressUR8G8B8A8(gpuMaterial.BaseColorFactor);
 #else
-    // Normally the GL does not try to compute automatic derivatives in shaders other than fragment. 
-    // However when using the lod bias overload it forces automatic derivative calculations on AMD
-    // which gives incorrect results. Therefore we ignore lod bias here.
+    // Normally the GL does not try to compute automatic derivatives in shaders other than fragment.
+    // However when using the lod bias overload it does (on AMD) which gives incorrect results. Therefore we ignore lod bias here.
     vec4 baseColorAndAlpha = texture(gpuMaterial.BaseColor, uv) * DecompressUR8G8B8A8(gpuMaterial.BaseColorFactor);
 #endif
 

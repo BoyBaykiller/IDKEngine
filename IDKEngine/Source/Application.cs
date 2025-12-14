@@ -238,16 +238,17 @@ class Application : GameWindowBase
                 Bloom.Compute(PathTracer.Result);
             }
 
-            TonemapAndGamma.Settings.DoTonemapAndSrgbTransform = !PathTracer.IsDebugBVHTraversal;
+            TonemapAndGamma.Settings.DoTonemapAndSrgbTransform = !PathTracer.DoDebugBVHTraversal;
             TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
         }
 
-        if (gui.SelectedEntity is Gui.SelectedEntityInfo.MeshInstance meshInstanceInfo)
+        if (gui.SelectedEntity is Gui.SelectedEntityInfo.Mesh meshInfo)
         {
-            ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[meshInstanceInfo.MeshInstanceId];
+            ref readonly GpuMesh mesh = ref ModelManager.Meshes[meshInfo.MeshId];
+            ref readonly GpuMeshTransform meshTransform = ref ModelManager.MeshTransforms[meshInfo.MeshTransformId];
 
-            Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(meshInstance.MeshId).Root);
-            BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
+            Box box = new Box(mesh.LocalBoundsMin, mesh.LocalBoundsMax);
+            BoxRenderer.Render(TonemapAndGamma.Result, meshTransform.ModelMatrix * gpuPerFrameData.ProjView, box);
         }
         else if (gui.SelectedEntity is Gui.SelectedEntityInfo.Light lightInfo)
         {
@@ -261,13 +262,19 @@ class Application : GameWindowBase
         {
             ModelLoader.Node.Traverse(nodeInfo.Node_, (node) =>
             {
-                Range meshInstanceIds = node.MeshInstanceRange;
-                for (int i = meshInstanceIds.Start; i < meshInstanceIds.End; i++)
+                if (node.HasMeshes)
                 {
-                    ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[i];
+                    Range meshInstanceRange = ModelManager.GetMeshesInstanceRange(node.MeshRange);
+                    for (int i = meshInstanceRange.Start; i < meshInstanceRange.End; i++)
+                    {
+                        ref readonly GpuMeshInstance meshInstance = ref ModelManager.MeshInstances[i];
 
-                    Box box = Conversions.ToBox(ModelManager.BVH.GetBlas(meshInstance.MeshId).Root);
-                    BoxRenderer.Render(TonemapAndGamma.Result, meshInstance.ModelMatrix * gpuPerFrameData.ProjView, box);
+                        ref readonly GpuMesh mesh = ref ModelManager.Meshes[meshInstance.MeshId];
+                        ref readonly GpuMeshTransform meshTransform = ref ModelManager.MeshTransforms[meshInstance.MeshTransformId];
+
+                        Box box = new Box(mesh.LocalBoundsMin, mesh.LocalBoundsMax);
+                        BoxRenderer.Render(TonemapAndGamma.Result, meshTransform.ModelMatrix * gpuPerFrameData.ProjView, box);
+                    }
                 }
             });
         }
@@ -450,14 +457,7 @@ class Application : GameWindowBase
         gpuPerFrameDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 1);
 
         SkyBoxManager.Initialize();
-        SkyBoxManager.SkyBoxImagePaths = [
-            "Resource/Textures/EnvironmentMap/1.jpg",
-            "Resource/Textures/EnvironmentMap/2.jpg",
-            "Resource/Textures/EnvironmentMap/3.jpg",
-            "Resource/Textures/EnvironmentMap/4.jpg",
-            "Resource/Textures/EnvironmentMap/5.jpg",
-            "Resource/Textures/EnvironmentMap/6.jpg"
-        ];
+        SkyBoxManager.SkyBoxImagePaths = ["Resource/Textures/EnvironmentMap/snow_field_puresky_1k.hdr"];
         SkyBoxManager.SetSkyBoxMode(SkyBoxManager.SkyBoxMode.ExternalAsset);
 
         ModelLoader.TextureLoaded += () =>
@@ -498,18 +498,15 @@ class Application : GameWindowBase
 
             ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
-            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\BistroMerged.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf").Value;
-            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponzaMerged.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb").Value;
-
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\deccer-cubes\SM_Deccer_Cubes_Textured_Complex.gltf").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\SimpleInstancing\glTF-Binary\SimpleInstancing.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\Bistro.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SanMiguel\SanMiguel.gltf").Value;
 
             // Merging a model with many meshes into one can more than 2x Ray Tracing performance! (even with TLAS)
-            //ModelLoader.MergeMeshes(ref sponza);
+            ModelLoader.FlattenNodeHierachy(ref sponza);
 
             ModelManager.Add(sponza, lucy, helmet);
 
@@ -534,10 +531,7 @@ class Application : GameWindowBase
             //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
             //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
             //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
-            //ModelLoader.Model e = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Candles\NewSponza_4_Combined_glTF.gltf").Value;
-            ModelLoader.MergeMeshes(ref a);
-            //ModelLoader.MergeIntoOneMesh(ref b);
-
+            //ModelLoader.FlattenNodeHierachy(ref a);
             ModelManager.Add(a);
 
             SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);

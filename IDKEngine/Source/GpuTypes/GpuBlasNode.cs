@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using OpenTK.Mathematics;
+﻿using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 

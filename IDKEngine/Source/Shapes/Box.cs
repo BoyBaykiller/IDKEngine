@@ -37,7 +37,7 @@ public struct Box
         }
     }
 
-    public void GrowToFit(in Vector128<float> point)
+    public void GrowToFit(Vector128<float> point)
     {
         SimdMin = Vector128.MinNative(SimdMin, point);
         SimdMax = Vector128.MaxNative(SimdMax, point);

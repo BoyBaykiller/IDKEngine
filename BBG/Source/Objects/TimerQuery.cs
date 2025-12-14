@@ -13,20 +13,20 @@ public static partial class BBG
             GL.CreateQueries(QueryTarget.TimeElapsed, 1, ref ID);
         }
 
-        public static TimerQuery BeginNew()
+        public static TimerQuery StartNew()
         {
             TimerQuery timer = new TimerQuery();
-            timer.Begin();
+            timer.Start();
 
             return timer;
         }
 
-        public void Begin()
+        public void Start()
         {
             GL.BeginQuery(QueryTarget.TimeElapsed, ID);
         }
 
-        public void End()
+        public void Stop()
         {
             GL.EndQuery(QueryTarget.TimeElapsed);
 

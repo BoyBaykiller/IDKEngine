@@ -16,29 +16,26 @@ vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 ndc)
 
 vec3 GetWorldSpaceDirection(vec2 ndc, int face)
 {
+    float x = ndc.x;
+    float y = ndc.y;
+
     switch (face)
     {
-        case 0:
-            return normalize(vec3(-1.0, -ndc.y, ndc.x));
-
-        case 1:
-            return normalize(vec3(1.0, -ndc.y, -ndc.x));
-        
-        case 2:
-		    return normalize(vec3(-ndc.x, 1.0, -ndc.y));
-
-        case 3:
-		    return normalize(vec3(-ndc.x, -1.0, ndc.y));
-
-        case 4:
-		    return normalize(vec3(-ndc, -1.0));
-
-        case 5:
-            return normalize(vec3(ndc.x, -ndc.y, 1.0));
-
-        default:
-            return vec3(0.0);
+        // +X
+        case 0: return normalize(vec3( 1.0, -y,  -x));
+        // -X
+        case 1: return normalize(vec3(-1.0, -y,   x));
+        // +Y
+        case 2: return normalize(vec3(  x,  1.0,  y));
+        // -Y
+        case 3: return normalize(vec3(  x, -1.0, -y));
+        // +Z
+        case 4: return normalize(vec3(  x, -y,  1.0));
+        // -Z
+        case 5: return normalize(vec3( -x, -y, -1.0));
     }
+
+    return vec3(0.0);
 }
 
 vec3 Interpolate(vec3 p0, vec3 p1, vec3 p2, vec3 bary)
@@ -210,7 +207,7 @@ vec3 KeyToFloat(uvec3 keys)
 
 /// Source: https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
 
-uint ExpandBits(uint v)
+uint InsertTwoZerosAfterEachBit(uint v)
 {
     v = (v * 0x00010001u) & 0xFF0000FFu;
     v = (v * 0x00000101u) & 0x0F00F00Fu;
@@ -228,10 +225,10 @@ uint GetMortonCode30(vec3 normalizedV)
     uint y = clamp(uint(normalizedV.y * 1024.0), 0u, 1023u);
     uint z = clamp(uint(normalizedV.z * 1024.0), 0u, 1023u);
 
-    uint xx = ExpandBits(x);
-    uint yy = ExpandBits(y);
-    uint zz = ExpandBits(z);
-    uint result = xx * 4 + yy * 2 + zz;
+    uint xx = InsertTwoZerosAfterEachBit(x);
+    uint yy = InsertTwoZerosAfterEachBit(y);
+    uint zz = InsertTwoZerosAfterEachBit(z);
+    uint result = (xx << 2) | (yy << 1) | zz;
 
     return result;
 }

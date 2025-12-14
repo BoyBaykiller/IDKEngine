@@ -45,4 +45,9 @@ public record struct Range
         overlap = overlappingRange.Count;
         return overlaps;
     }
+
+    public static implicit operator System.Range(Range range)
+    {
+        return new System.Range(range.Start, range.End);
+    }
 }

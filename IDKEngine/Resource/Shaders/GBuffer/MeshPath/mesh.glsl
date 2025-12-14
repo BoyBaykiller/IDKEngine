@@ -28,14 +28,13 @@ out InOutData
     vec3 Normal;
     vec3 Tangent;
     perprimitiveNV uint MeshId;
-    perprimitiveNV uint MaterialId;
 } outData[MESHLET_MAX_VERTEX_COUNT];
 
 taskNV in InOutData
 {
     uint MeshId;
     uint InstanceId;
-    uint MeshletsStart;
+    uint MeshletsOffset;
     uint8_t SurvivingMeshlets[32];
 } inData;
 
@@ -43,13 +42,13 @@ void main()
 {
     uint meshId = inData.MeshId;
     uint instanceId = inData.InstanceId;
-    uint meshletId = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x];
+    uint meshletId = inData.MeshletsOffset + inData.SurvivingMeshlets[gl_WorkGroupID.x];
 
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[instanceId];
+    GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
     GpuMeshlet meshlet = meshletSSBO.Meshlets[meshletId];
 
-    uint materialId;
     const uint verticesPerInvocationRounded = (MESHLET_MAX_VERTEX_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
     for (int i = 0; i < verticesPerInvocationRounded; i++)
     {
@@ -66,15 +65,14 @@ void main()
         vec3 position = vec3(vertexPosition.x, vertexPosition.y, vertexPosition.z);
         vec3 normal = DecompressSR11G11B10(vertex.Normal);
         vec3 tangent = DecompressSR11G11B10(vertex.Tangent);
-        mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
-        mat4 invModelMatrix = mat4(meshInstance.InvModelMatrix);
-        mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
+        mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
+        mat4 invModelMatrix = mat4(meshTransform.InvModelMatrix);
+        mat4 prevModelMatrix = mat4(meshTransform.PrevModelMatrix);
         mat3 unitVecToWorld = mat3(transpose(invModelMatrix));
 
         outData[meshletVertexId].Normal = normalize(unitVecToWorld * normal);
         outData[meshletVertexId].Tangent = normalize(unitVecToWorld * tangent);
         outData[meshletVertexId].PrevClipPos = perFrameDataUBO.PrevProjView * prevModelMatrix * vec4(prevVertexPosition, 1.0);
-        materialId = vertex.MaterialId;
 
         vec4 clipPos = perFrameDataUBO.ProjView * modelMatrix * vec4(position, 1.0);
 
@@ -102,7 +100,6 @@ void main()
         uint8_t meshletTriangleId = uint8_t(min(gl_LocalInvocationIndex + i * gl_WorkGroupSize.x, meshlet.TriangleCount - 1u));
 
         outData[meshletTriangleId].MeshId = meshId;
-        outData[meshletTriangleId].MaterialId = materialId;
     }
 
     if (gl_LocalInvocationIndex == 0)

@@ -18,7 +18,7 @@ namespace IDKEngine.Bvh;
 /// * The root starts at index 1 and is never a leaf
 /// * The left child of the root is at index 2
 /// * A leaf-pair always forms a continous range of geometry beginning left
-/// * Straddling geometry of a leaf-pair can be shared (when Pre-Splitting is enabled)
+/// * Straddling geometry of a leaf pair can be shared (when PreSplitting is enabled)
 /// </summary>
 public static class BLAS
 {
@@ -66,9 +66,9 @@ public static class BLAS
         public readonly int TriangleCount => TriIndices.Length;
 
         public Span<Vector3> VertexPositions;
-        public Span<GpuIndicesTriplet> TriIndices;
+        public Span<GpuBlasTriangle> TriIndices;
 
-        public Geometry(Span<GpuIndicesTriplet> triangles, Span<Vector3> vertexPositions)
+        public Geometry(Span<GpuBlasTriangle> triangles, Span<Vector3> vertexPositions)
         {
             TriIndices = triangles;
             VertexPositions = vertexPositions;
@@ -79,7 +79,7 @@ public static class BLAS
             return GetTriangle(TriIndices[index]);
         }
 
-        public readonly Triangle GetTriangle(in GpuIndicesTriplet indices)
+        public readonly Triangle GetTriangle(GpuBlasTriangle indices)
         {
             Vector3 p0 = VertexPositions[indices.X];
             Vector3 p1 = VertexPositions[indices.Y];
@@ -91,9 +91,9 @@ public static class BLAS
 
     public record struct RayHitInfo
     {
-        public int TriangleId;
         public Vector3 Bary;
         public float T;
+        public int TriangleId;
     }
 
     public record struct BuildData
@@ -151,7 +151,7 @@ public static class BLAS
 
     public static unsafe int Build(ref BuildResult blas, BuildData buildData, BuildSettings settings)
     {
-        // Adding padding to make child pairs 64 byte aligned can noticable increase perf
+        // Making child pairs 64 byte aligned can noticable increase perf
         blas.Nodes[0] = new GpuBlasNode();
 
         ref GpuBlasNode rootNode = ref blas.Nodes[1];
@@ -163,24 +163,32 @@ public static class BLAS
             ProcessBuildTask(blasPtr, 1, 2);
         }
 
-        // It's typical to end up with a few deep paths that can be collapsed for a very small SAH increase.
+        if (rootNode.IsLeaf)
+        {
+            blas.Nodes[2] = rootNode;
+            blas.Nodes[3] = rootNode;
+            rootNode.TriStartOrChild = 2;
+            rootNode.TriCount = 0;
+        }
+
+        // It's common to end up with a few deep paths that can be collapsed for a very small SAH increase.
         // Meanwhile the reduced stack size unlocks occupancy making the shader run faster overall.
         OptimizeStackSize(ref blas, settings);
+        //blas.RequiredStackSize = ComputeRequiredStackSize(blas);
 
         // Multithreaded building logic assumes 1PPL to get node offsets.
         // An atomic counter could be used to add nodes, but that gives uncoherent and undeterministic ordering.
-        // Plus OptimizeStackSize does node collapse also causing empty subtrees. Let's compact.
-        int nodeCounter = RemoveEmptySubtrees(blas);
+        // Plus OptimizeStackSize does node collapse which also causes empty subtrees. Let's compact.
+        int nodeCount = RemoveEmptySubtrees(blas);
 
-        return nodeCounter;
+        return nodeCount;
 
         void ProcessBuildTask(BuildResult* blas, int parentNodeId, int newNodesId)
         {
             ref GpuBlasNode parentNode = ref blas->Nodes[parentNodeId];
             parentNode.SetBounds(ComputeBoundingBox(parentNode.TriStartOrChild, parentNode.TriCount, buildData));
 
-            bool forceSplit = parentNodeId == 1;
-            if (TrySplit(parentNode, buildData, settings, forceSplit) is ObjectSplit objectSplit)
+            if (TrySplit(parentNode, buildData, settings) is ObjectSplit objectSplit)
             {
                 GpuBlasNode leftNode = new GpuBlasNode();
                 leftNode.TriStartOrChild = parentNode.TriStartOrChild;
@@ -331,9 +339,9 @@ public static class BLAS
 
                     if (Intersections.RayVsTriangle(ray, triangle, out Vector3 bary, out float t) && t < hitInfo.T)
                     {
-                        hitInfo.TriangleId = i;
                         hitInfo.Bary = bary;
                         hitInfo.T = t;
+                        hitInfo.TriangleId = i;
                     }
                 }
 
@@ -420,9 +428,9 @@ public static class BLAS
         }
     }
 
-    public static GpuIndicesTriplet[] GetUnindexedTriangles(BuildResult blas, BuildData buildData, Geometry geometry)
+    public static GpuBlasTriangle[] GetUnindexedTriangles(BuildResult blas, BuildData buildData, Geometry geometry)
     {
-        GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.Fragments.Count];
+        GpuBlasTriangle[] triangles = new GpuBlasTriangle[buildData.Fragments.Count];
         int triCounter = 0;
 
         for (int i = 2; i < blas.Nodes.Length; i++)
@@ -687,7 +695,7 @@ public static class BLAS
     {
         Box box = Box.Empty();
 
-        Span<GpuIndicesTriplet> triIndices = geometry.TriIndices.Slice(start, count);
+        Span<GpuBlasTriangle> triIndices = geometry.TriIndices.Slice(start, count);
         for (int i = 0; i < triIndices.Length; i++)
         {
             Triangle tri = geometry.GetTriangle(triIndices[i]);
@@ -709,7 +717,7 @@ public static class BLAS
         return box;
     }
 
-    private static ObjectSplit? TrySplit(GpuBlasNode parentNode, BuildData buildData, BuildSettings settings, bool forceSplit = false)
+    private static ObjectSplit? TrySplit(GpuBlasNode parentNode, BuildData buildData, BuildSettings settings)
     {
         Box parentBox = Conversions.ToBox(parentNode);
 
@@ -789,7 +797,7 @@ public static class BLAS
 
         float notSplitCost = settings.TriangleCost * parentNode.TriCount;
         split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost / parentBox.HalfArea());
-        if (split.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount && !forceSplit)
+        if (split.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
         {
             return null;
         }
@@ -851,20 +859,20 @@ public static class BLAS
 
     private static void OptimizeStackSize(ref BuildResult blas, BuildSettings settings)
     {
-        double initalCost = ComputeGlobalSAH(blas, settings);
+        double initialCost = ComputeGlobalSAH(blas, settings);
         int newStackSize = ComputeRequiredStackSize(blas);
 
         double costIncrease = 0.0f;
 
-        // Before we collapse the level we need to gather the cost increase first
+        // Before we collapse the level we first need to gather the cost increase
         CollapseDeepestLevel(blas, newStackSize - 1, firstPass: true, ref costIncrease);
-        double increasePercent = costIncrease / initalCost;
+        double increasePercent = costIncrease / initialCost;
 
         while (increasePercent <= settings.StackSizeOptSAHIncreaseAcceptance && newStackSize > 0)
         {
             // Collapse the deepest level and also add cost for collapsing the next level
             CollapseDeepestLevel(blas, --newStackSize, firstPass: false, ref costIncrease);
-            increasePercent = costIncrease / initalCost;
+            increasePercent = costIncrease / initialCost;
         }
 
         blas.RequiredStackSize = newStackSize;

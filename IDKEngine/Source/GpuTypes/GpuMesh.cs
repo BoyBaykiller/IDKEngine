@@ -4,24 +4,25 @@ namespace IDKEngine.GpuTypes;
 
 public unsafe struct GpuMesh
 {
+    public Vector3 LocalBoundsMin;
     public int MaterialId;
-    public float NormalMapStrength;
-    public float EmissiveBias;
-    public float SpecularBias;
 
-    public float RoughnessBias;
-    public float TransmissionBias;
-    public float IORBias;
-    public int MeshletsOffset;
+    public Vector3 LocalBoundsMax;
+    public float NormalMapStrength;
 
     public Vector3 AbsorbanceBias;
-    public int MeshletCount;
+    public int MeshletsOffset;
 
+    public int MeshletCount;
+    public float EmissiveBias;
+    public float SpecularBias;
+    public float RoughnessBias;
+
+    public float TransmissionBias;
+    public float IORBias;
     public int InstanceCount = 1;
     public bool TintOnTransmissive = true; // Required by KHR_materials_transmission
-    private fixed bool _pad[3];
-    private readonly float _pad0;
-    public readonly float _pad1;
+    private fixed byte _pad[3];
 
     public GpuMesh()
     {

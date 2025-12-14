@@ -3,7 +3,7 @@
 Feature list:
  - Wavefront Path Tracer with Ray Sorting
  - Real-Time Voxel Global Illumination
- - High Quality SweepSAH BVH with Pre-Splitting + GPU Refitting
+ - High Quality SweepSAH BVH with PreSplitting + GPU Refitting
  - [AMD FSR2](https://github.com/JuanDiegoMontoya/FidelityFX-FSR2-OpenGL) and Temporal Anti Aliasing
  - Mesh Shaders + Multi Draw Indirect + Bindless Textures + lots of OpenGL...
  - glTF support including animations and various extensions

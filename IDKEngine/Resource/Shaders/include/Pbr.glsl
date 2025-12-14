@@ -22,7 +22,7 @@ float BaseReflectivity(float n1, float n2)
     float r0 = (n1 - n2) / (n1 + n2);
     r0 *= r0;
 
-    float f0 = r0; // same as mix(r0, albedo, metallic) with metallic=0 
+    float f0 = r0; // same as mix(r0, albedo, metallic) with metallic=0, dielectric
     return f0;
 }
 

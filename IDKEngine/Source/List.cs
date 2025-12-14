@@ -15,6 +15,12 @@ public class List<T>
     public int Count { get; private set; }
     private T[] buffer;
 
+    public List(T[] elements)
+    {
+        buffer = elements;
+        Count = buffer.Length;
+    }
+
     public List(int capacity)
     {
         buffer = new T[capacity];

@@ -51,7 +51,7 @@ float SSAO(vec3 fragPos, vec3 normal)
         float rnd1 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
         float rnd2 = InterleavedGradientNoise(vec2(gl_GlobalInvocationID.xy), noiseIndex++);
 
-        vec3 samplePos = fragPos + CosineSampleHemisphere(normal, rnd0, rnd1) * settingsUBO.Radius * rnd2;
+        vec3 samplePos = fragPos + CosineSampleHemisphere(normal, vec2(rnd0, rnd1)) * settingsUBO.Radius * rnd2;
         
         vec3 projectedSample = PerspectiveTransform(samplePos, perFrameDataUBO.ProjView);
         projectedSample.xy = projectedSample.xy * 0.5 + 0.5;

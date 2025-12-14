@@ -19,7 +19,7 @@ taskNV out InOutData
     uint MeshId;
     uint InstanceId;
     uint8_t FaceId;
-    uint MeshletsStart;
+    uint MeshletsOffset;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
 } outData;
 
@@ -42,7 +42,7 @@ void main()
     }
 
     uint8_t localMeshlet = uint8_t(gl_LocalInvocationIndex);
-    uint workgroupFirstMeshlet = mesh.MeshletsStart + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
+    uint workgroupFirstMeshlet = mesh.MeshletsOffset + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
     uint workgroupThisMeshlet = workgroupFirstMeshlet + localMeshlet;
 
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
@@ -66,7 +66,7 @@ void main()
         outData.MeshId = meshId;
         outData.InstanceId = meshInstanceId;
         outData.FaceId = faceId;
-        outData.MeshletsStart = workgroupFirstMeshlet;
+        outData.MeshletsOffset = workgroupFirstMeshlet;
         
         uint survivingCount = subgroupBallotBitCount(visibleMeshletsBitmask);
         gl_TaskCountNV = survivingCount;

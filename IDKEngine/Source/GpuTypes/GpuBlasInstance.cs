@@ -1,7 +1,7 @@
 ﻿namespace IDKEngine.GpuTypes;
 
-public record struct GpuMeshInstance
+public record struct GpuBlasInstance
 {
-    public int MeshId;
+    public int BlasId;
     public int MeshTransformId;
 }

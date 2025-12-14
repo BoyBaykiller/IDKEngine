@@ -71,7 +71,7 @@ void main()
             bool hitLight = hitInfo.TriangleId == ~0u;
             if (hitLight)
             {
-                if (hitInfo.InstanceId == pointShadow.LightIndex)
+                if (hitInfo.MeshTransformId == pointShadow.LightIndex)
                 {
                     // Failsafe, distance cap should already prevent us from hitting the light
                 }
@@ -82,16 +82,18 @@ void main()
                 break;
             }
 
-            uvec3 indices = Unpack(blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId]);
+            uvec3 indices = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].Indices;
+            uint meshId = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].GeometryId;
+
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
             GpuVertex v2 = vertexSSBO.Vertices[indices.z];
             vec3 bary = vec3(hitInfo.BaryXY.xy, 1.0 - hitInfo.BaryXY.x - hitInfo.BaryXY.y);
             vec2 interpTexCoord = Interpolate(Unpack(v0.TexCoord), Unpack(v1.TexCoord), Unpack(v2.TexCoord), bary);
 
-            GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[hitInfo.InstanceId];
-            GpuMesh mesh = meshSSBO.Meshes[meshInstance.MeshId];
-            GpuMaterial material = materialSSBO.Materials[v0.MaterialId];
+            GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[hitInfo.MeshTransformId];
+            GpuMesh mesh = meshSSBO.Meshes[meshId];
+            GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
 
             Surface surface = GetSurface(material, interpTexCoord);
             SurfaceApplyModificatons(surface, mesh);

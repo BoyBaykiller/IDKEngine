@@ -138,8 +138,8 @@ public class CpuPointShadow : IDisposable
                 visibleFaces |= (uint)i << numVisibleFaces * 3;
                 numVisibleFaces++;
 
-                // Clear the faces that will potentially be rendered to.
-                // Some effects (VXGI) might access faces that the camera can't see so maintaining depth for these is better than no shadows at all
+                // Only clear faces that are visible.
+                // Some effects (VXGI) might access faces that the camera can't see and keeping depth is better than erasing all information
                 ShadowMap.Fill(1.0f, 0, 0, 0, i);
             }
         }

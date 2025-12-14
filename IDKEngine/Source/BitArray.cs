@@ -27,6 +27,11 @@ public record struct BitArray
 #endif
     }
 
+    public readonly void SetAll(bool value)
+    {
+        data.AsSpan().Fill(value ? ~0u : 0);
+    }
+
     public readonly bool this[int index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -3,6 +3,7 @@ using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
 using IDKEngine.Bvh;
+using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Shapes;
 
@@ -540,12 +541,14 @@ public static class Intersections
             bool triCollisionDetected = false;
             modelManager.BVH.Intersect(hitBox, (in BVH.BoxHitInfo hitInfo) =>
             {
+                GpuBlasInstance blasInstance = modelManager.BVH.BlasInstances[hitInfo.BlasInstanceId];
+                GpuBlasTriangle blasTriangle = modelManager.BVH.BlasTriangles[hitInfo.TriangleId];
                 Triangle triangle = new Triangle(
-                    modelManager.VertexPositions[hitInfo.TriangleIndices.X],
-                    modelManager.VertexPositions[hitInfo.TriangleIndices.Y],
-                    modelManager.VertexPositions[hitInfo.TriangleIndices.Z]
+                    modelManager.VertexPositions[blasTriangle.X],
+                    modelManager.VertexPositions[blasTriangle.Y],
+                    modelManager.VertexPositions[blasTriangle.Z]
                 );
-                Matrix4 modelMatrix = modelManager.MeshInstances[hitInfo.InstanceID].ModelMatrix;
+                Matrix4 modelMatrix = modelManager.MeshTransforms[blasInstance.MeshTransformId].ModelMatrix;
                 Triangle worldSpaceTri = Triangle.Transformed(triangle, modelMatrix);
 
                 bool intersects = SphereVsTriangle(movingSphereCopy, worldSpaceTri, out Vector3 closestPointOnTri, out float distance, out float penetrationDepth);

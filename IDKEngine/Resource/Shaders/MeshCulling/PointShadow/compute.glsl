@@ -32,20 +32,22 @@ void main()
     uint meshInstanceId = inCullingMeshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
+    GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
     uint meshId = meshInstance.MeshId;
     
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
-    GpuBlasNode node = blasNodeSSBO.Nodes[blasDescSSBO.Descs[meshId].NodeOffset + 1];
+    GpuMesh mesh = meshSSBO.Meshes[meshId];
+    Box localBounds = Box(mesh.LocalBoundsMin, mesh.LocalBoundsMax);
 
     for (int i = 0; i < NumVisibleFaces; i++)
     {
         uint faceId = (VisibleFaces >> (i * 3)) & ((1u << 3) - 1);
 
         mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceId];
-        mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+        mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
 
         Frustum frustum = GetFrustum(projView * modelMatrix);
-        bool isVisible = FrustumBoxIntersect(frustum, Box(node.Min, node.Max));
+        bool isVisible = FrustumBoxIntersect(frustum, localBounds);
 
         uint faceAndMeshInstanceId = (faceId << 29) | meshInstanceId; // 3bits | 29bits
 

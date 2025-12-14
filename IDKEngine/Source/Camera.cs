@@ -124,7 +124,8 @@ public class Camera
             thisFrameAcceleration.Y += -GravityDownForce;
         }
 
-        Position += dT * Velocity + 0.5f * thisFrameAcceleration * dT * dT;
+        // Equivalent to https://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet assuming currentAcceleration == nextAcceleration
+        Position = IntegratePosOverTimeWConstAccel(Position, Velocity, thisFrameAcceleration, dT);
         Velocity += thisFrameAcceleration * dT;
 
         if (Velocity.Length < 9.0f * dT)
@@ -138,6 +139,12 @@ public class Camera
         Velocity *= MathF.Exp(drag * dT); // https://stackoverflow.com/questions/61812575/which-formula-to-use-for-drag-simulation-each-frame
 
         thisFrameAcceleration = new Vector3(0.0f);
+
+        static Vector3 IntegratePosOverTimeWConstAccel(Vector3 position, Vector3 velocity, Vector3 acceleration, float dT)
+        {
+            // Closed form solution for integration of position over time with constant acceleration
+            return position + velocity * dT + 0.5f * acceleration * dT * dT;
+        }
     }
 
     public void SetPrevToCurrentPosition()

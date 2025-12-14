@@ -1,7 +1,6 @@
 AppInclude(include/Pbr.glsl)
 AppInclude(include/Random.glsl)
 AppInclude(include/Math.glsl)
-AppInclude(PathTracing/include/Bsdf.glsl)
 
 #define ENUM_BSDF uint
 #define ENUM_BSDF_DIFFUSE      0u
@@ -29,7 +28,7 @@ float SpecularBasedOnViewAngle(float specularChance, float cosTheta, float prevI
     return newSpecularChance;
 }
 
-ENUM_BSDF SelectBsdf(Surface surface, out float bsdfSelectionPdf)
+ENUM_BSDF SelectBsdf(Surface surface)
 {
     float specularChance = surface.Metallic;
     float transmissionChance = surface.Transmission;
@@ -38,17 +37,14 @@ ENUM_BSDF SelectBsdf(Surface surface, out float bsdfSelectionPdf)
     float rnd = GetRandomFloat01();
     if (specularChance > rnd)
     {
-        bsdfSelectionPdf = specularChance;
         return ENUM_BSDF_SPECULAR;
     }
     else if (specularChance + transmissionChance > rnd)
     {
-        bsdfSelectionPdf = transmissionChance;
         return ENUM_BSDF_TRANSMISSIVE;
     }
     else
     {
-        bsdfSelectionPdf = diffuseChance;
         return ENUM_BSDF_DIFFUSE;
     }
 }
@@ -63,24 +59,34 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
         // Fresnel
         float diffuseChance = 1.0 - surface.Metallic - surface.Transmission;
         surface.Metallic = SpecularBasedOnViewAngle(surface.Metallic, cosTheta, prevIor, surface.IOR);
-        surface.Transmission = 1.0 - diffuseChance - surface.Metallic; // renormalize
+        surface.Transmission = max(1.0 - diffuseChance - surface.Metallic, 0.0); // renormalize
     }
 
     SampleMaterialResult result;
 
-    float bsdfSelectionPdf;
-    result.BsdfType = SelectBsdf(surface, bsdfSelectionPdf);
+    result.BsdfType = SelectBsdf(surface);
 
-    float lambertianPdf;
-    vec3 diffuseRayDir = SampleLambertian(surface.Normal, cosTheta, lambertianPdf);
+    // vec3 diffuseRayDir = CosineSampleHemisphere(surface.Normal);
+
+    // Slightly lower noise, but increases register usage (from 72 to 80)
+    // https://discord.com/channels/318590007881236480/377557956775903232/1446938138722308309    
+    uint saved = GetCurrentRandomSeed();
+    InitializeRandomSeed((gl_GlobalInvocationID.y * 4096 + gl_GlobalInvocationID.x));
+    vec2 r2 = R2Sequence(wavefrontPTSSBO.AccumulatedSamples);
+    vec2 pixelOffset = vec2(GetRandomFloat01(), GetRandomFloat01());
+    vec2 uv = DecorrelateSequence(r2, pixelOffset);
+    vec3 diffuseRayDir = CosineSampleHemisphere(surface.Normal, uv);
+    InitializeRandomSeed(saved);
 
     if (result.BsdfType == ENUM_BSDF_DIFFUSE)
     {
         result.RayDirection = diffuseRayDir;
         result.NewIor = prevIor;
 
-        result.Bsdf = LambertianBrdf(surface.Albedo) * cosTheta;
-        result.Pdf = lambertianPdf;
+        // BSDF=cosTheta*albedo/PI / PDF=cosine/PI =>
+        // BSDF=albedo             / PDF=1
+        result.Bsdf = surface.Albedo;
+        result.Pdf = 1.0;
     }
     else if (result.BsdfType == ENUM_BSDF_SPECULAR)
     {
@@ -138,7 +144,7 @@ SampleMaterialResult SampleMaterial(vec3 incomming, Surface surface, float prevI
         }
         result.Pdf = 1.0;
     }
-    result.Pdf = max(result.Pdf * bsdfSelectionPdf, 0.0001);
+    result.Pdf = max(result.Pdf, 0.0001);
 
     return result;
 }

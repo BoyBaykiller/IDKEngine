@@ -1,6 +1,23 @@
 AppInclude(include/Random.glsl)
 AppInclude(include/Math.glsl)
 
+vec2 R2Sequence(uint id)
+{
+    // Source: https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+    const float g = 1.32471795724474602596;
+    const float a1 = 1.0 / g;
+    const float a2 = 1.0 / (g * g);
+    vec2 r2 = fract(vec2(id * a1, id * a2));
+
+    return r2;
+}
+
+vec2 DecorrelateSequence(vec2 ldsSample, vec2 noise)
+{
+    // Cranley Patterson Rotation
+    return fract(ldsSample + noise);
+}
+
 vec3 SampleCone(vec3 normal, float phi, float sinTheta, float cosTheta)
 {
     vec3 localSample;
@@ -41,13 +58,13 @@ vec3 SampleSphere(vec3 toSphere, float sphereRadius, out float distanceToSphere,
 
 vec3 SampleSphere(float rnd0, float rnd1)
 {
-    float z = rnd0 * 2.0 - 1.0;
-    float a = rnd1 * 2.0 * PI;
-    float r = sqrt(1.0 - z * z);
-    float x = r * cos(a);
-    float y = r * sin(a);
+    float cosTheta = rnd0 * 2.0 - 1.0;
+    float phi = rnd1 * 2.0 * PI;
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    float cosPhi = cos(phi);
+    float sinPhi = sin(phi);
 
-    return vec3(x, y, z);
+    return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
 }
 
 vec3 SampleSphere()
@@ -66,25 +83,16 @@ vec3 SampleHemisphere(vec3 normal)
     return SampleHemisphere(normal, GetRandomFloat01(), GetRandomFloat01());
 }
 
-
-vec3 CosineSampleHemisphere(vec3 normal, float rnd0, float rnd1)
+vec3 CosineSampleHemisphere(vec3 normal, vec2 uv)
 {
-    return normalize(normal + SampleSphere(rnd0, rnd1));
-
-    // float azimuth = 2.0 * PI * rnd0;
-    // float elevation = acos(sqrt(rnd1));
-
-    // vec3 dir = PolarToCartesian(azimuth, elevation);
-    // mat3 basis = ConstructBasis(normal);
-
-    // return basis * dir;
+    return normalize(normal + SampleSphere(uv.x, uv.y));
 }
 
 vec3 CosineSampleHemisphere(vec3 normal)
 {
     // Source: https://blog.demofox.org/2020/05/25/casual-shadertoy-path-tracing-1-basic-camera-diffuse-emissive/
     
-    return CosineSampleHemisphere(normal, GetRandomFloat01(), GetRandomFloat01());
+    return CosineSampleHemisphere(normal, vec2(GetRandomFloat01(), GetRandomFloat01()));
 }
 
 vec2 SampleDisk()

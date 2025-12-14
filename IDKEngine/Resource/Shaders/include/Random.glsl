@@ -8,6 +8,11 @@ void InitializeRandomSeed(uint value)
     Random_RNGSeed = value;
 }
 
+uint GetCurrentRandomSeed()
+{
+    return Random_RNGSeed;
+}
+
 uint GetPCGHash(inout uint seed)
 {
     // Source: https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/

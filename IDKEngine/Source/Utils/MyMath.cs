@@ -287,7 +287,7 @@ public static class MyMath
 
     // Expands a 10-bit integer into 30 bits
     // by inserting 2 zeros after each bit.
-    private static unsafe uint ExpandBits(uint v)
+    private static unsafe uint InsertTwoZerosAfterEachBit(uint v)
     {
         unchecked
         {
@@ -310,10 +310,10 @@ public static class MyMath
             uint y = Math.Clamp((uint)(normalizedV.Y * 1024.0f), 0, 1023);
             uint z = Math.Clamp((uint)(normalizedV.Z * 1024.0f), 0, 1023);
 
-            uint xx = ExpandBits(x);
-            uint yy = ExpandBits(y);
-            uint zz = ExpandBits(z);
-            uint result = xx * 4 + yy * 2 + zz;
+            uint xx = InsertTwoZerosAfterEachBit(x);
+            uint yy = InsertTwoZerosAfterEachBit(y);
+            uint zz = InsertTwoZerosAfterEachBit(z);
+            uint result = (xx << 2) | (yy << 1) | zz;
 
             return result;
         }

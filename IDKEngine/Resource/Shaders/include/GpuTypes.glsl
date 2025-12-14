@@ -121,49 +121,63 @@ struct GpuPointShadow
 
 struct GpuMesh
 {
-    int _pad0;
+    vec3 LocalBoundsMin;
+    int MaterialId;
+
+    vec3 LocalBoundsMax;
     float NormalMapStrength;
+
+    vec3 AbsorbanceBias;
+    uint MeshletsOffset;
+
+    uint MeshletCount;
     float EmissiveBias;
     float SpecularBias;
     float RoughnessBias;
+
     float TransmissionBias;
     float IORBias;
-    uint MeshletsStart;
-    vec3 AbsorbanceBias;
-    uint MeshletCount;
     uint InstanceCount;
     bool TintOnTransmissive;
-    float _pad1;
 };
 
 struct GpuMeshInstance
 {
+    uint MeshId;
+    uint MeshTransformId;
+};
+
+struct GpuMeshTransform
+{
     mat4x3 ModelMatrix;
     mat4x3 InvModelMatrix;
     mat4x3 PrevModelMatrix;
-    uint MeshId;
-    uint _pad0, _pad1, _pad2;
 };
 
-struct GpuBlasGeometryDesc
+struct GpuBlasTriangle
 {
-    int TriangleOffset;
-    int TriangleCount;
-    int VertexOffset;
-    int VertexCount;
+    uvec3 Indices;
+    uint GeometryId;
 };
 
 struct GpuBlasDesc
 {
-    GpuBlasGeometryDesc GeometryDesc;
-
     int NodeOffset;
     int NodeCount;
+    int TriangleOffset;
+    int TriangleCount;
     int LeafIndicesOffset;
     int LeafIndicesCount;
-
+    int ParentIndicesOffset;
+    int ParentIndicesCount;
     int RequiredStackSize;
-    bool PreSplittingWasDone;
+    bool IsRefittable;
+};
+
+struct GpuBlasInstance
+{
+    uint BlasId;
+    uint MeshTransformId;
 };
 
 struct GpuBlasNode
@@ -227,7 +241,6 @@ struct GpuVertex
     PackedVec2 TexCoord;
     uint Tangent;
     uint Normal;
-    uint MaterialId;
 };
 
 #ifdef DECLARE_MESHLET_RENDERING_TYPES

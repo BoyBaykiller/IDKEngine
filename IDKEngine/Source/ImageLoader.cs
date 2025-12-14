@@ -78,19 +78,21 @@ public static unsafe class ImageLoader
         }
     }
 
-    public static ImageResult Load(string path, ColorComponents colorComponents = ColorComponents.Default)
+    public static ImageResult Load(string path, ColorComponents colorComponents = ColorComponents.Default, bool flip = false)
     {
         byte[] imageData = File.ReadAllBytes(path);
-        return Load(imageData, colorComponents);
+        return Load(imageData, colorComponents, flip);
     }
 
-    public static ImageResult Load(ReadOnlySpan<byte> imageData, ColorComponents colorComponents = ColorComponents.Default)
+    public static ImageResult Load(ReadOnlySpan<byte> imageData, ColorComponents colorComponents = ColorComponents.Default, bool flip = false)
     {
         ImageResult imageResult = new ImageResult();
         fixed (byte* ptr = imageData)
         {
             int desiredChannels = ImageHeader.ColorComponentsToChannels(colorComponents);
             imageResult.Header.ChannelSizeInBytes = GetImageChannelSize(ptr, imageData.Length);
+
+            Stbi.set_flip_vertically_on_load(flip ? 1 : 0);
 
             if (Stbi.is_hdr_from_memory(ptr, imageData.Length) == 1)
             {

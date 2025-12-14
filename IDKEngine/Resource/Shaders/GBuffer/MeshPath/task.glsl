@@ -20,7 +20,7 @@ taskNV out InOutData
 {
     uint MeshId;
     uint InstanceId;
-    uint MeshletsStart;
+    uint MeshletsOffset;
     uint8_t SurvivingMeshlets[MESHLETS_PER_WORKGROUP];
 } outData;
 
@@ -28,6 +28,7 @@ void main()
 {
     uint meshInstanceId = visibleMeshInstanceIdSSBO.Ids[gl_DrawID];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
+    GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
 
     uint meshId = meshInstance.MeshId;
     GpuMesh mesh = meshSSBO.Meshes[meshId];
@@ -38,14 +39,14 @@ void main()
     }
 
     uint8_t localMeshlet = uint8_t(gl_LocalInvocationIndex);
-    uint workgroupFirstMeshlet = mesh.MeshletsStart + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
+    uint workgroupFirstMeshlet = mesh.MeshletsOffset + (gl_WorkGroupID.x * MESHLETS_PER_WORKGROUP);
     uint workgroupThisMeshlet = workgroupFirstMeshlet + localMeshlet;
 
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
     GpuMeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
 
-    mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
-    mat4 prevModelMatrix = mat4(meshInstance.PrevModelMatrix);
+    mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
+    mat4 prevModelMatrix = mat4(meshTransform.PrevModelMatrix);
     
     bool isVisible = true;
 
@@ -96,7 +97,7 @@ void main()
     {
         outData.MeshId = meshId;
         outData.InstanceId = meshInstanceId;
-        outData.MeshletsStart = workgroupFirstMeshlet;
+        outData.MeshletsOffset = workgroupFirstMeshlet;
         
         uint survivingCount = subgroupBallotBitCount(visibleMeshletsBitmask);
         gl_TaskCountNV = survivingCount;

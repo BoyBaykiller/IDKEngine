@@ -151,18 +151,18 @@ public static class PreSplitting
     }
 
     /// <summary>
-    /// When Pre-Splitting was done prior to building the BLAS duplicate triangle references in a leaf(-pair) may happen.
+    /// When PreSplitting was done prior to building the BLAS duplicate triangle references in a leaf(-pair) may happen.
     /// Here we deduplicate them, possibly resulting in leaf-pair triangle ranges like:
     /// [lStart, lEnd), [rStart, rEnd), where the "straddling triangles" in range [rStart, lEnd) are shared between the left and right node.
     /// Otherwise this is equivalent to <see cref="BLAS.GetUnindexedTriangles(BLAS.BuildResult, BLAS.BuildData, BLAS.Geometry)"/>
     /// </summary>
     /// <returns></returns>
-    public static GpuIndicesTriplet[] GetUnindexedTriangles(BLAS.BuildResult blas, BLAS.BuildData buildData, BLAS.Geometry geometry)
+    public static GpuBlasTriangle[] GetUnindexedTriangles(BLAS.BuildResult blas, BLAS.BuildData buildData, BLAS.Geometry geometry)
     {
         const bool straddlingOpt = true;
         const bool leafOpt = true;
 
-        GpuIndicesTriplet[] triangles = new GpuIndicesTriplet[buildData.Fragments.Count];
+        GpuBlasTriangle[] triangles = new GpuBlasTriangle[buildData.Fragments.Count];
 
         int globalTriCounter = 0;
 

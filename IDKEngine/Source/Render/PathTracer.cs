@@ -36,13 +36,35 @@ class PathTracer : IDisposable
         }
     }
 
-    public bool IsDebugBVHTraversal
+    public float FocalLength
     {
-        get => settings.IsDebugBVHTraversal == 1;
+        get => settings.FocalLength;
 
         set
         {
-            settings.IsDebugBVHTraversal = value ? 1 : 0;
+            settings.FocalLength = value;
+            ResetAccumulation();
+        }
+    }
+
+    public float LenseRadius
+    {
+        get => settings.LenseRadius;
+
+        set
+        {
+            settings.LenseRadius = value;
+            ResetAccumulation();
+        }
+    }
+
+    public bool DoDebugBVHTraversal
+    {
+        get => settings.DoDebugBVHTraversal == 1;
+
+        set
+        {
+            settings.DoDebugBVHTraversal = value ? 1 : 0;
 
             if (value)
             {
@@ -68,25 +90,13 @@ class PathTracer : IDisposable
         }
     }
 
-    public float FocalLength
+    public bool DoRussianRoulette
     {
-        get => settings.FocalLength;
+        get => settings.DoRussianRoulette == 1;
 
         set
         {
-            settings.FocalLength = value;
-            ResetAccumulation();
-        }
-    }
-
-    public float LenseRadius
-    {
-        get => settings.LenseRadius;
-
-        set
-        {
-            settings.LenseRadius = value;
-            ResetAccumulation();
+            settings.DoRussianRoulette = value ? 1 : 0;
         }
     }
 
@@ -105,9 +115,10 @@ class PathTracer : IDisposable
     public record struct GpuSettings
     {
         public float FocalLength = 8.0f;
-        public float LenseRadius = 0.01f;
-        public int IsDebugBVHTraversal;
-        public int DoTraceLights;
+        public float LenseRadius = 0.0f;
+        public int DoDebugBVHTraversal = 0;
+        public int DoTraceLights = 0;
+        public int DoRussianRoulette = 1;
 
         public GpuSettings()
         {
@@ -139,11 +150,10 @@ class PathTracer : IDisposable
     private BBG.TypedBuffer<uint> cachedKeyBuffer;
     private readonly BBG.TypedBuffer<uint> workGroupSumsPrefixSumBuffer;
     private readonly BBG.TypedBuffer<uint> workGroupPrefixSumBuffer;
-
     public PathTracer(Vector2i size, in GpuSettings settings)
     {
         this.settings = settings;
-        DoRaySorting = true;
+        DoRaySorting = false;
 
         // Wavefront Path Tracing
         firstHitProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/FirstHit/compute.glsl"));
@@ -200,10 +210,10 @@ class PathTracer : IDisposable
             {
                 if (i > 1)
                 {
-                    // Clear the buffer so we can build the inital histogram of sorting keys
                     RaySorting();
                 }
 
+                // Clear the buffer so we can build the inital histogram of sorting keys
                 workGroupPrefixSumBuffer.Fill(0);
             }
 

@@ -27,7 +27,7 @@ taskNV in InOutData
     uint MeshId;
     uint InstanceId;
     uint8_t FaceId;
-    uint MeshletsStart;
+    uint MeshletsOffset;
     uint8_t SurvivingMeshlets[32];
 } inData;
 
@@ -35,10 +35,11 @@ void main()
 {
     uint meshId = inData.MeshId;
     uint instanceId = inData.InstanceId;
-    uint meshletId = inData.MeshletsStart + inData.SurvivingMeshlets[gl_WorkGroupID.x]; 
+    uint meshletId = inData.MeshletsOffset + inData.SurvivingMeshlets[gl_WorkGroupID.x]; 
 
     GpuDrawElementsCmd drawCmd = drawElementsCmdSSBO.Commands[meshId];
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[instanceId];
+    GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
     GpuMeshlet meshlet = meshletSSBO.Meshlets[meshletId];
 
     const uint verticesPerInvocationRounded = (MESHLET_MAX_VERTEX_COUNT + gl_WorkGroupSize.x - 1) / gl_WorkGroupSize.x;
@@ -51,7 +52,7 @@ void main()
         PackedVec3 vertexPosition = vertexPositionsSSBO.Positions[globalVertexId];
         vec3 position = vec3(vertexPosition.x, vertexPosition.y, vertexPosition.z);
 
-        mat4 modelMatrix = mat4(meshInstance.ModelMatrix);
+        mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
         vec3 fragPos = vec3(modelMatrix * vec4(position, 1.0));
         vec4 clipPos = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[inData.FaceId] * vec4(fragPos, 1.0);
 

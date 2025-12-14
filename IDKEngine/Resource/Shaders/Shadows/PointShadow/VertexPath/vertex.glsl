@@ -21,7 +21,10 @@ void main()
     uint faceId = faceAndMeshInstanceId >> 29;
     uint meshInstanceId = faceAndMeshInstanceId & ((1u << 29) - 1);
     
-    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceId].ModelMatrix);
+    GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
+    GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
+
+    mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
     vec3 fragPos = vec3(modelMatrix * vec4(vertexPosition, 1.0));
     gl_Position = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceId] * vec4(fragPos, 1.0);
     gl_Layer = int(faceId);

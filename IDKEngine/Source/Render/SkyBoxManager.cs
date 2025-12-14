@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using BBLogger;
@@ -26,8 +27,8 @@ static class SkyBoxManager
     public static void Initialize()
     {
         skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>();
-        FSR2WorkaroundRebindUBO();
         skyBoxTextureBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+        FSR2WorkaroundRebindUBO();
 
         unprojectEquirectangularProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "UnprojectEquirectangular/compute.glsl"));
 
@@ -88,11 +89,6 @@ static class SkyBoxManager
 
     private static unsafe bool LoadSkyBox(string[] imagePaths)
     {
-        if (imagePaths == null)
-        {
-            Logger.Log(Logger.LogLevel.Error, $"SkyBox {nameof(imagePaths)} is null");
-            return false;
-        }
         if (!imagePaths.All(p => File.Exists(p)))
         {
             Logger.Log(Logger.LogLevel.Error, "At least one of the skybox images is not found");
@@ -118,18 +114,18 @@ static class SkyBoxManager
 
     private static unsafe bool LoadSkyBoxEquirectangular(string hrdPath)
     {
-        using ImageLoader.ImageResult hdrImage = ImageLoader.Load(hrdPath, ImageLoader.ColorComponents.RGB);
+        using ImageLoader.ImageResult hdrImage = ImageLoader.Load(hrdPath, ImageLoader.ColorComponents.RGB, true);
         if (!hdrImage.IsLoadedSuccesfully)
         {
-            Logger.Log(Logger.LogLevel.Error, $"Hdr image could not be loaded");
+            Logger.Log(Logger.LogLevel.Error, $"Hdr image {hrdPath} could not be loaded");
             return false;
         }
 
-        externalCubemapTexture.Allocate(1536, 1536, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
-        using BBG.Texture equirectangularTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+        externalCubemapTexture.Allocate(hdrImage.Header.Width / 4, hdrImage.Header.Width / 4, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
         BBG.Computing.Compute("Equirectangular to Cubemap", () =>
         {
+            using BBG.Texture equirectangularTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
             equirectangularTexture.Allocate(hdrImage.Header.Width, hdrImage.Header.Height, 1, externalCubemapTexture.Format);
             equirectangularTexture.Upload2D(
                 hdrImage.Header.Width, hdrImage.Header.Height,
