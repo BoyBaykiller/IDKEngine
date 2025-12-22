@@ -27,6 +27,14 @@ public record struct BitArray
 #endif
     }
 
+    public readonly void SetRange(int start, int count, bool value)
+    {
+        for (int i = start; i < start + count; i++)
+        {
+            this[i] = value;
+        }
+    }
+
     public readonly void SetAll(bool value)
     {
         data.AsSpan().Fill(value ? ~0u : 0);

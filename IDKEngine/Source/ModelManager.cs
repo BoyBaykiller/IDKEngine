@@ -310,30 +310,25 @@ public unsafe class ModelManager : IDisposable
             // Wait until skinned vertex positions are downloaded.
             // Then refit the BLASes and update bounding boxes. Refitting on GPU is done elsewhere.
 
-            Task[] tasks = new Task[skinningCmds.Sum(it => 1)];
-            int taskCounter = 0;
+            Task[] tasks = new Task[skinningCmds.Length];
             for (int i = 0; i < skinningCmds.Length; i++)
             {
                 SkinningCmd skinningCmd = skinningCmds[i];
+                GpuBlasDesc blasDesc = BVH.BlasesDesc[skinningCmd.BlasId];
 
-                Range blasRange = new Range(skinningCmd.BlasId, 1);
-                for (int j = blasRange.Start; j < blasRange.End; j++)
+                tasks[i] = Task.Run(() =>
                 {
-                    GpuBlasDesc blasDesc = BVH.BlasesDesc[j];
+                    BVH.CpuBlasRefit(blasDesc);
+                });
 
-                    tasks[taskCounter++] = Task.Run(() =>
-                    {
-                        BVH.CpuBlasRefit(blasDesc);
-                    });
-                }
-
+                // If this becomes a bottleneck we can move bounding box updating to the GPU
                 Range meshRange = skinningCmd.SkinnedNode.MeshRange;
                 for (int j = meshRange.Start; j < meshRange.End; j++)
                 {
                     Box bounds = Box.Empty();
 
                     ref readonly BBG.DrawElementsIndirectCommand cmd = ref DrawCommands[j];
-                    for (int k = cmd.BaseVertex; k < cmd.BaseVertex + GetMeshVertexCount(j); k++)
+                    for (int k = cmd.BaseVertex; k < cmd.BaseVertex + Meshes[j].VertexCount; k++)
                     {
                         Vector3 vertexPos = VertexPositions[k];
                         bounds.GrowToFit(vertexPos);
@@ -342,6 +337,7 @@ public unsafe class ModelManager : IDisposable
                     Meshes[j].LocalBoundsMin = bounds.Min;
                     Meshes[j].LocalBoundsMax = bounds.Max;
                 }
+                UploadMeshBuffer(meshRange.Start, meshRange.Count);
             }
             Task.WaitAll(tasks);
 
@@ -364,7 +360,7 @@ public unsafe class ModelManager : IDisposable
                 int inputVertexOffset = skinningCmd.VertexOffset;
                 int outputVertexOffset = DrawCommands[meshRange.Start].BaseVertex;
                 int jointMatricesOffset = skinningCmd.JointMatricesOffset;
-                int vertexCount = GetMeshesVertexCount(meshRange);
+                int vertexCount = GetNodeMeshesVertexCount(skinningCmd.SkinnedNode, DrawCommands, Meshes);
 
                 BBG.Computing.Compute("Compute Skinned vertices", () =>
                 {
@@ -415,35 +411,11 @@ public unsafe class ModelManager : IDisposable
         meshletTasksCountBuffer.UploadElements((uint)count);
     }
 
-    public int GetMeshVertexCount(int index)
-    {
-        return GetMeshesVertexCount(new Range(index, 1));
-    }
-
-    public int GetMeshesVertexCount(Range meshes)
-    {
-        return GetMeshesVertexCount(DrawCommands, VertexPositions, meshes.Start, meshes.Count);
-    }
-
-    public Range GetMeshesVerticesRange(Range meshes)
-    {
-        return new Range(DrawCommands[meshes.Start].BaseVertex, GetMeshesVertexCount(meshes));
-    }
-
     public Range GetMeshesInstanceRange(Range meshes)
     {
         Range range = new Range();
         range.Start = DrawCommands[meshes.Start].BaseInstance;
         range.End = DrawCommands[meshes.End - 1].BaseInstance + DrawCommands[meshes.End - 1].InstanceCount;
-
-        return range;
-    }
-
-    public Range GetMeshesIndicesRange(Range meshes)
-    {
-        Range range = new Range();
-        range.Start = DrawCommands[meshes.Start].FirstIndex;
-        range.End = DrawCommands[meshes.End - 1].FirstIndex + DrawCommands[meshes.End - 1].IndexCount;
 
         return range;
     }
@@ -697,9 +669,7 @@ public unsafe class ModelManager : IDisposable
                     skinningCmd.BlasId = blasCount;
                     skinningCmds.Add(skinningCmd);
 
-                    int vertexCount = GetMeshesVertexCount(DrawCommands, vertexPositions, node.MeshRange.Start, node.MeshRange.Count);
-
-                    unskinnedVerticesCount += vertexCount;
+                    unskinnedVerticesCount += GetNodeMeshesVertexCount(node, DrawCommands, Meshes);
                     numJoints += node.Skin.JointCount;
                 }
 
@@ -795,7 +765,7 @@ public unsafe class ModelManager : IDisposable
             {
                 Range meshRange = node.MeshRange;
                 int vertexOffset = model.GpuModel.DrawCommands[meshRange.Start].BaseVertex;
-                int vertexCount = GetMeshesVertexCount(model.GpuModel.DrawCommands, model.GpuModel.VertexPositions, meshRange.Start, meshRange.Count);
+                int vertexCount = GetNodeMeshesVertexCount(node, model.GpuModel.DrawCommands, model.GpuModel.Meshes);
 
                 ReadOnlySpan<Vector3> vertexPositions = new ReadOnlySpan<Vector3>(model.GpuModel.VertexPositions, vertexOffset, vertexCount);
                 ReadOnlySpan<GpuVertex> vertices = new ReadOnlySpan<GpuVertex>(model.GpuModel.Vertices, vertexOffset, vertexCount);
@@ -862,10 +832,15 @@ public unsafe class ModelManager : IDisposable
         return new Range(min, max - min);
     }
 
-    private static int GetMeshesVertexCount(ReadOnlySpan<BBG.DrawElementsIndirectCommand> drawCmds, ReadOnlySpan<Vector3> vertexPositions, int startMesh, int count = 1)
+    private static int GetNodeMeshesVertexCount(ModelLoader.Node node, ReadOnlySpan<BBG.DrawElementsIndirectCommand> drawCmds, ReadOnlySpan<GpuMesh> meshes)
     {
-        int baseVertex = drawCmds[startMesh].BaseVertex;
-        int nextBaseVertex = startMesh + count == drawCmds.Length ? vertexPositions.Length : drawCmds[startMesh + count].BaseVertex;
-        return nextBaseVertex - baseVertex;
+        if (!node.HasMeshes)
+        {
+            throw new ArgumentException();
+        }
+
+        int start = drawCmds[node.MeshRange.Start].BaseVertex;
+        int end = drawCmds[node.MeshRange.End - 1].BaseVertex + meshes[node.MeshRange.End - 1].VertexCount;
+        return end - start;
     }
 }

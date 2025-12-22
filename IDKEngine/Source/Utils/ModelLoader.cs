@@ -642,72 +642,58 @@ public static unsafe class ModelLoader
         myRoot.Name = modelName;
         myRoot.LocalTransform = Transformation.FromMatrix(rootTransform);
         myRoot.UpdateGlobalTransform();
-
-        Stack<ValueTuple<GltfNode, Node>> nodeStack = new Stack<ValueTuple<GltfNode, Node>>();
-        {
-            GltfNode[] gltfChildren = gltf.DefaultScene.VisualChildren.ToArray();
-            myRoot.Children = new Node[gltfChildren.Length];
-            for (int i = gltfChildren.Length - 1; i >= 0; i--)
-            {
-                GltfNode gltfNode = gltfChildren[i];
-
-                Node myNode = (myRoot.Children[i] = new Node());
-                myNode.Parent = myRoot;
-                myNode.Name = gltfNode.Name ?? $"RootNode_{i}";
-
-                nodeStack.Push((gltfNode, myNode));
-            }
-        }
+        
+        GltfNode[] gltfChildren = gltf.DefaultScene.VisualChildren.ToArray();
+        myRoot.Children = new Node[gltfChildren.Length];
 
         Dictionary<GltfNode, Node> gltfNodeToMyNode = new Dictionary<GltfNode, Node>(gltf.LogicalNodes.Count);
-        while (nodeStack.Count > 0)
+        for (int i = 0; i < gltfChildren.Length; i++)
         {
-            (GltfNode gltfNode, Node myNode) = nodeStack.Pop();
+            GltfNode gltfNode = gltfChildren[i];
+
+            Node myNode = myRoot.Children[i] = new Node();
+            myNode.Parent = myRoot;
+            myNode.Name = gltfNode.Name ?? $"RootNode_{i}";
+
+            TopDownBuildHierarchy(gltfNode, myNode);
+        }
+
+        foreach (GltfNode node in gltf.DefaultScene.VisualChildren)
+        {
+            BottomUpLoad(node);
+        }
+
+        void TopDownBuildHierarchy(GltfNode gltfNode, Node myNode)
+        {
             gltfNodeToMyNode[gltfNode] = myNode;
 
             myNode.LocalTransform = Transformation.FromMatrix(gltfNode.LocalMatrix.ToOpenTK());
             myNode.UpdateGlobalTransform();
 
+            GltfNode[] gltfChildren = gltfNode.VisualChildren.ToArray();
+            myNode.Children = new Node[gltfChildren.Length];
+            for (int i = 0; i < gltfChildren.Length; i++)
             {
-                GltfNode[] gltfChildren = gltfNode.VisualChildren.ToArray();
-                myNode.Children = new Node[gltfChildren.Length];
-                for (int i = gltfChildren.Length - 1; i >= 0; i--)
-                {
-                    GltfNode gltfChild = gltfChildren[i];
+                GltfNode gltfChild = gltfChildren[i];
 
-                    Node myChildNode = new Node();
-                    myChildNode.Parent = myNode;
-                    myChildNode.Name = gltfChild.Name ?? $"ChildNode_{i}";
-                    myNode.Children[i] = myChildNode;
+                Node myChildNode = myNode.Children[i] = new Node();
+                myChildNode.Parent = myNode;
+                myChildNode.Name = gltfChild.Name ?? $"ChildNode_{i}";
 
-                    nodeStack.Push((gltfChild, myChildNode));
-                }
+                TopDownBuildHierarchy(gltfChild, myChildNode);
             }
         }
-
-        {
-            GltfNode[] gltfChildren = gltf.DefaultScene.VisualChildren.ToArray();
-            for (int i = 0; i <  gltfChildren.Length; i++)
-            {
-                BottomUpLoad(gltfChildren[i]);
-            }
-        }
-
 
         void BottomUpLoad(GltfNode gltfNode)
         {
-            Node myNode = gltfNodeToMyNode[gltfNode];
-
+            foreach (GltfNode node in gltfNode.VisualChildren)
             {
-                GltfNode[] gltfChildren = gltfNode.VisualChildren.ToArray();
-                for (int i = 0; i < gltfChildren.Length; i++)
-                {
-                    BottomUpLoad(gltfChildren[i]);
-                }
+                BottomUpLoad(node);
             }
 
             if (gltfNode.Mesh is Mesh gltfMesh)
             {
+                Node myNode = gltfNodeToMyNode[gltfNode];
                 if (gltfNode.Skin is GltfSkin skin)
                 {
                     myNode.Skin = new Skin();
@@ -728,8 +714,17 @@ public static unsafe class ModelLoader
                         continue;
                     }
 
+                    Box localBounds = Box.Empty();
+                    for (int j = 0; j < meshGeometry.VertexData.Positons.Length; j++)
+                    {
+                        localBounds.GrowToFit(meshGeometry.VertexData.Positons[j]);
+                    }
+
                     GpuMesh mesh = new GpuMesh();
+                    mesh.LocalBoundsMin = localBounds.Min;
+                    mesh.LocalBoundsMax = localBounds.Max;
                     mesh.InstanceCount = nodeTransformations.Length;
+                    mesh.VertexCount = meshGeometry.VertexData.Vertices.Length;
                     mesh.MeshletsOffset = listMeshlets.Count;
                     mesh.MeshletCount = meshGeometry.Meshlets.Length;
                     if (gltfMeshPrimitive.Material == null)
@@ -748,14 +743,6 @@ public static unsafe class ModelLoader
                         mesh.NormalMapStrength = normalMapProvided ? 1.0f : 0.0f;
                         mesh.MaterialId = gltfMeshPrimitive.Material.LogicalIndex;
                     }
-
-                    Box localBounds = Box.Empty();
-                    for (int j = 0; j < meshGeometry.VertexData.Vertices.Length; j++)
-                    {
-                        localBounds.GrowToFit(meshGeometry.VertexData.Positons[j]);
-                    }
-                    mesh.LocalBoundsMin = localBounds.Min;
-                    mesh.LocalBoundsMax = localBounds.Max;
 
                     GpuMeshInstance[] meshInstances = new GpuMeshInstance[mesh.InstanceCount];
                     for (int j = 0; j < meshInstances.Length; j++)
@@ -2069,71 +2056,48 @@ public static unsafe class ModelLoader
         }
     }
 
-    public static void FlattenNodeHierachy(ref Model model)
+    public static void HoistMeshPrimitives(ref Model model)
     {
         // This method recursively hoists meshes of a node into it's parent, bottom up.
         // The goal is to to get as many meshes into a single node as possible.
         // Because a BLAS is build per node this typically results in a performance increase.
-        // This method does not destroy other types of nodes (without meshes) and it preserves mesh transformations for instances or animated nodes
 
         // TODO: Meshlet support (when I have a mesh-shader capable GPU)
-        // * Remove uneccesary mesh transform?
-        // * Optimize to do pre-apply hierachy only once?
 
-        Logger.Log(Logger.LogLevel.Info, $"Flattening node hierachy of model \"{model.RootNode.Name}\"");
-
-        BitArray isAnimatedNode = new BitArray(model.Nodes.Length, false);
-        for (int i = 0; i < model.Animations.Length; i++)
-        {
-            NodeAnimation[] nodeAnimations = model.Animations[i].NodeAnimations;
-            for (int j = 0; j < nodeAnimations.Length; j++)
-            {
-                isAnimatedNode[nodeAnimations[j].TargetNode.ArrayIndex] = true;
-            }
-        }
-        for (int i = 0; i < model.Nodes.Length; i++)
-        {
-            Node node = model.Nodes[i];
-
-            if (node.HasSkin)
-            {
-                isAnimatedNode[i] = true;
-
-                Node[] joints = node.Skin.Joints;
-                for (int j = 0; j < joints.Length; j++)
-                {
-                    isAnimatedNode[joints[j].ArrayIndex] = true;
-                }
-            }
-        }
+        Stopwatch sw = Stopwatch.StartNew();
 
         GpuModel gpuModel = model.GpuModel;
-        Flatten(model.RootNode);
-        
+        BitArray isAnimatedNodeTable = GetIsAnimatedNodeTable(model);
+        BitArray isNotHoistedMeshTable = new BitArray(gpuModel.Meshes.Length, false);
+        Hoist(model.RootNode);
         model.Nodes = Node.HierarchyToArray(model.RootNode);
 
-        void Flatten(Node parent)
+        CompactMeshTransforms(ref model);
+
+        Logger.Log(Logger.LogLevel.Info, $"Hoisted meshes for model \"{model.RootNode.Name}\" in {sw.ElapsedMilliseconds}ms");
+
+        void Hoist(Node parent)
         {
             for (int i = 0; i < parent.Children.Length; i++)
             {
                 Node child = parent.Children[i];
                 if (!child.IsLeaf)
                 {
-                    Flatten(child);
+                    Hoist(child);
                 }
             }
 
             if (parent.HasInstancing)
             {
                 // We might be able to handle this but not interested
-                Logger.Log(Logger.LogLevel.Warn, "  * Bail on parent.HasInstancing");
+                Logger.Log(Logger.LogLevel.Warn, "Bailing on parent.HasInstancing");
                 return;
             }
 
             if (parent.Children.Any(it => it.HasInstancing))
             {
                 // We can handle some nodes having instancing and others not but I first need to find a case for it
-                Logger.Log(Logger.LogLevel.Warn, "  * Bail on parent.Children.Any(it => it.HasInstancing)");
+                Logger.Log(Logger.LogLevel.Warn, "Bailing on parent.Children.Any(it => it.HasInstancing)");
                 return;
             }
 
@@ -2148,127 +2112,224 @@ public static unsafe class ModelLoader
                     if (meshesStart == -1)
                     {
                         meshesStart = child.MeshRange.Start;
-                    }
-                    meshesEnd = child.MeshRange.End;
 
-                    if (!isAnimatedNode[child.ArrayIndex])
-                    {
-                        // The mesh transforms of all hoisted nodes are no longer needed.
-                        // Just pick any index to place the new transform. Array will be collapsed as a post-processing step.
-                        newMeshTransformId = child.MeshTransformsRange.Start;
+                        if (!isAnimatedNodeTable[child.ArrayIndex])
+                        {
+                            // The mesh transforms of all hoisted meshes are no longer needed.
+                            // Just pick any index to place the new transform in. Array will be collapsed after hoisting.
+                            newMeshTransformId = child.MeshTransformsRange.Start;
+                        }
                     }
+
+                    meshesEnd = child.MeshRange.End;
                 }
             }
 
             int meshCount = meshesEnd - meshesStart;
-            if (meshCount == 0 || newMeshTransformId == -1)
+
+            if (parent.Children.Length == 1 && meshCount == gpuModel.Meshes.Length)
+            {
+                // All meshes are already inside 1 node, no more work needed
+                return;
+            }
+
+            if (newMeshTransformId == -1)
             {
                 return;
             }
 
-            List<Node> notHoistedNodes = new List<Node>();
-            bool[] isNotHoistedMesh = new bool[meshCount];
+            List<Node> children = new List<Node>();
+            isNotHoistedMeshTable.SetRange(meshesStart, meshCount, false);
+
             int notHoistedMeshCount = 0;
             for (int i = 0; i < parent.Children.Length; i++)
             {
                 Node child = parent.Children[i];
-
-                if (!child.HasMeshes)
+                
+                bool doHoistMeshes = child.HasMeshes && !isAnimatedNodeTable[child.ArrayIndex];
+                if (doHoistMeshes)
                 {
-                    continue;
-                }
+                    Matrix4 worldMatrix = child.LocalTransform.GetMatrix();
+                    Matrix3 unitVecToWorld = Matrix3.Transpose(Matrix3.Invert(new Matrix3(worldMatrix)));
 
-                if (isAnimatedNode[child.ArrayIndex])
-                {
-                    isNotHoistedMesh.AsSpan(child.MeshRange.Start - meshesStart, child.MeshRange.Count).Fill(true);
-                    child.MeshRange.Start = meshesStart + notHoistedMeshCount;
-                    notHoistedMeshCount += child.MeshRange.Count;
-
-                    continue;
-                }
-
-                notHoistedNodes.AddRange(child.Children);
-
-                Matrix4 worldMatrix = child.LocalTransform.GetMatrix();
-                Matrix3 unitVecToWorld = new Matrix3(Matrix4.Transpose(Matrix4.Invert(worldMatrix)));
-                for (int j = child.MeshRange.Start; j < child.MeshRange.End; j++)
-                {
-                    ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref gpuModel.DrawCommands[j];
-                    ref GpuMesh mesh = ref gpuModel.Meshes[j];
-
-                    Box bounds = Box.Empty();
-
-                    int vertexCount = GetMeshVertexCount(j, gpuModel.DrawCommands, gpuModel.VertexPositions);
-                    for (int k = drawCmd.BaseVertex; k < drawCmd.BaseVertex + vertexCount; k++)
+                    Parallel.For(child.MeshRange.Start, child.MeshRange.End, j =>
+                    //for (int j = child.MeshRange.Start; j < child.MeshRange.End; j++)
                     {
-                        Vector3 position = (new Vector4(gpuModel.VertexPositions[k], 1.0f) * worldMatrix).Xyz;
+                        TransformMesh(gpuModel, j, MyMath.Matrix4x4ToTranposed3x4(worldMatrix), unitVecToWorld);
+                    });
 
-                        GpuVertex vertex = gpuModel.Vertices[k];
-                        Vector3 tangent = Compression.DecompressSR11G11B10(vertex.Tangent);
-                        Vector3 normal = Compression.DecompressSR11G11B10(vertex.Normal);
-                        vertex.Tangent = Compression.CompressSR11G11B10(Vector3.Normalize(tangent * unitVecToWorld));
-                        vertex.Normal = Compression.CompressSR11G11B10(Vector3.Normalize(normal * unitVecToWorld));
+                    child.MeshRange = new Range(0, 0);
+                    child.MeshTransformsRange = new Range(0, 0);
 
-                        gpuModel.VertexPositions[k] = position;
-                        gpuModel.Vertices[k] = vertex;
-
-                        bounds.GrowToFit(position);
+                    if (child.Children.Length > 0)
+                    {
+                        KeepChild(child);
                     }
-                    mesh.LocalBoundsMin = bounds.Min;
-                    mesh.LocalBoundsMax = bounds.Max;
                 }
-            }
-            for (int i = 0; i < parent.Children.Length; i++)
-            {
-                Node child = parent.Children[i];
-
-                if (!child.HasMeshes || isAnimatedNode[child.ArrayIndex])
+                else
                 {
-                    notHoistedNodes.Add(child);
+                    KeepChild(child);
+                }
+
+                void KeepChild(Node child)
+                {
+                    children.Add(child);
+
+                    Node.Traverse(child, node =>
+                    {
+                        if (node.HasMeshes)
+                        {
+                            ref Range meshRange = ref node.MeshRange;
+                            if (meshRange.Start >= meshesStart && meshRange.End <= meshesEnd)
+                            {
+                                isNotHoistedMeshTable.SetRange(meshRange.Start, meshRange.Count, true);
+
+                                meshRange.Start = meshesStart + notHoistedMeshCount;
+                                notHoistedMeshCount += meshRange.Count;
+                            }
+                        }
+                    });
                 }
             }
-
-            Algorithms.StablePartition(gpuModel.Meshes.AsSpan(meshesStart, meshCount), (in int i) => isNotHoistedMesh[i]);
-            Algorithms.StablePartition(gpuModel.DrawCommands.AsSpan(meshesStart, meshCount), (in int i) => isNotHoistedMesh[i]);
 
             int hoistedMeshesStart = meshesStart + notHoistedMeshCount;
             int hoistedMeshCount = meshCount - notHoistedMeshCount;
 
+            // Reorder meshes so that the ones which are not hoisted come first
+            Algorithms.StablePartition(gpuModel.Meshes.AsSpan(meshesStart, meshCount), (int i) => isNotHoistedMeshTable[i + meshesStart]);
+            Algorithms.StablePartition(gpuModel.DrawCommands.AsSpan(meshesStart, meshCount), (int i) => isNotHoistedMeshTable[i + meshesStart]);
+            
             gpuModel.MeshTransforms[newMeshTransformId].ModelMatrix = parent.GlobalTransform;
-            for (int i = meshesStart; i < meshesEnd; i++)
-            {
-                ref readonly BBG.DrawElementsIndirectCommand cmd = ref gpuModel.DrawCommands[i];
 
-                for (int j = cmd.BaseInstance; j < cmd.BaseInstance + cmd.InstanceCount; j++)
-                {
-                    gpuModel.MeshInstances[j].MeshId = i;
-
-                    if (i >= hoistedMeshesStart)
-                    {
-                        gpuModel.MeshInstances[j].MeshTransformId = newMeshTransformId;
-                    }
-                }
-            }
-
-            parent.Children = notHoistedNodes.ToArray();
+            parent.Children = children.ToArray();
             parent.MeshRange = new Range(hoistedMeshesStart, hoistedMeshCount + parent.MeshRange.Count);
             parent.MeshTransformsRange = new Range(newMeshTransformId, 1);
         }
 
-        Range GetMeshesInstanceRange(Range meshes, ReadOnlySpan<BBG.DrawElementsIndirectCommand> drawCmds)
+        static void TransformMesh(in GpuModel gpuModel, int meshId, Matrix3x4 worldMatrix, Matrix3 unitVecToWorld)
         {
-            Range range = new Range();
-            range.Start = drawCmds[meshes.Start].BaseInstance;
-            range.End = drawCmds[meshes.End - 1].BaseInstance + drawCmds[meshes.End - 1].InstanceCount;
+            ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref gpuModel.DrawCommands[meshId];
+            ref GpuMesh mesh = ref gpuModel.Meshes[meshId];
 
-            return range;
+            Box bounds = Box.Empty();
+
+            Span<Vector3> vertexPositions = gpuModel.VertexPositions.AsSpan(drawCmd.BaseVertex, mesh.VertexCount);
+            Span<GpuVertex> vertices = gpuModel.Vertices.AsSpan(drawCmd.BaseVertex, mesh.VertexCount);
+
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                //Vector3 position = (new Vector4(vertexPositions[i], 1.0f) * worldMatrix).Xyz;
+                Vector3 position = TransformThreeDimensionsColumn(worldMatrix, new Vector4(vertexPositions[i], 1.0f));
+
+                GpuVertex vertex = vertices[i];
+                Vector3 tangent = Compression.DecompressSR11G11B10(vertex.Tangent);
+                Vector3 normal = Compression.DecompressSR11G11B10(vertex.Normal);
+
+                //vertex.Tangent = Compression.CompressSR11G11B10(Vector3.Normalize(tangent * unitVecToWorld));
+                vertex.Tangent = Compression.CompressSR11G11B10(Vector3.Normalize(TransformRowVec3(tangent, unitVecToWorld)));
+
+                //vertex.Normal = Compression.CompressSR11G11B10(Vector3.Normalize(normal * unitVecToWorld));
+                vertex.Normal = Compression.CompressSR11G11B10(Vector3.Normalize(TransformRowVec3(normal, unitVecToWorld)));
+
+                vertices[i] = vertex;
+                vertexPositions[i] = position;
+
+                bounds.GrowToFit(position);
+            }
+
+            mesh.LocalBoundsMin = bounds.Min;
+            mesh.LocalBoundsMax = bounds.Max;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static Vector3 TransformThreeDimensionsColumn(Matrix3x4 mat, Vector4 vec)
+            {
+                Vector3 result;
+                result = new Vector3(
+                    (mat.Row0.X * vec.X) + (mat.Row0.Y * vec.Y) + (mat.Row0.Z * vec.Z) + (mat.Row0.W * vec.W),
+                    (mat.Row1.X * vec.X) + (mat.Row1.Y * vec.Y) + (mat.Row1.Z * vec.Z) + (mat.Row1.W * vec.W),
+                    (mat.Row2.X * vec.X) + (mat.Row2.Y * vec.Y) + (mat.Row2.Z * vec.Z) + (mat.Row2.W * vec.W)
+                );
+
+                return result;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static Vector3 TransformRowVec3(Vector3 vec, Matrix3 mat)
+            {
+                Vector3 result;
+                result.X = (vec.X * mat.Row0.X) + (vec.Y * mat.Row1.X) + (vec.Z * mat.Row2.X);
+                result.Y = (vec.X * mat.Row0.Y) + (vec.Y * mat.Row1.Y) + (vec.Z * mat.Row2.Y);
+                result.Z = (vec.X * mat.Row0.Z) + (vec.Y * mat.Row1.Z) + (vec.Z * mat.Row2.Z);
+
+                return result;
+            }
         }
 
-        int GetMeshVertexCount(int meshId, ReadOnlySpan<BBG.DrawElementsIndirectCommand> drawCmds, ReadOnlySpan<Vector3> vertexPositions)
+        static BitArray GetIsAnimatedNodeTable(in Model model)
         {
-            int baseVertex = drawCmds[meshId].BaseVertex;
-            int nextBaseVertex = meshId + 1 == drawCmds.Length ? vertexPositions.Length : drawCmds[meshId + 1].BaseVertex;
-            return nextBaseVertex - baseVertex;
+            Node[] nodes = model.Nodes;
+            ModelAnimation[] animations = model.Animations;
+
+            BitArray isAnimatedNodeTable = new BitArray(nodes.Length, false);
+
+            for (int i = 0; i < animations.Length; i++)
+            {
+                NodeAnimation[] nodeAnimations = animations[i].NodeAnimations;
+                for (int j = 0; j < nodeAnimations.Length; j++)
+                {
+                    isAnimatedNodeTable[nodeAnimations[j].TargetNode.ArrayIndex] = true;
+                }
+            }
+
+            for (int i = 0; i < nodes.Length; i++)
+            {
+                Node node = nodes[i];
+
+                if (node.HasSkin)
+                {
+                    isAnimatedNodeTable[i] = true;
+
+                    Node[] joints = node.Skin.Joints;
+                    for (int j = 0; j < joints.Length; j++)
+                    {
+                        isAnimatedNodeTable[joints[j].ArrayIndex] = true;
+                    }
+                }
+            }
+
+            return isAnimatedNodeTable;
+        }
+
+        static void CompactMeshTransforms(ref Model model)
+        {
+            GpuModel gpuModel = model.GpuModel;
+
+            int counter = 0;
+            GpuMeshTransform[] newTransforms = new GpuMeshTransform[gpuModel.MeshTransforms.Length];
+            for (int i = 0; i < model.Nodes.Length; i++)
+            {
+                Node node = model.Nodes[i];
+                if (node.HasMeshes)
+                {
+                    Array.Copy(gpuModel.MeshTransforms, node.MeshTransformsRange.Start, newTransforms, counter, node.MeshTransformsRange.Count);
+                    node.MeshTransformsRange.Start = counter;
+                    counter += node.MeshTransformsRange.Count;
+
+                    for (int j = node.MeshRange.Start; j < node.MeshRange.End; j++)
+                    {
+                        ref readonly BBG.DrawElementsIndirectCommand cmd = ref gpuModel.DrawCommands[j];
+
+                        for (int k = cmd.BaseInstance; k < cmd.BaseInstance + cmd.InstanceCount; k++)
+                        {
+                            gpuModel.MeshInstances[k].MeshId = j;
+                            gpuModel.MeshInstances[k].MeshTransformId = node.MeshTransformsRange.Start;
+                        }
+                    }
+                }
+            }
+            Array.Resize(ref newTransforms, counter);
+
+            model.GpuModel.MeshTransforms = newTransforms;
         }
     }
 }

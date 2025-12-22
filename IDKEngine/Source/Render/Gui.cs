@@ -127,14 +127,14 @@ partial class Gui : IDisposable
                 float mbVertices = app.ModelManager.Vertices.SizeInBytes() / 1000000.0f;
                 float mbVertexPositions = app.ModelManager.VertexPositions.SizeInBytes() / 1000000.0f;
                 float mbIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
-                float mbMeshInstances = app.ModelManager.MeshInstances.SizeInBytes() / 1000000.0f;
-                float totalRasterizer = mbVertices + mbVertexPositions + mbIndices + mbMeshInstances;
+                float mbMeshTransforms = app.ModelManager.MeshTransforms.SizeInBytes() / 1000000.0f;
+                float totalRasterizer = mbVertices + mbVertexPositions + mbIndices + mbMeshTransforms;
                 if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb###Rasterizer Geometry total"))
                 {
                     ImGui.Text($"  * Vertices ({app.ModelManager.Vertices.Length}) = {mbVertices}mb");
                     ImGui.Text($"  * VertexPositions ({app.ModelManager.Vertices.Length}) = {mbVertexPositions}mb");
                     ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbIndices}mb");
-                    ImGui.Text($"  * MeshInstances ({app.ModelManager.MeshInstances.Length}) = {mbMeshInstances}mb");
+                    ImGui.Text($"  * MeshTransforms ({app.ModelManager.MeshTransforms.Length}) = {mbMeshTransforms}mb");
                     ImGui.TreePop();
                 }
             }
@@ -753,6 +753,8 @@ partial class Gui : IDisposable
 
                     if (!app.PathTracer.DoDebugBVHTraversal)
                     {
+                        ImGui.InputInt("SPP", ref app.PathTracer.SamplesPerPixel, 1);
+
                         tempInt = app.PathTracer.RayDepth;
                         if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
                         {
@@ -1144,7 +1146,7 @@ partial class Gui : IDisposable
                 ImGui.PushID(cpuModel.GetHashCode());
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
-                if (ImGui.TreeNodeEx(cpuModel.Name))
+                if (ImGui.TreeNodeEx(cpuModel.Name, ImGuiTreeNodeFlags.SpanFullWidth))
                 {
                     RenderNodesGraph(cpuModel.Root);
 
@@ -1520,7 +1522,7 @@ partial class Gui
         public record struct LoadParams
         {
             public bool SpawnInCamera = true;
-            public bool FlattenNodeHierachy = true;
+            public bool HoistMeshes = true;
             public OtkVec3 Scale = new OtkVec3(1.0f);
             public ModelLoader.OptimizationSettings ModelOptimizationSettings = ModelLoader.OptimizationSettings.Recommended;
 
@@ -1642,9 +1644,9 @@ partial class Gui
                 ImGui.Separator();
 
                 ImGui.Checkbox("SpawnInCamera", ref loadingTask.LoadParams.SpawnInCamera);
-                ImGui.Checkbox("FlattenNodeHierachy", ref loadingTask.LoadParams.FlattenNodeHierachy);
+                ImGui.Checkbox("Hoist Meshes", ref loadingTask.LoadParams.HoistMeshes);
                 ToolTipForItemAboveHovered("""
-                    Attempts to hoist non animated/instanced mesh primitives into a single node.
+                    Attempts to hoist non animated/instanced mesh primitives up into a single node.
                     Meshes in a node share the same mesh transform. This will lead to the
                     generation of a larger BLASes which typically improves performance.
                     """
@@ -1773,7 +1775,10 @@ partial class Gui
         
         if (ModelLoader.LoadGltfFromFile(modelPath, transformation.GetMatrix(), loadParams.ModelOptimizationSettings) is ModelLoader.Model model)
         {
-            ModelLoader.FlattenNodeHierachy(ref model);
+            if (loadParams.HoistMeshes)
+            {
+                ModelLoader.HoistMeshPrimitives(ref model);
+            }
             app.ModelManager.Add(model);
             return true;
         }

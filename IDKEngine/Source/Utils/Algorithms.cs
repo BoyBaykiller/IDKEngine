@@ -286,7 +286,7 @@ public static class Algorithms
         return lCounter;
     }
 
-    public static int StablePartition<T>(Span<T> source, Predicate<int> leftSide)
+    public static int StablePartition<T>(Span<T> source, Func<int, bool> left)
     {
         int lCounter = 0;
         int rCounter = 0;
@@ -296,7 +296,7 @@ public static class Algorithms
         for (int i = 0; i < source.Length; i++)
         {
             T el = source[i];
-            if (leftSide(i))
+            if (left(i))
             {
                 source[lCounter++] = el;
             }

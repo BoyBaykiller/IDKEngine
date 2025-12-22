@@ -11,6 +11,8 @@ class PathTracer : IDisposable
 {
     public Vector2i RenderResolution => new Vector2i(Result.Width, Result.Height);
 
+    public int SamplesPerPixel = 1;
+
     private int cachedRayDepth;
 
     public int _rayDepth;
@@ -194,52 +196,55 @@ class PathTracer : IDisposable
     {
         BBG.Cmd.SetUniforms(settings);
 
-        BBG.Computing.Compute("PathTrace Primary Rays", () =>
+        for (int i = 0; i < SamplesPerPixel; i++)
         {
-            BBG.Cmd.BindImageUnit(Result, 0);
-            BBG.Cmd.UseShaderProgram(firstHitProgram);
-            BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
-            BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
-        });
-
-        for (int i = 1; i < RayDepth; i++)
-        {
-            int pingPongIndex = i % 2;
-
-            if (DoRaySorting)
+            BBG.Computing.Compute("PathTrace Primary Rays", () =>
             {
-                if (i > 1)
-                {
-                    RaySorting();
-                }
-
-                // Clear the buffer so we can build the inital histogram of sorting keys
-                workGroupPrefixSumBuffer.Fill(0);
-            }
-
-            BBG.Computing.Compute($"PathTrace Ray bounce {i}", () =>
-            {
-                nint pingPongIndexOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.PingPongIndex));
-                wavefrontPTBuffer.UploadData(pingPongIndexOffset, sizeof(uint), pingPongIndex);
-
-                nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
-                wavefrontPTBuffer.UploadData(rayCountsBaseOffset + (1 - pingPongIndex) * sizeof(uint), sizeof(uint), 0);
-
-                BBG.Cmd.UseShaderProgram(nHitProgram);
-                BBG.Computing.DispatchIndirect(wavefrontPTBuffer, Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommand)));
+                BBG.Cmd.BindImageUnit(Result, 0);
+                BBG.Cmd.UseShaderProgram(firstHitProgram);
+                BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
+
+            for (int j = 1; j < RayDepth; j++)
+            {
+                int pingPongIndex = j % 2;
+
+                if (DoRaySorting)
+                {
+                    if (j > 1)
+                    {
+                        RaySorting();
+                    }
+
+                    // Clear the buffer so we can build the inital histogram of sorting keys
+                    workGroupPrefixSumBuffer.Fill(0);
+                }
+
+                BBG.Computing.Compute($"PathTrace Ray bounce {j}", () =>
+                {
+                    nint pingPongIndexOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.PingPongIndex));
+                    wavefrontPTBuffer.UploadData(pingPongIndexOffset, sizeof(uint), pingPongIndex);
+
+                    nint rayCountsBaseOffset = Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.Counts));
+                    wavefrontPTBuffer.UploadData(rayCountsBaseOffset + (1 - pingPongIndex) * sizeof(uint), sizeof(uint), 0);
+
+                    BBG.Cmd.UseShaderProgram(nHitProgram);
+                    BBG.Computing.DispatchIndirect(wavefrontPTBuffer, Marshal.OffsetOf<GpuWavefrontPTHeader>(nameof(GpuWavefrontPTHeader.DispatchCommand)));
+                    BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+                });
+            }
+
+            BBG.Computing.Compute("Accumulate and output rays color", () =>
+            {
+                BBG.Cmd.BindImageUnit(Result, 0);
+
+                BBG.Cmd.UseShaderProgram(finalDrawProgram);
+                BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit | BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+            });
+            AccumulatedSamples++;
         }
-
-        BBG.Computing.Compute("Accumulate and output rays color", () =>
-        {
-            BBG.Cmd.BindImageUnit(Result, 0);
-
-            BBG.Cmd.UseShaderProgram(finalDrawProgram);
-            BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
-            BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit | BBG.Cmd.MemoryBarrierMask.ShaderStorageBarrierBit | BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
-        });
-        AccumulatedSamples++;
     }
 
     public unsafe void RaySorting()

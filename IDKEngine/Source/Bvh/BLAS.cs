@@ -30,10 +30,17 @@ public static class BLAS
 
     public record struct BuildSettings
     {
+        // Default settings are usually close to optimal, however for Bistro,
+        // because it has unaliged geometry, increasing the PreSplitting factor to 1.0,
+        // limiting MaxLeafTriangleCount=1 and StackSizeOptMaxLeafTriangleCount=16 are better.
+
         public int StopSplittingThreshold = 1;
         public int MaxLeafTriangleCount = 8;
         public float TriangleCost = 1.1f;
-        public float StackSizeOptSAHIncreaseAcceptance = 0.0006f; // 0.06%
+
+        public int StackOptThreshold = 16;
+        public float StackOptSahIncreaseAcceptance = 0.0009745f; // 0.09745%
+        public float StackOptMaxLeafTriangleCount = int.MaxValue;
 
         public BuildSettings()
         {
@@ -105,7 +112,7 @@ public static class BLAS
         public readonly Span<int> PermutatedFragmentIds => FragmentIdsSortedOnAxis[0];
 
         public float[] RightCostsAccum;
-        public bool[] PartitionLeft; // For single threaded builds BitArray can be used to save memory
+        public bool[] FragLeftTable; // For single threaded builds BitArray can be used to save memory
         public Fragments Fragments;
 
         public FragmentsAxesSorted FragmentIdsSortedOnAxis;
@@ -122,7 +129,7 @@ public static class BLAS
     {
         BuildData buildData = new BuildData();
         buildData.Fragments = fragments;
-        buildData.PartitionLeft = new bool[fragments.Count];
+        buildData.FragLeftTable = new bool[fragments.Count];
         buildData.RightCostsAccum = new float[fragments.Count];
         buildData.FragmentIdsSortedOnAxis[0] = new int[fragments.Count];
         buildData.FragmentIdsSortedOnAxis[1] = new int[fragments.Count];
@@ -735,7 +742,7 @@ public static class BLAS
         // Unfortunately we have to manually load the fields for best perf
         // as the JIT otherwise repeatedly loads them in the loop
         // https://github.com/dotnet/runtime/issues/113107
-        bool[] partitionLeft = buildData.PartitionLeft;
+        bool[] fragLeftTable = buildData.FragLeftTable;
         Span<float> rightCostsAccum = buildData.RightCostsAccum;
         Box[] fragBounds = buildData.Fragments.Bounds;
         Span<int> fragIdsSorted;
@@ -813,11 +820,11 @@ public static class BLAS
         fragIdsSorted = buildData.FragmentIdsSortedOnAxis[split.Axis];
         for (int i = start; i < split.SplitIndex; i++)
         {
-            partitionLeft[fragIdsSorted[i]] = !swapSides;
+            fragLeftTable[fragIdsSorted[i]] = !swapSides;
         }
         for (int i = split.SplitIndex; i < end; i++)
         {
-            partitionLeft[fragIdsSorted[i]] = swapSides;
+            fragLeftTable[fragIdsSorted[i]] = swapSides;
         }
 
         Span<int> partitionAux = Helper.ReUseMemory<float, int>(buildData.RightCostsAccum, start, parentNode.TriCount);
@@ -836,10 +843,10 @@ public static class BLAS
                 if (mergedBox == smallerBox)
                 {
                     // If yes move to the other side
-                    buildData.PartitionLeft[fragIdsSorted[i]] = leftSmaller;
+                    buildData.FragLeftTable[fragIdsSorted[i]] = leftSmaller;
                 }
             }
-            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, buildData.PartitionLeft);
+            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, buildData.FragLeftTable);
 
             if (split.SplitIndex == start || split.SplitIndex == end)
             {
@@ -848,34 +855,37 @@ public static class BLAS
         }
         else if (swapSides)
         {
-            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, partitionLeft);
+            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, fragLeftTable);
         }
 
-        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 1) % 3].AsSpan(start, parentNode.TriCount), partitionAux, partitionLeft);
-        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 2) % 3].AsSpan(start, parentNode.TriCount), partitionAux, partitionLeft);
+        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 1) % 3].AsSpan(start, parentNode.TriCount), partitionAux, fragLeftTable);
+        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 2) % 3].AsSpan(start, parentNode.TriCount), partitionAux, fragLeftTable);
 
         return split;
     }
 
     private static void OptimizeStackSize(ref BuildResult blas, BuildSettings settings)
     {
-        double initialCost = ComputeGlobalSAH(blas, settings);
-        int newStackSize = ComputeRequiredStackSize(blas);
+        blas.RequiredStackSize = ComputeRequiredStackSize(blas);
 
-        double costIncrease = 0.0f;
-
-        // Before we collapse the level we first need to gather the cost increase
-        CollapseDeepestLevel(blas, newStackSize - 1, firstPass: true, ref costIncrease);
-        double increasePercent = costIncrease / initialCost;
-
-        while (increasePercent <= settings.StackSizeOptSAHIncreaseAcceptance && newStackSize > 0)
+        if (blas.RequiredStackSize < settings.StackOptThreshold)
         {
-            // Collapse the deepest level and also add cost for collapsing the next level
-            CollapseDeepestLevel(blas, --newStackSize, firstPass: false, ref costIncrease);
-            increasePercent = costIncrease / initialCost;
+            return;
         }
 
-        blas.RequiredStackSize = newStackSize;
+        double currentCost = ComputeGlobalSAH(blas, settings);
+        double addedCost = 0.0;
+
+        // Before we collapse the level we first need to gather the cost increase
+        CollapseDeepestLevel(blas, blas.RequiredStackSize - 1, firstPass: true, ref addedCost);
+        double increasePercent = addedCost / currentCost;
+
+        while (increasePercent <= settings.StackOptSahIncreaseAcceptance && blas.RequiredStackSize > 0)
+        {
+            // Collapse the deepest level and also add cost for collapsing the next level
+            CollapseDeepestLevel(blas, --blas.RequiredStackSize, firstPass: false, ref addedCost);
+            increasePercent = addedCost / currentCost;
+        }
 
         void CollapseDeepestLevel(BuildResult blas, int newStackSize, bool firstPass, ref double nextCollapseCost, int parentId = 1, int stackSize = 0)
         {
@@ -904,6 +914,12 @@ public static class BLAS
                 
                 if ((stackSize == newStackSize && !firstPass) || (stackSize > newStackSize && firstPass))
                 {
+                    if (leftNode.TriCount + rightNode.TriCount > settings.StackOptMaxLeafTriangleCount)
+                    {
+                        nextCollapseCost = float.MaxValue;
+                        return;
+                    }
+
                     double leavesCost = settings.TriangleCost * ((double)leftNode.TriCount * leftNode.HalfArea() + (double)rightNode.TriCount * rightNode.HalfArea());
                     double newParentLeafCost = (double)settings.TriangleCost * (leftNode.TriCount + rightNode.TriCount);
 
@@ -926,6 +942,7 @@ public static class BLAS
 
         public readonly uint GetKey(int index)
         {
+            // Sort by position on the axis. *0.5 is elided
             float p = fragments.Bounds[index].SimdMin[axis] + fragments.Bounds[index].SimdMax[axis];
             return Algorithms.FloatToKey(p);
         }

@@ -138,6 +138,9 @@ struct GpuMesh
     float TransmissionBias;
     float IORBias;
     uint InstanceCount;
+    uint VertexCount;
+
+    vec3 _pad0;
     bool TintOnTransmissive;
 };
 

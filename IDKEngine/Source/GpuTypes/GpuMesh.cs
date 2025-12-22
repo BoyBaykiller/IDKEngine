@@ -21,6 +21,9 @@ public unsafe struct GpuMesh
     public float TransmissionBias;
     public float IORBias;
     public int InstanceCount = 1;
+    public int VertexCount;
+
+    private readonly Vector3 _pad0;
     public bool TintOnTransmissive = true; // Required by KHR_materials_transmission
     private fixed byte _pad[3];
 
