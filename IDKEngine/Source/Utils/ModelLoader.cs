@@ -1085,8 +1085,7 @@ public static unsafe class ModelLoader
                                 stagingBuffer,
                                 imageHeader.Width, imageHeader.Height,
                                 GLTexture.NumChannelsToPixelFormat(imageHeader.Channels),
-                                GLTexture.PixelType.UByte,
-                                null
+                                GLTexture.PixelType.UByte
                             );
                             texture.GenerateMipmap();
 
@@ -1903,9 +1902,7 @@ public static unsafe class ModelLoader
     public static class GtlfpackWrapper
     {
         public const string CLI_NAME = "gltfpack"; // https://github.com/BoyBaykiller/meshoptimizer
-        public static readonly string? CliPath = TryFindGltfpack();
-
-        public static bool CliFound => CliPath != null;
+        public static bool CliFound => Helper.CanEmpiricallyResolveProcName(CLI_NAME);
 
         public record struct GltfpackSettings
         {
@@ -1923,12 +1920,6 @@ public static unsafe class ModelLoader
 
         public static Task Run(GltfpackSettings settings)
         {
-            if (!CliFound)
-            {
-                Logger.Log(Logger.LogLevel.Error, $"Can't run {CLI_NAME}. Tool is not found");
-                return null;
-            }
-
             // -v         = verbose output
             // -noq       = no mesh quantization (KHR_mesh_quantization)
             // -ac        = keep constant animation tracks even if they don't modify the node transform
@@ -1945,7 +1936,7 @@ public static unsafe class ModelLoader
 
             ProcessStartInfo startInfo = new ProcessStartInfo()
             {
-                FileName = CliPath,
+                FileName = CLI_NAME,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 Arguments = arguments,
@@ -1954,7 +1945,7 @@ public static unsafe class ModelLoader
             try
             {
                 Logger.Log(Logger.LogLevel.Info, $"Running \"{CLI_NAME} {arguments}\"");
-
+                
                 Process proc = Process.Start(startInfo);
 
                 proc.BeginErrorReadLine();
@@ -2013,46 +2004,6 @@ public static unsafe class ModelLoader
                 }
             }
             return false;
-        }
-
-        private static string? TryFindGltfpack()
-        {
-            List<string> pathsToSearch = [Directory.GetCurrentDirectory()];
-            {
-                if (TryGetEnvironmentVariable("PATH", out string[] envPath))
-                {
-                    pathsToSearch.AddRange(envPath);
-                }
-                if (TryGetEnvironmentVariable("Path", out envPath))
-                {
-                    pathsToSearch.AddRange(envPath);
-                }
-            }
-
-            for (int i = 0; i < pathsToSearch.Count; i++)
-            {
-                string envPath = pathsToSearch[i];
-                if (!Directory.Exists(envPath))
-                {
-                    continue;
-                }
-
-                string[] results = Directory.GetFiles(envPath, $"{CLI_NAME}.*");
-                if (results.Length > 0)
-                {
-                    return results[0];
-                }
-            }
-
-            return null;
-
-            static bool TryGetEnvironmentVariable(string envVar, out string[] strings)
-            {
-                string data = Environment.GetEnvironmentVariable(envVar);
-                strings = data?.Split(';');
-
-                return data != null;
-            }
         }
     }
 
@@ -2213,10 +2164,13 @@ public static unsafe class ModelLoader
 
             Box bounds = Box.Empty();
 
-            Span<Vector3> vertexPositions = gpuModel.VertexPositions.AsSpan(drawCmd.BaseVertex, mesh.VertexCount);
-            Span<GpuVertex> vertices = gpuModel.Vertices.AsSpan(drawCmd.BaseVertex, mesh.VertexCount);
+            int vertexCount = mesh.VertexCount;
 
-            for (int i = 0; i < vertices.Length; i++)
+            // https://github.com/dotnet/runtime/issues/122696
+            Span<Vector3> vertexPositions = gpuModel.VertexPositions.AsSpan().Slice(drawCmd.BaseVertex, vertexCount);
+            Span<GpuVertex> vertices = gpuModel.Vertices.AsSpan().Slice(drawCmd.BaseVertex, vertexCount);
+
+            for (int i = 0; i < vertexCount; i++)
             {
                 //Vector3 position = (new Vector4(vertexPositions[i], 1.0f) * worldMatrix).Xyz;
                 Vector3 position = TransformThreeDimensionsColumn(worldMatrix, new Vector4(vertexPositions[i], 1.0f));

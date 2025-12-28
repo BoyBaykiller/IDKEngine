@@ -30,11 +30,15 @@ class Application : GameWindowBase
 
     public record struct RecordingSettings
     {
+        // To merge recorded frames into video:
+        // ffmpeg.exe -framerate 144 -thread_queue_size 4096 -start_number 1 -i '%d.jpg' -vcodec libx264 -crf 22 -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "../render.mp4"
+
         public const string FRAME_RECORD_FILE_EXTENSION = ".frd";
         public const string FRAMES_OUTPUT_FOLDER = "RecordedFrames";
 
         public int FPSGoal = 30;
-        public int PathTracingSamplesGoal = 50;
+        public int PathTracerSamples = 50;
+        public bool DoDenoising = true;
         public bool IsOutputFrames = false;
         public FrameRecorderState State = FrameRecorderState.None;
         public Stopwatch FrameTimer = new Stopwatch();
@@ -52,7 +56,7 @@ class Application : GameWindowBase
             {
                 return RenderMode.Rasterizer;
             }
-            if (PathTracer != null)
+            if (PathTracerPipeline != null)
             {
                 return RenderMode.PathTracer;
             }
@@ -74,7 +78,7 @@ class Application : GameWindowBase
 
             if (RenderMode_ == RenderMode.PathTracer)
             {
-                return PathTracer.RenderResolution;
+                return PathTracerPipeline.RenderResolution;
             }
 
             throw new UnreachableException($"Unknown {nameof(RenderMode_)} = {RenderMode_}");
@@ -93,7 +97,7 @@ class Application : GameWindowBase
     // Used for Rasterizer and PathTracer RenderMode
     // Only one is ever used while the other is disposed and set to null
     public RasterPipeline? RasterizerPipeline;
-    public PathTracer? PathTracer;
+    public PathTracerPipeline? PathTracerPipeline;
 
     // Run at presentation resolution and are useful for
     // both Rasterizer and PathTracer RenderMode which is why they are here
@@ -116,30 +120,7 @@ class Application : GameWindowBase
 
     public int MeasuredFramesPerSecond { get; private set; }
 
-    private bool _timeEnabled;
-    public bool TimeEnabled
-    {
-        get => _timeEnabled;
-
-        set
-        {
-            _timeEnabled = value;
-            LightManager.DoAdvanceSimulation = TimeEnabled;
-        }
-    }
-
-    public float CameraCollisionRadius = 0.5f;
-
-    public SceneVsMovingSphereCollisionSettings SceneVsCamCollisionSettings = new SceneVsMovingSphereCollisionSettings()
-    {
-        IsEnabled = true,
-        Settings = new Intersections.SceneVsMovingSphereSettings()
-        {
-            TestSteps = 3,
-            RecursiveSteps = 12,
-            EpsilonNormalOffset = 0.001f
-        }
-    };
+    public bool TimeEnabled;
 
     private GpuPerFrameData gpuPerFrameData;
     private BBG.TypedBuffer<GpuPerFrameData> gpuPerFrameDataBuffer;
@@ -228,18 +209,18 @@ class Application : GameWindowBase
             bool cameraMoved = gpuPerFrameData.PrevProjView != gpuPerFrameData.ProjView;
             if (cameraMoved || anyAnimatedNodeMoved || anyMeshInstanceMoved || anyLightMoved)
             {
-                PathTracer.ResetAccumulation();
+                PathTracerPipeline.ResetAccumulation();
             }
 
-            PathTracer.Compute();
+            PathTracerPipeline.Compute();
 
             if (IsBloom)
             {
-                Bloom.Compute(PathTracer.Result);
+                Bloom.Compute(PathTracerPipeline.Result);
             }
 
-            TonemapAndGamma.Settings.DoTonemapAndSrgbTransform = !PathTracer.DoDebugBVHTraversal;
-            TonemapAndGamma.Compute(PathTracer.Result, IsBloom ? Bloom.Result : null);
+            TonemapAndGamma.Settings.DoTonemapAndSrgbTransform = !PathTracerPipeline.DoDebugBVHTraversal;
+            TonemapAndGamma.Compute(PathTracerPipeline.Result, IsBloom ? Bloom.Result : null);
         }
 
         if (gui.SelectedEntity is Gui.SelectedEntityInfo.Mesh meshInfo)
@@ -344,7 +325,7 @@ class Application : GameWindowBase
             if (KeyboardState[Keys.D1] == Keyboard.InputState.Touched)
             {
                 BBG.AbstractShaderProgram.RecompileAll();
-                PathTracer?.ResetAccumulation();
+                PathTracerPipeline?.ResetAccumulation();
             }
             if (KeyboardState[Keys.E] == Keyboard.InputState.Touched)
             {
@@ -364,26 +345,23 @@ class Application : GameWindowBase
         {
             if (!RenderImGui || !ImGuiNET.ImGui.GetIO().WantCaptureMouse)
             {
-                if (MouseState.CursorMode == CursorModeValue.CursorDisabled)
+                if (MouseState.CursorMode == CursorModeValue.CursorDisabled && MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
                 {
-                    if (MouseState[MouseButton.Left] == Keyboard.InputState.Touched)
+                    Vector3 force = Camera.ViewDir * 5.0f;
+
+                    CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, RNG.RandomVec3(32.0f, 88.0f), 0.3f);
+                    newLight.Velocity = Camera.Velocity;
+                    newLight.AddImpulse(force);
+
+                    Camera.AddImpulse(-force);
+
+                    if (LightManager.AddLight(newLight))
                     {
-                        Vector3 force = Camera.ViewDir * 5.0f;
-
-                        CpuLight newLight = new CpuLight(Camera.Position + Camera.ViewDir * 0.5f, RNG.RandomVec3(32.0f, 88.0f), 0.3f);
-                        newLight.Velocity = Camera.Velocity;
-                        newLight.AddImpulse(force);
-
-                        Camera.AddImpulse(-force);
-
-                        if (LightManager.AddLight(newLight))
+                        int newLightIndex = LightManager.Count - 1;
+                        CpuPointShadow pointShadow = new CpuPointShadow(256, RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
+                        if (!LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
                         {
-                            int newLightIndex = LightManager.Count - 1;
-                            CpuPointShadow pointShadow = new CpuPointShadow(256, RenderResolution, new Vector2(newLight.GpuLight.Radius, 60.0f));
-                            if (!LightManager.CreatePointShadowForLight(pointShadow, newLightIndex))
-                            {
-                                pointShadow.Dispose();
-                            }
+                            pointShadow.Dispose();
                         }
                     }
                 }
@@ -398,25 +376,19 @@ class Application : GameWindowBase
             {
                 Camera.ProcessInputs(KeyboardState, MouseState);
                 Camera.AdvanceSimulation(dT);
+
+                if (MouseState[MouseButton.Button5] != Keyboard.InputState.Pressed)
+                {
+                    Camera.CollisionDetection(ModelManager);
+                }
             }
 
-            LightManager.Update(dT, ModelManager);
-        }
-
-        if (SceneVsCamCollisionSettings.IsEnabled && MouseState[MouseButton.Button5] != Keyboard.InputState.Pressed)
-        {
-            Sphere movingSphere = new Sphere(Camera.PrevPosition, CameraCollisionRadius);
-            Vector3 prevSpherePos = movingSphere.Center;
-            Intersections.SceneVsMovingSphereCollisionRoutine(ModelManager, SceneVsCamCollisionSettings.Settings, ref movingSphere, ref Camera.Position, (in Intersections.SceneHitInfo hitInfo) =>
+            if (TimeEnabled)
             {
-                Vector3 deltaStep = Camera.Position - prevSpherePos;
-                Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
-                Camera.Position = movingSphere.Center + slidedDeltaStep;
+                LightManager.AdvanceSimulation(dT);
+            }
 
-                Camera.Velocity = Plane.Project(Camera.Velocity, hitInfo.SlidingPlane);
-
-                prevSpherePos = movingSphere.Center;
-            });
+            LightManager.CollisionDetection(ModelManager);
         }
 
         Camera.SetPrevToCurrentPosition();
@@ -462,7 +434,7 @@ class Application : GameWindowBase
 
         ModelLoader.TextureLoaded += () =>
         {
-            PathTracer?.ResetAccumulation();
+            PathTracerPipeline?.ResetAccumulation();
         };
 
         ModelManager = new ModelManager();
@@ -502,6 +474,7 @@ class Application : GameWindowBase
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SanMiguel\SanMiguel.gltf").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\SimpleInstancing\glTF-Binary\SimpleInstancing.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Showcase\Showcase\Showcase.gltf").Value;
+            // ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb").Value;
 
             // Merging a model with many meshes into one can more than 2x Ray Tracing performance! (even with TLAS)
             ModelLoader.HoistMeshPrimitives(ref sponza);
@@ -526,11 +499,20 @@ class Application : GameWindowBase
         else
         {
             ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
-            //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-            //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+            ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+            ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
             //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
+            ModelLoader.Model car = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\free_-_mclaren_p1_mso\scene.gltf", 
+                new Transformation().WithTranslation(4.2f, 0.0f, 0.1f).WithScale(1.5f).WithRotationDeg(-180.0f, -73.0f, -180.0f).GetMatrix()
+            ).Value;
+            ModelLoader.Model knight = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\medieval_knight__sculpture__game_ready\scene.gltf",
+                new Transformation().WithTranslation(-5.5f, 0.0f, 0.1f).WithScale(1.1f).WithRotationDeg(0.0f, 84.0f, 0.0f).GetMatrix()
+            ).Value;
+
             ModelLoader.HoistMeshPrimitives(ref a);
-            ModelManager.Add(a);
+            ModelLoader.HoistMeshPrimitives(ref b);
+            ModelLoader.HoistMeshPrimitives(ref car);
+            ModelManager.Add(a, b, c, car, knight);
 
             SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -588,7 +570,7 @@ class Application : GameWindowBase
     private void SetResolutions(Vector2i renderRes, Vector2i presentRes)
     {
         RasterizerPipeline?.SetSize(renderRes, presentRes);
-        PathTracer?.SetSize(renderRes);
+        PathTracerPipeline?.SetSize(renderRes);
 
         if (RenderMode_ == RenderMode.Rasterizer || RenderMode_ == RenderMode.PathTracer)
         {
@@ -625,13 +607,13 @@ class Application : GameWindowBase
             // We disable time to allow for accumulation by default in case there were any moving objects
             TimeEnabled = false;
 
-            PathTracer?.Dispose();
-            PathTracer = new PathTracer(renderRes, PathTracer == null ? new PathTracer.GpuSettings() : PathTracer.GetGpuSettings());
+            PathTracerPipeline?.Dispose();
+            PathTracerPipeline = new PathTracerPipeline(renderRes, PathTracerPipeline == null ? new PathTracer.GpuSettings() : PathTracerPipeline.GetPTSettings());
         }
         else
         {
-            PathTracer?.Dispose();
-            PathTracer = null;
+            PathTracerPipeline?.Dispose();
+            PathTracerPipeline = null;
         }
 
         if (renderMode == RenderMode.Rasterizer || renderMode == RenderMode.PathTracer)
@@ -678,7 +660,7 @@ class Application : GameWindowBase
         if (RecorderVars.State == FrameRecorderState.Replaying)
         {
             if (RenderMode_ == RenderMode.Rasterizer ||
-                (RenderMode_ == RenderMode.PathTracer && PathTracer.AccumulatedSamples >= RecorderVars.PathTracingSamplesGoal))
+                (RenderMode_ == RenderMode.PathTracer && PathTracerPipeline.AccumulatedSamples >= RecorderVars.PathTracerSamples))
             {
                 if (RecorderVars.IsOutputFrames)
                 {
@@ -717,8 +699,9 @@ class Application : GameWindowBase
             else
             {
                 RecorderVars.State = FrameRecorderState.Recording;
-                FrameStateRecorder.Clear();
                 RecorderVars.FrameTimer.Restart();
+
+                FrameStateRecorder.Clear();
             }
         }
 
@@ -733,6 +716,17 @@ class Application : GameWindowBase
             }
             else if (FrameStateRecorder.Count > 0)
             {
+                if (RenderMode_ == RenderMode.PathTracer)
+                {
+                    // Copy settings into PathTracer
+                    PathTracerPipeline.DenoisingEnabled = RecorderVars.DoDenoising;
+
+                    if (RecorderVars.DoDenoising)
+                    {
+                        PathTracerPipeline.AutoDenoiseSamplesThreshold = RecorderVars.PathTracerSamples;
+                    }
+                }
+
                 RecorderVars.State = FrameRecorderState.Replaying;
                 MouseState.CursorMode = CursorModeValue.CursorNormal;
 

@@ -29,10 +29,10 @@ float BaseReflectivity(float n1, float n2)
 vec3 BaseReflectivity(vec3 albedo, float metallic, float n1, float n2)
 {
     // Compute R0 term in https://en.wikipedia.org/wiki/Schlick%27s_approximation
-    vec3 r0 = (vec3(n1) - vec3(n2)) / (vec3(n1) + vec3(n2));
+    float r0 = (n1 - n2) / (n1 + n2);
     r0 *= r0;
 
-    vec3 f0 = mix(r0, albedo, metallic);
+    vec3 f0 = mix(vec3(r0), albedo, metallic);
     return f0;
 }
 

@@ -87,7 +87,7 @@ class FSR2Wrapper : IDisposable
             Flags = FSR2.InitializationFlagBits.EnableHighDynamicRange | FSR2.InitializationFlagBits.EnableAutoExposure | FSR2.InitializationFlagBits.EnableDebugChecking | FSR2.InitializationFlagBits.AllowNullDeviceAndCommandList,
             MaxRenderSize = new FSR2Types.Dimensions2D() { Width = (uint)inputSize.X, Height = (uint)inputSize.Y },
             DisplaySize = new FSR2Types.Dimensions2D() { Width = (uint)outputSize.X, Height = (uint)outputSize.Y },
-            FpMessage = &Fsr2Message,
+            FpMessage = &Fsr2MessageCallback,
         };
         fsr2ScratchMemory = new NativeArray<byte>(FSR2.GL.GetScratchMemorySize());
         FSR2.GL.GetInterface(out contextDesc.Callbacks, fsr2ScratchMemory.Elements, (nuint)fsr2ScratchMemory.Length, &GetProcAddress);
@@ -114,9 +114,15 @@ class FSR2Wrapper : IDisposable
     }
 
     [UnmanagedCallersOnly]
-    private static unsafe void Fsr2Message(FSR2Interface.MsgType type, char* message)
+    private static unsafe void Fsr2MessageCallback(FSR2Interface.MsgType type, char* message)
     {
-        Logger.Log(Logger.LogLevel.Warn, $"FSR2: {type} {new string(message)}");
+        Logger.LogLevel level = type switch
+        {
+            FSR2Interface.MsgType.Error => Logger.LogLevel.Error,
+            FSR2Interface.MsgType.Warning => Logger.LogLevel.Warn,
+            _ => Logger.LogLevel.Info
+        };
+        Logger.Log(level, $"FSR2: {level} {new string(message)}");
     }
 
     [UnmanagedCallersOnly]

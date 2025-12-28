@@ -2,6 +2,7 @@
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using IDKEngine.Utils;
+using IDKEngine.Shapes;
 using IDKEngine.Windowing;
 
 namespace IDKEngine;
@@ -18,7 +19,6 @@ public class Camera
     private Vector3 thisFrameAcceleration;
 
     public Vector3 UpVector;
-
 
     private float _lookX;
     public float LookX
@@ -54,6 +54,18 @@ public class Camera
     public float NearPlane = 0.1f;
     public float FarPlane = 250.0f;
     public float FovY = MyMath.DegreesToRadians(102.0f);
+
+    public SceneVsMovingSphereCollisionSettings CollisionSettings = new SceneVsMovingSphereCollisionSettings()
+    {
+        IsEnabled = true,
+        Settings = new Intersections.SceneVsMovingSphereSettings()
+        {
+            TestSteps = 3,
+            RecursiveSteps = 12,
+            EpsilonNormalOffset = 0.001f
+        }
+    };
+    public float CollisionRadius = 0.5f;
 
     public Camera(Vector2i size, Vector3 position, float lookX = 270.0f, float lookY = 0.0f)
     {
@@ -144,6 +156,25 @@ public class Camera
         {
             // Closed form solution for integration of position over time with constant acceleration
             return position + velocity * dT + 0.5f * acceleration * dT * dT;
+        }
+    }
+
+    public void CollisionDetection(ModelManager modelManager)
+    {
+        if (CollisionSettings.IsEnabled)
+        {
+            Sphere movingSphere = new Sphere(PrevPosition, CollisionRadius);
+            Vector3 prevSpherePos = movingSphere.Center;
+            Intersections.SceneVsMovingSphereCollisionRoutine(modelManager, CollisionSettings.Settings, ref movingSphere, ref Position, (in Intersections.SceneHitInfo hitInfo) =>
+            {
+                Vector3 deltaStep = Position - prevSpherePos;
+                Vector3 slidedDeltaStep = Plane.Project(deltaStep, hitInfo.SlidingPlane);
+                Position = movingSphere.Center + slidedDeltaStep;
+
+                Velocity = Plane.Project(Velocity, hitInfo.SlidingPlane);
+
+                prevSpherePos = movingSphere.Center;
+            });
         }
     }
 

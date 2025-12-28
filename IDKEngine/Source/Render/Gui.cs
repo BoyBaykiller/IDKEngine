@@ -204,13 +204,13 @@ partial class Gui : IDisposable
 
                 ImGui.Separator();
 
-                ImGui.Checkbox("Collision##Camera", ref app.SceneVsCamCollisionSettings.IsEnabled);
-                if (app.SceneVsCamCollisionSettings.IsEnabled)
+                ImGui.Checkbox("Collision##Camera", ref app.Camera.CollisionSettings.IsEnabled);
+                if (app.Camera.CollisionSettings.IsEnabled)
                 {
-                    ImGui.SliderFloat("Radius##Camera", ref app.CameraCollisionRadius, 0.0f, 2.0f);
-                    ImGui.SliderInt("TestSteps##Camera", ref app.SceneVsCamCollisionSettings.Settings.TestSteps, 1, 20);
-                    ImGui.SliderInt("RecursiveSteps##Camera", ref app.SceneVsCamCollisionSettings.Settings.RecursiveSteps, 1, 20);
-                    ImGui.SliderFloat("NormalOffset##Camera", ref app.SceneVsCamCollisionSettings.Settings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
+                    ImGui.SliderFloat("Radius##Camera", ref app.Camera.CollisionRadius, 0.0f, 2.0f);
+                    ImGui.SliderInt("TestSteps##Camera", ref app.Camera.CollisionSettings.Settings.TestSteps, 1, 20);
+                    ImGui.SliderInt("RecursiveSteps##Camera", ref app.Camera.CollisionSettings.Settings.RecursiveSteps, 1, 20);
+                    ImGui.SliderFloat("NormalOffset##Camera", ref app.Camera.CollisionSettings.Settings.EpsilonNormalOffset, 0.0f, 0.01f, "%.4g");
                 }
 
                 ImGui.Separator();
@@ -263,10 +263,9 @@ partial class Gui : IDisposable
                 ImGui.Separator();
             }
 
-            bool isReplaying = app.RecorderVars.State == Application.FrameRecorderState.Replaying;
-            if ((app.RecorderVars.State == Application.FrameRecorderState.None && app.FrameStateRecorder.Count > 0) || isReplaying)
+            if ((app.RecorderVars.State != Application.FrameRecorderState.Recording && app.FrameStateRecorder.Count > 0))
             {
-                ImGui.SeparatorText($"Replaying ({Keys.LeftControl} + {Keys.Space}): {isReplaying}");
+                ImGui.SeparatorText($"Replaying ({Keys.LeftControl} + {Keys.Space}): {app.RecorderVars.State == Application.FrameRecorderState.Replaying}");
 
                 string saveFileName = string.Empty;
                 for (int i = 0; i < app.ModelManager.CpuModels.Length; i++)
@@ -284,15 +283,6 @@ partial class Gui : IDisposable
                 ImGui.Checkbox("Is Video Render", ref app.RecorderVars.IsOutputFrames);
                 ToolTipForItemAboveHovered("When enabled rendered images are saved into a folder.");
 
-                if (app.RenderMode_ == Application.RenderMode.PathTracer)
-                {
-                    tempInt = app.RecorderVars.PathTracingSamplesGoal;
-                    if (ImGui.InputInt("Samples Per Pixel", ref tempInt))
-                    {
-                        app.RecorderVars.PathTracingSamplesGoal = Math.Max(1, tempInt);
-                    }
-                }
-
                 tempInt = app.FrameStateRecorder.ReplayStateIndex;
                 if (ImGui.SliderInt("ReplayFrame", ref tempInt, 0, Math.Max(app.FrameStateRecorder.Count - 1, 0)))
                 {
@@ -300,6 +290,23 @@ partial class Gui : IDisposable
 
                     FrameState state = app.FrameStateRecorder[app.FrameStateRecorder.ReplayStateIndex];
                     app.SetFrameState(state);
+                }
+
+                if (app.RenderMode_ == Application.RenderMode.PathTracer && app.RecorderVars.State == Application.FrameRecorderState.None)
+                {
+                    tempInt = app.RecorderVars.PathTracerSamples;
+                    if (ImGui.InputInt("SamplesPerPixel", ref tempInt))
+                    {
+                        app.RecorderVars.PathTracerSamples = Math.Max(1, tempInt);
+                    }
+
+                    if (ImGui.Checkbox("Denoising", ref app.RecorderVars.DoDenoising))
+                    {
+                        if (app.RecorderVars.DoDenoising)
+                        {
+                            app.RecorderVars.DoDenoising = true;
+                        }
+                    }
                 }
             }
 
@@ -369,11 +376,12 @@ partial class Gui : IDisposable
                 Application.RenderMode[] renderModes = Enum.GetValues<Application.RenderMode>();
                 for (int i = 0; i < renderModes.Length; i++)
                 {
-                    bool isSelected = app.RenderMode_ == renderModes[i];
-                    string enumName = renderModes[i].ToString();
-                    if (ImGui.Selectable(enumName, isSelected))
+                    Application.RenderMode mode = renderModes[i];
+
+                    bool isSelected = mode == app.RenderMode_;
+                    if (ImGui.Selectable(mode.ToString(), isSelected))
                     {
-                        app.RequestRenderMode = (Application.RenderMode)i;
+                        app.RequestRenderMode = mode;
                     }
 
                     if (isSelected)
@@ -525,11 +533,12 @@ partial class Gui : IDisposable
                         RasterPipeline.ShadowMode[] shadowTechniques = Enum.GetValues<RasterPipeline.ShadowMode>();
                         for (int i = 0; i < shadowTechniques.Length; i++)
                         {
-                            bool isSelected = app.RasterizerPipeline.ShadowMode_ == shadowTechniques[i];
-                            string enumName = shadowTechniques[i].ToString();
-                            if (ImGui.Selectable(enumName, isSelected))
+                            RasterPipeline.ShadowMode shadowMode = shadowTechniques[i];
+
+                            bool isSelected = shadowMode == app.RasterizerPipeline.ShadowMode_;
+                            if (ImGui.Selectable(shadowMode.ToString(), isSelected))
                             {
-                                app.RasterizerPipeline.ShadowMode_ = (RasterPipeline.ShadowMode)i;
+                                app.RasterizerPipeline.ShadowMode_ = shadowMode;
                             }
 
                             if (isSelected)
@@ -566,11 +575,12 @@ partial class Gui : IDisposable
                         RasterPipeline.AntiAliasingMode[] options = Enum.GetValues<RasterPipeline.AntiAliasingMode>();
                         for (int i = 0; i < options.Length; i++)
                         {
-                            bool isSelected = app.RasterizerPipeline.AntiAliasingMode_ == options[i];
-                            string enumName = options[i].ToString();
-                            if (ImGui.Selectable(enumName, isSelected))
+                            RasterPipeline.AntiAliasingMode aaMode = options[i];
+                            
+                            bool isSelected = aaMode == app.RasterizerPipeline.AntiAliasingMode_;
+                            if (ImGui.Selectable(aaMode.ToString(), isSelected))
                             {
-                                app.RasterizerPipeline.AntiAliasingMode_ = (RasterPipeline.AntiAliasingMode)i;
+                                app.RasterizerPipeline.AntiAliasingMode_ = aaMode;
                             }
 
                             if (isSelected)
@@ -667,11 +677,12 @@ partial class Gui : IDisposable
                         LightingShadingRateClassifier.DebugMode[] debugModes = Enum.GetValues<LightingShadingRateClassifier.DebugMode>();
                         for (int i = 0; i < debugModes.Length; i++)
                         {
-                            bool isSelected = app.RasterizerPipeline.LightingVRS.Settings.DebugValue == debugModes[i];
-                            string enumName = debugModes[i].ToString();
-                            if (ImGui.Selectable(enumName, isSelected))
+                            LightingShadingRateClassifier.DebugMode mode = debugModes[i];
+
+                            bool isSelected = mode == app.RasterizerPipeline.LightingVRS.Settings.DebugValue;
+                            if (ImGui.Selectable(mode.ToString(), isSelected))
                             {
-                                app.RasterizerPipeline.LightingVRS.Settings.DebugValue = (LightingShadingRateClassifier.DebugMode)i;
+                                app.RasterizerPipeline.LightingVRS.Settings.DebugValue = mode;
                             }
 
                             if (isSelected)
@@ -712,66 +723,142 @@ partial class Gui : IDisposable
             {
                 if (ImGui.CollapsingHeader("PathTracing"))
                 {
-                    ImGui.Text($"Samples taken: {app.PathTracer.AccumulatedSamples}");
+                    ImGui.Text($"Samples taken: {app.PathTracerPipeline.AccumulatedSamples}");
 
-                    tempBool = app.PathTracer.DoDebugBVHTraversal;
-
+                    tempBool = app.PathTracerPipeline.DoDebugBVHTraversal;
                     if (ImGui.Checkbox("DoDebugBVHTraversal", ref tempBool))
                     {
-                        app.PathTracer.DoDebugBVHTraversal = tempBool;
+                        app.PathTracerPipeline.DoDebugBVHTraversal = tempBool;
                     }
 
-                    tempBool = app.PathTracer.DoRaySorting;
-                    if (ImGui.Checkbox("Do RaySorting", ref tempBool))
-                    {
-                        app.PathTracer.DoRaySorting = tempBool;
-                    }
-                    ToolTipForItemAboveHovered("""
-                        Sorts all rays by their position between each bounce to restore coherency.
-                        This is only useful if many rays stay alive (e.g no Russian Roulette).
-                        """
-                    );
-
-                    tempBool = app.PathTracer.DoTraceLights;
+                    tempBool = app.PathTracerPipeline.DoTraceLights;
                     if (ImGui.Checkbox("DoTraceLights", ref tempBool))
                     {
-                        app.PathTracer.DoTraceLights = tempBool;
+                        app.PathTracerPipeline.DoTraceLights = tempBool;
                     }
 
-                    tempBool = app.PathTracer.DoRussianRoulette;
-                    if (ImGui.Checkbox("DoRussianRoulette", ref tempBool))
+                    if (!app.PathTracerPipeline.DoDebugBVHTraversal)
                     {
-                        app.PathTracer.DoRussianRoulette = tempBool;
+                        tempBool = app.PathTracerPipeline.DoRaySorting;
+                        if (ImGui.Checkbox("Do RaySorting", ref tempBool))
+                        {
+                            app.PathTracerPipeline.DoRaySorting = tempBool;
+                        }
+                        ToolTipForItemAboveHovered("""
+                            Sorts all rays by their position between each bounce to restore coherency.
+                            This is only useful if many rays stay alive (e.g no Russian Roulette).
+                            """
+                        );
+
+                        tempBool = app.PathTracerPipeline.DoRussianRoulette;
+                        if (ImGui.Checkbox("DoRussianRoulette", ref tempBool))
+                        {
+                            app.PathTracerPipeline.DoRussianRoulette = tempBool;
+                        }
+                        ToolTipForItemAboveHovered("""
+                            Probabilistically eliminates rays which carry little contribution.
+                            This can significantly boost performance. How many
+                            rays are eliminated depends on the albedo color.
+                            Never done for the first bounce.
+                            """
+                        );
+
+                        tempInt = app.PathTracerPipeline.SamplesPerPixel;
+                        if (ImGui.InputInt("SPP", ref tempInt, 1))
+                        {
+                            app.PathTracerPipeline.SamplesPerPixel = tempInt;
+                        }
+
+                        tempInt = app.PathTracerPipeline.RayDepth;
+                        if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 25))
+                        {
+                            app.PathTracerPipeline.RayDepth = tempInt;
+                        }   
                     }
-                    ToolTipForItemAboveHovered("""
-                        Probabilistically eliminates rays which carry little contribution.
-                        This can significantly boost performance. How many
-                        rays are eliminated depends on the albedo color.
-                        Never done for the first bounce.
-                        """
-                    );
 
-                    if (!app.PathTracer.DoDebugBVHTraversal)
+                    float floatTemp = app.PathTracerPipeline.FocalLength;
+                    if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
                     {
-                        ImGui.InputInt("SPP", ref app.PathTracer.SamplesPerPixel, 1);
+                        app.PathTracerPipeline.FocalLength = floatTemp;
+                    }
 
-                        tempInt = app.PathTracer.RayDepth;
-                        if (ImGui.SliderInt("MaxRayDepth", ref tempInt, 1, 50))
-                        {
-                            app.PathTracer.RayDepth = tempInt;
-                        }
+                    floatTemp = app.PathTracerPipeline.LenseRadius;
+                    if (ImGui.InputFloat("LenseRadius", ref floatTemp, 0.002f))
+                    {
+                        app.PathTracerPipeline.LenseRadius = floatTemp;
+                    }
 
-                        float floatTemp = app.PathTracer.FocalLength;
-                        if (ImGui.InputFloat("FocalLength", ref floatTemp, 0.1f))
+                    ImGui.SeparatorText("Denoising");
+                    
+                    if (IntelOpenImageDenoise.OIDN.LibraryFound)
+                    {
+                        tempBool = app.PathTracerPipeline.DenoisingEnabled;
+                        if (ImGui.Checkbox("DenoisingEnabled", ref tempBool))
                         {
-                            app.PathTracer.FocalLength = floatTemp;
+                            app.PathTracerPipeline.DenoisingEnabled = tempBool;
                         }
+                        ToolTipForItemAboveHovered("""
+                            The Intel Denoiser (OIDN 2.0) is fed certain inputs ("AOVs")
+                            which the Path Tracer has to accumulate. Outputting them has
+                            a small overhead which is why it needs to be manually enabled.
+                            """
+                        );
 
-                        floatTemp = app.PathTracer.LenseRadius;
-                        if (ImGui.InputFloat("LenseRadius", ref floatTemp, 0.002f))
+                        if (app.PathTracerPipeline.DenoisingEnabled)
                         {
-                            app.PathTracer.LenseRadius = floatTemp;
+                            if (ImGui.BeginCombo("Output", app.PathTracerPipeline.PathTracerOutput.ToString()))
+                            {
+                                PathTracerPipeline.OutputTexture[] outputModes = Enum.GetValues<PathTracerPipeline.OutputTexture>();
+                                for (int i = 0; i < outputModes.Length; i++)
+                                {
+                                    PathTracerPipeline.OutputTexture mode = outputModes[i];
+
+                                    bool isSelected = mode == app.PathTracerPipeline.PathTracerOutput;
+                                    if (ImGui.Selectable(mode.ToString(), isSelected))
+                                    {
+                                        app.PathTracerPipeline.PathTracerOutput = mode;
+                                    }
+                                    if (mode == PathTracerPipeline.OutputTexture.Denoised && app.TimeEnabled)
+                                    {
+                                        ToolTipForItemAboveHovered("""
+                                            Will revert to Noisy output when Path Tracer progress
+                                            is reset. So you may want to disable time (press T).
+                                            """
+                                        );
+                                    }
+
+                                    if (isSelected)
+                                    {
+                                        ImGui.SetItemDefaultFocus();
+                                    }
+                                }
+                                ImGui.EndCombo();
+                            }
+
+                            ImGui.Checkbox("DoPrefiltering", ref app.PathTracerPipeline.DoPrefiltering);
+                            ToolTipForItemAboveHovered("""
+                                If the input normal/albedo are noisy prefiltering should be applied.
+                                If not, prefiltering is unnecessary and costs time and quality.    
+                                """
+                            );
+
+                            ImGui.InputInt("AutoDenoisSamplesThreshold", ref app.PathTracerPipeline.AutoDenoiseSamplesThreshold);
+
+                            if (ImGui.Button("Denoise now"))
+                            {
+                                app.PathTracerPipeline.Denoise();
+                            }
                         }
+                    }
+                    else
+                    {
+                        ImGui.Text($"""
+                            {IntelOpenImageDenoise.OIDN.LIBRARY_NAME} not found.
+                            Download the DLLs from the official github
+                            and place them in the working directory or
+                            near the exe and restart.
+                            """
+                        );
                     }
                 }
             }
@@ -1118,12 +1205,28 @@ partial class Gui : IDisposable
                     modified = true;
                 }
 
-                SysVec3 previous = transform.Rotation.ToEulerAngles().ToNumerics();
-                tempVec3 = previous;
-                if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.005f))
+                SysVec3 currentEuler = transform.Rotation.ToEulerAngles().ToNumerics() * (180f / MathF.PI);
+                tempVec3 = currentEuler;
+                if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.5f))
                 {
-                    SysVec3 diff = tempVec3 - previous;
-                    transform.Rotation *= Quaternion.FromEulerAngles(diff.ToOpenTK());
+                    SysVec3 deltaEuler = tempVec3 - currentEuler;
+
+                    // Convert delta to radians
+                    Vector3 deltaRad = new Vector3(
+                        deltaEuler.X * MathF.PI / 180f,
+                        deltaEuler.Y * MathF.PI / 180f,
+                        deltaEuler.Z * MathF.PI / 180f
+                    );
+
+                    // Build incremental rotation quaternion (XYZ order)
+                    Quaternion qx = Quaternion.FromAxisAngle(Vector3.UnitX, deltaRad.X);
+                    Quaternion qy = Quaternion.FromAxisAngle(Vector3.UnitY, deltaRad.Y);
+                    Quaternion qz = Quaternion.FromAxisAngle(Vector3.UnitZ, deltaRad.Z);
+                    Quaternion deltaQ = qz * qy * qx;
+
+                    // Apply incremental rotation
+                    transform.Rotation = deltaQ * transform.Rotation;
+
                     modified = true;
                 }
 
@@ -1315,7 +1418,7 @@ partial class Gui : IDisposable
 
         if (resetPathTracer)
         {
-            app.PathTracer?.ResetAccumulation();
+            app.PathTracerPipeline?.ResetAccumulation();
         }
     }
 
@@ -1404,7 +1507,7 @@ partial class Gui : IDisposable
         bool hitMesh = app.ModelManager.BVH.Intersect(ray, out BVH.RayHitInfo meshHitInfo);
         bool hitLight = app.LightManager.Intersect(ray, out LightManager.RayHitInfo lightHitInfo);
 
-        if (app.RenderMode_ == Application.RenderMode.PathTracer && !app.PathTracer.DoTraceLights)
+        if (app.RenderMode_ == Application.RenderMode.PathTracer && !app.PathTracerPipeline.DoTraceLights)
         {
             hitLight = false;
         }
@@ -1587,25 +1690,27 @@ partial class Gui
                     GuiLoadModel.ModelPreprocessingMode[] preprocesModes = Enum.GetValues<GuiLoadModel.ModelPreprocessingMode>();
                     for (int i = 0; i < preprocesModes.Length; i++)
                     {
-                        GuiLoadModel.ModelPreprocessingMode it = preprocesModes[i];
+                        GuiLoadModel.ModelPreprocessingMode mode = preprocesModes[i];
 
-                        bool isDisabled = it == GuiLoadModel.ModelPreprocessingMode.gltfpack && !ModelLoader.GtlfpackWrapper.CliFound;
+                        bool isDisabled = mode == GuiLoadModel.ModelPreprocessingMode.gltfpack && !ModelLoader.GtlfpackWrapper.CliFound;
                         if (isDisabled)
                         {
                             ImGui.BeginDisabled();
                         }
-                        bool isSelected = current == it;
-                        if (ImGui.Selectable(it.ToString(), isSelected))
+
+                        bool isSelected = mode == current;
+                        if (ImGui.Selectable(mode.ToString(), isSelected))
                         {
-                            current = it;
-                            loadModelContext.PreprocessMode = it;
+                            current = mode;
+                            loadModelContext.PreprocessMode = mode;
                         }
+
                         if (isDisabled)
                         {
                             ImGui.EndDisabled();
                         }
 
-                        if (it == GuiLoadModel.ModelPreprocessingMode.gltfpack)
+                        if (mode == GuiLoadModel.ModelPreprocessingMode.gltfpack)
                         {
                             if (isDisabled)
                             {
@@ -1616,7 +1721,7 @@ partial class Gui
                                 ToolTipForItemAboveHovered("Does optimization + compression + more");
                             }
                         }
-                        if (it == GuiLoadModel.ModelPreprocessingMode.meshoptimizer)
+                        else if (mode == GuiLoadModel.ModelPreprocessingMode.meshoptimizer)
                         {
                             ToolTipForItemAboveHovered("Subset of gltfpack. Does not require external CLI");
                         }

@@ -138,7 +138,12 @@ layout(std430, binding = 30) restrict buffer WavefrontRaySSBO
     GpuWavefrontRay Rays[];
 } wavefrontRaySSBO;
 
-layout(std430, binding = 31) restrict buffer WavefrontPTSSBO
+layout(std430, binding = 31) restrict buffer AovRaySSBO
+{
+    GpuAOVRay Rays[];
+} aovRaySSBO;
+
+layout(std430, binding = 32) restrict buffer WavefrontPTSSBO
 {
     GpuDispatchCommand DispatchCommand;
     PackedUVec3 RayBoundsMin[2];
@@ -149,22 +154,22 @@ layout(std430, binding = 31) restrict buffer WavefrontPTSSBO
     uint AliveRayIndices[];
 } wavefrontPTSSBO;
 
-layout(std430, binding = 32) restrict buffer SortedRayIndicesSSBO
+layout(std430, binding = 33) restrict buffer SortedRayIndicesSSBO
 {
     uint Indices[];
 } sortedRayIndicesSSBO;
 
-layout(std430, binding = 33) restrict buffer CachedKeySSBO
+layout(std430, binding = 34) restrict buffer CachedKeySSBO
 {
     uint Keys[];
 } cachedKeySSBO;
 
-layout(std430, binding = 34) restrict buffer WorkGroupPrefixSumSSBO
+layout(std430, binding = 35) restrict buffer WorkGroupPrefixSumSSBO
 {
     uint PrefixSum[];
 } workGroupPrefixSumSSBO;
 
-layout(std430, binding = 35) restrict buffer WorkGroupSumsPrefixSumSSBO
+layout(std430, binding = 36) restrict buffer WorkGroupSumsPrefixSumSSBO
 {
     uint Sums[];
 } workGroupSumsPrefixSumSSBO;

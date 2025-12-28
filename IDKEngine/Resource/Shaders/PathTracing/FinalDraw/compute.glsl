@@ -7,6 +7,8 @@ AppInclude(PathTracing/include/Constants.glsl)
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0) restrict uniform image2D ImgResult;
+layout(binding = 1) restrict uniform image2D ImgAlbedo;
+layout(binding = 2) restrict uniform image2D ImgNormal;
 
 layout(std140, binding = 0) uniform SettingsUBO
 {
@@ -26,17 +28,26 @@ void main()
     uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
     GpuWavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
 
-    vec3 irradiance = wavefrontRay.Radiance;
+    vec3 newResult = wavefrontRay.Radiance;
     if (settingsUBO.DoDebugBVHTraversal)
     {
         float x = wavefrontRay.PreviousIOROrTraverseCost / 150.0;
         vec3 col = TurboColormap(x);
-        irradiance = col;
+        newResult = col;
     }
 
-    vec3 lastFrameIrradiance = imageLoad(ImgResult, imgCoord).rgb;
-    irradiance = mix(lastFrameIrradiance, irradiance, 1.0 / (float(wavefrontPTSSBO.AccumulatedSamples) + 1.0));
-    imageStore(ImgResult, imgCoord, vec4(irradiance, 1.0));
+    vec3 lastFrameResult = imageLoad(ImgResult, imgCoord).rgb;
+    newResult = mix(lastFrameResult, newResult, 1.0 / (float(wavefrontPTSSBO.AccumulatedSamples) + 1.0));
+    imageStore(ImgResult, imgCoord, vec4(newResult, 1.0));
+
+    GpuAOVRay aovRay = aovRaySSBO.Rays[rayIndex];
+    vec3 lastFrameAlbedo = imageLoad(ImgAlbedo, imgCoord).rgb;
+    vec3 newAlbedo = mix(lastFrameAlbedo, aovRay.Albedo, 1.0 / (float(wavefrontPTSSBO.AccumulatedSamples) + 1.0));
+    imageStore(ImgAlbedo, imgCoord, vec4(newAlbedo, 1.0));
+
+    vec3 lastFrameNormal = imageLoad(ImgNormal, imgCoord).rgb;
+    vec3 newNormal = mix(lastFrameNormal, aovRay.Normal, 1.0 / (float(wavefrontPTSSBO.AccumulatedSamples) + 1.0));
+    imageStore(ImgNormal, imgCoord, vec4(newNormal, 1.0));
 
     if (gl_GlobalInvocationID.x == 0)
     {

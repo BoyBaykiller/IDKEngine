@@ -1,8 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using System.Diagnostics;
 using System.Threading.Tasks;
-using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using OpenTK.Mathematics;
@@ -55,6 +55,30 @@ public static class Helper
             default:
                 break;
         }
+    }
+
+    public static bool CanEmpiricallyResolveProcName(string process)
+    {
+        try
+        {
+            using Process p = Process.Start(new ProcessStartInfo()
+            {
+                FileName = process,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            });
+            p.WaitForExit();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static unsafe byte* GetCString(ReadOnlySpan<byte> utf8)
+    {
+        return (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(utf8));
     }
 
     public static unsafe int SizeInBytes<T>(this T[] data) where T : unmanaged

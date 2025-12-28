@@ -38,6 +38,14 @@ vec3 GetWorldSpaceDirection(vec2 ndc, int face)
     return vec3(0.0);
 }
 
+vec3 CubemapFaceNormal(vec3 dir)
+{
+    vec3 a = abs(dir);
+    bvec3 m = greaterThanEqual(a, max(a.yzx, a.zxy));
+
+    return vec3(m) * -sign(dir);
+}
+
 vec3 Interpolate(vec3 p0, vec3 p1, vec3 p2, vec3 bary)
 {
     return p0 * bary.x + p1 * bary.y + p2 * bary.z;

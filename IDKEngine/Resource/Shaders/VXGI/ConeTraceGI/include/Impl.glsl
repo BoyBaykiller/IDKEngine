@@ -23,19 +23,12 @@ vec2 GetPixelCoord()
 #endif
 }
 
-float GetMaterialVariance(float specularChance, float roughness)
-{
-    float diffuseChance = 1.0 - specularChance;
-    float variance = diffuseChance + specularChance * roughness;
-    return variance;
-}
-
 vec3 IndirectLight(Surface surface, sampler3D samplerVoxels, vec3 position, vec3 incomming, ConeTraceGISettings settings)
 {    
     surface.Roughness *= surface.Roughness; // convention that makes roughness appear more linear
     
     vec3 irradiance = vec3(0.0);
-    float materialVariance = GetMaterialVariance(surface.Metallic, surface.Roughness);
+    float materialVariance = GetSurfaceVariance(surface.Metallic, 0.0, surface.Roughness);
     uint samples = uint(mix(1.0, float(settings.MaxSamples), materialVariance));
 
     bool taaEnabled = taaDataUBO.TemporalAntiAliasingMode != ENUM_ANTI_ALIASING_MODE_NONE;

@@ -726,7 +726,6 @@ class RasterPipeline : IDisposable
         Voxelizer.Dispose();
         ConeTracer.Dispose();
 
-
         resolveTransparentProgram.Dispose();
         recordTransparentProgram.Dispose();
         gBufferProgram.Dispose();

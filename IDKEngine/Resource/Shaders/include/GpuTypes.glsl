@@ -211,6 +211,14 @@ struct GpuWavefrontRay
     float PackedDirectionY;
 };
 
+struct GpuAOVRay
+{
+    vec3 Albedo;
+    float NewWeight;
+    vec3 Normal;
+    float _pad0;
+};
+
 // Allow for custum sampler2D types. Mainly for supporting fp16 samplers from GL_AMD_gpu_shader_half_float_fetch
 #ifndef MATERIAL_SAMPLER_2D_TYPE
 #define MATERIAL_SAMPLER_2D_TYPE sampler2D

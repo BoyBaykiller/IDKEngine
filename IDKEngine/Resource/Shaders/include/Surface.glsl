@@ -102,3 +102,10 @@ bool SurfaceHasAlphaBlending(Surface surface)
     
     return surface.AlphaCutoff == valueMeaniningBlendMode;
 }
+
+float GetSurfaceVariance(float specularChance, float transmisionChance, float roughness)
+{
+    float diffuseChance = 1.0 - specularChance - transmisionChance;
+    float variance = diffuseChance + specularChance * roughness + transmisionChance * roughness;
+    return variance;
+}

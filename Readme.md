@@ -1,13 +1,13 @@
 # IDKEngine
 
 Feature list:
- - Wavefront Path Tracer with Ray Sorting
- - Real-Time Voxel Global Illumination
+ - Wavefront Path Tracer with Ray Sorting and [OIDN](https://github.com/RenderKit/oidn)
  - High Quality SweepSAH BVH with PreSplitting + GPU Refitting
+ - Real-Time Voxel Global Illumination
  - [AMD FSR2](https://github.com/JuanDiegoMontoya/FidelityFX-FSR2-OpenGL) and Temporal Anti Aliasing
  - Mesh Shaders + Multi Draw Indirect + Bindless Textures + lots of OpenGL...
  - glTF support including animations and various extensions
- - Collision Detection against triangle meshes
+ - Custom Collision Detection against triangle meshes
  - CoD-Modern-Warfare Bloom
  - Ray Traced Shadows
  - Variable Rate Shading
@@ -23,7 +23,8 @@ Feature list:
 Required OpenGL: 4.6 + `ARB_bindless_texture` + `EXT_shader_image_load_formatted` + `KHR_shader_subgroup` + any of (`ARB_shader_viewport_layer_array`, `AMD_vertex_shader_layer`, `NV_viewport_array2`)
 
 Notes:
- * If [gltfpack](https://github.com/BoyBaykiller/meshoptimizer) is found in PATH or working dir you are given the option to automatically compress glTF files on load
+ * If [OIDN](https://github.com/RenderKit/oidn) is found in PATH or near the executable you are given the option to denoise path traced images
+ * If [gltfpack](https://github.com/BoyBaykiller/meshoptimizer) is found in PATH or near the executable you are given the option to automatically compress glTF files on load
  * Doesn't work on Mesa radeonsi or Intel driver
  * I no longer have access to a NVIDIA GPU, so I can't guarantee NVIDIA exclusive features work at any given point
 
@@ -571,7 +572,7 @@ The cost always increases in one direction. So in the right-to-left sweep when `
 
 #### Alloc free stable partition
 
-A O(N) stable partition needs to allocate a temporary buffer of length `N`. We already have a large enough temporary buffer: `rightCosts`. At this point the cost values are no longer needed so its fine to trash them. I implemented my own stable partition that reuses this buffer, avoiding extra allocations.
+A O(N) stable partition needs to allocate a temporary buffer of `N` items. We already have a large enough temporary buffer: `rightCosts`. At this point the cost values are no longer needed so it's fine to trash them. I implemented my own stable partition that reuses this buffer, avoiding extra allocations.
 
 #### Codegen
 

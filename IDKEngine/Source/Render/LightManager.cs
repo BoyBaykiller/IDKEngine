@@ -60,8 +60,6 @@ public class LightManager : IDisposable
         }
     };
 
-    public bool DoAdvanceSimulation = true;
-
     private readonly CpuLight[] lights;
 
     private readonly BBG.TypedBuffer<GpuLight> lightBufferObject;
@@ -227,17 +225,17 @@ public class LightManager : IDisposable
         }
     }
 
-    public void Update(float dT, ModelManager modelManager)
+    public void AdvanceSimulation(float dT)
     {
-        if (DoAdvanceSimulation)
+        for (int i = 0; i < Count; i++)
         {
-            for (int i = 0; i < Count; i++)
-            {
-                CpuLight cpuLight = lights[i];
-                cpuLight.AdvanceSimulation(dT);
-            }
+            CpuLight cpuLight = lights[i];
+            cpuLight.AdvanceSimulation(dT);
         }
+    }
 
+    public void CollisionDetection(ModelManager modelManager)
+    {
         if (SceneVsSphereCollisionSettings.IsEnabled)
         {
             for (int i = 0; i < Count; i++)

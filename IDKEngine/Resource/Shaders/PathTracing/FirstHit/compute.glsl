@@ -2,6 +2,8 @@
 #extension GL_AMD_gpu_shader_half_float : enable
 #extension GL_AMD_gpu_shader_half_float_fetch : enable
 
+#define PATH_TRACER_OUTPUT_AOVS AppInsert(PATH_TRACER_OUTPUT_AOVS)
+
 #if GL_AMD_gpu_shader_half_float_fetch
 #define MATERIAL_SAMPLER_2D_TYPE f16sampler2D
 #endif
@@ -33,7 +35,7 @@ layout(std140, binding = 0) uniform SettingsUBO
 } settingsUBO;
 
 
-bool TraceRay(inout GpuWavefrontRay wavefrontRay);
+bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay);
 ivec2 ReorderInvocations(uint n);
 
 AppInclude(PathTracing/include/RussianRoulette.glsl)
@@ -56,8 +58,8 @@ void main()
     vec3 camDir = GetWorldSpaceDirection(perFrameDataUBO.InvProjection, perFrameDataUBO.InvView, ndc);
     vec3 focalPoint = perFrameDataUBO.ViewPos + camDir * settingsUBO.FocalLength;
     vec3 pointOnLense = (perFrameDataUBO.InvView * vec4(settingsUBO.LenseRadius * SampleDisk(), 0.0, 1.0)).xyz;
-
     camDir = normalize(focalPoint - pointOnLense);
+    
     GpuWavefrontRay wavefrontRay;
     wavefrontRay.Origin = pointOnLense;
     
@@ -69,10 +71,19 @@ void main()
     wavefrontRay.Radiance = vec3(0.0);
     wavefrontRay.PreviousIOROrTraverseCost = 1.0;
     
+    GpuAOVRay aovRay;
+    aovRay.Albedo = vec3(0.0);
+    aovRay.Normal = vec3(0.0);
+    aovRay.NewWeight = 1.0;
+
+    bool continueRay = TraceRay(wavefrontRay, aovRay);
+    
     uint rayIndex = imgCoord.y * imageSize(ImgResult).x + imgCoord.x;
 
-    bool continueRay = TraceRay(wavefrontRay);
     wavefrontRaySSBO.Rays[rayIndex] = wavefrontRay;
+#if PATH_TRACER_OUTPUT_AOVS
+    aovRaySSBO.Rays[rayIndex] = aovRay;
+#endif
 
     if (continueRay)
     {
@@ -86,7 +97,7 @@ void main()
     }
 }
 
-bool TraceRay(inout GpuWavefrontRay wavefrontRay)
+bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
 {
     vec3 rayDir = DecodeUnitVec(vec2(wavefrontRay.PackedDirectionX, wavefrontRay.PackedDirectionY));
 
@@ -184,7 +195,14 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
         SampleMaterialResult result = SampleMaterial(rayDir, surface, prevIor, fromInside);
         wavefrontRay.Throughput *= result.Bsdf / result.Pdf;
 
-        // Do RR on first bounce?
+        {
+            float weight = GetSurfaceVariance(surface.Metallic, surface.Transmission, surface.Roughness);
+            aovRay.Albedo = surface.Albedo * weight;
+            aovRay.Normal = surface.Normal * weight;
+            aovRay.NewWeight = (1.0 - weight);
+        }
+
+        // RR on first bounce is counterproductive
         // bool terminateRay = settingsUBO.DoRussianRoulette && RussianRouletteTerminateRay(wavefrontRay.Throughput);
         // if (terminateRay)
         // {
@@ -205,7 +223,11 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay)
     }
     else
     {
-        wavefrontRay.Radiance += texture(skyBoxUBO.Albedo, rayDir).rgb * wavefrontRay.Throughput;
+        vec3 albedo = texture(skyBoxUBO.Albedo, rayDir).rgb;
+        aovRay.Albedo = albedo;
+        aovRay.Normal = CubemapFaceNormal(rayDir);
+        aovRay.NewWeight = 0.0;
+        wavefrontRay.Radiance += albedo * wavefrontRay.Throughput;
         return false;
     }
 }
