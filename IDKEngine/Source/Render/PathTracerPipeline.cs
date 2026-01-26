@@ -249,7 +249,6 @@ class PathTracerPipeline : IDisposable
             //OIDN.DeviceType deviceType = (OIDN.DeviceType)OIDN.GetDeviceInt(denoiseContext.Device, Helper.GetCString("type"u8));
             //Logger.Log(Logger.LogLevel.Info, $"OIDN: Selected device type is {deviceType}");
 
-
             int width = size.X;
             int height = size.Y;
             int imageSize = width * height * 3 * sizeof(float);
@@ -265,6 +264,7 @@ class PathTracerPipeline : IDisposable
             OIDN.SetFilterImage(denoiseContext.BeautyFilter, Helper.GetCString("output"u8), denoiseContext.OutputBuffer, OIDN.Format.FLOAT3, width, height, 0, 0, 0);
             OIDN.SetFilterBool(denoiseContext.BeautyFilter, Helper.GetCString("hdr"u8), true);
             OIDN.SetFilterBool(denoiseContext.BeautyFilter, Helper.GetCString("cleanAux"u8), true);
+            OIDN.SetFilterInt(denoiseContext.BeautyFilter, Helper.GetCString("quality"u8), (int)OIDN.Quality.HIGH);
             OIDN.CommitFilter(denoiseContext.BeautyFilter);
 
             denoiseContext.AlbedoFilter = OIDN.NewFilter(denoiseContext.Device, Helper.GetCString("RT"u8));

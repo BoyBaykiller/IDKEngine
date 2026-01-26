@@ -6,11 +6,10 @@ using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
-
 namespace IDKEngine.Bvh;
 
 /// <summary>
-/// Implementation of "Sweep SAH" from "Bonsai: Rapid Bounding Volume Hierarchy Generation using Mini Trees"
+/// Implementation of "SweepSAH" from "Bonsai: Rapid Bounding Volume Hierarchy Generation using Mini Trees"
 /// https://jcgt.org/published/0004/03/02/paper-lowres.pdf
 /// 
 /// There are a few properties we should be aware of and maintain:
@@ -49,7 +48,7 @@ public static class BLAS
 
     public record struct Fragments
     {
-        public readonly int Count => Bounds.Length;
+        public readonly int Length => Bounds.Length;
 
         public Box[] Bounds;
         public int[] OriginalTriIds;
@@ -129,21 +128,21 @@ public static class BLAS
     {
         BuildData buildData = new BuildData();
         buildData.Fragments = fragments;
-        buildData.FragLeftTable = new bool[fragments.Count];
-        buildData.RightCostsAccum = new float[fragments.Count];
-        buildData.FragmentIdsSortedOnAxis[0] = new int[fragments.Count];
-        buildData.FragmentIdsSortedOnAxis[1] = new int[fragments.Count];
-        buildData.FragmentIdsSortedOnAxis[2] = new int[fragments.Count];
+        buildData.FragLeftTable = new bool[fragments.Length];
+        buildData.RightCostsAccum = new float[fragments.Length];
+        buildData.FragmentIdsSortedOnAxis[0] = new int[fragments.Length];
+        buildData.FragmentIdsSortedOnAxis[1] = new int[fragments.Length];
+        buildData.FragmentIdsSortedOnAxis[2] = new int[fragments.Length];
 
         Task[] tasks = new Task[3];
         for (int axis = 0; axis < 3; axis++)
         {
             int copyAxis = axis;
 
-            bool threaded = fragments.Count >= THREADED_SORTING_THRESHOLD;
+            bool threaded = fragments.Length >= THREADED_SORTING_THRESHOLD;
             tasks[copyAxis] = Helper.ExecuteMaybeThreaded(threaded, () =>
             {
-                Span<int> input = new int[fragments.Count];
+                Span<int> input = new int[fragments.Length];
                 Span<int> output = buildData.FragmentIdsSortedOnAxis[copyAxis];
 
                 Helper.FillIncreasing(input);
@@ -158,12 +157,12 @@ public static class BLAS
 
     public static unsafe int Build(ref BuildResult blas, BuildData buildData, BuildSettings settings)
     {
-        // Making child pairs 64 byte aligned can noticable increase perf
+        // Making child pairs 64 byte aligned can noticably increase perf
         blas.Nodes[0] = new GpuBlasNode();
 
         ref GpuBlasNode rootNode = ref blas.Nodes[1];
         rootNode.TriStartOrChild = 0;
-        rootNode.TriCount = buildData.Fragments.Count;
+        rootNode.TriCount = buildData.Fragments.Length;
 
         fixed (BuildResult* blasPtr = &blas)
         {
@@ -183,9 +182,9 @@ public static class BLAS
         OptimizeStackSize(ref blas, settings);
         //blas.RequiredStackSize = ComputeRequiredStackSize(blas);
 
-        // Multithreaded building logic assumes 1PPL to get node offsets.
+        // Multithreaded building logic places nodes as if 1PPL was given which causes empty spots in the array.
         // An atomic counter could be used to add nodes, but that gives uncoherent and undeterministic ordering.
-        // Plus OptimizeStackSize does node collapse which also causes empty subtrees. Let's compact.
+        // In addition OptimizeStackSize does node collapse which also causes empty subtrees. So let's compact.
         int nodeCount = RemoveEmptySubtrees(blas);
 
         return nodeCount;
@@ -195,14 +194,14 @@ public static class BLAS
             ref GpuBlasNode parentNode = ref blas->Nodes[parentNodeId];
             parentNode.SetBounds(ComputeBoundingBox(parentNode.TriStartOrChild, parentNode.TriCount, buildData));
 
-            if (TrySplit(parentNode, buildData, settings) is ObjectSplit objectSplit)
+            if (TrySplit(parentNode, buildData, settings) is ObjectSplit split)
             {
                 GpuBlasNode leftNode = new GpuBlasNode();
                 leftNode.TriStartOrChild = parentNode.TriStartOrChild;
-                leftNode.TriCount = objectSplit.SplitIndex - leftNode.TriStartOrChild;
+                leftNode.TriCount = split.SplitIndex - leftNode.TriStartOrChild;
 
                 GpuBlasNode rightNode = new GpuBlasNode();
-                rightNode.TriStartOrChild = objectSplit.SplitIndex;
+                rightNode.TriStartOrChild = split.SplitIndex;
                 rightNode.TriCount = parentNode.TriCount - leftNode.TriCount;
 
                 int leftNodeId = newNodesId;
@@ -437,18 +436,18 @@ public static class BLAS
 
     public static GpuBlasTriangle[] GetUnindexedTriangles(BuildResult blas, BuildData buildData, Geometry geometry)
     {
-        GpuBlasTriangle[] triangles = new GpuBlasTriangle[buildData.Fragments.Count];
+        GpuBlasTriangle[] triangles = new GpuBlasTriangle[buildData.Fragments.Length];
         int triCounter = 0;
+
+        // It is important that we put the geometry of the left leaf first
+        // and then immeditaly afer the right leafs geometry. SweepSAH builder
+        // already guarantees this layout but some transformations can destroy it.
 
         for (int i = 2; i < blas.Nodes.Length; i++)
         {
             ref GpuBlasNode node = ref blas.Nodes[i];
             if (node.IsLeaf)
             {
-                // It is important that we put the geometry of the left leaf first
-                // and then immeditaly afer the right leafs geometry. SweepSAH builder
-                // already guarantees this layout but Reinsertion opt can destroy it.
-
                 for (int j = 0; j < node.TriCount; j++)
                 {
                     triangles[triCounter + j] = geometry.TriIndices[buildData.PermutatedFragmentIds[node.TriStartOrChild + j]];
@@ -727,8 +726,7 @@ public static class BLAS
     private static ObjectSplit? TrySplit(GpuBlasNode parentNode, BuildData buildData, BuildSettings settings)
     {
         Box parentBox = Conversions.ToBox(parentNode);
-
-        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentNode.HalfArea() == 0.0f)
+        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentBox.HalfArea() == 0.0f)
         {
             return null;
         }
@@ -736,8 +734,8 @@ public static class BLAS
         int start = parentNode.TriStartOrChild;
         int end = parentNode.TriEnd;
 
-        ObjectSplit split = new ObjectSplit();
-        split.NewCost = float.MaxValue;
+        ObjectSplit bestSplit = new ObjectSplit();
+        bestSplit.NewCost = float.MaxValue;
 
         // Unfortunately we have to manually load the fields for best perf
         // as the JIT otherwise repeatedly loads them in the loop
@@ -755,47 +753,47 @@ public static class BLAS
 
             Box rightBoxAccum = Box.Empty();
             int rightCounter = 0;
-            for (int j = end - 1; j >= firstRight; j--)
+            for (int i = end - 1; i >= firstRight; i--)
             {
                 rightCounter++;
-                rightBoxAccum.GrowToFit(fragBounds[fragIdsSorted[j]]);
+                rightBoxAccum.GrowToFit(fragBounds[fragIdsSorted[i]]);
 
                 float rightCost = rightBoxAccum.HalfArea() * rightCounter;
 
-                rightCostsAccum[j] = rightCost;
+                rightCostsAccum[i] = rightCost;
 
-                if (rightCost >= split.NewCost)
+                if (rightCost >= bestSplit.NewCost)
                 {
                     // Don't need to consider split positions beyond this point as cost is already greater and will only get more
-                    firstRight = j + 1;
+                    firstRight = i + 1;
                     break;
                 }
             }
 
             Box leftBoxAccum = Box.Empty();
             int leftCounter = firstRight - start - 1;
-            for (int j = start; j < firstRight - 1; j++)
+            for (int i = start; i < firstRight - 1; i++)
             {
-                leftBoxAccum.GrowToFit(fragBounds[fragIdsSorted[j]]);
+                leftBoxAccum.GrowToFit(fragBounds[fragIdsSorted[i]]);
             }
-            for (int j = firstRight - 1; j < end - 1; j++)
+            for (int i = firstRight - 1; i < end - 1; i++)
             {
-                int splitIndex = j + 1;
+                int splitIndex = i + 1;
 
                 leftCounter++;
-                leftBoxAccum.GrowToFit(fragBounds[fragIdsSorted[j]]);
+                leftBoxAccum.GrowToFit(fragBounds[fragIdsSorted[i]]);
 
                 float leftCost = leftBoxAccum.HalfArea() * leftCounter;
                 float rightCost = rightCostsAccum[splitIndex];
                 float cost = leftCost + rightCost;
 
-                if (cost < split.NewCost)
+                if (cost < bestSplit.NewCost)
                 {
-                    split.SplitIndex = splitIndex;
-                    split.Axis = axis;
-                    split.NewCost = cost;
+                    bestSplit.SplitIndex = splitIndex;
+                    bestSplit.Axis = axis;
+                    bestSplit.NewCost = cost;
                 }
-                else if (leftCost >= split.NewCost)
+                else if (leftCost >= bestSplit.NewCost)
                 {
                     break;
                 }
@@ -803,26 +801,26 @@ public static class BLAS
         }
 
         float notSplitCost = settings.TriangleCost * parentNode.TriCount;
-        split.NewCost = TRAVERSAL_COST + (settings.TriangleCost * split.NewCost / parentBox.HalfArea());
-        if (split.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
+        bestSplit.NewCost = TRAVERSAL_COST + (settings.TriangleCost * bestSplit.NewCost / parentBox.HalfArea());
+        if (bestSplit.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
         {
             return null;
         }
 
-        Box leftBox = ComputeBoundingBox(start, split.SplitIndex - start, buildData, split.Axis);
-        Box rightBox = ComputeBoundingBox(split.SplitIndex, end - split.SplitIndex, buildData, split.Axis);
+        Box leftBox = ComputeBoundingBox(start, bestSplit.SplitIndex - start, buildData, bestSplit.Axis);
+        Box rightBox = ComputeBoundingBox(bestSplit.SplitIndex, end - bestSplit.SplitIndex, buildData, bestSplit.Axis);
         bool leftSmaller = leftBox.HalfArea() < rightBox.HalfArea();
 
         // Make the larger child always be on the left as it's more likely
         // to be hit and traversing the left path is memory friendly
         bool swapSides = leftSmaller;
 
-        fragIdsSorted = buildData.FragmentIdsSortedOnAxis[split.Axis];
-        for (int i = start; i < split.SplitIndex; i++)
+        fragIdsSorted = buildData.FragmentIdsSortedOnAxis[bestSplit.Axis];
+        for (int i = start; i < bestSplit.SplitIndex; i++)
         {
             fragLeftTable[fragIdsSorted[i]] = !swapSides;
         }
-        for (int i = split.SplitIndex; i < end; i++)
+        for (int i = bestSplit.SplitIndex; i < end; i++)
         {
             fragLeftTable[fragIdsSorted[i]] = swapSides;
         }
@@ -831,9 +829,11 @@ public static class BLAS
 
         if (false)
         {
+            // Re-Partitioning opt https://github.com/jbikker/tinybvh/issues/197#issuecomment-2913853982
+
             Box smallerBox = leftSmaller ? leftBox : rightBox;
-            int sideStart = leftSmaller ? split.SplitIndex : start;
-            int sideEnd = leftSmaller ? end : split.SplitIndex;
+            int sideStart = leftSmaller ? bestSplit.SplitIndex : start;
+            int sideEnd = leftSmaller ? end : bestSplit.SplitIndex;
 
             for (int i = sideStart; i < sideEnd; i++)
             {
@@ -846,22 +846,22 @@ public static class BLAS
                     buildData.FragLeftTable[fragIdsSorted[i]] = leftSmaller;
                 }
             }
-            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, buildData.FragLeftTable);
+            bestSplit.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, buildData.FragLeftTable);
 
-            if (split.SplitIndex == start || split.SplitIndex == end)
+            if (bestSplit.SplitIndex == start || bestSplit.SplitIndex == end)
             {
                 return null;
             }
         }
         else if (swapSides)
         {
-            split.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, fragLeftTable);
+            bestSplit.SplitIndex = start + Algorithms.StablePartition(fragIdsSorted.Slice(start, parentNode.TriCount), partitionAux, fragLeftTable);
         }
 
-        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 1) % 3].AsSpan(start, parentNode.TriCount), partitionAux, fragLeftTable);
-        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(split.Axis + 2) % 3].AsSpan(start, parentNode.TriCount), partitionAux, fragLeftTable);
+        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(bestSplit.Axis + 1) % 3].AsSpan(start, parentNode.TriCount), partitionAux, fragLeftTable);
+        Algorithms.StablePartition(buildData.FragmentIdsSortedOnAxis[(bestSplit.Axis + 2) % 3].AsSpan(start, parentNode.TriCount), partitionAux, fragLeftTable);
 
-        return split;
+        return bestSplit;
     }
 
     private static void OptimizeStackSize(ref BuildResult blas, BuildSettings settings)

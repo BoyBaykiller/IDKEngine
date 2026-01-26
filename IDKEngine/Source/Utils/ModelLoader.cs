@@ -827,7 +827,9 @@ public static unsafe class ModelLoader
 
     private static ValueTuple<CpuMaterial[], GpuMaterial[]> LoadMaterials(ReadOnlySpan<MaterialDesc> materialsLoadData, bool useExtBc5NormalMetallicRoughness = false)
     {
-        Dictionary<Image, BindlessSampledTexture> uniqueBindlessTextures = new Dictionary<Image, BindlessSampledTexture>();
+        // We could use Texture as key, but then we'd have to generate a handle every time
+        // and thats a problem given: https://gist.github.com/BoyBaykiller/40d21d5b28391fb40d3f3bc348375ce8
+        Dictionary<SampledImage, BindlessSampledTexture> uniqueBindlessTextures = new Dictionary<SampledImage, BindlessSampledTexture>();
 
         CpuMaterial[] cpuMaterials = new CpuMaterial[materialsLoadData.Length];
         GpuMaterial[] gpuMaterials = new GpuMaterial[materialsLoadData.Length];
@@ -876,23 +878,26 @@ public static unsafe class ModelLoader
                     bindlessTexture = FallbackTextures.GetWhite();
                     hasFallbackPixels = true;
                 }
-                else if (!uniqueBindlessTextures.TryGetValue(sampledImage.GltfImage, out bindlessTexture))
+                else
                 {
-                    if (LoadGLTextureAsync(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out bindlessTexture))
+                    if (!uniqueBindlessTextures.TryGetValue(sampledImage, out bindlessTexture))
                     {
-                        uniqueBindlessTextures[sampledImage.GltfImage] = bindlessTexture;
-                    }
-                    else
-                    {
-                        if (textureType == TextureType.BaseColor)
+                        if (LoadGLTextureAsync(sampledImage, textureType, useExtBc5NormalMetallicRoughness, out bindlessTexture))
                         {
-                            bindlessTexture = FallbackTextures.GetPurpleBlack();
+                            uniqueBindlessTextures[sampledImage] = bindlessTexture;
                         }
                         else
                         {
-                            bindlessTexture = FallbackTextures.GetWhite();
+                            if (textureType == TextureType.BaseColor)
+                            {
+                                bindlessTexture = FallbackTextures.GetPurpleBlack();
+                            }
+                            else
+                            {
+                                bindlessTexture = FallbackTextures.GetWhite();
+                            }
+                            hasFallbackPixels = true;
                         }
-                        hasFallbackPixels = true;
                     }
                 }
 
@@ -1006,8 +1011,8 @@ public static unsafe class ModelLoader
             //       We want the main thread to only run the render loop only and not some random
             //       ThreadPool work (like loading texturs in this case), because it causes frame stutters
 
-            //System.Threading.ThreadPool.SetMinThreads(Environment.ProcessorCount / 2, 1);
-            //System.Threading.ThreadPool.SetMaxThreads(Environment.ProcessorCount / 2, 1);
+            System.Threading.ThreadPool.SetMinThreads(Environment.ProcessorCount / 2, 1);
+            System.Threading.ThreadPool.SetMaxThreads(Environment.ProcessorCount / 2, 1);
 
             if (gltfImage.Content.IsKtx2)
             {
@@ -1082,10 +1087,10 @@ public static unsafe class ModelLoader
                         if (!texture.IsDeleted())
                         {
                             texture.Upload2D(
-                                stagingBuffer,
                                 imageHeader.Width, imageHeader.Height,
                                 GLTexture.NumChannelsToPixelFormat(imageHeader.Channels),
-                                GLTexture.PixelType.UByte
+                                GLTexture.PixelType.UByte,
+                                stagingBuffer
                             );
                             texture.GenerateMipmap();
 
@@ -1236,7 +1241,7 @@ public static unsafe class ModelLoader
                         (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(gltf.LogicalAccessors, meshDesc);
                         OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
 
-                        MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
+                        MeshletData meshletData = new MeshletData(); // GenerateMeshlets(meshVertexData.Positons, meshIndices);
                         (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);
 
                         MeshGeometry meshGeometry = new MeshGeometry();
@@ -2007,15 +2012,26 @@ public static unsafe class ModelLoader
         }
     }
 
-    public static void HoistMeshPrimitives(ref Model model)
+    public static void HoistMeshPrimitives(ref Model model, bool bakeTopLevelTransform = false)
     {
-        // This method recursively hoists meshes of a node into it's parent, bottom up.
-        // The goal is to to get as many meshes into a single node as possible.
-        // Because a BLAS is build per node this typically results in a performance increase.
+        // This method recursively hoists meshes of a node into it's parent and bakes the transforms, buttom up fashion.
+        // The goal is to to get as many meshes into a single node as possible, because that means bigger BLAS will be build.
 
         // TODO: Meshlet support (when I have a mesh-shader capable GPU)
 
         Stopwatch sw = Stopwatch.StartNew();
+
+        if (bakeTopLevelTransform)
+        {
+            Node root = model.Nodes[0];
+
+            Node artificialRoot = new Node();
+            artificialRoot.Name = root.Name;
+            artificialRoot.Children = [root];
+
+            root.Parent = artificialRoot;
+            model.Nodes = Node.HierarchyToArray(artificialRoot);
+        }
 
         GpuModel gpuModel = model.GpuModel;
         BitArray isAnimatedNodeTable = GetIsAnimatedNodeTable(model);
@@ -2078,10 +2094,13 @@ public static unsafe class ModelLoader
 
             int meshCount = meshesEnd - meshesStart;
 
-            if (parent.Children.Length == 1 && meshCount == gpuModel.Meshes.Length)
+            if (!bakeTopLevelTransform)
             {
-                // All meshes are already inside 1 node, no more work needed
-                return;
+                if (parent.Children.Length == 1 && meshCount == gpuModel.Meshes.Length)
+                {
+                    // All meshes are already inside 1 node, no more work needed
+                    return;
+                }
             }
 
             if (newMeshTransformId == -1)

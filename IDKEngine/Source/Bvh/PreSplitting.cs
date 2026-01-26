@@ -29,21 +29,18 @@ public static class PreSplitting
         // * https://github.com/madmann91/bvh/blob/2fd0db62022993963a7343669275647cb073e19a/include/bvh/heuristic_primitive_splitter.hpp
         // * https://research.nvidia.com/sites/default/files/pubs/2013-07_Fast-Parallel-Construction/karras2013hpg_paper.pdf
 
-        Box globalBox = BLAS.ComputeBoundingBox(0, geometry.TriangleCount, geometry);
-        Vector3 globalSize = globalBox.Size();
-
         float totalPriority = 0.0f;
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
             Triangle triangle = geometry.GetTriangle(i);
-            totalPriority += Priority(Box.From(triangle), triangle);
+            totalPriority += Priority(triangle);
         }
 
         int counter = 0;
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
             Triangle triangle = geometry.GetTriangle(i);
-            float priority = Priority(Box.From(triangle), triangle);
+            float priority = Priority(triangle);
             int splitCount = GetSplitCount(priority, totalPriority, geometry.TriangleCount);
 
             counter += splitCount;
@@ -54,31 +51,33 @@ public static class PreSplitting
 
         counter = 0;
 
+        Box globalBox = BLAS.ComputeBoundingBox(0, geometry.TriangleCount, geometry);
+        Vector3 globalSize = globalBox.Size();
+
         Span<ValueTuple<Box, int>> stack = stackalloc ValueTuple<Box, int>[64];
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
             Triangle triangle = geometry.GetTriangle(i);
-            Box triBox = Box.From(triangle);
 
-            float priority = Priority(triBox, triangle);
+            float priority = Priority(triangle);
             int splitCount = GetSplitCount(priority, totalPriority, geometry.TriangleCount);
 
             int stackPtr = 0;
-            stack[stackPtr++] = (triBox, splitCount);
+            stack[stackPtr++] = (Box.From(triangle), splitCount);
             while (stackPtr > 0)
             {
-                (Box box, int splitsLeft) = stack[--stackPtr];
+                (Box parentBox, int splitsLeft) = stack[--stackPtr];
 
                 if (splitsLeft == 1)
                 {
-                    bounds[counter] = box;
+                    bounds[counter] = parentBox;
                     originalTriIds[counter] = i;
                     counter++;
                     continue;
                 }
 
-                int splitAxis = box.LargestAxis();
-                float largestExtent = box.LargestExtent();
+                int splitAxis = parentBox.LargestAxis();
+                float largestExtent = parentBox.LargestExtent();
 
                 float nodeSize = GetNodeSize(largestExtent, globalSize[splitAxis]);
                 if (nodeSize >= largestExtent - 0.0001f)
@@ -86,17 +85,14 @@ public static class PreSplitting
                     nodeSize *= 0.5f;
                 }
 
-                // This is computing [x = j * 2 ^ i, where i,j∈Z] as shown in the paper
-                float midPos = (box.Min[splitAxis] + box.Max[splitAxis]) * 0.5f;
-                float splitPos = globalBox.Min[splitAxis] + MathF.Round((midPos - globalBox.Min[splitAxis]) / nodeSize) * nodeSize;
-                if (splitPos < box.Min[splitAxis] || splitPos > box.Max[splitAxis])
-                {
-                    splitPos = midPos;
-                }
+                // Snap mid position to nearest split plane (still inside parentBox)
+                float midPos = (parentBox.Min[splitAxis] + parentBox.Max[splitAxis]) * 0.5f;
+                float index = MathF.Round((midPos - globalBox.Min[splitAxis]) / nodeSize);
+                float splitPos = globalBox.Min[splitAxis] + index * nodeSize;
 
                 (Box lBox, Box rBox) = triangle.Split(splitAxis, splitPos);
-                lBox.ShrinkToFit(box);
-                rBox.ShrinkToFit(box);
+                lBox.ClipAgainst(parentBox);
+                rBox.ClipAgainst(parentBox);
 
                 float leftExtent = lBox.LargestExtent();
                 float rightExtent = rBox.LargestExtent();
@@ -121,21 +117,34 @@ public static class PreSplitting
             return splitCount;
         }
 
-        static float Priority(Box triBox, Triangle triangle)
+        static float Priority(Triangle triangle)
         {
-            // Cbqrt to avoid spending the entire split budget on a few large triangles in pathological case
-            // Extent^2 to concentrate more splits on large triangles specifically
-            return MathF.Cbrt(MathF.Pow(triBox.LargestExtent(), 2.0f) * (triBox.Area() - triangle.Area));
+            Box triBox = Box.From(triangle);
+
+            // Extent^2 to concentrate more splits on large triangles
+            float extentPrio = triBox.LargestExtent() * triBox.LargestExtent();
+            float emptyAreaPrio = triBox.Area() - triangle.Area;
+
+            // Cbrt to more evenly distribute among triangles
+            return MathF.Cbrt(extentPrio * emptyAreaPrio);
         }
 
         static float GetNodeSize(float extent, float globalSize)
         {
             // See slide 64 in https://www.highperformancegraphics.org/wp-content/uploads/2013/Karras-BVH.pdf
-            // We assume the BVH will be build with spatial split on largest axis.
-            // Given that, here we find the smallest node size which fits the extent
+            // Split planes are defined by recursive spatial median splits of the scene box.
+            // Here we find the largest node size that is still smaller than the extent
             // For alpha between 0.5 and 1.0. level => -1, size => 0.5
             // For alpha between 0.25 and 0.5. level => -2, size => 0.25
             // For alpha between 0.125 and 0.25. level => -3, size => 0.125
+            // 
+            // In code:
+            // int level = (int)MathF.Floor(MathF.Log2(alpha));
+            // float size = MathF.Pow(2.0f, level);
+            // 
+            // In the paper:
+            // i == level
+            // 2 ^ i == size
 
             // Transform into [0.0, 1.0]
             float alpha = extent / globalSize;
@@ -162,7 +171,7 @@ public static class PreSplitting
         const bool straddlingOpt = true;
         const bool leafOpt = true;
 
-        GpuBlasTriangle[] triangles = new GpuBlasTriangle[buildData.Fragments.Count];
+        GpuBlasTriangle[] triangles = new GpuBlasTriangle[buildData.Fragments.Length];
 
         int globalTriCounter = 0;
 
@@ -237,6 +246,10 @@ public static class PreSplitting
             if (!leftNode.IsLeaf) stack[stackPtr++] = leftNode.TriStartOrChild;
         }
 
+        Array.Resize(ref triangles, globalTriCounter);
+
+        return triangles;
+
         static Span<int> GetUniqueTriIds(in GpuBlasNode leafNode, in BLAS.BuildData buildData)
         {
             Span<int> triIds = new int[leafNode.TriCount];
@@ -257,9 +270,5 @@ public static class PreSplitting
 
             return uniqueTriIds;
         }
-
-        Array.Resize(ref triangles, globalTriCounter);
-
-        return triangles;
     }
 }

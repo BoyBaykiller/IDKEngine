@@ -116,15 +116,15 @@ public static partial class BBG
                 // * On NVIDIA the uploaded data is kept arround even with GL_NONE flag
                 //   https://discord.com/channels/337627185248468993/337629838770700290/1361819795573575730
 
-                bool fastUploadPathCandidate =
+                bool doStagingBufferUpload =
                     memLocation == MemLocation.DeviceLocal && 
                     memAccess != MemAccess.MappedCoherent &&
                     memAccess != MemAccess.MappedIncoherent && 
                     memAccess != MemAccess.MappedCoherentWriteOnlyReBAR &&
                     data != null;
 
-                GL.NamedBufferStorage(ID, size, fastUploadPathCandidate ? null : data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
-                if (fastUploadPathCandidate)
+                GL.NamedBufferStorage(ID, size, doStagingBufferUpload ? null : data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
+                if (doStagingBufferUpload)
                 {
                     using Buffer stagingBuffer = new Buffer();
                     stagingBuffer.Allocate(MemLocation.HostLocal, MemAccess.AutoSync, size, data);

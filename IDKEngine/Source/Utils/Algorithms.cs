@@ -42,7 +42,7 @@ public static class Algorithms
         }
     }
 
-    public static unsafe void RadixSort<T, F>(Span<T> input, Span<T> output, F lambda) where F : struct, IRadixSortable<T>
+    public static unsafe void RadixSort<T, F>(Span<T> input, Span<T> output, F lambda) where F : struct, IRadixSortable<T>, allows ref struct
     {
         // Out performs built-in sort except for small inputs (~64)
         // http://stereopsis.com/radix.html

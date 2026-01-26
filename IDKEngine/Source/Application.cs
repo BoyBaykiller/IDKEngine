@@ -38,7 +38,7 @@ class Application : GameWindowBase
 
         public int FPSGoal = 30;
         public int PathTracerSamples = 50;
-        public bool DoDenoising = true;
+        public bool DoDenoising = false;
         public bool IsOutputFrames = false;
         public FrameRecorderState State = FrameRecorderState.None;
         public Stopwatch FrameTimer = new Stopwatch();
@@ -472,12 +472,12 @@ class Application : GameWindowBase
 
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\Bistro.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SanMiguel\SanMiguel.gltf").Value;
-            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\SimpleInstancing\glTF-Binary\SimpleInstancing.glb").Value;
-            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Showcase\Showcase\Showcase.gltf").Value;
-            // ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMergedRotated45.glb").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\DragonMerged.glb").Value;
 
             // Merging a model with many meshes into one can more than 2x Ray Tracing performance! (even with TLAS)
-            ModelLoader.HoistMeshPrimitives(ref sponza);
+            ModelLoader.HoistMeshPrimitives(ref sponza, true);
 
             ModelManager.Add(sponza, lucy, helmet);
 
@@ -499,20 +499,21 @@ class Application : GameWindowBase
         else
         {
             ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
-            ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
-            ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
-            //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
-            ModelLoader.Model car = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\free_-_mclaren_p1_mso\scene.gltf", 
-                new Transformation().WithTranslation(4.2f, 0.0f, 0.1f).WithScale(1.5f).WithRotationDeg(-180.0f, -73.0f, -180.0f).GetMatrix()
-            ).Value;
-            ModelLoader.Model knight = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\medieval_knight__sculpture__game_ready\scene.gltf",
-                new Transformation().WithTranslation(-5.5f, 0.0f, 0.1f).WithScale(1.1f).WithRotationDeg(0.0f, 84.0f, 0.0f).GetMatrix()
-            ).Value;
+            //ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
+            //ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
+            ////ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
+            //ModelLoader.Model car = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\free_-_mclaren_p1_mso\scene.gltf",
+            //    new Transformation().WithTranslation(4.2f, 0.0f, 0.1f).WithScale(1.5f).WithRotationDeg(-180.0f, -73.0f, -180.0f).GetMatrix()
+            //).Value;
+            //ModelLoader.Model knight = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\medieval_knight__sculpture__game_ready\scene.gltf",
+            //    new Transformation().WithTranslation(-5.5f, 0.0f, 0.1f).WithScale(1.3f).WithRotationDeg(0.0f, 84.0f, 0.0f).GetMatrix()
+            //).Value;
 
             ModelLoader.HoistMeshPrimitives(ref a);
-            ModelLoader.HoistMeshPrimitives(ref b);
-            ModelLoader.HoistMeshPrimitives(ref car);
-            ModelManager.Add(a, b, c, car, knight);
+            //ModelLoader.HoistMeshPrimitives(ref b);
+            //ModelLoader.HoistMeshPrimitives(ref car);
+
+            ModelManager.Add(a/*, b, c, car, knight*/);
 
             SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
@@ -636,8 +637,8 @@ class Application : GameWindowBase
     {
         Camera.Position = state.CameraState.Position;
         Camera.UpVector = state.CameraState.UpVector;
-        Camera.LookX = state.CameraState.LookX;
-        Camera.LookY = state.CameraState.LookY;
+        Camera.Yaw = state.CameraState.LookX;
+        Camera.Pitch = state.CameraState.LookY;
         Camera.FovY = state.CameraState.FovY;
         animationTime = state.AnimationTime;
     }
@@ -647,8 +648,8 @@ class Application : GameWindowBase
         FrameState state = new FrameState();
         state.CameraState.Position = Camera.Position;
         state.CameraState.UpVector = Camera.UpVector;
-        state.CameraState.LookX = Camera.LookX;
-        state.CameraState.LookY = Camera.LookY;
+        state.CameraState.LookX = Camera.Yaw;
+        state.CameraState.LookY = Camera.Pitch;
         state.CameraState.FovY = Camera.FovY;
         state.AnimationTime = animationTime;
 

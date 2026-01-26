@@ -62,7 +62,7 @@ public struct Box
         GrowToFit(tri.Position2);
     }
 
-    public void ShrinkToFit(in Box box)
+    public void ClipAgainst(in Box box)
     {
         SimdMin = Vector128.MaxNative(SimdMin, box.SimdMin);
         SimdMax = Vector128.MinNative(SimdMax, box.SimdMax);
@@ -153,7 +153,7 @@ public struct Box
     public static float GetOverlappingHalfArea(in Box a, in Box b)
     {
         Box shrinked = new Box(a.Min, a.Max);
-        shrinked.ShrinkToFit(b);
+        shrinked.ClipAgainst(b);
 
         const float epsilon = 0.001f; // handle imprecision
         Vector3 axesOverlap = shrinked.Max - shrinked.Min;

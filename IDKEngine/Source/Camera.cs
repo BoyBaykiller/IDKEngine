@@ -11,35 +11,24 @@ public class Camera
 {
     public const float MASS = 60.0f;
 
-    public Vector3 ViewDir => GetViewDirFromAngles(LookX, LookY);
+    public Vector3 ViewDir => MyMath.PolarToCartesian(MyMath.DegreesToRadians(Yaw), MyMath.DegreesToRadians(Pitch));
     public Vector3 PrevPosition { get; private set; }
 
     public Vector3 Position;
     public Vector3 Velocity;
-    private Vector3 thisFrameAcceleration;
 
     public Vector3 UpVector;
 
-    private float _lookX;
-    public float LookX
+    public float Yaw;
+
+    private float _pitch;
+    public float Pitch
     {
-        get => _lookX;
+        get => _pitch;
 
         set
         {
-            _lookX = value;
-        }
-    }
-
-    public float _lookY;
-    public float LookY
-    {
-        get => _lookY;
-
-        set
-        {
-            _lookY = Math.Min(value, 180.0f - 0.01f);
-            _lookY = Math.Max(_lookY, 0.0f + 0.01f);
+            _pitch = Math.Clamp(value, 0.001f, 179.999f);
         }
     }
 
@@ -67,13 +56,14 @@ public class Camera
     };
     public float CollisionRadius = 0.5f;
 
-    public Camera(Vector2i size, Vector3 position, float lookX = 270.0f, float lookY = 0.0f)
+    private Vector3 thisFrameAcceleration;
+    public Camera(Vector2i size, Vector3 position, float yaw = 0.0f, float pitch = 90.0f)
     {
         Position = position;
         PrevPosition = position;
         UpVector = new Vector3(0.0f, 1.0f, 0.0f);
-        LookX = lookX;
-        LookY = lookY;
+        Yaw = yaw;
+        Pitch = pitch;
 
         MouseSensitivity = 0.09f;
         KeyboardAccelerationSpeed = 30.0f * MASS; // same "experienced" acceleration regardless of mass
@@ -88,8 +78,8 @@ public class Camera
     {
         Vector2 mouseDelta = mouse.Position - mouse.LastPosition;
 
-        LookX += mouseDelta.X * MouseSensitivity;
-        LookY += mouseDelta.Y * MouseSensitivity;
+        Yaw += mouseDelta.X * MouseSensitivity;
+        Pitch += mouseDelta.Y * MouseSensitivity;
 
         Vector3 force = new Vector3();
         if (keyboard[Keys.W] == Keyboard.InputState.Pressed)
@@ -192,16 +182,6 @@ public class Camera
     {
         // f = m * a; a = f/m
         thisFrameAcceleration += force / MASS;
-    }
-
-    public static Vector3 GetViewDirFromAngles(float lookX, float lookY)
-    {
-        float radiansX = MyMath.DegreesToRadians(lookX);
-        float radiansY = MyMath.DegreesToRadians(lookY);
-
-        Vector3 viewDir = MyMath.PolarToCartesian(radiansX, radiansY);
-
-        return viewDir;
     }
 
     public Matrix4 GetViewMatrix()

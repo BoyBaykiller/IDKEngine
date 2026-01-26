@@ -333,16 +333,17 @@ public class BVH : IDisposable
                 (BLAS.GetTriangleBounds(geometry), []);
 
             // Allocate upper bound of nodes
-            GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(fragments.Count)];
+            GpuBlasNode[] nodes = new GpuBlasNode[BLAS.GetUpperBoundNodes(fragments.Length)];
             BLAS.BuildResult blas = new BLAS.BuildResult(nodes);
 
             // Build BLAS and resize nodes
             BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
             int nodesUsed = BLAS.Build(ref blas, buildData, buildSettings);
 
-            //Stopwatch sw = Stopwatch.StartNew();
-            //BLAS.Build(ref blas, BLAS.GetBuildData(fragments), buildSettings);
-            //Console.WriteLine(sw.ElapsedMilliseconds);
+            // Stopwatch sw = Stopwatch.StartNew();
+            // var b = BLAS.GetBuildData(fragments);
+            // BLAS.Build(ref blas, b, buildSettings);
+            // Console.WriteLine(sw.ElapsedMilliseconds);
 
             Array.Resize(ref nodes, nodesUsed);
             blas.Nodes = nodes;
@@ -353,7 +354,7 @@ public class BVH : IDisposable
                 BLAS.GetUnindexedTriangles(blas, buildData, geometry);
 
             // Statistics
-            Interlocked.Add(ref preSplitNewTris, fragments.Count - geometry.TriangleCount);
+            Interlocked.Add(ref preSplitNewTris, fragments.Length - geometry.TriangleCount);
             Interlocked.Add(ref newTrisDeduplicated, blasTriangles.Length - geometry.TriangleCount);
 
             int[] parentIds = blasDesc.IsRefittable ? BLAS.GetParentIndices(blas) : [];

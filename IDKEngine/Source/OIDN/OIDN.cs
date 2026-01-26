@@ -58,6 +58,14 @@ public static unsafe partial class OIDN
         HALF4,
     }
 
+    public enum Quality : int
+    {
+        DEFAULT = 0, // default quality
+        FAST = 4, // high performance (for interactive/real-time preview rendering)
+        BALANCED = 5, // balanced quality/performance (for interactive/real-time rendering)
+        HIGH = 6, // high quality (for final-frame rendering)
+    }
+
     [LibraryImport(LIBRARY_NAME, EntryPoint = "oidnNewDevice")]
     public static partial void* NewDevice(DeviceType type);
 
@@ -75,6 +83,9 @@ public static unsafe partial class OIDN
 
     [LibraryImport(LIBRARY_NAME, EntryPoint = "oidnSetFilterBool")]
     public static partial void SetFilterBool(void* filter, byte* name, [MarshalAs(UnmanagedType.I1)] bool value);
+
+    [LibraryImport(LIBRARY_NAME, EntryPoint = "oidnSetFilterInt")]
+    public static partial void SetFilterInt(void* filter, byte* name, int value);
 
     [LibraryImport(LIBRARY_NAME, EntryPoint = "oidnGetBufferData")]
     public static partial void* GetBufferData(void* buffer);

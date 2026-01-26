@@ -220,7 +220,7 @@ public static partial class BBG
         {
             GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
         }
-        public void Upload2D(Buffer buffer, int width, int height, PixelFormat pixelFormat, PixelType pixelType, nint offset = 0, int level = 0, int xOffset = 0, int yOffset = 0)
+        public void Upload2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, Buffer buffer, nint offset = 0, int level = 0, int xOffset = 0, int yOffset = 0)
         {
             GL.BindBuffer(BufferTarget.PixelUnpackBuffer, buffer.ID);
             Upload2D(width, height, pixelFormat, pixelType, (void*)offset, level, xOffset, yOffset);
@@ -237,7 +237,7 @@ public static partial class BBG
         {
             Download(pixelFormat, pixelType, pixels, Width, Height, Depth, bufSize, level);
         }
-        public void Download(Buffer buffer, PixelFormat pixelFormat, PixelType pixelType, nint offset, int bufSize, int level = 0)
+        public void Download(PixelFormat pixelFormat, PixelType pixelType, Buffer buffer, nint offset, int bufSize, int level = 0)
         {
             GL.BindBuffer(BufferTarget.PixelPackBuffer, buffer.ID);
             Download(pixelFormat, pixelType, (void*)offset, Width, Height, Depth, bufSize, level);

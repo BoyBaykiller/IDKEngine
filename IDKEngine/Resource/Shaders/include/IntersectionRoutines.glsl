@@ -29,8 +29,9 @@ bool RayBoxIntersect(Ray ray, Box box, out float t1, out float t2)
     t1 = FLOAT_MIN;
     t2 = FLOAT_MAX;
 
-    vec3 t0s = (box.Min - ray.Origin) / ray.Direction;
-    vec3 t1s = (box.Max - ray.Origin) / ray.Direction;
+    vec3 invDir = 1.0 / ray.Direction;
+    vec3 t0s = (box.Min - ray.Origin) * invDir;
+    vec3 t1s = (box.Max - ray.Origin) * invDir;
 
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);

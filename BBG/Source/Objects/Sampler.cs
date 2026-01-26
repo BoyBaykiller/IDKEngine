@@ -26,6 +26,7 @@ public partial class BBG
         {
             Repeat = TextureWrapMode.Repeat,
             ClampToEdge = TextureWrapMode.ClampToEdge,
+            MirroredRepeat = TextureWrapMode.MirroredRepeat,
         }
         public enum Anisotropy : uint
         {

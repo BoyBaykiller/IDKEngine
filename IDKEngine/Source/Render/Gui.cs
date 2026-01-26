@@ -183,11 +183,11 @@ partial class Gui : IDisposable
                 ImGui.SameLine();
                 ImGui.Text($"({app.Camera.Velocity.Length})");
 
-                tempVec2 = new SysVec2(app.Camera.LookX, app.Camera.LookY);
+                tempVec2 = new SysVec2(app.Camera.Yaw, app.Camera.Pitch);
                 if (ImGui.DragFloat2("LookAt", ref tempVec2))
                 {
-                    app.Camera.LookX = tempVec2.X;
-                    app.Camera.LookY = tempVec2.Y;
+                    app.Camera.Yaw = tempVec2.X;
+                    app.Camera.Pitch = tempVec2.Y;
                 }
 
                 ImGui.SliderFloat("AccelerationSpeed", ref app.Camera.KeyboardAccelerationSpeed, 0.0f, 50.0f * Camera.MASS);
@@ -300,13 +300,8 @@ partial class Gui : IDisposable
                         app.RecorderVars.PathTracerSamples = Math.Max(1, tempInt);
                     }
 
-                    if (ImGui.Checkbox("Denoising", ref app.RecorderVars.DoDenoising))
-                    {
-                        if (app.RecorderVars.DoDenoising)
-                        {
-                            app.RecorderVars.DoDenoising = true;
-                        }
-                    }
+
+                    CheckBoxEnabled("Denoising", ref app.RecorderVars.DoDenoising, IntelOpenImageDenoise.OIDN.LibraryFound);
                 }
             }
 
@@ -315,14 +310,15 @@ partial class Gui : IDisposable
                 ImGui.SeparatorText("Saved Frame Data Files");
 
                 string searchDir = Directory.GetCurrentDirectory();
-                string[] files = Directory.GetFiles(searchDir, $"*{Application.RecordingSettings.FRAME_RECORD_FILE_EXTENSION}", SearchOption.TopDirectoryOnly);
-                for (int i = 0; i < files.Length; i++)
+                string[] filePaths = Directory.GetFiles(searchDir, $"*{Application.RecordingSettings.FRAME_RECORD_FILE_EXTENSION}", SearchOption.TopDirectoryOnly);
+                for (int i = 0; i < filePaths.Length; i++)
                 {
-                    string name = Path.GetRelativePath(searchDir, files[i]);
+                    string filePath = filePaths[i];
+                    string name = Path.GetRelativePath(searchDir, filePath);
 
                     if (ImGui.Button(name))
                     {
-                        app.FrameStateRecorder = StateRecorder<FrameState>.Load(name);
+                        app.FrameStateRecorder = StateRecorder<FrameState>.Load(filePath);
                     }
                 }
             }

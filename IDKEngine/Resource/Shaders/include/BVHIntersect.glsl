@@ -16,7 +16,7 @@ struct HitInfo
 };
 
 #ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
-shared uint BlasTraversalStack[TRAVERSAL_STACK_USE_SHARED_STACK_SIZE][BLAS_STACK_SIZE];
+shared uint BlasTraversalStack[BLAS_STACK_SIZE][TRAVERSAL_STACK_USE_SHARED_STACK_SIZE];
 #else
 uint BlasTraversalStack[BLAS_STACK_SIZE];
 #endif
@@ -416,7 +416,7 @@ bool TraceRayAny(Ray ray, out HitInfo hitInfo, bool traceLights, float maxDist)
 void StackPush(inout uint stackPtr, uint newEntry)
 {
 #ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
-    BlasTraversalStack[gl_LocalInvocationIndex][stackPtr++] = newEntry;
+    BlasTraversalStack[stackPtr++][gl_LocalInvocationIndex] = newEntry;
 #else
     BlasTraversalStack[stackPtr++] = newEntry;
 #endif
@@ -425,7 +425,7 @@ void StackPush(inout uint stackPtr, uint newEntry)
 uint StackPop(inout uint stackPtr)
 {
 #ifdef TRAVERSAL_STACK_USE_SHARED_STACK_SIZE
-    return BlasTraversalStack[gl_LocalInvocationIndex][--stackPtr];
+    return BlasTraversalStack[--stackPtr][gl_LocalInvocationIndex];
 #else
     return BlasTraversalStack[--stackPtr];
 #endif

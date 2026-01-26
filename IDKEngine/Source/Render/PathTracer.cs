@@ -7,7 +7,7 @@ using IDKEngine.GpuTypes;
 
 namespace IDKEngine.Render;
 
-unsafe class PathTracer : IDisposable
+class PathTracer : IDisposable
 {
     public int SamplesPerPixel = 1;
 
