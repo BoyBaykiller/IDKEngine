@@ -26,9 +26,6 @@ bool RayBoxIntersect(Ray ray, Box box, out float t1, out float t2)
 {
     // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
 
-    t1 = FLOAT_MIN;
-    t2 = FLOAT_MAX;
-
     vec3 invDir = 1.0 / ray.Direction;
     vec3 t0s = (box.Min - ray.Origin) * invDir;
     vec3 t1s = (box.Max - ray.Origin) * invDir;
@@ -36,8 +33,8 @@ bool RayBoxIntersect(Ray ray, Box box, out float t1, out float t2)
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
 
-    t1 = max(t1, max(tsmaller.x, max(tsmaller.y, max(tsmaller.z, 0.0))));
-    t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
+    t1 = max(tsmaller.x, max(tsmaller.y, max(tsmaller.z, 0.0)));
+    t2 = min(tbigger.x, min(tbigger.y, tbigger.z));
 
     return t1 <= t2;
 }

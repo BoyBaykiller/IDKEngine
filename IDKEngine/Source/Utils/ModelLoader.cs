@@ -465,6 +465,7 @@ public static unsafe class ModelLoader
         public float IOR = 1.5f;
         public AlphaMode AlphaMode = AlphaMode.Opaque;
         public float ThicknessFactor = 0.0f;
+        public bool IsDoubleSided = false;
 
         public MaterialParams()
         {
@@ -842,16 +843,20 @@ public static unsafe class ModelLoader
             gpuMaterial.EmissiveFactor = materialParams.EmissiveFactor;
             gpuMaterial.BaseColorFactor = Compression.CompressUR8G8B8A8(materialParams.BaseColorFactor);
             gpuMaterial.TransmissionFactor = materialParams.TransmissionFactor;
-            gpuMaterial.AlphaCutoff = materialParams.AlphaCutoff;
             gpuMaterial.RoughnessFactor = materialParams.RoughnessFactor;
             gpuMaterial.MetallicFactor = materialParams.MetallicFactor;
             gpuMaterial.Absorbance = materialParams.Absorbance;
             gpuMaterial.IOR = materialParams.IOR;
             gpuMaterial.IsVolumetric = materialParams.IsVolumetric;
+            gpuMaterial.IsDoubleSided = materialParams.IsDoubleSided;
 
             if (materialParams.AlphaMode == AlphaMode.Opaque)
             {
                 gpuMaterial.AlphaCutoff = 0.0f;
+            }
+            else if (materialParams.AlphaMode == AlphaMode.Mask)
+            {
+                gpuMaterial.AlphaCutoff = materialParams.AlphaCutoff;
             }
             else if (materialParams.AlphaMode == AlphaMode.Blend)
             {
@@ -1563,6 +1568,7 @@ public static unsafe class ModelLoader
 
         materialParams.AlphaCutoff = gltfMaterial.AlphaCutoff;
         materialParams.AlphaMode = (AlphaMode)gltfMaterial.Alpha;
+        materialParams.IsDoubleSided = gltfMaterial.DoubleSided;
 
         MaterialChannel? baseColorChannel = gltfMaterial.FindChannel(KnownChannel.BaseColor.ToString());
         if (baseColorChannel.HasValue)
@@ -2017,7 +2023,9 @@ public static unsafe class ModelLoader
         // This method recursively hoists meshes of a node into it's parent and bakes the transforms, buttom up fashion.
         // The goal is to to get as many meshes into a single node as possible, because that means bigger BLAS will be build.
 
-        // TODO: Meshlet support (when I have a mesh-shader capable GPU)
+        // TODO: 
+        // * Breaks buster_drone animations, investigate
+        // * Meshlet support (when I have a mesh-shader capable GPU)
 
         Stopwatch sw = Stopwatch.StartNew();
 

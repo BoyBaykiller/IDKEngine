@@ -62,7 +62,7 @@ class Voxelizer : IDisposable
     private readonly BBG.AbstractShaderProgram voxelizeProgram;
     private readonly BBG.AbstractShaderProgram mipmapProgram;
     private readonly BBG.AbstractShaderProgram visualizeDebugProgram;
-    public readonly BBG.TypedBuffer<GpuVoxelizerData> voxelizerDataBuffer;
+    private readonly BBG.TypedBuffer<GpuVoxelizerData> voxelizerDataBuffer;
     private GpuVoxelizerData gpuVoxelizerData;
 
     public Voxelizer(int width, int height, int depth, Vector3 gridMin, Vector3 gridMax, float debugConeAngle = 0.0f, float debugStepMultiplier = 0.4f)
@@ -241,6 +241,11 @@ class Voxelizer : IDisposable
 
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
         });
+    }
+
+    public void FSR2WorkaroundRebindUBO()
+    {
+        voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
     }
 
     public void SetSize(int width, int height, int depth)

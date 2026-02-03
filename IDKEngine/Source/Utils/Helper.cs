@@ -232,42 +232,46 @@ public static class Helper
         return MemoryMarshal.Cast<TFrom, TTo>(source).Slice(0, length);
     }
 
-    public static Vector4 ToOpenTK(this System.Numerics.Vector4 vector4)
+    public static System.Numerics.Vector4 ToNumerics(this Vector4 vec)
     {
-        return Unsafe.BitCast<System.Numerics.Vector4, Vector4>(vector4);
+        return Unsafe.BitCast<Vector4, System.Numerics.Vector4>(vec);
+    }
+    public static Vector4 ToOpenTK(this System.Numerics.Vector4 vec)
+    {
+        return Unsafe.BitCast<System.Numerics.Vector4, Vector4>(vec);
     }
 
-    public static System.Numerics.Vector3 ToNumerics(this Vector3 vector3)
+    public static System.Numerics.Vector3 ToNumerics(this Vector3 vec)
     {
-        return Unsafe.BitCast<Vector3, System.Numerics.Vector3>(vector3);
+        return Unsafe.BitCast<Vector3, System.Numerics.Vector3>(vec);
     }
-    public static Vector3 ToOpenTK(this System.Numerics.Vector3 vector3)
+    public static Vector3 ToOpenTK(this System.Numerics.Vector3 vec)
     {
-        return Unsafe.BitCast<System.Numerics.Vector3, Vector3>(vector3);
-    }
-
-    public static System.Numerics.Vector2 ToNumerics(this Vector2 vector2)
-    {
-        return Unsafe.BitCast<Vector2, System.Numerics.Vector2>(vector2);
-    }
-    public static Vector2 ToOpenTK(this System.Numerics.Vector2 vector2)
-    {
-        return Unsafe.BitCast<System.Numerics.Vector2, Vector2>(vector2);
+        return Unsafe.BitCast<System.Numerics.Vector3, Vector3>(vec);
     }
 
-    public static Matrix4 ToOpenTK(this System.Numerics.Matrix4x4 Matrix4)
+    public static System.Numerics.Vector2 ToNumerics(this Vector2 vec)
     {
-        return Unsafe.BitCast<System.Numerics.Matrix4x4, Matrix4>(Matrix4);
+        return Unsafe.BitCast<Vector2, System.Numerics.Vector2>(vec);
+    }
+    public static Vector2 ToOpenTK(this System.Numerics.Vector2 vec)
+    {
+        return Unsafe.BitCast<System.Numerics.Vector2, Vector2>(vec);
     }
 
-    public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 Matrix4)
+    public static Matrix4 ToOpenTK(this System.Numerics.Matrix4x4 mat)
     {
-        return Unsafe.BitCast<Matrix4, System.Numerics.Matrix4x4>(Matrix4);
+        return Unsafe.BitCast<System.Numerics.Matrix4x4, Matrix4>(mat);
     }
 
-    public static Quaternion ToOpenTK(this System.Numerics.Quaternion quaternion)
+    public static System.Numerics.Matrix4x4 ToNumerics(this Matrix4 mat)
     {
-        return Unsafe.BitCast<System.Numerics.Quaternion, Quaternion>(quaternion);
+        return Unsafe.BitCast<Matrix4, System.Numerics.Matrix4x4>(mat);
+    }
+
+    public static Quaternion ToOpenTK(this System.Numerics.Quaternion quat)
+    {
+        return Unsafe.BitCast<System.Numerics.Quaternion, Quaternion>(quat);
     }
 
     public static string ToOnOff(this bool val)

@@ -6,6 +6,7 @@ using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
+
 namespace IDKEngine.Bvh;
 
 /// <summary>
@@ -34,7 +35,7 @@ public static class BLAS
         // limiting MaxLeafTriangleCount=1 and StackSizeOptMaxLeafTriangleCount=16 are better.
 
         public int StopSplittingThreshold = 1;
-        public int MaxLeafTriangleCount = 8;
+        public int MaxLeafTriangleCount = 2;
         public float TriangleCost = 1.1f;
 
         public int StackOptThreshold = 16;
@@ -327,13 +328,13 @@ public static class BLAS
             ref readonly GpuBlasNode leftNode = ref blas.Nodes[stackTop];
             ref readonly GpuBlasNode rightNode = ref blas.Nodes[stackTop + 1];
 
-            bool traverseLeft = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
-            bool traverseRight = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
+            bool hitLeft = Intersections.RayVsBox(ray, Conversions.ToBox(leftNode), out float tMinLeft, out float _) && tMinLeft <= hitInfo.T;
+            bool hitRight = Intersections.RayVsBox(ray, Conversions.ToBox(rightNode), out float tMinRight, out float _) && tMinRight <= hitInfo.T;
 
             Interlocked.Add(ref BVH.DebugStatistics.BoxIntersections, 2ul);
 
-            bool intersectLeft = traverseLeft && leftNode.IsLeaf;
-            bool intersectRight = traverseRight && rightNode.IsLeaf;
+            bool intersectLeft = hitLeft && leftNode.IsLeaf;
+            bool intersectRight = hitRight && rightNode.IsLeaf;
             if (intersectLeft || intersectRight)
             {
                 int first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
@@ -351,17 +352,17 @@ public static class BLAS
                     }
                 }
 
-                if (leftNode.IsLeaf) traverseLeft = false;
-                if (rightNode.IsLeaf) traverseRight = false;
-
                 Interlocked.Add(ref BVH.DebugStatistics.TriIntersections, (ulong)(end - first));
             }
 
+            bool traverseLeft = hitLeft && !leftNode.IsLeaf;
+            bool traverseRight = hitRight && !rightNode.IsLeaf;
             if (traverseLeft || traverseRight)
             {
                 if (traverseLeft && traverseRight)
                 {
                     bool leftCloser = tMinLeft < tMinRight;
+
                     stackTop = leftCloser ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
                     stack[stackPtr++] = leftCloser ? rightNode.TriStartOrChild : leftNode.TriStartOrChild;
                 }
@@ -399,11 +400,11 @@ public static class BLAS
             ref readonly GpuBlasNode leftNode = ref blas.Nodes[stackTop];
             ref readonly GpuBlasNode rightNode = ref blas.Nodes[stackTop + 1];
 
-            bool traverseLeft = Intersections.BoxVsBox(box, Conversions.ToBox(leftNode));
-            bool traverseRight = Intersections.BoxVsBox(box, Conversions.ToBox(rightNode));
+            bool hitLeft = Intersections.BoxVsBox(box, Conversions.ToBox(leftNode));
+            bool hitRight = Intersections.BoxVsBox(box, Conversions.ToBox(rightNode));
 
-            bool intersectLeft = traverseLeft && leftNode.IsLeaf;
-            bool intersectRight = traverseRight && rightNode.IsLeaf;
+            bool intersectLeft = hitLeft && leftNode.IsLeaf;
+            bool intersectRight = hitRight && rightNode.IsLeaf;
             if (intersectLeft || intersectRight)
             {
                 int first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
@@ -413,11 +414,10 @@ public static class BLAS
                 {
                     intersectFunc(i);
                 }
-
-                if (leftNode.IsLeaf) traverseLeft = false;
-                if (rightNode.IsLeaf) traverseRight = false;
             }
 
+            bool traverseLeft = hitLeft && !leftNode.IsLeaf;
+            bool traverseRight = hitRight && !rightNode.IsLeaf;
             if (traverseLeft || traverseRight)
             {
                 stackTop = traverseLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
@@ -570,9 +570,9 @@ public static class BLAS
             }
             else
             {
-                for (int j = node.TriStartOrChild; j < node.TriEnd; j++)
+                for (int i = node.TriStartOrChild; i < node.TriEnd; i++)
                 {
-                    Triangle tri = geometry.GetTriangle(j);
+                    Triangle tri = geometry.GetTriangle(i);
                     area += MyMath.GetTriangleAreaInBox(tri, subtreeBox);
                 }
             }
@@ -604,9 +604,9 @@ public static class BLAS
             {
                 cost += subtreeRoot.TriCount * settings.TriangleCost * area;
 
-                for (int j = subtreeRoot.TriStartOrChild; j < subtreeRoot.TriEnd; j++)
+                for (int i = subtreeRoot.TriStartOrChild; i < subtreeRoot.TriEnd; i++)
                 {
-                    Triangle tri = geometry.GetTriangle(j);
+                    Triangle tri = geometry.GetTriangle(i);
                     totalArea += tri.Area;
                 }
             }
@@ -726,7 +726,7 @@ public static class BLAS
     private static ObjectSplit? TrySplit(GpuBlasNode parentNode, BuildData buildData, BuildSettings settings)
     {
         Box parentBox = Conversions.ToBox(parentNode);
-        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentBox.HalfArea() == 0.0f)
+        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentBox.HalfArea() <= 0.0f)
         {
             return null;
         }
@@ -800,11 +800,15 @@ public static class BLAS
             }
         }
 
-        float notSplitCost = settings.TriangleCost * parentNode.TriCount;
-        bestSplit.NewCost = TRAVERSAL_COST + (settings.TriangleCost * bestSplit.NewCost / parentBox.HalfArea());
-        if (bestSplit.NewCost >= notSplitCost && parentNode.TriCount <= settings.MaxLeafTriangleCount)
+        if (parentNode.TriCount <= settings.MaxLeafTriangleCount)
         {
-            return null;
+            float notSplitCost = settings.TriangleCost * parentNode.TriCount;
+            bestSplit.NewCost = TRAVERSAL_COST + (settings.TriangleCost * bestSplit.NewCost / parentBox.HalfArea());
+            
+            if (bestSplit.NewCost >= notSplitCost)
+            {
+                return null;
+            }
         }
 
         Box leftBox = ComputeBoundingBox(start, bestSplit.SplitIndex - start, buildData, bestSplit.Axis);

@@ -364,17 +364,14 @@ public static class Intersections
     {
         // Source: https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
 
-        t1 = float.MinValue;
-        t2 = float.MaxValue;
-
         Vector3 t0s = (box.Min - ray.Origin) / ray.Direction;
         Vector3 t1s = (box.Max - ray.Origin) / ray.Direction;
 
         Vector3 tsmaller = Vector3.ComponentMin(t0s, t1s);
         Vector3 tbigger = Vector3.ComponentMax(t0s, t1s);
 
-        t1 = MathF.Max(t1, MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, MathF.Max(tsmaller.Z, 0.0f))));
-        t2 = MathF.Min(t2, MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z)));
+        t1 = MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, MathF.Max(tsmaller.Z, 0.0f)));
+        t2 = MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z));
 
         return t1 <= t2;
     }

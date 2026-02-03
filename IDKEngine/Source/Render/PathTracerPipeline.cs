@@ -218,7 +218,6 @@ class PathTracerPipeline : IDisposable
         // Setup Intel Open Image Denoiser (OIDN)
         if (OIDN.LibraryFound)
         {
-            Environment.SetEnvironmentVariable("OIDN_NUM_THREADS", "16");
             if (denoiseContext.Device != null)
             { 
                 OIDN.ReleaseBuffer(denoiseContext.BeautyBuffer);

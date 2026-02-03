@@ -15,19 +15,17 @@ AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-layout(std430, binding = 0) restrict readonly buffer MeshInstanceIdSSBO
-{
-    uint Ids[];
-} meshInstanceIdSSBO;
+uniform bool CullTransparentsOrOpaques;
+uniform bool CullDoubleSided;
 
 void main()
 {
-    if (gl_GlobalInvocationID.x >= meshInstanceIdSSBO.Ids.length())
+    if (gl_GlobalInvocationID.x >= meshInstanceSSBO.MeshInstances.length())
     {
         return;
     }
 
-    uint meshInstanceId = meshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
+    uint meshInstanceId = gl_GlobalInvocationID.x;
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
@@ -41,8 +39,25 @@ void main()
 
     bool isVisible = true;
 
-    Frustum frustum = GetFrustum(perFrameDataUBO.ProjView * modelMatrix);
-    isVisible = FrustumBoxIntersect(frustum, localBounds);
+    if (isVisible)
+    {
+        GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
+
+        bool hasAlphaBlending = material.AlphaCutoff == 2.0;
+        isVisible = CullTransparentsOrOpaques != hasAlphaBlending;
+    }
+
+    if (isVisible)
+    {
+        GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
+        isVisible = CullDoubleSided != material.IsDoubleSided;
+    }
+
+    if (isVisible)
+    {
+        Frustum frustum = GetFrustum(perFrameDataUBO.ProjView * modelMatrix);
+        isVisible = FrustumBoxIntersect(frustum, localBounds);
+    }
 
 #if IS_HI_Z_CULLING
     if (isVisible)

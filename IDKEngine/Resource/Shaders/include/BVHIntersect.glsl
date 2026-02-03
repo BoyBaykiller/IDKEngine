@@ -46,11 +46,11 @@ bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout f
         GpuBlasNode leftNode = blasNodeSSBO.Nodes[blasDesc.NodeOffset + stackTop];
         GpuBlasNode rightNode = blasNodeSSBO.Nodes[blasDesc.NodeOffset + stackTop + 1];
 
-        bool traverseLeft = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft <= hitInfo.T;
-        bool traverseRight = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight <= hitInfo.T;
+        bool hitLeft = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft <= hitInfo.T;
+        bool hitRight = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight <= hitInfo.T;
 
-        bool intersectLeft = traverseLeft && (leftNode.TriCount > 0);
-        bool intersectRight = traverseRight && (rightNode.TriCount > 0);
+        bool intersectLeft = hitLeft && leftNode.TriCount > 0;
+        bool intersectRight = hitRight && rightNode.TriCount > 0;
         if (intersectLeft || intersectRight)
         {
             uint first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
@@ -62,7 +62,6 @@ bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout f
             for (uint i = first; i < end; i++)
             {
                 uvec3 indices = blasTriangleIndicesSSBO.Indices[i].Indices;
-
                 vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
                 vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);
                 vec3 p2 = Unpack(vertexPositionsSSBO.Positions[indices.z]);
@@ -77,11 +76,10 @@ bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout f
                     hitInfo.T = hitT;
                 }
             }
-
-            if (leftNode.TriCount > 0) traverseLeft = false;
-            if (rightNode.TriCount > 0) traverseRight = false;
         }
 
+        bool traverseLeft = hitLeft && leftNode.TriCount == 0;
+        bool traverseRight = hitRight && rightNode.TriCount == 0;
         if (traverseLeft || traverseRight)
         {
             if (traverseLeft && traverseRight)
@@ -126,18 +124,18 @@ bool IntersectBlasAny(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo)
         GpuBlasNode leftNode = blasNodeSSBO.Nodes[blasDesc.NodeOffset + stackTop];
         GpuBlasNode rightNode = blasNodeSSBO.Nodes[blasDesc.NodeOffset + stackTop + 1];
 
-        bool traverseLeft = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft < hitInfo.T;
-        bool traverseRight = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight < hitInfo.T;
+        bool hitLeft = RayBoxIntersect(ray, Box(leftNode.Min, leftNode.Max), tMinLeft) && tMinLeft <= hitInfo.T;
+        bool hitRight = RayBoxIntersect(ray, Box(rightNode.Min, rightNode.Max), tMinRight) && tMinRight <= hitInfo.T;
 
-        bool intersectLeft = traverseLeft && (leftNode.TriCount > 0);
-        bool intersectRight = traverseRight && (rightNode.TriCount > 0);
+        bool intersectLeft = hitLeft && leftNode.TriCount > 0;
+        bool intersectRight = hitRight && rightNode.TriCount > 0;
         if (intersectLeft || intersectRight)
         {
             uint first = intersectLeft ? leftNode.TriStartOrChild : rightNode.TriStartOrChild;
             uint end = !intersectRight ? (leftNode.TriStartOrChild + leftNode.TriCount) : (rightNode.TriStartOrChild + rightNode.TriCount);
             first += blasDesc.TriangleOffset;
             end += blasDesc.TriangleOffset;
-
+            
             for (uint i = first; i < end; i++)
             {
                 uvec3 indices = blasTriangleIndicesSSBO.Indices[i].Indices;
@@ -156,11 +154,10 @@ bool IntersectBlasAny(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo)
                     return true;
                 }
             }
-
-            if (leftNode.TriCount > 0) traverseLeft = false;
-            if (rightNode.TriCount > 0) traverseRight = false;
         }
 
+        bool traverseLeft = hitLeft && leftNode.TriCount == 0;
+        bool traverseRight = hitRight && rightNode.TriCount == 0;
         if (traverseLeft || traverseRight)
         {
             if (traverseLeft && traverseRight)

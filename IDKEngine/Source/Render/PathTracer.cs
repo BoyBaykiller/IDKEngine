@@ -167,7 +167,7 @@ class PathTracer : IDisposable
     public BBG.Texture AlbedoTexture;
     public BBG.Texture NormalTexture;
 
-    public PathTracer(int width, int height, in GpuSettings settings)
+    public PathTracer(int width, int height, GpuSettings settings)
     {
         this.settings = settings;
         DoRaySorting = false;

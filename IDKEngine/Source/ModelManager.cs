@@ -46,8 +46,6 @@ public unsafe class ModelManager : IDisposable
     public NativeMemoryView<Vector3> VertexPositions;
     public uint[] VertexIndices = [];
     public Matrix3x4[] JointMatrices = [];
-    public BBG.TypedBuffer<uint> OpaqueMeshInstanceIdBuffer;
-    public BBG.TypedBuffer<uint> TransparentMeshInstanceIdBuffer;
 
     private GpuMeshTransform[] meshTransforms = [];
     private BitArray meshTransformsDirty;
@@ -101,8 +99,6 @@ public unsafe class ModelManager : IDisposable
         unskinnedVerticesBuffer = new BBG.TypedBuffer<GpuUnskinnedVertex>();
         vertexPositionsHostBuffer = new BBG.TypedBuffer<Vector3>();
         prevVertexPositionsBuffer = new BBG.TypedBuffer<Vector3>();
-        OpaqueMeshInstanceIdBuffer = new BBG.TypedBuffer<uint>();
-        TransparentMeshInstanceIdBuffer = new BBG.TypedBuffer<uint>();
 
         drawCommandBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 1);
         meshesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 2);
@@ -216,7 +212,6 @@ public unsafe class ModelManager : IDisposable
         BVH.SetBlasTransforms(meshTransforms);
         BVH.TlasBuild(true);
 
-        UpdateOpqauesAndTransparents();
         meshTransformsDirty = new BitArray(meshTransforms.Length, true);
     }
 
@@ -263,28 +258,6 @@ public unsafe class ModelManager : IDisposable
         {
             BVH.TlasBuild();
         }
-    }
-
-    public void UpdateOpqauesAndTransparents()
-    {
-        List<uint> opaqueMeshInstanceIds = new List<uint>();
-        List<uint> transparentMeshInstanceIds = new List<uint>();
-        for (uint i = 0; i < MeshInstances.Length; i++)
-        {
-            ref readonly GpuMeshInstance meshInstance = ref MeshInstances[i];
-            ref readonly GpuMesh mesh = ref Meshes[meshInstance.MeshId];
-
-            if (GpuMaterials[mesh.MaterialId].HasAlphaBlending())
-            {
-                transparentMeshInstanceIds.Add(i);
-            }
-            else
-            {
-                opaqueMeshInstanceIds.Add(i);
-            }
-        }
-        BBG.Buffer.Recreate(ref OpaqueMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, opaqueMeshInstanceIds);
-        BBG.Buffer.Recreate(ref TransparentMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, transparentMeshInstanceIds);
     }
 
     public void ComputeSkinnedPositions(bool anyAnimatedNodeMoved)
@@ -749,9 +722,6 @@ public unsafe class ModelManager : IDisposable
         BVH.Dispose();
 
         skinningShaderProgram.Dispose();
-
-        OpaqueMeshInstanceIdBuffer.Dispose();
-        TransparentMeshInstanceIdBuffer.Dispose();
     }
 
     private static GpuUnskinnedVertex[] LoadUnskinnedVertices(in ModelLoader.Model model)

@@ -1000,7 +1000,12 @@ partial class Gui : IDisposable
                     """
                 );
 
-                ImGui.Text($"Uses AlphaBlending: {material.HasAlphaBlending()}");
+                if (ImGui.Checkbox("DoubleSided", ref material.IsDoubleSided))
+                {
+                    modified = true;
+                }
+
+                ImGui.Text($"AlphaBlending: {material.HasAlphaBlending()}");
 
                 ImGui.SeparatorText("Mesh Info");
 
@@ -1201,17 +1206,17 @@ partial class Gui : IDisposable
                     modified = true;
                 }
 
-                SysVec3 currentEuler = transform.Rotation.ToEulerAngles().ToNumerics() * (180f / MathF.PI);
+                SysVec3 currentEuler = transform.Rotation.ToEulerAngles().ToNumerics() * (180.0f / MathF.PI);
                 tempVec3 = currentEuler;
                 if (ImGui.DragFloat3("Rotation", ref tempVec3, 0.5f))
                 {
                     SysVec3 deltaEuler = tempVec3 - currentEuler;
 
                     // Convert delta to radians
-                    Vector3 deltaRad = new Vector3(
-                        deltaEuler.X * MathF.PI / 180f,
-                        deltaEuler.Y * MathF.PI / 180f,
-                        deltaEuler.Z * MathF.PI / 180f
+                    OtkVec3 deltaRad = new OtkVec3(
+                        deltaEuler.X * MathF.PI / 180.0f,
+                        deltaEuler.Y * MathF.PI / 180.0f,
+                        deltaEuler.Z * MathF.PI / 180.0f
                     );
 
                     // Build incremental rotation quaternion (XYZ order)

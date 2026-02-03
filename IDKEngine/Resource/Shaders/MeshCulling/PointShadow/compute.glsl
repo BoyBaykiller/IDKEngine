@@ -13,23 +13,18 @@ AppInclude(include/StaticUniformBuffers.glsl)
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-layout(std430, binding = 0) restrict readonly buffer InCullingMeshInstanceIdSSBO
-{
-    uint Ids[];
-} inCullingMeshInstanceIdSSBO;
-
 layout(location = 0) uniform int ShadowIndex;
 layout(location = 1) uniform int NumVisibleFaces;
 layout(location = 2) uniform uint VisibleFaces;
 
 void main()
 {
-    if (gl_GlobalInvocationID.x >= inCullingMeshInstanceIdSSBO.Ids.length())
+    if (gl_GlobalInvocationID.x >= meshInstanceSSBO.MeshInstances.length())
     {
         return;
     }
 
-    uint meshInstanceId = inCullingMeshInstanceIdSSBO.Ids[gl_GlobalInvocationID.x];
+    uint meshInstanceId = gl_GlobalInvocationID.x;
 
     GpuMeshInstance meshInstance = meshInstanceSSBO.MeshInstances[meshInstanceId];
     GpuMeshTransform meshTransform = meshTransformSSBO.Transforms[meshInstance.MeshTransformId];
@@ -42,17 +37,29 @@ void main()
     for (int i = 0; i < NumVisibleFaces; i++)
     {
         uint faceId = (VisibleFaces >> (i * 3)) & ((1u << 3) - 1);
-
         mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceId];
         mat4 modelMatrix = mat4(meshTransform.ModelMatrix);
 
-        Frustum frustum = GetFrustum(projView * modelMatrix);
-        bool isVisible = FrustumBoxIntersect(frustum, localBounds);
-
-        uint faceAndMeshInstanceId = (faceId << 29) | meshInstanceId; // 3bits | 29bits
+        bool isVisible = true;
 
         if (isVisible)
         {
+            GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
+
+            bool hasAlphaBlending = material.AlphaCutoff == 2.0;
+            isVisible = !hasAlphaBlending;
+        }
+
+        if (isVisible)
+        {
+            Frustum frustum = GetFrustum(projView * modelMatrix);
+            isVisible = FrustumBoxIntersect(frustum, localBounds);
+        }
+
+        if (isVisible)
+        {
+            uint faceAndMeshInstanceId = (faceId << 29) | meshInstanceId; // 3bits | 29bits
+
         #if TAKE_MESH_SHADER_PATH_SHADOW
 
             uint meshletTaskId = atomicAdd(meshletTasksCountSSBO.Count, 1u);

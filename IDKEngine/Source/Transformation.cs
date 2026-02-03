@@ -39,7 +39,7 @@ public record struct Transformation
 
     public Transformation WithRotation(Quaternion quaternion)
     {
-        this.Rotation = quaternion;
+        Rotation = quaternion;
         return this;
     }
 

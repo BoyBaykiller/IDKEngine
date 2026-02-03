@@ -39,6 +39,12 @@ void main()
     mat3 tbn = GetTBN(interpTangent, interpNormal);
     surface.Normal = tbn * surface.Normal;
     surface.Normal = normalize(mix(interpNormal, surface.Normal, mesh.NormalMapStrength));
+    
+    if (!gl_FrontFacing)
+    {
+        // For doubleSided materials the back-face MUST have its normals reversed before the lighting equation is evaluated
+        surface.Normal = -surface.Normal;
+    }
 
     OutAlbedoAlpha = vec4(surface.Albedo, 1.0);
     OutNormal = EncodeUnitVec(surface.Normal);

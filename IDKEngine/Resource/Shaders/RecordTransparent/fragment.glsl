@@ -63,12 +63,17 @@ void main()
     surface.Normal = tbn * surface.Normal;
     surface.Normal = normalize(mix(interpNormal, surface.Normal, mesh.NormalMapStrength));
 
+    if (!gl_FrontFacing)
+    {
+        // For doubleSided materials the back-face MUST have its normals reversed before the lighting equation is evaluated
+        surface.Normal = -surface.Normal;
+    }
+
     vec2 uv = gl_FragCoord.xy / textureSize(gBufferDataUBO.Velocity, 0);
     vec3 ndc = vec3(uv * 2.0 - 1.0, gl_FragCoord.z);
     vec3 fragPos = PerspectiveTransform(vec3(ndc.xy, ndc.z), perFrameDataUBO.InvProjView);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
-    
-    
+
     vec3 directLighting = vec3(0.0);
     for (int i = 0; i < lightsUBO.Count; i++)
     {

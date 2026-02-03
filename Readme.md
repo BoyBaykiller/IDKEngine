@@ -404,7 +404,7 @@ The algorithm maintains three primitive indices arrays, one per axis. It's a goo
 struct BuildData
 {
     float RightCosts[primCount];
-+   int PrimIndicesSorted[primCount][3];
++   int PrimIndicesSorted[3][primCount];
 }
 ```
 
@@ -575,7 +575,7 @@ Triangle[] bvhTriangles = GetUnindexedTriangles(nodes, triangles, origTriangleId
 ```
 `PreSplit` takes in the mesh's triangles and returns two arrays of equal length. Together these may be called "Fragments", a term coined by a [paper](https://diglib.eg.org/items/f55715b1-9e56-4b40-af73-59d3dfba9fe7) about the aforementioned SBVH. `splitFactor` determines how many additional fragments are allowed. I use a value of 0.3 so a maximum 30% increase. The resulting `primitives` are then passed to `BuildBVH`. After the BVH is build, `GetUnindexedTriangles` removes the `origTriangleIds` indirection and outputs a new larger array of triangles. It can also do triangle deduplication.
 
-As you can see the new `primitives` returned are of type `Box`. **If you haven't already, you need to adjust your BVH builder to work on boxes and not triangles.** This may sound complex, but it's easily done and the better thing to do anyway. Instead of triangle centroids use box centers. And instead of recomputing the triangle bounds every time just use the given box bounds. This will not only lower build time and tend to give better trees but more importantly make it PreSplitting compatible. When PreSplitting is disabled (or not yet implemented) just feed it a box per triangle. This is equivalent to PreSplitting with `splitFactor = 0.0`:
+As you can see the new `primitives` returned are of type `Box`. **If you haven't already, you need to adjust your BVH builder to work on boxes and not triangles.** This may sound complex, but it's easily done and the better thing to do anyway. Instead of triangle centroids use box centers. And instead of recomputing the triangle bounds every time just use the given box bounds. This will not only lower build times and tend to give better trees but more importantly make it PreSplitting compatible. When PreSplitting is disabled (or not yet implemented) just feed it a box per triangle. This is equivalent to PreSplitting with `splitFactor = 0.0`:
 ```cs
 Box[] primitives = new Box[triangles.Length];
 for (int i = 0; i < triangles.Length; i++)
@@ -784,7 +784,7 @@ Triangle[] GetUnindexedTriangles(BuildResult blas, int[] originalTriIds, Triangl
         {
             for (int j = 0; j < node.TriCount; j++)
             {
-                int fragmentId = permutatedFragmentIds[node.TriStartOrChild + j];
+                int fragmentId = blas.PermutatedFragmentIds[node.TriStartOrChild + j];
                 int origTriId = originalTriIds[fragmentId];
                 newTriangles[triCounter + j] = triangles[origTriId];
             }

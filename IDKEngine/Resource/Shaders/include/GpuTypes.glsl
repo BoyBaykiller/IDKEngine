@@ -244,7 +244,7 @@ struct GpuMaterial
 
     MATERIAL_SAMPLER_2D_TYPE Transmission;
     bool IsVolumetric;
-    float _pad0;
+    bool IsDoubleSided;
 };
 
 struct GpuVertex

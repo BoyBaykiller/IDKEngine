@@ -340,10 +340,10 @@ public class BVH : IDisposable
             BLAS.BuildData buildData = BLAS.GetBuildData(fragments);
             int nodesUsed = BLAS.Build(ref blas, buildData, buildSettings);
 
-            // Stopwatch sw = Stopwatch.StartNew();
-            // var b = BLAS.GetBuildData(fragments);
-            // BLAS.Build(ref blas, b, buildSettings);
-            // Console.WriteLine(sw.ElapsedMilliseconds);
+            //Stopwatch sw = Stopwatch.StartNew();
+            //var b = BLAS.GetBuildData(fragments);
+            //BLAS.Build(ref blas, b, buildSettings);
+            //Console.WriteLine(sw.ElapsedMilliseconds);
 
             Array.Resize(ref nodes, nodesUsed);
             blas.Nodes = nodes;

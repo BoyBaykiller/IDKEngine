@@ -144,17 +144,16 @@ public class CpuPointShadow : IDisposable
             }
         }
 
-        BBG.Computing.Compute("Cubemap shadow map culling", () =>
+        BBG.Computing.Compute("Culling for omnidirectional shadow map", () =>
         {
             modelManager.ResetInstanceCounts();
-            modelManager.OpaqueMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 0);
 
             cullingProgram.Upload(0, gpuPointShadowIndex);
             cullingProgram.Upload(1, numVisibleFaces);
             cullingProgram.Upload(2, visibleFaces);
 
             BBG.Cmd.UseShaderProgram(cullingProgram);
-            BBG.Computing.Dispatch(MyMath.DivUp(modelManager.OpaqueMeshInstanceIdBuffer.NumElements, 64), 1, 1);
+            BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
         });
         

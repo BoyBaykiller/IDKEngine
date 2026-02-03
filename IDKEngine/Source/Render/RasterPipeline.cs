@@ -361,49 +361,57 @@ class RasterPipeline : IDisposable
             }
         }
 
-        BBG.Computing.Compute("Main view culling for opaques", () =>
+        for (int i = 0; i < 2; i++)
         {
-            modelManager.ResetInstanceCounts();
-            modelManager.OpaqueMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 0);
+            bool doubleSided = i == 1;
+            bool faceCulling = !IsWireframe && !doubleSided;
+            BBG.Rendering.AttachmentLoadOp loadOp = i == 0 ? BBG.Rendering.AttachmentLoadOp.Clear : BBG.Rendering.AttachmentLoadOp.Load;
 
-            BBG.Cmd.UseShaderProgram(cullingProgram);
-            BBG.Computing.Dispatch(MyMath.DivUp(modelManager.OpaqueMeshInstanceIdBuffer.NumElements, 64), 1, 1);
-            BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
-        });
+            BBG.Computing.Compute("Culling for Camera", () =>
+            {
+                modelManager.ResetInstanceCounts();
+                cullingProgram.Upload("CullTransparentsOrOpaques", true);
+                cullingProgram.Upload("CullDoubleSided", !doubleSided);
 
-        BBG.Rendering.Render("Fill G-Buffer with opaques", new BBG.Rendering.RenderAttachments()
-        {
-            ColorAttachments = new BBG.Rendering.ColorAttachments()
-            {
-                Textures = [AlbedoAlphaTexture, NormalTexture, MetallicRoughnessTexture, EmissiveTexture, VelocityTexture],
-                AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
-            },
-            DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
-            {
-                Texture = DepthTexture,
-                AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Clear,
-            }
-        }, new BBG.Rendering.GraphicsPipelineState()
-        {
-            EnabledCapabilities = [
-                BBG.Rendering.Capability.DepthTest,
-                BBG.Rendering.CapIf(!IsWireframe, BBG.Rendering.Capability.CullFace)
-            ],
-            FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
-        }, () =>
-        {
-            BBG.Cmd.UseShaderProgram(gBufferProgram);
+                BBG.Cmd.UseShaderProgram(cullingProgram);
+                BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+            });
 
-            BBG.Rendering.InferViewportSize();
-            if (TakeMeshShaderPath)
+            BBG.Rendering.Render("Fill G-Buffer", new BBG.Rendering.RenderAttachments()
             {
-                modelManager.MeshShaderDrawNV();
-            }
-            else
+                ColorAttachments = new BBG.Rendering.ColorAttachments()
+                {
+                    Textures = [AlbedoAlphaTexture, NormalTexture, MetallicRoughnessTexture, EmissiveTexture, VelocityTexture],
+                    AttachmentLoadOp = loadOp,
+                },
+                DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
+                {
+                    Texture = DepthTexture,
+                    AttachmentLoadOp = loadOp,
+                }
+            }, new BBG.Rendering.GraphicsPipelineState()
             {
-                modelManager.Draw();
-            }
-        });
+                EnabledCapabilities = [
+                    BBG.Rendering.Capability.DepthTest,
+                    BBG.Rendering.CapIf(faceCulling, BBG.Rendering.Capability.CullFace)
+                ],
+                FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
+            }, () =>
+            {
+                BBG.Cmd.UseShaderProgram(gBufferProgram);
+
+                BBG.Rendering.InferViewportSize();
+                if (TakeMeshShaderPath)
+                {
+                    modelManager.MeshShaderDrawNV();
+                }
+                else
+                {
+                    modelManager.Draw();
+                }
+            });
+        }
 
         // The AMD driver fails to detect a write-read dependency between G-Buffer and some of the
         // following passes like RayTraced shadows. Likely because the G-Buffer is bindless textures.
@@ -507,70 +515,65 @@ class RasterPipeline : IDisposable
             BBG.Rendering.DrawNonIndexed(BBG.Rendering.Topology.Quads, 0, 24);
         });
 
-        BBG.Computing.Compute("Main view culling for transparents", () =>
-        {
-            modelManager.ResetInstanceCounts();
-            modelManager.TransparentMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 0);
+        recordedFragmentsCounterTexture.Fill(0u);
 
-            BBG.Cmd.UseShaderProgram(cullingProgram);
-            BBG.Computing.Dispatch(MyMath.DivUp(modelManager.TransparentMeshInstanceIdBuffer.NumElements, 64), 1, 1);
-            BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
-        });
-
-        BBG.Rendering.Render("Record transparent fragments", new BBG.Rendering.RenderAttachmentsVerbose()
+        for (int i = 0; i < 2; i++)
         {
-            ColorAttachments = [new BBG.Rendering.ColorAttachment()
+            bool doubleSided = i == 1;
+            bool faceCulling = !IsWireframe && !doubleSided;
+
+            BBG.Computing.Compute("Culling for Camera", () =>
             {
-                EnableWrites = false,
-                Texture = beforeTAATexture,
-                AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
-                BlendState = new BBG.Rendering.BlendState()
+                modelManager.ResetInstanceCounts();
+                cullingProgram.Upload("CullTransparentsOrOpaques", false);
+                cullingProgram.Upload("CullDoubleSided", !doubleSided);
+
+                BBG.Cmd.UseShaderProgram(cullingProgram);
+                BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
+            });
+
+            BBG.Rendering.Render("Record transparent fragments", new BBG.Rendering.RenderAttachments()
+            {
+                DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
                 {
-                    Enabled = true,
-                    BlendOp = BBG.Rendering.BlendOp.Add,
-                    SrcFactor = BBG.Rendering.BlendFactor.SrcAlpha,
-                    DstFactor = BBG.Rendering.BlendFactor.OneMinusSrcAlpha,
+                    Texture = DepthTexture,
+                    AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
                 }
-            }],
-            DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
+            }, new BBG.Rendering.GraphicsPipelineState()
             {
-                Texture = DepthTexture,
-                AttachmentLoadOp = BBG.Rendering.AttachmentLoadOp.Load,
-            }
-        }, new BBG.Rendering.GraphicsPipelineState()
-        {
-            EnabledCapabilities = [
-                BBG.Rendering.Capability.DepthTest,
-            ],
-            EnableDepthWrites = false,
-            FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
-            VariableRateShading = LightingVRS.GetRenderData(),
-        },
-        () =>
-        {
-            recordTransparentProgram.Upload("IsVXGI", IsVXGI);
-            recordTransparentProgram.Upload("ShadowMode", (uint)ShadowMode_);
-
-            recordedFragmentsCounterTexture.Fill(0u);
-
-            BBG.Cmd.SetUniforms(ConeTracer.Settings);
-            BBG.Cmd.BindTextureUnit(Voxelizer.ResultVoxels, 0);
-            BBG.Cmd.BindImageUnit(recordedColorsArrayTexture, 0, 0, true);
-            BBG.Cmd.BindImageUnit(recordedDepthsArrayTexture, 1, 0, true);
-            BBG.Cmd.BindImageUnit(recordedFragmentsCounterTexture, 2);
-            BBG.Cmd.UseShaderProgram(recordTransparentProgram);
-
-            BBG.Rendering.InferViewportSize();
-            if (TakeMeshShaderPath)
+                EnabledCapabilities = [
+                    BBG.Rendering.Capability.DepthTest,
+                    BBG.Rendering.CapIf(faceCulling, BBG.Rendering.Capability.CullFace)
+                ],
+                EnableDepthWrites = false,
+                FillMode = IsWireframe ? BBG.Rendering.FillMode.Line : BBG.Rendering.FillMode.Fill,
+                VariableRateShading = LightingVRS.GetRenderData(),
+            },
+            () =>
             {
-                modelManager.MeshShaderDrawNV();
-            }
-            else
-            {
-                modelManager.Draw();
-            }
-            BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit);
-        });
+                recordTransparentProgram.Upload("IsVXGI", IsVXGI);
+                recordTransparentProgram.Upload("ShadowMode", (uint)ShadowMode_);
+
+                BBG.Cmd.SetUniforms(ConeTracer.Settings);
+                BBG.Cmd.BindTextureUnit(Voxelizer.ResultVoxels, 0);
+                BBG.Cmd.BindImageUnit(recordedColorsArrayTexture, 0, 0, true);
+                BBG.Cmd.BindImageUnit(recordedDepthsArrayTexture, 1, 0, true);
+                BBG.Cmd.BindImageUnit(recordedFragmentsCounterTexture, 2);
+                BBG.Cmd.UseShaderProgram(recordTransparentProgram);
+
+                BBG.Rendering.InferViewportSize();
+                if (TakeMeshShaderPath)
+                {
+                    modelManager.MeshShaderDrawNV();
+                }
+                else
+                {
+                    modelManager.Draw();
+                }
+                BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.ShaderImageAccessBarrierBit);
+            });
+        }
 
         BBG.Computing.Compute("Resolve transparent fragments", () =>
         {
@@ -617,7 +620,7 @@ class RasterPipeline : IDisposable
             lightManager.FSR2WorkaroundRebindUBO(); // binding 3
             taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
             SkyBoxManager.FSR2WorkaroundRebindUBO(); // binding 5
-            Voxelizer.voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
+            Voxelizer.FSR2WorkaroundRebindUBO(); // binding 6
         }
     }
 

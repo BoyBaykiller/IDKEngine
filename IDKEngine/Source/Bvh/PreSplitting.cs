@@ -250,7 +250,7 @@ public static class PreSplitting
 
         return triangles;
 
-        static Span<int> GetUniqueTriIds(in GpuBlasNode leafNode, in BLAS.BuildData buildData)
+        static Span<int> GetUniqueTriIds(GpuBlasNode leafNode, BLAS.BuildData buildData)
         {
             Span<int> triIds = new int[leafNode.TriCount];
             for (int i = 0; i < leafNode.TriCount; i++)
