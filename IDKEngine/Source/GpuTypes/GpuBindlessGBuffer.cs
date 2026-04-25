@@ -4,7 +4,7 @@ namespace IDKEngine.GpuTypes;
 
 public record struct GpuBindlessGBuffer
 {
-    public BBG.Texture.BindlessHandle AlbedoAlphaTexture;
+    public BBG.Texture.BindlessHandle AlbedoTexture;
     public BBG.Texture.BindlessHandle NormalTexture;
     public BBG.Texture.BindlessHandle MetallicRoughnessTexture;
     public BBG.Texture.BindlessHandle EmissiveTexture;

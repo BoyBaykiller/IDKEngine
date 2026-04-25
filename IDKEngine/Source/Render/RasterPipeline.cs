@@ -174,7 +174,7 @@ class RasterPipeline : IDisposable
     public int RayTracingSamples;
 
     // G-Buffer Attachments
-    public BBG.Texture AlbedoAlphaTexture;
+    public BBG.Texture AlbedoTexture;
     public BBG.Texture NormalTexture;
     public BBG.Texture MetallicRoughnessTexture;
     public BBG.Texture EmissiveTexture;
@@ -382,7 +382,7 @@ class RasterPipeline : IDisposable
             {
                 ColorAttachments = new BBG.Rendering.ColorAttachments()
                 {
-                    Textures = [AlbedoAlphaTexture, NormalTexture, MetallicRoughnessTexture, EmissiveTexture, VelocityTexture],
+                    Textures = [AlbedoTexture, NormalTexture, MetallicRoughnessTexture, EmissiveTexture, VelocityTexture],
                     AttachmentLoadOp = loadOp,
                 },
                 DepthStencilAttachment = new BBG.Rendering.DepthStencilAttachment()
@@ -641,15 +641,15 @@ class RasterPipeline : IDisposable
         beforeTAATexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
         beforeTAATexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
         beforeTAATexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-        beforeTAATexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+        beforeTAATexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R11G11B10Float);
 
         DisposeBindlessGBufferTextures();
 
-        AlbedoAlphaTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
-        AlbedoAlphaTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
-        AlbedoAlphaTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-        AlbedoAlphaTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R8G8B8A8Unorm);
-        gpuBindlessGBuffer.AlbedoAlphaTexture = AlbedoAlphaTexture.GetTextureHandleARB();
+        AlbedoTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+        AlbedoTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
+        AlbedoTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
+        AlbedoTexture.Allocate(renderSize.X, renderSize.Y, 1, BBG.Texture.InternalFormat.R11G11B10Float);
+        gpuBindlessGBuffer.AlbedoTexture = AlbedoTexture.GetTextureHandleARB();
 
         NormalTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
         NormalTexture.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
@@ -690,7 +690,7 @@ class RasterPipeline : IDisposable
         recordedColorsArrayTexture = new BBG.Texture(BBG.Texture.Type.Texture2DArray);
         recordedColorsArrayTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
         recordedColorsArrayTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
-        recordedColorsArrayTexture.Allocate(renderSize.X, renderSize.Y, layers, beforeTAATexture.Format);
+        recordedColorsArrayTexture.Allocate(renderSize.X, renderSize.Y, layers, BBG.Texture.InternalFormat.R16G16B16A16Float);
 
         if (recordedDepthsArrayTexture != null) recordedDepthsArrayTexture.Dispose();
         recordedDepthsArrayTexture = new BBG.Texture(BBG.Texture.Type.Texture2DArray);
@@ -707,7 +707,7 @@ class RasterPipeline : IDisposable
 
     private void DisposeBindlessGBufferTextures()
     {
-        if (AlbedoAlphaTexture != null) AlbedoAlphaTexture.Dispose();
+        if (AlbedoTexture != null) AlbedoTexture.Dispose();
         if (NormalTexture != null) NormalTexture.Dispose();
         if (MetallicRoughnessTexture != null) MetallicRoughnessTexture.Dispose();
         if (EmissiveTexture != null) EmissiveTexture.Dispose();

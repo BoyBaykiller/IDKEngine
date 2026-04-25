@@ -65,7 +65,7 @@ void main()
 
     if (!gl_FrontFacing)
     {
-        // For doubleSided materials the back-face MUST have its normals reversed before the lighting equation is evaluated
+        // For doubleSided materials the back-face MUST have its normals reversed before lighting is evaluated
         surface.Normal = -surface.Normal;
     }
 

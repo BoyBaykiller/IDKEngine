@@ -62,7 +62,7 @@ void main()
 
     // Finally calculate how much of the existing opaque color
     // reaches the camera after alpha blending is applied
-    vec4 opaqueColor = imageLoad(ImgResult, imgCoord);
+    vec4 opaqueColor = vec4(imageLoad(ImgResult, imgCoord).rgb, 1.0);
     accumulatedColor += (1.0 - accumulatedColor.a) * opaqueColor;
 
     imageStore(ImgResult, imgCoord, accumulatedColor);

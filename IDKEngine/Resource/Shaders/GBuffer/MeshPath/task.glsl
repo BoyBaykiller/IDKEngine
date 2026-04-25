@@ -56,7 +56,7 @@ void main()
     // {
     //     bool vertexBehindFrustum;
     //     Box meshletNdcBounds = BoxTransformPerspective(meshletLocalBounds, perFrameDataUBO.ProjView * modelMatrix, vertexBehindFrustum);
-    //     vec2 renderSize = textureSize(gBufferDataUBO.AlbedoAlpha, 0);
+    //     vec2 renderSize = textureSize(gBufferDataUBO.Albedo, 0);
     //     vec3 uvMin = vec3(meshletNdcBounds.Min.xy * 0.5 + 0.5, meshletNdcBounds.Min.z);
     //     vec3 uvMax = vec3(meshletNdcBounds.Max.xy * 0.5 + 0.5, meshletNdcBounds.Max.z);
     //     ivec2 size = ivec2(ceil((uvMax.xy - uvMin.xy) * renderSize));

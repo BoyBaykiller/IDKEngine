@@ -61,7 +61,7 @@ bool IntersectBlas(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo, inout f
             
             for (uint i = first; i < end; i++)
             {
-                uvec3 indices = blasTriangleIndicesSSBO.Indices[i].Indices;
+                uvec3 indices = blasTriangleSSBO.Triangles[i].Indices;
                 vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
                 vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);
                 vec3 p2 = Unpack(vertexPositionsSSBO.Positions[indices.z]);
@@ -138,7 +138,7 @@ bool IntersectBlasAny(Ray ray, GpuBlasDesc blasDesc, inout HitInfo hitInfo)
             
             for (uint i = first; i < end; i++)
             {
-                uvec3 indices = blasTriangleIndicesSSBO.Indices[i].Indices;
+                uvec3 indices = blasTriangleSSBO.Triangles[i].Indices;
                 vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
                 vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);
                 vec3 p2 = Unpack(vertexPositionsSSBO.Positions[indices.z]);

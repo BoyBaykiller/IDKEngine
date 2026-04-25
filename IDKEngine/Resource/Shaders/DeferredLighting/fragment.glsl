@@ -6,7 +6,7 @@ AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(DeferredLighting/include/Impl.glsl)
 
-layout(location = 0) out vec4 OutFragColor;
+layout(location = 0) out vec3 OutFragColor;
 
 layout(binding = 0) uniform sampler2D SamplerAO;
 layout(binding = 1) uniform sampler2D SamplerIndirectLighting;
@@ -27,7 +27,7 @@ void main()
     float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
-        OutFragColor = vec4(0.0);
+        OutFragColor = vec3(0.0);
         return;
     }
     
@@ -40,7 +40,7 @@ void main()
     float ambientOcclusion = texelFetch(SamplerAO, imgCoord, 0).r;
 
     Surface surface = GetDefaultSurface();
-    surface.Albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
+    surface.Albedo = texelFetch(gBufferDataUBO.Albedo, imgCoord, 0).rgb;
     surface.Normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
     surface.Metallic = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
     surface.Roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
@@ -88,6 +88,6 @@ void main()
         indirectLight = ambient * surface.Albedo;
     }
 
-    OutFragColor = vec4((directLighting + indirectLight) + surface.Emissive, 1.0);
-    // OutFragColor = vec4(surface.Normal * 0.5 + 0.5, 1.0);
+    OutFragColor = vec3((directLighting + indirectLight) + surface.Emissive);
+    // OutFragColor = vec3(surface.Normal * 0.5 + 0.5);
 }

@@ -85,8 +85,6 @@ public struct Box
 
     public readonly Vector128<float> SimdSize()
     {
-        // Unfortunately Simd.ToOpenTK() adds overhead because return value is stored on stack, see if this is fixed in NET10
-
         return SimdMax - SimdMin;
     }
 
@@ -117,7 +115,7 @@ public struct Box
     public readonly float LargestExtent()
     {
         Vector128<float> size = SimdSize();
-        return MyMath.NativeMax(size[0], MyMath.NativeMax(size[1], size[2]));
+        return float.MaxNative(size[0], float.MaxNative(size[1], size[2]));
     }
 
     public readonly float Area()

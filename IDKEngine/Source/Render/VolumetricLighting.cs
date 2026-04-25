@@ -43,7 +43,7 @@ class VolumetricLighting : IDisposable
 
     private readonly BBG.AbstractShaderProgram volumetricLightingProgram;
     private readonly BBG.AbstractShaderProgram upscaleProgram;
-    public unsafe VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
+    public VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
     {
         volumetricLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VolumetricLight/compute.glsl"));
         upscaleProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VolumetricLight/Upscale/compute.glsl"));

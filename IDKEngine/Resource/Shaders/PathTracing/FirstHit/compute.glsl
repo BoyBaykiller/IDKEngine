@@ -120,8 +120,8 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
         bool hitLight = hitInfo.TriangleId == ~0u;
         if (!hitLight)
         {
-            uvec3 indices = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].Indices;
-            uint meshId = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].GeometryId;
+            uvec3 indices = blasTriangleSSBO.Triangles[hitInfo.TriangleId].Indices;
+            uint meshId = blasTriangleSSBO.Triangles[hitInfo.TriangleId].GeometryId;
 
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
@@ -196,6 +196,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
         wavefrontRay.Throughput *= result.Bsdf / result.Pdf;
 
         {
+            // Record data for post-processing (e.g denoiser)
             float weight = GetSurfaceVariance(surface.Metallic, surface.Transmission, surface.Roughness);
             aovRay.Albedo = surface.Albedo * weight;
             aovRay.Normal = surface.Normal * weight;

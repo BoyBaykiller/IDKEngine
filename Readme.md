@@ -11,7 +11,7 @@ Feature list:
  - CoD-Modern-Warfare Bloom
  - Ray Traced Shadows
  - Variable Rate Shading
- - Order Independent Transparency
+ - Accurate Order Independent Transparency
  - Ray marched Volumetric Lighting
  - GPU Frustum + Hi-Z Culling
  - Screen Space Reflections
@@ -419,7 +419,7 @@ for (int axis = 0; axis < 3; axis++)
     FillIncreasing(PrimIndicesSorted[axis]);
 
     // Then sort them based on the position on the axis
-    Sort(PrimIndicesSorted[axis], (id) => primitives[id].Center()[axis]);
+    Sort(PrimIndicesSorted[axis], id => primitives[id].Center()[axis]);
 }
 ```
 With that, primitives are accessed as follows during SweepSAH:
@@ -429,20 +429,20 @@ Box primitive = primitives[indices[i]];
 ```
 `indices` is already sorted, so the `Sort` procedure which I mentioned in the [initial implementation](#20-implementation) that happens during recursion can be removed.
 
-After SweepSAH has found the best split, we need to do some work to correctly partition the arrays. This lies at the heart of the algorithm. Let's look at an example. Here, I've listed the parent "primitives" sorted by the x-, y- and z-axis respectively. SweepSAH has found the best split to be on the x-axis at `splitIndex=2`.
+After SweepSAH has found the best split, we need to do some work to correctly partition the arrays. This lies at the heart of the algorithm! Let's look at an example. Here, I've listed the parent "primitives" sorted by the x-, y- and z-axis respectively. SweepSAH has found the best split to be on the x-axis at `splitIndex=2`.
 ```
 x: [A, C, E, J];  y: [J, C, E, A];  z: [C, E, A, J]
          ^
         / \
   [A, C] + [E, J]
 ```
-That makes the set of left primitives {A, C} and right {E, J}. The goal is for all three arrays to contain the same primitives left and right to the `splitIndex` and to be sorted within each set. The x-array on which we split, is naturally partitioned that way. However, for the y- and z-array, the left primitives, {A, C}, still need to be moved before the right ones. And that while preserving relative order. This is achieved using a stable partition.
+That makes the set of left primitives {A, C} and right {E, J}. The goal is to move all left primitives before the `splitIndex` (and right after) and at the same time keep them sorted. The x-array on which we split, is naturally partitioned that way. However, for the y- and z-array, the left primitives {A, C} still need to be moved before the right ones. And that while preserving relative order so that they stay sorted. This is achieved using a stable partition.
 Below are the new y- and z- subsets:
 ```
 y => [C, A] + [J, E]
 z => [C, A] + [E, J]
 ```
-Since the initial parent primitives were sorted and the partitioning is stable (i.e. it preserves the relative order) the new child sets are also sorted. For example, in the initial y-array `J` was ordered before `E` and as you can see this is still the case.
+Since the initial parent primitives were sorted and the partitioning is stable (i.e. it preserves the relative order) the new child sets are also sorted. For example, in the initial y-array `J` was ordered before `E` and as you can see this is still the case. At the same time we now have same the primitives on each side on each axis.
 
 In code, we need to mark all primitives as being on the left/right side. For that we add a bool array:
 ```diff
@@ -454,7 +454,7 @@ struct BuildData
 }
 ```
 
-All left primitive indices are flagged as `true` and right `false`. When we `StablePartition` the other two primitive indices array it will move all elements for which `PartitionLeft[input[i]]` is `true` first, in order:
+All left primitive indices are flagged as `true` and right `false`. When we `StablePartition` the two primitive indices array it will move all elements for which `PartitionLeft[input[i]]` is `true` first, in order:
 ```cs
 // Mark on which side primitive references are
 for (int i = start; i < bestSplit.SplitIndex; i++)
@@ -466,7 +466,7 @@ for (int i = bestSplit.SplitIndex; i < end; i++)
     PartitionLeft[PrimIndicesSorted[bestSplit.Axis][i]] = false;
 }
 
-// For the other axes, move the left primitives before the right ones, while preserving relative order
+// Move the left primitives before the right ones while preserving relative order
 StablePartition(PrimIndicesSorted[(bestSplit.Axis + 1) % 3].Slice(start, end), PartitionLeft);
 StablePartition(PrimIndicesSorted[(bestSplit.Axis + 2) % 3].Slice(start, end), PartitionLeft);
 ```

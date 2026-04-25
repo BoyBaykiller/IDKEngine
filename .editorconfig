@@ -31,6 +31,9 @@ dotnet_diagnostic.CS9193.severity = error
 # CS8500: This takes the address of, gets the size of, or declares a pointer to a managed type
 dotnet_diagnostic.CS8500.severity = none
 
+# CA2248: Provide correct 'enum' argument to 'Enum.HasFlag'
+dotnet_diagnostic.CA2248.severity = error
+
 ########################
 ## Code quality rules ##
 ########################

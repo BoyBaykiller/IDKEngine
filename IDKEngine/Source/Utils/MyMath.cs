@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 using OpenTK.Mathematics;
 using IDKEngine.Shapes;
 
@@ -100,24 +98,6 @@ public static class MyMath
         return area;
     }
 
-    public static float NativeMax(float a, float b)
-    {
-        // TODO: Use float.MaxNative in .NET10
-        Vector128<float> va = Vector128.CreateScalarUnsafe(a);
-        Vector128<float> vb = Vector128.CreateScalarUnsafe(b);
-
-        return Sse.MaxScalar(va, vb).ToScalar();
-    }
-
-    public static float NativeMin(float a, float b)
-    {
-        // TODO: Use float.MinNative in .NET10
-        Vector128<float> va = Vector128.CreateScalarUnsafe(a);
-        Vector128<float> vb = Vector128.CreateScalarUnsafe(b);
-
-        return Sse.MinScalar(va, vb).ToScalar();
-    }
-
     public static int DivUp(int numerator, int divisor)
     {
         return (numerator + divisor - 1) / divisor;
@@ -155,16 +135,19 @@ public static class MyMath
         return result;
     }
 
-    public static int CeilLog2Int(uint value)
+    public static uint CeilLog2Int(uint value)
     {
         if (value <= 1)
         {
             return 0;
         }
-        unchecked
-        {
-            return 32 - System.Numerics.BitOperations.LeadingZeroCount(value - 1u);
-        }
+
+        return BitWidth(value - 1);
+    }
+
+    public static uint BitWidth(uint value)
+    {
+        return 32 - (uint)System.Numerics.BitOperations.LeadingZeroCount(value);
     }
 
     public static Vector3 Reflect(Vector3 incident, Vector3 normal)
@@ -287,7 +270,7 @@ public static class MyMath
 
     // Expands a 10-bit integer into 30 bits
     // by inserting 2 zeros after each bit.
-    private static unsafe uint InsertTwoZerosAfterEachBit(uint v)
+    private static uint InsertTwoZerosAfterEachBit(uint v)
     {
         unchecked
         {

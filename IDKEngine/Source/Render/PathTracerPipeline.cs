@@ -35,7 +35,7 @@ class PathTracerPipeline : IDisposable
         public void* OutputBuffer;
 
         [UnmanagedCallersOnly]
-        public static unsafe void ErrorCallback(void* device, OIDN.Error error, byte* message)
+        public static void ErrorCallback(void* device, OIDN.Error error, byte* message)
         {
             Logger.Log(Logger.LogLevel.Warn, $"OIDN: {error} {Marshal.PtrToStringAnsi((nint)message)}");
         }

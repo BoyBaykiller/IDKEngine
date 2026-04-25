@@ -32,7 +32,7 @@ public static class BLAS
     {
         // Default settings are usually close to optimal, however for Bistro,
         // because it has unaliged geometry, increasing the PreSplitting factor to 1.0,
-        // limiting MaxLeafTriangleCount=1 and StackSizeOptMaxLeafTriangleCount=16 are better.
+        // limiting MaxLeafTriangleCount=1 and StackOptMaxLeafTriangleCount=16 are better.
 
         public int StopSplittingThreshold = 1;
         public int MaxLeafTriangleCount = 2;

@@ -6,7 +6,7 @@ AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 
-layout(location = 0) out vec4 OutAlbedoAlpha;
+layout(location = 0) out vec3 OutAlbedo;
 layout(location = 1) out vec2 OutNormal;
 layout(location = 2) out vec2 OutMetallicRoughness;
 layout(location = 3) out vec3 OutEmissive;
@@ -42,11 +42,11 @@ void main()
     
     if (!gl_FrontFacing)
     {
-        // For doubleSided materials the back-face MUST have its normals reversed before the lighting equation is evaluated
+        // For doubleSided materials the back-face MUST have its normals reversed before lighting is evaluated
         surface.Normal = -surface.Normal;
     }
 
-    OutAlbedoAlpha = vec4(surface.Albedo, 1.0);
+    OutAlbedo = surface.Albedo;
     OutNormal = EncodeUnitVec(surface.Normal);
     OutMetallicRoughness = vec2(surface.Metallic, surface.Roughness);
     OutEmissive = surface.Emissive;

@@ -81,7 +81,7 @@ public static class Helper
         return (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(utf8));
     }
 
-    public static unsafe int SizeInBytes<T>(this T[] data) where T : unmanaged
+    public static unsafe int SizeInBytes<T>(this Span<T> data) where T : unmanaged
     {
         return sizeof(T) * data.Length;
     }
@@ -218,14 +218,14 @@ public static class Helper
         }
     }
 
-    public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int start, int length)
+    public static Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int start, int length)
         where TFrom : unmanaged
         where TTo : unmanaged
     {
         return MemoryMarshal.Cast<TFrom, TTo>(source).Slice(start, length);
     }
 
-    public static unsafe Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int length)
+    public static Span<TTo> ReUseMemory<TFrom, TTo>(Span<TFrom> source, int length)
         where TFrom : unmanaged
         where TTo : unmanaged
     {

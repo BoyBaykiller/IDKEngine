@@ -2,7 +2,7 @@
 
 AppInclude(include/Compression.glsl)
 
-layout(location = 0) out vec4 OutFragColor;
+layout(location = 0) out vec3 OutFragColor;
 layout(location = 1) out vec2 OutNormal;
 layout(location = 2) out vec3 OutEmissive;
 layout(location = 3) out vec2 OutVelocity;
@@ -19,7 +19,7 @@ in InOutData
 
 void main()
 {
-    OutFragColor = vec4(inData.LightColor, 1.0);
+    OutFragColor = inData.LightColor;
     OutNormal = EncodeUnitVec((inData.FragPos - inData.Position) / inData.Radius);
     OutEmissive = OutFragColor.rgb;
     

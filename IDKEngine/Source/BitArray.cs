@@ -50,7 +50,7 @@ public record struct BitArray
 #endif
             uint arrIndex = (uint)index / BITS_PER_ELEMENT;
             uint bitIndex = (uint)index % BITS_PER_ELEMENT;
-            uint mask = 1u << (int)bitIndex;
+            uint mask = 1u << bitIndex;
 
             return (data[arrIndex] & mask) != 0;
         }
@@ -64,7 +64,7 @@ public record struct BitArray
 
             uint arrIndex = (uint)index / BITS_PER_ELEMENT;
             uint bitIndex = (uint)index % BITS_PER_ELEMENT;
-            uint mask = 1u << (int)bitIndex;
+            uint mask = 1u << bitIndex;
 
             if (value)
             {
@@ -72,9 +72,10 @@ public record struct BitArray
             }
             else
             {
-                // Optimization discovered by clang/gcc: https://godbolt.org/z/3dGa4MYPj
+                // Missed opt https://godbolt.org/z/3sPvoP517
                 uint rol = BitOperations.RotateLeft(uint.MaxValue - 1, index);
                 data[arrIndex] &= rol;
+                //data[arrIndex] &= ~(1u << index); 
             }
         }
     }

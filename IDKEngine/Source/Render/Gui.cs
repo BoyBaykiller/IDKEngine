@@ -128,6 +128,7 @@ partial class Gui : IDisposable
                 float mbVertexPositions = app.ModelManager.VertexPositions.SizeInBytes() / 1000000.0f;
                 float mbIndices = app.ModelManager.VertexIndices.SizeInBytes() / 1000000.0f;
                 float mbMeshTransforms = app.ModelManager.MeshTransforms.SizeInBytes() / 1000000.0f;
+                float mbMeshes = app.ModelManager.Meshes.SizeInBytes() / 1000000.0f;
                 float totalRasterizer = mbVertices + mbVertexPositions + mbIndices + mbMeshTransforms;
                 if (ImGui.TreeNode($"Rasterizer Geometry total = {totalRasterizer}mb###Rasterizer Geometry total"))
                 {
@@ -135,6 +136,7 @@ partial class Gui : IDisposable
                     ImGui.Text($"  * VertexPositions ({app.ModelManager.Vertices.Length}) = {mbVertexPositions}mb");
                     ImGui.Text($"  * Triangles ({app.ModelManager.VertexIndices.Length / 3}) = {mbIndices}mb");
                     ImGui.Text($"  * MeshTransforms ({app.ModelManager.MeshTransforms.Length}) = {mbMeshTransforms}mb");
+                    ImGui.Text($"  * Meshes ({app.ModelManager.Meshes.Length}) = {mbMeshes}mb");
                     ImGui.TreePop();
                 }
             }

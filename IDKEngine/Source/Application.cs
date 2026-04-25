@@ -471,7 +471,6 @@ class Application : GameWindowBase
             ModelLoader.Model helmet = ModelLoader.LoadGltfFromFile("Resource/Models/HelmetCompressed/Helmet.gltf", new Transformation().WithRotationDeg(0.0f, 45.0f, 0.0f).GetMatrix()).Value;
 
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\Bistro.glb").Value;
-            //ModelLoader.Model tes25t = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\BistroRot25Z.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SanMiguel\SanMiguel.gltf").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMergedRotated45.glb").Value;
@@ -504,19 +503,19 @@ class Application : GameWindowBase
             ModelLoader.Model a = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Base\Compressed\NewSponza_Main_glTF_002.gltf").Value;
             ModelLoader.Model b = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Curtains\Compressed\NewSponza_Curtains_glTF.gltf").Value;
             ModelLoader.Model c = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Ivy\Compressed\NewSponza_IvyGrowth_glTF.gltf").Value;
-            ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
-            //ModelLoader.Model car = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\free_-_mclaren_p1_mso\scene.gltf",
-            //    new Transformation().WithTranslation(4.2f, 0.0f, 0.1f).WithScale(1.5f).WithRotationDeg(-180.0f, -73.0f, -180.0f).GetMatrix()
-            //).Value;
-            //ModelLoader.Model knight = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\medieval_knight__sculpture__game_ready\scene.gltf",
-            //    new Transformation().WithTranslation(-5.5f, 0.0f, 0.1f).WithScale(1.3f).WithRotationDeg(0.0f, 84.0f, 0.0f).GetMatrix()
-            //).Value;
+            //ModelLoader.Model d = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\IntelSponza\Tree\Compressed\NewSponza_CypressTree_glTF.gltf").Value;
+            ModelLoader.Model car = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\free_-_mclaren_p1_mso\scene.gltf",
+                new Transformation().WithTranslation(4.2f, 0.0f, 0.1f).WithScale(1.5f).WithRotationDeg(-180.0f, -73.0f, -180.0f).GetMatrix()
+            ).Value;
+            ModelLoader.Model knight = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\medieval_knight__sculpture__game_ready\scene.gltf",
+                new Transformation().WithTranslation(-5.5f, 0.0f, 0.1f).WithScale(1.3f).WithRotationDeg(0.0f, 84.0f, 0.0f).GetMatrix()
+            ).Value;
 
             ModelLoader.HoistMeshPrimitives(ref a);
-            //ModelLoader.HoistMeshPrimitives(ref b);
-            //ModelLoader.HoistMeshPrimitives(ref car);
+            ModelLoader.HoistMeshPrimitives(ref b);
+            ModelLoader.HoistMeshPrimitives(ref car);
 
-            ModelManager.Add(a, b, c, d);
+            ModelManager.Add(a, b, c, car, knight);
 
             SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 

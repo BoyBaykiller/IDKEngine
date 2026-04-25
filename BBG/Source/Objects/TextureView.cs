@@ -4,7 +4,7 @@ namespace BBOpenGL;
 
 public static partial class BBG
 {
-    public unsafe class TextureView : IDisposable
+    public class TextureView : IDisposable
     {
         public readonly int ID;
 

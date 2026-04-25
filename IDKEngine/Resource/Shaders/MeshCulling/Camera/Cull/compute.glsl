@@ -41,6 +41,7 @@ void main()
 
     if (isVisible)
     {
+        // Transparent cull
         GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
 
         bool hasAlphaBlending = material.AlphaCutoff == 2.0;
@@ -49,12 +50,14 @@ void main()
 
     if (isVisible)
     {
+        // DoubleSided cull
         GpuMaterial material = materialSSBO.Materials[mesh.MaterialId];
         isVisible = CullDoubleSided != material.IsDoubleSided;
     }
 
     if (isVisible)
     {
+        // Frustum cull
         Frustum frustum = GetFrustum(perFrameDataUBO.ProjView * modelMatrix);
         isVisible = FrustumBoxIntersect(frustum, localBounds);
     }
@@ -62,7 +65,7 @@ void main()
 #if IS_HI_Z_CULLING
     if (isVisible)
     {
-        // Occlusion Culling
+        // Occlusion cull
         bool vertexBehindFrustum;
         Box meshletOldNdcBounds = BoxTransformPerspective(localBounds, perFrameDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
         if (!vertexBehindFrustum)

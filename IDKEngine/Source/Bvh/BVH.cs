@@ -122,7 +122,7 @@ public class BVH : IDisposable
     private BBG.TypedBuffer<GpuBlasDesc> blasDescBuffer;
     private BBG.TypedBuffer<GpuBlasInstance> blasInstanceBuffer;
     private BBG.TypedBuffer<GpuBlasNode> blasNodesBuffer;
-    private BBG.TypedBuffer<GpuBlasTriangle> blasTriangleIndicesBuffer;
+    private BBG.TypedBuffer<GpuBlasTriangle> blasTriangleBuffer;
     private BBG.TypedBuffer<int> blasParentIdsBuffer;
     private BBG.TypedBuffer<int> blasLeafIndicesBuffer;
     private BBG.TypedBuffer<int> blasRefitLockBuffer;
@@ -136,7 +136,7 @@ public class BVH : IDisposable
         blasDescBuffer = new BBG.TypedBuffer<GpuBlasDesc>();
         blasInstanceBuffer = new BBG.TypedBuffer<GpuBlasInstance>();
         blasNodesBuffer = new BBG.TypedBuffer<GpuBlasNode>();
-        blasTriangleIndicesBuffer = new BBG.TypedBuffer<GpuBlasTriangle>();
+        blasTriangleBuffer = new BBG.TypedBuffer<GpuBlasTriangle>();
         blasParentIdsBuffer = new BBG.TypedBuffer<int>();
         blasLeafIndicesBuffer = new BBG.TypedBuffer<int>();
         blasRefitLockBuffer = new BBG.TypedBuffer<int>();
@@ -145,7 +145,7 @@ public class BVH : IDisposable
         blasDescBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 20);
         blasInstanceBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 21);
         blasNodesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 22);
-        blasTriangleIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 23);
+        blasTriangleBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 23);
         blasParentIdsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 24);
         blasLeafIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 25);
         blasRefitLockBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 26);
@@ -193,7 +193,7 @@ public class BVH : IDisposable
     }
 
     public delegate bool FuncIntersectLeafNode(in BoxHitInfo hitInfo);
-    public unsafe void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
+    public void Intersect(in Box box, FuncIntersectLeafNode intersectFunc)
     {
         if (CpuUseTlas)
         {
@@ -297,7 +297,7 @@ public class BVH : IDisposable
         }
     }
 
-    public unsafe void BlasesBuild(int start, int count)
+    public void BlasesBuild(int start, int count)
     {
         if (count == 0) return;
 
@@ -444,7 +444,7 @@ public class BVH : IDisposable
 
         BBG.Buffer.Recreate(ref blasDescBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc);
         BBG.Buffer.Recreate(ref blasInstanceBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasInstances);
-        BBG.Buffer.Recreate(ref blasTriangleIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasTriangles);
+        BBG.Buffer.Recreate(ref blasTriangleBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasTriangles);
         BBG.Buffer.Recreate(ref blasNodesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasNodes);
         BBG.Buffer.Recreate(ref blasLeafIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasLeafIds);
         BBG.Buffer.Recreate(ref blasParentIdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasParentIds);
@@ -575,7 +575,7 @@ public class BVH : IDisposable
         blasRefitLockBuffer.Dispose();
         blasParentIdsBuffer.Dispose();
         blasLeafIndicesBuffer.Dispose();
-        blasTriangleIndicesBuffer.Dispose();
+        blasTriangleBuffer.Dispose();
         blasNodesBuffer.Dispose();
     }
 }

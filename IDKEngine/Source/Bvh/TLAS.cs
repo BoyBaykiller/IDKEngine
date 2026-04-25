@@ -206,7 +206,7 @@ public static class TLAS
         return hitInfo.T != tMax;
     }
 
-    public static unsafe void Intersect(
+    public static void Intersect(
         ReadOnlySpan<GpuTlasNode> tlasNodes,
         FuncGetBlasAndGeometry funcGetBlasAndGeometry,
         Box box, BVH.FuncIntersectLeafNode intersectFunc)

@@ -2,7 +2,7 @@
 
 AppInclude(include/StaticUniformBuffers.glsl)
 
-layout(location = 0) out vec4 OutFragColor;
+layout(location = 0) out vec3 OutFragColor;
 layout(location = 1) out vec2 OutVelocity;
 
 in InOutData
@@ -14,7 +14,7 @@ in InOutData
 
 void main()
 {
-    OutFragColor = texture(skyBoxUBO.Albedo, inData.TexCoord);
+    OutFragColor = texture(skyBoxUBO.Albedo, inData.TexCoord).rgb;
 
     vec2 thisNdc = inData.ClipPos.xy / inData.ClipPos.w;
     vec2 historyNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;

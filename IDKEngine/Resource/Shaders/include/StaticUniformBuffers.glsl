@@ -47,7 +47,7 @@ layout(std140, binding = 6) uniform VoxelizerDataUBO
 
 layout(std140, binding = 7) uniform GBufferDataUBO
 {
-    sampler2D AlbedoAlpha;
+    sampler2D Albedo;
     sampler2D Normal;
     sampler2D MetallicRoughness;
     sampler2D Emissive;

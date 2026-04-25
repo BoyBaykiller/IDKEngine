@@ -59,7 +59,7 @@ Box ComputeBoundingBox(uint start, uint count)
     Box box = CreateBoxEmpty();
     for (uint i = start; i < start + count; i++)
     {
-        uvec3 indices = blasTriangleIndicesSSBO.Indices[i].Indices;
+        uvec3 indices = blasTriangleSSBO.Triangles[i].Indices;
 
         vec3 p0 = Unpack(vertexPositionsSSBO.Positions[indices.x]);
         vec3 p1 = Unpack(vertexPositionsSSBO.Positions[indices.y]);

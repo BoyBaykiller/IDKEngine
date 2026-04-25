@@ -40,7 +40,7 @@ void main()
 
     vec3 color = SSR(normal, fragPos) * specular;
 
-    vec3 albedo = texelFetch(gBufferDataUBO.AlbedoAlpha, imgCoord, 0).rgb;
+    vec3 albedo = texelFetch(gBufferDataUBO.Albedo, imgCoord, 0).rgb;
     color *= albedo;
 
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));

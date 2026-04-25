@@ -87,7 +87,7 @@ static class SkyBoxManager
         skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
     }
 
-    private static unsafe bool LoadSkyBox(string[] imagePaths)
+    private static bool LoadSkyBox(string[] imagePaths)
     {
         if (!imagePaths.All(p => File.Exists(p)))
         {

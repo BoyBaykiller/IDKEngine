@@ -108,10 +108,10 @@ layout(std430, binding = 22) restrict buffer BlasNodeSSBO
     GpuBlasNode Nodes[];
 } blasNodeSSBO;
 
-layout(std430, binding = 23) restrict readonly buffer BlasTriangleIndicesSSBO
+layout(std430, binding = 23) restrict readonly buffer BlasTriangleSSBO
 {
-    GpuBlasTriangle Indices[];
-} blasTriangleIndicesSSBO;
+    GpuBlasTriangle Triangles[];
+} blasTriangleSSBO;
 
 layout(std430, binding = 24) restrict readonly buffer BlasParentIndicesSSBO
 {

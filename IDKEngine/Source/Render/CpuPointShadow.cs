@@ -113,7 +113,7 @@ public class CpuPointShadow : IDisposable
         SetSizeRayTracedShadowMap(rayTracedShadowMapSize);
     }
 
-    public unsafe void RenderShadowMap(ModelManager modelManager, Camera camera, int gpuPointShadowIndex)
+    public void RenderShadowMap(ModelManager modelManager, Camera camera, int gpuPointShadowIndex)
     {
         Span<Vector3> shadowFrustumVertices = stackalloc Vector3[8];
         Span<Vector3> cameraFrustumVertices = stackalloc Vector3[8];

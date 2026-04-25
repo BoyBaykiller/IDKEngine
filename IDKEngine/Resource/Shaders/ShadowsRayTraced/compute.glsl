@@ -82,8 +82,8 @@ void main()
                 break;
             }
 
-            uvec3 indices = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].Indices;
-            uint meshId = blasTriangleIndicesSSBO.Indices[hitInfo.TriangleId].GeometryId;
+            uvec3 indices = blasTriangleSSBO.Triangles[hitInfo.TriangleId].Indices;
+            uint meshId = blasTriangleSSBO.Triangles[hitInfo.TriangleId].GeometryId;
 
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];

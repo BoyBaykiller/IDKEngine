@@ -412,7 +412,7 @@ public static unsafe class ModelLoader
 
         public readonly bool HasFallbackPixels(TextureType type)
         {
-            return (HasFallbackPixelsBits & (1 << (int)type)) != 0;
+            return (HasFallbackPixelsBits & (1u << (uint)type)) != 0;
         }
 
         public void SetHasFallbackPixels(TextureType type, bool value)
@@ -658,7 +658,7 @@ public static unsafe class ModelLoader
 
             TopDownBuildHierarchy(gltfNode, myNode);
         }
-
+        
         foreach (GltfNode node in gltf.DefaultScene.VisualChildren)
         {
             BottomUpLoad(node);
@@ -1753,8 +1753,8 @@ public static unsafe class ModelLoader
         byte[] meshletsLocalIndices = new byte[maxMeshlets * MESHLET_MAX_TRIANGLE_COUNT * 3];
         nuint meshletCount = Meshopt.BuildMeshlets(
             ref meshlets[0],
-            meshletsVertexIndices[0],
-            meshletsLocalIndices[0],
+            ref meshletsVertexIndices[0],
+            ref meshletsLocalIndices[0],
             meshIndices[0],
             (nuint)meshIndices.Length,
             meshVertexPositions[0].X,
