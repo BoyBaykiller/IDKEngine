@@ -172,6 +172,10 @@ public static class BLAS
 
         if (rootNode.IsLeaf)
         {
+            // TODO: This causes primitive duplication, which is bad given we are doing object splits.
+            // It causes a crash in GetUnindexedTriangles.
+            // PreSplitting.GetUnindexedTriangles de-duplicates so it deals with it.
+
             blas.Nodes[2] = rootNode;
             blas.Nodes[3] = rootNode;
             rootNode.TriStartOrChild = 2;
