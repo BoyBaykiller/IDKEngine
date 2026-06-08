@@ -237,20 +237,30 @@ public static class Algorithms
         int start = 0;
         int end = arr.Length;
 
-        while (start < end)
+        while (true)
         {
-            ref T value = ref arr[start];
-            if (func(value))
+            while (start < end && func(arr[start]))
             {
                 start++;
             }
-            else
-            {
-                SwapNotifyUser(arr, start, --end, onSwap);
-            }
-        }
 
-        return start;
+            if (start == end)
+            {
+                return start;
+            }
+
+            do
+            {
+                --end;
+                if (start == end)
+                {
+                    return start;
+                }
+            }
+            while (!func(arr[end]));
+
+            SwapNotifyUser(arr, start++, end, onSwap);
+        }
     }
 
     /// <summary>
@@ -263,7 +273,7 @@ public static class Algorithms
     /// <param name="auxiliary"></param>
     /// <param name="bitArray"></param>
     /// <returns></returns>
-    public static int StablePartition(Span<int> source, Span<int> auxiliary, bool[] bitArray)
+    public static int StablePartition(Span<int> source, Span<int> auxiliary, ReadOnlySpan<bool> bitArray)
     {
         int lCounter = 0;
         int rCounter = 0;

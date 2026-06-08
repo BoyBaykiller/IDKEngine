@@ -276,7 +276,7 @@ unsafe class ImGuiBackend : IDisposable
 
     private void CreateFontsTexture()
     {
-        glFontTexture = GL.CreateTexture(TextureTarget.Texture2d);
+        glFontTexture = GL.CreateTexture(TextureTarget.Texture2D);
 
         ImGuiIOPtr io = ImGui.GetIO();
         io.Fonts.GetTexDataAsRGBA32(out byte* pixels, out int width, out int height);

@@ -183,7 +183,7 @@ public static class Intersections
         var p2 = Vector3.Dot(v2, a00);
         var halfSize = box.HalfSize();
         var r = halfSize.Y * MathF.Abs(f0.Z) + halfSize.Z * MathF.Abs(f0.Y);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -194,7 +194,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a01);
         p2 = Vector3.Dot(v2, a01);
         r = halfSize.Y * MathF.Abs(f1.Z) + halfSize.Z * MathF.Abs(f1.Y);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -205,7 +205,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a02);
         p2 = Vector3.Dot(v2, a02);
         r = halfSize.Y * MathF.Abs(f2.Z) + halfSize.Z * MathF.Abs(f2.Y);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -216,7 +216,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a10);
         p2 = Vector3.Dot(v2, a10);
         r = halfSize.X * MathF.Abs(f0.Z) + halfSize.Z * MathF.Abs(f0.X);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -227,7 +227,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a11);
         p2 = Vector3.Dot(v2, a11);
         r = halfSize.X * MathF.Abs(f1.Z) + halfSize.Z * MathF.Abs(f1.X);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -238,7 +238,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a12);
         p2 = Vector3.Dot(v2, a12);
         r = halfSize.X * MathF.Abs(f2.Z) + halfSize.Z * MathF.Abs(f2.X);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -249,7 +249,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a20);
         p2 = Vector3.Dot(v2, a20);
         r = halfSize.X * MathF.Abs(f0.Y) + halfSize.Y * MathF.Abs(f0.X);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -260,7 +260,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a21);
         p2 = Vector3.Dot(v2, a21);
         r = halfSize.X * MathF.Abs(f1.Y) + halfSize.Y * MathF.Abs(f1.X);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -271,7 +271,7 @@ public static class Intersections
         p1 = Vector3.Dot(v1, a22);
         p2 = Vector3.Dot(v2, a22);
         r = halfSize.X * MathF.Abs(f2.Y) + halfSize.Y * MathF.Abs(f2.X);
-        if (MathF.Max(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
+        if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
         }
@@ -321,11 +321,11 @@ public static class Intersections
 
         static float Min3(float a, float b, float c)
         {
-            return MathF.Min(a, MathF.Min(b, c));
+            return float.MinNative(a, float.MinNative(b, c));
         }
         static float Max3(float a, float b, float c)
         {
-            return MathF.Max(a, MathF.Max(b, c));
+            return float.MaxNative(a, float.MaxNative(b, c));
         }
     }
     
@@ -367,11 +367,11 @@ public static class Intersections
         Vector3 t0s = (box.Min - ray.Origin) / ray.Direction;
         Vector3 t1s = (box.Max - ray.Origin) / ray.Direction;
 
-        Vector3 tsmaller = Vector3.ComponentMin(t0s, t1s);
-        Vector3 tbigger = Vector3.ComponentMax(t0s, t1s);
+        Vector3 tsmaller = Vector3.ComponentMinNative(t0s, t1s);
+        Vector3 tbigger = Vector3.ComponentMaxNative(t0s, t1s);
 
-        t1 = MathF.Max(tsmaller.X, MathF.Max(tsmaller.Y, MathF.Max(tsmaller.Z, 0.0f)));
-        t2 = MathF.Min(tbigger.X, MathF.Min(tbigger.Y, tbigger.Z));
+        t1 = float.MaxNative(tsmaller.X, float.MaxNative(tsmaller.Y, float.MaxNative(tsmaller.Z, 0.0f)));
+        t2 = float.MinNative(tbigger.X, float.MinNative(tbigger.Y, tbigger.Z));
 
         return t1 <= t2;
     }
@@ -429,8 +429,8 @@ public static class Intersections
             // full projecton would mean multiplying by axis, but we are not interested in that
             float projectedScaler = Vector3.Dot(vertices[i], axis);
 
-            projection.MinScaler = MathF.Min(projection.MinScaler, projectedScaler);
-            projection.MaxScaler = MathF.Max(projection.MaxScaler, projectedScaler);
+            projection.MinScaler = float.MinNative(projection.MinScaler, projectedScaler);
+            projection.MaxScaler = float.MaxNative(projection.MaxScaler, projectedScaler);
         }
 
         return projection;

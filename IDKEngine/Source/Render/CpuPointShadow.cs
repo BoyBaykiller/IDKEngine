@@ -68,11 +68,11 @@ public class CpuPointShadow : IDisposable
             gpuPointShadow.NearPlane = value.X;
             gpuPointShadow.FarPlane = value.Y;
 
-            gpuPointShadow.NearPlane = MathF.Max(gpuPointShadow.NearPlane, 0.1f);
-            gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, 0.1f);
+            gpuPointShadow.NearPlane = float.MaxNative(gpuPointShadow.NearPlane, 0.1f);
+            gpuPointShadow.FarPlane = float.MaxNative(gpuPointShadow.FarPlane, 0.1f);
 
-            gpuPointShadow.NearPlane = MathF.Min(gpuPointShadow.NearPlane, gpuPointShadow.FarPlane - 0.001f);
-            gpuPointShadow.FarPlane = MathF.Max(gpuPointShadow.FarPlane, gpuPointShadow.NearPlane + 0.001f);
+            gpuPointShadow.NearPlane = float.MinNative(gpuPointShadow.NearPlane, gpuPointShadow.FarPlane - 0.001f);
+            gpuPointShadow.FarPlane = float.MaxNative(gpuPointShadow.FarPlane, gpuPointShadow.NearPlane + 0.001f);
 
             projection = MyMath.CreatePerspectiveFieldOfViewDepthZeroToOne(MyMath.DegreesToRadians(90.0f), 1.0f, gpuPointShadow.NearPlane, gpuPointShadow.FarPlane);
         }

@@ -298,10 +298,10 @@ public static unsafe class ModelLoader
 
     public record struct ModelAnimation
     {
-        public readonly float Duration => End - Start;
+        public readonly float Duration => TMax - TMin;
 
-        public float Start; // Min of node animations start
-        public float End; // Max of node animations end
+        public float TMin; // Min of node animations start
+        public float TMax; // Max of node animations end
 
         public string Name;
 
@@ -310,8 +310,8 @@ public static unsafe class ModelLoader
         public readonly ModelAnimation DeepClone(ReadOnlySpan<Node> srcNewNodes)
         {
             ModelAnimation animation = new ModelAnimation();
-            animation.Start = Start;
-            animation.End = End;
+            animation.TMin = TMin;
+            animation.TMax = TMax;
             animation.Name = new string(Name);
             animation.NodeAnimations = new NodeAnimation[NodeAnimations.Length];
             for (int i = 0; i < animation.NodeAnimations.Length; i++)
@@ -350,7 +350,7 @@ public static unsafe class ModelLoader
 
         public readonly Span<Vector3> GetKeyFrameDataAsVec3()
         {
-            if (Type != AnimationType.Translation && Type != AnimationType.Scale)
+            if (!(Type == AnimationType.Translation || Type == AnimationType.Scale))
             {
                 throw new ArgumentException($"{nameof(Type)} = {Type} is not meant to be interpreted as Vector3");
             }
@@ -360,7 +360,7 @@ public static unsafe class ModelLoader
 
         public readonly Span<Quaternion> GetKeyFrameDataAsQuaternion()
         {
-            if (Type != AnimationType.Rotation)
+            if (!(Type == AnimationType.Rotation))
             {
                 throw new ArgumentException($"{nameof(Type)} = {Type} is not meant to be interpreted as Quaternion");
             }
@@ -705,7 +705,7 @@ public static unsafe class ModelLoader
                 Matrix4[] nodeTransformations = GetNodeTransformations(myNode, gltfNode.UseGpuInstancing());
                 myNode.MeshTransformsRange = new Range(listMeshTransforms.Count, nodeTransformations.Length);
                 myNode.MeshRange = new Range(listMeshes.Count, gltfMesh.Primitives.Count);
-
+                
                 for (int i = 0; i < gltfMesh.Primitives.Count; i++)
                 {
                     MeshPrimitive gltfMeshPrimitive = gltfMesh.Primitives[i];
@@ -1481,8 +1481,8 @@ public static unsafe class ModelLoader
             {
                 Array.Resize(ref myAnimation.NodeAnimations, nodeAmimsCount);
 
-                myAnimation.Start = myAnimation.NodeAnimations.Select(it => it.Start).Min();
-                myAnimation.End = myAnimation.NodeAnimations.Select(it => it.End).Max();
+                myAnimation.TMin = myAnimation.NodeAnimations.Select(it => it.Start).Min();
+                myAnimation.TMax = myAnimation.NodeAnimations.Select(it => it.End).Max();
                 animations[animationCount++] = myAnimation;
             }
         }
@@ -2023,12 +2023,11 @@ public static unsafe class ModelLoader
         // This method recursively hoists meshes of a node into it's parent and bakes the transforms, buttom up fashion.
         // The goal is to to get as many meshes into a single node as possible, because that means bigger BLAS will be build.
 
-        // TODO: 
-        // * Breaks buster_drone animations, investigate
-        // * Meshlet support (when I have a mesh-shader capable GPU)
+        // TODO: Meshlet support (when I have a mesh-shader capable GPU)
+
+        int meshNodesBefore = GetNumMeshNodes(model);
 
         Stopwatch sw = Stopwatch.StartNew();
-
         if (bakeTopLevelTransform)
         {
             Node root = model.Nodes[0];
@@ -2048,8 +2047,10 @@ public static unsafe class ModelLoader
         model.Nodes = Node.HierarchyToArray(model.RootNode);
 
         CompactMeshTransforms(ref model);
+        sw.Stop();
 
-        Logger.Log(Logger.LogLevel.Info, $"Hoisted meshes for model \"{model.RootNode.Name}\" in {sw.ElapsedMilliseconds}ms");
+        int meshNodesAfter = GetNumMeshNodes(model);
+        Logger.Log(Logger.LogLevel.Info, $"{nameof(HoistMeshPrimitives)} for model \"{model.RootNode.Name}\" in {sw.ElapsedMilliseconds}ms. Nodes with Mesh {meshNodesBefore} => {meshNodesAfter}");
 
         void Hoist(Node parent)
         {
@@ -2062,17 +2063,22 @@ public static unsafe class ModelLoader
                 }
             }
 
+            if (isAnimatedNodeTable[parent.ArrayIndex])
+            {
+                return;
+            }
+
             if (parent.HasInstancing)
             {
                 // We might be able to handle this but not interested
-                Logger.Log(Logger.LogLevel.Warn, "Bailing on parent.HasInstancing");
+                Logger.Log(Logger.LogLevel.Info, "Bailing: Parent has instancing");
                 return;
             }
 
             if (parent.Children.Any(it => it.HasInstancing))
             {
-                // We can handle some nodes having instancing and others not but I first need to find a case for it
-                Logger.Log(Logger.LogLevel.Warn, "Bailing on parent.Children.Any(it => it.HasInstancing)");
+                // We could handle some nodes having instancing and others not but I first need to find a case for it
+                Logger.Log(Logger.LogLevel.Info, "Bailing: Child has instancing");
                 return;
             }
 
@@ -2106,13 +2112,15 @@ public static unsafe class ModelLoader
             {
                 if (parent.Children.Length == 1 && meshCount == gpuModel.Meshes.Length)
                 {
-                    // All meshes are already inside 1 node, no more work needed
+                    // All meshes are already inside a single node, no more work needed
+                    // We could loosen the children.Length restriction though
                     return;
                 }
             }
 
             if (newMeshTransformId == -1)
             {
+                Logger.Log(Logger.LogLevel.Info, $"Bailing: Parent {parent.Name} has no hoistable meshes, meshCount = {meshCount}");
                 return;
             }
 
@@ -2189,14 +2197,12 @@ public static unsafe class ModelLoader
             ref readonly BBG.DrawElementsIndirectCommand drawCmd = ref gpuModel.DrawCommands[meshId];
             ref GpuMesh mesh = ref gpuModel.Meshes[meshId];
 
-            Box bounds = Box.Empty();
-
+            // https://github.com/dotnet/runtime/issues/122696#issuecomment-3688992330
             int vertexCount = mesh.VertexCount;
-
-            // https://github.com/dotnet/runtime/issues/122696
             Span<Vector3> vertexPositions = gpuModel.VertexPositions.AsSpan().Slice(drawCmd.BaseVertex, vertexCount);
             Span<GpuVertex> vertices = gpuModel.Vertices.AsSpan().Slice(drawCmd.BaseVertex, vertexCount);
 
+            Box bounds = Box.Empty();
             for (int i = 0; i < vertexCount; i++)
             {
                 //Vector3 position = (new Vector4(vertexPositions[i], 1.0f) * worldMatrix).Xyz;
@@ -2300,10 +2306,11 @@ public static unsafe class ModelLoader
                     {
                         ref readonly BBG.DrawElementsIndirectCommand cmd = ref gpuModel.DrawCommands[j];
 
-                        for (int k = cmd.BaseInstance; k < cmd.BaseInstance + cmd.InstanceCount; k++)
+                        for (int k = 0; k < cmd.InstanceCount; k++)
                         {
-                            gpuModel.MeshInstances[k].MeshId = j;
-                            gpuModel.MeshInstances[k].MeshTransformId = node.MeshTransformsRange.Start;
+                            int instanceId = cmd.BaseInstance + k;
+                            gpuModel.MeshInstances[instanceId].MeshId = j;
+                            gpuModel.MeshInstances[instanceId].MeshTransformId = node.MeshTransformsRange.Start + k;
                         }
                     }
                 }
@@ -2311,6 +2318,21 @@ public static unsafe class ModelLoader
             Array.Resize(ref newTransforms, counter);
 
             model.GpuModel.MeshTransforms = newTransforms;
+        }
+    
+        static int GetNumMeshNodes(in Model model)
+        {
+            int counter = 0;
+            for (int i = 0; i < model.Nodes.Length; i++)
+            {
+                Node node = model.Nodes[i];
+                if (node.HasMeshes)
+                {
+                    counter++;
+                }
+            }
+
+            return counter;
         }
     }
 }

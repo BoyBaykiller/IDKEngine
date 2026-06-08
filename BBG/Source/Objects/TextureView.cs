@@ -11,7 +11,7 @@ public static partial class BBG
         public TextureView(Texture texture, in Sampler.SamplerState samplerState, int level = 0)
         {
             GL.GenTextures(1, ref ID);
-            GL.TextureView(ID, TextureTarget.Texture2d, texture.ID, (SizedInternalFormat)texture.Format, (uint)level, 1, 0, 1);
+            GL.TextureView(ID, TextureTarget.Texture2D, texture.ID, (SizedInternalFormat)texture.Format, (uint)level, 1, 0, 1);
 
             GL.TextureParameteri(ID, TextureParameterName.TextureMinFilter, (int)samplerState.MinFilter);
             GL.TextureParameteri(ID, TextureParameterName.TextureMagFilter, (int)samplerState.MagFilter);

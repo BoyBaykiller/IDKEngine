@@ -11,9 +11,9 @@ public static partial class BBG
         public enum Type : uint
         {
             Cubemap = TextureTarget.TextureCubeMap,
-            Texture2D = TextureTarget.Texture2d,
-            Texture2DArray = TextureTarget.Texture2dArray,
-            Texture3D = TextureTarget.Texture3d,
+            Texture2D = TextureTarget.Texture2D,
+            Texture2DArray = TextureTarget.Texture2DArray,
+            Texture3D = TextureTarget.Texture3D,
         }
         
         public enum InternalFormat : uint

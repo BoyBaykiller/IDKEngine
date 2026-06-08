@@ -36,7 +36,7 @@ class AtmosphericScatterer : IDisposable
     {
         BBG.Computing.Compute("Compute Atmospheric Scattering", () =>
         {
-            Settings.LightIntensity = MathF.Max(Settings.LightIntensity, 0.0f);
+            Settings.LightIntensity = float.MaxNative(Settings.LightIntensity, 0.0f);
 
             BBG.Cmd.SetUniforms(Settings);
 

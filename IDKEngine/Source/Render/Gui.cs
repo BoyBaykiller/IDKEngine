@@ -1088,7 +1088,7 @@ partial class Gui : IDisposable
                     model.EnabledAnimations[animationInfo.AnimationId] = enabled;
                 }
 
-                ImGui.Text($"Start - End: {animation.Start} - {animation.End}sec");
+                ImGui.Text($"Start - End: {animation.TMin} - {animation.TMax}sec");
                 ImGui.Text($"Node Animatons: {animation.NodeAnimations.Length}");
             }
             else if (SelectedEntity is SelectedEntityInfo.Light lightInfo)

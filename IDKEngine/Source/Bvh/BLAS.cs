@@ -744,9 +744,9 @@ public static class BLAS
         // Unfortunately we have to manually load the fields for best perf
         // as the JIT otherwise repeatedly loads them in the loop
         // https://github.com/dotnet/runtime/issues/113107
-        bool[] fragLeftTable = buildData.FragLeftTable;
+        Span<bool> fragLeftTable = buildData.FragLeftTable;
         Span<float> rightCostsAccum = buildData.RightCostsAccum;
-        Box[] fragBounds = buildData.Fragments.Bounds;
+        Span<Box> fragBounds = buildData.Fragments.Bounds;
         Span<int> fragIdsSorted;
 
         for (int axis = 0; axis < 3; axis++)
@@ -875,7 +875,6 @@ public static class BLAS
     private static void OptimizeStackSize(ref BuildResult blas, BuildSettings settings)
     {
         blas.RequiredStackSize = ComputeRequiredStackSize(blas);
-
         if (blas.RequiredStackSize < settings.StackOptThreshold)
         {
             return;

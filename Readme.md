@@ -754,7 +754,7 @@ stack[stackPtr++] = (rBox, rightCount);
 stack[stackPtr++] = (lBox, leftCount);
 ```
 
-When `splitsLeft` reaches 1 we store the fragment and proceed:
+When `splitsLeft` reaches 1, we store the fragment and move on to the next triangle:
 ```cs
 (Box parentBox, int splitsLeft) = stack[--stackPtr];
 if (splitsLeft == 1)

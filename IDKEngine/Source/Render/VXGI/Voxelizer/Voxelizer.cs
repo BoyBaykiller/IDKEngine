@@ -22,7 +22,7 @@ class Voxelizer : IDisposable
 
         set
         {
-            gpuVoxelizerData.GridMin = Vector3.ComponentMin(value, gpuVoxelizerData.GridMax - new Vector3(0.1f));
+            gpuVoxelizerData.GridMin = Vector3.ComponentMinNative(value, gpuVoxelizerData.GridMax - new Vector3(0.1f));
         }
     }
     public Vector3 GridMax
@@ -31,7 +31,7 @@ class Voxelizer : IDisposable
 
         set
         {
-            gpuVoxelizerData.GridMax = Vector3.ComponentMax(value, gpuVoxelizerData.GridMin + new Vector3(0.1f));
+            gpuVoxelizerData.GridMax = Vector3.ComponentMaxNative(value, gpuVoxelizerData.GridMin + new Vector3(0.1f));
         }
     }
 
