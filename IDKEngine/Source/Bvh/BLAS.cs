@@ -628,9 +628,9 @@ public static class BLAS
 
     public static double ComputeGlobalSAH(BuildResult blas, BuildSettings settings)
     {
-        double cost = 0.0f;
+        double cost = 0.0;
 
-        double rootArea = 1.0f / blas.Root.HalfArea();
+        double rootArea = 1.0 / blas.Root.HalfArea();
 
         Span<int> stack = stackalloc int[128];
         int stackPtr = 0;
@@ -730,7 +730,7 @@ public static class BLAS
     private static ObjectSplit? TrySplit(GpuBlasNode parentNode, BuildData buildData, BuildSettings settings)
     {
         Box parentBox = Conversions.ToBox(parentNode);
-        if (parentNode.TriCount <= settings.StopSplittingThreshold || parentBox.HalfArea() <= 0.0f)
+        if (parentNode.TriCount <= settings.StopSplittingThreshold)
         {
             return null;
         }
@@ -756,7 +756,7 @@ public static class BLAS
             int firstRight = start + 1;
 
             Box rightBoxAccum = Box.Empty();
-            int rightCounter = 0;
+            float rightCounter = 0.0f;
             for (int i = end - 1; i >= firstRight; i--)
             {
                 rightCounter++;
@@ -768,14 +768,14 @@ public static class BLAS
 
                 if (rightCost >= bestSplit.NewCost)
                 {
-                    // Don't need to consider split positions beyond this point as cost is already greater and will only get more
+                    // Don't need to consider splits beyond this point as cost is already greater and will only get more
                     firstRight = i + 1;
                     break;
                 }
             }
 
             Box leftBoxAccum = Box.Empty();
-            int leftCounter = firstRight - start - 1;
+            float leftCounter = firstRight - start - 1.0f;
             for (int i = start; i < firstRight - 1; i++)
             {
                 leftBoxAccum.GrowToFit(fragBounds[fragIdsSorted[i]]);

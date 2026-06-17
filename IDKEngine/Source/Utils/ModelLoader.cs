@@ -2335,4 +2335,66 @@ public static unsafe class ModelLoader
             return counter;
         }
     }
+    
+    public static void DemoMakeNodeInstanced(ref Model model, int count)
+    {
+        const float scaleShift = 5.0f;
+        const float trans = 1000.0f;
+
+        if (model.Nodes.Length > 1)
+        {
+            // might want to expand the demo..
+            return;
+        }
+
+        Node node = model.Nodes[0];
+        if (!node.HasMeshes)
+        {
+            return;
+        }
+
+        model.GpuModel.MeshTransforms = new GpuMeshTransform[count];
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 translation = new Vector3(
+                RNG.RandomFloat(-trans, trans),
+                RNG.RandomFloat(-trans, trans),
+                RNG.RandomFloat(-trans, trans));
+            //translation.Z = (0.0f);
+
+            Vector3 scale = new Vector3(RNG.RandomFloat(0.5f * scaleShift, 3.0f * scaleShift));
+            //scale = new Vector3(10.0f);
+
+            Quaternion rotation = Quaternion.FromAxisAngle(
+                Vector3.Normalize(new Vector3(
+                    RNG.RandomFloat(-1.0f, 1.0f),
+                    RNG.RandomFloat(-1.0f, 1.0f),
+                    RNG.RandomFloat(-1.0f, 1.0f))),
+                RNG.RandomFloat(0.0f, MathF.PI * 2.0f));
+
+            //rotation = Quaternion.Identity;
+
+            model.GpuModel.MeshTransforms[i].ModelMatrix = new Transformation().WithTranslation(translation).WithScale(scale).WithRotation(rotation).GetMatrix();
+        }
+
+        model.GpuModel.MeshInstances = new GpuMeshInstance[count * node.MeshRange.Count];
+        for (int i = 0; i < node.MeshRange.Count; i++)
+        {
+            int meshId = node.MeshRange.Start + i;
+            ref GpuMesh mesh = ref model.GpuModel.Meshes[meshId];
+            ref BBG.DrawElementsIndirectCommand cmd = ref model.GpuModel.DrawCommands[meshId];
+
+            mesh.InstanceCount = count;
+            cmd.InstanceCount = count;
+            cmd.BaseInstance = i * count;
+
+            for (int j = 0; j < cmd.InstanceCount; j++)
+            {
+                int instanceId = cmd.BaseInstance + j;
+                model.GpuModel.MeshInstances[instanceId].MeshId = meshId;
+                model.GpuModel.MeshInstances[instanceId].MeshTransformId = j;
+            }
+        }
+        node.MeshTransformsRange = new Range(0, count);
+    }
 }

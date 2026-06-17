@@ -97,7 +97,7 @@ public static class PreSplitting
                 float leftExtent = lBox.LargestExtent();
                 float rightExtent = rBox.LargestExtent();
 
-                int leftCount = (int)MathF.Round(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
+                int leftCount = (int)(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
                 leftCount = Math.Clamp(leftCount, 1, splitsLeft - 1);
 
                 int rightCount = splitsLeft - leftCount;
