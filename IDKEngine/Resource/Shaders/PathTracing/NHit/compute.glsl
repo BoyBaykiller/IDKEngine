@@ -16,6 +16,7 @@ AppInclude(include/Math.glsl)
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(include/StaticUniformBuffers.glsl)
 AppInclude(PathTracing/include/Constants.glsl)
+AppInclude(PathTracing/CountingSort/BlellochScan/include/Constants.glsl)
 
 #define TRAVERSAL_STACK_USE_SHARED_STACK_SIZE N_HIT_PROGRAM_LOCAL_SIZE_X
 AppInclude(include/BVHIntersect.glsl)
@@ -31,8 +32,7 @@ layout(std140, binding = 0) uniform SettingsUBO
     bool DoRussianRoulette;
 } settingsUBO;
 
-bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay);
-uint GetSortingKey(GpuWavefrontRay wavefrontRay, uint pingPongIndex);
+bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay, out uint sortingKey);
 
 AppInclude(PathTracing/include/RussianRoulette.glsl)
 AppInclude(PathTracing/include/Shading.glsl)
@@ -58,7 +58,8 @@ void main()
     GpuWavefrontRay wavefrontRay = wavefrontRaySSBO.Rays[rayIndex];
     GpuAOVRay aovRay = aovRaySSBO.Rays[rayIndex];
 
-    bool continueRay = TraceRay(wavefrontRay, aovRay);
+    uint sortingKey;
+    bool continueRay = TraceRay(wavefrontRay, aovRay, sortingKey);
     
     wavefrontRaySSBO.Rays[rayIndex] = wavefrontRay;
 #if PATH_TRACER_OUTPUT_AOVS
@@ -76,17 +77,18 @@ void main()
         }
 
     #if PATH_TRACER_DO_RAY_SORTING
-        uint key = GetSortingKey(wavefrontRay, pingPongIndex);
-        
+        // Mask off the hi unsorted bits
+        sortingKey &= ~0u >> (32 - PREFIX_SUM_BIT_CAPACITY);
+
         // Build histogram and cache the key for subsequent shaders to do the sorting
-        atomicAdd(workGroupPrefixSumSSBO.PrefixSum[key], 1u);
-        cachedKeySSBO.Keys[index] = key;
+        atomicAdd(workGroupPrefixSumSSBO.PrefixSum[sortingKey], 1u);
+        cachedKeySSBO.Keys[index] = sortingKey;
     #endif
 
     }
 }
 
-bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
+bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay, out uint sortingKey)
 {
     vec3 rayDir = DecodeUnitVec(vec2(wavefrontRay.PackedDirectionX, wavefrontRay.PackedDirectionY));
 
@@ -100,8 +102,10 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
         bool hitLight = hitInfo.TriangleId == ~0u;
         if (!hitLight)
         {
+            sortingKey = hitInfo.TriangleId;
+
             uvec3 indices = blasTriangleSSBO.Triangles[hitInfo.TriangleId].Indices;
-            uint meshId = blasTriangleSSBO.Triangles[hitInfo.TriangleId].GeometryId;
+            uint meshId = blasTriangleSSBO.Triangles[hitInfo.TriangleId].MeshId;
 
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];
@@ -141,6 +145,8 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
         }
         else if (settingsUBO.DoTraceLights)
         {
+            sortingKey = hitInfo.MeshTransformId;
+
             GpuLight light = lightsUBO.Lights[hitInfo.MeshTransformId];
             surface.Emissive = light.Color;
             surface.Albedo = light.Color;
@@ -206,40 +212,4 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
         wavefrontRay.Radiance += albedo * wavefrontRay.Throughput;
         return false;
     }
-}
-
-uint GetSortingKey(GpuWavefrontRay wavefrontRay, uint pingPongIndex)
-{
-    // Need to manually scaralize the paths like that for good perf on AMD prop
-    // https://discord.com/channels/318590007881236480/374061825454768129/1440209508478619800
-    uvec3 bounds = FloatToKey(wavefrontRay.Origin);
-    if (pingPongIndex == 0)
-    {
-        atomicMin(wavefrontPTSSBO.RayBoundsMin[1].x, bounds.x);
-        atomicMin(wavefrontPTSSBO.RayBoundsMin[1].y, bounds.y);
-        atomicMin(wavefrontPTSSBO.RayBoundsMin[1].z, bounds.z);
-        atomicMax(wavefrontPTSSBO.RayBoundsMax[1].x, bounds.x);
-        atomicMax(wavefrontPTSSBO.RayBoundsMax[1].y, bounds.y);
-        atomicMax(wavefrontPTSSBO.RayBoundsMax[1].z, bounds.z);
-    }
-    else
-    {
-        atomicMin(wavefrontPTSSBO.RayBoundsMin[0].x, bounds.x);
-        atomicMin(wavefrontPTSSBO.RayBoundsMin[0].y, bounds.y);
-        atomicMin(wavefrontPTSSBO.RayBoundsMin[0].z, bounds.z);
-        atomicMax(wavefrontPTSSBO.RayBoundsMax[0].x, bounds.x);
-        atomicMax(wavefrontPTSSBO.RayBoundsMax[0].y, bounds.y);
-        atomicMax(wavefrontPTSSBO.RayBoundsMax[0].z, bounds.z);
-    }
-
-    // Use the ray bounds from the last bounce. This saves one pass. I don't fully understand how much that pessimizes the morton codes in practice.
-    vec3 rayBoundsMin = KeyToFloat(Unpack(wavefrontPTSSBO.RayBoundsMin[pingPongIndex]));
-    vec3 rayBoundsMax = KeyToFloat(Unpack(wavefrontPTSSBO.RayBoundsMax[pingPongIndex]));
-    uint key = GetMortonCode30(MapToZeroOne(wavefrontRay.Origin, rayBoundsMin, rayBoundsMax));
-
-    const uint bitsToSort = 16; // Only look at the hi 16 bits. Depends on how the sort is configured
-    const uint keyLength = 30; // Morton code only uses lower 30 bits
-    key >>= (keyLength - bitsToSort);
-
-    return key;
 }

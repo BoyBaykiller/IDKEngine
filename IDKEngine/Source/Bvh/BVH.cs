@@ -265,7 +265,7 @@ public class BVH : IDisposable
                     blasTriangle.X = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + k) * 3 + 0]);
                     blasTriangle.Y = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + k) * 3 + 1]);
                     blasTriangle.Z = (int)(userGeometryDesc.VertexOffset + vertexIndices[(userGeometryDesc.TriangleOffset + k) * 3 + 2]);
-                    blasTriangle.GeometryId = userGeometryDesc.MeshId;
+                    blasTriangle.MeshId = userGeometryDesc.MeshId;
                 }
 
                 triangleOffset += userGeometryDesc.TriangleCount;

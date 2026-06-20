@@ -150,8 +150,8 @@ class PathTracer : IDisposable
     private BBG.Buffer wavefrontPTBuffer;
     
     // Ray Sorting
-    private const int GROUP_WISE_PROGRAM_STEPS = 9; // Keep in sync between shader and client code!
-    private const int DOWN_UP_SWEEP_PROGRAM_STEPS = 7; // Keep in sync between shader and client code!
+    private const int GROUP_WISE_PROGRAM_STEPS = 10; // Keep in sync between shader and client code!
+    private const int DOWN_UP_SWEEP_PROGRAM_STEPS = 11; // Keep in sync between shader and client code!
     private const int PREFIX_SUM_CAPACITY = 1 << (DOWN_UP_SWEEP_PROGRAM_STEPS + GROUP_WISE_PROGRAM_STEPS);
 
     private readonly BBG.AbstractShaderProgram reorderProgram;

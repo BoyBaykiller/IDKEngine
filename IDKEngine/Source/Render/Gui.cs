@@ -1534,7 +1534,7 @@ partial class Gui : IDisposable
         {
             t = meshHitInfo.T;
 
-            int meshId = app.ModelManager.BVH.BlasTriangles[meshHitInfo.TriangleId].GeometryId;
+            int meshId = app.ModelManager.BVH.BlasTriangles[meshHitInfo.TriangleId].MeshId;
             int meshTransformId = app.ModelManager.BVH.BlasInstances[meshHitInfo.BlasInstanceId].MeshTransformId;
 
             hitEntity = new SelectedEntityInfo.Mesh(meshId, meshTransformId);

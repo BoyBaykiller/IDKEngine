@@ -25,13 +25,6 @@ void main()
     uint globalOffset = blockOffset + atomicAdd(workGroupPrefixSumSSBO.PrefixSum[key], 1u);
 
     SetItem(globalOffset, item);
-
-    if (invocationId == 0)
-    {
-        // Reset data for next ray bounce
-        wavefrontPTSSBO.RayBoundsMin[wavefrontPTSSBO.PingPongIndex] = Pack(FloatToKey(vec3(FLOAT_MAX)));
-        wavefrontPTSSBO.RayBoundsMax[wavefrontPTSSBO.PingPongIndex] = Pack(FloatToKey(vec3(FLOAT_MIN)));
-    }
 }
 
 uint GetItem(uint index)

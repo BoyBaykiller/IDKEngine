@@ -2030,6 +2030,8 @@ public static unsafe class ModelLoader
         Stopwatch sw = Stopwatch.StartNew();
         if (bakeTopLevelTransform)
         {
+            // TODO: Fix loosing of animations with bakeTopLevelTransform
+
             Node root = model.Nodes[0];
 
             Node artificialRoot = new Node();

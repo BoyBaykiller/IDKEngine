@@ -197,7 +197,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo, out float debugCost, bool traceLight
             {
                 hitInfo.T = tMin < 0.0 ? tMax : tMin;
                 hitInfo.MeshTransformId = i;
-                // hitInfo.TriangleId = ~0u; // Uncomment if moved after geometry test
+                hitInfo.TriangleId = ~0u;
             }
         }
     }

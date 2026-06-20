@@ -121,7 +121,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay)
         if (!hitLight)
         {
             uvec3 indices = blasTriangleSSBO.Triangles[hitInfo.TriangleId].Indices;
-            uint meshId = blasTriangleSSBO.Triangles[hitInfo.TriangleId].GeometryId;
+            uint meshId = blasTriangleSSBO.Triangles[hitInfo.TriangleId].MeshId;
 
             GpuVertex v0 = vertexSSBO.Vertices[indices.x];
             GpuVertex v1 = vertexSSBO.Vertices[indices.y];

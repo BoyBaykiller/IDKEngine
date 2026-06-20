@@ -1,5 +1,6 @@
-#define GROUP_WISE_PROGRAM_STEPS 9 // Keep in sync between shader and client code!
-#define DOWN_UP_SWEEP_PROGRAM_STEPS 7 // Keep in sync between shader and client code!
+#define GROUP_WISE_PROGRAM_STEPS 10 // Keep in sync between shader and client code!
+#define DOWN_UP_SWEEP_PROGRAM_STEPS 11 // Keep in sync between shader and client code!
+#define PREFIX_SUM_BIT_CAPACITY (GROUP_WISE_PROGRAM_STEPS + DOWN_UP_SWEEP_PROGRAM_STEPS)
 
 #define BLOCK_WISE_PROGRAM_LOCAL_SIZE_X (1 << GROUP_WISE_PROGRAM_STEPS)
 #define DOWN_UP_SWEEP_PROGRAM_LOCAL_SIZE_X ((1 << DOWN_UP_SWEEP_PROGRAM_STEPS) / 2)

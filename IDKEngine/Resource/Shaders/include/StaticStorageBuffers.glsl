@@ -146,8 +146,6 @@ layout(std430, binding = 31) restrict buffer AovRaySSBO
 layout(std430, binding = 32) restrict buffer WavefrontPTSSBO
 {
     GpuDispatchCommand DispatchCommand;
-    PackedUVec3 RayBoundsMin[2];
-    PackedUVec3 RayBoundsMax[2];
     uint Counts[2];
     uint PingPongIndex;
     uint AccumulatedSamples;

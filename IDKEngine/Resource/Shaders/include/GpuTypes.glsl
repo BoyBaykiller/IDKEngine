@@ -160,7 +160,7 @@ struct GpuMeshTransform
 struct GpuBlasTriangle
 {
     uvec3 Indices;
-    uint GeometryId;
+    uint MeshId;
 };
 
 struct GpuBlasDesc

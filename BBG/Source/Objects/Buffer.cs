@@ -60,7 +60,7 @@ public static partial class BBG
 
             /// <summary>
             /// The buffer must be written or read by using the Upload/Download functions.
-            /// Synchronization is taken care of by OpenGL.
+            /// Synchronization is taken care of by automatically.
             /// </summary>
             AutoSync = BufferStorageMask.DynamicStorageBit,
         }
