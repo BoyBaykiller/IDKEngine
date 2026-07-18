@@ -75,7 +75,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BBG\BBG.csproj" />
-    <ProjectReference Include="..\Logger\Logger.csproj" />
+    <ProjectReference Include="..\BBLogger\BBLogger.csproj" />
   </ItemGroup>
 
 </Project>

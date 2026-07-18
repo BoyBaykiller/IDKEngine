@@ -65,6 +65,7 @@ public record struct Transformation
 
     public static Transformation FromMatrix(in Matrix4 mat)
     {
+        // TODO: This causes issues in some scenes, e.g: scandinavian-studio.glb (the seats 'mdfitalia')
         Transformation transformation;
         transformation.Scale = mat.ExtractScale();
         transformation.Rotation = mat.ExtractRotation();

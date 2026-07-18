@@ -4,7 +4,8 @@
 #define FLOAT_NAN (0.0 / 0.0)
 
 vec3 GetWorldSpaceDirection(mat4 inverseProj, mat4 inverseView, vec2 ndc)
-{   
+{
+    // TODO: https://momentsingraphics.de/CameraRays.html
     vec4 rayView;
     rayView.xy = mat2(inverseProj) * ndc;
     rayView.z = -1.0;

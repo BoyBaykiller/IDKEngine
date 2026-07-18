@@ -1,4 +1,7 @@
-﻿namespace BBLogger;
+﻿using System;
+using System.IO;
+
+namespace BBLogger;
 
 public static class Logger
 {

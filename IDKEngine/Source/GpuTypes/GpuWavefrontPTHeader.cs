@@ -1,5 +1,4 @@
 ﻿using BBOpenGL;
-using OpenTK.Mathematics;
 
 namespace IDKEngine.GpuTypes;
 

@@ -949,7 +949,7 @@ public static unsafe class ModelLoader
             height = imageHeader.Height;
             levels = GLTexture.GetMaxMipmapLevel(imageHeader.Width, height, 1);
         }
-        else
+        else if (gltfImage.Content.IsKtx2)
         {
             Ktx2.Header header = MemoryMarshal.Cast<byte, Ktx2.Header>(gltfImage.Content.Content.Span)[0];
             Ktx2.ErrorCode errorCode = Ktx2.CheckHeader(ref header, out _);
@@ -975,6 +975,11 @@ public static unsafe class ModelLoader
             width = (int)header.PixelWidth;
             height = (int)header.PixelHeight;
             levels = (int)header.LevelCount;
+        }
+        else
+        {
+            Logger.Log(Logger.LogLevel.Error, $"Unsupported image format: {gltfImage.Content.MimeType}");
+            return false;
         }
 
         bool mipmapsRequired = GLSampler.IsMipmapFilter(sampledImage.SamplerState.MinFilter);
@@ -1246,7 +1251,7 @@ public static unsafe class ModelLoader
                         (VertexData meshVertexData, uint[] meshIndices) = LoadVertexAndIndices(gltf.LogicalAccessors, meshDesc);
                         OptimizeMesh(ref meshVertexData.Vertices, ref meshVertexData.Positons, meshIndices, optimizationSettings);
 
-                        MeshletData meshletData = new MeshletData(); // GenerateMeshlets(meshVertexData.Positons, meshIndices);
+                        MeshletData meshletData = GenerateMeshlets(meshVertexData.Positons, meshIndices);
                         (GpuMeshlet[] meshMeshlets, GpuMeshletInfo[] meshMeshletsInfo) = LoadGpuMeshlets(meshletData, meshVertexData.Positons);
 
                         MeshGeometry meshGeometry = new MeshGeometry();
@@ -1753,8 +1758,8 @@ public static unsafe class ModelLoader
         byte[] meshletsLocalIndices = new byte[maxMeshlets * MESHLET_MAX_TRIANGLE_COUNT * 3];
         nuint meshletCount = Meshopt.BuildMeshlets(
             ref meshlets[0],
-            ref meshletsVertexIndices[0],
-            ref meshletsLocalIndices[0],
+            in meshletsVertexIndices[0],
+            in meshletsLocalIndices[0],
             meshIndices[0],
             (nuint)meshIndices.Length,
             meshVertexPositions[0].X,
