@@ -159,7 +159,7 @@ public static class Helper
         while (true)
         {
             ulong cur = mem;
-            ulong newValue = Math.Max(cur, value);
+            ulong newValue = ulong.Max(cur, value);
             bool written = Interlocked.CompareExchange(ref mem, newValue, cur) == cur;
             if (written)
             {

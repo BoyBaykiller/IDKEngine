@@ -51,8 +51,8 @@ public class CpuLight
 
         // Ideally we would want to have some forces not be effected by drag (such as gravity)
         //const float dragConstant = 0.99f;
-        //float drag = MathF.Log10(dragConstant) * 144.0f;
-        //Velocity *= MathF.Exp(drag * dT); // https://stackoverflow.com/questions/61812575/which-formula-to-use-for-drag-simulation-each-frame
+        //float drag = float.Log10(dragConstant) * 144.0f;
+        //Velocity *= float.Exp(drag * dT); // https://stackoverflow.com/questions/61812575/which-formula-to-use-for-drag-simulation-each-frame
 
         thisFrameAcceleration = new Vector3(0.0f);
     }

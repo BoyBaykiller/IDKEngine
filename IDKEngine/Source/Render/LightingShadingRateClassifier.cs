@@ -97,8 +97,8 @@ class LightingShadingRateClassifier : IDisposable
 
     public void SetSize(Vector2i size)
     {
-        size.X = (int)MathF.Ceiling((float)size.X / TILE_SIZE);
-        size.Y = (int)MathF.Ceiling((float)size.Y / TILE_SIZE);
+        size.X = (int)float.Ceiling((float)size.X / TILE_SIZE);
+        size.Y = (int)float.Ceiling((float)size.Y / TILE_SIZE);
 
         if (Result != null) Result.Dispose();
         Result = new BBG.Texture(BBG.Texture.Type.Texture2D);

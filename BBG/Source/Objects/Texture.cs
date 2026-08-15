@@ -401,7 +401,10 @@ public static partial class BBG
 
         public static int GetMaxMipmapLevel(int width, int height, int depth)
         {
-            return MathF.ILogB(Math.Max(width, Math.Max(height, depth))) + 1;
+            int max = int.Max(width, int.Max(height, depth));
+            int bitWidth = 32 - System.Numerics.BitOperations.LeadingZeroCount((uint)max);
+
+            return bitWidth;
         }
 
         public static Vector3i GetMipmapLevelSize(int width, int height, int depth, int level)

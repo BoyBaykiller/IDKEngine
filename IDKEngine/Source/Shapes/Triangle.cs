@@ -7,7 +7,15 @@ namespace IDKEngine.Shapes;
 
 public record struct Triangle
 {
-    public readonly float Area => Vector3.Cross(Edge01, Edge02).Length * 0.5f;
+    public readonly float Area
+    {
+        // For PreSplitting. Reduces code size
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
+        {
+            return Vector3.Cross(Edge01, Edge02).Length * 0.5f;
+        }
+    }
 
     public readonly Vector3 Normal => Vector3.Normalize(Vector3.Cross(Edge01, Edge02));
 

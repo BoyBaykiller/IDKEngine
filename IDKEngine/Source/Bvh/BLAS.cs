@@ -218,7 +218,7 @@ public static class BLAS
                 parentNode.TriStartOrChild = leftNodeId;
                 parentNode.TriCount = 0;
 
-                if (Math.Min(leftNode.TriCount, rightNode.TriCount) >= THREADED_RECURSION_THRESHOLD)
+                if (int.Min(leftNode.TriCount, rightNode.TriCount) >= THREADED_RECURSION_THRESHOLD)
                 {
                     // Using a thread pool (Task.Run) is slightly faster if we don't do other BLAS builds in other threads.
                     // But when there are enough BLASes to build and we can saturate the cores that way,
@@ -530,7 +530,7 @@ public static class BLAS
 
     public static int GetUpperBoundNodes(int triangleCount)
     {
-        return Math.Max(2 * triangleCount, 4);
+        return int.Max(2 * triangleCount, 4);
     }
 
     public static float ComputeEPOArea(BuildResult blas, Geometry geometry, int subtreeRootId)
@@ -666,7 +666,7 @@ public static class BLAS
 
         int left = ComputeTreeDepth(blas, parent.TriStartOrChild);
         int right = ComputeTreeDepth(blas, parent.TriStartOrChild + 1);
-        return Math.Max(left, right) + 1;
+        return int.Max(left, right) + 1;
     }
 
     public static int ComputeRequiredStackSize(BuildResult blas, int nodeId = 2)
@@ -688,7 +688,7 @@ public static class BLAS
             {
                 int left = ComputeRequiredStackSize(blas, leftNode.TriStartOrChild);
                 int right = ComputeRequiredStackSize(blas, rightNode.TriStartOrChild);
-                return Math.Max(left, right) + 1;
+                return int.Max(left, right) + 1;
             }
             else
             {

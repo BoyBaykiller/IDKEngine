@@ -30,9 +30,9 @@ public static class Compression
 
     public static uint CompressUR11G11B10(Vector3 data)
     {
-        uint r = (uint)MathF.Round(data.X * ((1u << 11) - 1));
-        uint g = (uint)MathF.Round(data.Y * ((1u << 11) - 1));
-        uint b = (uint)MathF.Round(data.Z * ((1u << 10) - 1));
+        uint r = (uint)float.Round(data.X * ((1u << 11) - 1));
+        uint g = (uint)float.Round(data.Y * ((1u << 11) - 1));
+        uint b = (uint)float.Round(data.Z * ((1u << 10) - 1));
 
         uint compressed = b << 22 | g << 11 | r << 0;
 
@@ -41,10 +41,10 @@ public static class Compression
 
     public static uint CompressUR8G8B8A8(Vector4 data)
     {
-        uint r = (uint)MathF.Round(data.X * ((1u << 8) - 1));
-        uint g = (uint)MathF.Round(data.Y * ((1u << 8) - 1));
-        uint b = (uint)MathF.Round(data.Z * ((1u << 8) - 1));
-        uint a = (uint)MathF.Round(data.W * ((1u << 8) - 1));
+        uint r = (uint)float.Round(data.X * ((1u << 8) - 1));
+        uint g = (uint)float.Round(data.Y * ((1u << 8) - 1));
+        uint b = (uint)float.Round(data.Z * ((1u << 8) - 1));
+        uint a = (uint)float.Round(data.W * ((1u << 8) - 1));
 
         uint compressed = a << 24 | b << 16 | g << 8 | r << 0;
 
@@ -58,7 +58,7 @@ public static class Compression
 
     public static Vector2 EncodeUnitVec(Vector3 v)
     {
-        Vector2 p = v.Xy * (1.0f / (MathF.Abs(v.X) + MathF.Abs(v.Y) + MathF.Abs(v.Z)));
+        Vector2 p = v.Xy * (1.0f / (float.Abs(v.X) + float.Abs(v.Y) + float.Abs(v.Z)));
         return (v.Z <= 0.0) ? ((1.0f - Vector2.Abs(p.Yx)) * SignNotZero(p)) : p;
     }
 

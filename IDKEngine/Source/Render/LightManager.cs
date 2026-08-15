@@ -285,7 +285,7 @@ public class LightManager : IDisposable
                             bool invertBias = false;
                             if (thisIntersectionTime < 0.0f)
                             {
-                                if (MathF.Abs(t1) > MathF.Abs(t2))
+                                if (float.Abs(t1) > float.Abs(t2))
                                 {
                                     invertBias = true;
                                     thisIntersectionTime = t2;

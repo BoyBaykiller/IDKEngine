@@ -30,52 +30,52 @@ public static class PreSplitting
         // * https://research.nvidia.com/sites/default/files/pubs/2013-07_Fast-Parallel-Construction/karras2013hpg_paper.pdf
 
         float totalPriority = 0.0f;
+        float[] prios = new float[geometry.TriangleCount];
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
             Triangle triangle = geometry.GetTriangle(i);
-            totalPriority += Priority(triangle);
+            float prio = Priority(triangle);
+            totalPriority += prio;
+            prios[i] = prio;
         }
 
         int counter = 0;
+        int[] splitCounts = new int[geometry.TriangleCount + (int)(geometry.TriangleCount * settings.SplitFactor)];
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
-            Triangle triangle = geometry.GetTriangle(i);
-            float priority = Priority(triangle);
+            float priority = prios[i];
             int splitCount = GetSplitCount(priority, totalPriority, geometry.TriangleCount);
 
             counter += splitCount;
+            splitCounts[i] = splitCount;
         }
 
         Box[] bounds = new Box[counter];
         int[] originalTriIds = new int[counter];
-
-        counter = 0;
-
-        Box globalBox = BLAS.ComputeBoundingBox(0, geometry.TriangleCount, geometry);
-        Vector3 globalSize = globalBox.Size();
-
-        Span<ValueTuple<Box, int>> stack = stackalloc ValueTuple<Box, int>[64];
+        Box globalBox = Box.Empty();
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
-            Triangle triangle = geometry.GetTriangle(i);
+            Box box = Box.From(geometry.GetTriangle(i));
+            bounds[i] = box;
+            originalTriIds[i] = i;
+            globalBox.GrowToFit(box);
+        }
 
-            float priority = Priority(triangle);
-            int splitCount = GetSplitCount(priority, totalPriority, geometry.TriangleCount);
+        Vector3 globalSize = globalBox.Size();
+        counter = geometry.TriangleCount;
 
-            int stackPtr = 0;
-            stack[stackPtr++] = (Box.From(triangle), splitCount);
-            while (stackPtr > 0)
+        for (int i = 0; i < counter; i++)
+        {
+            int splitsLeft = splitCounts[i];
+            if (splitsLeft == 1)
             {
-                (Box parentBox, int splitsLeft) = stack[--stackPtr];
+                continue;
+            }
 
-                if (splitsLeft == 1)
-                {
-                    bounds[counter] = parentBox;
-                    originalTriIds[counter] = i;
-                    counter++;
-                    continue;
-                }
-
+            Box parentBox = bounds[i];
+            int origTriId = originalTriIds[i];
+            while (splitsLeft > 1)
+            {
                 int splitAxis = parentBox.LargestAxis();
                 float largestExtent = parentBox.LargestExtent();
 
@@ -84,12 +84,13 @@ public static class PreSplitting
                 {
                     nodeSize *= 0.5f;
                 }
-
+                
                 // Snap mid position to nearest split plane (still inside parentBox)
-                float midPos = (parentBox.Min[splitAxis] + parentBox.Max[splitAxis]) * 0.5f;
-                float index = MathF.Round((midPos - globalBox.Min[splitAxis]) / nodeSize);
-                float splitPos = globalBox.Min[splitAxis] + index * nodeSize;
-
+                float midPos = (parentBox.SimdMin[splitAxis] + parentBox.SimdMax[splitAxis]) * 0.5f;
+                float index = float.Round((midPos - globalBox.SimdMin[splitAxis]) / nodeSize);
+                float splitPos = globalBox.SimdMin[splitAxis] + index * nodeSize;
+                
+                Triangle triangle = geometry.GetTriangle(origTriId);
                 (Box lBox, Box rBox) = triangle.Split(splitAxis, splitPos);
                 lBox.ClipAgainst(parentBox);
                 rBox.ClipAgainst(parentBox);
@@ -98,14 +99,21 @@ public static class PreSplitting
                 float rightExtent = rBox.LargestExtent();
 
                 int leftCount = (int)(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
-                leftCount = Math.Clamp(leftCount, 1, splitsLeft - 1);
-
+                leftCount = int.Clamp(leftCount, 1, splitsLeft - 1);
                 int rightCount = splitsLeft - leftCount;
 
-                stack[stackPtr++] = (rBox, rightCount);
-                stack[stackPtr++] = (lBox, leftCount);
+                splitsLeft = leftCount;
+                parentBox = lBox;
+
+                bounds[counter] = rBox;
+                originalTriIds[counter] = origTriId;
+                splitCounts[counter] = rightCount;
+                counter++;
             }
+            bounds[i] = parentBox;
         }
+
+        System.Diagnostics.Debug.Assert(counter == bounds.Length);
 
         return (bounds, originalTriIds);
 
@@ -126,7 +134,21 @@ public static class PreSplitting
             float emptyAreaPrio = triBox.Area() - triangle.Area;
 
             // Cbrt to more evenly distribute among triangles
-            return MathF.Cbrt(extentPrio * emptyAreaPrio);
+            return FastCbrt(extentPrio * emptyAreaPrio);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static float FastCbrt(float x)
+        {
+            // Assumes: x >= 0.0
+            uint i = Unsafe.BitCast<float, uint>(x);
+            i = 0x2A51067F + i / 3u;
+            float y = Unsafe.BitCast<uint, float>(i);
+            
+            // Refine with Newton-Raphson iterations
+            y = (2.0f * y + x / (y * y)) * (1.0f / 3.0f);
+
+            return y;
         }
 
         static float GetNodeSize(float extent, float globalSize)
@@ -139,12 +161,8 @@ public static class PreSplitting
             // For alpha between 0.125 and 0.25. level => -3, size => 0.125
             // 
             // In code:
-            // int level = (int)MathF.Floor(MathF.Log2(alpha));
-            // float size = MathF.Pow(2.0f, level);
-            // 
-            // In the paper:
-            // i == level
-            // 2 ^ i == size
+            // int level = (int)float.Floor(float.Log2(alpha));
+            // float size = float.Exp2(level);
 
             // Transform into [0.0, 1.0]
             float alpha = extent / globalSize;

@@ -129,7 +129,7 @@ public static class MyMath
         {
             f /= haltonBase;
             result = result + f * (currentIndex % haltonBase);
-            currentIndex = (int)MathF.Floor((float)currentIndex / haltonBase);
+            currentIndex = (int)float.Floor((float)currentIndex / haltonBase);
         }
 
         return result;
@@ -172,8 +172,8 @@ public static class MyMath
         // elevation = theta
         // length    = rho
 
-        float sinTheta = MathF.Sin(elevation);
-        Vector3 pos = new Vector3(sinTheta * MathF.Cos(azimuth), MathF.Cos(elevation), sinTheta * MathF.Sin(azimuth)) * length;
+        float sinTheta = float.Sin(elevation);
+        Vector3 pos = new Vector3(sinTheta * float.Cos(azimuth), float.Cos(elevation), sinTheta * float.Sin(azimuth)) * length;
         return pos;
     }
 
@@ -231,7 +231,7 @@ public static class MyMath
 
     public static bool AlmostEqual(float a, float b, float epsilon)
     {
-        return MathF.Abs(a - b) < epsilon;
+        return float.Abs(a - b) < epsilon;
     }
 
     public static float Remap(float value, float valueMin, float valueMax, float mapMin, float mapMax)
@@ -289,9 +289,9 @@ public static class MyMath
     {
         unchecked
         {
-            uint x = Math.Clamp((uint)(normalizedV.X * 1024.0f), 0, 1023);
-            uint y = Math.Clamp((uint)(normalizedV.Y * 1024.0f), 0, 1023);
-            uint z = Math.Clamp((uint)(normalizedV.Z * 1024.0f), 0, 1023);
+            uint x = uint.Clamp((uint)(normalizedV.X * 1024.0f), 0, 1023);
+            uint y = uint.Clamp((uint)(normalizedV.Y * 1024.0f), 0, 1023);
+            uint z = uint.Clamp((uint)(normalizedV.Z * 1024.0f), 0, 1023);
 
             uint xx = InsertTwoZerosAfterEachBit(x);
             uint yy = InsertTwoZerosAfterEachBit(y);

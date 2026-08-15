@@ -110,7 +110,7 @@ class FSR2Wrapper : IDisposable
 
     public static float GetRecommendedMipmapBias(int renderWidth, int displayWith)
     {
-        return MathF.Log2((float)renderWidth / displayWith) - 1.0f;
+        return float.Log2((float)renderWidth / displayWith) - 1.0f;
     }
 
     [UnmanagedCallersOnly]

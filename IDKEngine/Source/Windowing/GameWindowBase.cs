@@ -178,7 +178,7 @@ abstract unsafe class GameWindowBase : IDisposable
             float timeToSimulate = frameTime;
             while (timeToSimulate > 0.0f)
             {
-                float thisDt = Math.Min(timeToSimulate, maxDt);
+                float thisDt = float.Min(timeToSimulate, maxDt);
 
                 KeyboardState.Update();
                 MouseState.Update();

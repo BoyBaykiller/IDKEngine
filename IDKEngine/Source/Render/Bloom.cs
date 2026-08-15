@@ -128,10 +128,10 @@ class Bloom : IDisposable
 
     public void SetSize(Vector2i size)
     {
-        size.X = (int)MathF.Ceiling(size.X / 2);
-        size.Y = (int)MathF.Ceiling(size.Y / 2);
+        size.X = (int)float.Ceiling(size.X / 2.0f);
+        size.Y = (int)float.Ceiling(size.Y / 2.0f);
 
-        int levels = Math.Max(BBG.Texture.GetMaxMipmapLevel(size.X, size.Y, 1) - MinusLods, 2);
+        int levels = int.Max(BBG.Texture.GetMaxMipmapLevel(size.X, size.Y, 1) - MinusLods, 2);
 
         if (downscaleTexture != null) downscaleTexture.Dispose();
         downscaleTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);

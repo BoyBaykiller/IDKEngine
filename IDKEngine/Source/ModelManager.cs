@@ -404,8 +404,8 @@ public unsafe class ModelManager : IDisposable
         int max = 0;
         for (int i = meshRange.Start; i < meshRange.End; i++)
         {
-            min = Math.Min(min, Meshes[i].MaterialId);
-            max = Math.Max(max, Meshes[i].MaterialId);
+            min = int.Min(min, Meshes[i].MaterialId);
+            max = int.Max(max, Meshes[i].MaterialId);
         }
 
         return new Range(min, max - min + 1);
@@ -456,7 +456,7 @@ public unsafe class ModelManager : IDisposable
             if (meshTransformsDirty[i])
             {
                 int batchStart = i;
-                int batchEnd = Math.Min(MyMath.NextMultiple(i, batchedUploadSize), end);
+                int batchEnd = int.Min(MyMath.NextMultiple(i, batchedUploadSize), end);
 
                 UploadMeshTransformBuffer(batchStart, batchEnd - batchStart);
                 for (int j = batchStart; j < batchEnd; j++)
@@ -540,7 +540,7 @@ public unsafe class ModelManager : IDisposable
                     }
 
                     int index = Algorithms.SortedLowerBound(nodeAnimation.KeyFramesStart, animationTime, MyComparer.LessThan);
-                    index = Math.Max(index, 1);
+                    index = int.Max(index, 1);
 
                     float prevT = nodeAnimation.KeyFramesStart[index - 1];
                     float nextT = nodeAnimation.KeyFramesStart[index];
@@ -788,8 +788,8 @@ public unsafe class ModelManager : IDisposable
         {
             if (node.HasMeshes)
             {
-                min = Math.Min(min, node.MeshRange.Start);
-                max = Math.Max(max, node.MeshRange.End);
+                min = int.Min(min, node.MeshRange.Start);
+                max = int.Max(max, node.MeshRange.End);
             }
         });
 

@@ -34,8 +34,8 @@ public record struct Range
     public readonly bool Overlaps(Range range, out Range overlap)
     {
         overlap = new Range();
-        overlap.Start = Math.Max(Start, range.Start);
-        overlap.End = Math.Min(End, range.End);
+        overlap.Start = int.Max(Start, range.Start);
+        overlap.End = int.Min(End, range.End);
         return overlap.Count > 0;
     }
 

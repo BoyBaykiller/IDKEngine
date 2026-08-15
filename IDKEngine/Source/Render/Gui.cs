@@ -254,7 +254,7 @@ partial class Gui : IDisposable
 
                 if (ImGui.InputInt("Recording FPS", ref app.RecorderVars.FPSGoal))
                 {
-                    app.RecorderVars.FPSGoal = Math.Max(5, app.RecorderVars.FPSGoal);
+                    app.RecorderVars.FPSGoal = int.Max(5, app.RecorderVars.FPSGoal);
                 }
 
                 if (app.RecorderVars.State == Application.FrameRecorderState.Recording)
@@ -286,7 +286,7 @@ partial class Gui : IDisposable
                 ToolTipForItemAboveHovered("When enabled rendered images are saved into a folder.");
 
                 tempInt = app.FrameStateRecorder.ReplayStateIndex;
-                if (ImGui.SliderInt("ReplayFrame", ref tempInt, 0, Math.Max(app.FrameStateRecorder.Count - 1, 0)))
+                if (ImGui.SliderInt("ReplayFrame", ref tempInt, 0, int.Max(app.FrameStateRecorder.Count - 1, 0)))
                 {
                     app.FrameStateRecorder.ReplayStateIndex = tempInt;
 
@@ -299,7 +299,7 @@ partial class Gui : IDisposable
                     tempInt = app.RecorderVars.PathTracerSamples;
                     if (ImGui.InputInt("SamplesPerPixel", ref tempInt))
                     {
-                        app.RecorderVars.PathTracerSamples = Math.Max(1, tempInt);
+                        app.RecorderVars.PathTracerSamples = int.Max(1, tempInt);
                     }
 
 
@@ -642,7 +642,7 @@ partial class Gui : IDisposable
                         tempFloat = app.VolumetricLight.ResolutionScale;
                         if (ImGui.SliderFloat("ResolutionScale##SamplesVolumetricLight", ref tempFloat, 0.1f, 1.0f))
                         {
-                            app.VolumetricLight.ResolutionScale = MathF.Max(tempFloat, 0.1f);
+                            app.VolumetricLight.ResolutionScale = float.Max(tempFloat, 0.1f);
                         }
 
                         ImGui.SliderInt("Samples##SamplesVolumetricLight", ref app.VolumetricLight.Settings.SampleCount, 1, 30);
@@ -1162,7 +1162,7 @@ partial class Gui : IDisposable
                         tempInt = pointShadow.ShadowMap.Width;
                         if (ImGui.InputInt("Resolution", ref tempInt))
                         {
-                            pointShadow.SetSizeShadowMap(Math.Max(tempInt, 1));
+                            pointShadow.SetSizeShadowMap(int.Max(tempInt, 1));
                         }
 
                         tempVec2 = pointShadow.ClippingPlanes.ToNumerics();
@@ -1187,7 +1187,7 @@ partial class Gui : IDisposable
 
             if (SelectedEntity is SelectedEntityInfo.Mesh || SelectedEntity is SelectedEntityInfo.Light)
             {
-                ImGui.Text($"Distance {MathF.Round(clickedEntityDistance, 3)}");
+                ImGui.Text($"Distance {float.Round(clickedEntityDistance, 3)}");
             }
 
             bool RenderTransformPanel(ref Transformation transform)
@@ -1612,7 +1612,7 @@ partial class Gui
             public LoadingTask(string modelPath)
             {
                 CompressGltfSettings = new ModelLoader.GtlfpackWrapper.GltfpackSettings();
-                CompressGltfSettings.ThreadsUsed = Math.Max(Environment.ProcessorCount, 1);
+                CompressGltfSettings.ThreadsUsed = int.Max(Environment.ProcessorCount, 1);
                 CompressGltfSettings.UseInstancing = true;
                 CompressGltfSettings.InputPath = modelPath;
 

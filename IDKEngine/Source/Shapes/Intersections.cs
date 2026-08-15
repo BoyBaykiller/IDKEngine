@@ -33,7 +33,7 @@ public static class Intersections
     {
         Vector3 ab = b - a;
         float t = Vector3.Dot(point - a, ab) / Vector3.Dot(ab, ab);
-        return a + Math.Clamp(t, 0.0f, 1.0f) * ab;
+        return a + float.ClampNative(t, 0.0f, 1.0f) * ab;
     }
     public static Vector3 TriangleClosestPoint(in Triangle triangle, Vector3 point)
     {
@@ -182,7 +182,7 @@ public static class Intersections
         var p1 = Vector3.Dot(v1, a00);
         var p2 = Vector3.Dot(v2, a00);
         var halfSize = box.HalfSize();
-        var r = halfSize.Y * MathF.Abs(f0.Z) + halfSize.Z * MathF.Abs(f0.Y);
+        var r = halfSize.Y * float.Abs(f0.Z) + halfSize.Z * float.Abs(f0.Y);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -193,7 +193,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a01);
         p1 = Vector3.Dot(v1, a01);
         p2 = Vector3.Dot(v2, a01);
-        r = halfSize.Y * MathF.Abs(f1.Z) + halfSize.Z * MathF.Abs(f1.Y);
+        r = halfSize.Y * float.Abs(f1.Z) + halfSize.Z * float.Abs(f1.Y);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -204,7 +204,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a02);
         p1 = Vector3.Dot(v1, a02);
         p2 = Vector3.Dot(v2, a02);
-        r = halfSize.Y * MathF.Abs(f2.Z) + halfSize.Z * MathF.Abs(f2.Y);
+        r = halfSize.Y * float.Abs(f2.Z) + halfSize.Z * float.Abs(f2.Y);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -215,7 +215,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a10);
         p1 = Vector3.Dot(v1, a10);
         p2 = Vector3.Dot(v2, a10);
-        r = halfSize.X * MathF.Abs(f0.Z) + halfSize.Z * MathF.Abs(f0.X);
+        r = halfSize.X * float.Abs(f0.Z) + halfSize.Z * float.Abs(f0.X);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -226,7 +226,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a11);
         p1 = Vector3.Dot(v1, a11);
         p2 = Vector3.Dot(v2, a11);
-        r = halfSize.X * MathF.Abs(f1.Z) + halfSize.Z * MathF.Abs(f1.X);
+        r = halfSize.X * float.Abs(f1.Z) + halfSize.Z * float.Abs(f1.X);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -237,7 +237,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a12);
         p1 = Vector3.Dot(v1, a12);
         p2 = Vector3.Dot(v2, a12);
-        r = halfSize.X * MathF.Abs(f2.Z) + halfSize.Z * MathF.Abs(f2.X);
+        r = halfSize.X * float.Abs(f2.Z) + halfSize.Z * float.Abs(f2.X);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -248,7 +248,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a20);
         p1 = Vector3.Dot(v1, a20);
         p2 = Vector3.Dot(v2, a20);
-        r = halfSize.X * MathF.Abs(f0.Y) + halfSize.Y * MathF.Abs(f0.X);
+        r = halfSize.X * float.Abs(f0.Y) + halfSize.Y * float.Abs(f0.X);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -259,7 +259,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a21);
         p1 = Vector3.Dot(v1, a21);
         p2 = Vector3.Dot(v2, a21);
-        r = halfSize.X * MathF.Abs(f1.Y) + halfSize.Y * MathF.Abs(f1.X);
+        r = halfSize.X * float.Abs(f1.Y) + halfSize.Y * float.Abs(f1.X);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -270,7 +270,7 @@ public static class Intersections
         p0 = Vector3.Dot(v0, a22);
         p1 = Vector3.Dot(v1, a22);
         p2 = Vector3.Dot(v2, a22);
-        r = halfSize.X * MathF.Abs(f2.Y) + halfSize.Y * MathF.Abs(f2.X);
+        r = halfSize.X * float.Abs(f2.Y) + halfSize.Y * float.Abs(f2.X);
         if (float.MaxNative(-Max3(p0, p1, p2), Min3(p0, p1, p2)) > r)
         {
             return false;
@@ -307,7 +307,7 @@ public static class Intersections
         var planeDistance = Vector3.Dot(planeNormal, v0);
 
         // Compute the projection interval radius of b onto L(t) = b.c + t * p.n
-        r = halfSize.X * MathF.Abs(planeNormal.X) + halfSize.Y * MathF.Abs(planeNormal.Y) + halfSize.Z * MathF.Abs(planeNormal.Z);
+        r = halfSize.X * float.Abs(planeNormal.X) + halfSize.Y * float.Abs(planeNormal.Y) + halfSize.Z * float.Abs(planeNormal.Z);
 
         // Intersection occurs when plane distance falls within [-r,+r] interval
         if (planeDistance > r)
@@ -353,7 +353,7 @@ public static class Intersections
             return false;
         }
 
-        float squareRoot = MathF.Sqrt(discriminant);
+        float squareRoot = float.Sqrt(discriminant);
         t1 = (-b - squareRoot) / a;
         t2 = (-b + squareRoot) / a;
 
@@ -411,7 +411,7 @@ public static class Intersections
             return false;
         }
 
-        tScale = MathF.Sqrt(lenSquared);
+        tScale = float.Sqrt(lenSquared);
         Ray ray = new Ray(sphereAPrevPos, path / tScale);
 
         float combinedRadius = sphereA.Radius + sphereB.Radius;
@@ -567,7 +567,7 @@ public static class Intersections
                 if (cosTheta < 0.0f)
                 {
                     triFaceNormal *= -1.0f;
-                    cosTheta = MathF.Abs(cosTheta);
+                    cosTheta = float.Abs(cosTheta);
                 }
 
                 thisSceneHitInfo.SlidingPlane = new Plane(hitPointToSphereDir);

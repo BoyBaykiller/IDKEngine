@@ -66,8 +66,8 @@ public static class TLAS
             for (int i = 0; i < activeRangeCount; i++)
             {
                 int nodeAId = activeRangeStart + i;
-                int searchStart = Math.Max(nodeAId - buildSettings.SearchRadius, activeRangeStart);
-                int searchEnd = Math.Min(nodeAId + buildSettings.SearchRadius + 1, activeRangeEnd);
+                int searchStart = int.Max(nodeAId - buildSettings.SearchRadius, activeRangeStart);
+                int searchEnd = int.Min(nodeAId + buildSettings.SearchRadius + 1, activeRangeEnd);
                 int nodeBId = FindBestMatch(nodes, searchStart, searchEnd, nodeAId);
                 int nodeBIdLocal = nodeBId - activeRangeStart;
                 preferedNbors[i] = nodeBIdLocal;
@@ -265,7 +265,7 @@ public static class TLAS
 
     public static GpuTlasNode[] AllocateRequiredNodes(int leafNodesCount)
     {
-        return new GpuTlasNode[Math.Max(2 * leafNodesCount - 1, 0)];
+        return new GpuTlasNode[int.Max(2 * leafNodesCount - 1, 0)];
     }
 
     private static int FindBestMatch(ReadOnlySpan<GpuTlasNode> nodes, int start, int end, int nodeIndex)

@@ -561,7 +561,7 @@ public class BVH : IDisposable
         int max = 0;
         for (int i = 0; i < BlasesDesc.Length; i++)
         {
-            max = Math.Max(max, BlasesDesc[i].RequiredStackSize);
+            max = int.Max(max, BlasesDesc[i].RequiredStackSize);
         }
         BlasStackSize = max;
     }

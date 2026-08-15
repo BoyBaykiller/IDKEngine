@@ -454,7 +454,7 @@ struct BuildData
 }
 ```
 
-All left primitive indices are flagged as `true` and right `false`. When we `StablePartition` the two primitive indices array it will move all elements for which `PartitionLeft[input[i]]` is `true` first, in order:
+All left primitive indices are flagged as `true` and right `false`. When we `StablePartition` the two primitive indices arrays it will move all elements for which `PartitionLeft[input[i]]` is `true` first, in order:
 ```cs
 // Mark on which side primitive references are
 for (int i = start; i < bestSplit.SplitIndex; i++)
@@ -488,7 +488,7 @@ A O(N) stable partition needs to allocate a temporary buffer of `N` items. We al
 #### Codegen
 
 The box is padded to 16 bytes for efficient vectorization using SSE instructions. 
-The `Grow` procedure is accelerated with vector min & max (`vminps` + `vmaxps`). For `HalfArea()`, a vector subtract (`vsubps`) gets the size on all dimensions and fused multiply-add (`vfmadd231ss`) is used to get the area. Methods are all inlined.
+The `Grow` procedure is accelerated with vector min & max (`vminps` + `vmaxps`). For `HalfArea()`, a vector subtract (`vsubps`) gets the size on all dimensions and fused multiply-add (`vfmadd231ss`) is used to get the area. All methods are inlined.
 
 #### Sorting
 
@@ -603,7 +603,7 @@ float Priority(Triangle triangle)
     float emptyAreaPrio = triBox.Area() - triangle.Area;
 
     // Cbrt to more evenly distribute among triangles
-    return MathF.Cbrt(extentPrio * emptyAreaPrio);
+    return float.Cbrt(extentPrio * emptyAreaPrio);
 }
 ```
 This prioritizes large triangles whos bounding box contains lots of empty space. The empty space term is specifically for rotated geometry, because AABBs (unlike OOBs) tend to be a poor fit for rotated geometry causing empty space. It's possible that a BVH using OBBs would not require this term.
@@ -678,8 +678,8 @@ Let the scene extents be normalized to range [0.0, 1.0]. We know,
 Now, let's say the normalized largest extent of a triangle is 0.6, named `alpha`. That means it must straddle the first level split plane because it can't fit into the 0.5-sized node.
 It also straddles lower level split planes, but we don't care about those. We only care about the largest node size that is still smaller than `alpha` which can be computed as follows:
 ```cs
-int level = (int)MathF.Floor(MathF.Log2(alpha));
-float size = MathF.Pow(2.0f, level);
+int level = (int)float.Floor(float.Log2(alpha));
+float size = float.Exp2(level);
 ```
 This chain of operations happens to be equivalent to extracting the exponent bits of a IEEE-754 floating point number. So my final optimized implementation looks like this:
 ```cs
@@ -713,7 +713,7 @@ float nodeSize = GetNodeSize(largestExtent, globalSize[splitAxis]);
 
 // Snap mid position to nearest split plane (still inside parentBox)
 float midPos = (parentBox.Min[splitAxis] + parentBox.Max[splitAxis]) * 0.5f;
-float index = MathF.Round((midPos - globalBox.Min[splitAxis]) / nodeSize);
+float index = float.Round((midPos - globalBox.Min[splitAxis]) / nodeSize);
 float splitPos = globalBox.Min[splitAxis] + index * nodeSize;
 ```
 
@@ -745,8 +745,8 @@ Then the split count is fairly distributed among the new primitives/boxes based 
 float leftExtent = lBox.LargestExtent();
 float rightExtent = rBox.LargestExtent();
 
-int leftCount = (int)MathF.Round(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
-leftCount = Math.Clamp(leftCount, 1, splitsLeft - 1);
+int leftCount = (int)float.Round(splitsLeft * (leftExtent / (leftExtent + rightExtent)));
+leftCount = int.Clamp(leftCount, 1, splitsLeft - 1);
 
 int rightCount = splitsLeft - leftCount;
 

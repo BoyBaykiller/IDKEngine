@@ -17,8 +17,8 @@ public static class GeometricPrimitives
         {
             // Source: https://gist.github.com/Pikachuxxxx/5c4c490a7d7679824e0e18af42918efc
 
-            longitudes = Math.Max(longitudes, 3);
-            latitudes = Math.Max(latitudes, 2);
+            longitudes = int.Max(longitudes, 3);
+            latitudes = int.Max(latitudes, 2);
 
             List<Vertex> vertices = new List<Vertex>((latitudes + 1) * (longitudes + 1));
 
@@ -28,16 +28,16 @@ public static class GeometricPrimitives
             for (int i = 0; i <= latitudes; i++)
             {
                 float latitudeAngle = MathF.PI / 2 - i * deltaLatitude;
-                float xy = radius * MathF.Cos(latitudeAngle);
-                float z = radius * MathF.Sin(latitudeAngle);
+                float xy = radius * float.Cos(latitudeAngle);
+                float z = radius * float.Sin(latitudeAngle);
 
                 for (int j = 0; j <= longitudes; j++)
                 {
                     float longitudeAngle = j * deltaLongitude;
 
                     Vertex vertex;
-                    vertex.Position.X = xy * MathF.Cos(longitudeAngle);
-                    vertex.Position.Y = xy * MathF.Sin(longitudeAngle);
+                    vertex.Position.X = xy * float.Cos(longitudeAngle);
+                    vertex.Position.Y = xy * float.Sin(longitudeAngle);
                     vertex.Position.Z = z;
 
                     vertex.TexCoord.X = (float)j / longitudes;
