@@ -188,7 +188,7 @@ public static class BLAS
         //blas.RequiredStackSize = ComputeRequiredStackSize(blas);
 
         // Multithreaded building logic places nodes as if 1PPL was given which causes empty spots in the array.
-        // An atomic counter could be used to add nodes, but that gives uncoherent and undeterministic ordering.
+        // An atomic counter could be used to add nodes, but that gives incoherent and nondeterministic ordering.
         // In addition OptimizeStackSize does node collapse which also causes empty subtrees. So let's compact.
         int nodeCount = RemoveEmptySubtrees(blas);
 

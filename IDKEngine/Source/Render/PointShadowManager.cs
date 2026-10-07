@@ -25,21 +25,20 @@ class PointShadowManager : IDisposable
 
     private readonly CpuPointShadow[] pointShadows;
     private readonly BBG.AbstractShaderProgram rayTracedShadowsProgram;
-    private readonly BBG.TypedBuffer<GpuPointShadow> pointShadowsBuffer;
+    private readonly BBG.Buffer pointShadowsBuffer;
     public unsafe PointShadowManager()
     {
         pointShadows = new CpuPointShadow[GPU_MAX_UBO_POINT_SHADOW_COUNT];
 
         rayTracedShadowsProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "ShadowsRayTraced/compute.glsl"));
 
-        pointShadowsBuffer = new BBG.TypedBuffer<GpuPointShadow>();
-        pointShadowsBuffer.Allocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
+        pointShadowsBuffer = new BBG.Buffer(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, GPU_MAX_UBO_POINT_SHADOW_COUNT * sizeof(GpuPointShadow) + sizeof(int));
         FSR2WorkaroundRebindUBO();
     }
 
     public void FSR2WorkaroundRebindUBO()
     {
-        pointShadowsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
+        pointShadowsBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 3);
     }
 
     public void RenderShadowMaps(ModelManager modelManager, Camera camera)
@@ -122,7 +121,7 @@ class PointShadowManager : IDisposable
         }
     }
 
-    private void UploadPointShadow(int index)
+    private unsafe void UploadPointShadow(int index)
     {
         if (!TryGetPointShadow(index, out CpuPointShadow pointShadow))
         {
@@ -130,7 +129,7 @@ class PointShadowManager : IDisposable
             return;
         }
 
-        pointShadowsBuffer.UploadElements(pointShadow.GetGpuPointShadow(), index);
+        pointShadowsBuffer.UploadData(index * sizeof(GpuPointShadow), sizeof(GpuPointShadow), pointShadow.GetGpuPointShadow());
     }
 
     public bool TryGetPointShadow(int index, out CpuPointShadow pointShadow)

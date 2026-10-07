@@ -79,45 +79,15 @@ public unsafe class ModelManager : IDisposable
 
     public ModelManager()
     {
-        drawCommandBuffer = new BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>();
-        meshesBuffer = new BBG.TypedBuffer<GpuMesh>();
-        materialsBuffer = new BBG.TypedBuffer<GpuMaterial>();
-        meshTransformBuffer = new BBG.TypedBuffer<GpuMeshTransform>();
-        meshInstanceBuffer = new BBG.TypedBuffer<GpuMeshInstance>();
-        visibleMeshInstanceIdBuffer = new BBG.TypedBuffer<uint>();
-        vertexBuffer = new BBG.TypedBuffer<GpuVertex>();
-        vertexPositionsBuffer = new BBG.TypedBuffer<Vector3>();
-        vertexIndicesBuffer = new BBG.TypedBuffer<uint>();
-        meshletTasksCmdsBuffer = new BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV>();
-        meshletTasksCountBuffer = new BBG.TypedBuffer<uint>();
+        meshletTasksCountBuffer = new BBG.TypedBuffer<uint>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+        meshletTasksCountBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 10);
+
+        vertexPositionsHostBuffer = new BBG.TypedBuffer<Vector3>();
         meshletBuffer = new BBG.TypedBuffer<GpuMeshlet>();
         meshletInfoBuffer = new BBG.TypedBuffer<GpuMeshletInfo>();
         meshletsVertexIndicesBuffer = new BBG.TypedBuffer<uint>();
         meshletsLocalIndicesBuffer = new BBG.TypedBuffer<byte>();
-        jointMatricesBuffer = new BBG.TypedBuffer<Matrix3x4>();
         unskinnedVerticesBuffer = new BBG.TypedBuffer<GpuUnskinnedVertex>();
-        vertexPositionsHostBuffer = new BBG.TypedBuffer<Vector3>();
-        prevVertexPositionsBuffer = new BBG.TypedBuffer<Vector3>();
-
-        drawCommandBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 1);
-        meshesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 2);
-        materialsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 3);
-        meshTransformBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 4);
-        meshInstanceBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 5);
-        visibleMeshInstanceIdBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 6);
-        vertexBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 7);
-        vertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 8);
-        meshletTasksCmdsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 9);
-        meshletTasksCountBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 10);
-        meshletBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 11);
-        meshletInfoBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 12);
-        meshletsVertexIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 13);
-        meshletsLocalIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 14);
-        jointMatricesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 15);
-        unskinnedVerticesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 16);
-        prevVertexPositionsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 17);
-
-        meshletTasksCountBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
 
         BVH = new BVH();
 
@@ -598,25 +568,76 @@ public unsafe class ModelManager : IDisposable
         ReadOnlySpan<byte> meshletsLocalIndices,
         ReadOnlySpan<GpuUnskinnedVertex> unskinnedVertices)
     {
-        BBG.Buffer.Recreate(ref drawCommandBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, DrawCommands);
-        BBG.Buffer.Recreate(ref meshesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, Meshes);
-        BBG.Buffer.Recreate(ref materialsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, GpuMaterials);
-        BBG.Buffer.Recreate(ref meshTransformBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshTransforms);
-        BBG.Buffer.Recreate(ref meshInstanceBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshInstances);
-        BBG.Buffer.Recreate(ref vertexBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, Vertices);
-        BBG.Buffer.Recreate(ref vertexPositionsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertexPositions);
-        BBG.Buffer.Recreate(ref vertexPositionsHostBuffer, BBG.Buffer.MemLocation.HostLocal, BBG.Buffer.MemAccess.MappedCoherent, vertexPositions);
+        drawCommandBuffer?.Dispose();
+        drawCommandBuffer = BBG.TypedBuffer<BBG.DrawElementsIndirectCommand>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, DrawCommands);
+        drawCommandBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 1);
+
+        meshesBuffer?.Dispose();
+        meshesBuffer = BBG.TypedBuffer<GpuMesh>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, Meshes);
+        meshesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 2);
+
+        materialsBuffer?.Dispose();
+        materialsBuffer = BBG.TypedBuffer<GpuMaterial>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, GpuMaterials);
+        materialsBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 3);
+
+        meshTransformBuffer?.Dispose();
+        meshTransformBuffer = BBG.TypedBuffer<GpuMeshTransform>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshTransforms);
+        meshTransformBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 4);
+
+        meshInstanceBuffer?.Dispose();
+        meshInstanceBuffer = BBG.TypedBuffer<GpuMeshInstance>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshInstances);
+        meshInstanceBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 5);
+
+        visibleMeshInstanceIdBuffer?.Dispose();
+        visibleMeshInstanceIdBuffer = new BBG.TypedBuffer<uint>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshInstances.Length * 6);
+        visibleMeshInstanceIdBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 6);
+
+        vertexBuffer?.Dispose();
+        vertexBuffer = BBG.TypedBuffer<GpuVertex>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, Vertices);
+        vertexBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 7);
+
+        vertexPositionsBuffer?.Dispose();
+        vertexPositionsBuffer = BBG.TypedBuffer<Vector3>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertexPositions);
+        vertexPositionsBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 8);
+
+        vertexPositionsHostBuffer?.Dispose();
+        vertexPositionsHostBuffer = BBG.TypedBuffer<Vector3>.FromData(BBG.Buffer.MemLocation.HostLocal, BBG.Buffer.MemAccess.MappedCoherent, vertexPositions);
         VertexPositions = new NativeMemoryView<Vector3>(vertexPositionsHostBuffer.Memory, vertexPositionsHostBuffer.NumElements);
-        BBG.Buffer.Recreate(ref vertexIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, VertexIndices);
-        BBG.Buffer.Recreate(ref meshletBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshlets);
-        BBG.Buffer.Recreate(ref meshletInfoBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsInfo);
-        BBG.Buffer.Recreate(ref meshletsVertexIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsVertexIndices);
-        BBG.Buffer.Recreate(ref meshletsLocalIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsLocalIndices);
-        BBG.Buffer.Recreate(ref jointMatricesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, JointMatrices);
-        BBG.Buffer.Recreate(ref unskinnedVerticesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, unskinnedVertices);
-        BBG.Buffer.Recreate(ref visibleMeshInstanceIdBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshInstances.Length * 6);
-        BBG.Buffer.Recreate(ref meshletTasksCmdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshInstances.Length * 6);
-        BBG.Buffer.Recreate(ref prevVertexPositionsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertexPositions);
+
+        vertexIndicesBuffer?.Dispose();
+        vertexIndicesBuffer = BBG.TypedBuffer<uint>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, VertexIndices);
+
+        meshletTasksCmdsBuffer?.Dispose();
+        meshletTasksCmdsBuffer = new BBG.TypedBuffer<BBG.DrawMeshTasksIndirectCommandNV>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MeshInstances.Length * 6);
+        meshletTasksCmdsBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 9);
+
+        meshletBuffer?.Dispose();
+        meshletBuffer = BBG.TypedBuffer<GpuMeshlet>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshlets);
+        meshletBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 11);
+
+        meshletInfoBuffer?.Dispose();
+        meshletInfoBuffer = BBG.TypedBuffer<GpuMeshletInfo>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsInfo);
+        meshletInfoBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 12);
+
+        meshletsVertexIndicesBuffer?.Dispose();
+        meshletsVertexIndicesBuffer = BBG.TypedBuffer<uint>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync,meshletsVertexIndices);
+        meshletsVertexIndicesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 13);
+
+        meshletsLocalIndicesBuffer?.Dispose();
+        meshletsLocalIndicesBuffer = BBG.TypedBuffer<byte>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, meshletsLocalIndices);
+        meshletsLocalIndicesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 14);
+
+        jointMatricesBuffer?.Dispose();
+        jointMatricesBuffer = BBG.TypedBuffer<Matrix3x4>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, JointMatrices);
+        jointMatricesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 15);
+
+        unskinnedVerticesBuffer?.Dispose();
+        unskinnedVerticesBuffer = BBG.TypedBuffer<GpuUnskinnedVertex>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, unskinnedVertices);
+        unskinnedVerticesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 16);
+
+        prevVertexPositionsBuffer?.Dispose();
+        prevVertexPositionsBuffer = BBG.TypedBuffer<Vector3>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertexPositions);
+        prevVertexPositionsBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 17);
     }
 
     private SkinningCmd[] GetSkinningCommands(out int numJoints, ReadOnlySpan<Vector3> vertexPositions)

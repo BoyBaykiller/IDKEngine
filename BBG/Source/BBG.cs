@@ -139,8 +139,7 @@ public static partial class BBG
         // set default graphics pipeline state
         Rendering.SetGraphicsPipelineState(new Rendering.GraphicsPipelineState());
 
-        globalUniformBuffer = new Buffer();
-        globalUniformBuffer.Allocate(Buffer.MemLocation.DeviceLocal, Buffer.MemAccess.AutoSync, 1 << 12);
+        globalUniformBuffer = new Buffer(Buffer.MemLocation.DeviceLocal, Buffer.MemAccess.AutoSync, 1 << 12);
 
         contextInfo.APIName = GL.GetString(StringName.Version);
         contextInfo.GLVersion = Convert.ToInt32($"{GL.GetInteger(GetPName.MajorVersion)}{GL.GetInteger(GetPName.MinorVersion)}") / 10.0;

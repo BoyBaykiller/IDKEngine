@@ -213,13 +213,11 @@ class RasterPipeline : IDisposable
         Voxelizer = new Voxelizer(256, 256, 256, new Vector3(-28.0f, -3.0f, -17.0f), new Vector3(28.0f, 20.0f, 17.0f));
         ConeTracer = new ConeTracer(renderSize, new ConeTracer.GpuSettings());
 
-        taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>();
-        taaDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-        taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
+        taaDataBuffer = new BBG.TypedBuffer<GpuTaaData>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+        taaDataBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
 
-        bindlessGBufferBuffer = new BBG.TypedBuffer<GpuBindlessGBuffer>();
-        bindlessGBufferBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-        bindlessGBufferBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
+        bindlessGBufferBuffer = new BBG.TypedBuffer<GpuBindlessGBuffer>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+        bindlessGBufferBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 7);
 
         SetSize(renderSize, presentationSize);
 
@@ -618,7 +616,7 @@ class RasterPipeline : IDisposable
 
             // This is a hack to fix global UBO bindings modified by FSR2
             lightManager.FSR2WorkaroundRebindUBO(); // binding 3
-            taaDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
+            taaDataBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 4);
             SkyBoxManager.FSR2WorkaroundRebindUBO(); // binding 5
             Voxelizer.FSR2WorkaroundRebindUBO(); // binding 6
         }

@@ -1074,9 +1074,7 @@ public static unsafe class ModelLoader
                 };
                 imageHeader.SetChannels(loadComponents);
 
-                BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>();
-                stagingBuffer.AllocateElements(BBG.Buffer.MemLocation.HostLocal, BBG.Buffer.MemAccess.MappedIncoherent, imageHeader.SizeInBytes);
-
+                BBG.TypedBuffer<byte> stagingBuffer = new BBG.TypedBuffer<byte>(BBG.Buffer.MemLocation.HostLocal, BBG.Buffer.MemAccess.MappedIncoherent, imageHeader.SizeInBytes);
                 Task.Run(() =>
                 {
                     {

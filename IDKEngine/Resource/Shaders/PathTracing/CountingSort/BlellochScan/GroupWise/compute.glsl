@@ -4,7 +4,7 @@
 AppInclude(include/StaticStorageBuffers.glsl)
 AppInclude(PathTracing/CountingSort/BlellochScan/include/Constants.glsl)
 
-layout(local_size_x = BLOCK_WISE_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = GROUP_WISE_PROGRAM_LOCAL_SIZE_X, local_size_y = 1, local_size_z = 1) in;
 
 shared uint SharedSubgroupSumsPrefixSum[gl_WorkGroupSize.x / MIN_SUBGROUP_SIZE];
 shared uint SharedGroupPrefixSums[gl_WorkGroupSize.x]; 

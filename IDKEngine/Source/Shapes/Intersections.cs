@@ -418,7 +418,7 @@ public static class Intersections
         return RayVsSphere(ray, new Sphere(sphereBPrevPos, combinedRadius), out t1, out t2);
     }
 
-    private static ScalarProjection ScalarProjectVerticesOnToAxis(ReadOnlySpan<Vector3> vertices, Vector3 axis)
+    private static ScalarProjection ProjectVertices(ReadOnlySpan<Vector3> vertices, Vector3 axis)
     {
         ScalarProjection projection = new ScalarProjection();
         projection.MinScaler = float.MaxValue;
@@ -426,7 +426,7 @@ public static class Intersections
 
         for (int i = 0; i < vertices.Length; i++)
         {
-            // full projecton would mean multiplying by axis, but we are not interested in that
+            // real projection multiplies by axis but don't need that
             float projectedScaler = Vector3.Dot(vertices[i], axis);
 
             projection.MinScaler = float.MinNative(projection.MinScaler, projectedScaler);
@@ -435,38 +435,16 @@ public static class Intersections
 
         return projection;
     }
-    private static bool ProjectionsIntersect(ScalarProjection projA, ScalarProjection projB)
+
+    public static bool ConvexSATIntersect(in Frustum frustum1, in Frustum frustum2, ReadOnlySpan<Vector3> frustum1Verts, ReadOnlySpan<Vector3> frustum2Verts)
     {
-        if (
-            FloatInRange(projB.MinScaler, projA) ||
-            FloatInRange(projB.MaxScaler, projA) ||
-
-            FloatInRange(projA.MinScaler, projB) ||
-            FloatInRange(projA.MaxScaler, projB)
-            )
-        {
-            return true;
-        }
-
-        return false;
-
-        static bool FloatInRange(float x, in ScalarProjection projection)
-        {
-            return projection.MinScaler < x && projection.MaxScaler > x;
-        }
-    }
-    public static bool ConvexSATIntersect(in Frustum frustum1, in Frustum frustum2, ReadOnlySpan<Vector3> vertices1, ReadOnlySpan<Vector3> vertices2)
-    {
-        // Uses brute force SAT-test
-
         for (int i = 0; i < frustum1.Planes.Length; i++)
         {
-            Vector3 normal = Vector3.NormalizeFast(frustum1.Planes[i].Xyz);
+            Vector3 normal = Vector3.Normalize(frustum1.Planes[i].Xyz);
+            ScalarProjection proj1 = ProjectVertices(frustum1Verts, normal);
+            ScalarProjection proj2 = ProjectVertices(frustum2Verts, normal);
 
-            ScalarProjection projection1 = ScalarProjectVerticesOnToAxis(vertices1, normal);
-            ScalarProjection projection2 = ScalarProjectVerticesOnToAxis(vertices2, normal);
-
-            if (!ProjectionsIntersect(projection1, projection2))
+            if (!ProjectionsIntersect(proj1, proj2))
             {
                 return false;
             }
@@ -475,17 +453,21 @@ public static class Intersections
         for (int i = 0; i < frustum2.Planes.Length; i++)
         {
             Vector3 normal = Vector3.Normalize(frustum2.Planes[i].Xyz);
+            ScalarProjection proj1 = ProjectVertices(frustum1Verts, normal);
+            ScalarProjection proj2 = ProjectVertices(frustum2Verts, normal);
 
-            ScalarProjection projection1 = ScalarProjectVerticesOnToAxis(vertices1, normal);
-            ScalarProjection projection2 = ScalarProjectVerticesOnToAxis(vertices2, normal);
-
-            if (!ProjectionsIntersect(projection1, projection2))
+            if (!ProjectionsIntersect(proj1, proj2))
             {
                 return false;
             }
         }
 
         return true;
+
+        static bool ProjectionsIntersect(ScalarProjection projA, ScalarProjection projB)
+        {
+            return projA.MinScaler < projB.MaxScaler && projB.MinScaler < projA.MaxScaler;
+        }
     }
 
     public delegate void FuncIntersect(in SceneHitInfo hitInfo);

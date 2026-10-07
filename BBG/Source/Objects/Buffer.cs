@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using System.Runtime.CompilerServices;
 using OpenTK.Graphics.OpenGL;
 
 namespace BBOpenGL;
@@ -70,78 +69,73 @@ public static partial class BBG
         public nint Size { get; private set; }
         public void* Memory { get; private set; }
 
-        public BufferBackedBlockTarget BackingBlock { get; private set; }
-        public int BlockIndex { get; private set; }
-
         public Buffer()
+        {
+            // OpenGL doesn't support zero-sized buffers, but we do
+            int id = 0;
+            GL.CreateBuffers(1, ref id);
+            ID = id;
+            Size = 0;
+        }
+
+        public Buffer(MemLocation memLocation, MemAccess memAccess, nint size)
+            : this(memLocation, memAccess, size, null)
+        {
+            // This overload avoids 'unsafe' on caller. Revisit in new-unsafe
+        }
+
+        public Buffer(MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
         {
             int id = 0;
             GL.CreateBuffers(1, ref id);
-
             ID = id;
+            Size = size;
+
+            if (Size == 0)
+            {
+                // OpenGL doesn't support zero-sized buffers, but we do
+                return;
+            }
+
+            // We use staging buffer upload pattern
+            // We only do this when the buffer is not mapped, otherwise a glFinish/glFence is required to have the new content be immediately visible.
+            // Reasons:
+            // * On AMD uploading a lot of data to a GPU-side buffer driver the classical way takes a lot of time.
+            //   Staging buffer approach is much faster (800ms vs 30ms, 101MB).
+            // * On NVIDIA the uploaded data is kept arround even with GL_NONE flag
+            //   https://discord.com/channels/337627185248468993/337629838770700290/1361819795573575730
+            bool doStagingBufferUpload =
+                memLocation == MemLocation.DeviceLocal &&
+                memAccess != MemAccess.MappedCoherent &&
+                memAccess != MemAccess.MappedIncoherent &&
+                memAccess != MemAccess.MappedCoherentWriteOnlyReBAR &&
+                data != null;
+
+            GL.NamedBufferStorage(ID, size, doStagingBufferUpload ? null : data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
+            if (doStagingBufferUpload)
+            {
+                using Buffer stagingBuffer = new Buffer(MemLocation.HostLocal, MemAccess.AutoSync, size, data);
+                stagingBuffer.CopyTo(this, 0, 0, stagingBuffer.Size);
+            }
+
+            if (memAccess == MemAccess.MappedCoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
+            {
+                Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
+            }
+            else if (memAccess == MemAccess.MappedIncoherent)
+            {
+                Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
+            }
         }
 
-        public void BindToBufferBackedBlock(BufferBackedBlockTarget target, int index)
+        public void BindToShaderBlock(BufferBackedBlockTarget target, int index)
         {
             GL.BindBufferBase((OpenTK.Graphics.OpenGL.BufferTarget)target, (uint)index, ID);
-            BackingBlock = target;
-            BlockIndex = index;
         }
 
         public void InvalidateData()
         {
             GL.InvalidateBufferData(ID);
-        }
-
-        public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size)
-        {
-            Allocate(memLocation, memAccess, size, null);
-        }
-
-        public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size, void* data)
-        {
-            Size = size;
-            Memory = null;
-
-            if (Size == 0)
-            {
-                Dispose();
-            }
-            else
-            {
-                // We use staging buffer upload pattern
-                // We only do this when the buffer is not mapped, otherwise a glFinish/glFence is required to have the new content be immediately visible.
-                // Reasons:
-                // * On AMD uploading a lot of data to a GPU-side buffer driver the classical way takes a lot of time.
-                //   Staging buffer approach is much faster (800ms vs 30ms, 101MB).
-                // * On NVIDIA the uploaded data is kept arround even with GL_NONE flag
-                //   https://discord.com/channels/337627185248468993/337629838770700290/1361819795573575730
-
-                bool doStagingBufferUpload =
-                    memLocation == MemLocation.DeviceLocal && 
-                    memAccess != MemAccess.MappedCoherent &&
-                    memAccess != MemAccess.MappedIncoherent && 
-                    memAccess != MemAccess.MappedCoherentWriteOnlyReBAR &&
-                    data != null;
-
-                GL.NamedBufferStorage(ID, size, doStagingBufferUpload ? null : data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
-                if (doStagingBufferUpload)
-                {
-                    using Buffer stagingBuffer = new Buffer();
-                    stagingBuffer.Allocate(MemLocation.HostLocal, MemAccess.AutoSync, size, data);
-
-                    stagingBuffer.CopyTo(this, 0, 0, stagingBuffer.Size);
-                }
-
-                if (memAccess == MemAccess.MappedCoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
-                {
-                    Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
-                }
-                else if (memAccess == MemAccess.MappedIncoherent)
-                {
-                    Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
-                }
-            }
         }
 
         public void UploadData<T>(nint offset, nint size, in T data) where T : unmanaged
@@ -222,50 +216,7 @@ public static partial class BBG
 
             GL.DeleteBuffer(ID);
             ID = 0;
-        }
-
-        public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size)
-        {
-            Recreate(ref buffer, memLocation, memAccess, size, null);
-        }
-
-        public static void Recreate(ref Buffer buffer, MemLocation memLocation, MemAccess memAccess, nint size, void* data = null)
-        {
-            buffer.Dispose();
-
-            Buffer newBuffer = new Buffer();
-            newBuffer.Allocate(memLocation, memAccess, size, data);   
-
-            if (buffer.BackingBlock != 0)
-            {
-                newBuffer.BindToBufferBackedBlock(buffer.BackingBlock, buffer.BlockIndex);
-            }
-
-            buffer = newBuffer;
-        }
-
-        public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> newValues) where T : unmanaged
-        {
-            Recreate(ref buffer, memLocation, memAccess, newValues.Length, MemoryMarshal.GetReference(newValues));
-        }
-
-        public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, nint count, in T data) where T : unmanaged
-        {
-            fixed (void* ptr = &data)
-            {
-                Recreate(ref buffer, memLocation, memAccess, count, ptr);
-            }
-        }
-
-        public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, nint count) where T : unmanaged
-        {
-            Recreate(ref buffer, memLocation, memAccess, count, null);
-        }
-
-        public static void Recreate<T>(ref TypedBuffer<T> buffer, MemLocation memLocation, MemAccess memAccess, nint count, void* data) where T : unmanaged
-        {
-            ref Buffer baseBuffer = ref Unsafe.As<TypedBuffer<T>, Buffer>(ref buffer);
-            Recreate(ref baseBuffer, memLocation, memAccess, sizeof(T) * count, data);
+            Memory = null;
         }
     }
 
@@ -274,33 +225,32 @@ public static partial class BBG
         public new T* Memory => (T*)base.Memory;
         public int NumElements => (int)(Size / sizeof(T));
 
-        public TypedBuffer()
-            : base()
+        public static TypedBuffer<T> FromData(MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> data)
         {
-
+            return FromData(memLocation, memAccess, data.Length, MemoryMarshal.GetReference(data));
         }
 
-        public void AllocateElements(MemLocation memLocation, MemAccess memAccess, ReadOnlySpan<T> data)
+        public static TypedBuffer<T> FromData(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
         {
-            AllocateElements(memLocation, memAccess, data.Length, MemoryMarshal.GetReference(data));
-        }
-
-        public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, in T data)
-        {
-            fixed (void* ptr = &data)
+            fixed (T* ptr = &data)
             {
-                AllocateElements(memLocation, memAccess, count, ptr);
+                return new TypedBuffer<T>(memLocation, memAccess, count, ptr);
             }
         }
 
-        public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count)
+        public TypedBuffer(MemLocation memLocation, MemAccess memAccess, nint count)
+            : base(memLocation, memAccess, sizeof(T) * count)
         {
-            AllocateElements(memLocation, memAccess, count, null);
         }
 
-        public void AllocateElements(MemLocation memLocation, MemAccess memAccess, nint count, void* data)
+        public TypedBuffer(MemLocation memLocation, MemAccess memAccess, nint count, T* data)
+            : base(memLocation, memAccess, sizeof(T) * count, data)
         {
-            Allocate(memLocation, memAccess, sizeof(T) * count, data);
+        }
+
+        public TypedBuffer()
+            : base()
+        { 
         }
 
         public void UploadElements(ReadOnlySpan<T> data, nint startIndex = 0)

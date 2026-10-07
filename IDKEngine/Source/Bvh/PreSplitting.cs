@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using OpenTK.Mathematics;
 using IDKEngine.Utils;
 using IDKEngine.Shapes;
 using IDKEngine.GpuTypes;
@@ -29,22 +28,23 @@ public static class PreSplitting
         // * https://github.com/madmann91/bvh/blob/2fd0db62022993963a7343669275647cb073e19a/include/bvh/heuristic_primitive_splitter.hpp
         // * https://research.nvidia.com/sites/default/files/pubs/2013-07_Fast-Parallel-Construction/karras2013hpg_paper.pdf
 
-        float totalPriority = 0.0f;
-        float[] prios = new float[geometry.TriangleCount];
+        float totalPrio = 0.0f;
+        float[] prioValues = new float[geometry.TriangleCount];
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
             Triangle triangle = geometry.GetTriangle(i);
+
             float prio = Priority(triangle);
-            totalPriority += prio;
-            prios[i] = prio;
+            totalPrio += prio;
+            prioValues[i] = prio;
         }
 
         int counter = 0;
         int[] splitCounts = new int[geometry.TriangleCount + (int)(geometry.TriangleCount * settings.SplitFactor)];
         for (int i = 0; i < geometry.TriangleCount; i++)
         {
-            float priority = prios[i];
-            int splitCount = GetSplitCount(priority, totalPriority, geometry.TriangleCount);
+            float prio = prioValues[i];
+            int splitCount = GetSplitCount(prio, totalPrio, geometry.TriangleCount);
 
             counter += splitCount;
             splitCounts[i] = splitCount;
@@ -61,7 +61,6 @@ public static class PreSplitting
             globalBox.GrowToFit(box);
         }
 
-        Vector3 globalSize = globalBox.Size();
         counter = geometry.TriangleCount;
 
         for (int i = 0; i < counter; i++)
@@ -79,7 +78,7 @@ public static class PreSplitting
                 int splitAxis = parentBox.LargestAxis();
                 float largestExtent = parentBox.LargestExtent();
 
-                float nodeSize = GetNodeSize(largestExtent, globalSize[splitAxis]);
+                float nodeSize = GetNodeSize(largestExtent, globalBox.SimdSize()[splitAxis]);
                 if (nodeSize >= largestExtent - 0.0001f)
                 {
                     nodeSize *= 0.5f;

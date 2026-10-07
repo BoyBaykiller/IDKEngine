@@ -93,9 +93,8 @@ class Voxelizer : IDisposable
             mergeIntermediatesProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VXGI/Voxelize/MergeIntermediates/compute.glsl"));
         }
 
-        voxelizerDataBuffer = new BBG.TypedBuffer<GpuVoxelizerData>();
-        voxelizerDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-        voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
+        voxelizerDataBuffer = new BBG.TypedBuffer<GpuVoxelizerData>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+        voxelizerDataBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
 
         SetSize(width, height, depth);
 
@@ -245,7 +244,7 @@ class Voxelizer : IDisposable
 
     public void FSR2WorkaroundRebindUBO()
     {
-        voxelizerDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
+        voxelizerDataBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 6);
     }
 
     public void SetSize(int width, int height, int depth)

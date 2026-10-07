@@ -178,33 +178,16 @@ class PathTracer : IDisposable
         nHitProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/NHit/compute.glsl"));
         finalDrawProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/FinalDraw/compute.glsl"));
 
-        wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>();
-        wavefrontRayBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 30);
-
-        aovRayBuffer = new BBG.TypedBuffer<GpuAovRay>();
-        aovRayBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 31);
-
-        wavefrontPTBuffer = new BBG.Buffer();
-        wavefrontPTBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 32);
-
         // Ray Sorting
         reorderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/Reorder/compute.glsl"));
         downUpSweepProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/BlellochScan/DownUpSweep/compute.glsl"));
         groupWiseScanProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "PathTracing/CountingSort/BlellochScan/GroupWise/compute.glsl"));
 
-        sortedRayIndicesBuffer = new BBG.TypedBuffer<uint>();
-        sortedRayIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 33);
+        workGroupPrefixSumBuffer = new BBG.TypedBuffer<uint>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, PREFIX_SUM_CAPACITY);
+        workGroupPrefixSumBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 35);
 
-        cachedKeyBuffer = new BBG.TypedBuffer<uint>();
-        cachedKeyBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 34);
-
-        workGroupPrefixSumBuffer = new BBG.TypedBuffer<uint>();
-        workGroupPrefixSumBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, PREFIX_SUM_CAPACITY);
-        workGroupPrefixSumBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 35);
-
-        workGroupSumsPrefixSumBuffer = new BBG.TypedBuffer<uint>();
-        workGroupSumsPrefixSumBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MyMath.DivUp(PREFIX_SUM_CAPACITY, 1 << GROUP_WISE_PROGRAM_STEPS));
-        workGroupSumsPrefixSumBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 36);
+        workGroupSumsPrefixSumBuffer = new BBG.TypedBuffer<uint>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, MyMath.DivUp(PREFIX_SUM_CAPACITY, 1 << GROUP_WISE_PROGRAM_STEPS));
+        workGroupSumsPrefixSumBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 36);
 
         SetSize(width, height);
 
@@ -317,16 +300,29 @@ class PathTracer : IDisposable
         NormalTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
         NormalTexture.Allocate(width, height, 1, BBG.Texture.InternalFormat.R32G32B32A32Float);
 
-        BBG.Buffer.Recreate(ref wavefrontRayBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
-        BBG.Buffer.Recreate(ref aovRayBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
-        BBG.Buffer.Recreate(ref wavefrontPTBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)));
+        wavefrontRayBuffer?.Dispose();
+        wavefrontRayBuffer = new BBG.TypedBuffer<GpuWavefrontRay>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
+        wavefrontRayBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 30);
+
+        aovRayBuffer?.Dispose();
+        aovRayBuffer = new BBG.TypedBuffer<GpuAovRay>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
+        aovRayBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 31);
+
+        wavefrontPTBuffer?.Dispose();
+        wavefrontPTBuffer = new BBG.Buffer(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, sizeof(GpuWavefrontPTHeader) + (width * height * sizeof(uint)));
         wavefrontPTBuffer.UploadData(0, sizeof(GpuWavefrontPTHeader), new GpuWavefrontPTHeader()
         {
             DispatchCommand = new BBG.DispatchIndirectCommand() { NumGroupsX = 0, NumGroupsY = 1, NumGroupsZ = 1 },
         });
+        wavefrontPTBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 32);
 
-        BBG.Buffer.Recreate(ref cachedKeyBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
-        BBG.Buffer.Recreate(ref sortedRayIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
+        sortedRayIndicesBuffer?.Dispose();
+        sortedRayIndicesBuffer = new BBG.TypedBuffer<uint>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
+        sortedRayIndicesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 33);
+
+        cachedKeyBuffer?.Dispose();
+        cachedKeyBuffer = new BBG.TypedBuffer<uint>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, width * height);
+        cachedKeyBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 34);
 
         ResetAccumulation();
     }

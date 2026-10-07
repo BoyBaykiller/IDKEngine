@@ -1,19 +1,19 @@
 ﻿using System;
-using System.IO;
 using System.Diagnostics;
-using OpenTK.Mathematics;
-using OpenTK.Windowing.GraphicsLibraryFramework;
+using System.IO;
 using BBLogger;
 using BBOpenGL;
-using IDKEngine.Utils;
-using IDKEngine.Shapes;
-using IDKEngine.Render;
 using IDKEngine.GpuTypes;
+using IDKEngine.Render;
+using IDKEngine.Shapes;
+using IDKEngine.Utils;
 using IDKEngine.Windowing;
+using OpenTK.Mathematics;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace IDKEngine;
 
-class Application : GameWindowBase
+unsafe class Application : GameWindowBase
 {
     public enum RenderMode : int
     {
@@ -414,19 +414,9 @@ class Application : GameWindowBase
             Logger.Log(Logger.LogLevel.Fatal, "Your system does not support GL_ARB_bindless_texture");
             Environment.Exit(0);
         }
-        if (!glContextInfo.DeviceInfo.ExtensionSupport.ImageLoadFormatted)
-        {
-            Logger.Log(Logger.LogLevel.Fatal,
-                "Your system does not support GL_EXT_shader_image_load_formatted.\n" +
-                "Execution is still continued because AMD drivers older than 24.10 have a bug to not report this extension even though its there.\n" +
-                "https://community.amd.com/t5/opengl-vulkan/opengl-bug-gl-ext-shader-image-load-formatted-not-reported-even/m-p/676326#M5140\n" +
-                "If the extension is indeed not supported shader compilation will throw errors"
-            );
-        }
 
-        gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>();
-        gpuPerFrameDataBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
-        gpuPerFrameDataBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 1);
+        gpuPerFrameDataBuffer = new BBG.TypedBuffer<GpuPerFrameData>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+        gpuPerFrameDataBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 1);
 
         SkyBoxManager.Initialize();
         SkyBoxManager.SkyBoxImagePaths = ["Resource/Textures/EnvironmentMap/snow_field_puresky_1k.hdr"];
@@ -473,13 +463,19 @@ class Application : GameWindowBase
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Bistro\Bistro.glb").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SanMiguel\SanMiguel.gltf").Value;
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\HighPolyDragon.glb").Value;
-            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMergedRotated45.glb").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\glTF-Sample-Assets\Models\ABeautifulGame\glTF-Binary\ABeautifulGame.glb").Value;
 
             //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\untitled.glb").Value;
-            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\DragonMerged.glb").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\DC\geometry_panic__factory\scene.gltf").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\Sketchfab\buster_drone\scene.gltf").Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\Models\SponzaMerged\SponzaMerged.gltf", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).GetMatrix()).Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\untitled.glb", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).GetMatrix()).Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:/Users/Julian/Downloads/untitled.glb", new Transformation().WithScale(1.815f).WithTranslation(0.0f, -1.0f, 0.0f).GetMatrix()).Value;
+            //ModelLoader.Model test = ModelLoader.LoadGltfFromFile(@"C:\Users\Julian\Downloads\scandinavian-studio\scandinavian-studio.glb", Matrix4.Identity, ModelLoader.OptimizationSettings.AllTurnedOff).Value;
 
             // Merging a model with many meshes into one can more than 2x Ray Tracing performance! (even with TLAS)
-            ModelLoader.HoistMeshPrimitives(ref sponza, true);
+            //ModelLoader.HoistMeshPrimitives(ref sponza, true);
+            //ModelLoader.DemoMakeNodeInstanced(ref sponza, 1_000);
 
             ModelManager.Add(sponza, lucy, helmet);
 
@@ -515,12 +511,12 @@ class Application : GameWindowBase
             ModelLoader.HoistMeshPrimitives(ref b);
             ModelLoader.HoistMeshPrimitives(ref car);
 
-            ModelManager.Add(a, b, c, car, knight);
-
+            ModelManager.Add(a);
+            
             SetRenderMode(RenderMode.Rasterizer, WindowFramebufferSize, WindowFramebufferSize);
 
-            //LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
-            //LightManager.CreatePointShadowForLight(new CpuPointShadow(512, WindowFramebufferSize, new Vector2(0.1f, 60.0f)), 0);
+            LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
+            LightManager.CreatePointShadowForLight(new CpuPointShadow(512, WindowFramebufferSize, new Vector2(0.1f, 60.0f)), 0);
         }
 
         MouseState.CursorMode = CursorModeValue.CursorNormal;

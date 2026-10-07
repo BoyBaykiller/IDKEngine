@@ -135,7 +135,8 @@ public static partial class BBG
 
             string arguments = $"-s opengl -c gfx1010 --{rgaShaderStage} {shaderPath} " +
                                $"--isa {Path.Combine(outDir, "isa_output.txt")} " +
-                               $"--livereg {Path.Combine(outDir, "livereg_report.txt")} ";
+                               $"--cfg {Path.Combine(outDir, "cfg_output.dot")} " +
+                               $"--livereg {Path.Combine(outDir, "livereg_output.txt")} ";
             
             System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo()
             {

@@ -21,7 +21,7 @@ void main()
     uint item = GetItem(invocationId);
     uint key = cachedKeySSBO.Keys[invocationId];
 
-    uint blockOffset = workGroupSumsPrefixSumSSBO.Sums[key / BLOCK_WISE_PROGRAM_LOCAL_SIZE_X];
+    uint blockOffset = workGroupSumsPrefixSumSSBO.Sums[key / GROUP_WISE_PROGRAM_LOCAL_SIZE_X];
     uint globalOffset = blockOffset + atomicAdd(workGroupPrefixSumSSBO.PrefixSum[key], 1u);
 
     SetItem(globalOffset, item);

@@ -133,23 +133,8 @@ public class BVH : IDisposable
 
     public BVH()
     {
-        blasDescBuffer = new BBG.TypedBuffer<GpuBlasDesc>();
-        blasInstanceBuffer = new BBG.TypedBuffer<GpuBlasInstance>();
-        blasNodesBuffer = new BBG.TypedBuffer<GpuBlasNode>();
-        blasTriangleBuffer = new BBG.TypedBuffer<GpuBlasTriangle>();
         blasParentIdsBuffer = new BBG.TypedBuffer<int>();
         blasLeafIndicesBuffer = new BBG.TypedBuffer<int>();
-        blasRefitLockBuffer = new BBG.TypedBuffer<int>();
-        tlasBuffer = new BBG.TypedBuffer<GpuTlasNode>();
-
-        blasDescBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 20);
-        blasInstanceBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 21);
-        blasNodesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 22);
-        blasTriangleBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 23);
-        blasParentIdsBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 24);
-        blasLeafIndicesBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 25);
-        blasRefitLockBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 26);
-        tlasBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 27);
 
         refitBlasProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "BLASRefit/compute.glsl"));
 
@@ -280,7 +265,10 @@ public class BVH : IDisposable
         if (RebuildTlas || force)
         {
             TLAS.Build(TlasNodes, GetPrimitive, BlasInstances.Length, new TLAS.BuildSettings());
-            BBG.Buffer.Recreate(ref tlasBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, TlasNodes);
+
+            tlasBuffer?.Dispose();
+            tlasBuffer = BBG.TypedBuffer<GpuTlasNode>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, TlasNodes);
+            tlasBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 27);
 
             Box GetPrimitive(int primId)
             {
@@ -442,13 +430,33 @@ public class BVH : IDisposable
 
         UpdateBlasStackSize();
 
-        BBG.Buffer.Recreate(ref blasDescBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc);
-        BBG.Buffer.Recreate(ref blasInstanceBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasInstances);
-        BBG.Buffer.Recreate(ref blasTriangleBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasTriangles);
-        BBG.Buffer.Recreate(ref blasNodesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasNodes);
-        BBG.Buffer.Recreate(ref blasLeafIndicesBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasLeafIds);
-        BBG.Buffer.Recreate(ref blasParentIdsBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasParentIds);
-        BBG.Buffer.Recreate(ref blasRefitLockBuffer, BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc.Max(it => it.NodeCount));
+        blasDescBuffer?.Dispose();
+        blasDescBuffer = BBG.TypedBuffer<GpuBlasDesc>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc);
+        blasDescBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 20);
+
+        blasInstanceBuffer?.Dispose();
+        blasInstanceBuffer = BBG.TypedBuffer<GpuBlasInstance>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasInstances);
+        blasInstanceBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 21);
+
+        blasNodesBuffer?.Dispose();
+        blasNodesBuffer = BBG.TypedBuffer<GpuBlasNode>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasNodes);
+        blasNodesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 22);
+
+        blasTriangleBuffer?.Dispose();
+        blasTriangleBuffer = BBG.TypedBuffer<GpuBlasTriangle>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasTriangles);
+        blasTriangleBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 23);
+
+        blasParentIdsBuffer?.Dispose();
+        blasParentIdsBuffer = BBG.TypedBuffer<int>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasParentIds);
+        blasParentIdsBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 24);
+
+        blasLeafIndicesBuffer?.Dispose();
+        blasLeafIndicesBuffer = BBG.TypedBuffer<int>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, blasLeafIds);
+        blasLeafIndicesBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 25);
+
+        blasRefitLockBuffer?.Dispose();
+        blasRefitLockBuffer = new BBG.TypedBuffer<int>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, BlasesDesc.Max(it => it.NodeCount));
+        blasRefitLockBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.ShaderStorage, 26);
 
         Logger.Log(Logger.LogLevel.Info, $"Created {count} BLAS'es in {swBuilding.ElapsedMilliseconds}ms");
 

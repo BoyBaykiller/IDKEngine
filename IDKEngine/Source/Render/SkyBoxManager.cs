@@ -25,8 +25,7 @@ static class SkyBoxManager
     private static BBG.AbstractShaderProgram unprojectEquirectangularProgram;
     public static void Initialize()
     {
-        skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>();
-        skyBoxTextureBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
+        skyBoxTextureBuffer = new BBG.TypedBuffer<BBG.Texture.BindlessHandle>(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, 1);
         FSR2WorkaroundRebindUBO();
 
         unprojectEquirectangularProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "UnprojectEquirectangular/compute.glsl"));
@@ -83,7 +82,7 @@ static class SkyBoxManager
 
     public static void FSR2WorkaroundRebindUBO()
     {
-        skyBoxTextureBuffer.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
+        skyBoxTextureBuffer.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 5);
     }
 
     private static bool LoadSkyBox(string[] imagePaths)

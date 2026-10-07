@@ -62,7 +62,7 @@ public class LightManager : IDisposable
 
     private readonly CpuLight[] lights;
 
-    private readonly BBG.TypedBuffer<GpuLight> lightBufferObject;
+    private readonly BBG.Buffer lightBufferObject;
     private readonly BBG.TypedBuffer<GeometricPrimitives.Sphere.Vertex> vertexBuffer;
     private readonly BBG.TypedBuffer<uint> indexBuffer;
     private readonly BBG.AbstractShaderProgram shaderProgram;
@@ -75,20 +75,17 @@ public class LightManager : IDisposable
             BBG.AbstractShader.FromFile(BBG.ShaderStage.Vertex, "Light/vertex.glsl"),
             BBG.AbstractShader.FromFile(BBG.ShaderStage.Fragment, "Light/fragment.glsl"));
 
-        lightBufferObject = new BBG.TypedBuffer<GpuLight>();
-        lightBufferObject.Allocate(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, lights.Length * sizeof(GpuLight) + sizeof(int));
-        lightBufferObject.BindToBufferBackedBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 2);
+        lightBufferObject = new BBG.Buffer(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, lights.Length * sizeof(GpuLight) + sizeof(int));
+        lightBufferObject.BindToShaderBlock(BBG.Buffer.BufferBackedBlockTarget.Uniform, 2);
 
         const int SphereLatitudes = 12, SphereLongitudes = 12;
         const float SphereRadius = 1.0f;
 
         Span<GeometricPrimitives.Sphere.Vertex> vertices = GeometricPrimitives.Sphere.GenerateVertices(SphereRadius, SphereLatitudes, SphereLongitudes);
-        vertexBuffer = new BBG.TypedBuffer<GeometricPrimitives.Sphere.Vertex>();
-        vertexBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertices);
+        vertexBuffer = BBG.TypedBuffer<GeometricPrimitives.Sphere.Vertex>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, vertices);
 
         Span<uint> indices = GeometricPrimitives.Sphere.GenerateIndices(SphereLatitudes, SphereLongitudes);
-        indexBuffer = new BBG.TypedBuffer<uint>();
-        indexBuffer.AllocateElements(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, indices);
+        indexBuffer = BBG.TypedBuffer<uint>.FromData(BBG.Buffer.MemLocation.DeviceLocal, BBG.Buffer.MemAccess.AutoSync, indices);
 
         pointShadowManager = new PointShadowManager();
     }
@@ -360,7 +357,7 @@ public class LightManager : IDisposable
         otherLight.Velocity += lightNormal * (ub - newVelB);
     }
 
-    public void Update(out bool anyLightMoved)
+    public unsafe void Update(out bool anyLightMoved)
     {
         // Update PointShadows
         for (int i = 0; i < pointShadowManager.Count; i++)
@@ -377,7 +374,7 @@ public class LightManager : IDisposable
         for (int i = 0; i < Count; i++)
         {
             CpuLight light = lights[i];
-            lightBufferObject.UploadElements(light.GpuLight, i);
+            lightBufferObject.UploadData(i * sizeof(GpuLight), sizeof(GpuLight), light.GpuLight);
 
             if (light.GpuLight.DidMove())
             {

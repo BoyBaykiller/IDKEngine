@@ -45,8 +45,9 @@ public record struct BitArray
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
+            Debug.Assert(index >= 0);
 #if DEBUG
-            Debug.Assert(index >= 0 && index < bitCount);
+            Debug.Assert(index < bitCount);
 #endif
             uint arrIndex = (uint)index / BITS_PER_ELEMENT;
             uint bitIndex = (uint)index % BITS_PER_ELEMENT;
@@ -58,8 +59,9 @@ public record struct BitArray
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
+            Debug.Assert(index >= 0);
 #if DEBUG
-            Debug.Assert(index >= 0 && index < bitCount);
+            Debug.Assert(index < bitCount);
 #endif
 
             uint arrIndex = (uint)index / BITS_PER_ELEMENT;

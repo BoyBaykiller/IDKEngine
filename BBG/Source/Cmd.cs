@@ -77,7 +77,7 @@ public static partial class BBG
             globalUniformBuffer.InvalidateData();
 
             globalUniformBuffer.UploadData(0, sizeof(T), uniforms);
-            globalUniformBuffer.BindToBufferBackedBlock(Buffer.BufferBackedBlockTarget.Uniform, SET_UNIFORMS_UBO_BLOCK_BINDING);
+            globalUniformBuffer.BindToShaderBlock(Buffer.BufferBackedBlockTarget.Uniform, SET_UNIFORMS_UBO_BLOCK_BINDING);
         }
     }
 }
